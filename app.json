@@ -1,0 +1,37 @@
+{
+  "name": "lms-learning-management-system",
+  "description": "A comprehensive Learning Management System",
+  "repository": "https://github.com/yourusername/lms",
+  "logo": "https://node-js-sample.herokuapp.com/node.png",
+  "keywords": ["node", "express", "react", "mongodb", "lms"],
+  "env": {
+    "NODE_ENV": {
+      "description": "Environment setting",
+      "value": "production"
+    },
+    "MONGODB_URI": {
+      "description": "MongoDB connection string",
+      "required": true
+    },
+    "JWT_SECRET": {
+      "description": "Secret key for JWT tokens",
+      "required": true,
+      "generator": "secret"
+    },
+    "JWT_EXPIRE": {
+      "description": "JWT token expiration time",
+      "value": "30d"
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  },
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    }
+  ]
+} 
