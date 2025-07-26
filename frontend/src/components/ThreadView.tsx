@@ -372,7 +372,7 @@ const ThreadView: React.FC = () => {
   });
 
   // Add state for students
-  const [students, setStudents] = useState<{ _id: string; firstName: string; lastName: string }[]>([]);
+  const [students, setStudents] = useState<{ _id: string; firstName: string; lastName: string; profilePicture?: string }[]>([]);
 
   const isTeacher = user?.role === 'teacher' || user?.role === 'admin';
 
@@ -1153,15 +1153,38 @@ const ThreadView: React.FC = () => {
                     <tr key={student._id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                            <User className="w-4 h-4 text-blue-600" />
+                          <div className="relative">
+                            {student.profilePicture ? (
+                              <img
+                                src={student.profilePicture.startsWith('http')
+                                  ? student.profilePicture
+                                  : `http://localhost:5000${student.profilePicture}`}
+                                alt={`${student.firstName} ${student.lastName}`}
+                                className="w-8 h-8 rounded-full object-cover border-2 border-gray-100"
+                                onError={(e) => {
+                                  // Hide the failed image and show fallback
+                                  e.currentTarget.style.display = 'none';
+                                  const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                  if (fallback) {
+                                    fallback.style.display = 'flex';
+                                  }
+                                }}
+                              />
+                            ) : null}
+                            {/* Fallback avatar - always present but hidden when image loads */}
+                            <div 
+                              className={`w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center ${student.profilePicture ? 'hidden' : ''}`}
+                              style={{ display: student.profilePicture ? 'none' : 'flex' }}
+                            >
+                              <User className="w-4 h-4 text-blue-600" />
+                            </div>
                           </div>
                           <div className="text-sm font-medium text-gray-900">{student.firstName} {student.lastName}</div>
                         </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
-                          {gradeObj ? `${gradeObj.grade} / ${thread.totalPoints}` : '-'}
+                          {gradeObj ? `${Number.isInteger(gradeObj.grade) ? gradeObj.grade : Number(gradeObj.grade).toFixed(2)} / ${thread.totalPoints}` : '-'}
                         </div>
                       </td>
                       <td className="px-4 py-3">

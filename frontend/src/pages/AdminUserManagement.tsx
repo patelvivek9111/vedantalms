@@ -279,18 +279,33 @@ export function AdminUserManagement() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-10 w-10">
-                        <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                        <div className="relative">
                           {user.profilePicture ? (
                             <img
-                              className="h-10 w-10 rounded-full object-cover"
-                              src={user.profilePicture}
+                              className="h-10 w-10 rounded-full object-cover border-2 border-gray-200"
+                              src={user.profilePicture.startsWith('http')
+                                ? user.profilePicture
+                                : `http://localhost:5000${user.profilePicture}`}
                               alt={`${user.firstName} ${user.lastName}`}
+                              onError={(e) => {
+                                // Hide the failed image and show fallback
+                                e.currentTarget.style.display = 'none';
+                                const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                if (fallback) {
+                                  fallback.style.display = 'flex';
+                                }
+                              }}
                             />
-                          ) : (
+                          ) : null}
+                          {/* Fallback avatar - always present but hidden when image loads */}
+                          <div 
+                            className={`h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center ${user.profilePicture ? 'hidden' : ''}`}
+                            style={{ display: user.profilePicture ? 'none' : 'flex' }}
+                          >
                             <span className="text-blue-600 font-semibold">
                               {user.firstName.charAt(0)}{user.lastName.charAt(0)}
                             </span>
-                          )}
+                          </div>
                         </div>
                       </div>
                       <div className="ml-4">

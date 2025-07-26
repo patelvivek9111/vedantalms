@@ -21,7 +21,8 @@ import {
   BarChart3, 
   UserPlus,
   BookOpenCheck,
-  Settings
+  Settings,
+  CheckSquare
 } from 'lucide-react';
 import WhatIfScores from './WhatIfScores';
 import StudentGradeSidebar from './StudentGradeSidebar';
@@ -36,6 +37,7 @@ import { createAnnouncement } from '../services/announcementService';
 import AssignmentList from './assignments/AssignmentList';
 import OverviewConfigModal from './OverviewConfigModal';
 import LatestAnnouncements from './LatestAnnouncements';
+import Attendance from './Attendance';
 
 // Navigation items for the left pane
 const navigationItems = [
@@ -46,6 +48,7 @@ const navigationItems = [
   { id: 'discussions', label: 'Discussions', icon: MessageSquare },
   { id: 'announcements', label: 'Announcements', icon: Megaphone },
   { id: 'groups', label: 'Groups', icon: Users },
+  { id: 'attendance', label: 'Attendance', icon: CheckSquare },
   { id: 'grades', label: 'Grades', icon: BarChart3, roles: ['student'] },
   { id: 'gradebook', label: 'Gradebook', icon: BookOpenCheck, roles: ['teacher', 'admin'] },
   { id: 'students', label: 'People', icon: UserPlus },
@@ -1071,6 +1074,60 @@ const CourseDetail: React.FC = () => {
     }
   };
 
+  const exportGradebookCSV = () => {
+    try {
+      const { students, assignments, grades } = gradebookData;
+      
+      // Create CSV header with course information
+      const instructorInfo = course?.instructor 
+        ? `${course.instructor.firstName} ${course.instructor.lastName} (${course.instructor.email})`
+        : 'No Instructor Assigned';
+        
+      const csvContent = [
+        `Course: ${course?.title || 'Unknown Course'}`,
+        `Instructor: ${instructorInfo}`,
+        `Export Date: ${new Date().toLocaleDateString()}`,
+        '', // Empty line for spacing
+        // Create header row with student name and all assignments
+        ['Student Name', 'Email', ...assignments.map((a: any) => a.title), 'Overall Grade', 'Letter Grade'].join(','),
+        // Create data rows for each student
+        ...students.map((student: any) => {
+          const weightedPercent = calculateFinalGradeWithWeightedGroups(
+            student._id,
+            course,
+            assignments,
+            grades
+          );
+          const letter = getLetterGrade(weightedPercent, course?.gradeScale);
+          
+          const assignmentGrades = assignments.map((assignment: any) => {
+            const grade = grades[student._id]?.[assignment._id];
+            return grade && typeof grade === 'number' ? grade.toString() : '-';
+          });
+          
+          return [
+            `${student.firstName} ${student.lastName}`,
+            student.email,
+            ...assignmentGrades,
+            weightedPercent.toFixed(2),
+            letter
+          ].join(',');
+        })
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `gradebook_${(course?.title || 'Unknown_Course').replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error exporting gradebook:', error);
+      alert('Failed to export gradebook CSV');
+    }
+  };
+
   // Handler to open group modal
   const handleOpenGroupModal = () => {
     setEditGroups(course?.groups ? [...course.groups] : []);
@@ -1643,45 +1700,127 @@ const CourseDetail: React.FC = () => {
         }
         return (
           <div className="space-y-6">
-            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">Gradebook</h2>
+            {/* Header Section */}
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="bg-gray-100 dark:bg-gray-800 rounded-full p-3">
+                    <svg className="w-8 h-8 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Gradebook</h2>
+                    <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">Track student performance and manage grades</p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-4 py-2 border border-gray-200 dark:border-gray-700">
+                    <div className="text-sm text-gray-600 dark:text-gray-400">Students</div>
+                    <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{students.length}</div>
+                  </div>
+                  <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-4 py-2 border border-gray-200 dark:border-gray-700">
+                    <div className="text-sm text-gray-600 dark:text-gray-400">Assignments</div>
+                    <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{assignments.length}</div>
+                  </div>
+                </div>
               </div>
+            </div>
+
+            {/* Gradebook Table */}
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
               <div className="relative w-full">
                 <div className="overflow-x-auto w-full relative">
-                  <table className="min-w-max border border-gray-300 dark:border-gray-700">
-                    <thead className="bg-gray-100 dark:bg-gray-800 sticky top-0 z-10">
+                  <table className="min-w-max w-full">
+                    <thead className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 sticky top-0 z-10">
                       <tr>
                         {/* Sticky first column header */}
-                        <th className="px-4 py-2 border-b border-r border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-left text-gray-900 dark:text-gray-100 sticky left-0 z-50" style={{left: 0, zIndex: 50, boxShadow: '2px 0 4px -2px #d1d5db'}}>Student Name</th>
+                        <th className="px-6 py-4 border-b border-gray-200 dark:border-gray-600 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 text-left text-gray-700 dark:text-gray-300 sticky left-0 z-50 font-semibold text-sm uppercase tracking-wider" style={{left: 0, zIndex: 50, boxShadow: '2px 0 8px -4px rgba(0,0,0,0.1)'}}>
+                          <div className="flex items-center space-x-2">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                            <span>Student Name</span>
+                          </div>
+                        </th>
                         {assignments.map((assignment: any) => (
                           <th
                             key={assignment._id}
-                            className="px-4 py-2 border-b border-r border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-center text-gray-900 dark:text-gray-100"
+                            className="px-4 py-4 border-b border-gray-200 dark:border-gray-600 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 text-center text-gray-700 dark:text-gray-300 min-w-[140px]"
                           >
-                            <div className="font-medium text-blue-700 cursor-pointer hover:underline text-center">{assignment.title}</div>
-                            <div className="text-xs text-gray-500 text-center">{assignment.group ? assignment.group : 'Ungrouped'}</div>
-                            <div className="text-xs text-gray-500 text-center">Out of {assignment.questions?.reduce((sum: number, q: any) => sum + (q.points || 0), 0) || assignment.totalPoints || 0}</div>
+                            <div className="font-semibold text-blue-700 dark:text-blue-300 cursor-pointer hover:underline text-center text-sm">{assignment.title}</div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400 text-center mt-1 bg-blue-50 dark:bg-blue-900/20 rounded-full px-2 py-1 mx-1">
+                              {assignment.group ? assignment.group : 'Ungrouped'}
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400 text-center mt-1">
+                              Out of {assignment.questions?.reduce((sum: number, q: any) => sum + (q.points || 0), 0) || assignment.totalPoints || 0}
+                            </div>
                           </th>
                         ))}
                         {/* Sticky last column header */}
-                        <th className="px-4 py-2 border-b border-l border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-center text-gray-900 dark:text-gray-100 sticky right-0 z-50" style={{right: 0, zIndex: 50, boxShadow: '-2px 0 4px -2px #d1d5db'}}>Overall Grade</th>
+                        <th className="px-6 py-4 border-b border-gray-200 dark:border-gray-600 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 text-center text-gray-700 dark:text-gray-300 sticky right-0 z-50 font-semibold text-sm uppercase tracking-wider" style={{right: 0, zIndex: 50, boxShadow: '-2px 0 8px -4px rgba(0,0,0,0.1)'}}>
+                          <div className="flex items-center justify-center space-x-2">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                            <span>Overall Grade</span>
+                          </div>
+                        </th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                       {students.map((student: any, rowIdx: number) => {
                         // Calculate weighted grade
                         const weightedPercent = getWeightedGrade(student);
                         const letter = getLetterGrade(weightedPercent, course?.gradeScale);
-                        const rowBg = rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50';
-                        const stickyBg = rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+                        const rowBg = rowIdx % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800';
+                        const stickyBg = rowIdx % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800';
+                        
+                        // Determine grade color
+                        let gradeColor = 'text-gray-700 dark:text-gray-300';
+                        if (letter === 'A') gradeColor = 'text-green-600 dark:text-green-400';
+                        else if (letter === 'B') gradeColor = 'text-blue-600 dark:text-blue-400';
+                        else if (letter === 'C') gradeColor = 'text-yellow-600 dark:text-yellow-400';
+                        else if (letter === 'D') gradeColor = 'text-orange-600 dark:text-orange-400';
+                        else if (letter === 'F') gradeColor = 'text-red-600 dark:text-red-400';
+                        
                         return (
                           <tr
                             key={student._id}
-                            className={rowBg}
+                            className={`${rowBg} hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-150`}
                           >
                             {/* Sticky first column body */}
-                            <td className={`px-4 py-2 border-b border-r border-gray-300 dark:border-gray-700 text-blue-700 dark:text-blue-300 hover:underline cursor-pointer font-medium whitespace-nowrap sticky left-0 z-40 ${stickyBg}`} style={{left: 0, zIndex: 40, boxShadow: '2px 0 4px -2px #d1d5db'}}>{student.firstName} {student.lastName}</td>
+                            <td className={`px-6 py-4 border-r border-gray-200 dark:border-gray-600 text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer font-medium whitespace-nowrap sticky left-0 z-40 ${stickyBg} transition-colors duration-150`} style={{left: 0, zIndex: 40, boxShadow: '2px 0 8px -4px rgba(0,0,0,0.1)'}}>
+                              <div className="flex items-center space-x-3">
+                                <div className="relative">
+                                  {student.profilePicture ? (
+                                    <img
+                                      src={student.profilePicture.startsWith('http')
+                                        ? student.profilePicture
+                                        : `http://localhost:5000${student.profilePicture}`}
+                                      alt={`${student.firstName} ${student.lastName}`}
+                                      className="w-8 h-8 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600"
+                                      onError={(e) => {
+                                        // Hide the failed image and show fallback
+                                        e.currentTarget.style.display = 'none';
+                                        const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                        if (fallback) {
+                                          fallback.style.display = 'flex';
+                                        }
+                                      }}
+                                    />
+                                  ) : null}
+                                  {/* Fallback avatar - always present but hidden when image loads */}
+                                  <div 
+                                    className={`w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-sm font-bold ${student.profilePicture ? 'hidden' : ''}`}
+                                    style={{ display: student.profilePicture ? 'none' : 'flex' }}
+                                  >
+                                    {student.firstName.charAt(0)}{student.lastName.charAt(0)}
+                                  </div>
+                                </div>
+                                <span>{student.firstName} {student.lastName}</span>
+                              </div>
+                            </td>
                             {assignments.map((assignment: any) => {
                               const submissionKey = `${student._id}_${assignment._id}`;
                               const hasSubmission = assignment.isDiscussion 
@@ -1712,37 +1851,75 @@ const CourseDetail: React.FC = () => {
                               }
 
                               let cellContent: React.ReactNode;
+                              let cellBg = '';
+                              let cellTextColor = 'text-gray-900 dark:text-gray-100';
+                              
                               if (!assignment.isDiscussion && !assignment.published) {
                                 // Not published
-                                cellContent = <span className="text-gray-500 italic">Not Published</span>;
+                                cellContent = <span className="text-gray-500 dark:text-gray-400 italic">Not Published</span>;
+                                cellBg = 'bg-gray-100 dark:bg-gray-800';
                               } else if (typeof grade === 'number') {
                                 // If graded, show the grade
-                                cellContent = grade;
+                                const maxPoints = assignment.questions?.reduce((sum: number, q: any) => sum + (q.points || 0), 0) || assignment.totalPoints || 0;
+                                const percentage = (grade / maxPoints) * 100;
+                                let gradeBg = 'bg-green-100 dark:bg-green-900/20';
+                                if (percentage < 60) gradeBg = 'bg-red-100 dark:bg-red-900/20';
+                                else if (percentage < 70) gradeBg = 'bg-orange-100 dark:bg-orange-900/20';
+                                else if (percentage < 80) gradeBg = 'bg-yellow-100 dark:bg-yellow-900/20';
+                                
+                                cellContent = (
+                                  <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${gradeBg} ${percentage < 60 ? 'text-red-700 dark:text-red-300' : percentage < 70 ? 'text-orange-700 dark:text-orange-300' : percentage < 80 ? 'text-yellow-700 dark:text-yellow-300' : 'text-green-700 dark:text-green-300'}`}>
+                                    {Number.isInteger(grade) ? grade : Number(grade).toFixed(2)}
+                                  </div>
+                                );
                               } else if (hasSubmission) {
                                 if (dueDate && submittedAt && submittedAt.getTime() > dueDate.getTime()) {
                                   // Submitted late
-                                  cellContent = <span className="text-orange-600 italic">Late</span>;
+                                  cellContent = (
+                                    <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300">
+                                      <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                      </svg>
+                                      Late
+                                    </div>
+                                  );
                                 } else {
                                   // Submitted but not graded
-                                  cellContent = <span className="text-blue-600 italic">Not Graded</span>;
+                                  cellContent = (
+                                    <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300">
+                                      <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                      </svg>
+                                      Not Graded
+                                    </div>
+                                  );
                                 }
                               } else if (dueDate && now.getTime() > dueDate.getTime()) {
                                 // Missing after due date
                                 cellContent = (
-                                  <>
-                                    <span className="font-normal">0</span>
-                                    <span className="text-red-600 italic ml-1">(MA)</span>
-                                  </>
+                                  <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300">
+                                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                    0 (MA)
+                                  </div>
                                 );
                               } else {
                                 // Not submitted yet, due date not passed
-                                cellContent = <span className="text-gray-500 italic">No Submission</span>;
+                                cellContent = (
+                                  <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
+                                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    No Submission
+                                  </div>
+                                );
                               }
 
                               return (
                                 <td
                                   key={assignment._id}
-                                  className={`px-4 py-2 border-b border-r border-gray-300 dark:border-gray-700 text-center whitespace-nowrap relative text-gray-900 dark:text-gray-100 ${rowIdx % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800'}`}
+                                  className={`px-4 py-4 text-center whitespace-nowrap relative ${rowBg} ${cellBg} transition-all duration-150`}
                                   onClick={() => {
                                     if ((isInstructor || isAdmin) && hasSubmission) {
                                       handleGradeCellClick(student._id, assignment._id, grade?.toString() || '');
@@ -1769,16 +1946,22 @@ const CourseDetail: React.FC = () => {
                                             setGradeError('');
                                           }
                                         }}
-                                        className="w-20 px-2 py-1 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+                                        className="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                         autoFocus
                                       />
                                     </div>
                                   ) : (
                                     <div
-                                      className={`px-2 py-1 rounded ${(isInstructor || isAdmin) && hasSubmission ? 'cursor-pointer hover:bg-blue-50' : ''} ${savingGrade?.studentId === student._id && savingGrade?.assignmentId === assignment._id ? 'opacity-50' : ''}`}
+                                      className={`${(isInstructor || isAdmin) && hasSubmission ? 'cursor-pointer hover:scale-105 transform transition-transform duration-150' : ''} ${savingGrade?.studentId === student._id && savingGrade?.assignmentId === assignment._id ? 'opacity-50' : ''}`}
                                     >
                                       {savingGrade?.studentId === student._id && savingGrade?.assignmentId === assignment._id ? (
-                                        <span className="inline-block animate-spin mr-1">⟳</span>
+                                        <div className="inline-flex items-center">
+                                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                          </svg>
+                                          Saving...
+                                        </div>
                                       ) : null}
                                       {cellContent}
                                     </div>
@@ -1787,7 +1970,13 @@ const CourseDetail: React.FC = () => {
                               );
                             })}
                             {/* Sticky last column body */}
-                            <td className={`px-4 py-2 border-b border-l border-gray-300 dark:border-gray-700 text-center font-semibold whitespace-nowrap sticky right-0 z-40 ${rowIdx % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800'}`} style={{right: 0, zIndex: 40, boxShadow: '-2px 0 4px -2px #d1d5db'}}>{(course.groups && course.groups.length > 0) ? <span className="font-bold">{Number(weightedPercent).toFixed(2)}% ({letter})</span> : '-'}</td>
+                            <td className={`px-6 py-4 border-l border-gray-200 dark:border-gray-600 text-center font-semibold whitespace-nowrap sticky right-0 z-40 ${rowBg} transition-colors duration-150`} style={{right: 0, zIndex: 40, boxShadow: '-2px 0 8px -4px rgba(0,0,0,0.1)'}}>
+                              {(course.groups && course.groups.length > 0) ? (
+                                <div className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-bold ${gradeColor} bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-600`}>
+                                  {Number(weightedPercent).toFixed(2)}% ({letter})
+                                </div>
+                              ) : '-'}
+                            </td>
                           </tr>
                         );
                       })}
@@ -1795,22 +1984,44 @@ const CourseDetail: React.FC = () => {
                   </table>
                 </div>
                 {/* Right edge gradient for scroll cue */}
-                <div className="pointer-events-none absolute top-0 right-0 h-full w-8 bg-gradient-to-l from-gray-100 to-transparent" style={{zIndex: 10}} />
+                <div className="pointer-events-none absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-gray-50 dark:from-gray-800 to-transparent" style={{zIndex: 10}} />
               </div>
               {(!students.length || !assignments.length) && (
-                <div className="mt-4 text-gray-500 text-sm">No students or assignments found.</div>
-              )}
-              {(isInstructor || isAdmin) && (
-                <div className="mb-4 flex justify-end">
-                  <button
-                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                    onClick={handleOpenGradeScaleModal}
-                  >
-                    Edit Grade Scale
-                  </button>
+                <div className="text-center py-12">
+                  <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">No data available</h3>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">No students or assignments found.</p>
                 </div>
               )}
             </div>
+
+            {/* Action Buttons */}
+            {(isInstructor || isAdmin) && (
+              <div className="flex justify-end space-x-4">
+                <div className="flex space-x-3">
+                  <button
+                    className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                    onClick={exportGradebookCSV}
+                  >
+                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Export CSV
+                  </button>
+                  <button
+                    className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                    onClick={handleOpenGradeScaleModal}
+                  >
+                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    Edit Grade Scale
+                  </button>
+                </div>
+              </div>
+            )}
             {/* Assignment Group Weights Display & Edit Button (moved to bottom) */}
             <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-6 mt-6 border border-gray-200 dark:border-gray-700">
               <div className="flex items-center justify-between">
@@ -2147,6 +2358,9 @@ const CourseDetail: React.FC = () => {
         } else {
           return <StudentGroupView courseId={course?._id || ''} userId={user?._id || ''} />;
         }
+
+      case 'attendance':
+        return <Attendance />;
 
       case 'announcements':
         return (

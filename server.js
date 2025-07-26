@@ -54,9 +54,6 @@ mongoose.connect(MONGODB_URI, mongoOptions)
 // Serve uploads directory for profile pictures and other files
 app.use('/uploads', express.static('uploads'));
 
-// Serve static files from the React app build
-app.use(express.static(path.join(__dirname, 'public')));
-
 // Routes
 app.use('/api/auth', require('./routes/auth.routes'));
 app.use('/api/courses', require('./routes/course.routes'));
@@ -72,6 +69,7 @@ app.use('/api/announcements', require('./routes/announcement.routes'));
 app.use('/api/events', require('./routes/event.routes'));
 app.use('/api/todos', require('./routes/todo.routes'));
 app.use('/api/inbox', require('./routes/inbox.routes'));
+app.use('/api', require('./routes/attendance.routes'));
 
 // Upload route for file uploads
 const upload = require('./middleware/upload');
@@ -105,9 +103,9 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Something went wrong!' });
 });
 
-// Handle React routing, return all requests to React app
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+// API route not found handler
+app.use('/api/*', (req, res) => {
+  res.status(404).json({ message: 'API route not found' });
 });
 
 // Start server

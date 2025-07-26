@@ -12,7 +12,8 @@ const {
   unenrollStudent,
   publishCourse,
   getCourseModules,
-  updateOverviewConfig
+  updateOverviewConfig,
+  assignInstructor
 } = require('../controllers/course.controller');
 const Course = require('../models/course.model');
 const announcementController = require('../controllers/announcement.controller');
@@ -50,6 +51,10 @@ router
 router
   .route('/:id/publish')
   .patch(protect, authorize('teacher', 'admin'), publishCourse);
+
+router
+  .route('/:id/assign-instructor')
+  .patch(protect, authorize('teacher', 'admin'), assignInstructor);
 
 router
   .route('/:id/enroll')

@@ -6,6 +6,7 @@ interface Member {
   firstName: string;
   lastName: string;
   email: string;
+  profilePicture?: string;
 }
 
 interface GroupPeopleProps {
@@ -110,10 +111,38 @@ const GroupPeople: React.FC<GroupPeopleProps> = ({ groupId, groupSetId }) => {
         {search && searchResults.length > 0 && (
           <div className="bg-white border rounded shadow p-2 mt-1">
             {searchResults.map(student => (
-              <div key={student._id} className="flex justify-between items-center py-1 px-2 hover:bg-gray-50 rounded">
-                <div>
-                  <span className="font-medium">{student.firstName} {student.lastName}</span>
-                  <span className="text-gray-500 ml-2">{student.email}</span>
+              <div key={student._id} className="flex justify-between items-center py-2 px-2 hover:bg-gray-50 rounded">
+                <div className="flex items-center space-x-3">
+                  <div className="relative">
+                    {student.profilePicture ? (
+                      <img
+                        src={student.profilePicture.startsWith('http')
+                          ? student.profilePicture
+                          : `http://localhost:5000${student.profilePicture}`}
+                        alt={`${student.firstName} ${student.lastName}`}
+                        className="w-8 h-8 rounded-full object-cover border-2 border-gray-200"
+                        onError={(e) => {
+                          // Hide the failed image and show fallback
+                          e.currentTarget.style.display = 'none';
+                          const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                          if (fallback) {
+                            fallback.style.display = 'flex';
+                          }
+                        }}
+                      />
+                    ) : null}
+                    {/* Fallback avatar - always present but hidden when image loads */}
+                    <div 
+                      className={`w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-sm font-bold ${student.profilePicture ? 'hidden' : ''}`}
+                      style={{ display: student.profilePicture ? 'none' : 'flex' }}
+                    >
+                      {student.firstName.charAt(0)}{student.lastName.charAt(0)}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="font-medium">{student.firstName} {student.lastName}</span>
+                    <span className="text-gray-500 ml-2">{student.email}</span>
+                  </div>
                 </div>
                 <button
                   className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded"
@@ -139,11 +168,39 @@ const GroupPeople: React.FC<GroupPeopleProps> = ({ groupId, groupSetId }) => {
             key={member._id}
             className="bg-white rounded shadow p-4 flex flex-col md:flex-row md:items-center md:justify-between"
           >
-            <div>
-              <div className="font-semibold text-lg">
-                {member.firstName} {member.lastName}
+            <div className="flex items-center space-x-3">
+              <div className="relative">
+                {member.profilePicture ? (
+                  <img
+                    src={member.profilePicture.startsWith('http')
+                      ? member.profilePicture
+                      : `http://localhost:5000${member.profilePicture}`}
+                    alt={`${member.firstName} ${member.lastName}`}
+                    className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
+                    onError={(e) => {
+                      // Hide the failed image and show fallback
+                      e.currentTarget.style.display = 'none';
+                      const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                      if (fallback) {
+                        fallback.style.display = 'flex';
+                      }
+                    }}
+                  />
+                ) : null}
+                {/* Fallback avatar - always present but hidden when image loads */}
+                <div 
+                  className={`w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-sm font-bold ${member.profilePicture ? 'hidden' : ''}`}
+                  style={{ display: member.profilePicture ? 'none' : 'flex' }}
+                >
+                  {member.firstName.charAt(0)}{member.lastName.charAt(0)}
+                </div>
               </div>
-              <div className="text-gray-500">{member.email}</div>
+              <div>
+                <div className="font-semibold text-lg">
+                  {member.firstName} {member.lastName}
+                </div>
+                <div className="text-gray-500">{member.email}</div>
+              </div>
             </div>
             <button
               className="mt-2 md:mt-0 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded"

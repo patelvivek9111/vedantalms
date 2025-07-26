@@ -19,7 +19,7 @@ export function PrivateRoute({ children, allowedRoles }: PrivateRouteProps) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
+  if (allowedRoles && !allowedRoles.includes(user.role as 'student' | 'teacher' | 'admin')) {
     return <Navigate to="/unauthorized" replace />;
   }
 

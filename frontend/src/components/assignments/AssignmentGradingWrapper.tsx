@@ -13,7 +13,8 @@ import {
   Megaphone, 
   Users, 
   BarChart3, 
-  UserPlus 
+  UserPlus,
+  CheckSquare
 } from 'lucide-react';
 
 // Navigation items for the course sidebar
@@ -25,6 +26,7 @@ const navigationItems = [
   { id: 'discussions', label: 'Discussions', icon: MessageSquare },
   { id: 'announcements', label: 'Announcements', icon: Megaphone },
   { id: 'groups', label: 'Groups', icon: Users },
+  { id: 'attendance', label: 'Attendance', icon: CheckSquare },
   { id: 'grades', label: 'Grades', icon: BarChart3, roles: ['student'] },
   { id: 'gradebook', label: 'Gradebook', icon: BookOpen, roles: ['teacher', 'admin'] },
   { id: 'students', label: 'People', icon: UserPlus },

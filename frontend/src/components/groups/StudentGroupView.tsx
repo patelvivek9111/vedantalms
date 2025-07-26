@@ -67,7 +67,7 @@ const StudentGroupView: React.FC<StudentGroupViewProps> = ({ courseId, userId })
             );
             
             // Add enrolled groups to the list
-            studentGroups.forEach(group => {
+            studentGroups.forEach((group: Group) => {
               enrolledGroupsData.push({ groupSet, group });
             });
           } catch (err) {

@@ -49,6 +49,7 @@ import Groups from './pages/Groups';
 import GroupSetView from './components/groups/GroupSetView';
 import { ThemeProvider } from './context/ThemeContext';
 
+
 // Wrapper components to handle moduleId prop
 const AssignmentListWrapper = () => {
   const { moduleId } = useParams<{ moduleId: string }>();
@@ -160,6 +161,7 @@ function AppContent() {
               </PrivateRoute>
             }
           />
+
           <Route
             path="/courses/:id/edit"
             element={

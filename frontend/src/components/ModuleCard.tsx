@@ -327,7 +327,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
                     <div className="flex items-center space-x-2">
                       <ClipboardList className="h-5 w-5 text-green-400 group-hover:text-green-600" />
                       <span className="group-hover:text-green-600">{a.title}</span>
-                      <span className="text-xs text-gray-500">({a.questions ? a.questions.reduce((sum, q) => sum + (q.points || 0), 0) : 0} pts)</span>
+                      <span className="text-xs text-gray-500">({a.questions ? a.questions.reduce((sum: number, q: any) => sum + (q.points || 0), 0) : 0} pts)</span>
                     </div>
                     {(user?.role === 'teacher' || user?.role === 'admin') && (
                       <div className="flex items-center gap-2">

@@ -204,6 +204,59 @@ exports.updateCourse = async (req, res) => {
   }
 };
 
+// @desc    Assign instructor to course (for courses without instructor)
+// @route   PATCH /api/courses/:id/assign-instructor
+// @access  Private (Teacher/Admin)
+exports.assignInstructor = async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Invalid course ID' });
+    }
+
+    const course = await Course.findById(req.params.id);
+
+    if (!course) {
+      return res.status(404).json({ success: false, message: 'Course not found' });
+    }
+
+    // Check if course already has an instructor
+    if (course.instructor) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Course already has an instructor assigned' 
+      });
+    }
+
+    // Assign current user as instructor if they are a teacher
+    if (req.user.role !== 'teacher' && req.user.role !== 'admin') {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Only teachers can be assigned as instructors' 
+      });
+    }
+
+    course.instructor = req.user.id;
+    await course.save();
+
+    const updatedCourse = await Course.findById(req.params.id)
+      .populate('instructor', 'firstName lastName email')
+      .populate('students', 'firstName lastName email');
+
+    res.json({
+      success: true,
+      message: 'Instructor assigned successfully',
+      data: updatedCourse
+    });
+  } catch (err) {
+    console.error('Assign instructor error:', err);
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error while assigning instructor',
+      error: err.message 
+    });
+  }
+};
+
 // @desc    Publish/Unpublish a course
 // @route   PATCH /api/courses/:id/publish
 // @access  Private (Teacher/Admin)

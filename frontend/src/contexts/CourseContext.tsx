@@ -63,6 +63,10 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const getCourse = async (id: string): Promise<Course> => {
+    if (!id || id === 'undefined' || id === 'null') {
+      throw new Error('Invalid course ID');
+    }
+    
     try {
       setLoading(true);
       setError(null);
