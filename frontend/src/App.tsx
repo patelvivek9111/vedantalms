@@ -47,6 +47,10 @@ import Inbox from './pages/Inbox';
 import AccountPage from './pages/AccountPage';
 import Groups from './pages/Groups';
 import GroupSetView from './components/groups/GroupSetView';
+import Catalog from './pages/Catalog';
+import CoursePeople from './pages/CoursePeople';
+import LandingPage from './pages/LandingPage';
+import ErrorBoundary from './components/ErrorBoundary';
 import { ThemeProvider } from './context/ThemeContext';
 
 
@@ -118,11 +122,15 @@ function AppContent() {
       {isAuthenticated && <GlobalSidebar />}
       <main className={isAuthenticated ? "pb-10 pl-20" : "pb-10"}>
         <Routes>
+          {/* Public Routes */}
+          <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" /> : <LandingPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
+          
+          {/* Protected Routes */}
           <Route
-            path="/"
+            path="/dashboard"
             element={
               <PrivateRoute>
                 <DashboardWrapper />
@@ -158,6 +166,14 @@ function AppContent() {
             element={
               <PrivateRoute>
                 <CourseDetail />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/courses/:courseId/people"
+            element={
+              <PrivateRoute>
+                <CoursePeople />
               </PrivateRoute>
             }
           />
@@ -297,6 +313,14 @@ function AppContent() {
           />
           <Route path="/inbox" element={<PrivateRoute><Inbox /></PrivateRoute>} />
           <Route
+            path="/catalog"
+            element={
+              <PrivateRoute>
+                <Catalog />
+              </PrivateRoute>
+            }
+          />
+          <Route
             path="/account"
             element={
               <PrivateRoute>
@@ -390,7 +414,9 @@ function App() {
       <ThemeProvider>
         <AuthProvider>
           <CourseProvider>
-            <AppContent />
+            <ErrorBoundary>
+              <AppContent />
+            </ErrorBoundary>
           </CourseProvider>
         </AuthProvider>
       </ThemeProvider>

@@ -90,6 +90,21 @@ export const ToDoPanel: React.FC = () => {
     setPersonalTodos(todos => todos.filter((t: any) => t._id !== id));
   };
 
+  const handleEnrollmentNotificationClick = async (todo: any) => {
+    try {
+      // Delete the notification from the database
+      await api.delete(`/todos/${todo._id}`);
+      
+      // Remove from local state
+      setPersonalTodos(todos => todos.filter((t: any) => t._id !== todo._id));
+      
+      // Navigate to the course students page
+      window.location.href = `/courses/${todo.courseId}/students`;
+    } catch (err) {
+      console.error('Error removing enrollment notification:', err);
+    }
+  };
+
   const refreshToDo = () => {
     setRefreshKey(prev => prev + 1);
   };
@@ -103,9 +118,74 @@ export const ToDoPanel: React.FC = () => {
     return isWithinInterval(due, { start: weekStart, end: weekEnd });
   });
 
+  // Separate enrollment requests, enrollment summaries, and waitlist promotions from regular todos
+  const enrollmentRequests = personalTodosThisWeek.filter(todo => todo.type === 'enrollment_request' && todo.action === 'pending');
+  const enrollmentSummaries = personalTodosThisWeek.filter(todo => todo.type === 'enrollment_summary');
+  const waitlistPromotions = personalTodosThisWeek.filter(todo => todo.type === 'waitlist_promotion');
+  const regularTodos = personalTodosThisWeek.filter(todo => todo.type !== 'enrollment_request' && todo.type !== 'enrollment_summary' && todo.type !== 'waitlist_promotion');
+
   return (
     <div className="bg-white rounded-lg shadow-md p-6 mb-6 border border-gray-200">
       <h2 className="text-xl font-semibold text-gray-800 mb-6">To Do</h2>
+      {/* Enrollment Summaries */}
+      {enrollmentSummaries.length > 0 && (
+        <div className="mb-6">
+          <h3 className="text-md font-semibold text-gray-600 mb-3">Enrollment Updates</h3>
+          <ul className="space-y-2">
+            {enrollmentSummaries.map((todo) => (
+              <li key={todo._id} className="p-3 bg-green-50 rounded-lg hover:bg-green-100 transition-colors cursor-pointer" onClick={() => handleEnrollmentNotificationClick(todo)}>
+                <div>
+                  <span className="font-medium text-gray-800">
+                    {todo.enrollmentCount} student{todo.enrollmentCount !== 1 ? 's' : ''} enrolled in {todo.courseName}
+                  </span>
+                  {todo.dueDate && (
+                    <span className="ml-2 text-xs text-gray-500">{new Date(todo.dueDate).toLocaleDateString()}</span>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Waitlist Promotions */}
+      {waitlistPromotions.length > 0 && (
+        <div className="mb-6">
+          <h3 className="text-md font-semibold text-gray-600 mb-3">Waitlist Promotions</h3>
+          <ul className="space-y-2">
+            {waitlistPromotions.map((todo) => (
+              <li key={todo._id} className="p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors cursor-pointer" onClick={() => handleEnrollmentNotificationClick(todo)}>
+                <div>
+                  <span className="font-medium text-gray-800">{todo.title}</span>
+                  {todo.dueDate && (
+                    <span className="ml-2 text-xs text-gray-500">{new Date(todo.dueDate).toLocaleDateString()}</span>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Enrollment Requests */}
+      {enrollmentRequests.length > 0 && (
+        <div className="mb-6">
+          <h3 className="text-md font-semibold text-gray-600 mb-3">Enrollment Requests</h3>
+          <ul className="space-y-2">
+            {enrollmentRequests.map((todo) => (
+              <li key={todo._id} className="p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer" onClick={() => window.location.href = `/courses/${todo.courseId}/students`}>
+                <div>
+                  <span className="font-medium text-gray-800">{todo.title}</span>
+                  {todo.dueDate && (
+                    <span className="ml-2 text-xs text-gray-500">{new Date(todo.dueDate).toLocaleDateString()}</span>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Personal To-Dos */}
       <div className="mb-6">
         <h3 className="text-md font-semibold text-gray-600 mb-3">My To Do</h3>
@@ -113,11 +193,11 @@ export const ToDoPanel: React.FC = () => {
           <div className="text-gray-500">Loading...</div>
         ) : personalError ? (
           <div className="text-red-500">{personalError}</div>
-        ) : personalTodosThisWeek.length === 0 ? (
+        ) : regularTodos.length === 0 ? (
           <div className="text-gray-500 text-sm italic">No personal to-dos</div>
         ) : (
           <ul className="space-y-2">
-            {personalTodosThisWeek.map((todo) => (
+            {regularTodos.map((todo) => (
               <li key={todo._id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                 <div className="flex-1">
                   <span className="font-medium text-gray-800">{todo.title}</span>

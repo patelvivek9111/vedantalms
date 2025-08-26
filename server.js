@@ -11,19 +11,27 @@ dotenv.config();
 // Create Express app
 const app = express();
 
+// CORS configuration for production
+const corsOptions = {
+  origin: process.env.NODE_ENV === 'production' 
+    ? [process.env.FRONTEND_URL || 'https://lms-frontend.onrender.com']
+    : ['http://localhost:3000', 'http://localhost:5173'],
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
 // Middleware
-app.use(cors());
-app.use(express.json());
+app.use(cors(corsOptions));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Add request logging
-app.use((req, res, next) => {
-
-  next();
-});
-
-app.use((req, res, next) => {
-  next();
-});
+// Add request logging in development
+if (process.env.NODE_ENV !== 'production') {
+  app.use((req, res, next) => {
+    console.log(`${req.method} ${req.path}`);
+    next();
+  });
+}
 
 // Set default JWT secret if not in environment
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-123';
@@ -37,25 +45,39 @@ if (!fs.existsSync(uploadsDir)) {
 
 // MongoDB connection options
 const mongoOptions = {
-  dbName: 'lms'
+  dbName: 'lms',
+  maxPoolSize: 10,
+  serverSelectionTimeoutMS: 5000,
+  socketTimeoutMS: 45000,
 };
 
 // Connect to MongoDB
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/lms';
 mongoose.connect(MONGODB_URI, mongoOptions)
   .then(() => {
-    console.log('Connected to MongoDB');
+    console.log('✅ Connected to MongoDB');
+    console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   })
   .catch((err) => {
-    console.error('MongoDB connection error:', err);
+    console.error('❌ MongoDB connection error:', err);
     process.exit(1); // Exit if cannot connect to database
   });
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
 
 // Serve uploads directory for profile pictures and other files
 app.use('/uploads', express.static('uploads'));
 
 // Routes
 app.use('/api/auth', require('./routes/auth.routes'));
+app.use('/api/catalog', require('./routes/catalog.routes'));
 app.use('/api/courses', require('./routes/course.routes'));
 app.use('/api/modules', require('./routes/module.routes'));
 app.use('/api/pages', require('./routes/page.routes'));
@@ -70,6 +92,7 @@ app.use('/api/events', require('./routes/event.routes'));
 app.use('/api/todos', require('./routes/todo.routes'));
 app.use('/api/inbox', require('./routes/inbox.routes'));
 app.use('/api', require('./routes/attendance.routes'));
+app.use('/api/polls', require('./routes/poll.routes'));
 
 // Upload route for file uploads
 const upload = require('./middleware/upload');
@@ -99,8 +122,17 @@ app.post('/api/upload', protect, upload.array('files', 10), (req, res) => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: 'Something went wrong!' });
+  console.error('❌ Error:', err.stack);
+  
+  // Don't expose internal errors in production
+  const message = process.env.NODE_ENV === 'production' 
+    ? 'Something went wrong!' 
+    : err.message;
+    
+  res.status(err.status || 500).json({ 
+    message,
+    ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
+  });
 });
 
 // API route not found handler
@@ -111,5 +143,24 @@ app.use('/api/*', (req, res) => {
 // Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📱 Health check: http://localhost:${PORT}/health`);
+  console.log(`🔗 Environment: ${process.env.NODE_ENV || 'development'}`);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('🛑 SIGTERM received, shutting down gracefully');
+  mongoose.connection.close(() => {
+    console.log('✅ MongoDB connection closed');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('🛑 SIGINT received, shutting down gracefully');
+  mongoose.connection.close(() => {
+    console.log('✅ MongoDB connection closed');
+    process.exit(0);
+  });
 }); 

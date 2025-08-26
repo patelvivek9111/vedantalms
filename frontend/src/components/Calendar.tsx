@@ -368,7 +368,7 @@ const CalendarPage: React.FC = () => {
         // Fetch assignments for all modules in this course
         let assignmentEvents: RBCEvent[] = [];
         
-        console.log(`[Calendar] Fetching assignments for course: ${calId}`);
+
         
         try {
           const courseObj = courses.find((c: any) => c._id === calId);
@@ -377,13 +377,13 @@ const CalendarPage: React.FC = () => {
               try {
                 const response = await api.get(`/assignments/module/${module._id}`);
                 const assignments = response.data;
-                console.log(`[Calendar] Found ${assignments.length} assignments in module ${module._id}:`, assignments.map((a: any) => ({ id: a._id, title: a.title, dueDate: a.dueDate })));
+                
                 
                 assignments.forEach((a: any) => {
                   // Only add if we haven't seen this assignment before globally
                   if (!globalSeenAssignmentIds.has(a._id)) {
                     globalSeenAssignmentIds.add(a._id);
-                    console.log(`[Calendar] Adding assignment: ${a.title} (${a._id}) due on ${a.dueDate}`);
+                    
                     assignmentEvents.push({
                       _id: a._id,
                       title: a.title,
@@ -395,7 +395,7 @@ const CalendarPage: React.FC = () => {
                       resource: { ...a, readOnly: true, courseId: calId },
                     } as RBCEvent);
                   } else {
-                    console.log(`[Calendar] Skipping duplicate assignment: ${a.title} (${a._id})`);
+                    
                   }
                 });
               } catch (error) {
@@ -411,13 +411,13 @@ const CalendarPage: React.FC = () => {
                   try {
                     const response = await api.get(`/assignments/module/${module._id}`);
                     const assignments = response.data;
-                    console.log(`[Calendar] Found ${assignments.length} assignments in module ${module._id}:`, assignments.map((a: any) => ({ id: a._id, title: a.title, dueDate: a.dueDate })));
+
                     
                     assignments.forEach((a: any) => {
                       // Only add if we haven't seen this assignment before globally
                       if (!globalSeenAssignmentIds.has(a._id)) {
                         globalSeenAssignmentIds.add(a._id);
-                        console.log(`[Calendar] Adding assignment: ${a.title} (${a._id}) due on ${a.dueDate}`);
+
                         assignmentEvents.push({
                           _id: a._id,
                           title: a.title,
@@ -429,7 +429,7 @@ const CalendarPage: React.FC = () => {
                           resource: { ...a, readOnly: true, courseId: calId },
                         } as RBCEvent);
                       } else {
-                        console.log(`[Calendar] Skipping duplicate assignment: ${a.title} (${a._id})`);
+
                       }
                     });
                   } catch (error) {
@@ -445,7 +445,7 @@ const CalendarPage: React.FC = () => {
           console.error('Error processing assignments:', e);
         }
         
-        console.log(`[Calendar] Final assignment events for course ${calId}:`, assignmentEvents.map(e => ({ id: (e as any)._id, title: e.title, start: e.start })));
+
         allEvents.push(...courseEvents, ...assignmentEvents);
       } catch (error) {
         console.error(`Error fetching course events for ${calId}:`, error);
@@ -499,8 +499,7 @@ const CalendarPage: React.FC = () => {
 
   // Handle event click (for editing)
   const handleSelectEvent = (event: RBCEvent) => {
-    console.log('Event clicked:', event); // DEBUG: Log event object
-    console.log('Current user:', user); // DEBUG: Log current user
+
     // Make assignment detection case-insensitive and fallback to event.type
     const type = event.resource?.type || (event as any).type;
     const isAssignment = typeof type === 'string' && type.toLowerCase() === 'assignment';
@@ -520,7 +519,7 @@ const CalendarPage: React.FC = () => {
       location: event.resource?.location || '',
       calendar: event.resource?.calendar || (user ? user._id : ''),
     };
-    console.log('Setting editing event:', editingEventData); // DEBUG: Log editing event data
+    
     setEditingEvent(editingEventData);
     setActiveTab(event.resource?.type || 'Event');
     setModalOpen(true);

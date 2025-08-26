@@ -84,10 +84,58 @@ const AssignmentDetailsWrapper: React.FC = () => {
     fetchCourseData();
   }, [assignmentId]);
 
-  // Filter navigation items based on user role
-  const filteredNavigationItems = navigationItems.filter(item => 
-    !item.roles || item.roles.includes(user?.role || '')
-  );
+  // Get custom sidebar configuration or use default
+  const sidebarConfig = course?.sidebarConfig || {
+    items: navigationItems.map((item, index) => ({
+      id: item.id,
+      label: item.label,
+      visible: true,
+      order: index,
+      fixed: item.id === 'overview'
+    })),
+    studentVisibility: {
+      overview: true,
+      modules: true,
+      pages: true,
+      assignments: true,
+      discussions: true,
+      announcements: true,
+      polls: true,
+      groups: true,
+      attendance: true,
+      grades: true,
+      gradebook: false,
+      students: true
+    }
+  };
+
+  // Create navigation items from custom configuration
+  const customNavigationItems = sidebarConfig.items
+    .sort((a: { order: number }, b: { order: number }) => a.order - b.order)
+    .filter((item: { visible: boolean }) => item.visible)
+    .map((item: { id: string; label: string; visible: boolean; order: number }) => {
+      const originalItem = navigationItems.find(nav => nav.id === item.id);
+      return {
+        ...originalItem,
+        ...item
+      };
+    });
+
+  // Filter navigation items based on user role and student visibility
+  const filteredNavigationItems = customNavigationItems.filter((item: any) => {
+    // Check role-based filtering
+    if (item.roles && !item.roles.includes(user?.role || '')) {
+      return false;
+    }
+    
+    // For students, check both general visibility and student visibility settings
+    if (user?.role === 'student') {
+      return item.visible && sidebarConfig.studentVisibility[item.id as keyof typeof sidebarConfig.studentVisibility];
+    }
+    
+    // Teachers and admins can see all items (they can see everything)
+    return true;
+  });
 
   if (loading) {
     return (
@@ -106,7 +154,7 @@ const AssignmentDetailsWrapper: React.FC = () => {
       {/* Course Sidebar */}
       <aside className="w-64 mr-8 mt-4">
         <nav className="bg-white/80 dark:bg-gray-900/80 backdrop-blur rounded-2xl shadow-lg p-4 flex flex-col gap-1 border border-gray-100 dark:border-gray-700">
-          {filteredNavigationItems.map(item => (
+          {filteredNavigationItems.map((item: any) => (
             <button
               key={item.id}
               className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-200 ${item.id === 'assignments' ? 'bg-blue-100 text-blue-700 font-semibold shadow' : ''}`}

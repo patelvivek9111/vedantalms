@@ -14,7 +14,8 @@ import {
   Settings,
   BarChart3,
   Shield,
-  Database
+  Database,
+  Search
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCourse } from '../contexts/CourseContext';
@@ -38,8 +39,8 @@ const getNavItems = (userRole: string) => {
     ];
   }
 
-  // Add Groups for non-admin users
-  return [...baseItems, { label: 'Groups', icon: Users, to: '/groups' }, { label: 'More', icon: MoreHorizontal, to: '/more' }];
+  // Add Groups and Catalog for non-admin users
+  return [...baseItems, { label: 'Groups', icon: Users, to: '/groups' }, { label: 'Catalog', icon: Search, to: '/catalog' }];
 };
 
 export default function GlobalSidebar() {

@@ -21,14 +21,30 @@ interface Course {
   createdAt: string;
   updatedAt: string;
   published?: boolean;
+  catalog?: {
+    subject: string;
+    description: string;
+    prerequisites: string[];
+    maxStudents: number;
+    enrollmentDeadline: Date;
+    startDate: Date;
+    endDate: Date;
+    tags: string[];
+    thumbnail: string;
+    syllabus: string;
+    allowTeacherEnrollment: boolean;
+    isPublic: boolean;
+  };
+  enrollmentRequests?: any[];
+  waitlist?: any[];
 }
 
 interface CourseContextType {
   courses: Course[];
   loading: boolean;
   error: string | null;
-  createCourse: (title: string, description: string) => Promise<void>;
-  updateCourse: (id: string, title: string, description: string) => Promise<void>;
+  createCourse: (title: string, description: string, catalogData?: any) => Promise<void>;
+  updateCourse: (id: string, title: string, description: string, catalogData?: any) => Promise<void>;
   deleteCourse: (id: string) => Promise<void>;
   enrollStudent: (courseId: string, studentId: string) => Promise<void>;
   unenrollStudent: (courseId: string, studentId: string) => Promise<void>;
@@ -85,11 +101,15 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  const createCourse = async (title: string, description: string) => {
+  const createCourse = async (title: string, description: string, catalogData?: any) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.post('/courses', { title, description });
+      const response = await api.post('/courses', { 
+        title, 
+        description,
+        catalog: catalogData
+      });
       if (response.data.success) {
         setCourses([...courses, response.data.data]);
       } else {
@@ -104,11 +124,15 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  const updateCourse = async (id: string, title: string, description: string) => {
+  const updateCourse = async (id: string, title: string, description: string, catalogData?: any) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.put(`/courses/${id}`, { title, description });
+      const response = await api.put(`/courses/${id}`, { 
+        title, 
+        description,
+        catalog: catalogData
+      });
       if (response.data.success) {
         setCourses(courses.map(course => 
           course._id === id ? response.data.data : course

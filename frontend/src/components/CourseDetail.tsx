@@ -22,7 +22,9 @@ import {
   UserPlus,
   BookOpenCheck,
   Settings,
-  CheckSquare
+  CheckSquare,
+  Vote,
+  Layout
 } from 'lucide-react';
 import WhatIfScores from './WhatIfScores';
 import StudentGradeSidebar from './StudentGradeSidebar';
@@ -36,8 +38,95 @@ import AnnouncementForm from './announcements/AnnouncementForm';
 import { createAnnouncement } from '../services/announcementService';
 import AssignmentList from './assignments/AssignmentList';
 import OverviewConfigModal from './OverviewConfigModal';
+import SidebarConfigModal from './SidebarConfigModal';
 import LatestAnnouncements from './LatestAnnouncements';
 import Attendance from './Attendance';
+import PollList from './polls/PollList';
+
+// EnrollmentRequestsHandler component
+const EnrollmentRequestsHandler: React.FC<{ courseId: string }> = ({ courseId }) => {
+  const [enrollmentRequests, setEnrollmentRequests] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchEnrollmentRequests = async () => {
+      try {
+        const todosRes = await api.get('/todos');
+        const enrollmentTodos = todosRes.data.filter((todo: any) => 
+          todo.type === 'enrollment_request' && 
+          todo.courseId === courseId && 
+          todo.action === 'pending'
+        );
+        setEnrollmentRequests(enrollmentTodos);
+      } catch (err) {
+        console.error('Error fetching enrollment requests:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (courseId) {
+      fetchEnrollmentRequests();
+    }
+  }, [courseId]);
+
+  const handleApproveEnrollment = async (studentId: string) => {
+    try {
+      await api.post(`/courses/${courseId}/enrollment/${studentId}/approve`);
+      setEnrollmentRequests(prev => prev.filter(req => req.studentId !== studentId));
+    } catch (err) {
+      console.error('Error approving enrollment:', err);
+      alert('Failed to approve enrollment');
+    }
+  };
+
+  const handleDenyEnrollment = async (studentId: string) => {
+    try {
+      await api.post(`/courses/${courseId}/enrollment/${studentId}/deny`);
+      setEnrollmentRequests(prev => prev.filter(req => req.studentId !== studentId));
+    } catch (err) {
+      console.error('Error denying enrollment:', err);
+      alert('Failed to deny enrollment');
+    }
+  };
+
+  if (loading) {
+    return <div className="text-gray-500">Loading enrollment requests...</div>;
+  }
+
+  if (enrollmentRequests.length === 0) {
+    return <div className="text-gray-500 text-sm italic">No pending enrollment requests</div>;
+  }
+
+  return (
+    <div className="space-y-3">
+      {enrollmentRequests.map((request) => (
+        <div key={request._id} className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg border border-orange-200 dark:border-orange-700">
+          <div className="flex-1">
+            <p className="font-medium text-gray-800 dark:text-gray-200">{request.title}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Requested on {new Date(request.createdAt).toLocaleDateString()}
+            </p>
+          </div>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => handleApproveEnrollment(request.studentId)}
+              className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600"
+            >
+              Approve
+            </button>
+            <button
+              onClick={() => handleDenyEnrollment(request.studentId)}
+              className="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600"
+            >
+              Deny
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 // Navigation items for the left pane
 const navigationItems = [
@@ -47,6 +136,7 @@ const navigationItems = [
   { id: 'assignments', label: 'Assignments', icon: PenTool },
   { id: 'discussions', label: 'Discussions', icon: MessageSquare },
   { id: 'announcements', label: 'Announcements', icon: Megaphone },
+  { id: 'polls', label: 'Polls', icon: BarChart3 },
   { id: 'groups', label: 'Groups', icon: Users },
   { id: 'attendance', label: 'Attendance', icon: CheckSquare },
   { id: 'grades', label: 'Grades', icon: BarChart3, roles: ['student'] },
@@ -144,6 +234,7 @@ const CourseDetail: React.FC = () => {
   const [discussionsLoading, setDiscussionsLoading] = useState(true);
   const [groupAssignments, setGroupAssignments] = useState<any[]>([]);
   const [showOverviewConfigModal, setShowOverviewConfigModal] = useState(false);
+  const [showSidebarConfigModal, setShowSidebarConfigModal] = useState(false);
 
   const initialSection = section || 'overview';
 
@@ -245,10 +336,58 @@ const CourseDetail: React.FC = () => {
     fetchDiscussions();
   }, [course?._id, modules]);
 
-  // Filter navigation items based on user role
-  const filteredNavigationItems = navigationItems.filter(item => 
-    !item.roles || item.roles.includes(user?.role || '')
-  );
+  // Get custom sidebar configuration or use default
+  const sidebarConfig = course?.sidebarConfig || {
+    items: navigationItems.map((item, index) => ({
+      id: item.id,
+      label: item.label,
+      visible: true,
+      order: index,
+      fixed: item.id === 'overview'
+    })),
+    studentVisibility: {
+      overview: true,
+      modules: true,
+      pages: true,
+      assignments: true,
+      discussions: true,
+      announcements: true,
+      polls: true,
+      groups: true,
+      attendance: true,
+      grades: true,
+      gradebook: false,
+      students: true
+    }
+  };
+
+  // Create navigation items from custom configuration
+  const customNavigationItems = sidebarConfig.items
+    .sort((a: { order: number }, b: { order: number }) => a.order - b.order)
+    .filter((item: { visible: boolean }) => item.visible)
+    .map((item: { id: string; label: string; visible: boolean; order: number }) => {
+      const originalItem = navigationItems.find(nav => nav.id === item.id);
+      return {
+        ...originalItem,
+        ...item
+      };
+    });
+
+  // Filter navigation items based on user role and student visibility
+  const filteredNavigationItems = customNavigationItems.filter((item: any) => {
+    // Check role-based filtering
+    if (item.roles && !item.roles.includes(user?.role || '')) {
+      return false;
+    }
+    
+    // For students, check both general visibility and student visibility settings
+    if (user?.role === 'student') {
+      return item.visible && sidebarConfig.studentVisibility[item.id as keyof typeof sidebarConfig.studentVisibility];
+    }
+    
+    // Teachers and admins can see all items (they can see everything)
+    return true;
+  });
 
   // Update ref when getCourse changes
   useEffect(() => {
@@ -390,6 +529,54 @@ const CourseDetail: React.FC = () => {
       console.error('Error unenrolling student:', err);
     }
   };
+
+  const handleApproveEnrollment = async (studentId: string) => {
+    if (!id) return;
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(
+        `${API_URL}/api/courses/${id}/enrollment/${studentId}/approve`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      // Refresh course data to show updated student list and enrollment requests
+      if (id) {
+        const updatedCourse = await getCourseRef.current(id);
+        setCourse(updatedCourse);
+      }
+      
+      alert('Enrollment approved successfully!');
+    } catch (err: any) {
+      console.error('Error approving enrollment:', err);
+      alert('Failed to approve enrollment: ' + (err.response?.data?.message || err.message));
+    }
+  };
+
+  const handleDenyEnrollment = async (studentId: string) => {
+    if (!id) return;
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(
+        `${API_URL}/api/courses/${id}/enrollment/${studentId}/deny`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      // Refresh course data to show updated enrollment requests
+      if (id) {
+        const updatedCourse = await getCourseRef.current(id);
+        setCourse(updatedCourse);
+      }
+      
+      alert('Enrollment denied successfully!');
+    } catch (err: any) {
+      console.error('Error denying enrollment:', err);
+      alert('Failed to deny enrollment: ' + (err.response?.data?.message || err.message));
+    }
+  };
+
+
 
   const handleToggleAssignmentPublish = async (assignment: any) => {
     setAssignmentPublishing(assignment._id);
@@ -1231,6 +1418,10 @@ const CourseDetail: React.FC = () => {
     setCourse(updatedCourse);
   };
 
+  const handleSidebarConfigUpdated = (updatedCourse: any) => {
+    setCourse(updatedCourse);
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -1353,6 +1544,26 @@ const CourseDetail: React.FC = () => {
                     <Settings className="w-4 h-4" />
                     Configure Overview
                   </button>
+                  <button 
+                    className="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700 transition-colors flex items-center gap-2" 
+                    onClick={() => setShowSidebarConfigModal(true)}
+                  >
+                    <Layout className="w-4 h-4" />
+                    Customize Sidebar
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Student Enrollment Status */}
+            {!isInstructor && !isAdmin && (
+              <div className="bg-white dark:bg-gray-900 rounded-xl shadow p-6 border border-gray-200 dark:border-gray-700">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">Your Enrollment Status</h3>
+                  <div className="flex items-center space-x-3">
+                    <span className="text-green-600 font-medium">✓ Enrolled in this course</span>
+                    <span className="text-sm text-gray-500">You have access to all course materials and assignments</span>
+                  </div>
                 </div>
               </div>
             )}
@@ -1459,6 +1670,15 @@ const CourseDetail: React.FC = () => {
             courseId={course?._id || ''}
             courseGroups={course?.groups || []}
           />
+        );
+
+      case 'polls':
+        return (
+          <div className="space-y-6">
+            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
+              <PollList courseId={course?._id || ''} />
+            </div>
+          </div>
         );
 
       case 'grades':
@@ -2253,6 +2473,8 @@ const CourseDetail: React.FC = () => {
             <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
               <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4">Student Management</h2>
               
+
+              
               {/* Student Search Section */}
               {(isInstructor || isAdmin) && (
                 <div className="mb-8 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
@@ -2306,16 +2528,92 @@ const CourseDetail: React.FC = () => {
                     </div>
                   )}
                   
-                  {/* Search Error */}
-                  {searchError && (
-                    <div className="mt-2 text-sm text-red-600 dark:text-red-400">
-                      {searchError}
-                    </div>
-                  )}
+                                {/* Search Error */}
+              {searchError && (
+                <div className="mt-2 text-sm text-red-600 dark:text-red-400">
+                  {searchError}
                 </div>
               )}
-              
-              {/* Instructor FIRST */}
+            </div>
+          )}
+          
+          {/* Waitlisted Students - NEW SECTION */}
+          {(isInstructor || isAdmin) && (
+            <div className="mb-8 p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-700">
+              <h3 className="text-lg font-semibold mb-4 text-orange-800 dark:text-orange-200">
+                Waitlisted Students - Pending Approval ({course.enrollmentRequests?.filter((req: any) => req.status === 'waitlisted').length || 0})
+              </h3>
+              {course.catalog?.maxStudents && course.students.length >= course.catalog.maxStudents && (
+                <div className="mb-3 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-600 rounded text-sm text-blue-700 dark:text-blue-300">
+                  💡 <strong>Note:</strong> As a teacher, you can approve waitlisted students to enroll them in the course, even when it's full. You can also override capacity by enrolling students directly.
+                </div>
+              )}
+              {(!course.enrollmentRequests || course.enrollmentRequests.filter((req: any) => req.status === 'waitlisted').length === 0) ? (
+                <div className="text-center text-orange-700 dark:text-orange-300 py-4">
+                  No waitlisted students at this time.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {course.enrollmentRequests
+                    .filter((req: any) => req.status === 'waitlisted')
+                    .map((request: any) => {
+                      const waitlistPosition = course.waitlist?.find((entry: any) => entry.student._id === request.student._id)?.position;
+                      
+                      return (
+                        <div key={request._id} className="flex items-center justify-between p-3 rounded-lg border bg-orange-100 dark:bg-orange-800/30 border-orange-300 dark:border-orange-600">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 rounded-full flex items-center justify-center bg-orange-200 dark:bg-orange-700">
+                              {request.student.profilePicture ? (
+                                <img 
+                                  src={request.student.profilePicture.startsWith('http')
+                                    ? request.student.profilePicture
+                                    : `http://localhost:5000${request.student.profilePicture}`}
+                                  alt={`${request.student.firstName} ${request.student.lastName}`}
+                                  className="w-10 h-10 rounded-full object-cover"
+                                />
+                              ) : (
+                                <span className="font-medium text-orange-700 dark:text-orange-200">
+                                  {request.student.firstName.charAt(0)}{request.student.lastName.charAt(0)}
+                                </span>
+                              )}
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-800 dark:text-gray-200">
+                                {request.student.firstName} {request.student.lastName} wants to join
+                                {waitlistPosition && (
+                                  <span className="ml-2 text-sm text-orange-600 dark:text-orange-400 font-normal">
+                                    (Waitlist Position {waitlistPosition})
+                                  </span>
+                                )}
+                              </p>
+                              <p className="text-sm text-gray-500 dark:text-gray-400">
+                                Waitlisted on {new Date(request.requestDate).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => handleApproveEnrollment(request.student._id)}
+                              className="px-4 py-2 bg-green-500 text-white rounded-lg text-sm hover:bg-green-600 transition-colors font-medium"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => handleDenyEnrollment(request.student._id)}
+                              className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600 transition-colors font-medium"
+                            >
+                              Deny
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* Instructor FIRST */}
               <div className="mb-8">
                 <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-gray-100">Instructor</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -2332,7 +2630,14 @@ const CourseDetail: React.FC = () => {
               
               {/* Enrolled Students SECOND */}
               <div>
-                <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-gray-100">Enrolled Students ({course.students.length})</h3>
+                <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-gray-100">
+                  Enrolled Students ({course.students.length})
+                  {course.catalog?.maxStudents && course.students.length > course.catalog.maxStudents && (
+                    <span className="ml-2 text-sm text-orange-600 dark:text-orange-400 font-normal">
+                      (Over Capacity: {course.students.length}/{course.catalog.maxStudents})
+                    </span>
+                  )}
+                </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {course.students.map((student: any) => (
                     <StudentCard
@@ -2394,6 +2699,17 @@ const CourseDetail: React.FC = () => {
           </div>
         );
 
+      case 'sidebar':
+        return (
+          <SidebarConfigModal
+            isOpen={showSidebarConfigModal}
+            onClose={() => setShowSidebarConfigModal(false)}
+            courseId={course?._id || ''}
+            currentConfig={course?.sidebarConfig || {}}
+            onConfigUpdated={handleSidebarConfigUpdated}
+          />
+        );
+
       default:
         return null;
     }
@@ -2404,7 +2720,7 @@ const CourseDetail: React.FC = () => {
       {/* Modern Sidebar */}
       <aside className="w-64 mr-8 mt-4">
         <nav className="bg-white/80 dark:bg-gray-900/80 backdrop-blur rounded-2xl shadow-lg p-4 flex flex-col gap-1 border border-gray-100 dark:border-gray-700">
-          {filteredNavigationItems.map(item => (
+          {filteredNavigationItems.map((item: any) => (
             <button
               key={item.id}
               className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-200 ${activeSection === item.id ? 'bg-blue-100 text-blue-700 font-semibold shadow' : ''}`}
@@ -2431,6 +2747,14 @@ const CourseDetail: React.FC = () => {
         courseId={course?._id || ''}
         currentConfig={course?.overviewConfig || { showLatestAnnouncements: false, numberOfAnnouncements: 3 }}
         onConfigUpdated={handleOverviewConfigUpdated}
+      />
+      {/* Sidebar Configuration Modal */}
+      <SidebarConfigModal
+        isOpen={showSidebarConfigModal}
+        onClose={() => setShowSidebarConfigModal(false)}
+        courseId={course?._id || ''}
+        currentConfig={course?.sidebarConfig || {}}
+        onConfigUpdated={handleSidebarConfigUpdated}
       />
     </div>
   );

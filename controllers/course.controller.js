@@ -19,7 +19,7 @@ exports.createCourse = async (req, res) => {
       });
     }
 
-    const { title, description, gradeScale } = req.body;
+    const { title, description, gradeScale, catalog } = req.body;
     if (gradeScale) {
       const validationError = validateGradeScale(gradeScale);
       if (validationError) {
@@ -30,7 +30,8 @@ exports.createCourse = async (req, res) => {
       title,
       description,
       instructor: req.user.id,
-      ...(gradeScale ? { gradeScale } : {})
+      ...(gradeScale ? { gradeScale } : {}),
+      ...(catalog ? { catalog } : {})
     });
 
     res.status(201).json({
@@ -57,17 +58,20 @@ exports.getCourses = async (req, res) => {
       // Admin can see all courses
       courses = await Course.find()
         .populate('instructor', 'firstName lastName email')
-        .populate('students', 'firstName lastName email');
+        .populate('students', 'firstName lastName email')
+        .populate('enrollmentRequests.student', 'firstName lastName email');
     } else if (req.user.role === 'teacher') {
       // Teachers can see their own courses
       courses = await Course.find({ instructor: req.user.id })
         .populate('instructor', 'firstName lastName email')
-        .populate('students', 'firstName lastName email');
+        .populate('students', 'firstName lastName email')
+        .populate('enrollmentRequests.student', 'firstName lastName email');
     } else {
       // Students can see courses they're enrolled in
       courses = await Course.find({ students: req.user.id, published: true })
         .populate('instructor', 'firstName lastName email')
-        .populate('students', 'firstName lastName email');
+        .populate('students', 'firstName lastName email')
+        .populate('enrollmentRequests.student', 'firstName lastName email');
     }
 
     res.json({
@@ -90,6 +94,11 @@ exports.getCourses = async (req, res) => {
 // @access  Private
 exports.getCourse = async (req, res) => {
   try {
+    console.log('=== GET COURSE DEBUG ===');
+    console.log('User ID:', req.user.id);
+    console.log('User Role:', req.user.role);
+    console.log('Course ID:', req.params.id);
+    
     // Validate if the ID is a valid MongoDB ObjectId
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({
@@ -100,7 +109,9 @@ exports.getCourse = async (req, res) => {
 
     const course = await Course.findById(req.params.id)
       .populate('instructor', 'firstName lastName email profilePicture')
-      .populate('students', 'firstName lastName email profilePicture');
+      .populate('students', 'firstName lastName email profilePicture')
+      .populate('enrollmentRequests.student', 'firstName lastName email profilePicture')
+      .populate('waitlist.student', 'firstName lastName email profilePicture');
 
     if (!course) {
       return res.status(404).json({
@@ -108,17 +119,17 @@ exports.getCourse = async (req, res) => {
         message: 'Course not found'
       });
     }
+    
+    console.log('Course found:', course.title);
+    console.log('Course instructor:', course.instructor._id);
+    console.log('Course students count:', course.students.length);
+    console.log('Course published:', course.published);
 
-    // Check if user has access to the course
-    if (req.user.role === 'student' && 
-        !course.students.some(student => student._id.toString() === req.user.id) &&
-        course.instructor._id.toString() !== req.user.id) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to access this course'
-      });
-    }
+    // All authenticated users can view course details
+    // This allows students to see course information before enrolling
+    // Teachers and admins can always view courses
 
+    console.log('Access granted - sending course data');
     res.json({
       success: true,
       data: course
@@ -402,15 +413,64 @@ exports.unenrollStudent = async (req, res) => {
   const { courseId } = req.params;
   const { studentId } = req.body;
   try {
-    const course = await Course.findByIdAndUpdate(
-      courseId,
-      { $pull: { students: studentId } },
-      { new: true }
-    );
+    const course = await Course.findById(courseId);
+    
     if (!course) {
       return res.status(404).json({ success: false, message: 'Course not found' });
     }
-    res.json({ success: true, data: course });
+    
+    // Remove student from course
+    course.students = course.students.filter(id => id.toString() !== studentId);
+    
+    // Check if there are students on the waitlist and promote the first one
+    if (course.waitlist && course.waitlist.length > 0) {
+      try {
+        const promotedStudent = course.waitlist.shift(); // Remove first student from waitlist
+        
+        // Add them to the course
+        course.students.push(promotedStudent.student);
+        
+        // Update positions for remaining waitlist students
+        course.waitlist.forEach((waitlistEntry, index) => {
+          waitlistEntry.position = index + 1;
+        });
+        
+        // Create todo notification for teacher about the promotion
+        const Todo = require('../models/todo.model');
+        const User = require('../models/user.model');
+        
+        const promotedUser = await User.findById(promotedStudent.student).select('firstName lastName');
+        
+        if (promotedUser) {
+          await Todo.create({
+            title: `Student ${promotedUser.firstName} ${promotedUser.lastName} has been promoted from waitlist to "${course.title}"`,
+            dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000), // 1 day from now
+            user: course.instructor._id,
+            type: 'waitlist_promotion',
+            courseId: course._id,
+            studentId: promotedStudent.student,
+            action: 'completed'
+          });
+        }
+      } catch (waitlistError) {
+        console.error('Error during waitlist promotion:', waitlistError);
+        // Continue with unenrollment even if waitlist promotion fails
+      }
+    }
+    
+    await course.save();
+    
+    // Populate the updated course data
+    const updatedCourse = await Course.findById(course._id)
+      .populate('instructor', 'firstName lastName email')
+      .populate('students', 'firstName lastName email')
+      .populate('waitlist.student', 'firstName lastName email');
+    
+    res.json({ 
+      success: true, 
+      data: updatedCourse,
+      message: 'Student unenrolled successfully' + (course.waitlist && course.waitlist.length > 0 ? '. A student has been promoted from the waitlist.' : '')
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error', error: err.message });
   }
@@ -553,6 +613,121 @@ exports.updateOverviewConfig = async (req, res) => {
     res.status(500).json({ 
       success: false,
       message: 'Server error while updating overview configuration',
+      error: err.message 
+    });
+  }
+}; 
+
+// @desc    Update course sidebar configuration
+// @route   PUT /api/courses/:id/sidebar-config
+// @access  Private (Teacher/Admin)
+exports.updateSidebarConfig = async (req, res) => {
+  try {
+    // Validate if the ID is a valid MongoDB ObjectId
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid course ID format'
+      });
+    }
+
+    const course = await Course.findById(req.params.id);
+
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: 'Course not found'
+      });
+    }
+
+    // Check if user is authorized to update
+    if (req.user.role !== 'admin' && course.instructor.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to update this course'
+      });
+    }
+
+    const { items, studentVisibility } = req.body;
+
+    // Validate items if provided
+    if (items) {
+      if (!Array.isArray(items)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Items must be an array'
+        });
+      }
+
+      // Validate each item
+      for (const item of items) {
+        if (!item.id || !item.label || typeof item.visible !== 'boolean' || typeof item.order !== 'number') {
+          return res.status(400).json({
+            success: false,
+            message: 'Each item must have id, label, visible (boolean), and order (number)'
+          });
+        }
+      }
+
+      // Check for duplicate orders
+      const orders = items.map(item => item.order);
+      if (new Set(orders).size !== orders.length) {
+        return res.status(400).json({
+          success: false,
+          message: 'Item orders must be unique'
+        });
+      }
+    }
+
+    // Validate studentVisibility if provided
+    if (studentVisibility) {
+      const validKeys = [
+        'overview', 'modules', 'pages', 'assignments', 'discussions',
+        'announcements', 'polls', 'groups', 'attendance', 'grades',
+        'gradebook', 'students'
+      ];
+
+      for (const key of Object.keys(studentVisibility)) {
+        if (!validKeys.includes(key)) {
+          return res.status(400).json({
+            success: false,
+            message: `Invalid key in studentVisibility: ${key}`
+          });
+        }
+        if (typeof studentVisibility[key] !== 'boolean') {
+          return res.status(400).json({
+            success: false,
+            message: `studentVisibility.${key} must be a boolean`
+          });
+        }
+      }
+    }
+
+    // Update the sidebar configuration
+    const updateData = {};
+    if (items) {
+      updateData['sidebarConfig.items'] = items;
+    }
+    if (studentVisibility) {
+      updateData['sidebarConfig.studentVisibility'] = studentVisibility;
+    }
+
+    const updatedCourse = await Course.findByIdAndUpdate(
+      req.params.id,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    ).populate('instructor', 'firstName lastName email')
+     .populate('students', 'firstName lastName email');
+
+    res.json({
+      success: true,
+      data: updatedCourse
+    });
+  } catch (err) {
+    console.error('Update sidebar config error:', err);
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error while updating sidebar configuration',
       error: err.message 
     });
   }
