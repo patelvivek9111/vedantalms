@@ -140,6 +140,17 @@ app.use('/api/*', (req, res) => {
   res.status(404).json({ message: 'API route not found' });
 });
 
+// Serve frontend static files in production
+if (process.env.NODE_ENV === 'production') {
+  // Serve static files from the frontend/dist directory
+  app.use(express.static(path.join(__dirname, 'frontend', 'dist')));
+  
+  // Handle all non-API routes by serving the frontend
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'frontend', 'dist', 'index.html'));
+  });
+}
+
 // Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
