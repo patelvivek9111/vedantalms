@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getImageUrl } from '../utils/apiUtils';
 import { 
   Users, 
   Search, 
@@ -285,7 +286,7 @@ export function AdminUserManagement() {
                               className="h-10 w-10 rounded-full object-cover border-2 border-gray-200"
                               src={user.profilePicture.startsWith('http')
                                 ? user.profilePicture
-                                : `http://localhost:5000${user.profilePicture}`}
+                                : getImageUrl(user.profilePicture)}
                               alt={`${user.firstName} ${user.lastName}`}
                               onError={(e) => {
                                 // Hide the failed image and show fallback

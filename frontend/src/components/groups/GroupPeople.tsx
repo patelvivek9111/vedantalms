@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { getImageUrl } from '../../utils/apiUtils';
 
 interface Member {
   _id: string;
@@ -118,7 +119,7 @@ const GroupPeople: React.FC<GroupPeopleProps> = ({ groupId, groupSetId }) => {
                       <img
                         src={student.profilePicture.startsWith('http')
                           ? student.profilePicture
-                          : `http://localhost:5000${student.profilePicture}`}
+                          : getImageUrl(student.profilePicture)}
                         alt={`${student.firstName} ${student.lastName}`}
                         className="w-8 h-8 rounded-full object-cover border-2 border-gray-200"
                         onError={(e) => {
@@ -174,7 +175,7 @@ const GroupPeople: React.FC<GroupPeopleProps> = ({ groupId, groupSetId }) => {
                   <img
                     src={member.profilePicture.startsWith('http')
                       ? member.profilePicture
-                      : `http://localhost:5000${member.profilePicture}`}
+                      : getImageUrl(member.profilePicture)}
                     alt={`${member.firstName} ${member.lastName}`}
                     className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
                     onError={(e) => {

@@ -4,6 +4,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { API_URL } from '../config';
+import { getImageUrl } from '../utils/apiUtils';
 import RichTextEditor from './RichTextEditor';
 import { 
   MessageSquare, 
@@ -185,7 +186,7 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
                   src={reply.author.profilePicture
                     ? (reply.author.profilePicture.startsWith('http')
                         ? reply.author.profilePicture
-                        : `http://localhost:5000${reply.author.profilePicture}`)
+                        : getImageUrl(reply.author.profilePicture))
                     : '/default-avatar.png'}
                   alt={reply.author.firstName}
                   className="w-10 h-10 rounded-full object-cover border-2 border-gray-100"
@@ -799,11 +800,11 @@ const ThreadView: React.FC = () => {
                           src={thread.author.profilePicture
                             ? (thread.author.profilePicture.startsWith('http')
                                 ? thread.author.profilePicture
-                                : `http://localhost:5000${thread.author.profilePicture}`)
+                                : getImageUrl(thread.author.profilePicture))
                             : thread.author.avatarUrl
                             ? (thread.author.avatarUrl.startsWith('http')
                                 ? thread.author.avatarUrl
-                                : `http://localhost:5000${thread.author.avatarUrl}`)
+                                : getImageUrl(thread.author.avatarUrl))
                             : '/default-avatar.png'}
                           alt={thread.author.firstName}
                           className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm"
@@ -1158,7 +1159,7 @@ const ThreadView: React.FC = () => {
                               <img
                                 src={student.profilePicture.startsWith('http')
                                   ? student.profilePicture
-                                  : `http://localhost:5000${student.profilePicture}`}
+                                  : getImageUrl(student.profilePicture)}
                                 alt={`${student.firstName} ${student.lastName}`}
                                 className="w-8 h-8 rounded-full object-cover border-2 border-gray-100"
                                 onError={(e) => {

@@ -32,6 +32,7 @@ import CourseDiscussions from './CourseDiscussions';
 import GroupManagement from './groups/GroupManagement';
 import StudentGroupView from './groups/StudentGroupView';
 import { getWeightedGradeForStudent, getLetterGrade, calculateFinalGradeWithWeightedGroups } from '../utils/gradeUtils';
+import { getImageUrl } from '../utils/apiUtils';
 import CoursePages from './CoursePages';
 import Announcements from '../pages/Announcements';
 import AnnouncementForm from './announcements/AnnouncementForm';
@@ -153,7 +154,7 @@ const StudentCard = ({ student, isInstructor, isAdmin, handleUnenroll, isInstruc
         <img
           src={student.profilePicture.startsWith('http')
             ? student.profilePicture
-            : `http://localhost:5000${student.profilePicture}`}
+            : getImageUrl(student.profilePicture)}
           alt={student.firstName}
           className="w-12 h-12 object-cover rounded-full border"
           onError={() => setImgError(true)}
@@ -2017,7 +2018,7 @@ const CourseDetail: React.FC = () => {
                                     <img
                                       src={student.profilePicture.startsWith('http')
                                         ? student.profilePicture
-                                        : `http://localhost:5000${student.profilePicture}`}
+                                        : getImageUrl(student.profilePicture)}
                                       alt={`${student.firstName} ${student.lastName}`}
                                       className="w-8 h-8 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600"
                                       onError={(e) => {
@@ -2567,7 +2568,7 @@ const CourseDetail: React.FC = () => {
                                 <img 
                                   src={request.student.profilePicture.startsWith('http')
                                     ? request.student.profilePicture
-                                    : `http://localhost:5000${request.student.profilePicture}`}
+                                    : getImageUrl(request.student.profilePicture)}
                                   alt={`${request.student.firstName} ${request.student.lastName}`}
                                   className="w-10 h-10 rounded-full object-cover"
                                 />

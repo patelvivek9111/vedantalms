@@ -3,6 +3,7 @@ import { fetchConversations, fetchMessages, sendMessage, createConversation, sea
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { getImageUrl } from '../utils/apiUtils';
 import { Edit, Reply, Archive, Trash2, Search, ChevronLeft, CheckSquare, Paperclip, CheckSquare2 } from 'lucide-react';
 import RichTextEditor from '../components/RichTextEditor';
 
@@ -783,7 +784,7 @@ const Inbox: React.FC = () => {
                             <img
                               src={otherParticipants[0].profilePicture.startsWith('http')
                                 ? otherParticipants[0].profilePicture
-                                : `http://localhost:5000${otherParticipants[0].profilePicture}`}
+                                : getImageUrl(otherParticipants[0].profilePicture)}
                               alt={participantNames}
                               className="w-8 h-8 object-cover rounded-full"
                             />
@@ -873,7 +874,7 @@ const Inbox: React.FC = () => {
                                 <img
                                   src={msg.senderId.profilePicture.startsWith('http')
                                     ? msg.senderId.profilePicture
-                                    : `http://localhost:5000${msg.senderId.profilePicture}`}
+                                    : getImageUrl(msg.senderId.profilePicture)}
                                   alt={senderName}
                                   className="w-10 h-10 object-cover rounded-full"
                                 />

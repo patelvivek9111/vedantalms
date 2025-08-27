@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { updateUserProfile, uploadProfilePicture, getUserPreferences, updateUserPreferences, getLoginActivity } from '../services/api';
+import { getImageUrl } from '../utils/apiUtils';
 import { useTheme } from '../context/ThemeContext';
 
 const sections = [
@@ -88,7 +89,7 @@ function ProfileSection() {
                 src={
                   user.profilePicture.startsWith('http')
                     ? user.profilePicture
-                    : `http://localhost:5000${user.profilePicture}`
+                    : getImageUrl(user.profilePicture)
                 }
                 alt="Profile"
                 className="w-20 h-20 rounded-full object-cover border"
