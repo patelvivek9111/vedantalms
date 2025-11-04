@@ -13,8 +13,7 @@
     "strict": true,
     "noEmit": true,
     "rootDir": "src",
-    "outDir": "dist",
-    "types": ["vite/client", "node"]
+    "outDir": "dist"
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist"]
