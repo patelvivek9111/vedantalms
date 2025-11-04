@@ -14,15 +14,19 @@ import {
   Users, 
   BarChart3, 
   UserPlus,
-  CheckSquare
+  CheckSquare,
+  ClipboardCheck,
+  GraduationCap
 } from 'lucide-react';
 
 // Navigation items for the course sidebar
 const navigationItems = [
   { id: 'overview', label: 'Overview', icon: ClipboardList },
+  { id: 'syllabus', label: 'Syllabus', icon: GraduationCap },
   { id: 'modules', label: 'Modules', icon: BookOpen },
   { id: 'pages', label: 'Pages', icon: FileText },
   { id: 'assignments', label: 'Assignments', icon: PenTool },
+  { id: 'quizzes', label: 'Quizzes', icon: ClipboardCheck },
   { id: 'discussions', label: 'Discussions', icon: MessageSquare },
   { id: 'announcements', label: 'Announcements', icon: Megaphone },
   { id: 'groups', label: 'Groups', icon: Users },
@@ -84,20 +88,41 @@ const AssignmentViewWrapper: React.FC = () => {
     fetchCourseData();
   }, [assignmentId]);
 
-  // Get custom sidebar configuration or use default
-  const sidebarConfig = course?.sidebarConfig || {
-    items: navigationItems.map((item, index) => ({
-      id: item.id,
-      label: item.label,
+  // Merge existing config with default navigationItems to ensure all items are included
+  const existingItems = course?.sidebarConfig?.items || [];
+  const existingItemsMap = new Map(existingItems.map((item: any) => [item.id, item]));
+  
+  // Build merged items: start with all navigationItems, use existing config if available
+  const mergedItems = navigationItems.map((navItem, index) => {
+    const existing = existingItemsMap.get(navItem.id);
+    if (existing) {
+      // Use existing config, but ensure we have the icon and other properties from navigationItems
+      return {
+        ...existing,
+        label: navItem.label, // Always use the current label from navigationItems
+        fixed: navItem.id === 'overview'
+      };
+    }
+    // Item doesn't exist in config, add it with defaults
+    return {
+      id: navItem.id,
+      label: navItem.label,
       visible: true,
       order: index,
-      fixed: item.id === 'overview'
-    })),
+      fixed: navItem.id === 'overview'
+    };
+  });
+
+  // Get custom sidebar configuration or use default
+  const sidebarConfig = {
+    items: mergedItems,
     studentVisibility: {
       overview: true,
+      syllabus: true,
       modules: true,
       pages: true,
       assignments: true,
+      quizzes: true,
       discussions: true,
       announcements: true,
       polls: true,
@@ -105,7 +130,8 @@ const AssignmentViewWrapper: React.FC = () => {
       attendance: true,
       grades: true,
       gradebook: false,
-      students: true
+      students: true,
+      ...(course?.sidebarConfig?.studentVisibility || {})
     }
   };
 
@@ -115,9 +141,15 @@ const AssignmentViewWrapper: React.FC = () => {
     .filter((item: { visible: boolean }) => item.visible)
     .map((item: { id: string; label: string; visible: boolean; order: number }) => {
       const originalItem = navigationItems.find(nav => nav.id === item.id);
-      return {
+      return originalItem ? {
         ...originalItem,
         ...item
+      } : {
+        id: item.id,
+        label: item.label,
+        icon: ClipboardList, // Default icon fallback
+        visible: item.visible,
+        order: item.order
       };
     });
 

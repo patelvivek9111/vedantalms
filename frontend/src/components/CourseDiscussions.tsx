@@ -95,12 +95,12 @@ const CourseDiscussions: React.FC<CourseDiscussionsProps> = ({ courseId, courseG
         if (res.data && Array.isArray(res.data.data)) {
           modulesArr = res.data.data.map((module: any) => ({
             ...module,
-            title: module.name
+            title: module.title // API returns 'title', not 'name'
           }));
         } else if (Array.isArray(res.data)) {
           modulesArr = res.data.map((module: any) => ({
             ...module,
-            title: module.name
+            title: module.title // API returns 'title', not 'name'
           }));
         }
         setModules(modulesArr);

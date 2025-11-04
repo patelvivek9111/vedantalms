@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { updateUserProfile, uploadProfilePicture, getUserPreferences, updateUserPreferences, getLoginActivity } from '../services/api';
-import { getImageUrl } from '../utils/apiUtils';
+import { updateUserProfile, uploadProfilePicture, getUserPreferences, updateUserPreferences, getLoginActivity, getImageUrl } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 
 const sections = [

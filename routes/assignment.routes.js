@@ -3,7 +3,7 @@ const router = express.Router();
 const assignmentController = require('../controllers/assignment.controller');
 const { protect, authorize } = require('../middleware/auth');
 const upload = require('../middleware/upload');
-const { toggleAssignmentPublish, getUngradedAssignmentsTodo, getStudentAssignmentsDueThisWeek } = require('../controllers/assignment.controller');
+const { toggleAssignmentPublish, getUngradedAssignmentsTodo, getStudentAssignmentsDueThisWeek, getAllItemsDueThisWeek } = require('../controllers/assignment.controller');
 
 // Create assignment (teacher/admin only)
 router.post('/', protect, authorize(['teacher', 'admin']), upload.array('attachments', 5), assignmentController.createAssignment);
@@ -37,5 +37,8 @@ router.get('/todo/ungraded', protect, getUngradedAssignmentsTodo);
 
 // To-Do: Get all assignments due this week for the logged-in student
 router.get('/todo/due', protect, getStudentAssignmentsDueThisWeek);
+
+// To-Do: Get all items due this week for the logged-in student (assignments + discussions)
+router.get('/todo/due-all', protect, getAllItemsDueThisWeek);
 
 module.exports = router; 

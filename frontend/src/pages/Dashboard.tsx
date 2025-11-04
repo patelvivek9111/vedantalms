@@ -4,6 +4,7 @@ import { useCourse } from '../contexts/CourseContext';
 import { useAuth } from '../context/AuthContext';
 import { ToDoPanel } from '../components/ToDoPanel';
 import { MoreVertical, Megaphone, FileText, MessageSquare, Palette, BookOpen, File, Settings } from 'lucide-react';
+import api, { getUserPreferences, updateUserPreferences } from '../services/api';
 
 // Earthy tone color palette
 const earthyColors = [
@@ -28,16 +29,24 @@ const availableIcons = [
 ];
 
 export function Dashboard() {
-  const { courses, loading, error } = useCourse();
+  const courseContext = useCourse();
   const { user } = useAuth();
+  
+  // Safety check - ensure context is available
+  if (!courseContext) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+  
+  const { courses, loading, error, updateCourse, getCourses } = courseContext;
   const navigate = useNavigate();
   
-  // State to track custom colors for each course
-  const [courseColors, setCourseColors] = useState<{ [key: string]: string }>(() => {
-    // Load colors from localStorage on component mount
-    const savedColors = localStorage.getItem('courseColors');
-    return savedColors ? JSON.parse(savedColors) : {};
-  });
+  // State to track user's personal course colors (for students) or course default colors (for teachers)
+  const [userCourseColors, setUserCourseColors] = useState<{ [key: string]: string }>({});
+  const [loadingPreferences, setLoadingPreferences] = useState(true);
   const [openColorPicker, setOpenColorPicker] = useState<string | null>(null);
   
   // State to track selected icons for each course (default to first 3)
@@ -48,16 +57,64 @@ export function Dashboard() {
   });
   const [openIconPicker, setOpenIconPicker] = useState<string | null>(null);
   
-  // Ref for dropdown container
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  // Refs for dropdown containers
+  const colorPickerRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const iconPickerRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
   const isTeacherOrAdmin = user?.role === 'teacher' || user?.role === 'admin';
 
-  // Click outside handler to close dropdowns
+  // Load user preferences on mount and when user changes
+  useEffect(() => {
+    const loadUserPreferences = async () => {
+      if (!user) {
+        // Clear preferences when no user
+        setUserCourseColors({});
+        setLoadingPreferences(false);
+        return;
+      }
+      
+      try {
+        setLoadingPreferences(true);
+        const response = await getUserPreferences();
+        if (response.data.success && response.data.preferences?.courseColors) {
+          setUserCourseColors(response.data.preferences.courseColors || {});
+        } else {
+          setUserCourseColors({});
+        }
+      } catch (err) {
+        console.error('Error loading user preferences:', err);
+        setUserCourseColors({});
+      } finally {
+        setLoadingPreferences(false);
+      }
+    };
+
+    loadUserPreferences();
+  }, [user?._id]); // Use user._id to ensure it reloads when user changes
+
+  // Click outside handler to close dropdowns - FIXED VERSION
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      
+      // Check if click is outside any color picker
+      const isOutsideColorPicker = Object.values(colorPickerRefs.current).every(ref => 
+        !ref || !ref.contains(target)
+      );
+      
+      // Check if click is outside any icon picker
+      const isOutsideIconPicker = Object.values(iconPickerRefs.current).every(ref => 
+        !ref || !ref.contains(target)
+      );
+      
+      // Only close dropdowns if clicking outside AND not on a course card
+      const isOnCourseCard = (target as Element).closest('[data-course-card]');
+      
+      if (isOutsideColorPicker && !isOnCourseCard) {
         setOpenColorPicker(null);
+      }
+      
+      if (isOutsideIconPicker && !isOnCourseCard) {
         setOpenIconPicker(null);
       }
     };
@@ -92,19 +149,42 @@ export function Dashboard() {
     navigate(`/courses/${courseId}`);
   };
 
-  const handleColorChange = (courseId: string, color: string) => {
+  const handleColorChange = async (courseId: string, color: string) => {
+    try {
+      if (isTeacherOrAdmin) {
+        // Teacher/Admin: Update course's defaultColor
+        await updateCourse(courseId, undefined, undefined, undefined, color);
+        // Refresh courses to get updated defaultColor
+        await getCourses();
+      } else {
+        // Student: Update user's personal course color preference
     const newColors = {
-      ...courseColors,
+          ...userCourseColors,
       [courseId]: color
     };
-    setCourseColors(newColors);
-    // Save to localStorage
-    localStorage.setItem('courseColors', JSON.stringify(newColors));
+        setUserCourseColors(newColors);
+        await updateUserPreferences({ courseColors: newColors });
+      }
     setOpenColorPicker(null);
+    } catch (err) {
+      console.error('Error updating course color:', err);
+      // Optionally show an error message to the user
+    }
   };
 
   const getCourseColor = (courseId: string) => {
-    return courseColors[courseId] || '#556B2F'; // Default olive green
+    const course = courses.find(c => c._id === courseId);
+    
+    if (isTeacherOrAdmin) {
+      // Teachers see the course's defaultColor
+      return course?.defaultColor || '#556B2F';
+    } else {
+      // Students: priority is user's personal color > course defaultColor > fallback
+      if (userCourseColors[courseId]) {
+        return userCourseColors[courseId];
+      }
+      return course?.defaultColor || '#556B2F';
+    }
   };
 
   const getCourseIcons = (courseId: string) => {
@@ -205,8 +285,9 @@ export function Dashboard() {
               {publishedCourses.map((course) => (
                 <div 
                   key={course._id} 
-                  className="bg-white rounded-xl shadow-lg overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 ml-4 border border-gray-100"
+                  className="bg-white rounded-xl shadow-lg overflow-visible cursor-pointer hover:shadow-xl transition-all duration-300 ml-4 border border-gray-100 group"
                   onClick={() => handleCardClick(course._id)}
+                  data-course-card
                 >
                   {/* Top section - Dynamic color */}
                   <div 
@@ -228,7 +309,10 @@ export function Dashboard() {
                         
                         {/* Color picker dropdown */}
                         {openColorPicker === course._id && (
-                          <div className="absolute right-0 top-8 bg-white rounded-lg shadow-lg border border-gray-200 p-3 z-10 min-w-48" ref={dropdownRef}>
+                          <div 
+                            className="absolute right-0 top-8 bg-white rounded-lg shadow-lg border border-gray-200 p-3 z-50 min-w-48" 
+                            ref={(el) => colorPickerRefs.current[course._id] = el}
+                          >
                             <div className="flex items-center gap-2 mb-3">
                               <Palette className="h-4 w-4 text-gray-600" />
                               <span className="text-sm font-medium text-gray-700">Choose Color</span>
@@ -264,7 +348,10 @@ export function Dashboard() {
 
                         {/* Icon picker dropdown */}
                         {openIconPicker === course._id && (
-                          <div className="absolute right-0 top-8 bg-white rounded-lg shadow-lg border border-gray-200 p-3 z-10 min-w-48" ref={dropdownRef}>
+                          <div 
+                            className="absolute right-0 top-8 bg-white rounded-lg shadow-lg border border-gray-200 p-3 z-50 min-w-48" 
+                            ref={(el) => iconPickerRefs.current[course._id] = el}
+                          >
                             <div className="flex items-center gap-2 mb-3">
                               <Settings className="h-4 w-4 text-gray-600" />
                               <span className="text-sm font-medium text-gray-700">Display Icons (Max 3)</span>
@@ -329,7 +416,7 @@ export function Dashboard() {
                         className="font-bold text-lg mb-1"
                         style={{ color: getCourseColor(course._id) }}
                       >
-                        {course.title}
+                        {course.catalog?.courseCode || course.title}
                       </h2>
                       <p className="text-gray-500 text-sm">
                         Instructor: {course.instructor.firstName} {course.instructor.lastName}
@@ -386,7 +473,10 @@ export function Dashboard() {
                           
                           {/* Color picker dropdown */}
                           {openColorPicker === course._id && (
-                            <div className="absolute right-0 top-8 bg-white rounded-lg shadow-lg border border-gray-200 p-3 z-10 min-w-48" ref={dropdownRef}>
+                            <div 
+                              className="absolute right-0 top-8 bg-white rounded-lg shadow-lg border border-gray-200 p-3 z-50 min-w-48" 
+                              ref={(el) => colorPickerRefs.current[course._id] = el}
+                            >
                               <div className="flex items-center gap-2 mb-3">
                                 <Palette className="h-4 w-4 text-gray-600" />
                                 <span className="text-sm font-medium text-gray-700">Choose Color</span>
@@ -422,7 +512,10 @@ export function Dashboard() {
 
                           {/* Icon picker dropdown */}
                           {openIconPicker === course._id && (
-                            <div className="absolute right-0 top-8 bg-white rounded-lg shadow-lg border border-gray-200 p-3 z-10 min-w-48" ref={dropdownRef}>
+                            <div 
+                              className="absolute right-0 top-8 bg-white rounded-lg shadow-lg border border-gray-200 p-3 z-50 min-w-48" 
+                              ref={(el) => iconPickerRefs.current[course._id] = el}
+                            >
                               <div className="flex items-center gap-2 mb-3">
                                 <Settings className="h-4 w-4 text-gray-600" />
                                 <span className="text-sm font-medium text-gray-700">Display Icons (Max 3)</span>
@@ -487,7 +580,7 @@ export function Dashboard() {
                           className="font-bold text-xl mb-2"
                           style={{ color: getCourseColor(course._id) }}
                         >
-                          {course.title}
+                          {course.catalog?.courseCode || course.title}
                         </h2>
                         <p className="text-gray-600 text-sm flex items-center">
                           <span className="w-2 h-2 bg-gray-400 rounded-full mr-2"></span>

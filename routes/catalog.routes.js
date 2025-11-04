@@ -19,7 +19,6 @@ router.get('/', async (req, res) => {
         user = await User.findById(decoded.id);
       } catch (err) {
         // Token is invalid, treat as unauthenticated
-        console.log('Invalid token in catalog request, treating as unauthenticated');
       }
     }
 

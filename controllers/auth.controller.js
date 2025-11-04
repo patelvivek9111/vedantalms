@@ -118,6 +118,10 @@ exports.login = async (req, res) => {
       success: true
     });
 
+    // Update lastLogin timestamp
+    user.lastLogin = new Date();
+    await user.save();
+
     // Create token
     const token = user.getSignedJwtToken();
 

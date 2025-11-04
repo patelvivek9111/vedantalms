@@ -47,11 +47,38 @@ const courseSchema = new mongoose.Schema({
         weight: { type: Number, required: true }
       }
     ],
-    default: []
+    default: [
+      { name: 'Projects', weight: 15 },
+      { name: 'Homework', weight: 15 },
+      { name: 'Exams', weight: 20 },
+      { name: 'Quizzes', weight: 30 },
+      { name: 'Participation', weight: 20 }
+    ]
   },
   published: {
     type: Boolean,
     default: false
+  },
+  publishedStateSnapshot: {
+    type: {
+      modules: [{
+        moduleId: mongoose.Schema.Types.ObjectId,
+        published: Boolean
+      }],
+      pages: [{
+        pageId: mongoose.Schema.Types.ObjectId,
+        published: Boolean
+      }],
+      assignments: [{
+        assignmentId: mongoose.Schema.Types.ObjectId,
+        published: Boolean
+      }],
+      threads: [{
+        threadId: mongoose.Schema.Types.ObjectId,
+        published: Boolean
+      }]
+    },
+    default: null
   },
   catalog: {
     isPublic: { type: Boolean, default: false },
@@ -60,12 +87,26 @@ const courseSchema = new mongoose.Schema({
     prerequisites: [{ type: String }],
     allowTeacherEnrollment: { type: Boolean, default: false },
     maxStudents: { type: Number },
+    creditHours: { type: Number, default: 3 },
     enrollmentDeadline: { type: Date },
     startDate: { type: Date },
     endDate: { type: Date },
     tags: [{ type: String }],
     thumbnail: { type: String },
-    syllabus: { type: String }
+    syllabus: { type: String },
+    courseCode: { type: String, default: '' },
+    officeHours: { type: String, default: 'By Appointment' },
+    syllabusContent: { type: String, default: '' },
+    syllabusFiles: [{ 
+      name: { type: String },
+      url: { type: String },
+      size: { type: Number },
+      uploadedAt: { type: Date, default: Date.now }
+    }]
+  },
+  semester: {
+    term: { type: String, enum: ['Fall', 'Spring', 'Summer', 'Winter'], default: 'Fall' },
+    year: { type: Number, default: new Date().getFullYear() }
   },
   enrollmentRequests: [{
     student: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -95,6 +136,10 @@ const courseSchema = new mongoose.Schema({
       numberOfAnnouncements: 3
     }
   },
+  defaultColor: {
+    type: String,
+    default: '#556B2F' // Default olive green
+  },
   sidebarConfig: {
     type: {
       items: {
@@ -108,25 +153,29 @@ const courseSchema = new mongoose.Schema({
         ],
         default: [
           { id: 'overview', label: 'Overview', visible: true, order: 0 },
-          { id: 'modules', label: 'Modules', visible: true, order: 1 },
-          { id: 'pages', label: 'Pages', visible: true, order: 2 },
-          { id: 'assignments', label: 'Assignments', visible: true, order: 3 },
-          { id: 'discussions', label: 'Discussions', visible: true, order: 4 },
-          { id: 'announcements', label: 'Announcements', visible: true, order: 5 },
-          { id: 'polls', label: 'Polls', visible: true, order: 6 },
-          { id: 'groups', label: 'Groups', visible: true, order: 7 },
-          { id: 'attendance', label: 'Attendance', visible: true, order: 8 },
-          { id: 'grades', label: 'Grades', visible: true, order: 9 },
-          { id: 'gradebook', label: 'Gradebook', visible: true, order: 10 },
-          { id: 'students', label: 'People', visible: true, order: 11 }
+          { id: 'syllabus', label: 'Syllabus', visible: true, order: 1 },
+          { id: 'modules', label: 'Modules', visible: true, order: 2 },
+          { id: 'pages', label: 'Pages', visible: true, order: 3 },
+          { id: 'assignments', label: 'Assignments', visible: true, order: 4 },
+          { id: 'quizzes', label: 'Quizzes', visible: true, order: 5 },
+          { id: 'discussions', label: 'Discussions', visible: true, order: 6 },
+          { id: 'announcements', label: 'Announcements', visible: true, order: 7 },
+          { id: 'polls', label: 'Polls', visible: true, order: 8 },
+          { id: 'groups', label: 'Groups', visible: true, order: 9 },
+          { id: 'attendance', label: 'Attendance', visible: true, order: 10 },
+          { id: 'grades', label: 'Grades', visible: true, order: 11 },
+          { id: 'gradebook', label: 'Gradebook', visible: true, order: 12 },
+          { id: 'students', label: 'People', visible: true, order: 13 }
         ]
       },
       studentVisibility: {
         type: {
           overview: { type: Boolean, default: true },
+          syllabus: { type: Boolean, default: true },
           modules: { type: Boolean, default: true },
           pages: { type: Boolean, default: true },
           assignments: { type: Boolean, default: true },
+          quizzes: { type: Boolean, default: true },
           discussions: { type: Boolean, default: true },
           announcements: { type: Boolean, default: true },
           polls: { type: Boolean, default: true },
@@ -138,9 +187,11 @@ const courseSchema = new mongoose.Schema({
         },
         default: {
           overview: true,
+          syllabus: true,
           modules: true,
           pages: true,
           assignments: true,
+          quizzes: true,
           discussions: true,
           announcements: true,
           polls: true,
@@ -155,23 +206,27 @@ const courseSchema = new mongoose.Schema({
     default: {
       items: [
         { id: 'overview', label: 'Overview', visible: true, order: 0 },
-        { id: 'modules', label: 'Modules', visible: true, order: 1 },
-        { id: 'pages', label: 'Pages', visible: true, order: 2 },
-        { id: 'assignments', label: 'Assignments', visible: true, order: 3 },
-        { id: 'discussions', label: 'Discussions', visible: true, order: 4 },
-        { id: 'announcements', label: 'Announcements', visible: true, order: 5 },
-        { id: 'polls', label: 'Polls', visible: true, order: 6 },
-        { id: 'groups', label: 'Groups', visible: true, order: 7 },
-        { id: 'attendance', label: 'Attendance', visible: true, order: 8 },
-        { id: 'grades', label: 'Grades', visible: true, order: 9 },
-        { id: 'gradebook', label: 'Gradebook', visible: true, order: 10 },
-        { id: 'students', label: 'People', visible: true, order: 11 }
+        { id: 'syllabus', label: 'Syllabus', visible: true, order: 1 },
+        { id: 'modules', label: 'Modules', visible: true, order: 2 },
+        { id: 'pages', label: 'Pages', visible: true, order: 3 },
+        { id: 'assignments', label: 'Assignments', visible: true, order: 4 },
+        { id: 'quizzes', label: 'Quizzes', visible: true, order: 5 },
+        { id: 'discussions', label: 'Discussions', visible: true, order: 6 },
+        { id: 'announcements', label: 'Announcements', visible: true, order: 7 },
+        { id: 'polls', label: 'Polls', visible: true, order: 8 },
+        { id: 'groups', label: 'Groups', visible: true, order: 9 },
+        { id: 'attendance', label: 'Attendance', visible: true, order: 10 },
+        { id: 'grades', label: 'Grades', visible: true, order: 11 },
+        { id: 'gradebook', label: 'Gradebook', visible: true, order: 12 },
+        { id: 'students', label: 'People', visible: true, order: 13 }
       ],
       studentVisibility: {
         overview: true,
+        syllabus: true,
         modules: true,
         pages: true,
         assignments: true,
+        quizzes: true,
         discussions: true,
         announcements: true,
         polls: true,

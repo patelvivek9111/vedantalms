@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import api from '../../services/api';
+import api, { getImageUrl } from '../../services/api';
 import { API_URL } from '../../config';
 import { formatDistanceToNow } from 'date-fns';
 import CreateThreadModal from '../CreateThreadModal';
@@ -18,6 +18,8 @@ interface Thread {
     firstName: string;
     lastName: string;
     role: string;
+    profilePicture?: string;
+    avatarUrl?: string;
   };
   createdAt: string;
   updatedAt: string;
@@ -121,12 +123,12 @@ const GroupDiscussion: React.FC = () => {
         if (res.data && Array.isArray(res.data.data)) {
           modulesArr = res.data.data.map((module: any) => ({
             ...module,
-            title: module.name
+            title: module.title // API returns 'title', not 'name'
           }));
         } else if (Array.isArray(res.data)) {
           modulesArr = res.data.map((module: any) => ({
             ...module,
-            title: module.name
+            title: module.title // API returns 'title', not 'name'
           }));
         }
         setModules(modulesArr);
@@ -174,11 +176,11 @@ const GroupDiscussion: React.FC = () => {
   };
 
   const handleThreadClick = (threadId: string) => {
-    if (courseId) {
-      navigate(`/courses/${courseId}/threads/${threadId}`);
+    if (groupId) {
+      navigate(`/groups/${groupId}/discussion/${threadId}`);
     } else {
-      console.error('Course ID not found for this group. Cannot navigate to thread.');
-      alert('Course ID not found for this group. Please contact your administrator.');
+      console.error('Group ID not found. Cannot navigate to thread.');
+      alert('Group ID not found. Please contact your administrator.');
     }
   };
 
@@ -275,12 +277,52 @@ const GroupDiscussion: React.FC = () => {
                               )}
                             </h3>
                             <div className="flex items-center text-sm text-gray-600 space-x-4">
-                              <span>
-                                Posted by {thread.author.firstName} {thread.author.lastName}
-                                <span className="ml-1 px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
-                                  {thread.author.role}
+                              <div className="flex items-center space-x-2">
+                                <div className="relative">
+                                  {thread.author.profilePicture || thread.author.avatarUrl ? (
+                                    <img
+                                      src={
+                                        thread.author.profilePicture
+                                          ? (thread.author.profilePicture.startsWith('http')
+                                              ? thread.author.profilePicture
+                                              : getImageUrl(thread.author.profilePicture))
+                                          : thread.author.avatarUrl
+                                          ? (thread.author.avatarUrl.startsWith('http')
+                                              ? thread.author.avatarUrl
+                                              : getImageUrl(thread.author.avatarUrl))
+                                          : '/default-avatar.png'
+                                      }
+                                      alt={`${thread.author.firstName} ${thread.author.lastName}`}
+                                      className="w-8 h-8 rounded-full object-cover border-2 border-gray-200"
+                                      onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                        const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                        if (fallback) {
+                                          fallback.style.display = 'flex';
+                                        }
+                                      }}
+                                    />
+                                  ) : null}
+                                  {/* Fallback avatar with initials */}
+                                  <div
+                                    className={`w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold ${
+                                      thread.author.profilePicture || thread.author.avatarUrl ? 'hidden' : 'flex'
+                                    }`}
+                                    style={{
+                                      display: thread.author.profilePicture || thread.author.avatarUrl ? 'none' : 'flex'
+                                    }}
+                                  >
+                                    {thread.author.firstName?.charAt(0) || ''}
+                                    {thread.author.lastName?.charAt(0) || ''}
+                                  </div>
+                                </div>
+                                <span>
+                                  Posted by {thread.author.firstName} {thread.author.lastName}
+                                  <span className="ml-1 px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                                    {thread.author.role}
+                                  </span>
                                 </span>
-                              </span>
+                              </div>
                               <span>•</span>
                               <span title={new Date(thread.createdAt).toLocaleString()}>
                                 {formatDistanceToNow(new Date(thread.createdAt), { addSuffix: true })}
@@ -337,12 +379,52 @@ const GroupDiscussion: React.FC = () => {
                               )}
                             </h3>
                             <div className="flex items-center text-sm text-gray-600 space-x-4">
-                              <span>
-                                Posted by {thread.author.firstName} {thread.author.lastName}
-                                <span className="ml-1 px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
-                                  {thread.author.role}
+                              <div className="flex items-center space-x-2">
+                                <div className="relative">
+                                  {thread.author.profilePicture || thread.author.avatarUrl ? (
+                                    <img
+                                      src={
+                                        thread.author.profilePicture
+                                          ? (thread.author.profilePicture.startsWith('http')
+                                              ? thread.author.profilePicture
+                                              : getImageUrl(thread.author.profilePicture))
+                                          : thread.author.avatarUrl
+                                          ? (thread.author.avatarUrl.startsWith('http')
+                                              ? thread.author.avatarUrl
+                                              : getImageUrl(thread.author.avatarUrl))
+                                          : '/default-avatar.png'
+                                      }
+                                      alt={`${thread.author.firstName} ${thread.author.lastName}`}
+                                      className="w-8 h-8 rounded-full object-cover border-2 border-gray-200"
+                                      onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                        const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                        if (fallback) {
+                                          fallback.style.display = 'flex';
+                                        }
+                                      }}
+                                    />
+                                  ) : null}
+                                  {/* Fallback avatar with initials */}
+                                  <div
+                                    className={`w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold ${
+                                      thread.author.profilePicture || thread.author.avatarUrl ? 'hidden' : 'flex'
+                                    }`}
+                                    style={{
+                                      display: thread.author.profilePicture || thread.author.avatarUrl ? 'none' : 'flex'
+                                    }}
+                                  >
+                                    {thread.author.firstName?.charAt(0) || ''}
+                                    {thread.author.lastName?.charAt(0) || ''}
+                                  </div>
+                                </div>
+                                <span>
+                                  Posted by {thread.author.firstName} {thread.author.lastName}
+                                  <span className="ml-1 px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                                    {thread.author.role}
+                                  </span>
                                 </span>
-                              </span>
+                              </div>
                               <span>•</span>
                               <span title={new Date(thread.createdAt).toLocaleString()}>
                                 {formatDistanceToNow(new Date(thread.createdAt), { addSuffix: true })}

@@ -2,6 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useModule } from '../contexts/ModuleContext';
 import ReactMarkdown from 'react-markdown';
+function sanitizeHtml(html: string): string {
+  if (!html) return '';
+  let sanitized = html.replace(/<\/(script|style)>/gi, '</removed>');
+  sanitized = sanitized.replace(/<(script|style)[^>]*>[\s\S]*?<\/(script|style)>/gi, '');
+  sanitized = sanitized.replace(/ on\w+="[^"]*"/gi, '');
+  sanitized = sanitized.replace(/ on\w+='[^']*'/gi, '');
+  return sanitized;
+}
 
 const PageView: React.FC = () => {
   const { pageId } = useParams<{ pageId: string }>();
@@ -73,9 +81,7 @@ const PageView: React.FC = () => {
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="bg-white rounded-lg shadow-md p-6">
         <h1 className="text-3xl font-bold text-gray-800 mb-6">{page.title}</h1>
-        <div className="prose max-w-none">
-          <ReactMarkdown>{page.content}</ReactMarkdown>
-        </div>
+        <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: sanitizeHtml(page.content) }} />
       </div>
     </div>
   );

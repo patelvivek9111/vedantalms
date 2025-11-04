@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { Megaphone } from 'lucide-react';
 
 export interface Announcement {
   _id: string;
@@ -26,7 +27,15 @@ interface AnnouncementListProps {
 const AnnouncementList: React.FC<AnnouncementListProps> = ({ announcements, onSelect }) => {
   const { user } = useAuth();
   if (!announcements.length) {
-    return <div className="text-gray-500">No announcements yet.</div>;
+    return (
+      <div className="text-center py-16">
+        <div className="flex flex-col items-center">
+          <Megaphone className="h-16 w-16 text-gray-300 mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No announcements yet</h3>
+          <p className="text-sm text-gray-500">Check back later for group announcements.</p>
+        </div>
+      </div>
+    );
   }
   return (
     <ul className="space-y-4">

@@ -21,8 +21,8 @@ const announcementController = require('../controllers/announcement.controller')
 const upload = require('../middleware/upload');
 const mongoose = require('mongoose');
 
-// Validation middleware
-const courseValidation = [
+// Validation middleware for creating courses (requires title and description)
+const createCourseValidation = [
   check('title')
     .trim()
     .notEmpty()
@@ -34,7 +34,37 @@ const courseValidation = [
     .notEmpty()
     .withMessage('Description is required')
     .isLength({ min: 10, max: 1000 })
-    .withMessage('Description must be between 10 and 1000 characters')
+    .withMessage('Description must be between 10 and 1000 characters'),
+  check('defaultColor')
+    .optional()
+    .isString()
+    .withMessage('Default color must be a string')
+    .matches(/^#[0-9A-Fa-f]{6}$/)
+    .withMessage('Default color must be a valid hex color code')
+];
+
+// Validation middleware for updating courses (all fields optional for partial updates)
+const updateCourseValidation = [
+  check('title')
+    .optional()
+    .trim()
+    .notEmpty()
+    .withMessage('Title cannot be empty')
+    .isLength({ min: 3, max: 100 })
+    .withMessage('Title must be between 3 and 100 characters'),
+  check('description')
+    .optional()
+    .trim()
+    .notEmpty()
+    .withMessage('Description cannot be empty')
+    .isLength({ min: 10, max: 1000 })
+    .withMessage('Description must be between 10 and 1000 characters'),
+  check('defaultColor')
+    .optional()
+    .isString()
+    .withMessage('Default color must be a string')
+    .matches(/^#[0-9A-Fa-f]{6}$/)
+    .withMessage('Default color must be a valid hex color code')
 ];
 
 // Add route to get all available courses for browsing (including enrollment status)
@@ -70,10 +100,6 @@ router.get('/:courseId/enrollment-requests', protect, async (req, res) => {
   try {
     const { courseId } = req.params;
     
-    console.log('=== FETCHING ENROLLMENT REQUESTS DEBUG ===');
-    console.log('Course ID:', courseId);
-    console.log('User ID:', req.user.id);
-    console.log('User role:', req.user.role);
     
     // Validate courseId
     if (!mongoose.Types.ObjectId.isValid(courseId)) {
@@ -93,10 +119,6 @@ router.get('/:courseId/enrollment-requests', protect, async (req, res) => {
       });
     }
     
-    console.log('Course found:', course.title);
-    console.log('Course enrollment requests:', course.enrollmentRequests);
-    console.log('Course students:', course.students);
-    console.log('Course instructor:', course.instructor);
 
     // Check if user has access to the course (instructor or admin)
     if (req.user.role === 'student' && 
@@ -111,8 +133,6 @@ router.get('/:courseId/enrollment-requests', protect, async (req, res) => {
     // Filter to only show pending requests
     const pendingRequests = course.enrollmentRequests.filter(request => request.status === 'pending');
     
-    console.log('Pending requests found:', pendingRequests.length);
-    console.log('Pending requests data:', pendingRequests);
     
     res.json(pendingRequests);
   } catch (err) {
@@ -278,12 +298,12 @@ router.get('/:courseId/enrollment-status', protect, async (req, res) => {
 router
   .route('/')
   .get(protect, getCourses)
-  .post(protect, authorize('teacher', 'admin'), courseValidation, createCourse);
+  .post(protect, authorize('teacher', 'admin'), createCourseValidation, createCourse);
 
 router
   .route('/:id')
   .get(protect, getCourse)
-  .put(protect, authorize('teacher', 'admin'), courseValidation, updateCourse)
+  .put(protect, authorize('teacher', 'admin'), updateCourseValidation, updateCourse)
   .delete(protect, authorize('admin'), deleteCourse);
 
 router
@@ -297,6 +317,9 @@ router
 
 
 router.post('/:courseId/unenroll', protect, authorize('teacher', 'admin'), unenrollStudent);
+
+// Teacher enrollment route (must come before student self-enrollment)
+router.post('/:id/enroll-teacher', protect, authorize('teacher', 'admin'), enrollStudent);
 
 // Allow students to unenroll themselves
 router.post('/:courseId/unenroll-self', protect, async (req, res) => {
@@ -404,11 +427,6 @@ router.post('/:id/enroll', protect, async (req, res) => {
     // Migrate existing notifications for this course if needed
     await migrateExistingNotifications();
     
-    console.log('=== ENROLLMENT REQUEST DEBUG ===');
-    console.log('Course ID:', req.params.id);
-    console.log('Student ID:', req.user.id);
-    console.log('Current course students:', course.students);
-    console.log('Current enrollment requests:', course.enrollmentRequests);
     
     // Check if already enrolled
     if (course.students.includes(req.user.id)) {
@@ -436,7 +454,6 @@ router.post('/:id/enroll', protect, async (req, res) => {
         // Create or update consolidated enrollment notification for instructor
         await createOrUpdateEnrollmentNotification(course, Todo);
         
-        console.log('Teacher enrolled despite course being full - capacity overridden');
         
         return res.json({ 
           success: true, 
@@ -484,7 +501,6 @@ router.post('/:id/enroll', protect, async (req, res) => {
     // Create or update consolidated enrollment notification for instructor
     await createOrUpdateEnrollmentNotification(course, Todo);
     
-    console.log('Student enrolled directly - no approval needed');
     
     res.json({ 
       success: true, 
@@ -536,10 +552,6 @@ async function createOrUpdateEnrollmentNotification(course, Todo) {
 // Helper function to create or update consolidated waitlist notification
 async function createOrUpdateWaitlistNotification(course, Todo) {
   try {
-    console.log('=== WAITLIST NOTIFICATION DEBUG ===');
-    console.log('Course ID:', course._id);
-    console.log('Waitlist length:', course.waitlist.length);
-    console.log('Instructor ID:', course.instructor);
     
     // Count waitlisted students
     const waitlistedCount = course.waitlist.length;
@@ -551,7 +563,6 @@ async function createOrUpdateWaitlistNotification(course, Todo) {
       user: course.instructor,
       action: 'pending'
     });
-    console.log('Deleted old notifications:', deletedCount.deletedCount);
     
           if (waitlistedCount > 0) {
         // Create new consolidated notification
@@ -564,9 +575,7 @@ async function createOrUpdateWaitlistNotification(course, Todo) {
           action: 'pending'
         });
         await newNotification.save();
-        console.log('Created new consolidated notification:', newNotification.title);
       } else {
-        console.log('No waitlisted students, no notification created');
       }
   } catch (err) {
     console.error('Error creating/updating waitlist notification:', err);
@@ -606,7 +615,6 @@ async function migrateExistingNotifications() {
       }
     }
     
-    console.log('Successfully migrated existing notifications to consolidated format');
   } catch (err) {
     console.error('Error migrating existing notifications:', err);
   }
@@ -624,7 +632,7 @@ router.post('/migrate-notifications', protect, authorize('admin'), async (req, r
 
 // Announcements routes
 router.get('/:courseId/announcements', protect, announcementController.getAnnouncementsByCourse);
-router.post('/:courseId/announcements', protect, authorize('admin'), upload.array('attachments'), announcementController.createAnnouncement);
+router.post('/:courseId/announcements', protect, authorize('teacher', 'admin'), upload.array('attachments'), announcementController.createAnnouncement);
 
 // Add route to get all modules for a course
 router.get('/:courseId/modules', protect, getCourseModules);

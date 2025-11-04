@@ -51,12 +51,10 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
   useEffect(() => {
     const fetchPages = async () => {
       if (isExpanded) {
-        console.log('Fetching pages for module:', module._id);
         setIsLoadingPages(true);
         setError(null);
         try {
           const fetchedPages = await getPages(module._id);
-          console.log('Fetched pages:', fetchedPages);
           setPages(fetchedPages);
         } catch (err) {
           console.error('Error fetching pages:', err);
@@ -102,7 +100,8 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
           const res = await axios.get(`${API_URL}/api/threads/module/${module._id}`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
-          setDiscussions(res.data || []);
+          const discussions = res.data.data || res.data || [];
+          setDiscussions(discussions);
         } catch (err) {
           console.error('Discussions fetch error:', err);
           setDiscussionsError('Failed to load discussions');
@@ -314,7 +313,6 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
               ) : assignmentsError ? (
                 <div className="p-4 text-center text-red-500">{assignmentsError}</div>
               ) : assignments.length === 0 ? null : (
-                console.log('Assignments for module', module.title, assignments),
                 assignments.map(a => (
                   <div
                     key={a._id}
@@ -377,30 +375,36 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
                   </div>
                 ))
               )}
-              {isLoadingDiscussions ? (
-                <div className="p-4 text-center text-gray-500">Loading discussions...</div>
-              ) : discussionsError ? (
-                <div className="p-4 text-center text-red-500">{discussionsError}</div>
-              ) : discussions.length === 0 ? null : (
-                discussions.map(d => (
-                  <div
-                    key={d._id}
-                    className="p-4 hover:bg-gray-50 flex justify-between items-center group"
-                    onClick={e => {
-                      e.stopPropagation();
-                      navigate(`/courses/${d.course}/threads/${d._id}`);
-                    }}
-                  >
-                    <div className="flex items-center space-x-2">
-                      <DiscussionIcon />
-                      <span className="group-hover:text-blue-600">{d.title}</span>
-                      {d.totalPoints ? (
-                        <span className="text-xs text-gray-500">({d.totalPoints} pts)</span>
-                      ) : null}
-                    </div>
+            </div>
+          )}
+          
+          {/* Discussions Section - Moved outside assignments conditional */}
+          {isLoadingDiscussions ? (
+            <div className="p-4 text-center text-gray-500">Loading discussions...</div>
+          ) : discussionsError ? (
+            <div className="p-4 text-center text-red-500">{discussionsError}</div>
+          ) : discussions.length === 0 ? (
+            <div className="p-4 text-center text-gray-500">No discussions available</div>
+          ) : (
+            <div className="divide-y">
+              {discussions.map(d => (
+                <div
+                  key={d._id}
+                  className="p-4 hover:bg-gray-50 flex justify-between items-center group"
+                  onClick={e => {
+                    e.stopPropagation();
+                    navigate(`/courses/${d.course}/threads/${d._id}`);
+                  }}
+                >
+                  <div className="flex items-center space-x-2">
+                    <DiscussionIcon />
+                    <span className="group-hover:text-blue-600">{d.title}</span>
+                    {d.totalPoints ? (
+                      <span className="text-xs text-gray-500">({d.totalPoints} pts)</span>
+                    ) : null}
                   </div>
-                ))
-              )}
+                </div>
+              ))}
             </div>
           )}
         </div>

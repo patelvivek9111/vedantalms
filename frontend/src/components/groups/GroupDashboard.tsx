@@ -36,23 +36,18 @@ export default function GroupDashboard() {
   useEffect(() => {
     async function fetchGroup() {
       if (!groupId) {
-        console.log('[DEBUG] No groupId available');
         return;
       }
       try {
         const token = localStorage.getItem('token');
-        console.log('[DEBUG] Fetching group with ID:', groupId);
         const res = await axios.get(`${API_URL}/api/groups/` + groupId, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        console.log('[DEBUG] Group response:', JSON.stringify(res.data, null, 2));
         setGroupName(res.data.name || 'Group');
         setGroupSetId(res.data.groupSet);
         setGroupSetName(res.data.groupSetName || 'Group Set');
         setCourseId(res.data.course?._id || res.data.course || '');
-        console.log('[DEBUG] Set groupSetId to:', res.data.groupSet);
       } catch (err) {
-        console.error('[DEBUG] Error fetching group:', err);
         setGroupName('Group');
         setGroupSetName('Group Set');
       }
@@ -168,9 +163,15 @@ export default function GroupDashboard() {
             <div className="p-4">
               <h3 className="text-xl font-semibold mb-4">Group Assignments</h3>
               {assignmentsLoading ? (
-                <div>Loading assignments...</div>
+                <div className="text-center py-8 text-gray-500">Loading assignments...</div>
               ) : assignments.length === 0 ? (
-                <div className="text-gray-500">No assignments for this group set.</div>
+                <div className="text-center py-16">
+                  <div className="flex flex-col items-center">
+                    <ClipboardList className="h-16 w-16 text-gray-300 mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No assignments yet</h3>
+                    <p className="text-sm text-gray-500">There are no assignments for this group set yet.</p>
+                  </div>
+                </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {assignments.map(assignment => (

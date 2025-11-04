@@ -6,7 +6,7 @@ const Course = require('../models/course.model');
 // Get all members of a group
 exports.getGroupMembers = async (req, res) => {
   try {
-    const group = await Group.findById(req.params.groupId).populate('members', 'firstName lastName email');
+    const group = await Group.findById(req.params.groupId).populate('members', 'firstName lastName email profilePicture');
     if (!group) return res.status(404).json({ message: 'Group not found' });
     res.json(group.members);
   } catch (err) {
@@ -52,7 +52,7 @@ exports.getAvailableStudentsForGroupSet = async (req, res) => {
         { lastName: { $regex: search, $options: 'i' } },
         { email: { $regex: search, $options: 'i' } }
       ]
-    }).select('firstName lastName email');
+    }).select('firstName lastName email profilePicture');
     res.json(availableStudents);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -91,14 +91,26 @@ exports.getMyGroups = async (req, res) => {
     }
     
     const userId = req.user._id;
+    const isStudent = req.user.role === 'student';
     
     // Find all courses where the user is enrolled as a student or is the instructor
-    const userCourses = await Course.find({
-      $or: [
-        { students: userId },
-        { instructor: userId }
-      ]
-    }).select('_id title');
+    // For students, only get published courses; for teachers/admins, filter out unpublished courses
+    const courseQuery = isStudent 
+      ? {
+          $or: [
+            { students: userId },
+            { instructor: userId }
+          ],
+          published: true // Students only see groups from published courses
+        }
+      : {
+          $or: [
+            { students: userId },
+            { instructor: userId }
+          ]
+        };
+    
+    const userCourses = await Course.find(courseQuery).select('_id title published');
     
     const courseIds = userCourses.map(course => course._id);
     
@@ -108,16 +120,24 @@ exports.getMyGroups = async (req, res) => {
     }
     
     // Find all groups from these courses where the user is a member
+    // Also filter by course published status if user is a student
     const groups = await Group.find({ 
       course: { $in: courseIds },
       members: userId  // Only show groups where the user is a member
     })
-      .populate('course', 'title')
-      .populate('members', 'firstName lastName email')
-      .populate('leader', 'firstName lastName email');
+      .populate({
+        path: 'course',
+        select: 'title published'
+      })
+      .populate('members', 'firstName lastName email profilePicture')
+      .populate('leader', 'firstName lastName email profilePicture');
     
+    // Filter out groups from unpublished courses
+    const filteredGroups = groups.filter(
+      group => group.course && group.course.published !== false
+    );
 
-    res.json({ success: true, data: groups });
+    res.json({ success: true, data: filteredGroups });
   } catch (err) {
     console.error('Error in getMyGroups:', err);
     console.error('Error stack:', err.stack);
@@ -141,7 +161,7 @@ exports.getMyGroupSets = async (req, res) => {
     // Find all courses where the user is the instructor
     const taughtCourses = await Course.find({
       instructor: userId
-    }).select('_id title');
+    }).select('_id title published');
     
     const courseIds = taughtCourses.map(course => course._id);
     
@@ -154,10 +174,17 @@ exports.getMyGroupSets = async (req, res) => {
     const groupSets = await GroupSet.find({ 
       course: { $in: courseIds }
     })
-      .populate('course', 'title _id');
+      .populate({
+        path: 'course',
+        select: 'title _id published'
+      });
     
+    // Filter out groupsets from unpublished courses
+    const filteredGroupSets = groupSets.filter(
+      groupSet => groupSet.course && groupSet.course.published !== false
+    );
 
-    res.json({ success: true, data: groupSets });
+    res.json({ success: true, data: filteredGroupSets });
   } catch (err) {
     console.error('Error in getMyGroupSets:', err);
     console.error('Error stack:', err.stack);

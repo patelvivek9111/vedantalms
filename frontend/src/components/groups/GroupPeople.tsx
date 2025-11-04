@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { getImageUrl } from '../../utils/apiUtils';
+import { getImageUrl } from '../../services/api';
 
 interface Member {
   _id: string;

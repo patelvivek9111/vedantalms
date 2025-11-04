@@ -117,12 +117,6 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
     fetchGroups();
   }, [selectedSet]);
 
-  // When a group set is selected, log its value for debugging
-  useEffect(() => {
-    if (selectedSet) {
-      console.log('[DEBUG] selectedSet:', selectedSet);
-    }
-  }, [selectedSet]);
 
   const handleCreateSet = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -182,7 +176,6 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
       payload.members = selectedStudents;
       payload.leader = selectedStudents[0];
     }
-    console.log("[DEBUG] Creating group with payload:", payload);
     try {
       const token = localStorage.getItem('token');
       const response = await api.post(
@@ -199,7 +192,7 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
       // Redirect to the new group's page
       navigate(`/groups/${response.data._id}`);
     } catch (err: any) {
-      console.error("[DEBUG] Error creating group:", err.response?.data || err.message);
+      console.error("Error creating group:", err.response?.data || err.message);
       setError(err.response?.data?.message || err.response?.data?.error || 'Error creating group');
     }
   };

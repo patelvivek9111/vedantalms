@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { getImageUrl } from '../utils/apiUtils';
 import { 
   Users, 
   Search, 
@@ -16,6 +15,9 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react';
+import { getImageUrl } from '../services/api';
+import axios from 'axios';
+import { API_URL } from '../config';
 
 interface User {
   _id: string;
@@ -32,89 +34,48 @@ interface User {
 
 export function AdminUserManagement() {
   const [users, setUsers] = useState<User[]>([]);
-  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showUserModal, setShowUserModal] = useState(false);
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [newUser, setNewUser] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    password: '',
+    role: 'student' as 'student' | 'teacher' | 'admin'
+  });
+  const [createUserLoading, setCreateUserLoading] = useState(false);
+  const [createUserError, setCreateUserError] = useState('');
 
   useEffect(() => {
-    // Simulate loading users
-    setTimeout(() => {
-      const mockUsers: User[] = [
-        {
-          _id: '1',
-          firstName: 'John',
-          lastName: 'Doe',
-          email: 'john.doe@example.com',
-          role: 'student',
-          status: 'active',
-          lastLogin: '2024-01-15T10:30:00Z',
-          createdAt: '2024-01-01T00:00:00Z'
-        },
-        {
-          _id: '2',
-          firstName: 'Jane',
-          lastName: 'Smith',
-          email: 'jane.smith@example.com',
-          role: 'teacher',
-          status: 'active',
-          lastLogin: '2024-01-15T09:15:00Z',
-          createdAt: '2023-12-15T00:00:00Z'
-        },
-        {
-          _id: '3',
-          firstName: 'Bob',
-          lastName: 'Johnson',
-          email: 'bob.johnson@example.com',
-          role: 'admin',
-          status: 'active',
-          lastLogin: '2024-01-15T08:45:00Z',
-          createdAt: '2023-11-01T00:00:00Z'
-        },
-        {
-          _id: '4',
-          firstName: 'Alice',
-          lastName: 'Brown',
-          email: 'alice.brown@example.com',
-          role: 'student',
-          status: 'inactive',
-          lastLogin: '2024-01-10T14:20:00Z',
-          createdAt: '2024-01-05T00:00:00Z'
+    const fetchUsers = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const headers = { Authorization: `Bearer ${token}` };
+        
+        const params = new URLSearchParams();
+        if (roleFilter !== 'all') params.append('role', roleFilter);
+        if (statusFilter !== 'all') params.append('status', statusFilter);
+        if (searchTerm) params.append('search', searchTerm);
+        
+        const response = await axios.get(`${API_URL}/api/admin/users?${params.toString()}`, { headers });
+        
+        if (response.data.success) {
+          setUsers(response.data.data);
         }
-      ];
-      setUsers(mockUsers);
-      setFilteredUsers(mockUsers);
-      setLoading(false);
-    }, 1000);
-  }, []);
+      } catch (error) {
+        console.error('Error fetching users:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  useEffect(() => {
-    let filtered = users;
-
-    // Apply search filter
-    if (searchTerm) {
-      filtered = filtered.filter(user =>
-        user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    // Apply role filter
-    if (roleFilter !== 'all') {
-      filtered = filtered.filter(user => user.role === roleFilter);
-    }
-
-    // Apply status filter
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(user => user.status === statusFilter);
-    }
-
-    setFilteredUsers(filtered);
-  }, [users, searchTerm, roleFilter, statusFilter]);
+    fetchUsers();
+  }, [roleFilter, statusFilter, searchTerm]);
 
   const getRoleColor = (role: string) => {
     switch (role) {
@@ -143,8 +104,33 @@ export function AdminUserManagement() {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return 'Never';
+    try {
+      return new Date(dateString).toLocaleDateString();
+    } catch {
+      return 'Never';
+    }
+  };
+  
+  const formatRelativeDate = (dateString: string | null | undefined) => {
+    if (!dateString) return 'Never';
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
+      
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
+      if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+      if (diffDays < 7) return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
+      return date.toLocaleDateString();
+    } catch {
+      return 'Never';
+    }
   };
 
   const handleUserAction = (action: string, user: User) => {
@@ -171,6 +157,58 @@ export function AdminUserManagement() {
     }
   };
 
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreateUserError('');
+    setCreateUserLoading(true);
+
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+
+      // Use the register endpoint to create a new user
+      const response = await axios.post(`${API_URL}/api/auth/register`, {
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        email: newUser.email,
+        password: newUser.password,
+        role: newUser.role
+      }, { headers });
+
+      if (response.data.success) {
+        // Reset form
+        setNewUser({
+          firstName: '',
+          lastName: '',
+          email: '',
+          password: '',
+          role: 'student'
+        });
+        setShowAddUserModal(false);
+        
+        // Refresh users list
+        const params = new URLSearchParams();
+        if (roleFilter !== 'all') params.append('role', roleFilter);
+        if (statusFilter !== 'all') params.append('status', statusFilter);
+        if (searchTerm) params.append('search', searchTerm);
+        
+        const usersResponse = await axios.get(`${API_URL}/api/admin/users?${params.toString()}`, { headers });
+        if (usersResponse.data.success) {
+          setUsers(usersResponse.data.data);
+        }
+      }
+    } catch (error: any) {
+      console.error('Error creating user:', error);
+      setCreateUserError(
+        error.response?.data?.message || 
+        error.response?.data?.errors?.map((e: any) => e.message).join(', ') ||
+        'Failed to create user'
+      );
+    } finally {
+      setCreateUserLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -190,7 +228,7 @@ export function AdminUserManagement() {
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
             <Users className="w-5 h-5 text-blue-600" />
-            <span className="text-sm text-gray-600">{filteredUsers.length} users</span>
+            <span className="text-sm text-gray-600">{users.length} users</span>
           </div>
         </div>
       </div>
@@ -241,7 +279,10 @@ export function AdminUserManagement() {
           </div>
 
           <div className="flex items-end">
-            <button className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+            <button 
+              onClick={() => setShowAddUserModal(true)}
+              className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
               Add User
             </button>
           </div>
@@ -275,7 +316,7 @@ export function AdminUserManagement() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredUsers.map((user) => (
+              {users.map((user) => (
                 <tr key={user._id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
@@ -331,7 +372,7 @@ export function AdminUserManagement() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {user.lastLogin ? formatDate(user.lastLogin) : 'Never'}
+                    {formatRelativeDate(user.lastLogin)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {formatDate(user.createdAt)}
@@ -373,6 +414,111 @@ export function AdminUserManagement() {
           </table>
         </div>
       </div>
+
+      {/* Add User Modal */}
+      {showAddUserModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Create New User</h3>
+            <form onSubmit={handleCreateUser}>
+              {createUserError && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                  <p className="text-sm text-red-800">{createUserError}</p>
+                </div>
+              )}
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={newUser.firstName}
+                    onChange={(e) => setNewUser({ ...newUser, firstName: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={newUser.lastName}
+                    onChange={(e) => setNewUser({ ...newUser, lastName: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <input
+                    type="email"
+                    required
+                    value={newUser.email}
+                    onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
+                    value={newUser.password}
+                    onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Minimum 6 characters"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                  <select
+                    required
+                    value={newUser.role}
+                    onChange={(e) => setNewUser({ ...newUser, role: e.target.value as 'student' | 'teacher' | 'admin' })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="student">Student</option>
+                    <option value="teacher">Teacher</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddUserModal(false);
+                    setCreateUserError('');
+                    setNewUser({
+                      firstName: '',
+                      lastName: '',
+                      email: '',
+                      password: '',
+                      role: 'student'
+                    });
+                  }}
+                  className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={createUserLoading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {createUserLoading ? 'Creating...' : 'Create User'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* User Modal */}
       {showUserModal && selectedUser && (

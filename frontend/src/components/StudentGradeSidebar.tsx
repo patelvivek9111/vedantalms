@@ -26,7 +26,7 @@ const StudentGradeSidebar: React.FC<StudentGradeSidebarProps> = ({
   const [showWhatIfScores, setShowWhatIfScores] = useState(false);
 
   // Use backend grade if available, otherwise fall back to frontend calculation
-  const weightedPercent = backendTotalGrade !== null ? backendTotalGrade : calculateFinalGradeWithWeightedGroups(studentId, course, assignments, grades);
+  const weightedPercent = backendTotalGrade !== null ? backendTotalGrade : calculateFinalGradeWithWeightedGroups(studentId, course, assignments, grades, submissionMap);
   const letter = backendLetterGrade || getLetterGrade(weightedPercent || 0, course?.gradeScale);
 
   return (
@@ -81,7 +81,6 @@ const StudentGradeSidebar: React.FC<StudentGradeSidebarProps> = ({
           studentId={studentId}
           onSaveWhatIf={(scores) => {
             // Here you would typically save the what-if scores to the backend
-            console.log('Saving what-if scores:', scores);
           }}
           onClose={() => setShowWhatIfScores(false)}
         />

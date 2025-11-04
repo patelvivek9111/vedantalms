@@ -2,6 +2,27 @@ const Course = require('../models/course.model');
 const { validationResult } = require('express-validator');
 const mongoose = require('mongoose');
 const Module = require('../models/module.model');
+const Page = require('../models/page.model');
+
+// Earthy tone color palette for course cards
+const earthyColors = [
+  '#556B2F', // Olive Green
+  '#9CAF88', // Sage Green
+  '#E2725B', // Terra Cotta
+  '#8B4513', // Warm Brown
+  '#606C38', // Moss Green
+  '#D2691E', // Clay Brown
+  '#228B22', // Forest Green
+  '#CD5C5C', // Earth Red
+  '#F4A460', // Sand Beige
+  '#654321'  // Deep Brown
+];
+
+// Function to get a random color from the palette
+const getRandomColor = () => {
+  const randomIndex = Math.floor(Math.random() * earthyColors.length);
+  return earthyColors[randomIndex];
+};
 
 // @desc    Create a course
 // @route   POST /api/courses
@@ -19,17 +40,49 @@ exports.createCourse = async (req, res) => {
       });
     }
 
-    const { title, description, gradeScale, catalog } = req.body;
+    const { title, description, gradeScale, catalog, defaultColor, semester } = req.body;
     if (gradeScale) {
       const validationError = validateGradeScale(gradeScale);
       if (validationError) {
         return res.status(400).json({ success: false, message: validationError });
       }
     }
+    
+    // Assign a random color if defaultColor is not provided
+    const courseDefaultColor = defaultColor || getRandomColor();
+    
+    // Set default semester if not provided
+    // Determine current semester based on month
+    const now = new Date();
+    const currentMonth = now.getMonth(); // 0-11 (Jan = 0, Dec = 11)
+    const currentYear = now.getFullYear();
+    
+    let defaultSemester = semester;
+    if (!defaultSemester || !defaultSemester.term || !defaultSemester.year) {
+      // Default to current semester based on month
+      // Fall: Aug-Nov (months 7-10), Spring: Jan-May (months 0-4), Summer: Jun-Jul (months 5-6), Winter: Dec (month 11)
+      let term = 'Fall';
+      let year = currentYear;
+      
+      if (currentMonth >= 0 && currentMonth <= 4) {
+        term = 'Spring';
+      } else if (currentMonth >= 5 && currentMonth <= 6) {
+        term = 'Summer';
+      } else if (currentMonth === 11) {
+        term = 'Winter';
+      } else {
+        term = 'Fall';
+      }
+      
+      defaultSemester = { term, year };
+    }
+    
     const course = await Course.create({
       title,
       description,
       instructor: req.user.id,
+      defaultColor: courseDefaultColor,
+      semester: defaultSemester,
       ...(gradeScale ? { gradeScale } : {}),
       ...(catalog ? { catalog } : {})
     });
@@ -74,6 +127,24 @@ exports.getCourses = async (req, res) => {
         .populate('enrollmentRequests.student', 'firstName lastName email');
     }
 
+    // Migration: Add default groups to courses that don't have them
+    const defaultGroups = [
+      { name: 'Projects', weight: 15 },
+      { name: 'Homework', weight: 15 },
+      { name: 'Exams', weight: 20 },
+      { name: 'Quizzes', weight: 30 },
+      { name: 'Participation', weight: 20 }
+    ];
+
+    const coursesToUpdate = courses.filter(course => !course.groups || course.groups.length === 0);
+    if (coursesToUpdate.length > 0) {
+      
+      for (const course of coursesToUpdate) {
+        course.groups = defaultGroups;
+        await course.save();
+      }
+    }
+
     res.json({
       success: true,
       count: courses.length,
@@ -94,10 +165,6 @@ exports.getCourses = async (req, res) => {
 // @access  Private
 exports.getCourse = async (req, res) => {
   try {
-    console.log('=== GET COURSE DEBUG ===');
-    console.log('User ID:', req.user.id);
-    console.log('User Role:', req.user.role);
-    console.log('Course ID:', req.params.id);
     
     // Validate if the ID is a valid MongoDB ObjectId
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -120,16 +187,25 @@ exports.getCourse = async (req, res) => {
       });
     }
     
-    console.log('Course found:', course.title);
-    console.log('Course instructor:', course.instructor._id);
-    console.log('Course students count:', course.students.length);
-    console.log('Course published:', course.published);
+
+    // Migration: Add default groups if course has no groups
+    if (!course.groups || course.groups.length === 0) {
+      const defaultGroups = [
+        { name: 'Projects', weight: 15 },
+        { name: 'Homework', weight: 15 },
+        { name: 'Exams', weight: 20 },
+        { name: 'Quizzes', weight: 30 },
+        { name: 'Participation', weight: 20 }
+      ];
+      
+      course.groups = defaultGroups;
+      await course.save();
+    }
 
     // All authenticated users can view course details
     // This allows students to see course information before enrolling
     // Teachers and admins can always view courses
 
-    console.log('Access granted - sending course data');
     res.json({
       success: true,
       data: course
@@ -287,12 +363,164 @@ exports.publishCourse = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Not authorized to publish this course' });
     }
 
+    const wasPublished = course.published;
+    const willBePublished = !wasPublished;
 
-    course.published = !course.published;
+    // If unpublishing: save current published states and unpublish everything
+    if (wasPublished && !willBePublished) {
+      // Get all modules for this course
+      const modules = await Module.find({ course: course._id });
+      const moduleIds = modules.map(m => m._id);
+      
+      // Get all pages for these modules
+      const pages = await Page.find({ module: { $in: moduleIds } });
+      
+      // Get all assignments for these modules
+      const Assignment = require('../models/Assignment');
+      const assignments = await Assignment.find({ module: { $in: moduleIds } });
+      
+      // Get all threads for this course
+      const Thread = require('../models/thread.model');
+      const threads = await Thread.find({ course: course._id });
+      
+      // Save the current published states BEFORE unpublishing
+      const snapshot = {
+        modules: modules.map(m => ({
+          moduleId: m._id,
+          published: m.published || false
+        })),
+        pages: pages.map(p => ({
+          pageId: p._id,
+          published: p.published || false
+        })),
+        assignments: assignments.map(a => ({
+          assignmentId: a._id,
+          published: a.published || false
+        })),
+        threads: threads.map(t => ({
+          threadId: t._id,
+          published: t.published !== undefined ? t.published : true
+        }))
+      };
+      
+      // Save snapshot to course FIRST (before unpublishing)
+      course.publishedStateSnapshot = snapshot;
+      await course.save();
+      
+      // Now unpublish everything
+      course.published = false;
+      
+      // Unpublish all modules
+      await Module.updateMany(
+        { course: course._id },
+        { published: false }
+      );
+      
+      // Unpublish all pages
+      await Page.updateMany(
+        { module: { $in: moduleIds } },
+        { published: false }
+      );
+      
+      // Unpublish all assignments
+      await Assignment.updateMany(
+        { module: { $in: moduleIds } },
+        { published: false }
+      );
+      
+      // Unpublish all threads
+      await Thread.updateMany(
+        { course: course._id },
+        { published: false }
+      );
+      
+    } else if (!wasPublished && willBePublished) {
+      // If republishing: restore saved published states
+      course.published = true;
+      
+      if (course.publishedStateSnapshot) {
+        const snapshot = course.publishedStateSnapshot;
+        const Assignment = require('../models/Assignment');
+        const Thread = require('../models/thread.model');
+        
+        // Restore module published states
+        if (snapshot.modules && snapshot.modules.length > 0) {
+          for (const moduleState of snapshot.modules) {
+            try {
+              const moduleExists = await Module.findById(moduleState.moduleId);
+              if (moduleExists) {
+                await Module.findByIdAndUpdate(
+                  moduleState.moduleId,
+                  { published: moduleState.published !== undefined ? moduleState.published : false },
+                  { runValidators: false }
+                );
+              }
+            } catch (err) {
+              console.error(`Error restoring module ${moduleState.moduleId}:`, err);
+            }
+          }
+        }
+        
+        // Restore page published states
+        if (snapshot.pages && snapshot.pages.length > 0) {
+          for (const pageState of snapshot.pages) {
+            try {
+              const pageExists = await Page.findById(pageState.pageId);
+              if (pageExists) {
+                await Page.findByIdAndUpdate(
+                  pageState.pageId,
+                  { published: pageState.published !== undefined ? pageState.published : false },
+                  { runValidators: false }
+                );
+              }
+            } catch (err) {
+              console.error(`Error restoring page ${pageState.pageId}:`, err);
+            }
+          }
+        }
+        
+        // Restore assignment published states
+        if (snapshot.assignments && snapshot.assignments.length > 0) {
+          for (const assignmentState of snapshot.assignments) {
+            try {
+              const assignmentExists = await Assignment.findById(assignmentState.assignmentId);
+              if (assignmentExists) {
+                await Assignment.findByIdAndUpdate(
+                  assignmentState.assignmentId,
+                  { published: assignmentState.published !== undefined ? assignmentState.published : false },
+                  { runValidators: false }
+                );
+              }
+            } catch (err) {
+              console.error(`Error restoring assignment ${assignmentState.assignmentId}:`, err);
+            }
+          }
+        }
+        
+        // Restore thread published states
+        if (snapshot.threads && snapshot.threads.length > 0) {
+          for (const threadState of snapshot.threads) {
+            try {
+              const threadExists = await Thread.findById(threadState.threadId);
+              if (threadExists) {
+                await Thread.findByIdAndUpdate(
+                  threadState.threadId,
+                  { published: threadState.published !== undefined ? threadState.published : true },
+                  { runValidators: false }
+                );
+              }
+            } catch (err) {
+              console.error(`Error restoring thread ${threadState.threadId}:`, err);
+            }
+          }
+        }
+      }
+      // Clear the snapshot after restoring (optional - you can keep it if you want)
+      // course.publishedStateSnapshot = null;
+    }
 
     await course.save();
     const updatedCourse = await Course.findById(req.params.id);
-
 
     res.json({
       success: true,
@@ -682,7 +910,7 @@ exports.updateSidebarConfig = async (req, res) => {
     // Validate studentVisibility if provided
     if (studentVisibility) {
       const validKeys = [
-        'overview', 'modules', 'pages', 'assignments', 'discussions',
+        'overview', 'modules', 'pages', 'assignments', 'quizzes', 'discussions',
         'announcements', 'polls', 'groups', 'attendance', 'grades',
         'gradebook', 'students'
       ];

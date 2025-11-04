@@ -1,8 +1,8 @@
 import axios from 'axios';
-import { getApiBaseUrl } from '../utils/apiUtils';
+import { API_URL } from '../config';
 
 const api = axios.create({
-  baseURL: getApiBaseUrl(),
+  baseURL: `${API_URL}/api`,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -59,6 +59,7 @@ export const updateUserPreferences = async (prefs: {
   language?: string;
   timeZone?: string;
   theme?: string;
+  courseColors?: { [courseId: string]: string };
 }) => {
   return api.put('/users/me/preferences', prefs);
 };
@@ -77,6 +78,18 @@ export const updateOverviewConfig = async (courseId: string, config: {
     headers: { Authorization: `Bearer ${token}` }
   });
   return response.data;
+};
+
+// Utility function to get full image URL for uploaded files
+export const getImageUrl = (filename: string): string => {
+  if (!filename) return '';
+  if (filename.startsWith('http')) return filename;
+  // If the path already includes /uploads/, just prepend the base URL
+  if (filename.startsWith('/uploads/')) {
+    return `${API_URL}${filename}`;
+  }
+  // Otherwise, assume it's just a filename and prepend /uploads/
+  return `${API_URL}/uploads/${filename}`;
 };
 
 export default api; 

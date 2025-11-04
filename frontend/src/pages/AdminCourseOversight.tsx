@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import { API_URL } from '../config';
 import { 
   BookOpen, 
   Search, 
@@ -8,11 +11,10 @@ import {
   Eye, 
   EyeOff,
   Users,
-  FileText,
   Calendar,
   CheckCircle,
   XCircle,
-  AlertTriangle
+  TrendingUp
 } from 'lucide-react';
 
 interface Course {
@@ -22,13 +24,17 @@ interface Course {
   instructor: string;
   published: boolean;
   enrollmentCount: number;
-  assignmentCount: number;
+  classAverage?: number;
+  catalog?: {
+    courseCode?: string;
+  };
   createdAt: string;
   lastUpdated: string;
   status: 'active' | 'draft' | 'archived';
 }
 
 export function AdminCourseOversight() {
+  const navigate = useNavigate();
   const [courses, setCourses] = useState<Course[]>([]);
   const [filteredCourses, setFilteredCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,91 +43,73 @@ export function AdminCourseOversight() {
   const [publishedFilter, setPublishedFilter] = useState<string>('all');
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [showCourseModal, setShowCourseModal] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    title: '',
+    description: '',
+    instructor: '',
+    status: 'active' as 'active' | 'draft' | 'archived'
+  });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    // Simulate loading courses
-    setTimeout(() => {
-      const mockCourses: Course[] = [
-        {
-          _id: '1',
-          title: 'Mathematics 101',
-          description: 'Introduction to basic mathematics concepts',
-          instructor: 'Dr. John Smith',
-          published: true,
-          enrollmentCount: 45,
-          assignmentCount: 12,
-          createdAt: '2024-01-01T00:00:00Z',
-          lastUpdated: '2024-01-15T10:30:00Z',
-          status: 'active'
-        },
-        {
-          _id: '2',
-          title: 'English Literature',
-          description: 'Study of classic and modern literature',
-          instructor: 'Prof. Jane Doe',
-          published: true,
-          enrollmentCount: 38,
-          assignmentCount: 8,
-          createdAt: '2024-01-05T00:00:00Z',
-          lastUpdated: '2024-01-14T15:20:00Z',
-          status: 'active'
-        },
-        {
-          _id: '3',
-          title: 'Computer Science Fundamentals',
-          description: 'Introduction to programming and algorithms',
-          instructor: 'Dr. Bob Johnson',
-          published: false,
-          enrollmentCount: 0,
-          assignmentCount: 15,
-          createdAt: '2024-01-10T00:00:00Z',
-          lastUpdated: '2024-01-16T09:15:00Z',
-          status: 'draft'
-        },
-        {
-          _id: '4',
-          title: 'History of Art',
-          description: 'Survey of art history from ancient to modern times',
-          instructor: 'Prof. Alice Brown',
-          published: true,
-          enrollmentCount: 29,
-          assignmentCount: 6,
-          createdAt: '2023-12-15T00:00:00Z',
-          lastUpdated: '2024-01-13T14:45:00Z',
-          status: 'active'
+    const fetchCourses = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const headers = { Authorization: `Bearer ${token}` };
+        
+        const params = new URLSearchParams();
+        if (statusFilter !== 'all') params.append('status', statusFilter);
+        if (publishedFilter !== 'all') params.append('published', publishedFilter);
+        if (searchTerm) params.append('search', searchTerm);
+        
+        const response = await axios.get(`${API_URL}/api/admin/courses?${params.toString()}`, { headers });
+        
+        if (response.data.success) {
+          // Process courses to add class averages
+          const coursesWithAverages = await Promise.all((response.data.data || []).map(async (course: any) => {
+            try {
+              // Calculate class average
+              let classAverage: number | undefined = undefined;
+              
+              try {
+                const averageResponse = await axios.get(
+                  `${API_URL}/api/grades/course/${course._id}/average`,
+                  { headers }
+                );
+                
+                if (averageResponse.data && averageResponse.data.average !== null && averageResponse.data.average !== undefined) {
+                  classAverage = averageResponse.data.average;
+                }
+              } catch (error) {
+                // Skip if we can't get average (course might have no grades yet)
+                console.warn(`Could not fetch class average for course ${course._id}:`, error);
+              }
+              
+              return {
+                ...course,
+                classAverage: classAverage
+              };
+            } catch (error) {
+              console.error(`Error processing course ${course._id}:`, error);
+              return {
+                ...course,
+                classAverage: undefined
+              };
+            }
+          }));
+          
+          setCourses(coursesWithAverages);
+          setFilteredCourses(coursesWithAverages);
         }
-      ];
-      setCourses(mockCourses);
-      setFilteredCourses(mockCourses);
-      setLoading(false);
-    }, 1000);
-  }, []);
+      } catch (error) {
+        console.error('Error fetching courses:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  useEffect(() => {
-    let filtered = courses;
-
-    // Apply search filter
-    if (searchTerm) {
-      filtered = filtered.filter(course =>
-        course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        course.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        course.instructor.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    // Apply status filter
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(course => course.status === statusFilter);
-    }
-
-    // Apply published filter
-    if (publishedFilter !== 'all') {
-      const isPublished = publishedFilter === 'published';
-      filtered = filtered.filter(course => course.published === isPublished);
-    }
-
-    setFilteredCourses(filtered);
-  }, [courses, searchTerm, statusFilter, publishedFilter]);
+    fetchCourses();
+  }, [statusFilter, publishedFilter, searchTerm]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -136,6 +124,23 @@ export function AdminCourseOversight() {
     return published ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800';
   };
 
+  const getAverageColor = (average: number | undefined | null) => {
+    if (average === undefined || average === null) {
+      return 'text-gray-500';
+    }
+    if (average >= 90) {
+      return 'text-green-600 font-semibold';
+    } else if (average >= 80) {
+      return 'text-blue-600 font-semibold';
+    } else if (average >= 70) {
+      return 'text-yellow-600 font-semibold';
+    } else if (average >= 60) {
+      return 'text-orange-600 font-semibold';
+    } else {
+      return 'text-red-600 font-semibold';
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
   };
@@ -144,6 +149,12 @@ export function AdminCourseOversight() {
     switch (action) {
       case 'edit':
         setSelectedCourse(course);
+        setEditFormData({
+          title: course.title,
+          description: course.description,
+          instructor: course.instructor,
+          status: course.status
+        });
         setShowCourseModal(true);
         break;
       case 'delete':
@@ -169,6 +180,81 @@ export function AdminCourseOversight() {
     }
   };
 
+  const handleSaveCourse = async () => {
+    if (!selectedCourse) return;
+    
+    setSaving(true);
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      const response = await axios.put(
+        `${API_URL}/api/courses/${selectedCourse._id}`,
+        {
+          title: editFormData.title,
+          description: editFormData.description,
+          status: editFormData.status
+        },
+        { headers }
+      );
+      
+      if (response.data.success) {
+        // Refresh courses list
+        const params = new URLSearchParams();
+        if (statusFilter !== 'all') params.append('status', statusFilter);
+        if (publishedFilter !== 'all') params.append('published', publishedFilter);
+        if (searchTerm) params.append('search', searchTerm);
+        
+        const refreshResponse = await axios.get(`${API_URL}/api/admin/courses?${params.toString()}`, { headers });
+        if (refreshResponse.data.success) {
+          // Process courses to add class averages
+          const coursesWithAverages = await Promise.all((refreshResponse.data.data || []).map(async (course: any) => {
+            try {
+              // Calculate class average
+              let classAverage: number | undefined = undefined;
+              
+              try {
+                const averageResponse = await axios.get(
+                  `${API_URL}/api/grades/course/${course._id}/average`,
+                  { headers }
+                );
+                
+                if (averageResponse.data && averageResponse.data.average !== null && averageResponse.data.average !== undefined) {
+                  classAverage = averageResponse.data.average;
+                }
+              } catch (error) {
+                // Skip if we can't get average (course might have no grades yet)
+                console.warn(`Could not fetch class average for course ${course._id}:`, error);
+              }
+              
+              return {
+                ...course,
+                classAverage: classAverage
+              };
+            } catch (error) {
+              console.error(`Error processing course ${course._id}:`, error);
+              return {
+                ...course,
+                classAverage: undefined
+              };
+            }
+          }));
+          
+          setCourses(coursesWithAverages);
+          setFilteredCourses(coursesWithAverages);
+        }
+        
+        setShowCourseModal(false);
+        setSelectedCourse(null);
+      }
+    } catch (error: any) {
+      console.error('Error updating course:', error);
+      alert(error.response?.data?.message || 'Failed to update course');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -188,7 +274,7 @@ export function AdminCourseOversight() {
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
             <BookOpen className="w-5 h-5 text-blue-600" />
-            <span className="text-sm text-gray-600">{filteredCourses.length} courses</span>
+            <span className="text-sm text-gray-600">{courses.length} courses</span>
           </div>
         </div>
       </div>
@@ -267,7 +353,7 @@ export function AdminCourseOversight() {
                   Enrollment
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Assignments
+                  Average
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Updated
@@ -278,13 +364,15 @@ export function AdminCourseOversight() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredCourses.map((course) => (
+              {courses.map((course) => (
                 <tr key={course._id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">{course.title}</div>
-                      <div className="text-sm text-gray-500">{course.description}</div>
-                    </div>
+                    <button
+                      onClick={() => navigate(`/courses/${course._id}`)}
+                      className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer text-left"
+                    >
+                      {course.catalog?.courseCode || course.title}
+                    </button>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {course.instructor}
@@ -307,8 +395,12 @@ export function AdminCourseOversight() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      <FileText className="w-4 h-4 text-gray-400 mr-1" />
-                      <span className="text-sm text-gray-900">{course.assignmentCount}</span>
+                      <TrendingUp className="w-4 h-4 text-gray-400 mr-1" />
+                      <span className={`text-sm font-medium ${getAverageColor(course.classAverage)}`}>
+                        {course.classAverage !== undefined && course.classAverage !== null 
+                          ? `${course.classAverage.toFixed(1)}%` 
+                          : 'N/A'}
+                      </span>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -330,19 +422,13 @@ export function AdminCourseOversight() {
                           <EyeOff className="w-4 h-4" />
                         </button>
                       ) : (
-                        <button
-                          onClick={() => handleCourseAction('publish', course)}
-                          className="text-green-600 hover:text-green-900"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                      )}
                       <button
-                        onClick={() => handleCourseAction('archive', course)}
-                        className="text-orange-600 hover:text-orange-900"
+                        onClick={() => handleCourseAction('publish', course)}
+                        className="text-green-600 hover:text-green-900"
                       >
-                        <AlertTriangle className="w-4 h-4" />
+                        <Eye className="w-4 h-4" />
                       </button>
+                      )}
                       <button
                         onClick={() => handleCourseAction('delete', course)}
                         className="text-red-600 hover:text-red-900"
@@ -368,31 +454,40 @@ export function AdminCourseOversight() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
                 <input
                   type="text"
-                  defaultValue={selectedCourse.title}
+                  value={editFormData.title}
+                  onChange={(e) => setEditFormData({ ...editFormData, title: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={saving}
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                 <textarea
-                  defaultValue={selectedCourse.description}
+                  value={editFormData.description}
+                  onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={saving}
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Instructor</label>
                 <input
                   type="text"
-                  defaultValue={selectedCourse.instructor}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  value={editFormData.instructor}
+                  readOnly
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
+                  disabled={saving}
                 />
+                <p className="text-xs text-gray-500 mt-1">Instructor cannot be changed from here</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                 <select
-                  defaultValue={selectedCourse.status}
+                  value={editFormData.status}
+                  onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value as 'active' | 'draft' | 'archived' })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={saving}
                 >
                   <option value="active">Active</option>
                   <option value="draft">Draft</option>
@@ -402,13 +497,21 @@ export function AdminCourseOversight() {
             </div>
             <div className="flex justify-end space-x-3 mt-6">
               <button
-                onClick={() => setShowCourseModal(false)}
-                className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+                onClick={() => {
+                  setShowCourseModal(false);
+                  setSelectedCourse(null);
+                }}
+                disabled={saving}
+                className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                Save Changes
+              <button 
+                onClick={handleSaveCourse}
+                disabled={saving}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </div>

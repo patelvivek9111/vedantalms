@@ -80,6 +80,10 @@ const assignmentSchema = new mongoose.Schema({
     type: String,
     required: false
   },
+  isGradedQuiz: {
+    type: Boolean,
+    default: false
+  },
   isTimedQuiz: {
     type: Boolean,
     default: false

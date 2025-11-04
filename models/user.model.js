@@ -44,10 +44,18 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
+  lastLogin: {
+    type: Date,
+    default: null
+  },
   preferences: {
     language: { type: String, default: 'en' },
     timeZone: { type: String, default: 'UTC' },
-    theme: { type: String, enum: ['light', 'dark'], default: 'light' }
+    theme: { type: String, enum: ['light', 'dark'], default: 'light' },
+    courseColors: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {}
+    }
   }
 });
 

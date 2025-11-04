@@ -1,6 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { useModule, Page } from '../contexts/ModuleContext';
 import ReactMarkdown from 'react-markdown';
+function sanitizeHtml(html: string): string {
+  if (!html) return '';
+  // Basic sanitization: remove script/style tags and event handlers
+  let sanitized = html.replace(/<\/(script|style)>/gi, '</removed>');
+  sanitized = sanitized.replace(/<(script|style)[^>]*>[\s\S]*?<\/(script|style)>/gi, '');
+  sanitized = sanitized.replace(/ on\w+="[^"]*"/gi, '');
+  sanitized = sanitized.replace(/ on\w+='[^']*'/gi, '');
+  return sanitized;
+}
 
 interface PageViewerProps {
   pageId: string;
@@ -28,9 +37,7 @@ const PageViewer: React.FC<PageViewerProps> = ({ pageId }) => {
   return (
     <div className="bg-gray-50 p-4 rounded">
       <h4 className="text-md font-bold mb-2">{page.title}</h4>
-      <div className="prose max-w-none mb-2">
-        <ReactMarkdown>{page.content}</ReactMarkdown>
-      </div>
+      <div className="prose max-w-none mb-2" dangerouslySetInnerHTML={{ __html: sanitizeHtml(page.content) }} />
       {page.attachments && page.attachments.length > 0 && (
         <div className="mt-2">
           <div className="font-semibold text-sm mb-1">Attachments:</div>

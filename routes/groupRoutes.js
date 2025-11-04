@@ -198,8 +198,8 @@ router.post('/sets/:setId/self-signup', protect, async (req, res) => {
 router.get('/sets/:setId/groups', protect, async (req, res) => {
     try {
         const groups = await Group.find({ groupSet: req.params.setId })
-            .populate('members', 'firstName lastName email')
-            .populate('leader', 'firstName lastName email');
+            .populate('members', 'firstName lastName email profilePicture')
+            .populate('leader', 'firstName lastName email profilePicture');
         res.json(groups);
     } catch (error) {
         res.status(400).json({ error: error.message });

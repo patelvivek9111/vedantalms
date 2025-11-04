@@ -70,7 +70,13 @@ const STATUS_CONFIG = {
 
 // Helper function to generate calendar days for a given month
 const generateCalendarDays = (dateString: string) => {
-  const date = new Date(dateString);
+  if (!dateString) {
+    // If no date provided, use current month
+    const today = new Date();
+    dateString = today.toISOString().split('T')[0];
+  }
+  // Add time to avoid timezone issues when parsing date
+  const date = new Date(dateString + 'T00:00:00');
   const year = date.getFullYear();
   const month = date.getMonth();
   
@@ -122,24 +128,42 @@ interface CalendarDayProps {
 const CalendarDay: React.FC<CalendarDayProps> = ({ day, courseId, isInstructor, onDateSelect, selectedDate }) => {
   const [attendanceData, setAttendanceData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
-    if (day.date && day.isCurrentMonth) {
+    if (day.date && day.isCurrentMonth && courseId) {
       fetchDayAttendance(day.date);
+    } else {
+      setAttendanceData([]);
     }
-  }, [day.date]);
+  }, [day.date, day.isCurrentMonth, courseId]);
 
   const fetchDayAttendance = async (date: string) => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      if (!token || !courseId) return;
+      if (!token || !courseId) {
+        setAttendanceData([]);
+        return;
+      }
 
       const headers = { Authorization: `Bearer ${token}` };
       const response = await axios.get(`${API_URL}/api/courses/${courseId}/attendance?date=${date}`, { headers });
-      setAttendanceData(response.data);
+      const allAttendanceData = response.data || [];
+      
+      // Filter data based on user role
+      if (isInstructor || user?.role === 'admin') {
+        // Teachers/Admins see all students
+        setAttendanceData(Array.isArray(allAttendanceData) ? allAttendanceData : []);
+      } else {
+        // Students only see their own attendance
+        const studentAttendanceData = (Array.isArray(allAttendanceData) ? allAttendanceData : []).filter((record: any) => 
+          record.studentId === user?._id
+        );
+        setAttendanceData(studentAttendanceData);
+      }
     } catch (error) {
-      console.log('No attendance data for this date');
+      // If no attendance data exists, return empty array
       setAttendanceData([]);
     } finally {
       setLoading(false);
@@ -147,10 +171,27 @@ const CalendarDay: React.FC<CalendarDayProps> = ({ day, courseId, isInstructor, 
   };
 
   const getAttendanceBreakdown = () => {
-    if (!day.date || !day.isCurrentMonth || attendanceData.length === 0) {
+    if (!day.date || !day.isCurrentMonth) {
       return null;
     }
 
+    // If no attendance data, return null (will show empty state)
+    if (!attendanceData || attendanceData.length === 0) {
+      return null;
+    }
+
+    // For students, show only their own status
+    if (!isInstructor && user?.role !== 'admin') {
+      const studentRecord = attendanceData[0]; // Should only be one record for students
+      if (!studentRecord) return null;
+      
+      return {
+        studentStatus: studentRecord.status,
+        isStudent: true
+      };
+    }
+
+    // For teachers/admins, show aggregated data
     const totalCount = attendanceData.length;
     if (totalCount === 0) return null;
 
@@ -171,7 +212,8 @@ const CalendarDay: React.FC<CalendarDayProps> = ({ day, courseId, isInstructor, 
         late: (breakdown.late / totalCount) * 100,
         excused: (breakdown.excused / totalCount) * 100,
         unmarked: (breakdown.unmarked / totalCount) * 100
-      }
+      },
+      isStudent: false
     };
   };
 
@@ -197,49 +239,84 @@ const CalendarDay: React.FC<CalendarDayProps> = ({ day, courseId, isInstructor, 
         <div className="w-2 h-2 bg-gray-400 rounded-full mx-auto animate-pulse"></div>
       ) : breakdown ? (
         <div className="space-y-1">
-          {/* Visual breakdown bar */}
-          <div className="flex h-2 rounded-full overflow-hidden">
-            {breakdown.present > 0 && (
-              <div 
-                className="bg-green-500" 
-                style={{ width: `${breakdown.percentages.present}%` }}
-                title={`Present: ${breakdown.present}/${breakdown.total}`}
-              ></div>
-            )}
-            {breakdown.absent > 0 && (
-              <div 
-                className="bg-red-500" 
-                style={{ width: `${breakdown.percentages.absent}%` }}
-                title={`Absent: ${breakdown.absent}/${breakdown.total}`}
-              ></div>
-            )}
-            {breakdown.late > 0 && (
-              <div 
-                className="bg-yellow-500" 
-                style={{ width: `${breakdown.percentages.late}%` }}
-                title={`Late: ${breakdown.late}/${breakdown.total}`}
-              ></div>
-            )}
-            {breakdown.excused > 0 && (
-              <div 
-                className="bg-blue-500" 
-                style={{ width: `${breakdown.percentages.excused}%` }}
-                title={`Excused: ${breakdown.excused}/${breakdown.total}`}
-              ></div>
-            )}
-            {breakdown.unmarked > 0 && (
-              <div 
-                className="bg-gray-400" 
-                style={{ width: `${breakdown.percentages.unmarked}%` }}
-                title={`Unmarked: ${breakdown.unmarked}/${breakdown.total}`}
-              ></div>
-            )}
-          </div>
-          
-          {/* Attendance count */}
-          <div className="text-xs text-gray-600">
-            {breakdown.present}/{breakdown.total}
-          </div>
+          {breakdown.isStudent ? (
+            // Student view - show only their own status
+            <div className="space-y-1">
+              <div className="flex h-2 rounded-full overflow-hidden">
+                {breakdown.studentStatus === 'present' && (
+                  <div className="bg-green-500 w-full" title="Present"></div>
+                )}
+                {breakdown.studentStatus === 'absent' && (
+                  <div className="bg-red-500 w-full" title="Absent"></div>
+                )}
+                {breakdown.studentStatus === 'late' && (
+                  <div className="bg-yellow-500 w-full" title="Late"></div>
+                )}
+                {breakdown.studentStatus === 'excused' && (
+                  <div className="bg-blue-500 w-full" title="Excused"></div>
+                )}
+                {breakdown.studentStatus === 'unmarked' && (
+                  <div className="bg-gray-400 w-full" title="Unmarked"></div>
+                )}
+              </div>
+              <div className="text-xs text-gray-600">
+                {breakdown.studentStatus === 'present' && 'Present'}
+                {breakdown.studentStatus === 'absent' && 'Absent'}
+                {breakdown.studentStatus === 'late' && 'Late'}
+                {breakdown.studentStatus === 'excused' && 'Excused'}
+                {breakdown.studentStatus === 'unmarked' && 'Unmarked'}
+              </div>
+            </div>
+          ) : (
+            // Teacher/Admin view - show aggregated data
+            <>
+              {/* Visual breakdown bar */}
+              <div className="flex h-2 rounded-full overflow-hidden">
+                {!breakdown.isStudent && (breakdown as any).present > 0 && (
+                  <div 
+                    className="bg-green-500" 
+                    style={{ width: `${(breakdown as any).percentages.present}%` }}
+                    title={`Present: ${(breakdown as any).present}/${(breakdown as any).total}`}
+                  ></div>
+                )}
+                {!breakdown.isStudent && (breakdown as any).absent > 0 && (
+                  <div 
+                    className="bg-red-500" 
+                    style={{ width: `${(breakdown as any).percentages.absent}%` }}
+                    title={`Absent: ${(breakdown as any).absent}/${(breakdown as any).total}`}
+                  ></div>
+                )}
+                {!breakdown.isStudent && (breakdown as any).late > 0 && (
+                  <div 
+                    className="bg-yellow-500" 
+                    style={{ width: `${(breakdown as any).percentages.late}%` }}
+                    title={`Late: ${(breakdown as any).late}/${(breakdown as any).total}`}
+                  ></div>
+                )}
+                {!breakdown.isStudent && (breakdown as any).excused > 0 && (
+                  <div 
+                    className="bg-blue-500" 
+                    style={{ width: `${(breakdown as any).percentages.excused}%` }}
+                    title={`Excused: ${(breakdown as any).excused}/${(breakdown as any).total}`}
+                  ></div>
+                )}
+                {!breakdown.isStudent && (breakdown as any).unmarked > 0 && (
+                  <div 
+                    className="bg-gray-400" 
+                    style={{ width: `${(breakdown as any).percentages.unmarked}%` }}
+                    title={`Unmarked: ${(breakdown as any).unmarked}/${(breakdown as any).total}`}
+                  ></div>
+                )}
+              </div>
+              
+              {/* Attendance count */}
+              {!breakdown.isStudent && (
+                <div className="text-xs text-gray-600">
+                  {(breakdown as any).present}/{(breakdown as any).total}
+                </div>
+              )}
+            </>
+          )}
         </div>
       ) : (
         <div className="w-2 h-2 bg-gray-300 rounded-full mx-auto"></div>
@@ -306,22 +383,49 @@ const Attendance: React.FC = () => {
         
         try {
           const attendanceResponse = await axios.get(`${API_URL}/api/courses/${courseId}/attendance?date=${currentDate}`, { headers });
-          setAttendanceData(attendanceResponse.data);
+          const allAttendanceData = attendanceResponse.data;
+          
+          // Filter data based on user role
+          if (isUserInstructor || user?.role === 'admin') {
+            // Teachers/Admins see all students
+            setAttendanceData(allAttendanceData);
+          } else {
+            // Students only see their own attendance
+            const studentAttendanceData = allAttendanceData.filter((record: any) => 
+              record.studentId === user?._id
+            );
+            setAttendanceData(studentAttendanceData);
+          }
         } catch (attendanceError) {
-          console.log('No existing attendance data, creating default records');
-          // If no attendance data exists, create default records for all students
-          const studentsResponse = await axios.get(`${API_URL}/api/courses/${courseId}/students`, { headers });
-          const defaultAttendanceData = studentsResponse.data.map((student: any) => ({
-            studentId: student._id,
-            studentName: `${student.firstName} ${student.lastName}`,
-            email: student.email,
-            status: ATTENDANCE_STATUSES.UNMARKED,
-            date: currentDate,
-            timestamp: null,
-            reason: '',
-            notes: ''
-          }));
-          setAttendanceData(defaultAttendanceData);
+          // If no attendance data exists, create default records
+          if (isUserInstructor || user?.role === 'admin') {
+            // For teachers/admins, create records for all students
+            const studentsResponse = await axios.get(`${API_URL}/api/courses/${courseId}/students`, { headers });
+            const defaultAttendanceData = studentsResponse.data.map((student: any) => ({
+              studentId: student._id,
+              studentName: `${student.firstName} ${student.lastName}`,
+              email: student.email,
+              status: ATTENDANCE_STATUSES.UNMARKED,
+              date: currentDate,
+              timestamp: null,
+              reason: '',
+              notes: ''
+            }));
+            setAttendanceData(defaultAttendanceData);
+          } else {
+            // For students, create only their own record
+            const defaultAttendanceData = [{
+              studentId: user?._id,
+              studentName: `${user?.firstName} ${user?.lastName}`,
+              email: user?.email,
+              status: ATTENDANCE_STATUSES.UNMARKED,
+              date: currentDate,
+              timestamp: null,
+              reason: '',
+              notes: ''
+            }];
+            setAttendanceData(defaultAttendanceData);
+          }
         }
               } catch (error) {
           console.error('Error fetching attendance data:', error);
@@ -390,7 +494,6 @@ const Attendance: React.FC = () => {
         attendanceData: attendanceData.filter(record => record.status !== ATTENDANCE_STATUSES.UNMARKED)
       }, { headers });
       
-      console.log('Attendance saved:', response.data);
       alert('Attendance saved successfully!');
     } catch (error: any) {
       console.error('Error saving attendance:', error);
@@ -400,8 +503,6 @@ const Attendance: React.FC = () => {
 
   // Auto-save attendance when status changes
   const handleAttendanceChange = async (studentId: string, status: string) => {
-    console.log('Changing attendance for student:', studentId, 'to status:', status);
-    console.log('Current isInstructor:', isInstructor);
     
     // Create updated attendance data with the new status
     const updatedAttendanceData = attendanceData.map(record => 
@@ -441,32 +542,9 @@ const Attendance: React.FC = () => {
           }))
       };
       
-      console.log('Sending attendance data:', requestData);
-      console.log('Course ID:', courseId);
-      console.log('Headers:', headers);
-      console.log('Total students being saved:', requestData.attendanceData.length);
-      console.log('Individual student data:');
-      requestData.attendanceData.forEach((student, index) => {
-        console.log(`Student ${index + 1}:`, student);
-      });
-      
-      // Log the current state for debugging
-      console.log('Current attendanceData state:', attendanceData);
-      console.log('Updated attendanceData state:', updatedAttendanceData);
       
       const response = await axios.post(`${API_URL}/api/courses/${courseId}/attendance`, requestData, { headers });
       
-      console.log('Attendance auto-saved:', response.data);
-      
-      // Test: Fetch the attendance data back to see what was actually saved
-      setTimeout(async () => {
-        try {
-          const testResponse = await axios.get(`${API_URL}/api/courses/${courseId}/attendance?date=${selectedDate}`, { headers });
-          console.log('Fetched back attendance data:', testResponse.data);
-        } catch (testError) {
-          console.error('Error fetching back attendance data:', testError);
-        }
-      }, 1000);
     } catch (error: any) {
       console.error('Error auto-saving attendance:', error);
       // Don't show alert for auto-save errors to avoid spam
@@ -474,46 +552,77 @@ const Attendance: React.FC = () => {
   };
 
   const handleDateChange = async (date: string) => {
-    setSelectedDate(date);
-    setLoading(true);
+    if (!date) return;
     
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        console.error('No authentication token found');
-        return;
-      }
-
-      const headers = { Authorization: `Bearer ${token}` };
+    setSelectedDate(date);
+    
+    // Only fetch attendance data if in daily view
+    if (viewMode === 'daily') {
+      setLoading(true);
       
-      // Fetch attendance data for the selected date
-      const attendanceResponse = await axios.get(`${API_URL}/api/courses/${courseId}/attendance?date=${date}`, { headers });
-      console.log('Fetched attendance data:', attendanceResponse.data);
-      setAttendanceData(attendanceResponse.data);
-    } catch (error) {
-      console.error('Error fetching attendance for date:', date, error);
-      // If no attendance data exists for this date, create default records
       try {
         const token = localStorage.getItem('token');
+        if (!token) {
+          console.error('No authentication token found');
+          setLoading(false);
+          return;
+        }
+
         const headers = { Authorization: `Bearer ${token}` };
-        const studentsResponse = await axios.get(`${API_URL}/api/courses/${courseId}/students`, { headers });
-        const defaultAttendanceData = studentsResponse.data.map((student: any) => ({
-          studentId: student._id,
-          studentName: `${student.firstName} ${student.lastName}`,
-          email: student.email,
-          status: ATTENDANCE_STATUSES.UNMARKED,
-          date: date,
-          timestamp: null,
-          reason: '',
-          notes: ''
-        }));
-        setAttendanceData(defaultAttendanceData);
-      } catch (fallbackError) {
-        console.error('Error creating default attendance data:', fallbackError);
+        
+        try {
+          const attendanceResponse = await axios.get(`${API_URL}/api/courses/${courseId}/attendance?date=${date}`, { headers });
+          const allAttendanceData = attendanceResponse.data || [];
+          
+          // Filter data based on user role
+          if (isInstructor || user?.role === 'admin') {
+            // Teachers/Admins see all students
+            setAttendanceData(Array.isArray(allAttendanceData) ? allAttendanceData : []);
+          } else {
+            // Students only see their own attendance
+            const studentAttendanceData = (Array.isArray(allAttendanceData) ? allAttendanceData : []).filter((record: any) => 
+              record.studentId === user?._id
+            );
+            setAttendanceData(studentAttendanceData);
+          }
+        } catch (attendanceError) {
+          // If no attendance data exists, create default records
+          if (isInstructor || user?.role === 'admin') {
+            // For teachers/admins, create records for all students
+            const studentsResponse = await axios.get(`${API_URL}/api/courses/${courseId}/students`, { headers });
+            const defaultAttendanceData = (studentsResponse.data || []).map((student: any) => ({
+              studentId: student._id,
+              studentName: `${student.firstName} ${student.lastName}`,
+              email: student.email,
+              status: ATTENDANCE_STATUSES.UNMARKED,
+              date: date,
+              timestamp: null,
+              reason: '',
+              notes: ''
+            }));
+            setAttendanceData(defaultAttendanceData);
+          } else {
+            // For students, create only their own record
+            const defaultAttendanceData = [{
+              studentId: user?._id,
+              studentName: `${user?.firstName} ${user?.lastName}`,
+              email: user?.email,
+              status: ATTENDANCE_STATUSES.UNMARKED,
+              date: date,
+              timestamp: null,
+              reason: '',
+              notes: ''
+            }];
+            setAttendanceData(defaultAttendanceData);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching attendance data:', error);
+      } finally {
+        setLoading(false);
       }
-    } finally {
-      setLoading(false);
     }
+    // In calendar view, date change just updates selectedDate and the calendar will re-render
   };
 
   const [showExportModal, setShowExportModal] = useState(false);
@@ -633,7 +742,6 @@ const Attendance: React.FC = () => {
           }
         } catch (error) {
           // Skip days with no data
-          console.log(`No attendance data for ${dateString}`);
         }
       }
 
@@ -670,7 +778,6 @@ const Attendance: React.FC = () => {
       a.click();
       window.URL.revokeObjectURL(url);
       
-      console.log(`Exported ${allAttendanceData.length} attendance records for ${year}-${String(month + 1).padStart(2, '0')}`);
     } catch (error) {
       console.error('Error exporting monthly attendance:', error);
       alert('Error exporting attendance data');
@@ -718,7 +825,6 @@ const Attendance: React.FC = () => {
             allAttendanceData.push(...filteredData);
           }
         } catch (error) {
-          console.log(`No attendance data for ${dateString}`);
         }
       }
 
@@ -752,7 +858,6 @@ const Attendance: React.FC = () => {
       window.URL.revokeObjectURL(url);
       
       setShowExportModal(false);
-      console.log(`Exported ${allAttendanceData.length} attendance records for custom range`);
     } catch (error) {
       console.error('Error exporting custom attendance:', error);
       alert('Error exporting attendance data');
@@ -867,20 +972,24 @@ const Attendance: React.FC = () => {
           </button>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={exportAttendance}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2"
-          >
-            <Download className="h-4 w-4" />
-            Export Daily CSV
-          </button>
-          <button
-            onClick={() => setShowExportModal(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2"
-          >
-            <Download className="h-4 w-4" />
-            Custom Export
-          </button>
+          {(isInstructor || user?.role === 'admin') && (
+            <>
+              <button
+                onClick={exportAttendance}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Export Daily CSV
+              </button>
+              <button
+                onClick={() => setShowExportModal(true)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2"
+              >
+                <Settings className="h-4 w-4" />
+                Custom Export
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -963,30 +1072,32 @@ const Attendance: React.FC = () => {
       {/* Conditional Rendering based on View Mode */}
       {viewMode === 'daily' ? (
         <>
-          {/* Status Summary */}
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-            {Object.entries(STATUS_CONFIG).map(([status, config]) => {
-              const Icon = config.icon;
-              return (
-                <div key={status} className="bg-white rounded-lg p-4 shadow-sm border text-center">
-                  <div className="flex items-center justify-center mb-2">
-                    <Icon className={`h-6 w-6 ${config.color.split(' ')[1]}`} />
+          {/* Status Summary - Only show for teachers/admins */}
+          {(isInstructor || user?.role === 'admin') && (
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+              {Object.entries(STATUS_CONFIG).map(([status, config]) => {
+                const Icon = config.icon;
+                return (
+                  <div key={status} className="bg-white rounded-lg p-4 shadow-sm border text-center">
+                    <div className="flex items-center justify-center mb-2">
+                      <Icon className={`h-6 w-6 ${config.color.split(' ')[1]}`} />
+                    </div>
+                    <div className="text-2xl font-bold text-gray-900">{statusCounts[status]}</div>
+                    <div className="text-sm text-gray-500">{config.label}</div>
                   </div>
-                  <div className="text-2xl font-bold text-gray-900">{statusCounts[status]}</div>
-                  <div className="text-sm text-gray-500">{config.label}</div>
+                );
+              })}
+              
+              {/* Overall Attendance Percentage Card */}
+              <div className="bg-white rounded-lg p-4 shadow-sm border border-green-200 text-center">
+                <div className="flex items-center justify-center mb-2">
+                  <span className="text-2xl">📊</span>
                 </div>
-              );
-            })}
-            
-            {/* Overall Attendance Percentage Card */}
-            <div className="bg-white rounded-lg p-4 shadow-sm border border-green-200 text-center">
-              <div className="flex items-center justify-center mb-2">
-                <span className="text-2xl">📊</span>
+                <div className="text-2xl font-bold text-green-600">{attendancePercentage}%</div>
+                <div className="text-sm text-gray-500">Attendance Rate</div>
               </div>
-              <div className="text-2xl font-bold text-green-600">{attendancePercentage}%</div>
-              <div className="text-sm text-gray-500">Attendance Rate</div>
             </div>
-          </div>
+          )}
         </>
       ) : (
         /* Calendar View */
@@ -997,7 +1108,12 @@ const Attendance: React.FC = () => {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => {
-                    const currentDate = new Date(selectedDate);
+                    if (!selectedDate) {
+                      const today = new Date();
+                      setSelectedDate(today.toISOString().split('T')[0]);
+                      return;
+                    }
+                    const currentDate = new Date(selectedDate + 'T00:00:00'); // Add time to avoid timezone issues
                     const prevMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
                     setSelectedDate(prevMonth.toISOString().split('T')[0]);
                   }}
@@ -1005,12 +1121,19 @@ const Attendance: React.FC = () => {
                 >
                   <ChevronLeft className="h-5 w-5" />
                 </button>
-                <span className="text-lg font-medium text-gray-900">
-                  {new Date(selectedDate).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                <span className="text-lg font-medium text-gray-900 min-w-[150px] text-center">
+                  {selectedDate 
+                    ? new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                    : 'Loading...'}
                 </span>
                 <button
                   onClick={() => {
-                    const currentDate = new Date(selectedDate);
+                    if (!selectedDate) {
+                      const today = new Date();
+                      setSelectedDate(today.toISOString().split('T')[0]);
+                      return;
+                    }
+                    const currentDate = new Date(selectedDate + 'T00:00:00'); // Add time to avoid timezone issues
                     const nextMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
                     setSelectedDate(nextMonth.toISOString().split('T')[0]);
                   }}
@@ -1018,13 +1141,15 @@ const Attendance: React.FC = () => {
                 >
                   <ChevronRight className="h-5 w-5" />
                 </button>
-                <button
-                  onClick={exportMonthlyAttendance}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2"
-                >
-                  <Download className="h-4 w-4" />
-                  Export CSV
-                </button>
+                {(isInstructor || user?.role === 'admin') && (
+                  <button
+                    onClick={exportMonthlyAttendance}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2"
+                  >
+                    <Download className="h-4 w-4" />
+                    Export CSV
+                  </button>
+                )}
               </div>
             </div>
             
@@ -1096,7 +1221,9 @@ const Attendance: React.FC = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-gray-500" />
-                <h2 className="text-lg font-semibold text-gray-900">Student Attendance</h2>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  {(isInstructor || user?.role === 'admin') ? 'Student Attendance' : 'My Attendance'}
+                </h2>
               </div>
               {isInstructor && (
                 <button
@@ -1142,7 +1269,7 @@ const Attendance: React.FC = () => {
                     </div>
                   </div>
                   
-                  {true ? ( // Temporarily show buttons for all users for testing
+                  {(isInstructor || user?.role === 'admin') ? (
                     <div className="flex items-center gap-2">
                       {Object.entries(STATUS_CONFIG).map(([status, config]) => {
                         const Icon = config.icon;

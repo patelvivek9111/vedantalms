@@ -20,18 +20,21 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
+    courseCode: '',
     // Catalog fields
     subject: '',
     catalogDescription: '',
     prerequisites: [] as string[],
     maxStudents: '',
+    creditHours: '3',
     enrollmentDeadline: '',
     startDate: '',
     endDate: '',
-    tags: '',
-    syllabus: '',
     isPublic: false,
-    allowTeacherEnrollment: false
+    allowTeacherEnrollment: false,
+    // Semester fields
+    semesterTerm: 'Fall',
+    semesterYear: new Date().getFullYear().toString()
   });
 
   const [formErrors, setFormErrors] = useState({
@@ -40,11 +43,10 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
     subject: '',
     catalogDescription: '',
     maxStudents: '',
+    creditHours: '',
     enrollmentDeadline: '',
     startDate: '',
     endDate: '',
-    tags: '',
-    syllabus: '',
     allowTeacherEnrollment: ''
   });
 
@@ -56,17 +58,19 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
         setFormData({
           title: course.title,
           description: course.description,
+          courseCode: course.catalog?.courseCode || '',
           subject: course.catalog?.subject || '',
           catalogDescription: course.catalog?.description || '',
           prerequisites: course.catalog?.prerequisites || [],
           maxStudents: course.catalog?.maxStudents?.toString() || '',
+          creditHours: course.catalog?.creditHours?.toString() || '3',
           enrollmentDeadline: course.catalog?.enrollmentDeadline ? new Date(course.catalog.enrollmentDeadline).toISOString().split('T')[0] : '',
           startDate: course.catalog?.startDate ? new Date(course.catalog.startDate).toISOString().split('T')[0] : '',
           endDate: course.catalog?.endDate ? new Date(course.catalog.endDate).toISOString().split('T')[0] : '',
-          tags: course.catalog?.tags?.join(', ') || '',
-          syllabus: course.catalog?.syllabus || '',
           isPublic: course.catalog?.isPublic || false,
-          allowTeacherEnrollment: course.catalog?.allowTeacherEnrollment || false
+          allowTeacherEnrollment: course.catalog?.allowTeacherEnrollment || false,
+          semesterTerm: course.semester?.term || 'Fall',
+          semesterYear: course.semester?.year?.toString() || new Date().getFullYear().toString()
         });
         } catch (err) {
           console.error('Error fetching course:', err);
@@ -83,11 +87,10 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
       subject: '',
       catalogDescription: '',
       maxStudents: '',
+      creditHours: '',
       enrollmentDeadline: '',
       startDate: '',
       endDate: '',
-      tags: '',
-      syllabus: '',
       allowTeacherEnrollment: ''
     };
     let isValid = true;
@@ -124,21 +127,27 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
       const catalogData = {
         subject: formData.subject,
         description: formData.catalogDescription,
+        courseCode: formData.courseCode,
         prerequisites: formData.prerequisites,
         maxStudents: formData.maxStudents ? parseInt(formData.maxStudents) : null,
+        creditHours: formData.creditHours ? parseInt(formData.creditHours) : 3,
         enrollmentDeadline: formData.enrollmentDeadline ? new Date(formData.enrollmentDeadline) : null,
         startDate: formData.startDate ? new Date(formData.startDate) : null,
         endDate: formData.endDate ? new Date(formData.endDate) : null,
-        tags: formData.tags ? formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag) : [],
-        syllabus: formData.syllabus,
         isPublic: formData.isPublic,
         allowTeacherEnrollment: formData.allowTeacherEnrollment
       };
 
+      // Prepare semester data - always include it
+      const semesterData = {
+        term: formData.semesterTerm || 'Fall',
+        year: parseInt(formData.semesterYear) || new Date().getFullYear()
+      };
+
              if (mode === 'create') {
-         await createCourse(formData.title, formData.description, catalogData);
+         await createCourse(formData.title, formData.description, catalogData, semesterData);
        } else if (mode === 'edit' && id) {
-         await updateCourse(id, formData.title, formData.description, catalogData);
+         await updateCourse(id, formData.title, formData.description, catalogData, semesterData);
        }
        navigate('/dashboard');
     } catch (err) {
@@ -221,6 +230,24 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
             )}
           </div>
 
+          <div>
+            <label
+              htmlFor="courseCode"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Course Code
+            </label>
+            <input
+              type="text"
+              id="courseCode"
+              name="courseCode"
+              value={formData.courseCode}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
+              placeholder="e.g., CS101, MATH201"
+            />
+          </div>
+
                      {/* Catalog Section */}
            <div className="border-t pt-6">
              <h3 className="text-lg font-medium text-gray-900 mb-4">Catalog Information</h3>
@@ -297,25 +324,27 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
 
               <div>
                 <label
-                  htmlFor="tags"
+                  htmlFor="creditHours"
                   className="block text-sm font-medium text-gray-700 mb-1"
                 >
-                  Tags
+                  Credit Hours
                 </label>
                 <input
-                  type="text"
-                  id="tags"
-                  name="tags"
-                  value={formData.tags}
+                  type="number"
+                  id="creditHours"
+                  name="creditHours"
+                  value={formData.creditHours}
                   onChange={handleChange}
+                  min="1"
+                  max="10"
                   className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    formErrors.tags ? 'border-red-500' : 'border-gray-300'
+                    formErrors.creditHours ? 'border-red-500' : 'border-gray-300'
                   }`}
-                  placeholder="e.g., programming, web development, javascript"
+                  placeholder="3"
                 />
-                <p className="mt-1 text-sm text-gray-500">Separate tags with commas</p>
-                {formErrors.tags && (
-                  <p className="mt-1 text-sm text-red-600">{formErrors.tags}</p>
+                <p className="mt-1 text-sm text-gray-500">Number of credit hours for this course</p>
+                {formErrors.creditHours && (
+                  <p className="mt-1 text-sm text-red-600">{formErrors.creditHours}</p>
                 )}
               </div>
 
@@ -386,27 +415,52 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
               </div>
             </div>
 
-            <div className="mt-6">
-              <label
-                htmlFor="syllabus"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Syllabus
-              </label>
-              <textarea
-                id="syllabus"
-                name="syllabus"
-                value={formData.syllabus}
-                onChange={handleChange}
-                rows={4}
-                className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  formErrors.syllabus ? 'border-red-500' : 'border-gray-300'
-                }`}
-                placeholder="Enter course syllabus or detailed description"
-              />
-              {formErrors.syllabus && (
-                <p className="mt-1 text-sm text-red-600">{formErrors.syllabus}</p>
-              )}
+            {/* Semester Section */}
+            <div className="border-t pt-6 mt-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Semester Information</h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label
+                    htmlFor="semesterTerm"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    Term
+                  </label>
+                  <select
+                    id="semesterTerm"
+                    name="semesterTerm"
+                    value={formData.semesterTerm}
+                    onChange={(e) => setFormData(prev => ({ ...prev, semesterTerm: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="Fall">Fall</option>
+                    <option value="Spring">Spring</option>
+                    <option value="Summer">Summer</option>
+                    <option value="Winter">Winter</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="semesterYear"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    Year
+                  </label>
+                  <input
+                    type="number"
+                    id="semesterYear"
+                    name="semesterYear"
+                    value={formData.semesterYear}
+                    onChange={handleChange}
+                    min="2020"
+                    max="2100"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="2025"
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="mt-6">

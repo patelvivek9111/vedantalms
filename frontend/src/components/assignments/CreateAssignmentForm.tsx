@@ -1,5 +1,5 @@
 import React, { useState, ChangeEvent, FormEvent, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
 import { format } from 'date-fns';
@@ -51,6 +51,7 @@ interface FormData {
   groupSetId: string | null;
   allowStudentUploads: boolean;
   displayMode: 'single' | 'scrollable';
+  isGradedQuiz: boolean;
   isTimedQuiz: boolean;
   quizTimeLimit: number; // in minutes
   showCorrectAnswers: boolean; // Show correct answers to students after submission
@@ -66,6 +67,7 @@ interface GroupSet {
 
 const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, editMode = false, assignmentData = null }) => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [modules, setModules] = useState<Module[]>([]);
   const [groupSets, setGroupSets] = useState<GroupSet[]>([]);
   const [formData, setFormData] = useState<FormData>({
@@ -81,6 +83,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
     groupSetId: null,
     allowStudentUploads: false,
     displayMode: 'single',
+    isGradedQuiz: false,
     isTimedQuiz: false,
     quizTimeLimit: 60,
     showCorrectAnswers: false,
@@ -91,7 +94,8 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
   const [newOption, setNewOption] = useState({ text: '', isCorrect: false });
   const [courseId, setCourseId] = useState<string | null>(null);
   const [courseGroups, setCourseGroups] = useState<{ name: string; weight: number }[]>([]);
-  const [group, setGroup] = useState('');
+  // Initialize group from URL param, assignmentData, or empty string
+  const [group, setGroup] = useState(searchParams.get('group') || '');
   const [currentStep, setCurrentStep] = useState(1);
   const [existingAttachments, setExistingAttachments] = useState<string[]>([]);
   const [submissionCount, setSubmissionCount] = useState(0);
@@ -122,6 +126,16 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
           });
           if (courseRes.data.success) {
             setCourseGroups(courseRes.data.data.groups || []);
+            // If group param exists in URL and the group exists in course groups, set it
+            const groupParam = searchParams.get('group');
+            if (groupParam && (courseRes.data.data.groups || []).some((g: any) => g.name === groupParam)) {
+              setGroup(groupParam);
+            }
+            // Set isGradedQuiz from URL parameter if it exists
+            const isGradedQuizParam = searchParams.get('isGradedQuiz');
+            if (isGradedQuizParam === 'true') {
+              setFormData(prev => ({ ...prev, isGradedQuiz: true }));
+            }
           }
           // Then fetch all modules for that course
           const modulesResponse = await axios.get(`${API_URL}/api/modules/${courseId}`, {
@@ -159,7 +173,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
     };
 
     fetchModules();
-  }, [moduleId, navigate]);
+  }, [moduleId, navigate, searchParams]);
 
   useEffect(() => {
     const fetchGroupSets = async () => {
@@ -180,9 +194,6 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
   // Populate form with existing assignment data when in edit mode
   useEffect(() => {
     if (editMode && assignmentData) {
-      console.log('Processing assignment data in CreateAssignmentForm:', assignmentData);
-      console.log('Original availableFrom:', assignmentData.availableFrom);
-      console.log('Original dueDate:', assignmentData.dueDate);
       
       // Fetch submission count for this assignment
       const fetchSubmissionCount = async () => {
@@ -206,11 +217,9 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
       let availableFromDate = '';
       if (assignmentData.availableFrom) {
         availableFromDate = format(new Date(assignmentData.availableFrom), "yyyy-MM-dd'T'HH:mm");
-        console.log('Using availableFrom:', availableFromDate);
       } else if (assignmentData.dueDate) {
         // If no availableFrom exists, use dueDate as a fallback
         availableFromDate = format(new Date(assignmentData.dueDate), "yyyy-MM-dd'T'HH:mm");
-        console.log('Using dueDate as fallback for availableFrom:', availableFromDate);
       }
       
       // Ensure boolean values are properly converted
@@ -229,15 +238,18 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
         groupSetId: assignmentData.groupSet || null,
         allowStudentUploads: allowStudentUploads,
         displayMode: assignmentData.displayMode || 'single',
+        isGradedQuiz: Boolean(assignmentData.isGradedQuiz || assignmentData.isTimedQuiz || assignmentData.showCorrectAnswers || assignmentData.showStudentAnswers),
         isTimedQuiz: Boolean(assignmentData.isTimedQuiz),
         quizTimeLimit: assignmentData.quizTimeLimit || 60,
         showCorrectAnswers: Boolean(assignmentData.showCorrectAnswers),
         showStudentAnswers: Boolean(assignmentData.showStudentAnswers)
       };
       
-      console.log('Setting form data:', formDataToSet);
       setFormData(formDataToSet);
-      setGroup(assignmentData.group || '');
+      // Set group from assignmentData if in edit mode, otherwise keep URL param value
+      if (!group) {
+        setGroup(assignmentData.group || '');
+      }
       setExistingAttachments(assignmentData.attachments || []);
     }
   }, [editMode, assignmentData]);
@@ -409,6 +421,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
       formDataToSend.append('isGroupAssignment', formData.isGroupAssignment.toString());
       formDataToSend.append('allowStudentUploads', formData.allowStudentUploads.toString());
       formDataToSend.append('displayMode', formData.displayMode);
+      formDataToSend.append('isGradedQuiz', formData.isGradedQuiz.toString());
       formDataToSend.append('isTimedQuiz', formData.isTimedQuiz.toString());
       formDataToSend.append('quizTimeLimit', formData.quizTimeLimit.toString());
       formDataToSend.append('showCorrectAnswers', formData.showCorrectAnswers.toString());
@@ -423,13 +436,6 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
         formDataToSend.append('attachments', file);
       });
 
-      // Debug: Log the form data being sent
-      console.log('Sending form data:', {
-        title: formData.title,
-        availableFrom: formData.availableFrom,
-        dueDate: formData.dueDate,
-        moduleId: formData.moduleId
-      });
 
       const token = localStorage.getItem('token');
       
@@ -455,7 +461,31 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
         });
 
         if (response.data) {
-          navigate(`/modules/${moduleId}`);
+          // Determine where to redirect based on assignment/quiz type and module
+          // Use the module ID from the form (user's selection) or fallback to URL param
+          const selectedModuleId = (formData.moduleId && formData.moduleId.trim() !== '') 
+            ? formData.moduleId 
+            : (moduleId || null);
+          
+          // Also check if it's a group assignment (which might not have a module)
+          const isGroupAssignment = formData.isGroupAssignment && formData.groupSetId;
+          
+          if (selectedModuleId && !isGroupAssignment) {
+            // If assignment has a module, navigate to that module's page
+            navigate(`/modules/${selectedModuleId}`);
+          } else if (courseId) {
+            // If no module or group assignment, navigate to appropriate page based on quiz type
+            if (formData.isGradedQuiz) {
+              // Navigate to quizzes page
+              navigate(`/courses/${courseId}/quizzes`);
+            } else {
+              // Navigate to assignments page
+              navigate(`/courses/${courseId}/assignments`);
+            }
+          } else {
+            // Fallback to dashboard if no courseId available
+            navigate('/dashboard');
+          }
         }
       }
     } catch (err: any) {
@@ -474,7 +504,10 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
     <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
       <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg p-6">
       <h2 className="text-2xl font-bold mb-6 text-gray-800">
-        {editMode ? 'Edit Assignment' : 'Create New Assignment'}
+        {editMode 
+          ? (formData.isGradedQuiz ? 'Edit Quiz' : 'Edit Assignment')
+          : (formData.isGradedQuiz ? 'Create New Quiz' : 'Create New Assignment')
+        }
       </h2>
       
       {/* Step Indicator */}
@@ -609,8 +642,24 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
               </div>
             </div>
 
-            {/* Timer Quiz Options - Only show when Quizzes is selected */}
-            {group === 'Quizzes' && (
+            {/* Graded Quiz Checkbox */}
+            <div className="space-y-4">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="isGradedQuiz"
+                  checked={formData.isGradedQuiz}
+                  onChange={(e) => setFormData({ ...formData, isGradedQuiz: e.target.checked })}
+                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                />
+                <label htmlFor="isGradedQuiz" className="ml-2 block text-sm text-gray-900">
+                  Graded Quiz
+                </label>
+              </div>
+            </div>
+
+            {/* Timer Options - Show when Graded Quiz is checked */}
+            {formData.isGradedQuiz && (
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Quiz Timer</label>
@@ -1170,7 +1219,10 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                   type="submit"
                   className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
                 >
-                  {editMode ? 'Update Assignment' : 'Create Assignment'}
+                  {editMode 
+                    ? (formData.isGradedQuiz ? 'Update Quiz' : 'Update Assignment')
+                    : (formData.isGradedQuiz ? 'Create Quiz' : 'Create Assignment')
+                  }
                 </button>
               </div>
             </div>

@@ -283,26 +283,26 @@ const PollList: React.FC<PollListProps> = ({ courseId }) => {
                                  {/* Poll Options */}
                  <div className="p-6">
                    {/* Show voting interface for students if poll is active and they haven't voted */}
-                   {!isInstructor && status.status === 'active' && !poll.hasVoted && (
+                   {!isInstructor && status.status === 'active' && !poll.hasVoted ? (
                      <PollVote poll={poll} onVoteSuccess={handleVoteSuccess} />
-                   )}
-                   
-                   {/* Show results for everyone */}
-                   {!isInstructor && !poll.hasVoted && status.status === 'active' && (
-                     <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
-                       <div className="flex items-center gap-2">
-                         <Vote className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                         <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                           Vote to see results
-                         </span>
-                       </div>
-                       <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                         Submit your vote to view the current poll results and see which option is winning.
-                       </p>
-                     </div>
-                   )}
-                   
-                   <div className="space-y-3">
+                   ) : (
+                     <>
+                       {/* Show results for everyone */}
+                       {!isInstructor && !poll.hasVoted && status.status === 'active' && (
+                         <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
+                           <div className="flex items-center gap-2">
+                             <Vote className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                             <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                               Vote to see results
+                             </span>
+                           </div>
+                           <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                             Submit your vote to view the current poll results and see which option is winning.
+                           </p>
+                         </div>
+                       )}
+                       
+                       <div className="space-y-3">
                      {poll.options.map((option, index) => {
                        const votePercentage = poll.totalVotes && poll.totalVotes > 0 
                          ? ((option.votes || 0) / poll.totalVotes) * 100 
@@ -373,6 +373,8 @@ const PollList: React.FC<PollListProps> = ({ courseId }) => {
                          ))}
                        </div>
                      </div>
+                   )}
+                     </>
                    )}
                  </div>
               </div>

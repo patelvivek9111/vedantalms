@@ -11,9 +11,10 @@
  * @param {Object} course - The course object with groups
  * @param {Array} assignments - Array of assignment objects
  * @param {Object} grades - Object mapping studentId -> assignmentId -> grade
+ * @param {Object} submissions - Object mapping assignmentId -> submission (optional)
  * @returns {number} The calculated final grade percentage
  */
-function calculateFinalGradeWithWeightedGroups(studentId, course, assignments, grades) {
+function calculateFinalGradeWithWeightedGroups(studentId, course, assignments, grades, submissions = {}) {
   const courseGroups = course.groups || [];
   const now = new Date();
 
@@ -44,24 +45,29 @@ function calculateFinalGradeWithWeightedGroups(studentId, course, assignments, g
         : assignment.totalPoints || 0;
       const dueDate = assignment.dueDate ? new Date(assignment.dueDate) : null;
       
-      // Skip unpublished assignments (but discussions are always considered published)
-      if (!assignment.isDiscussion && !assignment.published) {
+      // Skip unpublished items (for discussions too)
+      if ((assignment.isDiscussion && assignment.published === false) || (!assignment.isDiscussion && !assignment.published)) {
         return;
       }
       
-      // Count as 0 if past due date and no submission
-      if (dueDate && now > dueDate && (grade === undefined || grade === null || grade === '-')) {
-        earned += 0;
-        possible += max;
-      } else if (typeof grade === 'number') {
+      // Check if student has submitted this assignment
+      // For discussions, use the hasSubmitted flag from the controller
+      const hasSubmission = assignment.isDiscussion
+        ? (assignment.hasSubmitted === true)
+        : (submissions[assignment._id.toString()] !== undefined);
+      
+      // Only count assignments that have been explicitly graded
+      if (typeof grade === 'number') {
         earned += grade;
         possible += max;
         hasGradedAssignments = true; // This group has at least one graded assignment
-      } else if (dueDate && now > dueDate) {
-        // Also count as 0 if past due and no valid grade
+      } else if (dueDate && now > dueDate && !hasSubmission) {
+        // Count as 0 if past due date and no submission (student never submitted)
         earned += 0;
         possible += max;
+        hasGradedAssignments = true; // This group has at least one graded assignment
       }
+      // Note: We exclude "Not Graded" submissions (hasSubmission but no grade) from calculation entirely
     });
 
     if (hasGradedAssignments && possible > 0) {
@@ -92,24 +98,28 @@ function calculateFinalGradeWithWeightedGroups(studentId, course, assignments, g
         : assignment.totalPoints || 0;
       const dueDate = assignment.dueDate ? new Date(assignment.dueDate) : null;
       
-      // Skip unpublished assignments (but discussions are always considered published)
-      if (!assignment.isDiscussion && !assignment.published) {
+      // Skip unpublished items (for discussions too)
+      if ((assignment.isDiscussion && assignment.published === false) || (!assignment.isDiscussion && !assignment.published)) {
         return;
       }
       
-      // Count as 0 if past due date and no submission
-      if (dueDate && now > dueDate && (grade === undefined || grade === null || grade === '-')) {
-        otherEarned += 0;
-        otherPossible += max;
-      } else if (typeof grade === 'number') {
+      // Check if student has submitted this assignment
+      const hasSubmission = assignment.isDiscussion
+        ? (assignment.hasSubmitted === true)
+        : (submissions[assignment._id.toString()] !== undefined);
+      
+      // Only count assignments that have been explicitly graded
+      if (typeof grade === 'number') {
         otherEarned += grade;
         otherPossible += max;
         otherGroupHasGrades = true;
-      } else if (dueDate && now > dueDate) {
-        // Also count as 0 if past due and no valid grade
+      } else if (dueDate && now > dueDate && !hasSubmission) {
+        // Count as 0 if past due date and no submission (student never submitted)
         otherEarned += 0;
         otherPossible += max;
+        otherGroupHasGrades = true;
       }
+      // Note: We exclude "Not Graded" submissions (hasSubmission but no grade) from calculation entirely
     });
   }
 
@@ -164,7 +174,7 @@ function calculateFinalGradeWithWeightedGroups(studentId, course, assignments, g
  * Calculate the weighted grade for a student using the traditional method.
  * This function maintains backward compatibility with existing code.
  */
-function getWeightedGradeForStudent(studentId, course, assignments, grades) {
+function getWeightedGradeForStudent(studentId, course, assignments, grades, submissions = {}) {
   let weightedSum = 0;
   let totalWeight = 0;
   const courseGroups = course.groups || [];
@@ -202,23 +212,26 @@ function getWeightedGradeForStudent(studentId, course, assignments, grades) {
         : assignment.totalPoints || 0;
       const dueDate = assignment.dueDate ? new Date(assignment.dueDate) : null;
       
-      // Skip unpublished assignments (but discussions are always considered published)
-      if (!assignment.isDiscussion && !assignment.published) {
+      // Skip unpublished items (for discussions too)
+      if ((assignment.isDiscussion && assignment.published === false) || (!assignment.isDiscussion && !assignment.published)) {
         return;
       }
       
-      // Count as 0 if past due date and no submission
-      if (dueDate && now > dueDate && (grade === undefined || grade === null || grade === '-')) {
-        earned += 0;
-        possible += max;
-      } else if (typeof grade === 'number') {
+      // Check if student has submitted this assignment
+      const hasSubmission = assignment.isDiscussion
+        ? (assignment.hasSubmitted === true)
+        : (submissions[assignment._id.toString()] !== undefined);
+      
+      // Only count assignments that have been explicitly graded
+      if (typeof grade === 'number') {
         earned += grade;
         possible += max;
-      } else if (dueDate && now > dueDate) {
-        // Also count as 0 if past due and no valid grade
+      } else if (dueDate && now > dueDate && !hasSubmission) {
+        // Count as 0 if past due date and no submission (student never submitted)
         earned += 0;
         possible += max;
       }
+      // Note: We exclude "Not Graded" submissions (hasSubmission but no grade) from calculation entirely
     });
     if (possible > 0) {
       const percent = (earned / possible) * 100;
@@ -239,23 +252,26 @@ function getWeightedGradeForStudent(studentId, course, assignments, grades) {
         : assignment.totalPoints || 0;
       const dueDate = assignment.dueDate ? new Date(assignment.dueDate) : null;
       
-      // Skip unpublished assignments (but discussions are always considered published)
-      if (!assignment.isDiscussion && !assignment.published) {
+      // Skip unpublished items (for discussions too)
+      if ((assignment.isDiscussion && assignment.published === false) || (!assignment.isDiscussion && !assignment.published)) {
         return;
       }
       
-      // Count as 0 if past due date and no submission
-      if (dueDate && now > dueDate && (grade === undefined || grade === null || grade === '-')) {
-        earned += 0;
-        possible += max;
-      } else if (typeof grade === 'number') {
+      // Check if student has submitted this assignment
+      const hasSubmission = assignment.isDiscussion
+        ? (assignment.hasSubmitted === true)
+        : (submissions[assignment._id.toString()] !== undefined);
+      
+      // Only count assignments that have been explicitly graded
+      if (typeof grade === 'number') {
         earned += grade;
         possible += max;
-      } else if (dueDate && now > dueDate) {
-        // Also count as 0 if past due and no valid grade
+      } else if (dueDate && now > dueDate && !hasSubmission) {
+        // Count as 0 if past due date and no submission (student never submitted)
         earned += 0;
         possible += max;
       }
+      // Note: We exclude "Not Graded" submissions (hasSubmission but no grade) from calculation entirely
     });
     if (possible > 0) {
       // Assign remaining weight to ungrouped assignments

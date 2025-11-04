@@ -12,7 +12,7 @@ export const ToDoPanel: React.FC = () => {
   const [personalTodos, setPersonalTodos] = useState<any[]>([]);                                                                                              
   const [personalLoading, setPersonalLoading] = useState(false);
   const [personalError, setPersonalError] = useState<string | null>(null);
-  const [studentDueAssignments, setStudentDueAssignments] = useState<any[]>([]);
+  const [studentDueItems, setStudentDueItems] = useState<any[]>([]);
   const [studentDueLoading, setStudentDueLoading] = useState(false);
   const [studentDueError, setStudentDueError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -35,15 +35,15 @@ export const ToDoPanel: React.FC = () => {
       };
       fetchTodo();
     } else {
-      // Student: fetch assignments due this week
+      // Student: fetch all items due this week (assignments + discussions)
       const fetchStudentDue = async () => {
         setStudentDueLoading(true);
         setStudentDueError(null);
         try {
-          const res = await api.get('/assignments/todo/due');
-          setStudentDueAssignments(res.data);
+          const res = await api.get('/assignments/todo/due-all');
+          setStudentDueItems(res.data);
         } catch (err: any) {
-          setStudentDueError('Failed to load assignments due this week');
+          setStudentDueError('Failed to load items due this week');
         } finally {
           setStudentDueLoading(false);
         }
@@ -249,28 +249,44 @@ export const ToDoPanel: React.FC = () => {
         </>
       ) : (
         <>
-          <h3 className="text-md font-semibold text-gray-600 mb-3">Assignments Due This Week</h3>
+          <h3 className="text-md font-semibold text-gray-600 mb-3">Due This Week</h3>
           {studentDueLoading ? (
             <div className="text-gray-500">Loading...</div>
           ) : studentDueError ? (
             <div className="text-red-500">{studentDueError}</div>
-          ) : studentDueAssignments.length === 0 ? (
-            <div className="text-gray-500 text-sm italic">No assignments due this week</div>
+          ) : studentDueItems.length === 0 ? (
+            <div className="text-gray-500 text-sm italic">No items due this week</div>
           ) : (
             <ul className="space-y-3">
-              {studentDueAssignments.map((item) => (
+              {studentDueItems.map((item) => (
                 <li key={item._id} className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                   <Link
-                    to={`/assignments/${item._id}/view`}
+                    to={item.type === 'assignment' 
+                      ? `/assignments/${item._id}/view`
+                      : `/courses/${item.course._id}/threads/${item._id}`
+                    }
                     className="block"
                   >
                     <div className="flex justify-between items-center mb-1">
                       <span className="font-medium text-gray-800" title={item.title}>
                         {item.title.length > 30 ? item.title.slice(0, 30) + '...' : item.title}
                       </span>
-                      <span className="text-xs bg-yellow-100 text-yellow-700 rounded px-2 py-1">Due {new Date(item.dueDate).toLocaleDateString()}</span>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs rounded px-2 py-1 ${
+                          item.type === 'assignment' 
+                            ? 'bg-blue-100 text-blue-700' 
+                            : 'bg-purple-100 text-purple-700'
+                        }`}>
+                          {item.itemType}
+                        </span>
+                        <span className="text-xs bg-yellow-100 text-yellow-700 rounded px-2 py-1">
+                          Due {new Date(item.dueDate).toLocaleDateString()}
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-sm text-gray-500">{item.module?.course?.title || ''}</div>
+                    <div className="text-sm text-gray-500">
+                      {item.module?.course?.title || item.course?.title || ''}
+                    </div>
                   </Link>
                 </li>
               ))}

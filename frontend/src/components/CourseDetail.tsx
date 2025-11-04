@@ -24,7 +24,9 @@ import {
   Settings,
   CheckSquare,
   Vote,
-  Layout
+  Layout,
+  ClipboardCheck,
+  GraduationCap
 } from 'lucide-react';
 import WhatIfScores from './WhatIfScores';
 import StudentGradeSidebar from './StudentGradeSidebar';
@@ -32,7 +34,6 @@ import CourseDiscussions from './CourseDiscussions';
 import GroupManagement from './groups/GroupManagement';
 import StudentGroupView from './groups/StudentGroupView';
 import { getWeightedGradeForStudent, getLetterGrade, calculateFinalGradeWithWeightedGroups } from '../utils/gradeUtils';
-import { getImageUrl } from '../utils/apiUtils';
 import CoursePages from './CoursePages';
 import Announcements from '../pages/Announcements';
 import AnnouncementForm from './announcements/AnnouncementForm';
@@ -43,6 +44,7 @@ import SidebarConfigModal from './SidebarConfigModal';
 import LatestAnnouncements from './LatestAnnouncements';
 import Attendance from './Attendance';
 import PollList from './polls/PollList';
+import RichTextEditor from './RichTextEditor';
 
 // EnrollmentRequestsHandler component
 const EnrollmentRequestsHandler: React.FC<{ courseId: string }> = ({ courseId }) => {
@@ -101,8 +103,8 @@ const EnrollmentRequestsHandler: React.FC<{ courseId: string }> = ({ courseId })
 
   return (
     <div className="space-y-3">
-      {enrollmentRequests.map((request) => (
-        <div key={request._id} className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg border border-orange-200 dark:border-orange-700">
+      {enrollmentRequests.map((request, idx: number) => (
+        <div key={`enrollment-${request._id}-${idx}`} className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg border border-orange-200 dark:border-orange-700">
           <div className="flex-1">
             <p className="font-medium text-gray-800 dark:text-gray-200">{request.title}</p>
             <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -132,9 +134,11 @@ const EnrollmentRequestsHandler: React.FC<{ courseId: string }> = ({ courseId })
 // Navigation items for the left pane
 const navigationItems = [
   { id: 'overview', label: 'Overview', icon: ClipboardList },
+  { id: 'syllabus', label: 'Syllabus', icon: GraduationCap },
   { id: 'modules', label: 'Modules', icon: BookOpen },
   { id: 'pages', label: 'Pages', icon: FileText },
   { id: 'assignments', label: 'Assignments', icon: PenTool },
+  { id: 'quizzes', label: 'Quizzes', icon: ClipboardCheck },
   { id: 'discussions', label: 'Discussions', icon: MessageSquare },
   { id: 'announcements', label: 'Announcements', icon: Megaphone },
   { id: 'polls', label: 'Polls', icon: BarChart3 },
@@ -154,7 +158,7 @@ const StudentCard = ({ student, isInstructor, isAdmin, handleUnenroll, isInstruc
         <img
           src={student.profilePicture.startsWith('http')
             ? student.profilePicture
-            : getImageUrl(student.profilePicture)}
+            : `http://localhost:5000${student.profilePicture}`}
           alt={student.firstName}
           className="w-12 h-12 object-cover rounded-full border"
           onError={() => setImgError(true)}
@@ -234,6 +238,21 @@ const CourseDetail: React.FC = () => {
   const [discussions, setDiscussions] = useState<any[]>([]);
   const [discussionsLoading, setDiscussionsLoading] = useState(true);
   const [groupAssignments, setGroupAssignments] = useState<any[]>([]);
+  // Syllabus state
+  const [editingSyllabus, setEditingSyllabus] = useState(false);
+  const [syllabusFields, setSyllabusFields] = useState({
+    courseTitle: '',
+    courseCode: '',
+    instructorName: '',
+    instructorEmail: '',
+    officeHours: 'By Appointment'
+  });
+  const [savingSyllabus, setSavingSyllabus] = useState(false);
+  const [syllabusMode, setSyllabusMode] = useState<'none' | 'upload' | 'editor'>('none');
+  const [syllabusContent, setSyllabusContent] = useState('');
+  const [syllabusFiles, setSyllabusFiles] = useState<File[]>([]);
+  const [uploadedSyllabusFiles, setUploadedSyllabusFiles] = useState<any[]>([]);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
   const [showOverviewConfigModal, setShowOverviewConfigModal] = useState(false);
   const [showSidebarConfigModal, setShowSidebarConfigModal] = useState(false);
 
@@ -288,6 +307,21 @@ const CourseDetail: React.FC = () => {
     fetchCourseAndModulesWithAssignments();
   }, [fetchCourseAndModulesWithAssignments]);
 
+  // Load syllabus data when course is loaded
+  useEffect(() => {
+    if (course) {
+      setSyllabusFields({
+        courseTitle: course.title || '',
+        courseCode: course.catalog?.courseCode || '',
+        instructorName: `${course.instructor?.firstName || ''} ${course.instructor?.lastName || ''}`.trim(),
+        instructorEmail: course.instructor?.email || '',
+        officeHours: course.catalog?.officeHours || 'By Appointment'
+      });
+      setSyllabusContent(course.catalog?.syllabusContent || '');
+      setUploadedSyllabusFiles(course.catalog?.syllabusFiles || []);
+    }
+  }, [course]);
+
   // 3. When switching to assignments tab, re-fetch modules and assignments
   useEffect(() => {
     if (activeSection === 'assignments') {
@@ -315,7 +349,7 @@ const CourseDetail: React.FC = () => {
             modules.map(async (module: any) => {
               try {
                 const res = await axios.get(`${API_URL}/api/threads/module/${module._id}`, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined);
-                return (res.data.data || []).filter((thread: any) => thread.isGraded);
+                return (res.data.data || res.data || []).filter((thread: any) => thread.isGraded);
               } catch (err) {
                 return [];
               }
@@ -338,19 +372,40 @@ const CourseDetail: React.FC = () => {
   }, [course?._id, modules]);
 
   // Get custom sidebar configuration or use default
-  const sidebarConfig = course?.sidebarConfig || {
-    items: navigationItems.map((item, index) => ({
-      id: item.id,
-      label: item.label,
+  // Merge existing config with default navigationItems to ensure all items are included
+  const existingItems = course?.sidebarConfig?.items || [];
+  const existingItemsMap = new Map(existingItems.map((item: any) => [item.id, item]));
+  
+  // Build merged items: start with all navigationItems, use existing config if available
+  const mergedItems = navigationItems.map((navItem, index) => {
+    const existing = existingItemsMap.get(navItem.id);
+    if (existing) {
+      // Use existing config, but ensure we have the icon and other properties from navigationItems
+      return {
+        ...existing,
+        label: navItem.label, // Always use the current label from navigationItems
+        fixed: navItem.id === 'overview'
+      };
+    }
+    // Item doesn't exist in config, add it with defaults
+    return {
+      id: navItem.id,
+      label: navItem.label,
       visible: true,
       order: index,
-      fixed: item.id === 'overview'
-    })),
+      fixed: navItem.id === 'overview'
+    };
+  });
+  
+  const sidebarConfig = {
+    items: mergedItems,
     studentVisibility: {
       overview: true,
+      syllabus: true,
       modules: true,
       pages: true,
       assignments: true,
+      quizzes: true,
       discussions: true,
       announcements: true,
       polls: true,
@@ -358,19 +413,26 @@ const CourseDetail: React.FC = () => {
       attendance: true,
       grades: true,
       gradebook: false,
-      students: true
+      students: true,
+      ...(course?.sidebarConfig?.studentVisibility || {})
     }
   };
 
   // Create navigation items from custom configuration
   const customNavigationItems = sidebarConfig.items
-    .sort((a: { order: number }, b: { order: number }) => a.order - b.order)
-    .filter((item: { visible: boolean }) => item.visible)
-    .map((item: { id: string; label: string; visible: boolean; order: number }) => {
+    .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
+    .filter((item: any) => item.visible !== false)
+    .map((item: any) => {
       const originalItem = navigationItems.find(nav => nav.id === item.id);
-      return {
+      return originalItem ? {
         ...originalItem,
         ...item
+      } : {
+        id: item.id,
+        label: item.label,
+        icon: ClipboardList, // Default icon fallback
+        visible: item.visible !== false,
+        order: item.order || 0
       };
     });
 
@@ -616,10 +678,15 @@ const CourseDetail: React.FC = () => {
         const groupAssignmentsResponse = await axios.get(`${API_URL}/api/assignments/course/${course?._id}/group-assignments`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        const groupAssignments = groupAssignmentsResponse.data.map((assignment: any) => ({
+        let groupAssignments = groupAssignmentsResponse.data.map((assignment: any) => ({
           ...assignment,
           moduleTitle: 'Group Assignments'
         }));
+
+        // Remove group assignments that are also present in regular assignments (same title)
+        const normalizeTitle = (t: any) => String(t || '').trim().toLowerCase();
+        const regularTitles = new Set((allAssignments || []).map((a: any) => normalizeTitle(a.title)));
+        groupAssignments = groupAssignments.filter((ga: any) => !regularTitles.has(normalizeTitle(ga.title)));
 
         // 4. Get all graded discussions
         const threadsResponse = await axios.get(`${API_URL}/api/threads/course/${course?._id}`, {
@@ -699,9 +766,49 @@ const CourseDetail: React.FC = () => {
           }
         }
 
+        // Deduplicate assignments to avoid duplicate columns in the gradebook
+        // 1) First pass: by _id
+        const allAssignmentsCombined = [...allAssignments, ...groupAssignments, ...gradedDiscussions];
+        const byId = allAssignmentsCombined.filter((assignment, index, self) =>
+          index === self.findIndex((a) => a._id === assignment._id)
+        );
+        // 2) Second pass: collapse items that share the same normalized title and type (covers duplicates from different sources)
+        const seenKeys = new Set<string>();
+        const uniqueAssignments = byId.filter(a => {
+          const type = a.isDiscussion ? 'discussion' : 'assignment';
+          const normalizedTitle = String(a.title || '').trim().toLowerCase();
+          const key = `${normalizedTitle}|${type}`;
+          if (seenKeys.has(key)) return false;
+          seenKeys.add(key);
+          return true;
+        });
+
+        // Sort assignments by creation date (oldest first, newest last)
+        // Use createdAt if available, otherwise use dueDate, otherwise use current date as fallback
+        uniqueAssignments.sort((a: any, b: any) => {
+          const getDate = (item: any) => {
+            if (item.createdAt) return new Date(item.createdAt).getTime();
+            if (item.dueDate) return new Date(item.dueDate).getTime();
+            return 0; // Put items without dates at the end
+          };
+          
+          const dateA = getDate(a);
+          const dateB = getDate(b);
+          
+          // If both have dates, sort oldest first
+          if (dateA > 0 && dateB > 0) {
+            return dateA - dateB;
+          }
+          // If only one has a date, prioritize it
+          if (dateA > 0 && dateB === 0) return -1;
+          if (dateA === 0 && dateB > 0) return 1;
+          // If neither has a date, maintain original order
+          return 0;
+        });
+
         setGradebookData({ 
           students, 
-          assignments: [...allAssignments, ...groupAssignments, ...gradedDiscussions], 
+          assignments: uniqueAssignments, 
           grades 
         });
       } catch (err) {
@@ -724,8 +831,23 @@ const CourseDetail: React.FC = () => {
       try {
         // For each assignment, fetch submissions
         for (const assignment of gradebookData.assignments) {
-          // Skip if assignment._id is missing or assignment.isDiscussion is true
-          if (!assignment._id || assignment.isDiscussion) continue;
+          // Skip if assignment._id is missing
+          if (!assignment._id) continue;
+          
+          if (assignment.isDiscussion) {
+            // For discussions, check if students have replies (participation)
+            if (assignment.replies && Array.isArray(assignment.replies)) {
+              assignment.replies.forEach((reply: any) => {
+                const studentId = reply.author?._id || reply.author;
+                if (studentId) {
+                  const key = `${String(studentId)}_${String(assignment._id)}`;
+                  newSubmissionMap[key] = reply._id; // Use reply ID as submission ID
+                }
+              });
+            }
+            continue;
+          }
+          
           try {
             const res = await axios.get(`${API_URL}/api/submissions/assignment/${assignment._id}`, {
               headers: { Authorization: `Bearer ${token}` }
@@ -793,16 +915,19 @@ const CourseDetail: React.FC = () => {
         }
         setSubmissionMap(newSubmissionMap);
         
-        // Add discussion grades to the grades object
-        const discussionGrades = { ...newGrades };
+        // Merge all grades (both regular assignments and discussions)
+        const allGrades = { ...newGrades };
         for (const discussion of studentDiscussions) {
           if (typeof discussion.grade === 'number') {
-            if (!discussionGrades[String(user._id)]) discussionGrades[String(user._id)] = {};
-            discussionGrades[String(user._id)][String(discussion._id)] = discussion.grade;
+            if (!allGrades[String(user._id)]) allGrades[String(user._id)] = {};
+            allGrades[String(user._id)][String(discussion._id)] = discussion.grade;
           }
         }
         
-        setGradebookData((prev: any) => ({ ...prev, grades: discussionGrades }));
+        setGradebookData((prev: any) => ({ 
+          ...prev, 
+          grades: { ...prev.grades, ...allGrades }
+        }));
       } catch (err) {
       }
     };
@@ -1064,9 +1189,44 @@ const CourseDetail: React.FC = () => {
           }
         }
 
+        // Deduplicate for instructor view as well
+        const combined = [...allAssignments, ...groupAssignments, ...gradedDiscussions];
+        const byIdInstructor = combined.filter((a, i, arr) => i === arr.findIndex(b => b._id === a._id));
+        const seenInstructor = new Set<string>();
+        const uniqueInstructor = byIdInstructor.filter(a => {
+          const type = a.isDiscussion ? 'discussion' : 'assignment';
+          const key = `${String(a.title || '').trim().toLowerCase()}|${type}`;
+          if (seenInstructor.has(key)) return false;
+          seenInstructor.add(key);
+          return true;
+        });
+
+        // Sort assignments by creation date (oldest first, newest last)
+        // Use createdAt if available, otherwise use dueDate, otherwise use current date as fallback
+        uniqueInstructor.sort((a: any, b: any) => {
+          const getDate = (item: any) => {
+            if (item.createdAt) return new Date(item.createdAt).getTime();
+            if (item.dueDate) return new Date(item.dueDate).getTime();
+            return 0; // Put items without dates at the end
+          };
+          
+          const dateA = getDate(a);
+          const dateB = getDate(b);
+          
+          // If both have dates, sort oldest first
+          if (dateA > 0 && dateB > 0) {
+            return dateA - dateB;
+          }
+          // If only one has a date, prioritize it
+          if (dateA > 0 && dateB === 0) return -1;
+          if (dateA === 0 && dateB > 0) return 1;
+          // If neither has a date, maintain original order
+          return 0;
+        });
+
         setGradebookData({ 
           students, 
-          assignments: [...allAssignments, ...groupAssignments, ...gradedDiscussions], 
+          assignments: uniqueInstructor, 
           grades 
         });
       } catch (err) {
@@ -1081,6 +1241,7 @@ const CourseDetail: React.FC = () => {
     setEditGradeScale(course?.gradeScale ? [...course.gradeScale] : []);
     setShowGradeScaleModal(true);
     setGradeScaleError('');
+    setGroupError(''); // Clear any group errors
   };
 
   // Handler to update a row
@@ -1271,6 +1432,19 @@ const CourseDetail: React.FC = () => {
         ? `${course.instructor.firstName} ${course.instructor.lastName} (${course.instructor.email})`
         : 'No Instructor Assigned';
         
+      // Helper to detect discussion participation by a specific user
+      const hasReplyByUser = (replies: any[], userId: string): boolean => {
+        if (!Array.isArray(replies)) return false;
+        const stack = [...replies];
+        while (stack.length) {
+          const r = stack.pop();
+          const authorId = r?.author?._id || r?.author;
+          if (String(authorId) === String(userId)) return true;
+          if (Array.isArray(r?.replies)) stack.push(...r.replies);
+        }
+        return false;
+      };
+
       const csvContent = [
         `Course: ${course?.title || 'Unknown Course'}`,
         `Instructor: ${instructorInfo}`,
@@ -1280,11 +1454,17 @@ const CourseDetail: React.FC = () => {
         ['Student Name', 'Email', ...assignments.map((a: any) => a.title), 'Overall Grade', 'Letter Grade'].join(','),
         // Create data rows for each student
         ...students.map((student: any) => {
+          // Augment discussions with per-student hasSubmitted flag (affects zero handling)
+          const augmentedAssignments = assignments.map((a: any) =>
+            a.isDiscussion ? { ...a, hasSubmitted: hasReplyByUser(a.replies || [], student._id) } : a
+          );
+          // Compute using the same utility and the augmented assignments + submissions
           const weightedPercent = calculateFinalGradeWithWeightedGroups(
             student._id,
             course,
-            assignments,
-            grades
+            augmentedAssignments,
+            grades,
+            submissionMap
           );
           const letter = getLetterGrade(weightedPercent, course?.gradeScale);
           
@@ -1321,6 +1501,7 @@ const CourseDetail: React.FC = () => {
     setEditGroups(course?.groups ? [...course.groups] : []);
     setShowGroupModal(true);
     setGroupError('');
+    setGradeScaleError(''); // Clear any grade scale errors
   };
 
   // Handler to update a group row
@@ -1336,6 +1517,19 @@ const CourseDetail: React.FC = () => {
   // Handler to remove a group row
   const handleRemoveGroupRow = (idx: number) => {
     setEditGroups(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  // Handler to reset to default groups
+  const handleResetToDefaults = () => {
+    const defaultGroups = [
+      { name: 'Projects', weight: 15 },
+      { name: 'Homework', weight: 15 },
+      { name: 'Exams', weight: 20 },
+      { name: 'Quizzes', weight: 30 },
+      { name: 'Participation', weight: 20 }
+    ];
+    setEditGroups(defaultGroups);
+    setGroupError('');
   };
 
   // Handler to save group weights
@@ -1423,6 +1617,108 @@ const CourseDetail: React.FC = () => {
     setCourse(updatedCourse);
   };
 
+  // Syllabus handlers
+  const handleSyllabusFieldChange = (field: string, value: string) => {
+    setSyllabusFields(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSaveSyllabusFields = async () => {
+    if (!course?._id) return;
+    setSavingSyllabus(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await api.put(`/courses/${course._id}`, {
+        title: syllabusFields.courseTitle,
+        catalog: {
+          ...course.catalog,
+          courseCode: syllabusFields.courseCode,
+          officeHours: syllabusFields.officeHours
+        }
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.data.success) {
+        setCourse(response.data.data);
+        setEditingSyllabus(false);
+      }
+    } catch (err: any) {
+      console.error('Error saving syllabus fields:', err);
+      alert('Failed to save syllabus fields');
+    } finally {
+      setSavingSyllabus(false);
+    }
+  };
+
+  const handleSyllabusFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+
+    setUploadingFiles(true);
+    try {
+      const formData = new FormData();
+      files.forEach(file => {
+        formData.append('files', file);
+      });
+
+      const token = localStorage.getItem('token');
+      const response = await axios.post(`${API_URL}/api/upload`, formData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      const newFiles = response.data.files.map((file: any) => ({
+        name: file.originalname,
+        url: file.path,
+        size: file.size,
+        uploadedAt: new Date()
+      }));
+
+      setUploadedSyllabusFiles(prev => [...prev, ...newFiles]);
+      setSyllabusFiles(prev => [...prev, ...files]);
+    } catch (error: any) {
+      console.error('Error uploading files:', error);
+      alert('Error uploading files. Please try again.');
+    } finally {
+      setUploadingFiles(false);
+    }
+  };
+
+  const handleRemoveSyllabusFile = (index: number) => {
+    setUploadedSyllabusFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSaveSyllabus = async () => {
+    if (!course?._id) return;
+    setSavingSyllabus(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await api.put(`/courses/${course._id}`, {
+        catalog: {
+          ...course.catalog,
+          syllabusContent: syllabusContent,
+          syllabusFiles: uploadedSyllabusFiles
+        }
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.data.success) {
+        setCourse(response.data.data);
+        setSyllabusMode('none');
+        setSyllabusContent('');
+        setSyllabusFiles([]);
+      }
+    } catch (err: any) {
+      console.error('Error saving syllabus:', err);
+      alert('Failed to save syllabus');
+    } finally {
+      setSavingSyllabus(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -1461,8 +1757,7 @@ const CourseDetail: React.FC = () => {
             {/* Course Header */}
             <div className="bg-white dark:bg-gray-900 rounded-xl shadow p-6 flex flex-col md:flex-row justify-between items-start md:items-center mb-4 border border-gray-200 dark:border-gray-700">
                 <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-1">{course.title}</h1>
-                <p className="text-gray-500 mb-2">{course.description}</p>
+                <h1 className="text-3xl font-bold text-gray-900 mb-1">{course.catalog?.courseCode || course.title}</h1>
                 <div className="text-sm text-gray-600">
                   Instructor: {course.instructor.firstName} {course.instructor.lastName}
                 </div>
@@ -1556,19 +1851,6 @@ const CourseDetail: React.FC = () => {
               </div>
             )}
 
-            {/* Student Enrollment Status */}
-            {!isInstructor && !isAdmin && (
-              <div className="bg-white dark:bg-gray-900 rounded-xl shadow p-6 border border-gray-200 dark:border-gray-700">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">Your Enrollment Status</h3>
-                  <div className="flex items-center space-x-3">
-                    <span className="text-green-600 font-medium">✓ Enrolled in this course</span>
-                    <span className="text-sm text-gray-500">You have access to all course materials and assignments</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* Student View - Latest Announcements */}
             {!isInstructor && !isAdmin && course.overviewConfig?.showLatestAnnouncements && (
               <LatestAnnouncements 
@@ -1576,6 +1858,286 @@ const CourseDetail: React.FC = () => {
                 numberOfAnnouncements={course.overviewConfig.numberOfAnnouncements || 3} 
               />
             )}
+          </div>
+        );
+
+      case 'syllabus':
+        return (
+          <div className="space-y-6">
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow p-6 border border-gray-200 dark:border-gray-700">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Course Syllabus</h2>
+                {(isInstructor || isAdmin) && !editingSyllabus && (
+                  <button
+                    onClick={() => setEditingSyllabus(true)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                  >
+                    Edit
+                  </button>
+                )}
+              </div>
+
+              {/* Editable Syllabus Fields */}
+              <div className="space-y-4 mb-6">
+                {(editingSyllabus && (isInstructor || isAdmin)) ? (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Course Title</label>
+                        <input
+                          type="text"
+                          value={syllabusFields.courseTitle}
+                          onChange={(e) => handleSyllabusFieldChange('courseTitle', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="-"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Course Code</label>
+                        <input
+                          type="text"
+                          value={syllabusFields.courseCode}
+                          onChange={(e) => handleSyllabusFieldChange('courseCode', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="-"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Instructor</label>
+                      <input
+                        type="text"
+                        value={syllabusFields.instructorName}
+                        onChange={(e) => handleSyllabusFieldChange('instructorName', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+                      <input
+                        type="email"
+                        value={syllabusFields.instructorEmail}
+                        onChange={(e) => handleSyllabusFieldChange('instructorEmail', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Office Hours</label>
+                      <input
+                        type="text"
+                        value={syllabusFields.officeHours}
+                        onChange={(e) => handleSyllabusFieldChange('officeHours', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="By Appointment"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleSaveSyllabusFields}
+                        disabled={savingSyllabus}
+                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50"
+                      >
+                        {savingSyllabus ? 'Saving...' : 'Save'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingSyllabus(false);
+                          // Reset to original values
+                          if (course) {
+                            setSyllabusFields({
+                              courseTitle: course.title || '',
+                              courseCode: course.catalog?.courseCode || '',
+                              instructorName: `${course.instructor?.firstName || ''} ${course.instructor?.lastName || ''}`.trim(),
+                              instructorEmail: course.instructor?.email || '',
+                              officeHours: course.catalog?.officeHours || 'By Appointment'
+                            });
+                          }
+                        }}
+                        className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-3">
+                    <div><strong>Course Title:</strong> {syllabusFields.courseTitle || '-'}</div>
+                    <div><strong>Course Code:</strong> {syllabusFields.courseCode || '-'}</div>
+                    <div><strong>Instructor:</strong> {syllabusFields.instructorName || '-'}</div>
+                    <div><strong>Email:</strong> {syllabusFields.instructorEmail || '-'}</div>
+                    <div><strong>Office Hours:</strong> {syllabusFields.officeHours || 'By Appointment'}</div>
+                  </div>
+                )}
+              </div>
+
+              {/* Add Syllabus Section */}
+              {(isInstructor || isAdmin) && (
+                <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+                  <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Add Syllabus</h3>
+                  
+                  {syllabusMode === 'none' && (
+                    <div className="flex gap-4">
+                      <button
+                        onClick={() => setSyllabusMode('upload')}
+                        className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                      >
+                        Upload File
+                      </button>
+                      <button
+                        onClick={() => setSyllabusMode('editor')}
+                        className="px-6 py-3 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
+                      >
+                        Editor + Upload File
+                      </button>
+                    </div>
+                  )}
+
+                  {syllabusMode === 'upload' && (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Upload File</label>
+                        <input
+                          type="file"
+                          multiple
+                          onChange={handleSyllabusFileUpload}
+                          disabled={uploadingFiles}
+                          className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                        />
+                        {uploadingFiles && <p className="text-sm text-gray-500 mt-2">Uploading...</p>}
+                      </div>
+
+                      {uploadedSyllabusFiles.length > 0 && (
+                        <div className="space-y-2">
+                          <h4 className="font-medium">Uploaded Files:</h4>
+                          {uploadedSyllabusFiles.map((file: any, index: number) => (
+                            <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                              <a href={file.url?.startsWith('http') ? file.url : `${API_URL}${file.url}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                                {file.name}
+                              </a>
+                              <button
+                                onClick={() => handleRemoveSyllabusFile(index)}
+                                className="text-red-600 hover:text-red-800"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleSaveSyllabus}
+                          disabled={savingSyllabus || uploadingFiles}
+                          className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50"
+                        >
+                          {savingSyllabus ? 'Saving...' : 'Save'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSyllabusMode('none');
+                            setUploadedSyllabusFiles(course.catalog?.syllabusFiles || []);
+                          }}
+                          className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {syllabusMode === 'editor' && (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Syllabus Content</label>
+                        <div className="border border-gray-300 rounded-md">
+                          <RichTextEditor
+                            content={syllabusContent}
+                            onChange={setSyllabusContent}
+                            height={400}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Upload File</label>
+                        <input
+                          type="file"
+                          multiple
+                          onChange={handleSyllabusFileUpload}
+                          disabled={uploadingFiles}
+                          className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                        />
+                        {uploadingFiles && <p className="text-sm text-gray-500 mt-2">Uploading...</p>}
+                      </div>
+
+                      {uploadedSyllabusFiles.length > 0 && (
+                        <div className="space-y-2">
+                          <h4 className="font-medium">Uploaded Files:</h4>
+                          {uploadedSyllabusFiles.map((file: any, index: number) => (
+                            <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                              <a href={file.url?.startsWith('http') ? file.url : `${API_URL}${file.url}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                                {file.name}
+                              </a>
+                              <button
+                                onClick={() => handleRemoveSyllabusFile(index)}
+                                className="text-red-600 hover:text-red-800"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleSaveSyllabus}
+                          disabled={savingSyllabus || uploadingFiles}
+                          className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50"
+                        >
+                          {savingSyllabus ? 'Saving...' : 'Save'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSyllabusMode('none');
+                            setSyllabusContent(course.catalog?.syllabusContent || '');
+                            setUploadedSyllabusFiles(course.catalog?.syllabusFiles || []);
+                          }}
+                          className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Display Syllabus Content */}
+              {course.catalog?.syllabusContent && (
+                <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+                  <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Syllabus Content</h3>
+                  <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: course.catalog.syllabusContent }} />
+                </div>
+              )}
+
+              {/* Display Syllabus Files */}
+              {course.catalog?.syllabusFiles && course.catalog.syllabusFiles.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Syllabus Files</h3>
+                  <div className="space-y-2">
+                    {course.catalog.syllabusFiles.map((file: any, index: number) => (
+                      <div key={index} className="flex items-center p-2 bg-gray-50 rounded">
+                        <a href={file.url?.startsWith('http') ? file.url : `${API_URL}${file.url}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                          {file.name}
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         );
 
@@ -1610,9 +2172,13 @@ const CourseDetail: React.FC = () => {
           isGroupAssignment: true,
           totalPoints: a.totalPoints || (Array.isArray(a.questions) ? a.questions.reduce((sum: number, q: any) => sum + (q.points || 0), 0) : 0)
         }));
+        
+        // Deduplicate: Remove group assignments from module assignments to avoid showing them twice
+        const moduleAssignmentsOnly = allAssignments.filter(assignment => !assignment.isGroupAssignment);
+        
         // Combine assignments, group assignments, and discussions
         const combinedList = [
-          ...allAssignments,
+          ...moduleAssignmentsOnly,
           ...allGroupAssignments,
           ...discussions.map(d => ({
             _id: d._id,
@@ -1628,6 +2194,17 @@ const CourseDetail: React.FC = () => {
             replies: d.replies || [],
           }))
         ];
+        
+        // Final deduplication by ID to ensure no duplicates exist
+        const seenIds = new Set<string>();
+        const deduplicatedList = combinedList.filter(item => {
+          const id = item._id;
+          if (seenIds.has(id)) {
+            return false;
+          }
+          seenIds.add(id);
+          return true;
+        });
         return (
           <div className="space-y-6">
             <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
@@ -1657,9 +2234,82 @@ const CourseDetail: React.FC = () => {
               {discussionsLoading ? (
                 <div className="text-center text-gray-500 py-8">Loading discussions...</div>
               ) : modules.length > 0 ? (
-                <AssignmentList assignments={combinedList} userRole={user?.role} studentSubmissions={user?.role === 'student' ? studentSubmissions : undefined} studentId={user?._id} submissionMap={user?.role === 'student' ? submissionMap : undefined} courseId={course?._id} />
+                <AssignmentList assignments={deduplicatedList} userRole={user?.role} studentSubmissions={user?.role === 'student' ? studentSubmissions : undefined} studentId={user?._id} submissionMap={user?.role === 'student' ? submissionMap : undefined} courseId={course?._id} />
               ) : (
                 <div className="text-center text-gray-500 py-8">No modules available. Please create a module to add assignments.</div>
+              )}
+            </div>
+          </div>
+        );
+
+      case 'quizzes':
+        // Gather all assignments and filter for graded quizzes (isGradedQuiz === true)
+        const allAssignmentsForQuizzes = modules.flatMap((module: any) => module.assignments || []);
+        const allGroupAssignmentsForQuizzes = groupAssignments.map((a: any) => ({
+          ...a,
+          isGroupAssignment: true,
+          totalPoints: a.totalPoints || (Array.isArray(a.questions) ? a.questions.reduce((sum: number, q: any) => sum + (q.points || 0), 0) : 0)
+        }));
+        
+        // Combine all assignments and filter for graded quizzes
+        const allItemsForQuizzes = [
+          ...allAssignmentsForQuizzes,
+          ...allGroupAssignmentsForQuizzes
+        ];
+        
+        const quizzesList = allItemsForQuizzes.filter((item: any) => item.isGradedQuiz === true);
+        
+        // Deduplicate quizzes by ID
+        const seenQuizIds = new Set<string>();
+        const deduplicatedQuizzes = quizzesList.filter((item: any) => {
+          const id = item._id;
+          if (seenQuizIds.has(id)) {
+            return false;
+          }
+          seenQuizIds.add(id);
+          return true;
+        });
+        
+        return (
+          <div className="space-y-6">
+            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
+              <div className="flex justify-between items-center mb-8">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Quizzes</h2>
+                  <p className="text-gray-600 dark:text-gray-400 mt-1">View and manage course quizzes</p>
+                </div>
+                {(isInstructor || isAdmin) && (
+                  <>
+                    {modules.length > 0 ? (
+                      <button
+                        onClick={() => navigate(`/modules/${modules[0]._id}/assignments/create?isGradedQuiz=true`)}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
+                      >
+                        <span>+</span> Create Quiz
+                      </button>
+                    ) : (
+                      <div className="text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 px-4 py-2 rounded-md">
+                        Create a module first to add quizzes
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+              {/* Render quizzes using AssignmentList */}
+              {discussionsLoading ? (
+                <div className="text-center text-gray-500 py-8">Loading quizzes...</div>
+              ) : modules.length > 0 ? (
+                <AssignmentList 
+                  assignments={deduplicatedQuizzes} 
+                  userRole={user?.role} 
+                  studentSubmissions={user?.role === 'student' ? studentSubmissions : undefined} 
+                  studentId={user?._id} 
+                  submissionMap={user?.role === 'student' ? submissionMap : undefined} 
+                  courseId={course?._id}
+                  isQuizzesView={true}
+                />
+              ) : (
+                <div className="text-center text-gray-500 py-8">No modules available. Please create a module to add quizzes.</div>
               )}
             </div>
           </div>
@@ -1759,7 +2409,7 @@ const CourseDetail: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                      {studentAssignments.map((assignment: any) => {
+                      {studentAssignments.map((assignment: any, idx: number) => {
                         const submissionKey = `${String(studentId)}_${String(assignment._id)}`;
                         let hasSubmission = assignment.isDiscussion 
                           ? assignment.hasSubmitted || (Array.isArray(assignment.replies) && assignment.replies.some((r: any) => r.author && (r.author._id === String(studentId) || r.author === String(studentId))))
@@ -1833,7 +2483,7 @@ const CourseDetail: React.FC = () => {
                           }
                         }
                         return (
-                          <tr key={assignment._id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-150">
+                          <tr key={`student-assignment-${assignment._id}-${idx}`} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-150">
                             <td className="px-4 py-3">
                               <div className="font-medium text-gray-900 dark:text-gray-100">{assignment.title}</div>
                               {assignment.group && (
@@ -1878,6 +2528,118 @@ const CourseDetail: React.FC = () => {
                   </table>
                 </div>
               </div>
+              
+              {/* Assignment Group Performance Summary - Separate Card */}
+              {course.groups && course.groups.length > 0 && (
+                <div className="mt-6">
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                    <div className="flex items-center space-x-3 mb-4">
+                      <div className="bg-blue-100 dark:bg-blue-900 rounded-lg p-2">
+                        <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Performance by Assignment Group</h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Your scores broken down by weighted categories</p>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-white dark:bg-gray-900 rounded-lg overflow-hidden shadow-sm">
+                      <table className="w-full">
+                        <thead className="bg-gray-50 dark:bg-gray-800">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Assignment Group</th>
+                            <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Assignments</th>
+                            <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Points Earned</th>
+                            <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Total Points</th>
+                            <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Percentage</th>
+                            <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Weight</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                          {(course.groups || []).map((group: any, idx: number) => {
+                            // Calculate group performance
+                            const groupAssignments = studentAssignments.filter((assignment: any) => assignment.group === group.name);
+                            let totalEarned = 0;
+                            let totalPossible = 0;
+                            let gradedAssignments = 0;
+                            
+                            groupAssignments.forEach((assignment: any) => {
+                              const maxPoints = assignment.questions?.reduce((sum: number, q: any) => sum + (q.points || 0), 0) || assignment.totalPoints || 0;
+                              let grade = assignment.isDiscussion
+                                ? assignment.grade
+                                : gradebookData.grades[String(studentId)]?.[String(assignment._id)];
+                              
+                              // For discussions, check studentGrades
+                              if (assignment.isDiscussion && (grade === null || grade === undefined)) {
+                                if (Array.isArray(assignment.studentGrades)) {
+                                  const studentGradeObj = assignment.studentGrades.find((g: any) => g.student && (g.student._id === String(studentId) || g.student === String(studentId)));
+                                  if (studentGradeObj && typeof studentGradeObj.grade === 'number') {
+                                    grade = studentGradeObj.grade;
+                                  }
+                                }
+                              }
+                              
+                              if (typeof grade === 'number') {
+                                totalEarned += grade;
+                                totalPossible += maxPoints;
+                                gradedAssignments++;
+                              } else {
+                                // Check if assignment is past due and no submission
+                                const dueDate = assignment.dueDate ? new Date(assignment.dueDate) : null;
+                                const now = new Date();
+                                const submissionKey = `${String(studentId)}_${String(assignment._id)}`;
+                                const hasSubmission = assignment.isDiscussion 
+                                  ? assignment.hasSubmitted || (Array.isArray(assignment.replies) && assignment.replies.some((r: any) => r.author && (r.author._id === String(studentId) || r.author === String(studentId))))
+                                  : !!submissionMap[submissionKey];
+                                
+                                if (dueDate && now > dueDate && !hasSubmission) {
+                                  // Count as 0 for missing submissions
+                                  totalEarned += 0;
+                                  totalPossible += maxPoints;
+                                  gradedAssignments++;
+                                }
+                              }
+                            });
+                            
+                            const percentage = totalPossible > 0 ? (totalEarned / totalPossible) * 100 : 0;
+                            const percentageColor = percentage >= 90 ? 'text-green-600 dark:text-green-400' : 
+                                                 percentage >= 80 ? 'text-blue-600 dark:text-blue-400' : 
+                                                 percentage >= 70 ? 'text-yellow-600 dark:text-yellow-400' : 
+                                                 'text-red-600 dark:text-red-400';
+                            
+                            return (
+                              <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-150">
+                                <td className="px-4 py-3">
+                                  <div className="font-medium text-gray-900 dark:text-gray-100">{group.name}</div>
+                                </td>
+                                <td className="px-4 py-3 text-center text-sm text-gray-600 dark:text-gray-400">
+                                  {gradedAssignments}/{groupAssignments.length}
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  <span className="font-semibold text-gray-900 dark:text-gray-100">{totalEarned.toFixed(1)}</span>
+                                </td>
+                                <td className="px-4 py-3 text-center text-sm text-gray-600 dark:text-gray-400">
+                                  {totalPossible.toFixed(1)}
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  <span className={`font-semibold ${percentageColor}`}>
+                                    {totalPossible > 0 ? percentage.toFixed(1) : '-'}%
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-center text-sm text-gray-600 dark:text-gray-400">
+                                  {group.weight}%
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Right Sidebar (only) */}
@@ -1911,12 +2673,49 @@ const CourseDetail: React.FC = () => {
         });
         // Helper to calculate weighted grade for a student
         function getWeightedGrade(student: any) {
-          // Use the new function that ignores groups with no grades
+          // Create a submission map for this specific student
+          const studentSubmissionMap: { [assignmentId: string]: any } = {};
+          
+          // Build submission map for this student
+          Object.keys(submissionMap).forEach(key => {
+            if (key.startsWith(`${student._id}_`)) {
+              const assignmentId = key.split('_')[1];
+              studentSubmissionMap[assignmentId] = submissionMap[key];
+            }
+          });
+          
+          // Augment assignments with per-student discussion submission flag
+          const augmentedAssignments = assignments.map((a: any) => {
+            if (a.isDiscussion) {
+              const hasSubmitted = Array.isArray(a.replies)
+                ? a.replies.some((r: any) => {
+                    const authorId = r.author && r.author._id ? String(r.author._id) : String(r.author || '');
+                    if (authorId === String(student._id)) return true;
+                    if (Array.isArray(r.replies) && r.replies.length > 0) {
+                      // Nested replies
+                      const stack = [...r.replies];
+                      while (stack.length) {
+                        const cur = stack.pop();
+                        const curAuthorId = cur.author && cur.author._id ? String(cur.author._id) : String(cur.author || '');
+                        if (curAuthorId === String(student._id)) return true;
+                        if (Array.isArray(cur.replies)) stack.push(...cur.replies);
+                      }
+                    }
+                    return false;
+                  })
+                : false;
+              return { ...a, hasSubmitted };
+            }
+            return a;
+          });
+          
+          // Use the function that ignores groups with no grades and now respects per-student discussion submission
           return calculateFinalGradeWithWeightedGroups(
             student._id,
             course,
-            assignments,
-            grades
+            augmentedAssignments,
+            grades,
+            studentSubmissionMap
           );
         }
         return (
@@ -1936,11 +2735,11 @@ const CourseDetail: React.FC = () => {
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">
-                  <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-4 py-2 border border-gray-200 dark:border-gray-700">
+                  <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-4 py-2 border border-gray-200 dark:border-gray-700 text-center">
                     <div className="text-sm text-gray-600 dark:text-gray-400">Students</div>
                     <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{students.length}</div>
                   </div>
-                  <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-4 py-2 border border-gray-200 dark:border-gray-700">
+                  <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-4 py-2 border border-gray-200 dark:border-gray-700 text-center">
                     <div className="text-sm text-gray-600 dark:text-gray-400">Assignments</div>
                     <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{assignments.length}</div>
                   </div>
@@ -1964,20 +2763,37 @@ const CourseDetail: React.FC = () => {
                             <span>Student Name</span>
                           </div>
                         </th>
-                        {assignments.map((assignment: any) => (
-                          <th
-                            key={assignment._id}
-                            className="px-4 py-4 border-b border-gray-200 dark:border-gray-600 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 text-center text-gray-700 dark:text-gray-300 min-w-[140px]"
-                          >
-                            <div className="font-semibold text-blue-700 dark:text-blue-300 cursor-pointer hover:underline text-center text-sm">{assignment.title}</div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400 text-center mt-1 bg-blue-50 dark:bg-blue-900/20 rounded-full px-2 py-1 mx-1">
-                              {assignment.group ? assignment.group : 'Ungrouped'}
-                            </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400 text-center mt-1">
-                              Out of {assignment.questions?.reduce((sum: number, q: any) => sum + (q.points || 0), 0) || assignment.totalPoints || 0}
-                            </div>
-                          </th>
-                        ))}
+                        {assignments.map((assignment: any, idx: number) => {
+                          const handleAssignmentClick = () => {
+                            if (assignment.isDiscussion) {
+                              // Navigate to discussion thread
+                              navigate(`/courses/${id}/threads/${assignment._id}`);
+                            } else {
+                              // Navigate to assignment view page
+                              navigate(`/assignments/${assignment._id}/view`);
+                            }
+                          };
+
+                          return (
+                            <th
+                              key={`assignment-${assignment._id}-${idx}`}
+                              className="px-4 py-4 border-b border-gray-200 dark:border-gray-600 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 text-center text-gray-700 dark:text-gray-300 min-w-[140px]"
+                            >
+                              <div 
+                                className="font-semibold text-blue-700 dark:text-blue-300 cursor-pointer hover:underline text-center text-sm"
+                                onClick={handleAssignmentClick}
+                              >
+                                {assignment.title}
+                              </div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 text-center mt-1 bg-blue-50 dark:bg-blue-900/20 rounded-full px-2 py-1 mx-1">
+                                {assignment.group ? assignment.group : 'Ungrouped'}
+                              </div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 text-center mt-1">
+                                Out of {assignment.questions?.reduce((sum: number, q: any) => sum + (q.points || 0), 0) || assignment.totalPoints || 0}
+                              </div>
+                            </th>
+                          );
+                        })}
                         {/* Sticky last column header */}
                         <th className="px-6 py-4 border-b border-gray-200 dark:border-gray-600 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 text-center text-gray-700 dark:text-gray-300 sticky right-0 z-50 font-semibold text-sm uppercase tracking-wider" style={{right: 0, zIndex: 50, boxShadow: '-2px 0 8px -4px rgba(0,0,0,0.1)'}}>
                           <div className="flex items-center justify-center space-x-2">
@@ -2018,7 +2834,7 @@ const CourseDetail: React.FC = () => {
                                     <img
                                       src={student.profilePicture.startsWith('http')
                                         ? student.profilePicture
-                                        : getImageUrl(student.profilePicture)}
+                                        : `http://localhost:5000${student.profilePicture}`}
                                       alt={`${student.firstName} ${student.lastName}`}
                                       className="w-8 h-8 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600"
                                       onError={(e) => {
@@ -2042,7 +2858,7 @@ const CourseDetail: React.FC = () => {
                                 <span>{student.firstName} {student.lastName}</span>
                               </div>
                             </td>
-                            {assignments.map((assignment: any) => {
+                            {assignments.map((assignment: any, assIdx: number) => {
                               const submissionKey = `${student._id}_${assignment._id}`;
                               const hasSubmission = assignment.isDiscussion 
                                 ? Array.isArray(assignment.replies) && assignment.replies.some((r: any) => r.author && (r.author._id === student._id || r.author === student._id))
@@ -2137,15 +2953,31 @@ const CourseDetail: React.FC = () => {
                                 );
                               }
 
+                              const handleCellClick = (e: React.MouseEvent) => {
+                                // If clicking on input or editing controls, don't navigate
+                                const target = e.target as HTMLElement;
+                                if (target.tagName === 'INPUT' || target.closest('input')) {
+                                  return;
+                                }
+
+                                // If instructor/admin clicking on cell with submission, allow editing
+                                if ((isInstructor || isAdmin) && hasSubmission) {
+                                  handleGradeCellClick(student._id, assignment._id, grade?.toString() || '');
+                                } else {
+                                  // Otherwise, navigate to assignment/discussion view
+                                  if (assignment.isDiscussion) {
+                                    navigate(`/courses/${id}/threads/${assignment._id}`);
+                                  } else {
+                                    navigate(`/assignments/${assignment._id}/view`);
+                                  }
+                                }
+                              };
+
                               return (
                                 <td
-                                  key={assignment._id}
-                                  className={`px-4 py-4 text-center whitespace-nowrap relative ${rowBg} ${cellBg} transition-all duration-150`}
-                                  onClick={() => {
-                                    if ((isInstructor || isAdmin) && hasSubmission) {
-                                      handleGradeCellClick(student._id, assignment._id, grade?.toString() || '');
-                                    }
-                                  }}
+                                  key={`${student._id}-${assignment._id}-${assIdx}`}
+                                  className={`px-4 py-4 text-center whitespace-nowrap relative ${rowBg} ${cellBg} transition-all duration-150 ${hasSubmission || assignment.published ? 'cursor-pointer' : ''}`}
+                                  onClick={handleCellClick}
                                 >
                                   {editingGrade?.studentId === student._id && editingGrade?.assignmentId === assignment._id ? (
                                     <div className="relative">
@@ -2243,40 +3075,58 @@ const CourseDetail: React.FC = () => {
                 </div>
               </div>
             )}
-            {/* Assignment Group Weights Display & Edit Button (moved to bottom) */}
-            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-6 mt-6 border border-gray-200 dark:border-gray-700">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold mb-2">Assignment Group Weights</h3>
-                  <table className="min-w-max border border-gray-300 dark:border-gray-700 mb-2">
-                    <thead className="bg-gray-100 dark:bg-gray-800">
+            {/* Assignment Group Weights Display & Edit Button */}
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden mt-6">
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700 px-6 py-4 border-b border-gray-200 dark:border-gray-600">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="bg-blue-100 dark:bg-blue-900 rounded-lg p-2">
+                      <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Assignment Weights</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Configure how different assignment types contribute to final grades</p>
+                    </div>
+                  </div>
+                  {(isInstructor || isAdmin) && (
+                    <button
+                      onClick={handleOpenGroupModal}
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center space-x-2 shadow-sm"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                      <span>Edit Groups</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+              
+              <div className="p-6">
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg overflow-hidden">
+                  <table className="w-full">
+                    <thead className="bg-gray-100 dark:bg-gray-700">
                       <tr>
-                        <th className="px-4 py-2 border-b border-r border-gray-300 dark:border-gray-700 text-left text-gray-900 dark:text-gray-100">Group</th>
-                        <th className="px-4 py-2 border-b border-gray-300 dark:border-gray-700 text-left text-gray-900 dark:text-gray-100">Weight</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Assignment Group</th>
+                        <th className="px-6 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Weight</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
                       {(course.groups || []).map((group: any, idx: number) => (
-                        <tr key={idx}>
-                          <td className="px-4 py-2 border-b border-r border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">{group.name}</td>
-                          <td className="px-4 py-2 border-b border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">{group.weight}%</td>
+                        <tr key={idx} className="hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-150">
+                          <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">{group.name}</td>
+                          <td className="px-6 py-4 text-sm font-semibold text-gray-900 dark:text-gray-100 text-right">{group.weight}%</td>
                         </tr>
                       ))}
-                      <tr>
-                        <td className="px-4 py-2 font-bold border-r border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">Total</td>
-                        <td className="px-4 py-2 font-bold border-r border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">{(course.groups || []).reduce((sum: number, g: any) => sum + Number(g.weight), 0)}%</td>
+                      <tr className="bg-blue-50 dark:bg-blue-900/20 border-t-2 border-blue-200 dark:border-blue-700">
+                        <td className="px-6 py-4 text-sm font-bold text-blue-900 dark:text-blue-100">Total</td>
+                        <td className="px-6 py-4 text-sm font-bold text-blue-900 dark:text-blue-100 text-right">{(course.groups || []).reduce((sum: number, g: any) => sum + Number(g.weight), 0)}%</td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
-                {(isInstructor || isAdmin) && (
-                  <button
-                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                    onClick={handleOpenGroupModal}
-                  >
-                    Edit Assignment Groups
-                  </button>
-                )}
               </div>
             </div>
             {showGroupModal && (
@@ -2332,6 +3182,12 @@ const CourseDetail: React.FC = () => {
                     onClick={handleAddGroupRow}
                   >
                     + Add Group
+                  </button>
+                  <button
+                    className="mb-4 ml-2 px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                    onClick={handleResetToDefaults}
+                  >
+                    Reset to Defaults
                   </button>
                   {groupError && <div className="text-red-600 mb-2">{groupError}</div>}
                   <div className="flex justify-end gap-2">
@@ -2500,8 +3356,8 @@ const CourseDetail: React.FC = () => {
                     <div className="mt-4">
                       <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Search Results</h4>
                       <div className="space-y-2 max-h-60 overflow-y-auto">
-                        {searchResults.map((student: any) => (
-                          <div key={student._id} className="flex items-center justify-between p-3 bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+                        {searchResults.map((student: any, idx: number) => (
+                          <div key={`search-${student._id}-${idx}`} className="flex items-center justify-between p-3 bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
                             <div className="flex items-center space-x-3">
                               <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-sm font-semibold text-blue-600 dark:text-blue-300">
                                 {student.firstName && student.lastName
@@ -2557,18 +3413,18 @@ const CourseDetail: React.FC = () => {
                 <div className="space-y-3">
                   {course.enrollmentRequests
                     .filter((req: any) => req.status === 'waitlisted')
-                    .map((request: any) => {
+                    .map((request: any, idx: number) => {
                       const waitlistPosition = course.waitlist?.find((entry: any) => entry.student._id === request.student._id)?.position;
                       
                       return (
-                        <div key={request._id} className="flex items-center justify-between p-3 rounded-lg border bg-orange-100 dark:bg-orange-800/30 border-orange-300 dark:border-orange-600">
+                        <div key={`waitlist-${request._id}-${idx}`} className="flex items-center justify-between p-3 rounded-lg border bg-orange-100 dark:bg-orange-800/30 border-orange-300 dark:border-orange-600">
                           <div className="flex items-center space-x-3">
                             <div className="w-10 h-10 rounded-full flex items-center justify-center bg-orange-200 dark:bg-orange-700">
                               {request.student.profilePicture ? (
                                 <img 
                                   src={request.student.profilePicture.startsWith('http')
                                     ? request.student.profilePicture
-                                    : getImageUrl(request.student.profilePicture)}
+                                    : `http://localhost:5000${request.student.profilePicture}`}
                                   alt={`${request.student.firstName} ${request.student.lastName}`}
                                   className="w-10 h-10 rounded-full object-cover"
                                 />
@@ -2640,9 +3496,9 @@ const CourseDetail: React.FC = () => {
                   )}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {course.students.map((student: any) => (
+                  {course.students.map((student: any, idx: number) => (
                     <StudentCard
-                      key={student._id}
+                      key={`student-card-${student._id}-${idx}`}
                       student={student}
                       isInstructor={isInstructor}
                       isAdmin={isAdmin}
@@ -2719,7 +3575,7 @@ const CourseDetail: React.FC = () => {
   return (
     <div className="flex w-full max-w-7xl mx-auto">
       {/* Modern Sidebar */}
-      <aside className="w-64 mr-8 mt-4">
+      <aside className="w-64 mr-8 mt-4 self-start sticky top-4 h-fit">
         <nav className="bg-white/80 dark:bg-gray-900/80 backdrop-blur rounded-2xl shadow-lg p-4 flex flex-col gap-1 border border-gray-100 dark:border-gray-700">
           {filteredNavigationItems.map((item: any) => (
             <button

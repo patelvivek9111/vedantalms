@@ -14,6 +14,7 @@ import { AdminAnalytics } from './pages/AdminAnalytics';
 import { AdminSystemSettings } from './pages/AdminSystemSettings';
 import { AdminCourseOversight } from './pages/AdminCourseOversight';
 import { AdminSecurity } from './pages/AdminSecurity';
+import { TeacherCourseOversight } from './pages/TeacherCourseOversight';
 import CourseList from './components/CourseList';
 import CourseDetail from './components/CourseDetail';
 import CourseForm from './components/CourseForm';
@@ -22,6 +23,7 @@ import PageViewWrapper from './components/PageViewWrapper';
 import AssignmentList from './components/assignments/AssignmentList';
 import AssignmentDetails from './components/assignments/AssignmentDetails';
 import CreateAssignmentForm from './components/assignments/CreateAssignmentForm';
+import CreateAssignmentWrapper from './components/assignments/CreateAssignmentWrapper';
 import GradeSubmissions from './components/assignments/GradeSubmissions';
 import ViewAssignment from './components/assignments/ViewAssignment';
 import ModuleEditPage from './pages/ModuleEditPage';
@@ -35,11 +37,13 @@ import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import ThreadView from './components/ThreadView';
 import ThreadViewWrapper from './components/ThreadViewWrapper';
+import Transcript from './pages/Transcript';
 import { Provider } from 'react-redux';
 import { store } from './store/store';
 import GroupDashboard from './components/groups/GroupDashboard';
 import GroupDiscussion from './components/groups/GroupDiscussion';
-import GroupPeople from './components/groups/GroupPeople';
+import GroupPeopleWrapper from './components/groups/GroupPeopleWrapper';
+import GroupHome from './components/groups/GroupHome';
 import Announcements from './pages/Announcements';
 import GlobalSidebar from './components/GlobalSidebar';
 import CalendarPage from './components/Calendar';
@@ -62,9 +66,7 @@ const AssignmentListWrapper = () => {
 };
 
 const CreateAssignmentFormWrapper = () => {
-  const { moduleId } = useParams<{ moduleId: string }>();
-  if (!moduleId) return null;
-  return <CreateAssignmentForm moduleId={moduleId} />;
+  return <CreateAssignmentWrapper />;
 };
 
 function Unauthorized() {
@@ -78,14 +80,6 @@ function Unauthorized() {
   );
 }
 
-function GroupPeopleWrapper() {
-  // Get groupId from params and groupSetId from outlet context
-  const { groupId } = useParams();
-  const context = useOutletContext() as any;
-  const groupSetId = context?.groupSetId;
-  if (!groupId || !groupSetId) return <div>No group selected.</div>;
-  return <GroupPeople groupId={groupId} groupSetId={groupSetId} />;
-}
 
 function AnnouncementsWrapper() {
   const { courseId } = useParams<{ courseId: string }>();
@@ -123,8 +117,8 @@ function AppContent() {
       <main className={isAuthenticated ? "pb-10 pl-20" : "pb-10"}>
         <Routes>
           {/* Public Routes */}
-          <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" /> : <LandingPage />} />
-          <Route path="/login" element={<Login />} />
+          <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
+          <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
           
@@ -295,13 +289,11 @@ function AppContent() {
             </PrivateRoute>
           } />
           <Route path="/groups/:groupId/*" element={<GroupDashboard />}>
-            <Route path="home" element={<div>Group Home (placeholder)</div>} />
-            <Route path="pages" element={<div>Group Pages</div>} />
+            <Route path="home" element={<GroupHome />} />
             <Route path="discussion" element={<GroupDiscussion />} />
-            <Route path="assignments" element={<div>Group Assignments (placeholder)</div>} />
-            <Route path="announcements" element={<div>Group Announcements (placeholder)</div>} />
+            <Route path="discussion/:threadId" element={<ThreadView />} />
             <Route path="people" element={<GroupPeopleWrapper />} />
-            <Route index element={<div>Group Home (placeholder)</div>} />
+            <Route index element={<GroupHome />} />
           </Route>
           <Route
             path="/calendar"
@@ -357,6 +349,14 @@ function AppContent() {
             }
           />
           <Route
+            path="/teacher/courses"
+            element={
+              <PrivateRoute allowedRoles={['teacher']}>
+                <TeacherCourseOversight />
+              </PrivateRoute>
+            }
+          />
+          <Route
             path="/admin/analytics"
             element={
               <PrivateRoute>
@@ -388,6 +388,15 @@ function AppContent() {
                   <h1 className="text-3xl font-bold text-gray-900">Backup & Recovery</h1>
                   <p className="text-gray-600">System backup and recovery management</p>
                 </div>
+              </PrivateRoute>
+            }
+          />
+          {/* Reports/Transcript Routes */}
+          <Route
+            path="/reports/transcript"
+            element={
+              <PrivateRoute allowedRoles={['student']}>
+                <Transcript />
               </PrivateRoute>
             }
           />

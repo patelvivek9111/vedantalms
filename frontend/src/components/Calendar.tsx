@@ -296,10 +296,10 @@ const CalendarPage: React.FC = () => {
   // Only show for teachers/admins
   const isTeacherOrAdmin = user && (user.role === 'teacher' || user.role === 'admin');
 
-  // Build calendar options: teacher's name, then all their courses
+  // Build calendar options: admin only gets personal calendar, teachers get personal + courses
   const calendarOptions = user ? [
     { label: `${user.firstName} ${user.lastName}`, value: user._id },
-    ...courses.map((course: any) => ({ label: course.title, value: course._id, course }))
+    ...(user.role === 'admin' ? [] : courses.map((course: any) => ({ label: course.title, value: course._id, course })))
   ] : [];
 
   // Update: Multi-calendar selection logic
@@ -351,6 +351,10 @@ const CalendarPage: React.FC = () => {
         continue;
       }
       // Else, course calendar: fetch events for course and assignments as events
+      // Skip course events for admins (should not happen since admins don't have course calendars, but just in case)
+      if (user?.role === 'admin') {
+        continue; // Skip course calendars for admins
+      }
       try {
         const res = await api.get('/events?calendar=' + calId);
         const data = res.data.data || res.data; // Handle both new and old response formats
@@ -460,10 +464,16 @@ const CalendarPage: React.FC = () => {
     }
   }, [selectedCalendars]);
 
-  // On mount, select teacher calendar by default
+  // On mount, select personal calendar by default (admin only gets their personal calendar)
   useEffect(() => {
     if (user && selectedCalendars.length === 0 && calendarOptions.length > 0) {
+      if (user.role === 'admin') {
+        // Admin only selects their personal calendar
+        setSelectedCalendars([user._id]);
+      } else {
+        // Teachers/students can select all available calendars
       setSelectedCalendars(calendarOptions.map(opt => opt.value));
+      }
     }
   }, [user, selectedCalendars, calendarOptions]);
 
@@ -560,7 +570,6 @@ const CalendarPage: React.FC = () => {
   const handleDelete = async () => {
     if (editingEvent && editingEvent._id) {
       try {
-        console.log('Attempting to delete event:', editingEvent._id);
         // Check if the event is an assignment
         const type = editingEvent.type || (editingEvent as any).type;
         const isAssignment = typeof type === 'string' && type.toLowerCase() === 'assignment';
@@ -569,7 +578,6 @@ const CalendarPage: React.FC = () => {
         } else {
           await api.delete(`/events/${editingEvent._id}`);
         }
-        console.log('Event deleted successfully');
         setModalOpen(false);
         setEditingEvent(null);
         fetchEvents();
@@ -932,14 +940,6 @@ const CalendarPage: React.FC = () => {
             <div className="flex gap-2">
               {(() => {
                 const canDelete = isEdit && (isTeacherOrAdmin || (user && editingEvent?.calendar === user._id));
-                console.log('Delete button visibility check:', {
-                  isEdit,
-                  isTeacherOrAdmin,
-                  userRole: user?.role,
-                  userCalendar: user?._id,
-                  eventCalendar: editingEvent?.calendar,
-                  canDelete
-                });
                 return canDelete ? (
                   <button
                     type="button"

@@ -30,7 +30,7 @@ const WhatIfScores: React.FC<WhatIfScoresProps> = ({
   const calculateWeightedGrade = (scores: { [key: string]: number }) => {
     // Create a grades object in the format expected by the function
     const grades = { [studentId]: scores };
-    return calculateFinalGradeWithWeightedGroups(studentId, course, assignments, grades);
+    return calculateFinalGradeWithWeightedGroups(studentId, course, assignments, grades, {});
   };
 
   // Get letter grade from percentage

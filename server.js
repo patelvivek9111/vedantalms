@@ -93,6 +93,8 @@ app.use('/api/todos', require('./routes/todo.routes'));
 app.use('/api/inbox', require('./routes/inbox.routes'));
 app.use('/api', require('./routes/attendance.routes'));
 app.use('/api/polls', require('./routes/poll.routes'));
+app.use('/api/reports', require('./routes/reports.routes'));
+app.use('/api/admin', require('./routes/admin.routes'));
 
 // Upload route for file uploads
 const upload = require('./middleware/upload');

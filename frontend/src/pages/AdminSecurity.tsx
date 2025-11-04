@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { API_URL } from '../config';
 import { 
   Shield, 
   AlertTriangle, 
@@ -45,44 +47,39 @@ export function AdminSecurity() {
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    // Simulate loading security data
-    setTimeout(() => {
-      setSecurityStats({
-        totalLogins: 1247,
-        failedLogins: 23,
-        suspiciousActivities: 5,
-        blockedIPs: 3,
-        securityScore: 85
-      });
-      setSecurityEvents([
-        {
-          id: '1',
-          type: 'failed_login',
-          description: 'Failed login attempt from 192.168.1.100',
-          timestamp: '2 minutes ago',
-          severity: 'medium',
-          ipAddress: '192.168.1.100',
-          userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
-        },
-        {
-          id: '2',
-          type: 'suspicious_activity',
-          description: 'Multiple rapid login attempts detected',
-          timestamp: '15 minutes ago',
-          severity: 'high',
-          ipAddress: '203.0.113.45',
-          userAgent: 'Mozilla/5.0 (Unknown)'
-        },
-        {
-          id: '3',
-          type: 'system_alert',
-          description: 'Security scan completed - no threats found',
-          timestamp: '1 hour ago',
-          severity: 'low'
+    const fetchSecurityData = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const headers = { Authorization: `Bearer ${token}` };
+
+        // Fetch security stats
+        const statsResponse = await axios.get(`${API_URL}/api/admin/security/stats`, { headers });
+        if (statsResponse.data.success) {
+          setSecurityStats(statsResponse.data.data);
         }
-      ]);
-      setLoading(false);
-    }, 1000);
+
+        // Fetch security events (only 5 latest)
+        const eventsResponse = await axios.get(`${API_URL}/api/admin/security/events?limit=5`, { headers });
+        if (eventsResponse.data.success) {
+          setSecurityEvents(eventsResponse.data.data);
+        }
+      } catch (error) {
+        console.error('Error fetching security data:', error);
+        // Keep default values on error
+        setSecurityStats({
+          totalLogins: 0,
+          failedLogins: 0,
+          suspiciousActivities: 0,
+          blockedIPs: 0,
+          securityScore: 100
+        });
+        setSecurityEvents([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSecurityData();
   }, []);
 
   const getSeverityColor = (severity: string) => {
@@ -204,40 +201,9 @@ export function AdminSecurity() {
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Security Configuration</h3>
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-900">Two-Factor Authentication</p>
-                <p className="text-xs text-gray-500">Require 2FA for all users</p>
-              </div>
-              <button className="bg-green-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-green-700">
-                Enabled
-              </button>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-900">IP Whitelist</p>
-                <p className="text-xs text-gray-500">Restrict access to specific IPs</p>
-              </div>
-              <button className="bg-gray-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-gray-700">
-                Disabled
-              </button>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-900">Session Timeout</p>
-                <p className="text-xs text-gray-500">Auto-logout after inactivity</p>
-              </div>
-              <span className="text-sm text-gray-900">30 minutes</span>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-900">Password Policy</p>
-                <p className="text-xs text-gray-500">Minimum requirements</p>
-              </div>
-              <span className="text-sm text-gray-900">8+ chars, mixed case</span>
+            <div className="text-center py-8 text-gray-500">
+              <p className="text-sm">Security configuration settings coming soon</p>
+              <p className="text-xs text-gray-400 mt-2">Configuration options will be available in a future update</p>
             </div>
           </div>
         </div>
@@ -246,20 +212,37 @@ export function AdminSecurity() {
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Security Events</h3>
           <div className="space-y-3">
-            {securityEvents.map((event) => (
-              <div key={event.id} className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50">
-                <div className={`p-2 rounded-lg ${getSeverityColor(event.severity)}`}>
-                  {getEventIcon(event.type)}
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">{event.description}</p>
-                  <p className="text-xs text-gray-500">{event.timestamp}</p>
-                  {event.ipAddress && (
-                    <p className="text-xs text-gray-400">IP: {event.ipAddress}</p>
-                  )}
-                </div>
+            {securityEvents.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p className="text-sm">No security events in the last 30 days</p>
               </div>
-            ))}
+            ) : (
+              securityEvents.map((event) => {
+                const eventDate = new Date(event.timestamp);
+                const formattedDate = eventDate.toLocaleString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                });
+                
+                return (
+                  <div key={event.id} className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50">
+                    <div className={`p-2 rounded-lg ${getSeverityColor(event.severity)}`}>
+                      {getEventIcon(event.type)}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900">{event.description}</p>
+                      <p className="text-xs text-gray-500">{formattedDate}</p>
+                      {event.ipAddress && (
+                        <p className="text-xs text-gray-400">IP: {event.ipAddress}</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       </div>
@@ -267,21 +250,9 @@ export function AdminSecurity() {
       {/* Security Actions */}
       <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Security Actions</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button className="flex items-center justify-center space-x-2 p-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-            <RefreshCw className="w-5 h-5 text-blue-600" />
-            <span className="text-sm font-medium text-gray-900">Run Security Scan</span>
-          </button>
-          
-          <button className="flex items-center justify-center space-x-2 p-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-            <Database className="w-5 h-5 text-green-600" />
-            <span className="text-sm font-medium text-gray-900">Backup Security Logs</span>
-          </button>
-          
-          <button className="flex items-center justify-center space-x-2 p-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-            <Key className="w-5 h-5 text-purple-600" />
-            <span className="text-sm font-medium text-gray-900">Generate Security Report</span>
-          </button>
+        <div className="text-center py-8 text-gray-500">
+          <p className="text-sm">Security actions coming soon</p>
+          <p className="text-xs text-gray-400 mt-2">Additional security features will be available in a future update</p>
         </div>
       </div>
     </div>

@@ -2,9 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '../context/AuthContext';
-import api from '../services/api';
+import api, { getImageUrl } from '../services/api';
 import { API_URL } from '../config';
-import { getImageUrl } from '../utils/apiUtils';
 import RichTextEditor from './RichTextEditor';
 import { 
   MessageSquare, 
@@ -23,7 +22,8 @@ import {
   AlertCircle,
   Send,
   X,
-  Settings
+  Settings,
+  Heart
 } from 'lucide-react';
 
 interface User {
@@ -50,6 +50,14 @@ interface Reply {
   parentReply?: string; // ID of the parent reply if this is a nested reply
   grade?: number;
   feedback?: string;
+  likes?: Array<{
+    user: {
+      _id: string;
+      firstName: string;
+      lastName: string;
+    };
+    likedAt: string;
+  }>;
 }
 
 interface StudentGrade {
@@ -89,7 +97,13 @@ interface Thread {
   totalPoints: number;
   group: string;
   dueDate: string | null;
+  module?: string;
   studentGrades: StudentGrade[];
+  settings?: {
+    requirePostBeforeSee: boolean;
+    allowLikes: boolean;
+    allowComments: boolean;
+  };
 }
 
 interface ReplyComponentProps {
@@ -105,6 +119,8 @@ interface ReplyComponentProps {
   replyContent: string;
   setReplyContent: (content: string) => void;
   setReplyingTo: (id: string | null) => void;
+  onLike: (replyId: string) => Promise<void>;
+  allowLikes: boolean;
 }
 
 const ReplyComponent: React.FC<ReplyComponentProps> = ({
@@ -119,7 +135,9 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
   onSubmitReply,
   replyContent,
   setReplyContent,
-  setReplyingTo
+  setReplyingTo,
+  onLike,
+  allowLikes
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(reply.content);
@@ -285,13 +303,31 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
               
               {/* Reply button */}
               <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                <button
-                  onClick={() => onReply(reply._id)}
-                  className="flex items-center space-x-2 text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
-                >
-                  <Reply className="w-4 h-4" />
-                  <span>Reply</span>
-                </button>
+                <div className="flex items-center space-x-4">
+                  <button
+                    onClick={() => onReply(reply._id)}
+                    className="flex items-center space-x-2 text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                  >
+                    <Reply className="w-4 h-4" />
+                    <span>Reply</span>
+                  </button>
+                  
+                  {allowLikes && (
+                    <button
+                      onClick={() => onLike(reply._id)}
+                      className="flex items-center space-x-2 text-sm text-gray-600 hover:text-red-600 font-medium transition-colors"
+                    >
+                      <Heart 
+                        className={`w-4 h-4 ${
+                          reply.likes?.some(like => like.user._id === user?._id) 
+                            ? 'fill-red-500 text-red-500' 
+                            : ''
+                        }`} 
+                      />
+                      <span>{reply.likes?.length || 0}</span>
+                    </button>
+                  )}
+                </div>
               </div>
             </>
           )}
@@ -319,6 +355,12 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
                   onClick={() => {
                     setReplyingTo(null);
                     setReplyContent('');
+                    
+                    // Clear draft when canceling
+                    if (threadId && user?._id) {
+                      const draftKey = `thread_reply_draft_${threadId}_${user._id}`;
+                      localStorage.removeItem(draftKey);
+                    }
                   }}
                   className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                 >
@@ -342,14 +384,41 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
 };
 
 const ThreadView: React.FC = () => {
-  const { courseId, threadId } = useParams<{ courseId: string; threadId: string }>();
+  const { courseId, threadId, groupId } = useParams<{ courseId?: string; threadId: string; groupId?: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [thread, setThread] = useState<Thread | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [resolvedCourseId, setResolvedCourseId] = useState<string | null>(courseId || null);
   const [replyContent, setReplyContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Load saved draft from localStorage on mount
+  useEffect(() => {
+    if (threadId && user?._id) {
+      const draftKey = `thread_reply_draft_${threadId}_${user._id}`;
+      const savedDraft = localStorage.getItem(draftKey);
+      if (savedDraft) {
+        try {
+          setReplyContent(savedDraft);
+        } catch (e) {
+          console.error('Error loading draft:', e);
+        }
+      }
+    }
+  }, [threadId, user?._id]);
+
+  // Auto-save reply content to localStorage
+  useEffect(() => {
+    if (threadId && user?._id && replyContent) {
+      const draftKey = `thread_reply_draft_${threadId}_${user._id}`;
+      const timeoutId = setTimeout(() => {
+        localStorage.setItem(draftKey, replyContent);
+      }, 500); // Debounce by 500ms
+      return () => clearTimeout(timeoutId);
+    }
+  }, [replyContent, threadId, user?._id]);
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
@@ -369,44 +438,114 @@ const ThreadView: React.FC = () => {
     isGraded: false,
     totalPoints: 100,
     group: 'Discussions',
-    dueDate: ''
+    dueDate: '',
+    requirePostBeforeSee: false,
+    allowLikes: true,
+    allowComments: true,
+    module: ''
   });
 
   // Add state for students
   const [students, setStudents] = useState<{ _id: string; firstName: string; lastName: string; profilePicture?: string }[]>([]);
+  
+  // Add state for modules
+  const [modules, setModules] = useState<{ _id: string; title: string }[]>([]);
 
   const isTeacher = user?.role === 'teacher' || user?.role === 'admin';
 
+  // Fetch courseId from group if in group context
+  useEffect(() => {
+    const fetchGroupCourseId = async () => {
+      if (groupId && !courseId) {
+        try {
+          const token = localStorage.getItem('token');
+          const response = await api.get(`${API_URL}/api/groups/${groupId}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const course = response.data.course;
+          const fetchedCourseId = typeof course === 'string' ? course : course?._id || '';
+          if (fetchedCourseId) {
+            setResolvedCourseId(fetchedCourseId);
+          } else {
+            setError('Course ID not found for this group');
+            setLoading(false);
+          }
+        } catch (err) {
+          console.error('Error fetching group:', err);
+          setError('Failed to load group information');
+          setLoading(false);
+        }
+      } else if (courseId) {
+        setResolvedCourseId(courseId);
+      }
+    };
+    fetchGroupCourseId();
+  }, [groupId, courseId]);
+
   useEffect(() => {
     const fetchThreadAndStudents = async () => {
-      if (!courseId || !threadId) {
-        setError('Invalid course or thread ID');
+      if (!threadId) {
+        setError('Invalid thread ID');
+        setLoading(false);
+        return;
+      }
+      
+      // If in group context and still loading courseId, wait
+      if (groupId && !resolvedCourseId) {
+        return; // Still loading group info
+      }
+      
+      if (!resolvedCourseId) {
+        setError('Invalid course ID');
         setLoading(false);
         return;
       }
       try {
         const token = localStorage.getItem('token');
-        // Fetch thread
+        
+        // First, fetch the thread to check settings
         const threadRes = await api.get(`${API_URL}/api/threads/${threadId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
+        
         if (threadRes.data.success) {
-          if (threadRes.data.data.course !== courseId) {
+          if (threadRes.data.data.course !== resolvedCourseId) {
             setError('Thread not found in this course');
             setLoading(false);
             return;
           }
-          setThread(threadRes.data.data);
+          
+          // If "post before see" is enabled and user is a student, use participant endpoint
+          if (threadRes.data.data.settings?.requirePostBeforeSee && user?.role === 'student') {
+            const participantRes = await api.get(`${API_URL}/api/threads/${threadId}/participant/${user._id}`, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            if (participantRes.data.success) {
+              setThread(participantRes.data.data);
+            } else {
+              setThread(threadRes.data.data);
+            }
+          } else {
+            setThread(threadRes.data.data);
+          }
         } else {
           setError('Failed to load thread');
         }
-        // Fetch course to get students
-        const courseRes = await api.get(`${API_URL}/api/courses/${courseId}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (courseRes.data.success) {
-          setStudents(courseRes.data.data.students || []);
-        }
+          // Fetch course to get students
+          const courseRes = await api.get(`${API_URL}/api/courses/${resolvedCourseId}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (courseRes.data.success) {
+            setStudents(courseRes.data.data.students || []);
+          }
+          
+          // Fetch modules for the course
+          const modulesRes = await api.get(`${API_URL}/api/modules/${resolvedCourseId}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (modulesRes.data.success) {
+            setModules(modulesRes.data.data || []);
+          }
       } catch (err) {
         console.error('Error fetching thread or students:', err);
         setError('Failed to load thread or students');
@@ -415,7 +554,7 @@ const ThreadView: React.FC = () => {
       }
     };
     fetchThreadAndStudents();
-  }, [courseId, threadId]);
+  }, [resolvedCourseId, threadId, groupId, user?._id]);
 
   useEffect(() => {
     const handleThreadUpdate = (event: CustomEvent) => {
@@ -449,6 +588,13 @@ const ThreadView: React.FC = () => {
       if (response.data.success) {
         setThread(response.data.data);
         setReplyContent('');
+        
+        // Clear draft from localStorage after successful reply
+        if (threadId && user?._id) {
+          const draftKey = `thread_reply_draft_${threadId}_${user._id}`;
+          localStorage.removeItem(draftKey);
+        }
+        
         setReplyingTo(null);
         setShowReplyEditor(false);
       }
@@ -456,6 +602,27 @@ const ThreadView: React.FC = () => {
       console.error('Error posting reply:', error);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleLike = async (replyId: string) => {
+    if (!thread) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await api.post(
+        `${API_URL}/api/threads/${thread._id}/replies/${replyId}/like`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      if (response.data.success) {
+        setThread(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error liking reply:', error);
     }
   };
 
@@ -640,7 +807,13 @@ const ThreadView: React.FC = () => {
         `${API_URL}/api/threads/${thread._id}`,
         {
           ...editSettings,
-          dueDate: editSettings.dueDate || null
+          dueDate: editSettings.dueDate || null,
+          module: editSettings.module || null,
+          settings: {
+            requirePostBeforeSee: editSettings.requirePostBeforeSee,
+            allowLikes: editSettings.allowLikes,
+            allowComments: editSettings.allowComments
+          }
         },
         {
           headers: { Authorization: `Bearer ${token}` }
@@ -723,6 +896,8 @@ const ThreadView: React.FC = () => {
           replyContent={replyContent}
           setReplyContent={setReplyContent}
           setReplyingTo={setReplyingTo}
+          onLike={handleLike}
+          allowLikes={thread.settings?.allowLikes !== false}
         />
         {replyMap.get(reply._id) && renderReplies(replyMap.get(reply._id)!, level + 1, onEdit, onDelete)}
       </React.Fragment>
@@ -860,6 +1035,25 @@ const ThreadView: React.FC = () => {
                           <Edit3 className="w-5 h-5" />
                         </button>
                         <button
+                          onClick={() => {
+                            setEditSettings({
+                              isGraded: thread.isGraded || false,
+                              totalPoints: thread.totalPoints || 100,
+                              group: thread.group || 'Discussions',
+                              dueDate: thread.dueDate ? new Date(thread.dueDate).toISOString().split('T')[0] : '',
+                              requirePostBeforeSee: thread.settings?.requirePostBeforeSee || false,
+                              allowLikes: thread.settings?.allowLikes !== false,
+                              allowComments: thread.settings?.allowComments !== false,
+                              module: thread.module || ''
+                            });
+                            setShowEditModal(true);
+                          }}
+                          className="p-2 text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-colors"
+                          title="Edit discussion settings"
+                        >
+                          <Settings className="w-5 h-5" />
+                        </button>
+                        <button
                           onClick={handleDeleteThread}
                           className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
                           title="Delete thread"
@@ -914,6 +1108,12 @@ const ThreadView: React.FC = () => {
                         onClick={() => {
                           setShowReplyEditor(false);
                           setReplyContent('');
+                          
+                          // Clear draft when canceling
+                          if (threadId && user?._id) {
+                            const draftKey = `thread_reply_draft_${threadId}_${user._id}`;
+                            localStorage.removeItem(draftKey);
+                          }
                         }}
                         className="px-6 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                       >
@@ -939,7 +1139,7 @@ const ThreadView: React.FC = () => {
       {/* Grading Modal */}
       {showGradingModal && selectedStudent && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
             <div className="flex justify-between items-center p-6 border-b border-gray-200">
               <h2 className="text-xl font-semibold text-gray-800 flex items-center space-x-2">
                 <Award className="w-5 h-5" />
@@ -953,62 +1153,126 @@ const ThreadView: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleGradeSubmit} className="p-6">
-              {gradingError && (
-                <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg flex items-center space-x-2">
-                  <AlertCircle className="w-5 h-5" />
-                  <span>{gradingError}</span>
+            <div className="flex h-[calc(90vh-120px)]">
+              {/* Left Panel - Student Posts */}
+              <div className="flex-1 p-6 border-r border-gray-200 overflow-y-auto">
+                <div className="mb-4">
+                  <h3 className="text-lg font-semibold text-gray-800 flex items-center space-x-2 mb-3">
+                    <MessageSquare className="w-5 h-5" />
+                    <span>Student's Posts in This Discussion</span>
+                  </h3>
+                  
+                  {/* Filter student's replies */}
+                  {(() => {
+                    const studentReplies = thread?.replies?.filter(reply => 
+                      reply.author._id === selectedStudent._id
+                    ) || [];
+                    
+                    if (studentReplies.length === 0) {
+                      return (
+                        <div className="text-center py-8 text-gray-500">
+                          <MessageSquare className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                          <p className="text-lg font-medium">No posts yet</p>
+                          <p className="text-sm">This student hasn't posted in this discussion.</p>
+                        </div>
+                      );
+                    }
+                    
+                    return (
+                      <div className="space-y-4">
+                        {studentReplies.map((reply, index) => (
+                          <div key={reply._id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center space-x-2">
+                                <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                                  <span className="text-xs font-medium text-blue-600">{index + 1}</span>
+                                </div>
+                                <span className="text-sm font-medium text-gray-700">Post #{index + 1}</span>
+                              </div>
+                              <div className="flex items-center space-x-1 text-xs text-gray-500">
+                                <Clock className="w-3 h-3" />
+                                <span>{formatDistanceToNow(new Date(reply.createdAt), { addSuffix: true })}</span>
+                              </div>
+                            </div>
+                            
+                            <div 
+                              className="prose prose-sm max-w-none text-gray-700 leading-relaxed"
+                              dangerouslySetInnerHTML={{ __html: reply.content }}
+                            />
+                            
+                            {reply.updatedAt !== reply.createdAt && (
+                              <div className="mt-2 text-xs text-gray-500 italic">
+                                Edited {formatDistanceToNow(new Date(reply.updatedAt), { addSuffix: true })}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
-              )}
-
-              <div className="mb-4">
-                <label htmlFor="grade" className="block text-sm font-medium text-gray-700 mb-2">
-                  Grade (out of {thread?.totalPoints || 100})
-                </label>
-                <input
-                  type="number"
-                  id="grade"
-                  value={grade ?? ''}
-                  onChange={(e) => setGrade(e.target.value)}
-                  min="0"
-                  max={thread?.totalPoints || 100}
-                  step="0.01"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  required
-                />
               </div>
 
-              <div className="mb-6">
-                <label htmlFor="feedback" className="block text-sm font-medium text-gray-700 mb-2">
-                  Feedback
-                </label>
-                <textarea
-                  id="feedback"
-                  value={feedback ?? ''}
-                  onChange={(e) => setFeedback(e.target.value)}
-                  rows={4}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Enter feedback for the student..."
-                />
-              </div>
+              {/* Right Panel - Grading Form */}
+              <div className="w-96 p-6 overflow-y-auto">
+                <form onSubmit={handleGradeSubmit}>
+                  {gradingError && (
+                    <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg flex items-center space-x-2">
+                      <AlertCircle className="w-5 h-5" />
+                      <span>{gradingError}</span>
+                    </div>
+                  )}
 
-              <div className="flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => setShowGradingModal(false)}
-                  className="px-6 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isGrading}
-                  className="px-6 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {isGrading ? 'Submitting...' : 'Submit Grade'}
-                </button>
+                  <div className="mb-4">
+                    <label htmlFor="grade" className="block text-sm font-medium text-gray-700 mb-2">
+                      Grade (out of {thread?.totalPoints || 100})
+                    </label>
+                    <input
+                      type="number"
+                      id="grade"
+                      value={grade ?? ''}
+                      onChange={(e) => setGrade(e.target.value)}
+                      min="0"
+                      max={thread?.totalPoints || 100}
+                      step="0.01"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      required
+                    />
+                  </div>
+
+                  <div className="mb-6">
+                    <label htmlFor="feedback" className="block text-sm font-medium text-gray-700 mb-2">
+                      Feedback
+                    </label>
+                    <textarea
+                      id="feedback"
+                      value={feedback ?? ''}
+                      onChange={(e) => setFeedback(e.target.value)}
+                      rows={6}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Enter feedback for the student..."
+                    />
+                  </div>
+
+                  <div className="flex justify-end space-x-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowGradingModal(false)}
+                      className="px-6 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isGrading}
+                      className="px-6 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {isGrading ? 'Submitting...' : 'Submit Grade'}
+                    </button>
+                  </div>
+                </form>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
@@ -1046,6 +1310,27 @@ const ThreadView: React.FC = () => {
                     Make this a graded discussion
                   </span>
                 </label>
+              </div>
+
+              {/* Module Selection */}
+              <div className="mb-4">
+                <label htmlFor="module" className="block text-sm font-medium text-gray-700 mb-2">
+                  Module
+                </label>
+                <select
+                  id="module"
+                  value={editSettings.module}
+                  onChange={(e) => setEditSettings(prev => ({
+                    ...prev,
+                    module: e.target.value
+                  }))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">No module</option>
+                  {modules.map((module) => (
+                    <option key={module._id} value={module._id}>{module.title}</option>
+                  ))}
+                </select>
               </div>
 
               {editSettings.isGraded && (
@@ -1106,6 +1391,61 @@ const ThreadView: React.FC = () => {
                   </div>
                 </>
               )}
+
+              {/* Discussion Settings */}
+              <div className="mb-6">
+                <h3 className="text-lg font-medium text-gray-800 mb-4">Discussion Settings</h3>
+                
+                <div className="space-y-4">
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="requirePostBeforeSee"
+                      checked={editSettings.requirePostBeforeSee}
+                      onChange={(e) => setEditSettings(prev => ({
+                        ...prev,
+                        requirePostBeforeSee: e.target.checked
+                      }))}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <label htmlFor="requirePostBeforeSee" className="ml-2 block text-sm text-gray-700">
+                      Users must post before seeing replies
+                    </label>
+                  </div>
+                  
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="allowLikes"
+                      checked={editSettings.allowLikes}
+                      onChange={(e) => setEditSettings(prev => ({
+                        ...prev,
+                        allowLikes: e.target.checked
+                      }))}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <label htmlFor="allowLikes" className="ml-2 block text-sm text-gray-700">
+                      Allow liking
+                    </label>
+                  </div>
+                  
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="allowComments"
+                      checked={editSettings.allowComments}
+                      onChange={(e) => setEditSettings(prev => ({
+                        ...prev,
+                        allowComments: e.target.checked
+                      }))}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <label htmlFor="allowComments" className="ml-2 block text-sm text-gray-700">
+                      Allow comments
+                    </label>
+                  </div>
+                </div>
+              </div>
 
               <div className="flex justify-end space-x-3">
                 <button

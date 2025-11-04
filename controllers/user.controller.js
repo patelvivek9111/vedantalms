@@ -6,9 +6,9 @@ const User = require('../models/user.model');
 exports.searchUsers = async (req, res) => {
   try {
     const { email, name, role, courseId } = req.query;
-  
+    
 
-    // If no email/name but role is provided, allow fetching all users of that role
+    // If no search parameters provided, return error
     if (!email && !name && !role) {
       return res.status(400).json({
         success: false,
@@ -16,31 +16,48 @@ exports.searchUsers = async (req, res) => {
       });
     }
 
-    // Build $or conditions for name and email
+    // Build $or conditions for name and email search
     const orConditions = [];
-    if (email) {
-      orConditions.push({ email: { $regex: email, $options: 'i' } });
-    }
-    if (name) {
-      orConditions.push({ firstName: { $regex: name, $options: 'i' } });
-      orConditions.push({ lastName: { $regex: name, $options: 'i' } });
+    
+    // If both name and email are provided with the same value, treat it as a general search
+    if (email && name && email === name) {
+      const searchTerm = email; // or name, they're the same
+      orConditions.push(
+        { email: { $regex: searchTerm, $options: 'i' } },
+        { firstName: { $regex: searchTerm, $options: 'i' } },
+        { lastName: { $regex: searchTerm, $options: 'i' } }
+      );
+    } else {
+      // Handle individual parameters
+      if (email) {
+        orConditions.push({ email: { $regex: email, $options: 'i' } });
+      }
+      if (name) {
+        orConditions.push({ firstName: { $regex: name, $options: 'i' } });
+        orConditions.push({ lastName: { $regex: name, $options: 'i' } });
+      }
     }
 
     const searchQuery = {};
+    
+    // Add role filter if specified
     if (role) {
       searchQuery.role = { $in: role.split(',') };
     }
+    
+    // Add search conditions
     if (orConditions.length > 0) {
       searchQuery.$or = orConditions;
     }
+    
+    // Add course filter if specified
     if (courseId) {
-      searchQuery.courses = courseId; // assumes user model has a 'courses' array
+      searchQuery.courses = courseId;
     }
 
-    
 
     // Search for users with matching criteria
-    const users = await User.find(searchQuery).select('firstName lastName email role');
+    const users = await User.find(searchQuery).select('firstName lastName email role profilePicture');
     
 
     res.json({
@@ -109,7 +126,19 @@ exports.getPreferences = async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
-    res.json({ success: true, preferences: user.preferences });
+    
+    // Ensure preferences object exists and courseColors is properly formatted
+    const preferences = user.preferences || {};
+    if (!preferences.courseColors) {
+      preferences.courseColors = {};
+    }
+    
+    // If it's a Map, convert to object
+    if (preferences.courseColors instanceof Map) {
+      preferences.courseColors = Object.fromEntries(preferences.courseColors);
+    }
+    
+    res.json({ success: true, preferences });
   } catch (err) {
     console.error('Get preferences error:', err);
     res.status(500).json({ success: false, message: 'Server error while getting preferences', error: err.message });
@@ -122,13 +151,48 @@ exports.getPreferences = async (req, res) => {
 exports.updatePreferences = async (req, res) => {
   try {
     const userId = req.user._id;
-    const { language, timeZone, theme } = req.body;
+    const { language, timeZone, theme, courseColors } = req.body;
     const updateFields = {};
     if (language !== undefined) updateFields['preferences.language'] = language;
     if (timeZone !== undefined) updateFields['preferences.timeZone'] = timeZone;
     if (theme !== undefined) updateFields['preferences.theme'] = theme;
+    
+    // Handle courseColors - update specific course color(s)
+    if (courseColors !== undefined) {
+      const user = await User.findById(userId).select('preferences');
+      if (!user) {
+        return res.status(404).json({ success: false, message: 'User not found' });
+      }
+      
+      // Get current courseColors, handling both Map and object formats
+      let currentColors = {};
+      if (user.preferences && user.preferences.courseColors) {
+        if (user.preferences.courseColors instanceof Map) {
+          currentColors = Object.fromEntries(user.preferences.courseColors);
+        } else {
+          currentColors = user.preferences.courseColors || {};
+        }
+      }
+      
+      // Merge new colors with existing ones
+      const mergedColors = { ...currentColors, ...courseColors };
+      updateFields['preferences.courseColors'] = mergedColors;
+    }
+    
     const updatedUser = await User.findByIdAndUpdate(userId, updateFields, { new: true, runValidators: true }).select('preferences');
-    res.json({ success: true, preferences: updatedUser.preferences });
+    
+    // Ensure preferences object exists and courseColors is properly formatted
+    const preferences = updatedUser.preferences || {};
+    if (!preferences.courseColors) {
+      preferences.courseColors = {};
+    }
+    
+    // If it's a Map, convert to object
+    if (preferences.courseColors instanceof Map) {
+      preferences.courseColors = Object.fromEntries(preferences.courseColors);
+    }
+    
+    res.json({ success: true, preferences });
   } catch (err) {
     console.error('Update preferences error:', err);
     res.status(500).json({ success: false, message: 'Server error while updating preferences', error: err.message });

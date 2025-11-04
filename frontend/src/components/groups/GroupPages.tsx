@@ -110,7 +110,17 @@ const GroupPages: React.FC<GroupPagesProps> = ({ groupSetId, groupId, isInstruct
       {loading ? (
         <div className="text-center py-8 text-gray-500">Loading pages...</div>
       ) : pages.length === 0 ? (
-        <div className="text-center py-8 text-gray-500">No pages available for this group set.</div>
+        <div className="text-center py-16">
+          <div className="flex flex-col items-center">
+            <FileText className="h-16 w-16 text-gray-300 mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No pages yet</h3>
+            <p className="text-sm text-gray-500 max-w-md">
+              {isInstructor 
+                ? "Get started by creating a page to share with this group set."
+                : "There are no pages available for this group set yet."}
+            </p>
+          </div>
+        </div>
       ) : (
         <div className="divide-y">
           {pages.map(page => (

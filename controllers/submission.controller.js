@@ -436,13 +436,11 @@ exports.gradeSubmission = async (req, res) => {
       submission.submittedBy = submission.student;
     }
 
-    // Handle auto-graded submissions
-    if (submission.autoGraded && !submission.teacherApproved) {
+    // Handle auto-graded submissions (allow re-grading even if approved)
+    if (submission.autoGraded) {
       if (approveGrade) {
         // Teacher is approving the auto-grade
         submission.teacherApproved = true;
-        submission.finalGrade = submission.autoGrade;
-        submission.grade = submission.autoGrade;
         submission.gradedBy = req.user._id;
         submission.gradedAt = new Date();
         
@@ -467,32 +465,17 @@ exports.gradeSubmission = async (req, res) => {
           });
         }
         submission.questionGrades = combinedQuestionGrades;
-      } else {
-        // Teacher is providing manual grades for non-MC questions
-        if (questionGrades) {
-          submission.questionGrades = new Map(
-            Object.entries(questionGrades).map(([key, value]) => [key, parseFloat(value) || 0])
-          );
-        }
         
-        // Calculate final grade combining auto-grade and manual grades
+        // Calculate final grade from combined question grades
         const assignment = await Assignment.findById(submission.assignment);
         if (assignment && assignment.questions) {
-          let totalPoints = 0;
           let earnedPoints = 0;
-          
           for (let i = 0; i < assignment.questions.length; i++) {
-            const question = assignment.questions[i];
-            totalPoints += question.points || 0;
-            
-            // Check if teacher has provided a grade for this question
-            const teacherGrade = submission.questionGrades.get(i.toString());
-            
-            if (teacherGrade !== undefined) {
-              // Use teacher's grade if provided
-              earnedPoints += teacherGrade;
-            } else if (question.type === 'multiple-choice') {
-              // Use auto-grade for MC questions if teacher hasn't provided a grade
+            const grade = combinedQuestionGrades.get(i.toString());
+            if (grade !== undefined) {
+              earnedPoints += grade;
+            } else {
+              // Fallback to auto-grade if not in combined grades
               let autoGrade = 0;
               if (submission.autoQuestionGrades instanceof Map) {
                 autoGrade = submission.autoQuestionGrades.get(i.toString()) || 0;
@@ -500,14 +483,175 @@ exports.gradeSubmission = async (req, res) => {
                 autoGrade = submission.autoQuestionGrades[i.toString()] || 0;
               }
               earnedPoints += autoGrade;
-            } else {
-              // Use 0 for non-MC questions if teacher hasn't provided a grade
-              earnedPoints += 0;
             }
+          }
+          submission.finalGrade = earnedPoints;
+          submission.grade = submission.finalGrade;
+        } else {
+          // Fallback if assignment not found
+          submission.finalGrade = submission.autoGrade;
+          submission.grade = submission.autoGrade;
+        }
+      } else {
+        // Teacher is providing manual grades for non-MC questions or re-grading
+        // Always recalculate final grade combining auto-grade and manual grades
+        // This ensures correct calculation even when re-grading existing submissions
+        const assignment = await Assignment.findById(submission.assignment);
+        if (assignment && assignment.questions) {
+          let totalPoints = 0;
+          let earnedPoints = 0;
+          
+          // Ensure autoQuestionGrades exists - if not, recalculate them
+          // Convert to Map format if it's stored as an object
+          let autoQuestionGradesMap = new Map();
+          if (submission.autoQuestionGrades) {
+            if (submission.autoQuestionGrades instanceof Map) {
+              autoQuestionGradesMap = submission.autoQuestionGrades;
+            } else if (typeof submission.autoQuestionGrades === 'object') {
+              // Convert object to Map
+              Object.entries(submission.autoQuestionGrades).forEach(([key, value]) => {
+                autoQuestionGradesMap.set(key, value);
+              });
+            }
+          }
+          
+          // Always recalculate auto-grades if we have an auto-graded submission but no auto-grades stored
+          // This ensures we have the latest auto-grades even if they weren't saved properly
+          if (submission.autoGraded && autoQuestionGradesMap.size === 0) {
+            const autoGradeResult = await autoGradeSubmission(submission, assignment);
+            submission.autoGraded = autoGradeResult.autoGraded;
+            submission.autoGrade = autoGradeResult.autoGrade;
+            submission.autoQuestionGrades = autoGradeResult.autoQuestionGrades;
+            autoQuestionGradesMap = autoGradeResult.autoQuestionGrades;
+          }
+          
+          // If we still don't have auto-grades for all questions, recalculate
+          if (autoQuestionGradesMap.size < assignment.questions.length && submission.autoGraded) {
+            const autoGradeResult = await autoGradeSubmission(submission, assignment);
+            submission.autoGraded = autoGradeResult.autoGraded;
+            submission.autoGrade = autoGradeResult.autoGrade;
+            submission.autoQuestionGrades = autoGradeResult.autoQuestionGrades;
+            autoQuestionGradesMap = autoGradeResult.autoQuestionGrades;
+          }
+          
+          // Convert questionGrades to Map format if needed
+          // Start fresh and build from teacher-provided grades + auto-grades
+          // This ensures we always recalculate correctly, even when re-grading
+          let questionGradesMap = new Map();
+          
+          // First, load teacher-provided grades from the request (highest priority)
+          // These are the grades the teacher is submitting now
+          if (questionGrades && typeof questionGrades === 'object') {
+            Object.entries(questionGrades).forEach(([key, value]) => {
+              const questionIndex = parseInt(key);
+              if (questionIndex < assignment.questions.length) {
+                const question = assignment.questions[questionIndex];
+                const parsedValue = parseFloat(value);
+                
+                // Store teacher-provided grades for text questions
+                if (question.type !== 'multiple-choice' && question.type !== 'matching') {
+                  questionGradesMap.set(key, isNaN(parsedValue) ? 0 : parsedValue);
+                } else {
+                  // For auto-graded questions, only store if teacher explicitly changed it
+                  const autoGrade = autoQuestionGradesMap.get(key);
+                  if (autoGrade !== undefined && autoGrade !== null && 
+                      !isNaN(parsedValue) && Math.abs(parsedValue - autoGrade) > 0.01) {
+                    // Teacher explicitly changed the auto-grade
+                    questionGradesMap.set(key, parsedValue);
+                  }
+                }
+              }
+            });
+          }
+          
+          // Load existing text question grades from submission for any questions not provided in request
+          // This ensures we don't lose previously graded text questions when re-grading
+          // IMPORTANT: Don't load auto-graded questions unless they were manually overridden
+          if (submission.questionGrades) {
+            if (submission.questionGrades instanceof Map) {
+              submission.questionGrades.forEach((value, key) => {
+                const questionIndex = parseInt(key);
+                if (questionIndex < assignment.questions.length && !questionGradesMap.has(key)) {
+                  const question = assignment.questions[questionIndex];
+                  // Only preserve text questions (auto-graded questions will use auto-grade)
+                  if (question.type !== 'multiple-choice' && question.type !== 'matching') {
+                    questionGradesMap.set(key, value);
+                  } else {
+                    // For auto-graded questions, only preserve if manually overridden
+                    // Filter out incorrect stored data (0 when auto-grade is > 0)
+                    const autoGrade = autoQuestionGradesMap.get(key);
+                    if (autoGrade !== undefined && autoGrade !== null) {
+                      const difference = Math.abs(value - autoGrade);
+                      // Only preserve if significantly different AND not incorrect stored data
+                      if (difference > 0.01 && !(value === 0 && autoGrade > 0)) {
+                        // Teacher previously overrode this auto-grade, preserve it
+                        questionGradesMap.set(key, value);
+                      }
+                    }
+                  }
+                }
+              });
+            } else if (typeof submission.questionGrades === 'object') {
+              Object.entries(submission.questionGrades).forEach(([key, value]) => {
+                const questionIndex = parseInt(key);
+                if (questionIndex < assignment.questions.length && !questionGradesMap.has(key)) {
+                  const question = assignment.questions[questionIndex];
+                  // Only preserve text questions
+                  if (question.type !== 'multiple-choice' && question.type !== 'matching') {
+                    questionGradesMap.set(key, value);
+                  } else {
+                    // For auto-graded questions, only preserve if manually overridden
+                    // Filter out incorrect stored data (0 when auto-grade is > 0)
+                    const autoGrade = autoQuestionGradesMap.get(key);
+                    if (autoGrade !== undefined && autoGrade !== null) {
+                      const difference = Math.abs(value - autoGrade);
+                      // Only preserve if significantly different AND not incorrect stored data
+                      if (difference > 0.01 && !(value === 0 && autoGrade > 0)) {
+                        // Teacher previously overrode this auto-grade, preserve it
+                        questionGradesMap.set(key, value);
+                      }
+                    }
+                  }
+                }
+              });
+            }
+          }
+          
+          for (let i = 0; i < assignment.questions.length; i++) {
+            const question = assignment.questions[i];
+            totalPoints += question.points || 0;
+            
+            // Check if teacher has provided a grade for this question
+            const teacherGrade = questionGradesMap.get(i.toString());
+            
+            let pointsToAdd = 0;
+            if (teacherGrade !== undefined && teacherGrade !== null) {
+              // Use teacher's grade if provided
+              pointsToAdd = teacherGrade;
+            } else if (question.type === 'multiple-choice' || question.type === 'matching') {
+              // Use auto-grade for MC and matching questions if teacher hasn't provided a grade
+              const autoGrade = autoQuestionGradesMap.get(i.toString());
+              if (autoGrade !== undefined && autoGrade !== null) {
+                pointsToAdd = autoGrade;
+              } else {
+                // If auto-grade not found, use 0
+                pointsToAdd = 0;
+              }
+            } else {
+              // Use 0 for non-MC/non-matching questions if teacher hasn't provided a grade
+              pointsToAdd = 0;
+            }
+            
+            // Store the final grade for this question (whether auto or manual)
+            // This ensures questionGrades contains all grades for accurate recalculation
+            questionGradesMap.set(i.toString(), pointsToAdd);
+            
+            earnedPoints += pointsToAdd;
           }
           
           submission.finalGrade = earnedPoints; // Store actual points earned, not percentage
           submission.grade = submission.finalGrade;
+          submission.questionGrades = questionGradesMap; // Store as Map with all final grades
           submission.teacherApproved = true;
           submission.gradedBy = req.user._id;
           submission.gradedAt = new Date();
@@ -553,6 +697,25 @@ exports.gradeSubmission = async (req, res) => {
         submission.questionGrades = new Map(
           Object.entries(questionGrades).map(([key, value]) => [key, parseFloat(value) || 0])
         );
+        
+        // Recalculate final grade based on manual grades
+        const assignment = await Assignment.findById(submission.assignment);
+        if (assignment && assignment.questions) {
+          let earnedPoints = 0;
+          
+          for (let i = 0; i < assignment.questions.length; i++) {
+            const teacherGrade = submission.questionGrades.get(i.toString());
+            if (teacherGrade !== undefined) {
+              earnedPoints += teacherGrade;
+            }
+          }
+          
+          submission.finalGrade = earnedPoints;
+          submission.grade = submission.finalGrade;
+          submission.teacherApproved = true;
+          submission.gradedBy = req.user._id;
+          submission.gradedAt = new Date();
+        }
       }
     }
 

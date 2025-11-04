@@ -22,14 +22,49 @@ const AssignmentGrading = () => {
       const initialGrades = {};
       
       assignment.questions.forEach((question, index) => {
-        const autoGrade = getAutoGradeForQuestion(index);
-        // Initialize with auto-grade if available, otherwise with existing grade or 0
-        if (autoGrade !== null) {
-          initialGrades[index] = autoGrade;
-        } else if (selectedSubmission.questionGrades && selectedSubmission.questionGrades[index] !== undefined) {
-          initialGrades[index] = selectedSubmission.questionGrades[index];
+        // Load existing grades from questionGrades if available
+        // This includes all grades that were previously set (both auto and manual)
+        let existingGrade = null;
+        
+        if (selectedSubmission.questionGrades) {
+          if (selectedSubmission.questionGrades instanceof Map) {
+            existingGrade = selectedSubmission.questionGrades.get(index.toString());
+          } else if (typeof selectedSubmission.questionGrades === 'object') {
+            existingGrade = selectedSubmission.questionGrades[index] !== undefined 
+              ? selectedSubmission.questionGrades[index] 
+              : selectedSubmission.questionGrades[index.toString()];
+          }
+        }
+        
+        // Get auto-grade for comparison
+        const autoGrade = selectedSubmission.autoQuestionGrades instanceof Map
+          ? selectedSubmission.autoQuestionGrades.get(index.toString())
+          : selectedSubmission.autoQuestionGrades?.[index.toString()];
+        
+        if (question.type !== 'multiple-choice' && question.type !== 'matching') {
+          // Text questions - use existing grade if available, otherwise use auto-grade or 0
+          if (existingGrade !== null && existingGrade !== undefined) {
+            initialGrades[index] = existingGrade;
+          } else if (autoGrade !== null && autoGrade !== undefined) {
+            initialGrades[index] = autoGrade;
+          } else {
+            initialGrades[index] = 0;
+          }
         } else {
-          initialGrades[index] = 0;
+          // Auto-graded questions - only include if teacher manually changed it
+          // IMPORTANT: Don't include if stored value is 0 and auto-grade is non-zero
+          // This filters out incorrect stored data
+          if (existingGrade !== null && existingGrade !== undefined && 
+              autoGrade !== null && autoGrade !== undefined) {
+            const difference = Math.abs(existingGrade - autoGrade);
+            // Only include if significantly different AND it's a legitimate change
+            // (not just incorrect 0 stored when auto-grade is correct)
+            if (difference > 0.01 && !(existingGrade === 0 && autoGrade > 0)) {
+              // Teacher manually changed this auto-graded question
+              initialGrades[index] = existingGrade;
+            }
+          }
+          // Otherwise don't include it - backend will use auto-grade
         }
       });
       
@@ -77,8 +112,77 @@ const AssignmentGrading = () => {
       };
 
       // Only include questionGrades if not approving auto-grade
+      // Always send existing grades when re-grading to ensure backend recalculates correctly
       if (!approveGrade) {
-        payload.questionGrades = questionGrades;
+        // Build complete grades object: include all question grades from state
+        // The state should already have all existing grades loaded from the submission
+        const gradesToSend = {};
+        
+        // Send grades from state, but filter out auto-graded questions unless manually changed
+        // This ensures we don't send incorrect stored values for auto-graded questions
+        Object.keys(questionGrades).forEach(index => {
+          const gradeValue = questionGrades[index];
+          if (gradeValue !== undefined && gradeValue !== null) {
+            const questionIdx = parseInt(index);
+            const question = assignment?.questions?.[questionIdx];
+            
+            // For auto-graded questions, only send if teacher manually changed it
+            if (question && (question.type === 'multiple-choice' || question.type === 'matching')) {
+              const autoGrade = getAutoGradeForQuestion(questionIdx);
+              // Only send if it's different from auto-grade AND not incorrect stored data
+              // Filter out cases where stored value is 0 but auto-grade is correct (non-zero)
+              if (autoGrade !== null && autoGrade !== undefined) {
+                const difference = Math.abs(gradeValue - autoGrade);
+                if (difference > 0.01 && !(gradeValue === 0 && autoGrade > 0)) {
+                  // Teacher manually changed this auto-graded question
+                  gradesToSend[index.toString()] = gradeValue;
+                }
+              }
+              // Otherwise don't send - backend will use auto-grade
+            } else {
+              // Text questions - always send
+              gradesToSend[index.toString()] = gradeValue;
+            }
+          }
+        });
+        
+        // If questionGrades is empty but submission has existing grades, load them
+        if (Object.keys(gradesToSend).length === 0 && selectedSubmission.questionGrades) {
+          if (assignment && assignment.questions) {
+            assignment.questions.forEach((question, index) => {
+              let existingGrade = null;
+              
+              // Get existing grade from submission
+              if (selectedSubmission.questionGrades instanceof Map) {
+                existingGrade = selectedSubmission.questionGrades.get(index.toString());
+              } else if (typeof selectedSubmission.questionGrades === 'object') {
+                existingGrade = selectedSubmission.questionGrades[index] !== undefined 
+                  ? selectedSubmission.questionGrades[index] 
+                  : selectedSubmission.questionGrades[index.toString()];
+              }
+              
+              // Get auto-grade for comparison
+              const autoGrade = getAutoGradeForQuestion(index);
+              
+              if (question.type !== 'multiple-choice' && question.type !== 'matching') {
+                // Text questions - always send if grade exists
+                if (existingGrade !== null && existingGrade !== undefined) {
+                  gradesToSend[index.toString()] = existingGrade;
+                }
+              } else {
+                // Auto-graded questions - only send if manually changed
+                if (existingGrade !== null && existingGrade !== undefined && 
+                    autoGrade !== null && autoGrade !== undefined && 
+                    Math.abs(existingGrade - autoGrade) > 0.01) {
+                  gradesToSend[index.toString()] = existingGrade;
+                }
+              }
+            });
+          }
+        }
+        
+        // Always send questionGrades when grading with edits (even if empty, backend will use existing)
+        payload.questionGrades = gradesToSend;
       }
 
       const response = await axios.put(`/api/submissions/${selectedSubmission._id}`, payload, {
@@ -93,6 +197,25 @@ const AssignmentGrading = () => {
       );
       
       setSelectedSubmission(response.data);
+      
+      // Reset questionGrades to reflect the updated submission
+      const updatedGrades = {};
+      if (assignment && assignment.questions) {
+        assignment.questions.forEach((question, index) => {
+          // For text questions, use the grade from the response if available
+          if (response.data.questionGrades && response.data.questionGrades[index] !== undefined) {
+            updatedGrades[index] = response.data.questionGrades[index];
+          } else {
+            // Fallback to auto-grade for multiple-choice or 0 for text questions
+            const autoGrade = question.type === 'multiple-choice' ? 
+              (question.options.find(opt => opt.isCorrect) ? question.points : 0) : 
+              0;
+            updatedGrades[index] = autoGrade;
+          }
+        });
+      }
+      setQuestionGrades(updatedGrades);
+      
       setError('');
     } catch (err) {
       setError(err.response?.data?.message || 'Error grading submission');
@@ -108,24 +231,20 @@ const AssignmentGrading = () => {
       return;
     }
     
-    console.log('[Frontend] Attempting to delete submission:', selectedSubmission._id);
     setIsDeleting(true);
     try {
       const token = localStorage.getItem('token');
-      console.log('[Frontend] Making DELETE request to:', `/api/submissions/${selectedSubmission._id}`);
       
       const response = await axios.delete(`/api/submissions/${selectedSubmission._id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
-      console.log('[Frontend] Delete response:', response.data);
       
       // Remove the deleted submission from the list
       setSubmissions(prev => prev.filter(s => s._id !== selectedSubmission._id));
       setSelectedSubmission(null);
       setError('');
     } catch (err) {
-      console.error('[Frontend] Delete error:', err.response?.data || err.message);
+      console.error('Delete error:', err.response?.data || err.message);
       setError(err.response?.data?.message || 'Error deleting submission');
     } finally {
       setIsDeleting(false);
@@ -174,7 +293,6 @@ const AssignmentGrading = () => {
       try {
         return JSON.parse(answer);
       } catch (e) {
-        console.log(`Failed to parse matching answer for question ${questionIndex}:`, answer);
         return {};
       }
     }
@@ -387,6 +505,7 @@ const AssignmentGrading = () => {
                                 </label>
                                 <div className="flex items-center space-x-3">
                                   <input
+                                    key={`grade-${index}-${questionGrades[index] || 0}`}
                                     id={`grade-${index}`}
                                     name={`grade-${index}`}
                                     type="number"
@@ -397,6 +516,12 @@ const AssignmentGrading = () => {
                                       ...prev,
                                       [index]: parseFloat(e.target.value) || 0
                                     }))}
+                                    onFocus={(e) => {
+                                      // Clear the input when focused to allow easy editing
+                                      if (e.target.value === '0' || e.target.value === '') {
+                                        e.target.select();
+                                      }
+                                    }}
                                     className="w-20 p-2 border border-gray-300 rounded text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                   />
                                   {autoGrade !== null && (
@@ -413,6 +538,7 @@ const AssignmentGrading = () => {
                                 </label>
                                 <div className="flex items-center space-x-3">
                                   <input
+                                    key={`grade-${index}-${questionGrades[index] || 0}`}
                                     id={`grade-${index}`}
                                     name={`grade-${index}`}
                                     type="number"
@@ -423,6 +549,12 @@ const AssignmentGrading = () => {
                                       ...prev,
                                       [index]: parseFloat(e.target.value) || 0
                                     }))}
+                                    onFocus={(e) => {
+                                      // Clear the input when focused to allow easy editing
+                                      if (e.target.value === '0' || e.target.value === '') {
+                                        e.target.select();
+                                      }
+                                    }}
                                     className="w-20 p-2 border border-gray-300 rounded text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                   />
                                   {questionType === 'multiple-choice' && autoGrade !== null && (

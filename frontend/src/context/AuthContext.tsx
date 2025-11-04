@@ -45,16 +45,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               bio: userData.bio,
               profilePicture: userData.profilePicture
             });
+          } else {
+            // Invalid response, clear auth
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            setToken(null);
+            setUser(null);
           }
         })
         .catch(() => {
           localStorage.removeItem('token');
+          localStorage.removeItem('user');
           setToken(null);
+          setUser(null);
         })
         .finally(() => {
           setLoading(false);
         });
     } else {
+      // No token, clear user state
+      setUser(null);
       setLoading(false);
     }
   }, [token]);
@@ -79,10 +89,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signup = async (firstName: string, lastName: string, email: string, password: string, role: string) => {
-    console.log('Signup request data:', { firstName, lastName, email, password, role });
     try {
       const response = await api.post('/auth/register', { firstName, lastName, email, password, role });
-      console.log('Signup response:', response.data);
       const { token, user: userData } = response.data;
       // Map the user data to match our User interface
       const user = {
@@ -105,8 +113,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    // Clear all localStorage items related to auth
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    // Clear any course-related cached data
+    localStorage.removeItem('courseColors');
     setToken(null);
     setUser(null);
   };

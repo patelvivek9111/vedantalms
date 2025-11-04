@@ -24,7 +24,19 @@ const replySchema = new mongoose.Schema({
   feedback: {
     type: String,
     default: null
-  }
+  },
+  // Like/reaction system
+  likes: [{
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    likedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }]
 }, {
   timestamps: true
 });
@@ -115,7 +127,22 @@ const threadSchema = new mongoose.Schema({
       ref: 'User',
       default: null
     }
-  }]
+  }],
+  // Discussion settings
+  settings: {
+    requirePostBeforeSee: {
+      type: Boolean,
+      default: false
+    },
+    allowLikes: {
+      type: Boolean,
+      default: true
+    },
+    allowComments: {
+      type: Boolean,
+      default: true
+    }
+  }
 }, {
   timestamps: true
 });

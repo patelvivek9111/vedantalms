@@ -18,6 +18,8 @@ interface Course {
     description: string;
     prerequisites: string[];
     maxStudents: number;
+    creditHours?: number;
+    courseCode?: string;
     enrollmentDeadline: Date;
     startDate: Date;
     endDate: Date;
@@ -68,7 +70,6 @@ const Catalog: React.FC = () => {
           return; // Success, exit early
         }
       } catch (err: any) {
-        console.log('New route failed, trying fallback catalog route:', err.message);
       }
 
       // Fallback to the original catalog route
@@ -91,10 +92,13 @@ const Catalog: React.FC = () => {
   };
 
   const filteredCourses = courses.filter(course => {
-    const matchesSearch = course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         course.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         course.instructor.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         course.instructor.lastName.toLowerCase().includes(searchTerm.toLowerCase());
+    const searchLower = searchTerm.toLowerCase();
+    const matchesSearch = !searchTerm || 
+                         course.title.toLowerCase().includes(searchLower) ||
+                         course.catalog?.courseCode?.toLowerCase().includes(searchLower) ||
+                         course.description.toLowerCase().includes(searchLower) ||
+                         course.instructor.firstName.toLowerCase().includes(searchLower) ||
+                         course.instructor.lastName.toLowerCase().includes(searchLower);
     
     const matchesSubject = !selectedSubject || course.catalog?.subject === selectedSubject;
     
@@ -177,7 +181,7 @@ const Catalog: React.FC = () => {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
                 type="text"
-                placeholder="Search courses by title, description, or instructor..."
+                placeholder="Search courses by title, course code, description, or instructor..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -327,7 +331,7 @@ const CourseListItem: React.FC<CourseListItemProps> = ({ course, onEnroll, onUne
             {/* Course Info */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center space-x-2">
-                <h3 className="text-lg font-semibold text-gray-900">{course.title}</h3>
+                <h3 className="text-lg font-semibold text-gray-900">{course.catalog?.courseCode || course.title}</h3>
                 {course.catalog?.subject && (
                   <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
                     {course.catalog.subject}
@@ -340,6 +344,12 @@ const CourseListItem: React.FC<CourseListItemProps> = ({ course, onEnroll, onUne
                   <User className="w-4 h-4 mr-1" />
                   <span>{course.instructor.firstName} {course.instructor.lastName}</span>
                 </div>
+                {course.catalog?.creditHours && (
+                  <div className="flex items-center">
+                    <BookOpen className="w-4 h-4 mr-1" />
+                    <span>{course.catalog.creditHours} {course.catalog.creditHours === 1 ? 'Credit' : 'Credits'}</span>
+                  </div>
+                )}
                 <div className="flex items-center">
                   <Users className="w-4 h-4 mr-1" />
                   <span className={isCapacityOverridden ? 'text-orange-600 font-medium' : ''}>
@@ -407,6 +417,12 @@ const CourseListItem: React.FC<CourseListItemProps> = ({ course, onEnroll, onUne
                   <span className="text-gray-600">Instructor:</span>
                   <span className="font-medium">{course.instructor.firstName} {course.instructor.lastName}</span>
                 </div>
+                {course.catalog?.creditHours && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Credit Hours:</span>
+                    <span className="font-medium">{course.catalog.creditHours} {course.catalog.creditHours === 1 ? 'Credit' : 'Credits'}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-gray-600">Enrollment:</span>
                   <span className={`font-medium ${isCapacityOverridden ? 'text-orange-600' : ''}`}>

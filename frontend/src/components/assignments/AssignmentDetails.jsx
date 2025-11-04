@@ -15,6 +15,7 @@ const AssignmentDetails = () => {
   const [error, setError] = useState('');
   const [userRole, setUserRole] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
   const [answers, setAnswers] = useState({});
 
   useEffect(() => {
@@ -143,7 +144,6 @@ const AssignmentDetails = () => {
             <p className="mt-2 text-sm text-gray-600">
               Due: {format(new Date(assignment.dueDate), 'PPp')}
             </p>
-            {console.log('userRole:', userRole, 'assignment.submission:', assignment.submission)}
             {userRole === 'student' && assignment.submission && (
               <span className="ml-4 text-green-600">
                 Submitted: {format(new Date(assignment.submission.submittedAt), 'PPp')}

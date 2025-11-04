@@ -284,17 +284,7 @@ const Announcements: React.FC<AnnouncementsProps> = ({ courseId }) => {
           <h2 className="text-3xl font-bold text-gray-900 mb-2">Announcements</h2>
           <p className="text-gray-600">Stay updated with the latest course information</p>
         </div>
-        {!selectedAnnouncement && user && (user.role === 'teacher' || user.role === 'admin') && (
-          <button
-            onClick={() => setShowCreate(true)}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2 shadow-lg"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-            </svg>
-            New Announcement
-          </button>
-        )}
+        {/* Top "New Announcement" button removed; creation is available via the bottom "+ Announcement" button */}
       </div>
       
       {error && (

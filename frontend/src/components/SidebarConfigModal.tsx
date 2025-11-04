@@ -16,7 +16,9 @@ import {
   Users,
   CheckSquare,
   BookOpenCheck,
-  UserPlus
+  UserPlus,
+  GraduationCap,
+  ClipboardCheck
 } from 'lucide-react';
 import api from '../services/api';
 
@@ -30,9 +32,11 @@ interface SidebarItem {
 
 interface StudentVisibility {
   overview: boolean;
+  syllabus: boolean;
   modules: boolean;
   pages: boolean;
   assignments: boolean;
+  quizzes: boolean;
   discussions: boolean;
   announcements: boolean;
   polls: boolean;
@@ -56,9 +60,11 @@ interface SidebarConfigModalProps {
 
 const iconMap: { [key: string]: React.ComponentType<any> } = {
   overview: ClipboardList,
+  syllabus: GraduationCap,
   modules: BookOpen,
   pages: FileText,
   assignments: PenTool,
+  quizzes: ClipboardCheck,
   discussions: MessageSquare,
   announcements: Megaphone,
   polls: BarChart3,
@@ -97,7 +103,7 @@ const SidebarConfigModal: React.FC<SidebarConfigModalProps> = ({
       // Clean studentVisibility to ensure it only contains valid keys
       const cleanStudentVisibility = currentConfig.studentVisibility || {};
       const validKeys = [
-        'overview', 'modules', 'pages', 'assignments', 'discussions',
+        'overview', 'syllabus', 'modules', 'pages', 'assignments', 'quizzes', 'discussions',
         'announcements', 'polls', 'groups', 'attendance', 'grades',
         'gradebook', 'students'
       ];
@@ -175,24 +181,28 @@ const SidebarConfigModal: React.FC<SidebarConfigModalProps> = ({
   const resetToDefault = () => {
     const defaultItems: SidebarItem[] = [
       { id: 'overview', label: 'Overview', visible: true, order: 0, fixed: true },
-      { id: 'modules', label: 'Modules', visible: true, order: 1 },
-      { id: 'pages', label: 'Pages', visible: true, order: 2 },
-      { id: 'assignments', label: 'Assignments', visible: true, order: 3 },
-      { id: 'discussions', label: 'Discussions', visible: true, order: 4 },
-      { id: 'announcements', label: 'Announcements', visible: true, order: 5 },
-      { id: 'polls', label: 'Polls', visible: true, order: 6 },
-      { id: 'groups', label: 'Groups', visible: true, order: 7 },
-      { id: 'attendance', label: 'Attendance', visible: true, order: 8 },
-      { id: 'grades', label: 'Grades', visible: true, order: 9 },
-      { id: 'gradebook', label: 'Gradebook', visible: true, order: 10 },
-      { id: 'students', label: 'People', visible: true, order: 11 }
+      { id: 'syllabus', label: 'Syllabus', visible: true, order: 1 },
+      { id: 'modules', label: 'Modules', visible: true, order: 2 },
+      { id: 'pages', label: 'Pages', visible: true, order: 3 },
+      { id: 'assignments', label: 'Assignments', visible: true, order: 4 },
+      { id: 'quizzes', label: 'Quizzes', visible: true, order: 5 },
+      { id: 'discussions', label: 'Discussions', visible: true, order: 6 },
+      { id: 'announcements', label: 'Announcements', visible: true, order: 7 },
+      { id: 'polls', label: 'Polls', visible: true, order: 8 },
+      { id: 'groups', label: 'Groups', visible: true, order: 9 },
+      { id: 'attendance', label: 'Attendance', visible: true, order: 10 },
+      { id: 'grades', label: 'Grades', visible: true, order: 11 },
+      { id: 'gradebook', label: 'Gradebook', visible: true, order: 12 },
+      { id: 'students', label: 'People', visible: true, order: 13 }
     ];
 
     const defaultStudentVisibility: StudentVisibility = {
       overview: true,
+      syllabus: true,
       modules: true,
       pages: true,
       assignments: true,
+      quizzes: true,
       discussions: true,
       announcements: true,
       polls: true,
@@ -221,8 +231,6 @@ const SidebarConfigModal: React.FC<SidebarConfigModalProps> = ({
         fixed: item.fixed
       }));
 
-      // Debug: Log what we're sending
-      console.log('Sending sidebar config:', { items: cleanItems, studentVisibility });
       
       const response = await api.put(`/courses/${courseId}/sidebar-config`, {
         items: cleanItems,

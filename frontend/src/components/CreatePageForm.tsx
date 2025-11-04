@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useModule } from '../contexts/ModuleContext';
 import api from '../services/api';
+import RichTextEditor from './RichTextEditor';
 
 interface Module {
   _id: string;
@@ -26,6 +27,7 @@ const CreatePageForm: React.FC<CreatePageFormProps> = ({ modules, courseId, onSu
   const [selectedModule, setSelectedModule] = useState('');
   const [groupSets, setGroupSets] = useState<GroupSet[]>([]);
   const [selectedGroupSet, setSelectedGroupSet] = useState('');
+  const [attachments, setAttachments] = useState<File[]>([]);
   const { createPage } = useModule();
 
   useEffect(() => {
@@ -49,11 +51,12 @@ const CreatePageForm: React.FC<CreatePageFormProps> = ({ modules, courseId, onSu
       const payload: any = { title, content };
       if (selectedModule) payload.module = selectedModule;
       if (selectedGroupSet) payload.groupSet = selectedGroupSet;
-      await createPage(payload);
+      await createPage(payload, attachments);
       setTitle('');
       setContent('');
       setSelectedModule('');
       setSelectedGroupSet('');
+      setAttachments([]);
       onSuccess();
     } catch (error) {
       console.error('Error creating page:', error);
@@ -71,8 +74,8 @@ const CreatePageForm: React.FC<CreatePageFormProps> = ({ modules, courseId, onSu
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-      <div className="bg-white rounded-lg shadow-lg w-full max-w-lg p-8 relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+      <div className="bg-white rounded-xl shadow-2xl w-[90%] max-w-6xl h-[90vh] p-6 relative overflow-hidden flex flex-col">
         <button
           type="button"
           onClick={handleCancel}
@@ -81,8 +84,8 @@ const CreatePageForm: React.FC<CreatePageFormProps> = ({ modules, courseId, onSu
         >
           ×
         </button>
-        <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">Create New Page</h2>
-        <form onSubmit={handleSubmit}>
+        <h2 className="text-2xl font-bold mb-4 text-center text-gray-800">Create New Page</h2>
+        <form onSubmit={handleSubmit} className="flex-1 overflow-auto">
           <div className="mb-4">
             <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
               Page Title
@@ -97,18 +100,19 @@ const CreatePageForm: React.FC<CreatePageFormProps> = ({ modules, courseId, onSu
             />
           </div>
           <div className="mb-4">
-            <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-1">
-              Content
-            </label>
-            <textarea
-              id="content"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              rows={5}
+            <label className="block text-sm font-medium text-gray-700 mb-1">Content</label>
+            <RichTextEditor content={content} onChange={setContent} height={400} />
+          </div>
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Attachments (optional)</label>
+            <input
+              type="file"
+              multiple
+              onChange={(e) => setAttachments(Array.from(e.target.files || []))}
+              className="block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
             />
           </div>
-          <div className="mb-6 flex gap-4">
+          <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="flex-1">
               <label className="block text-sm font-medium text-gray-700 mb-1">Module</label>
               <select
@@ -148,7 +152,7 @@ const CreatePageForm: React.FC<CreatePageFormProps> = ({ modules, courseId, onSu
               </select>
             </div>
           </div>
-          <div className="flex justify-end space-x-2">
+          <div className="flex justify-end space-x-2 sticky bottom-0 bg-white py-3">
             <button
               type="button"
               onClick={handleCancel}

@@ -25,7 +25,7 @@ export function Signup() {
     
     try {
       await signup(firstName, lastName, email, password, role);
-      navigate('/');
+      navigate('/dashboard', { replace: true });
     } catch (err: any) {
       if (err.response?.data?.errors) {
         setErrors(err.response.data.errors);

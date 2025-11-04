@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { API_URL } from '../config';
 import { 
   Settings, 
   Shield, 
@@ -47,65 +49,96 @@ interface SystemConfig {
 }
 
 export function AdminSystemSettings() {
-  const [config, setConfig] = useState<SystemConfig>({
-    general: {
-      siteName: 'UIS Learning Management System',
-      siteDescription: 'A comprehensive learning management system',
-      maintenanceMode: false,
-      maxFileSize: 10,
-      allowedFileTypes: ['pdf', 'doc', 'docx', 'jpg', 'png', 'mp4']
-    },
-    security: {
-      passwordMinLength: 8,
-      requireStrongPassword: true,
-      sessionTimeout: 30,
-      maxLoginAttempts: 5,
-      enableTwoFactor: false
-    },
-    email: {
-      smtpHost: 'smtp.gmail.com',
-      smtpPort: 587,
-      smtpUser: 'admin@example.com',
-      smtpPassword: '',
-      fromEmail: 'noreply@example.com',
-      fromName: 'UIS LMS'
-    },
-    storage: {
-      maxStoragePerUser: 100,
-      compressionEnabled: true,
-      backupFrequency: 'daily',
-      retentionDays: 30
-    }
-  });
-  const [loading, setLoading] = useState(false);
+  const [config, setConfig] = useState<SystemConfig | null>(null);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('general');
   const [showPassword, setShowPassword] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const headers = { Authorization: `Bearer ${token}` };
+        
+        const response = await axios.get(`${API_URL}/api/admin/settings`, { headers });
+        
+        if (response.data.success) {
+          setConfig(response.data.data);
+        }
+      } catch (error) {
+        console.error('Error fetching system settings:', error);
+        setSaveMessage({ type: 'error', text: 'Failed to load system settings' });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSettings();
+  }, []);
 
   const handleConfigChange = (section: keyof SystemConfig, field: string, value: any) => {
+    if (!config) return;
+    
     setConfig(prev => ({
-      ...prev,
+      ...prev!,
       [section]: {
-        ...prev[section],
+        ...prev![section],
         [field]: value
       }
     }));
   };
 
   const handleSave = async () => {
+    if (!config) return;
+    
     setSaving(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setSaving(false);
-    // Show success message
+    setSaveMessage(null);
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      await axios.put(`${API_URL}/api/admin/settings`, config, { headers });
+      
+      setSaveMessage({ type: 'success', text: 'Settings saved successfully!' });
+      setTimeout(() => setSaveMessage(null), 3000);
+    } catch (error: any) {
+      console.error('Error saving settings:', error);
+      setSaveMessage({ 
+        type: 'error', 
+        text: error.response?.data?.message || 'Failed to save settings' 
+      });
+      setTimeout(() => setSaveMessage(null), 5000);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleTestEmail = async () => {
+    if (!config) return;
+    
     setLoading(true);
-    // Simulate email test
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setLoading(false);
-    // Show test result
+    setSaveMessage(null);
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      const response = await axios.post(`${API_URL}/api/admin/settings/test-email`, config.email, { headers });
+      
+      if (response.data.success) {
+        setSaveMessage({ type: 'success', text: response.data.message });
+      }
+    } catch (error: any) {
+      console.error('Error testing email:', error);
+      setSaveMessage({ 
+        type: 'error', 
+        text: error.response?.data?.message || 'Failed to test email configuration' 
+      });
+    } finally {
+      setLoading(false);
+      setTimeout(() => setSaveMessage(null), 5000);
+    }
   };
 
   const tabs = [
@@ -114,6 +147,24 @@ export function AdminSystemSettings() {
     { id: 'email', label: 'Email', icon: Bell },
     { id: 'storage', label: 'Storage', icon: Database }
   ];
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (!config) {
+    return (
+      <div className="p-6">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-800">Failed to load system settings. Please refresh the page.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -124,6 +175,15 @@ export function AdminSystemSettings() {
           <p className="text-gray-600">Configure system parameters and preferences</p>
         </div>
         <div className="flex items-center space-x-3">
+          {saveMessage && (
+            <div className={`px-4 py-2 rounded-lg ${
+              saveMessage.type === 'success' 
+                ? 'bg-green-50 text-green-800 border border-green-200' 
+                : 'bg-red-50 text-red-800 border border-red-200'
+            }`}>
+              {saveMessage.text}
+            </div>
+          )}
           <button
             onClick={handleSave}
             disabled={saving}

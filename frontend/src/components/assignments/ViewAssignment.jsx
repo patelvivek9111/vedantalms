@@ -6,6 +6,19 @@ import { format } from 'date-fns';
 import { Lock, Unlock, HelpCircle, CheckCircle, Circle, Bookmark, BarChart3, Edit, Eye } from 'lucide-react';
 import { API_URL } from '../../config';
 
+// Fisher-Yates shuffle algorithm for proper randomization
+const shuffleArray = (array) => {
+  if (!Array.isArray(array) || array.length === 0) {
+    return [];
+  }
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+};
+
 const ViewAssignment = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -28,6 +41,7 @@ const ViewAssignment = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [showTimer, setShowTimer] = useState(true);
   const [showUploadSection, setShowUploadSection] = useState(false);
+  const [shuffledOptions, setShuffledOptions] = useState({});
 
   // Teacher analytics state
   const [submissionStats, setSubmissionStats] = useState({
@@ -134,6 +148,18 @@ const ViewAssignment = () => {
         });
         setAssignment(assignmentRes.data);
 
+        // Initialize shuffled options for matching questions
+        if (assignmentRes.data.questions) {
+          const shuffled = {};
+          assignmentRes.data.questions.forEach((question, index) => {
+            if (question.type === 'matching' && Array.isArray(question.rightItems) && question.rightItems.length > 0) {
+              // Shuffle the rightItems to randomize the order using Fisher-Yates algorithm
+              shuffled[index] = shuffleArray([...question.rightItems]);
+            }
+          });
+          setShuffledOptions(shuffled);
+        }
+
         // Initialize answers object for student submission
         if (assignmentRes.data.questions) {
           const initialAnswers = {};
@@ -160,41 +186,73 @@ const ViewAssignment = () => {
         }
 
         // Always fetch submission for the current user
+        let hasSubmission = false;
         if (user?.role === 'student') {
           try {
             const submissionRes = await axios.get(`/api/submissions/student/${id}`, {
               headers: { 'Authorization': `Bearer ${token}` }
             });
             
-            setSubmission(submissionRes.data);
-            if (submissionRes.data?.answers) {
-              // Parse answers back to proper format
-              const parsedAnswers = {};
-              Object.keys(submissionRes.data.answers).forEach(questionIndex => {
-                const answer = submissionRes.data.answers[questionIndex];
-                try {
-                  // Try to parse as JSON for matching questions
-                  parsedAnswers[questionIndex] = JSON.parse(answer);
-                } catch (e) {
-                  // If parsing fails, it's a regular string answer
-                  parsedAnswers[questionIndex] = answer;
-                }
-              });
-              setAnswers(parsedAnswers);
+            if (submissionRes.data) {
+              hasSubmission = true;
+              setSubmission(submissionRes.data);
+              if (submissionRes.data?.answers) {
+                // Parse answers back to proper format
+                const parsedAnswers = {};
+                Object.keys(submissionRes.data.answers).forEach(questionIndex => {
+                  const answer = submissionRes.data.answers[questionIndex];
+                  try {
+                    // Try to parse as JSON for matching questions
+                    parsedAnswers[questionIndex] = JSON.parse(answer);
+                  } catch (e) {
+                    // If parsing fails, it's a regular string answer
+                    parsedAnswers[questionIndex] = answer;
+                  }
+                });
+                setAnswers(parsedAnswers);
+              }
             }
           } catch (err) {
             setSubmission(null);
-            // Reset answers to empty
-            if (assignmentRes.data.questions) {
-              const initialAnswers = {};
-              assignmentRes.data.questions.forEach((q, index) => {
-                if (q.type === 'matching') {
-                  initialAnswers[index] = {}; // Object for matching questions
-                } else {
-                  initialAnswers[index] = ''; // String for other question types
+            hasSubmission = false;
+          }
+          
+          // Load saved draft from localStorage if no submission exists
+          if (!hasSubmission && assignmentRes.data.questions) {
+            const draftKey = `assignment_draft_${id}_${user._id}`;
+            const savedDraft = localStorage.getItem(draftKey);
+            if (savedDraft) {
+              try {
+                const draft = JSON.parse(savedDraft);
+                if (draft.answers) {
+                  // Merge saved answers with initial structure
+                  const initialAnswers = {};
+                  assignmentRes.data.questions.forEach((q, index) => {
+                    if (q.type === 'matching') {
+                      initialAnswers[index] = {}; // Object for matching questions
+                    } else {
+                      initialAnswers[index] = ''; // String for other question types
+                    }
+                  });
+                  const mergedAnswers = { ...initialAnswers };
+                  Object.keys(draft.answers).forEach(key => {
+                    try {
+                      // Try to parse matching question answers
+                      mergedAnswers[key] = typeof draft.answers[key] === 'string' && draft.answers[key].startsWith('{') 
+                        ? JSON.parse(draft.answers[key]) 
+                        : draft.answers[key];
+                    } catch {
+                      mergedAnswers[key] = draft.answers[key];
+                    }
+                  });
+                  setAnswers(mergedAnswers);
                 }
-              });
-              setAnswers(initialAnswers);
+                if (draft.uploadedFiles) {
+                  setUploadedFiles(draft.uploadedFiles);
+                }
+              } catch (e) {
+                console.error('Error loading draft:', e);
+              }
             }
           }
         } else if (user?.role === 'teacher' || user?.role === 'admin') {
@@ -314,7 +372,25 @@ const ViewAssignment = () => {
         size: file.size
       }));
 
-      setUploadedFiles(prev => [...prev, ...newFiles]);
+      setUploadedFiles(prev => {
+        const updated = [...prev, ...newFiles];
+        
+        // Auto-save to localStorage if student and no submission exists
+        if (user?.role === 'student' && !submission && id) {
+          const draftKey = `assignment_draft_${id}_${user._id}`;
+          try {
+            const existingDraft = localStorage.getItem(draftKey);
+            const draft = existingDraft ? JSON.parse(existingDraft) : {};
+            draft.answers = answers;
+            draft.uploadedFiles = updated;
+            localStorage.setItem(draftKey, JSON.stringify(draft));
+          } catch (e) {
+            console.error('Error saving draft:', e);
+          }
+        }
+        
+        return updated;
+      });
     } catch (error) {
       console.error('Error uploading files:', error);
       setError('Error uploading files. Please try again.');
@@ -324,7 +400,25 @@ const ViewAssignment = () => {
   };
 
   const removeFile = (index) => {
-    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+    setUploadedFiles(prev => {
+      const updated = prev.filter((_, i) => i !== index);
+      
+      // Auto-save to localStorage if student and no submission exists
+      if (user?.role === 'student' && !submission && id) {
+        const draftKey = `assignment_draft_${id}_${user._id}`;
+        try {
+          const existingDraft = localStorage.getItem(draftKey);
+          const draft = existingDraft ? JSON.parse(existingDraft) : {};
+          draft.answers = answers;
+          draft.uploadedFiles = updated;
+          localStorage.setItem(draftKey, JSON.stringify(draft));
+        } catch (e) {
+          console.error('Error saving draft:', e);
+        }
+      }
+      
+      return updated;
+    });
   };
 
   const formatTime = (seconds) => {
@@ -338,10 +432,28 @@ const ViewAssignment = () => {
   };
 
   const handleAnswerChange = (questionIndex, value) => {
-    setAnswers(prev => ({
-      ...prev,
-      [questionIndex]: value
-    }));
+    setAnswers(prev => {
+      const newAnswers = {
+        ...prev,
+        [questionIndex]: value
+      };
+      
+      // Auto-save to localStorage if student and no submission exists
+      if (user?.role === 'student' && !submission && id) {
+        const draftKey = `assignment_draft_${id}_${user._id}`;
+        try {
+          const existingDraft = localStorage.getItem(draftKey);
+          const draft = existingDraft ? JSON.parse(existingDraft) : {};
+          draft.answers = newAnswers;
+          draft.uploadedFiles = uploadedFiles;
+          localStorage.setItem(draftKey, JSON.stringify(draft));
+        } catch (e) {
+          console.error('Error saving draft:', e);
+        }
+      }
+      
+      return newAnswers;
+    });
     
     // Update answered questions tracking
     const isAnswered = typeof value === 'object' ? 
@@ -428,10 +540,16 @@ const ViewAssignment = () => {
       setSubmission(response.data);
       setError('');
       
+      // Clear draft from localStorage after successful submission
+      if (user?._id && id) {
+        const draftKey = `assignment_draft_${id}_${user._id}`;
+        localStorage.removeItem(draftKey);
+      }
+      
       // Dispatch event to refresh ToDo panel
       window.dispatchEvent(new Event('assignmentSubmitted'));
     } catch (err) {
-      console.error('[Frontend] Submit error:', err.response?.status, err.response?.data);
+      console.error('Submit error:', err.response?.status, err.response?.data);
       setError(err.response?.data?.message || 'Error submitting assignment');
     } finally {
       setIsSubmitting(false);
@@ -931,6 +1049,91 @@ const ViewAssignment = () => {
                                 </label>
                               </div>
                             ))}
+                          </div>
+                        )}
+                        
+                        {assignment.questions[currentQuestion].type === 'matching' && (
+                          <div className="space-y-4">
+                            {/* Check if matching question has data */}
+                            {assignment.questions[currentQuestion].leftItems && 
+                             assignment.questions[currentQuestion].rightItems && 
+                             assignment.questions[currentQuestion].leftItems.length > 0 && 
+                             assignment.questions[currentQuestion].rightItems.length > 0 ? (
+                              <>
+                                {/* Only show reference columns for teachers/admins, not for students */}
+                                {(user?.role === 'teacher' || user?.role === 'admin') && (
+                                  <div className="grid grid-cols-2 gap-6">
+                                    {/* Left Column - Items to match */}
+                                    <div>
+                                      <h4 className="text-sm font-medium text-gray-700 mb-3">Items to Match</h4>
+                                      <div className="space-y-2">
+                                        {assignment.questions[currentQuestion].leftItems.map((leftItem, leftIndex) => (
+                                          <div key={leftItem.id || leftIndex} className="p-3 bg-gray-50 rounded-lg border">
+                                            <span className="text-sm font-medium text-gray-900">{leftItem.text}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    
+                                    {/* Right Column - All available options (shuffled) */}
+                                    <div>
+                                      <h4 className="text-sm font-medium text-gray-700 mb-3">Available Options</h4>
+                                      <div className="space-y-2">
+                                        {shuffledOptions[currentQuestion] && shuffledOptions[currentQuestion].map((rightItem, rightIndex) => (
+                                          <div key={rightItem.id || rightIndex} className="p-3 bg-gray-50 rounded-lg border">
+                                            <span className="text-sm font-medium text-gray-900">{rightItem.text}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {/* Matching Interface - Always show for students */}
+                                <div className="mt-6">
+                                  <h4 className="text-sm font-medium text-gray-700 mb-3">Your Matches</h4>
+                                  <div className="space-y-3">
+                                    {assignment.questions[currentQuestion].leftItems.map((leftItem, leftIndex) => (
+                                      <div key={leftItem.id || leftIndex} className="flex items-center space-x-3">
+                                        <div className="flex-1 p-2 bg-gray-50 rounded border">
+                                          <span className="text-sm text-gray-900">{leftItem.text}</span>
+                                        </div>
+                                        <span className="text-gray-400">→</span>
+                                        <select
+                                          value={answers[currentQuestion] && answers[currentQuestion][leftIndex] ? answers[currentQuestion][leftIndex] : ''}
+                                          onChange={(e) => {
+                                            const newAnswer = { ...answers[currentQuestion] };
+                                            newAnswer[leftIndex] = e.target.value;
+                                            handleAnswerChange(currentQuestion, newAnswer);
+                                          }}
+                                          className="flex-1 p-2 border border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500"
+                                        >
+                                          <option value="">Select match...</option>
+                                          {shuffledOptions[currentQuestion] && shuffledOptions[currentQuestion].map((rightItem, rightIndex) => (
+                                            <option key={rightItem.id || rightIndex} value={rightItem.text}>
+                                              {rightItem.text}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </>
+                            ) : (
+                              /* Show message when matching question has no data */
+                              <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded">
+                                <div className="flex items-center">
+                                  <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                  </svg>
+                                  <div>
+                                    <p className="font-medium">Matching Question Not Configured</p>
+                                    <p className="text-sm">This matching question has no items to match. Please contact your instructor to fix this question.</p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
                         
@@ -1545,30 +1748,14 @@ const ViewAssignment = () => {
                               {/* Show regular matching interface for non-submitted or non-auto-graded assignments */}
                               {(!submission || !submission.autoGraded) && (
                                 question.leftItems.map((leftItem, leftIndex) => {
-                                  // Create stable shuffled options based on question ID and left item index
-                                  const getShuffledOptions = () => {
-                                    if (!question.rightItems || question.rightItems.length === 0) {
-                                      return [];
-                                    }
-                                    
-                                    // Simple rotation based on left item index to create different orders
-                                    const rotation = leftIndex % question.rightItems.length;
-                                    const shuffled = [...question.rightItems];
-                                    
-                                    // Rotate the array by the rotation amount
-                                    for (let i = 0; i < rotation; i++) {
-                                      shuffled.push(shuffled.shift());
-                                    }
-                                    
-                                    return shuffled;
-                                  };
-                                  
-                                  const shuffledOptions = getShuffledOptions();
+                                  // Use the same shuffled options for all dropdowns in this question
+                                  // This ensures consistency - all dropdowns show the same shuffled order
+                                  const questionShuffledOptions = shuffledOptions[index] || (Array.isArray(question.rightItems) && question.rightItems.length > 0 ? shuffleArray([...question.rightItems]) : []);
                                   
                                   // Filter out already selected options from other dropdowns
                                   const currentAnswers = answers[index] || {};
                                   const selectedOptions = Object.values(currentAnswers).filter(option => option !== '');
-                                  const availableOptions = shuffledOptions.filter(option => 
+                                  const availableOptions = questionShuffledOptions.filter(option => 
                                     // Include the currently selected option for this dropdown
                                     currentAnswers[leftIndex] === option.text ||
                                     // Include options that haven't been selected in other dropdowns

@@ -2,8 +2,8 @@ import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { fetchConversations, fetchMessages, sendMessage, createConversation, searchUsers, toggleStar, moveConversation, bulkMoveConversations, bulkDeleteForever } from '../services/inboxService';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import api from '../services/api';
+import { getImageUrl } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { getImageUrl } from '../utils/apiUtils';
 import { Edit, Reply, Archive, Trash2, Search, ChevronLeft, CheckSquare, Paperclip, CheckSquare2 } from 'lucide-react';
 import RichTextEditor from '../components/RichTextEditor';
 
@@ -206,6 +206,8 @@ const Inbox: React.FC = () => {
         setConversations(prev => prev.map(c =>
           c._id === conv._id ? { ...c, unreadCount: 0 } : c
         ));
+        // Dispatch event to update sidebar unread count
+        window.dispatchEvent(new CustomEvent('inboxMessageRead'));
       }
       const msgs = await fetchMessages(conv._id);
       setMessages(msgs);
@@ -274,11 +276,12 @@ const Inbox: React.FC = () => {
       let recipients = composeRecipients.map(u => u._id);
       if (composeToGroup === 'sections') {
         // Fetch all students for the course
-        const res = await api.get(`/api/courses/${composeCourse}/students`);
+        const res = await api.get(`/courses/${composeCourse}/students`);
         recipients = res.data.map((u: any) => u._id);
       }
+      // For admins, course can be empty/null
       await api.post('/inbox/conversations', {
-        course: composeCourse,
+        course: user?.role === 'admin' ? null : composeCourse,
         participantIds: recipients,
         subject: composeSubject,
         body: composeBody,
@@ -290,6 +293,7 @@ const Inbox: React.FC = () => {
       setComposeBody('');
       setComposeToGroup('');
       setComposeGroupUsers([]);
+      setComposeCourse('');
       setSendIndividually(false); // reset
     } catch (err: any) {
       setComposeError(err.response?.data?.message || 'Failed to send message');
@@ -311,27 +315,47 @@ const Inbox: React.FC = () => {
 
   // Fetch group users when group or course changes
   useEffect(() => {
-    if (!composeCourse || !composeToGroup) return;
-    if (composeToGroup === 'teachers') {
-      if (user?.role === 'teacher' || user?.role === 'admin') {
-        // Teachers/Admins see all teachers and admins
+    if (!composeToGroup) return;
+    
+    if (user?.role === 'admin') {
+      // Admin can fetch all users without course requirement
+      if (composeToGroup === 'teachers') {
         api.get('/users/search?role=teacher,admin').then(res => {
           setComposeGroupUsers(res.data.data || []);
         });
-      } else {
-        // Students see only their course's instructor/admins
-        api.get(`/api/courses/${composeCourse}`).then(res => {
-          const instructor = res.data.data.instructor ? [res.data.data.instructor] : [];
-          // If course has admins assigned, add them here as well (extend as needed)
-          setComposeGroupUsers(instructor);
+      } else if (composeToGroup === 'students') {
+        api.get('/users/search?role=student').then(res => {
+          setComposeGroupUsers(res.data.data || []);
+        });
+      } else if (composeToGroup === 'admins') {
+        api.get('/users/search?role=admin').then(res => {
+          setComposeGroupUsers(res.data.data || []);
         });
       }
-    } else if (composeToGroup === 'students') {
-      api.get(`/api/courses/${composeCourse}/students`).then(res => {
-        setComposeGroupUsers(res.data || []);
-      });
-    } else if (composeToGroup === 'sections') {
-      setComposeGroupUsers([]);
+    } else {
+      // Non-admin users require course
+      if (!composeCourse) return;
+      if (composeToGroup === 'teachers') {
+        if (user?.role === 'teacher' || user?.role === 'admin') {
+          // Teachers/Admins see all teachers and admins
+          api.get('/users/search?role=teacher,admin').then(res => {
+            setComposeGroupUsers(res.data.data || []);
+          });
+        } else {
+          // Students see only their course's instructor/admins
+          api.get(`/courses/${composeCourse}`).then(res => {
+            const instructor = res.data.data.instructor ? [res.data.data.instructor] : [];
+            // If course has admins assigned, add them here as well (extend as needed)
+            setComposeGroupUsers(instructor);
+          });
+        }
+      } else if (composeToGroup === 'students') {
+        api.get(`/courses/${composeCourse}/students`).then(res => {
+          setComposeGroupUsers(res.data || []);
+        });
+      } else if (composeToGroup === 'sections') {
+        setComposeGroupUsers([]);
+      }
     }
   }, [composeCourse, composeToGroup, user]);
 
@@ -355,32 +379,55 @@ const Inbox: React.FC = () => {
     }
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
     searchTimeout.current = setTimeout(() => {
+      // If admin, search all users without role filter (unless group is selected)
+      // Otherwise, use role filter based on group selection
       let roleParam = '';
-      if (composeToGroup === 'teachers') {
-        roleParam = user?.role === 'teacher' || user?.role === 'admin' ? 'teacher,admin' : 'teacher';
-      } else if (composeToGroup === 'students') {
-        roleParam = 'student';
+      if (user?.role === 'admin') {
+        // Admin can search all users, but respect group selection if set
+        if (composeToGroup === 'teachers') {
+          roleParam = 'teacher,admin';
+        } else if (composeToGroup === 'students') {
+          roleParam = 'student';
+        }
+        // If no group selected, search all users (no role filter)
+      } else {
+        // Non-admin users use existing logic
+        if (composeToGroup === 'teachers') {
+          roleParam = user?.role === 'teacher' || user?.role === 'admin' ? 'teacher,admin' : 'teacher';
+        } else if (composeToGroup === 'students') {
+          roleParam = 'student';
+        }
       }
-      api.get(`/users/search?name=${encodeURIComponent(composeToInput)}&role=${roleParam}`)
+      
+      // Build search URL - if admin and no role filter, search without role param
+      const searchUrl = roleParam 
+        ? `/users/search?name=${encodeURIComponent(composeToInput)}&email=${encodeURIComponent(composeToInput)}&role=${roleParam}`
+        : `/users/search?name=${encodeURIComponent(composeToInput)}&email=${encodeURIComponent(composeToInput)}`;
+      
+      api.get(searchUrl)
         .then(res => setComposeUserResults(res.data.data || []))
         .catch(() => setComposeUserResults([]));
     }, 300);
     return () => { if (searchTimeout.current) clearTimeout(searchTimeout.current); };
   }, [composeToInput, composeToGroup, user]);
 
-  // Fetch user-specific courses for the main dropdown
+  // Fetch user-specific courses for the main dropdown - Skip for admins
   useEffect(() => {
+    if (user?.role === 'admin') {
+      // Admins don't need course options
+      return;
+    }
     api.get('/courses').then(res => {
       const userCourses = (res.data.data || []).map((c: any) => ({ value: c._id, label: c.title }));
       setCourseOptions([{ value: 'all', label: 'All Courses' }, ...userCourses]);
     });
-  }, []);
+  }, [user]);
 
   // Memoize filteredConversations to prevent infinite loops
   const filteredConversations = useMemo(() => {
     return conversations.filter(conv => {
-      // Course filter
-      if (selectedCourse !== 'all' && conv.course !== selectedCourse) return false;
+      // Course filter - Skip for admins
+      if (user?.role !== 'admin' && selectedCourse !== 'all' && conv.course !== selectedCourse) return false;
       // Folder filter (find participant for current user)
       const participant = conv.participants.find((p: any) => p._id === currentUserId);
       const folder = participant?.folder || conv.folder || 'inbox';
@@ -406,7 +453,7 @@ const Inbox: React.FC = () => {
       }
       return true;
     });
-  }, [conversations, selectedCourse, selectedFolder, search, currentUserId]);
+  }, [conversations, selectedCourse, selectedFolder, search, currentUserId, user]);
 
   useEffect(() => {
     setSelectedConversations(prev =>
@@ -434,24 +481,26 @@ const Inbox: React.FC = () => {
     <div className="flex flex-col h-full min-h-[80vh] bg-gray-100 dark:bg-gray-900">
       {/* Top Bar */}
       <div className="flex items-center gap-2 px-6 py-3 border-b bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-sm sticky top-0 z-20" style={{ minHeight: 64 }}>
-        {/* Course Dropdown */}
-        <div className="relative">
-          <select
-            id="topbar-course-dropdown"
-            name="topbarCourseDropdown"
-            className="appearance-none border border-gray-200 dark:border-gray-700 rounded px-3 py-2 text-sm bg-white dark:bg-gray-900 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-200"
-            value={selectedCourse}
-            onChange={e => setSelectedCourse(e.target.value)}
-            style={{ minWidth: 140 }}
-          >
-            {courseOptions.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-          <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400">
-            ▼
-          </span>
-        </div>
+        {/* Course Dropdown - Hide for admins */}
+        {user?.role !== 'admin' && (
+          <div className="relative">
+            <select
+              id="topbar-course-dropdown"
+              name="topbarCourseDropdown"
+              className="appearance-none border border-gray-200 dark:border-gray-700 rounded px-3 py-2 text-sm bg-white dark:bg-gray-900 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              value={selectedCourse}
+              onChange={e => setSelectedCourse(e.target.value)}
+              style={{ minWidth: 140 }}
+            >
+              {courseOptions.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400">
+              ▼
+            </span>
+          </div>
+        )}
         {/* Folder Dropdown */}
         <div className="relative">
           <select
@@ -537,28 +586,30 @@ const Inbox: React.FC = () => {
               <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 text-2xl" onClick={() => setShowCompose(false)}>&times;</button>
               <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-4 text-xl font-semibold">Compose Message</div>
               <form onSubmit={handleCompose} className="px-6 py-4">
-                {/* Course Dropdown */}
-                <div className="mb-4 flex items-center">
-                  <label htmlFor="compose-course" className="w-20 text-gray-700 font-medium">Course</label>
-                  <select
-                    id="compose-course"
-                    name="course"
-                    className="border border-gray-200 dark:border-gray-700 rounded px-3 py-2 text-sm bg-white dark:bg-gray-900 flex-1"
-                    value={composeCourse}
-                    onChange={e => { setComposeCourse(e.target.value); setComposeToGroup(''); setComposeGroupUsers([]); }}
-                  >
-                    {composeCourseOptions.map((c: any) => (
-                      <option key={c._id} value={c._id}>{c.title}</option>
-                    ))}
-                  </select>
-                </div>
+                {/* Course Dropdown - Hide for admins */}
+                {user?.role !== 'admin' && (
+                  <div className="mb-4 flex items-center">
+                    <label htmlFor="compose-course" className="w-20 text-gray-700 font-medium">Course</label>
+                    <select
+                      id="compose-course"
+                      name="course"
+                      className="border border-gray-200 dark:border-gray-700 rounded px-3 py-2 text-sm bg-white dark:bg-gray-900 flex-1"
+                      value={composeCourse}
+                      onChange={e => { setComposeCourse(e.target.value); setComposeToGroup(''); setComposeGroupUsers([]); }}
+                    >
+                      {composeCourseOptions.map((c: any) => (
+                        <option key={c._id} value={c._id}>{c.title}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 {/* To Field with group selection */}
                 <div className="mb-4 flex items-center relative" ref={composeToDropdownRef}>
                   <span className="w-20 text-gray-700 font-medium">To</span>
                   <div className="flex-1 relative">
                     <div id="compose-to" className="flex items-center border border-gray-200 dark:border-gray-700 rounded px-3 py-2 bg-white dark:bg-gray-900 cursor-text">
                       <div className="flex flex-wrap gap-1 flex-1 min-w-0">
-                        {composeToGroup === 'sections' ? (
+                        {composeToGroup === 'sections' && user?.role !== 'admin' ? (
                           composeCourse ? (
                             <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs flex items-center">
                               All Students in {composeCourseOptions.find(c => c._id === composeCourse)?.title || 'Course'}
@@ -569,9 +620,38 @@ const Inbox: React.FC = () => {
                           )
                         ) : (
                           composeRecipients.map((u) => (
-                            <span key={u._id} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs flex items-center">
-                              {u.firstName} {u.lastName}
-                              <button type="button" className="ml-1 text-xs text-red-500" onClick={e => { e.stopPropagation(); handleRemoveRecipient(u._id); }}>&times;</button>
+                            <span key={u._id} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs flex items-center gap-1.5">
+                              <div className="relative flex-shrink-0">
+                                {u.profilePicture ? (
+                                  <img
+                                    src={u.profilePicture.startsWith('http') ? u.profilePicture : getImageUrl(u.profilePicture)}
+                                    alt={`${u.firstName} ${u.lastName}`}
+                                    className="w-5 h-5 rounded-full object-cover border border-blue-300"
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                      const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                      if (fallback) {
+                                        fallback.style.display = 'flex';
+                                      }
+                                    }}
+                                  />
+                                ) : null}
+                                {/* Fallback avatar with initials */}
+                                <div
+                                  className={`w-5 h-5 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center text-white text-[10px] font-bold ${
+                                    u.profilePicture ? 'hidden' : 'flex'
+                                  }`}
+                                  style={{
+                                    display: u.profilePicture ? 'none' : 'flex'
+                                  }}
+                                >
+                                  {u.firstName?.charAt(0) || ''}
+                                  {u.lastName?.charAt(0) || ''}
+                                </div>
+                              </div>
+                              <span>{u.firstName} {u.lastName}</span>
+                              {u.role && <span className="text-[10px] opacity-75">({u.role})</span>}
+                              <button type="button" className="ml-0.5 text-xs text-red-500 hover:text-red-700" onClick={e => { e.stopPropagation(); handleRemoveRecipient(u._id); }}>&times;</button>
                             </span>
                           ))
                         )}
@@ -582,7 +662,7 @@ const Inbox: React.FC = () => {
                             id="compose-to-input"
                             name="composeToInput"
                             className="flex-1 min-w-24 outline-none border-none bg-transparent text-sm"
-                            placeholder={composeRecipients.length === 0 ? 'Type name or email...' : ''}
+                            placeholder={composeRecipients.length === 0 ? (user?.role === 'admin' ? 'Type name or email to search users...' : 'Type name or email...') : ''}
                             value={composeToInput}
                             onChange={e => { setComposeToInput(e.target.value); setShowGroupDropdown(false); }}
                             onFocus={() => { setShowGroupDropdown(false); }}
@@ -600,25 +680,72 @@ const Inbox: React.FC = () => {
                         <CheckSquare2 size={20} />
                       </button>
                     </div>
-                    {/* Group dropdown only when icon is clicked */}
+                    {/* Group dropdown only when icon is clicked - Hide for admins or show modified options */}
                     {showGroupDropdown && !composeToGroup && (
                       <div className="absolute left-0 top-12 w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded shadow z-20">
-                        <div className="px-4 py-2 text-red-600 hover:bg-gray-100 cursor-pointer" onClick={() => { setComposeToGroup('teachers'); setShowGroupDropdown(false); }}>Teachers</div>
-                        <div className="px-4 py-2 text-red-600 hover:bg-gray-100 cursor-pointer" onClick={() => { setComposeToGroup('students'); setShowGroupDropdown(false); }}>Students</div>
-                        <div className="px-4 py-2 text-red-600 hover:bg-gray-100 cursor-pointer" onClick={() => { setComposeToGroup('sections'); setShowGroupDropdown(false); setComposeCourse(''); }}>Course Sections</div>
+                        {user?.role === 'admin' ? (
+                          // Admin sees simplified options
+                          <>
+                            <div className="px-4 py-2 text-blue-600 hover:bg-gray-100 cursor-pointer" onClick={() => { setComposeToGroup('teachers'); setShowGroupDropdown(false); }}>All Teachers</div>
+                            <div className="px-4 py-2 text-green-600 hover:bg-gray-100 cursor-pointer" onClick={() => { setComposeToGroup('students'); setShowGroupDropdown(false); }}>All Students</div>
+                            <div className="px-4 py-2 text-purple-600 hover:bg-gray-100 cursor-pointer" onClick={() => { setComposeToGroup('admins'); setShowGroupDropdown(false); }}>All Admins</div>
+                          </>
+                        ) : (
+                          // Non-admin users see course-based options
+                          <>
+                            <div className="px-4 py-2 text-red-600 hover:bg-gray-100 cursor-pointer" onClick={() => { setComposeToGroup('teachers'); setShowGroupDropdown(false); }}>Teachers</div>
+                            <div className="px-4 py-2 text-red-600 hover:bg-gray-100 cursor-pointer" onClick={() => { setComposeToGroup('students'); setShowGroupDropdown(false); }}>Students</div>
+                            <div className="px-4 py-2 text-red-600 hover:bg-gray-100 cursor-pointer" onClick={() => { setComposeToGroup('sections'); setShowGroupDropdown(false); setComposeCourse(''); }}>Course Sections</div>
+                          </>
+                        )}
                       </div>
                     )}
                     {/* User search results dropdown */}
                     {composeToInput.length >= 2 && composeUserResults.length > 0 && (
                       <div className="absolute left-0 top-12 w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded shadow z-20 max-h-48 overflow-y-auto">
                         {composeUserResults.map((u: any) => (
-                          <div key={u._id} className="px-4 py-2 hover:bg-blue-100 cursor-pointer" onClick={() => { handleAddRecipient(u); setComposeToInput(''); setComposeUserResults([]); }}>
-                            {u.firstName} {u.lastName} ({u.email})
+                          <div key={u._id} className="px-4 py-2 hover:bg-blue-100 cursor-pointer flex items-center gap-3" onClick={() => { handleAddRecipient(u); setComposeToInput(''); setComposeUserResults([]); }}>
+                            <div className="relative flex-shrink-0">
+                              {u.profilePicture ? (
+                                <img
+                                  src={u.profilePicture.startsWith('http') ? u.profilePicture : getImageUrl(u.profilePicture)}
+                                  alt={`${u.firstName} ${u.lastName}`}
+                                  className="w-8 h-8 rounded-full object-cover border-2 border-gray-200"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                    const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                    if (fallback) {
+                                      fallback.style.display = 'flex';
+                                    }
+                                  }}
+                                />
+                              ) : null}
+                              {/* Fallback avatar with initials */}
+                              <div
+                                className={`w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold ${
+                                  u.profilePicture ? 'hidden' : 'flex'
+                                }`}
+                                style={{
+                                  display: u.profilePicture ? 'none' : 'flex'
+                                }}
+                              >
+                                {u.firstName?.charAt(0) || ''}
+                                {u.lastName?.charAt(0) || ''}
+                              </div>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium text-gray-900">
+                                {u.firstName} {u.lastName}
+                              </div>
+                              <div className="text-xs text-gray-500 truncate">
+                                {u.email} {u.role && `• ${u.role}`}
+                              </div>
+                            </div>
                           </div>
                         ))}
                       </div>
                     )}
-                    {/* Dropdown for users in group (for Teachers/Students) */}
+                    {/* Dropdown for users in group (for Teachers/Students/Admins) */}
                     {composeToGroup && composeToGroup !== 'sections' && composeGroupUsers.length > 0 && !composeToInput && (
                       <div className="absolute left-0 top-12 w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded shadow z-20 max-h-48 overflow-y-auto">
                         <div className="flex items-center px-2 py-2 border-b cursor-pointer hover:bg-gray-100" onClick={() => setComposeToGroup('')}>
@@ -626,14 +753,49 @@ const Inbox: React.FC = () => {
                           <span className="ml-2 text-gray-600 text-sm">Back</span>
                         </div>
                         {composeGroupUsers.map((u: any) => (
-                          <div key={u._id} className="px-4 py-2 hover:bg-blue-100 cursor-pointer" onClick={() => { handleAddRecipient(u); setComposeToGroup(''); }}>
-                            {u.firstName} {u.lastName} ({u.email})
+                          <div key={u._id} className="px-4 py-2 hover:bg-blue-100 cursor-pointer flex items-center gap-3" onClick={() => { handleAddRecipient(u); setComposeToGroup(''); }}>
+                            <div className="relative flex-shrink-0">
+                              {u.profilePicture ? (
+                                <img
+                                  src={u.profilePicture.startsWith('http') ? u.profilePicture : getImageUrl(u.profilePicture)}
+                                  alt={`${u.firstName} ${u.lastName}`}
+                                  className="w-8 h-8 rounded-full object-cover border-2 border-gray-200"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                    const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                    if (fallback) {
+                                      fallback.style.display = 'flex';
+                                    }
+                                  }}
+                                />
+                              ) : null}
+                              {/* Fallback avatar with initials */}
+                              <div
+                                className={`w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold ${
+                                  u.profilePicture ? 'hidden' : 'flex'
+                                }`}
+                                style={{
+                                  display: u.profilePicture ? 'none' : 'flex'
+                                }}
+                              >
+                                {u.firstName?.charAt(0) || ''}
+                                {u.lastName?.charAt(0) || ''}
+                              </div>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium text-gray-900">
+                                {u.firstName} {u.lastName}
+                              </div>
+                              <div className="text-xs text-gray-500 truncate">
+                                {u.email} {u.role && `• ${u.role}`}
+                              </div>
+                            </div>
                           </div>
                         ))}
                       </div>
                     )}
-                    {/* Dropdown for course selection when Course Sections is selected */}
-                    {composeToGroup === 'sections' && !composeCourse && (
+                    {/* Dropdown for course selection when Course Sections is selected - Hide for admins */}
+                    {user?.role !== 'admin' && composeToGroup === 'sections' && !composeCourse && (
                       <div className="absolute left-0 top-12 w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded shadow z-20 max-h-48 overflow-y-auto">
                         <div className="flex items-center px-2 py-2 border-b cursor-pointer hover:bg-gray-100" onClick={() => setComposeToGroup('')}>
                           <ChevronLeft size={18} />
@@ -784,7 +946,7 @@ const Inbox: React.FC = () => {
                             <img
                               src={otherParticipants[0].profilePicture.startsWith('http')
                                 ? otherParticipants[0].profilePicture
-                                : getImageUrl(otherParticipants[0].profilePicture)}
+                                : `http://localhost:5000${otherParticipants[0].profilePicture}`}
                               alt={participantNames}
                               className="w-8 h-8 object-cover rounded-full"
                             />
@@ -827,7 +989,13 @@ const Inbox: React.FC = () => {
                           <span className="ml-2 bg-blue-500 text-white text-xs rounded-full px-2 py-0.5">{conv.unreadCount}</span>
                         )}
                       </div>
-                      <div className="truncate text-xs text-gray-500 mt-1">{conv.lastMessage ? conv.lastMessage.body : <span className="italic text-gray-400">No messages</span>}</div>
+                      <div className="truncate text-xs text-gray-500 mt-1">
+                        {conv.lastMessage ? (
+                          conv.lastMessage.body.replace(/<[^>]*>/g, '')
+                        ) : (
+                          <span className="italic text-gray-400">No messages</span>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -874,7 +1042,7 @@ const Inbox: React.FC = () => {
                                 <img
                                   src={msg.senderId.profilePicture.startsWith('http')
                                     ? msg.senderId.profilePicture
-                                    : getImageUrl(msg.senderId.profilePicture)}
+                                    : `http://localhost:5000${msg.senderId.profilePicture}`}
                                   alt={senderName}
                                   className="w-10 h-10 object-cover rounded-full"
                                 />
@@ -900,9 +1068,10 @@ const Inbox: React.FC = () => {
                         
                         {/* Email Body */}
                         <div className="pl-13">
-                          <div className="text-gray-900 dark:text-gray-100 whitespace-pre-line break-words leading-relaxed">
-                            {msg.body}
-                          </div>
+                          <div 
+                            className="text-gray-900 dark:text-gray-100 break-words leading-relaxed prose prose-sm max-w-none"
+                            dangerouslySetInnerHTML={{ __html: msg.body }}
+                          />
                         </div>
                       </div>
                     );

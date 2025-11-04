@@ -19,6 +19,8 @@ import {
   HardDrive
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import axios from 'axios';
+import { API_URL } from '../config';
 
 interface SystemStats {
   totalUsers: number;
@@ -53,42 +55,39 @@ export function AdminDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate loading system stats
-    setTimeout(() => {
-      setSystemStats({
-        totalUsers: 1247,
-        totalCourses: 89,
-        activeUsers: 892,
-        totalAssignments: 156,
-        systemHealth: 'excellent',
-        storageUsed: 234,
-        storageTotal: 1000
-      });
-      setRecentActivity([
-        {
-          id: '1',
-          type: 'user_registration',
-          description: 'New student registered: John Doe',
-          timestamp: '2 minutes ago',
-          severity: 'low'
-        },
-        {
-          id: '2',
-          type: 'course_creation',
-          description: 'New course created: Advanced Mathematics',
-          timestamp: '15 minutes ago',
-          severity: 'medium'
-        },
-        {
-          id: '3',
-          type: 'system_alert',
-          description: 'High storage usage detected',
-          timestamp: '1 hour ago',
-          severity: 'high'
+    const fetchData = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const headers = { Authorization: `Bearer ${token}` };
+
+        // Fetch system stats
+        const statsResponse = await axios.get(`${API_URL}/api/admin/stats`, { headers });
+        if (statsResponse.data.success) {
+          setSystemStats({
+            totalUsers: statsResponse.data.data.totalUsers || 0,
+            totalCourses: statsResponse.data.data.totalCourses || 0,
+            activeUsers: statsResponse.data.data.activeUsers || 0,
+            totalAssignments: statsResponse.data.data.totalAssignments || 0,
+            systemHealth: statsResponse.data.data.systemHealth || 'good',
+            storageUsed: statsResponse.data.data.storageUsed || 0,
+            storageTotal: statsResponse.data.data.storageTotal || 1000
+          });
         }
-      ]);
-      setLoading(false);
-    }, 1000);
+
+        // Fetch recent activity
+        const activityResponse = await axios.get(`${API_URL}/api/admin/activity?limit=10`, { headers });
+        if (activityResponse.data.success) {
+          setRecentActivity(activityResponse.data.data || []);
+        }
+      } catch (error) {
+        console.error('Error fetching admin dashboard data:', error);
+        // Keep default values on error
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
   }, []);
 
   const getHealthColor = (health: string) => {
@@ -249,7 +248,7 @@ export function AdminDashboard() {
           </div>
         </Link>
 
-        <Link to="/admin/system" className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow">
+        <Link to="/admin/settings" className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow">
           <div className="flex items-center">
             <div className="p-3 bg-orange-100 rounded-lg">
               <Settings className="w-8 h-8 text-orange-600" />

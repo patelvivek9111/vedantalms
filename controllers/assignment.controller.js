@@ -25,6 +25,7 @@ exports.createAssignment = async (req, res) => {
       isGroupAssignment: req.body.isGroupAssignment === 'true' || req.body.isGroupAssignment === true,
       groupSet: req.body.groupSet || null,
       group,
+      isGradedQuiz: req.body.isGradedQuiz === 'true' || req.body.isGradedQuiz === true,
       isTimedQuiz: req.body.isTimedQuiz === 'true' || req.body.isTimedQuiz === true,
       quizTimeLimit: req.body.quizTimeLimit ? parseInt(req.body.quizTimeLimit) : null,
       allowStudentUploads: req.body.allowStudentUploads === 'true' || req.body.allowStudentUploads === true,
@@ -32,7 +33,8 @@ exports.createAssignment = async (req, res) => {
       showCorrectAnswers: req.body.showCorrectAnswers === 'true' || req.body.showCorrectAnswers === true,
       showStudentAnswers: req.body.showStudentAnswers === 'true' || req.body.showStudentAnswers === true
     };
-    if (moduleId) {
+    // Only set module for non-group assignments
+    if (moduleId && !assignmentData.isGroupAssignment) {
       assignmentData.module = moduleId;
     }
 
@@ -59,7 +61,7 @@ exports.getModuleAssignments = async (req, res) => {
       module: req.params.moduleId,
       ...(isStudent ? { published: true } : {})
     })
-      .populate('createdBy', 'firstName lastName')
+      .populate('createdBy', 'firstName lastName profilePicture')
       .sort({ createdAt: -1 });
     // Add totalPoints to each assignment
     const assignmentsWithPoints = assignments.map(a => {
@@ -80,7 +82,7 @@ exports.getModuleAssignments = async (req, res) => {
 exports.getAssignment = async (req, res) => {
   try {
     const assignment = await Assignment.findById(req.params.id)
-      .populate('createdBy', 'firstName lastName')
+      .populate('createdBy', 'firstName lastName profilePicture')
       .populate('module', 'title');
       
     if (!assignment) {
@@ -134,6 +136,7 @@ exports.updateAssignment = async (req, res) => {
     assignment.dueDate = dueDate || assignment.dueDate;
     assignment.attachments = newAttachments.length > 0 ? newAttachments : assignment.attachments;
     if (group !== undefined) assignment.group = group;
+    if (req.body.isGradedQuiz !== undefined) assignment.isGradedQuiz = req.body.isGradedQuiz === 'true' || req.body.isGradedQuiz === true;
     if (req.body.isTimedQuiz !== undefined) assignment.isTimedQuiz = req.body.isTimedQuiz === 'true' || req.body.isTimedQuiz === true;
     if (req.body.quizTimeLimit !== undefined) assignment.quizTimeLimit = req.body.quizTimeLimit ? parseInt(req.body.quizTimeLimit) : null;
     if (req.body.allowStudentUploads !== undefined) assignment.allowStudentUploads = req.body.allowStudentUploads === 'true' || req.body.allowStudentUploads === true;
@@ -179,6 +182,15 @@ exports.updateAssignment = async (req, res) => {
             options: q.type === 'multiple-choice' ? q.options.map(opt => ({
               text: opt.text,
               isCorrect: opt.isCorrect
+            })) : undefined,
+            // Handle matching questions
+            leftItems: q.type === 'matching' && q.leftItems ? q.leftItems.map(item => ({
+              id: item.id || new mongoose.Types.ObjectId().toString(),
+              text: item.text
+            })) : undefined,
+            rightItems: q.type === 'matching' && q.rightItems ? q.rightItems.map(item => ({
+              id: item.id || new mongoose.Types.ObjectId().toString(),
+              text: item.text
             })) : undefined
           }));
         }
@@ -283,7 +295,7 @@ exports.getGroupSetAssignments = async (req, res) => {
       isGroupAssignment: true,
       groupSet: groupSetId
     })
-      .populate('createdBy', 'firstName lastName')
+      .populate('createdBy', 'firstName lastName profilePicture')
       .sort({ createdAt: -1 });
     res.json(assignments);
   } catch (error) {
@@ -307,7 +319,7 @@ exports.getCourseGroupAssignments = async (req, res) => {
         match: { course: courseId },
         select: 'name course'
       })
-      .populate('createdBy', 'firstName lastName')
+      .populate('createdBy', 'firstName lastName profilePicture')
       .sort({ createdAt: -1 });
     const courseGroupAssignments = assignments.filter(assignment => assignment.groupSet);
     if (courseGroupAssignments.length > 0) {
@@ -422,6 +434,102 @@ exports.getStudentAssignmentsDueThisWeek = async (req, res) => {
     res.json(filtered);
   } catch (err) {
     console.error('Error in getStudentAssignmentsDueThisWeek:', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Get all items due this week for the current student (assignments + discussions)
+exports.getAllItemsDueThisWeek = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const now = new Date();
+    const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+    const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
+    
+    // Find assignments where dueDate is this week and user is enrolled
+    const assignments = await Assignment.find({
+      dueDate: { $gte: weekStart, $lte: weekEnd },
+      published: true,
+    })
+      .populate({
+        path: 'module',
+        populate: {
+          path: 'course',
+          select: 'title'
+        }
+      })
+      .sort({ dueDate: 1 })
+      .lean();
+    
+    // Find discussions where dueDate is this week and user is enrolled
+    const Thread = require('../models/thread.model');
+    const discussions = await Thread.find({
+      dueDate: { $gte: weekStart, $lte: weekEnd },
+      published: true,
+    })
+      .populate({
+        path: 'module',
+        populate: {
+          path: 'course',
+          select: 'title'
+        }
+      })
+      .populate('course', 'title')
+      .sort({ dueDate: 1 })
+      .lean();
+    
+    // Filter out assignments already submitted by this student
+    const Submission = require('../models/Submission');
+    const Group = require('../models/Group');
+    
+    // Get individual submissions by this student
+    const individualSubmissions = await Submission.find({ 
+      student: userId,
+      group: { $exists: false }
+    }).distinct('assignment');
+    
+    // Get group submissions where this student is a member
+    const userGroups = await Group.find({ members: userId }).distinct('_id');
+    const groupSubmissions = await Submission.find({ 
+      group: { $in: userGroups }
+    }).distinct('assignment');
+    
+    // Combine all submitted assignment IDs
+    const submittedIds = new Set([
+      ...individualSubmissions.map(id => id.toString()),
+      ...groupSubmissions.map(id => id.toString())
+    ]);
+    
+    // Filter out submitted assignments
+    const filteredAssignments = assignments.filter(a => !submittedIds.has(a._id.toString()));
+    
+    // Filter out discussions where student has already posted
+    const filteredDiscussions = discussions.filter(d => {
+      // Check if student has posted in this discussion
+      const hasPosted = d.replies && d.replies.some(reply => 
+        reply.author && reply.author.toString() === userId.toString()
+      );
+      return !hasPosted;
+    });
+    
+    // Combine and format results
+    const allItems = [
+      ...filteredAssignments.map(item => ({
+        ...item,
+        type: 'assignment',
+        itemType: 'Assignment'
+      })),
+      ...filteredDiscussions.map(item => ({
+        ...item,
+        type: 'discussion',
+        itemType: 'Discussion',
+        module: item.module || { course: item.course }
+      }))
+    ].sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+    
+    res.json(allItems);
+  } catch (err) {
+    console.error('Error in getAllItemsDueThisWeek:', err);
     res.status(500).json({ error: err.message });
   }
 }; 

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { format } from 'date-fns';
 import { API_URL } from '../../config';
+import ProfileImage from '../ProfileImage';
 
 interface Attachment {
   _id: string;
@@ -14,6 +15,7 @@ interface User {
   _id: string;
   firstName: string;
   lastName: string;
+  profilePicture?: string;
 }
 
 interface Assignment {
@@ -33,6 +35,7 @@ interface AssignmentListProps {
   studentId?: string;
   submissionMap?: { [key: string]: string };
   courseId?: string;
+  isQuizzesView?: boolean;
 }
 
 const TABS = [
@@ -43,7 +46,7 @@ const TABS = [
   { label: 'Discussions', value: 'discussion' },
 ];
 
-const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: propAssignments, userRole, studentSubmissions, studentId, submissionMap, courseId }) => {
+const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: propAssignments, userRole, studentSubmissions, studentId, submissionMap, courseId, isQuizzesView = false }) => {
   const navigate = useNavigate();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [discussions, setDiscussions] = useState<any[]>([]);
@@ -70,8 +73,8 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
         navigate(`/discussions/${item._id}/view`);
       }
     } else {
-      // For assignments, go to details page first
-      navigate(`/assignments/${item._id}`);
+      // For assignments, go to details page with /view route
+      navigate(`/assignments/${item._id}/view`);
     }
   };
 
@@ -97,7 +100,7 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
           threadsRes = await axios.get(`/api/threads?module=${moduleId}`, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined);
         }
         // Only include graded discussions
-        const gradedDiscussions = (threadsRes.data || []).filter((thread: any) => thread.isGraded);
+        const gradedDiscussions = (threadsRes.data.data || threadsRes.data || []).filter((thread: any) => thread.isGraded);
         setDiscussions(gradedDiscussions);
         setLoading(false);
       } catch (err) {
@@ -358,7 +361,7 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
       {/* Tabs */}
       {isTeacherOrAdmin && (
         <div className="flex space-x-2 border-b border-gray-200 dark:border-gray-700 mb-4">
-          {TABS.map(tab => (
+          {(isQuizzesView ? TABS.filter(tab => tab.value !== 'assignment' && tab.value !== 'discussion') : TABS).map(tab => (
             <button
               key={tab.value}
               className={`px-4 py-2 -mb-px border-b-2 font-medium text-sm focus:outline-none ${selectedTab === tab.value ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-500 hover:text-indigo-600'}`}
@@ -390,9 +393,9 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
                 </th>
               )}
               <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Group</th>
+              {!isQuizzesView && <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Group</th>}
               <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Due Date</th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Points</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{isQuizzesView ? 'Total Points' : 'Points'}</th>
               {isTeacherOrAdmin && <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>}
               {isTeacherOrAdmin && <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>}
             </tr>
@@ -401,7 +404,7 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
             {userRole === 'student' && filteredGroupedAssignments.length > 0 ? (
               filteredGroupedAssignments.map(group => [
                 <tr key={group.label}>
-                  <td colSpan={5} className="bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-semibold py-2 pl-2">{group.label}</td>
+                  <td colSpan={isQuizzesView ? 3 : 4} className="bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-semibold py-2 pl-2">{group.label}</td>
                 </tr>,
                 ...group.items.map(item => {
                   const dueDate = item.dueDate ? new Date(item.dueDate) : null;
@@ -414,11 +417,13 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
                       <td className="px-4 py-2">
                         <span className="text-indigo-700 font-medium hover:underline">{item.title}</span>
                       </td>
-                      <td className="px-4 py-2 text-sm text-gray-600">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getGroupColor(item.group)}`}>
-                          {item.group}
-                        </span>
-                      </td>
+                      {!isQuizzesView && (
+                        <td className="px-4 py-2 text-sm text-gray-600">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getGroupColor(item.group)}`}>
+                            {item.group}
+                          </span>
+                        </td>
+                      )}
                       <td className="px-4 py-2 text-sm text-gray-600">{dueDate ? format(dueDate, 'PPp') : '-'}</td>
                       <td className="px-4 py-2 text-sm text-gray-600">{item.totalPoints}</td>
                     </tr>
@@ -428,7 +433,7 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
             ) : isTeacherOrAdmin ? (
               flatList.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-6 text-gray-400">No assignments found</td>
+                  <td colSpan={isQuizzesView ? 6 : 7} className="text-center py-6 text-gray-400">No {isQuizzesView ? 'quizzes' : 'assignments'} found</td>
                 </tr>
               ) : (
                 flatList.map(item => {
@@ -445,11 +450,13 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
                       <td className="px-4 py-2">
                         <span className="text-indigo-700 font-medium hover:underline">{item.title}</span>
                       </td>
-                      <td className="px-4 py-2 text-sm text-gray-600">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getGroupColor(item.group)}`}>
-                          {item.group}
-                        </span>
-                      </td>
+                      {!isQuizzesView && (
+                        <td className="px-4 py-2 text-sm text-gray-600">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getGroupColor(item.group)}`}>
+                            {item.group}
+                          </span>
+                        </td>
+                      )}
                       <td className="px-4 py-2 text-sm text-gray-600">{dueDate ? format(dueDate, 'PPp') : '-'}</td>
                       <td className="px-4 py-2 text-sm text-gray-600">{item.totalPoints}</td>
                       <td className="px-4 py-2">
@@ -477,7 +484,7 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
               )
             ) : (
               <tr>
-                <td colSpan={isTeacherOrAdmin ? 7 : 5} className="text-center py-6 text-gray-400">No assignments found</td>
+                <td colSpan={isTeacherOrAdmin ? (isQuizzesView ? 6 : 7) : (isQuizzesView ? 3 : 4)} className="text-center py-6 text-gray-400">No {isQuizzesView ? 'quizzes' : 'assignments'} found</td>
               </tr>
             )}
           </tbody>

@@ -48,6 +48,11 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
   const [groupSets, setGroupSets] = useState<GroupSet[]>([]);
   const [isGroupDiscussion, setIsGroupDiscussion] = useState(false);
   const [selectedGroupSet, setSelectedGroupSet] = useState('');
+  
+  // New state for discussion settings
+  const [requirePostBeforeSee, setRequirePostBeforeSee] = useState(false);
+  const [allowLikes, setAllowLikes] = useState(true);
+  const [allowComments, setAllowComments] = useState(true);
 
   // Set default groupset if provided
   useEffect(() => {
@@ -91,7 +96,12 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
         isGraded,
         totalPoints: isGraded ? totalPoints : null,
         group: selectedGroup,
-        dueDate: dueDate ? new Date(dueDate).toISOString() : null
+        dueDate: dueDate ? new Date(dueDate).toISOString() : null,
+        settings: {
+          requirePostBeforeSee,
+          allowLikes,
+          allowComments
+        }
       };
 
       // Add groupset if this is a group discussion
@@ -120,6 +130,9 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
         setSelectedModule('');
         setIsGroupDiscussion(false);
         setSelectedGroupSet('');
+        setRequirePostBeforeSee(false);
+        setAllowLikes(true);
+        setAllowComments(true);
       } else {
         setError('Failed to create thread');
       }
@@ -135,8 +148,8 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl">
-        <div className="flex justify-between items-center p-6 border-b">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+        <div className="flex justify-between items-center p-6 border-b flex-shrink-0">
           <h2 className="text-2xl font-semibold text-gray-800">Create New Discussion Thread</h2>
           <button
             onClick={onClose}
@@ -148,7 +161,8 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6">
+        <div className="flex-1 overflow-y-auto">
+          <form id="create-thread-form" onSubmit={handleSubmit} className="p-6">
           {error && (
             <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
               {error}
@@ -296,6 +310,52 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
             )}
           </div>
 
+          {/* Discussion Settings */}
+          <div className="mb-4 space-y-4">
+            <h3 className="text-lg font-medium text-gray-800">Discussion Settings</h3>
+            
+            <div className="space-y-3">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="requirePostBeforeSee"
+                  checked={requirePostBeforeSee}
+                  onChange={(e) => setRequirePostBeforeSee(e.target.checked)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="requirePostBeforeSee" className="ml-2 block text-sm text-gray-700">
+                  Users must post before seeing replies
+                </label>
+              </div>
+              
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="allowLikes"
+                  checked={allowLikes}
+                  onChange={(e) => setAllowLikes(e.target.checked)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="allowLikes" className="ml-2 block text-sm text-gray-700">
+                  Allow liking
+                </label>
+              </div>
+              
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="allowComments"
+                  checked={allowComments}
+                  onChange={(e) => setAllowComments(e.target.checked)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="allowComments" className="ml-2 block text-sm text-gray-700">
+                  Allow comments
+                </label>
+              </div>
+            </div>
+          </div>
+
           <div className="mb-4">
             <label htmlFor="module" className="block text-sm font-medium text-gray-700 mb-1">
               Module (optional)
@@ -312,24 +372,26 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
               ))}
             </select>
           </div>
+          </form>
+        </div>
 
-          <div className="flex justify-end space-x-3 mt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting || !title.trim() || !content.trim() || (isGroupDiscussion && !selectedGroupSet)}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSubmitting ? 'Creating...' : 'Create Thread'}
-            </button>
-          </div>
-        </form>
+        <div className="flex justify-end space-x-3 p-6 border-t bg-gray-50 flex-shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="create-thread-form"
+            disabled={isSubmitting || !title.trim() || !content.trim() || (isGroupDiscussion && !selectedGroupSet)}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSubmitting ? 'Creating...' : 'Create Thread'}
+          </button>
+        </div>
       </div>
     </div>
   );

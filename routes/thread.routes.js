@@ -71,7 +71,18 @@ router.get('/groupset/:groupSetId', protect, async (req, res) => {
 // Create a new thread
 router.post('/', protect, authorize(['teacher', 'admin']), async (req, res) => {
   try {
-    const { title, content, courseId, module, isGraded, totalPoints, group, dueDate, groupSet } = req.body;
+    const { 
+      title, 
+      content, 
+      courseId, 
+      module, 
+      isGraded, 
+      totalPoints, 
+      group, 
+      dueDate, 
+      groupSet,
+      settings 
+    } = req.body;
     
     const thread = new Thread({
       title,
@@ -83,7 +94,12 @@ router.post('/', protect, authorize(['teacher', 'admin']), async (req, res) => {
       isGraded: isGraded || false,
       totalPoints: isGraded ? totalPoints : null,
       group: group || 'Discussions',
-      dueDate: dueDate || null
+      dueDate: dueDate || null,
+      settings: {
+        requirePostBeforeSee: settings?.requirePostBeforeSee || false,
+        allowLikes: settings?.allowLikes !== undefined ? settings.allowLikes : true,
+        allowComments: settings?.allowComments !== undefined ? settings.allowComments : true
+      }
     });
 
     await thread.save();
@@ -117,10 +133,16 @@ router.get('/:threadId', protect, async (req, res) => {
       .populate('groupSet', 'name')
       .populate({
         path: 'replies',
-        populate: {
-          path: 'author',
-          select: 'firstName lastName role profilePicture'
-        }
+        populate: [
+          {
+            path: 'author',
+            select: 'firstName lastName role profilePicture'
+          },
+          {
+            path: 'likes.user',
+            select: 'firstName lastName'
+          }
+        ]
       });
 
     if (!thread) {
@@ -201,10 +223,16 @@ router.post('/:threadId/replies', protect, async (req, res) => {
       .populate('studentGrades.gradedBy', 'firstName lastName')
       .populate({
         path: 'replies',
-        populate: {
-          path: 'author',
-          select: 'firstName lastName role profilePicture'
-        }
+        populate: [
+          {
+            path: 'author',
+            select: 'firstName lastName role profilePicture'
+          },
+          {
+            path: 'likes.user',
+            select: 'firstName lastName'
+          }
+        ]
       });
 
     res.json({
@@ -240,7 +268,7 @@ router.put('/:threadId', protect, async (req, res) => {
       });
     }
 
-    const { title, content, isGraded, totalPoints, group, dueDate, module, groupSet } = req.body;
+    const { title, content, isGraded, totalPoints, group, dueDate, module, groupSet, settings } = req.body;
     thread.title = title || thread.title;
     thread.content = content || thread.content;
     thread.isGraded = isGraded !== undefined ? isGraded : thread.isGraded;
@@ -249,6 +277,15 @@ router.put('/:threadId', protect, async (req, res) => {
     thread.dueDate = dueDate || thread.dueDate;
     if (module !== undefined) thread.module = module;
     if (groupSet !== undefined) thread.groupSet = groupSet;
+    
+    // Update settings if provided
+    if (settings) {
+      thread.settings = {
+        requirePostBeforeSee: settings.requirePostBeforeSee !== undefined ? settings.requirePostBeforeSee : thread.settings.requirePostBeforeSee,
+        allowLikes: settings.allowLikes !== undefined ? settings.allowLikes : thread.settings.allowLikes,
+        allowComments: settings.allowComments !== undefined ? settings.allowComments : thread.settings.allowComments
+      };
+    }
 
     await thread.save();
     
@@ -259,10 +296,16 @@ router.put('/:threadId', protect, async (req, res) => {
       .populate('groupSet', 'name')
       .populate({
         path: 'replies',
-        populate: {
-          path: 'author',
-          select: 'firstName lastName role profilePicture'
-        }
+        populate: [
+          {
+            path: 'author',
+            select: 'firstName lastName role profilePicture'
+          },
+          {
+            path: 'likes.user',
+            select: 'firstName lastName'
+          }
+        ]
       });
 
     res.json({
@@ -374,10 +417,16 @@ router.post('/:threadId/grade', protect, authorize(['teacher', 'admin']), async 
       .populate('studentGrades.gradedBy', 'firstName lastName')
       .populate({
         path: 'replies',
-        populate: {
-          path: 'author',
-          select: 'firstName lastName role profilePicture'
-        }
+        populate: [
+          {
+            path: 'author',
+            select: 'firstName lastName role profilePicture'
+          },
+          {
+            path: 'likes.user',
+            select: 'firstName lastName'
+          }
+        ]
       });
 
     res.json({
@@ -451,10 +500,16 @@ router.patch('/:threadId/pin', protect, authorize(['teacher', 'admin']), async (
       .populate('studentGrades.gradedBy', 'firstName lastName')
       .populate({
         path: 'replies',
-        populate: {
-          path: 'author',
-          select: 'firstName lastName role profilePicture'
-        }
+        populate: [
+          {
+            path: 'author',
+            select: 'firstName lastName role profilePicture'
+          },
+          {
+            path: 'likes.user',
+            select: 'firstName lastName'
+          }
+        ]
       });
 
     res.json({
@@ -470,23 +525,32 @@ router.patch('/:threadId/pin', protect, authorize(['teacher', 'admin']), async (
   }
 });
 
-// Get all graded threads for a module
+// Get all threads for a module (both graded and non-graded)
 router.get('/module/:moduleId', protect, async (req, res) => {
   try {
-    const threads = await Thread.find({ module: req.params.moduleId, isGraded: true })
+    const threads = await Thread.find({ module: req.params.moduleId })
       .populate('author', 'firstName lastName role profilePicture')
       .populate('studentGrades.student', 'firstName lastName')
       .populate('studentGrades.gradedBy', 'firstName lastName')
       .populate({
         path: 'replies',
-        populate: {
-          path: 'author',
-          select: '_id firstName lastName role profilePicture'
-        }
+        populate: [
+          {
+            path: 'author',
+            select: 'firstName lastName role profilePicture'
+          },
+          {
+            path: 'likes.user',
+            select: 'firstName lastName'
+          }
+        ]
       })
-      .sort({ dueDate: 1 });
+      .sort({ lastActivity: -1 });
 
-    res.json(threads);
+    res.json({
+      success: true,
+      data: threads
+    });
   } catch (error) {
     console.error('Error fetching module threads:', error);
     res.status(500).json({
@@ -511,6 +575,140 @@ router.patch('/threads/:id/publish', protect, authorize(['teacher', 'admin']), a
   } catch (error) {
     console.error('Error publishing/unpublishing thread:', error);
     res.status(500).json({ success: false, message: 'Error publishing/unpublishing thread' });
+  }
+});
+
+// Like/Unlike a reply
+router.post('/:threadId/replies/:replyId/like', protect, async (req, res) => {
+  try {
+    const thread = await Thread.findById(req.params.threadId);
+    
+    if (!thread) {
+      return res.status(404).json({
+        success: false,
+        message: 'Thread not found'
+      });
+    }
+
+    // Check if likes are allowed
+    if (!thread.settings.allowLikes) {
+      return res.status(400).json({
+        success: false,
+        message: 'Likes are not allowed for this discussion'
+      });
+    }
+
+    const reply = thread.replies.id(req.params.replyId);
+    
+    if (!reply) {
+      return res.status(404).json({
+        success: false,
+        message: 'Reply not found'
+      });
+    }
+
+    const existingLikeIndex = reply.likes.findIndex(
+      like => like.user.toString() === req.user._id.toString()
+    );
+
+    if (existingLikeIndex > -1) {
+      // Unlike - remove the like
+      reply.likes.splice(existingLikeIndex, 1);
+    } else {
+      // Like - add the like
+      reply.likes.push({
+        user: req.user._id,
+        likedAt: new Date()
+      });
+    }
+
+    await thread.save();
+
+    const updatedThread = await Thread.findById(thread._id)
+      .populate('author', 'firstName lastName role profilePicture')
+      .populate('studentGrades.student', 'firstName lastName')
+      .populate('studentGrades.gradedBy', 'firstName lastName')
+      .populate({
+        path: 'replies',
+        populate: [
+          {
+            path: 'author',
+            select: 'firstName lastName role profilePicture'
+          },
+          {
+            path: 'likes.user',
+            select: 'firstName lastName'
+          }
+        ]
+      });
+
+    res.json({
+      success: true,
+      data: updatedThread
+    });
+  } catch (error) {
+    console.error('Error liking/unliking reply:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating like status'
+    });
+  }
+});
+
+// Get thread with filtered replies based on user participation
+router.get('/:threadId/participant/:userId', protect, async (req, res) => {
+  try {
+    const thread = await Thread.findById(req.params.threadId)
+      .populate('author', 'firstName lastName role profilePicture')
+      .populate('studentGrades.student', 'firstName lastName')
+      .populate('studentGrades.gradedBy', 'firstName lastName')
+      .populate('groupSet', 'name')
+      .populate({
+        path: 'replies',
+        populate: [
+          {
+            path: 'author',
+            select: 'firstName lastName role profilePicture'
+          },
+          {
+            path: 'likes.user',
+            select: 'firstName lastName'
+          }
+        ]
+      });
+
+    if (!thread) {
+      return res.status(404).json({
+        success: false,
+        message: 'Thread not found'
+      });
+    }
+
+    // If "require post before see" is enabled and user is a student
+    if (thread.settings.requirePostBeforeSee && req.user.role === 'student') {
+      // Check if the user has posted in this thread
+      const userHasPosted = thread.replies.some(reply => 
+        reply.author._id.toString() === req.user._id.toString()
+      );
+
+      if (!userHasPosted) {
+        // Filter out all replies except the original post
+        thread.replies = thread.replies.filter(reply => 
+          reply.author._id.toString() === thread.author._id.toString()
+        );
+      }
+    }
+
+    res.json({
+      success: true,
+      data: thread
+    });
+  } catch (error) {
+    console.error('Error fetching thread for participant:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching thread'
+    });
   }
 });
 

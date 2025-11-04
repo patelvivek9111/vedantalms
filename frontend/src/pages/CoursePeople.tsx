@@ -53,15 +53,11 @@ const CoursePeople: React.FC = () => {
 
         // Fetch enrollment requests directly from the course
         if (isTeacherOrAdmin) {
-          console.log('Fetching enrollment requests for course:', courseId);
           try {
             const requestsRes = await api.get(`/courses/${courseId}/enrollment-requests`);
-            console.log('Enrollment requests response:', requestsRes.data);
             setEnrollmentRequests(requestsRes.data);
           } catch (err: any) {
-            console.error('Error fetching enrollment requests:', err);
-            console.error('Error response:', err.response?.data);
-            // Don't set error for enrollment requests, just log it
+            // Don't set error for enrollment requests
           }
         }
       } catch (err: any) {
@@ -140,61 +136,6 @@ const CoursePeople: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto py-8">
       <h1 className="text-3xl font-bold text-gray-900 mb-8">Course People</h1>
-
-      {/* SUPER OBVIOUS DEBUG SECTION - SHOULD BE IMPOSSIBLE TO MISS */}
-      <div className="mb-6 p-4 bg-red-500 text-white border-4 border-red-700 rounded-lg">
-        <h3 className="font-bold text-white mb-2 text-xl">🚨 SUPER OBVIOUS DEBUG SECTION 🚨</h3>
-        <p><strong>Course ID:</strong> {courseId || 'undefined'}</p>
-        <p><strong>User Role:</strong> {user?.role || 'undefined'}</p>
-        <p><strong>Is Teacher/Admin:</strong> {isTeacherOrAdmin ? 'YES' : 'NO'}</p>
-        <p><strong>Loading:</strong> {loading ? 'YES' : 'NO'}</p>
-        <p><strong>Error:</strong> {error || 'none'}</p>
-        <p><strong>Students Count:</strong> {students.length}</p>
-        <p><strong>Enrollment Requests Count:</strong> {enrollmentRequests.length}</p>
-        <p><strong>Timestamp:</strong> {new Date().toLocaleTimeString()}</p>
-      </div>
-
-      {/* Simple Debug Section - Shows for all users */}
-      <div className="mb-6 p-4 bg-yellow-100 border border-yellow-300 rounded-lg">
-        <h3 className="font-bold text-yellow-800 mb-2">DEBUG INFO:</h3>
-        <p><strong>Course ID:</strong> {courseId || 'undefined'}</p>
-        <p><strong>User Role:</strong> {user?.role || 'undefined'}</p>
-        <p><strong>Is Teacher/Admin:</strong> {isTeacherOrAdmin ? 'YES' : 'NO'}</p>
-        <p><strong>Loading:</strong> {loading ? 'YES' : 'NO'}</p>
-        <p><strong>Error:</strong> {error || 'none'}</p>
-        <p><strong>Students Count:</strong> {students.length}</p>
-        <p><strong>Enrollment Requests Count:</strong> {enrollmentRequests.length}</p>
-      </div>
-
-      {/* Debug Section - Remove this after fixing */}
-      {isTeacherOrAdmin && (
-        <div className="mb-6 p-4 bg-blue-100 border border-blue-300 rounded-lg">
-          <h3 className="font-bold text-blue-800 mb-2">TEACHER DEBUG INFO:</h3>
-          <p><strong>Course ID:</strong> {courseId || 'undefined'}</p>
-          <p><strong>User Role:</strong> {user?.role || 'undefined'}</p>
-          <p><strong>Is Teacher/Admin:</strong> {isTeacherOrAdmin ? 'YES' : 'NO'}</p>
-          <p><strong>Enrollment Requests Count:</strong> {enrollmentRequests.length}</p>
-          <p><strong>Enrollment Requests Data:</strong> {JSON.stringify(enrollmentRequests, null, 2)}</p>
-          
-          <button 
-            onClick={async () => {
-              try {
-                console.log('Testing API call for course:', courseId);
-                const response = await api.get(`/courses/${courseId}/enrollment-requests`);
-                console.log('Test API response:', response.data);
-                alert(`API call successful! Found ${response.data.length} enrollment requests. Check console for details.`);
-                setEnrollmentRequests(response.data);
-              } catch (err: any) {
-                console.error('Test API call failed:', err);
-                alert('Test API call failed: ' + err.message);
-              }
-            }}
-            className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            Test Enrollment Requests API
-          </button>
-        </div>
-      )}
 
       {/* Enrollment Requests */}
       {isTeacherOrAdmin && (

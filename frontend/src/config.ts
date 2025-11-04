@@ -1,3 +1,1 @@
-import { getApiBaseUrl } from './utils/apiUtils';
-
-export const API_URL = getApiBaseUrl(); 
+export const API_URL = 'http://localhost:5000'; 

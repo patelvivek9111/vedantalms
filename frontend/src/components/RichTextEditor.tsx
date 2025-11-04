@@ -6,16 +6,17 @@ interface RichTextEditorProps {
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
+  height?: number;
 }
 
-const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, placeholder, className }) => {
+const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, placeholder, className, height }) => {
   return (
     <Editor
       apiKey="gm5axo7z7bcihdlgxc1cyco7y5fczucedjgtm419lvc1sk5s"
       value={content}
       onEditorChange={onChange}
       init={{
-        height: 200,
+        height: height || 200,
         menubar: false,
         plugins: [
           'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview', 'anchor',

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 
@@ -21,11 +21,14 @@ interface Course {
   createdAt: string;
   updatedAt: string;
   published?: boolean;
+  defaultColor?: string;
   catalog?: {
     subject: string;
     description: string;
     prerequisites: string[];
     maxStudents: number;
+    creditHours?: number;
+    courseCode?: string;
     enrollmentDeadline: Date;
     startDate: Date;
     endDate: Date;
@@ -35,6 +38,10 @@ interface Course {
     allowTeacherEnrollment: boolean;
     isPublic: boolean;
   };
+  semester?: {
+    term: string;
+    year: number;
+  };
   enrollmentRequests?: any[];
   waitlist?: any[];
 }
@@ -43,8 +50,8 @@ interface CourseContextType {
   courses: Course[];
   loading: boolean;
   error: string | null;
-  createCourse: (title: string, description: string, catalogData?: any) => Promise<void>;
-  updateCourse: (id: string, title: string, description: string, catalogData?: any) => Promise<void>;
+  createCourse: (title: string, description: string, catalogData?: any, semesterData?: any) => Promise<void>;
+  updateCourse: (id: string, title?: string, description?: string, catalogData?: any, semesterData?: any, defaultColor?: string) => Promise<void>;
   deleteCourse: (id: string) => Promise<void>;
   enrollStudent: (courseId: string, studentId: string) => Promise<void>;
   unenrollStudent: (courseId: string, studentId: string) => Promise<void>;
@@ -58,7 +65,7 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { token } = useAuth();
+  const { token, user } = useAuth();
 
   const getCourses = async () => {
     try {
@@ -101,14 +108,15 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  const createCourse = async (title: string, description: string, catalogData?: any) => {
+  const createCourse = async (title: string, description: string, catalogData?: any, semesterData?: any) => {
     try {
       setLoading(true);
       setError(null);
       const response = await api.post('/courses', { 
         title, 
         description,
-        catalog: catalogData
+        catalog: catalogData,
+        semester: semesterData
       });
       if (response.data.success) {
         setCourses([...courses, response.data.data]);
@@ -124,15 +132,18 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  const updateCourse = async (id: string, title: string, description: string, catalogData?: any) => {
+  const updateCourse = async (id: string, title?: string, description?: string, catalogData?: any, semesterData?: any, defaultColor?: string) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.put(`/courses/${id}`, { 
-        title, 
-        description,
-        catalog: catalogData
-      });
+      const updateData: any = {};
+      if (title !== undefined) updateData.title = title;
+      if (description !== undefined) updateData.description = description;
+      if (catalogData !== undefined) updateData.catalog = catalogData;
+      if (semesterData !== undefined) updateData.semester = semesterData;
+      if (defaultColor !== undefined) updateData.defaultColor = defaultColor;
+      
+      const response = await api.put(`/courses/${id}`, updateData);
       if (response.data.success) {
         setCourses(courses.map(course => 
           course._id === id ? response.data.data : course
@@ -172,7 +183,7 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       setLoading(true);
       setError(null);
-      const response = await api.post(`/courses/${courseId}/enroll`, { studentId });
+      const response = await api.post(`/courses/${courseId}/enroll-teacher`, { studentId });
       if (response.data.success) {
         setCourses(courses.map(course => 
           course._id === courseId ? response.data.data : course
@@ -203,16 +214,21 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   useEffect(() => {
-    if (token) {
+    if (token && user?._id) {
+      // Fetch courses when token and user are available
       getCourses().catch(err => {
         console.error('Error in CourseProvider useEffect:', err);
       });
+    } else {
+      // Clear courses when token is removed or user changes (logout or new login)
+      setCourses([]);
+      setError(null);
     }
-  }, [token]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, user?._id]); // Also depend on user._id to reload when user changes
 
-  return (
-    <CourseContext.Provider
-      value={{
+  // Ensure context value is always defined - use object literal to always return the same structure
+  const contextValue: CourseContextType = {
         courses,
         loading,
         error,
@@ -223,8 +239,10 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         unenrollStudent,
         getCourses,
         getCourse,
-      }}
-    >
+  };
+
+  return (
+    <CourseContext.Provider value={contextValue}>
       {children}
     </CourseContext.Provider>
   );
@@ -232,8 +250,21 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
 export const useCourse = () => {
   const context = useContext(CourseContext);
-  if (context === undefined) {
-    throw new Error('useCourse must be used within a CourseProvider');
+  if (!context) {
+    // Return a default value instead of throwing to prevent crashes during transitions
+    console.warn('useCourse called outside CourseProvider, returning default values');
+    return {
+      courses: [],
+      loading: false,
+      error: null,
+      createCourse: async () => {},
+      updateCourse: async () => {},
+      deleteCourse: async () => {},
+      enrollStudent: async () => {},
+      unenrollStudent: async () => {},
+      getCourses: async () => {},
+      getCourse: async () => { throw new Error('CourseProvider not available'); },
+    } as CourseContextType;
   }
   return context;
 }; 

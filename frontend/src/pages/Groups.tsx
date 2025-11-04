@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import api from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useCourse } from '../contexts/CourseContext';
+import { getUserPreferences } from '../services/api';
 import { 
   Users, 
   Plus, 
@@ -50,8 +52,10 @@ const Groups: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
+  const [userCourseColors, setUserCourseColors] = useState<{ [key: string]: string }>({});
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+  const { courses } = useCourse();
 
   useEffect(() => {
     // Don't fetch if still loading auth or if user is not authenticated
@@ -169,11 +173,38 @@ const Groups: React.FC = () => {
     ? 'View all group sets from all your courses in one place' 
     : 'View all groups from all your courses in one place';
 
-  // Helper to get course color from localStorage (same as dashboard)
+  // Load user preferences on mount
+  useEffect(() => {
+    const loadUserPreferences = async () => {
+      if (!user) return;
+      
+      try {
+        const response = await getUserPreferences();
+        if (response.data.success && response.data.preferences?.courseColors) {
+          setUserCourseColors(response.data.preferences.courseColors || {});
+        }
+      } catch (err) {
+        console.error('Error loading user preferences:', err);
+      }
+    };
+
+    loadUserPreferences();
+  }, [user]);
+
+  // Helper to get course color (same logic as Dashboard)
   const getCourseColor = (courseId: string) => {
-    const savedColors = localStorage.getItem('courseColors');
-    const courseColors = savedColors ? JSON.parse(savedColors) : {};
-    return courseColors[courseId] || '#556B2F'; // Default olive green
+    const course = courses.find(c => c._id === courseId);
+    
+    if (isTeacher) {
+      // Teachers see the course's defaultColor
+      return course?.defaultColor || '#556B2F';
+    } else {
+      // Students: priority is user's personal color > course defaultColor > fallback
+      if (userCourseColors[courseId]) {
+        return userCourseColors[courseId];
+      }
+      return course?.defaultColor || '#556B2F';
+    }
   };
 
   // Get unique courses for filter
@@ -576,7 +607,7 @@ const Groups: React.FC = () => {
             return (
             <div 
               key={groupSet._id} 
-                className={`bg-white rounded-xl shadow-lg overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border border-gray-100 ${
+                className={`bg-white rounded-xl shadow-lg overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300 border border-gray-100 ${
                   viewMode === 'list' ? 'flex items-center' : ''
                 }`}
               onClick={() => navigate(`/groupsets/${groupSet._id}`)}
