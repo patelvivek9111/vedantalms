@@ -136,7 +136,7 @@ const PageViewWrapper: React.FC = () => {
       typeof item.visible === 'boolean' && 
       typeof item.order === 'number'
     )
-    .sort((a, b) => a.order - b.order)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
     .filter((item) => item.visible)
     .map((item) => {
       const originalItem = navigationItems.find(nav => nav.id === item.id);
