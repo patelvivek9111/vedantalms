@@ -129,9 +129,16 @@ const PageViewWrapper: React.FC = () => {
 
   // Create navigation items from custom configuration
   const customNavigationItems = sidebarConfig.items
-    .sort((a: { order: number }, b: { order: number }) => a.order - b.order)
-    .filter((item: { visible: boolean }) => item.visible)
-    .map((item: { id: string; label: string; visible: boolean; order: number }) => {
+    .filter((item: any): item is { id: string; label: string; visible: boolean; order: number } => 
+      typeof item === 'object' && 
+      item !== null && 
+      typeof item.id === 'string' && 
+      typeof item.visible === 'boolean' && 
+      typeof item.order === 'number'
+    )
+    .sort((a, b) => a.order - b.order)
+    .filter((item) => item.visible)
+    .map((item) => {
       const originalItem = navigationItems.find(nav => nav.id === item.id);
       return originalItem ? {
         ...originalItem,
