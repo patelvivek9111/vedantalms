@@ -96,8 +96,8 @@ function hasOverlap(event: RBCEvent, allEvents: RBCEvent[]) {
     }
     if (!eStart || !eEnd) return false;
     return (
-      (eventStart.getTime() < eEnd.getTime() && eventEnd.getTime() > eStart.getTime()) ||
-      (eStart.getTime() < eventEnd.getTime() && eEnd.getTime() > eventStart.getTime())
+      (eventStart!.getTime() < eEnd.getTime() && eventEnd!.getTime() > eStart.getTime()) ||
+      (eStart.getTime() < eventEnd!.getTime() && eEnd.getTime() > eventStart!.getTime())
     );
   });
 }
@@ -135,8 +135,8 @@ const CustomEvent: React.FC<{ event: RBCEvent }> = ({ event }) => {
     // Same day, and overlap
     return (
       eStart.toDateString() === start.toDateString() &&
-      ((start.getTime() < eEnd.getTime() && end.getTime() > eStart.getTime()) ||
-        (eStart.getTime() < end.getTime() && eEnd.getTime() > start.getTime()))
+      ((start!.getTime() < eEnd.getTime() && end!.getTime() > eStart.getTime()) ||
+        (eStart.getTime() < end!.getTime() && eEnd.getTime() > start!.getTime()))
     );
   });
   // Sort by start time
@@ -1065,7 +1065,7 @@ const CalendarPage: React.FC = () => {
                 />
                 <button
                   type="button"
-                  ref={el => (colorDotRefs.current[opt.value] = el)}
+                  ref={el => { colorDotRefs.current[opt.value] = el; }}
                   className="w-3 h-3 rounded-full mr-2 border-2 border-white shadow focus:outline-none focus:ring-2 focus:ring-blue-400"
                   style={{ background: getCalendarColor(opt.value, idx), outline: calendarColors[opt.value] ? '2px solid #2563eb' : 'none' }}
                   onClick={() => setColorWheelOpen(opt.value)}
@@ -1085,7 +1085,7 @@ const CalendarPage: React.FC = () => {
                     setColorWheelOpen(null);
                   }}
                   onClose={() => setColorWheelOpen(null)}
-                  anchorRef={{ current: null }}
+                  anchorRef={{ current: colorDotRefs.current[colorWheelOpen] ?? null }}
                 />
               </div>
             )}

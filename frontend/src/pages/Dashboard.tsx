@@ -311,7 +311,7 @@ export function Dashboard() {
                         {openColorPicker === course._id && (
                           <div 
                             className="absolute right-0 top-8 bg-white rounded-lg shadow-lg border border-gray-200 p-3 z-50 min-w-48" 
-                            ref={(el) => colorPickerRefs.current[course._id] = el}
+                            ref={(el) => { colorPickerRefs.current[course._id] = el; }}
                           >
                             <div className="flex items-center gap-2 mb-3">
                               <Palette className="h-4 w-4 text-gray-600" />
@@ -350,7 +350,7 @@ export function Dashboard() {
                         {openIconPicker === course._id && (
                           <div 
                             className="absolute right-0 top-8 bg-white rounded-lg shadow-lg border border-gray-200 p-3 z-50 min-w-48" 
-                            ref={(el) => iconPickerRefs.current[course._id] = el}
+                            ref={(el) => { iconPickerRefs.current[course._id] = el; }}
                           >
                             <div className="flex items-center gap-2 mb-3">
                               <Settings className="h-4 w-4 text-gray-600" />
@@ -475,7 +475,7 @@ export function Dashboard() {
                           {openColorPicker === course._id && (
                             <div 
                               className="absolute right-0 top-8 bg-white rounded-lg shadow-lg border border-gray-200 p-3 z-50 min-w-48" 
-                              ref={(el) => colorPickerRefs.current[course._id] = el}
+                              ref={(el) => { colorPickerRefs.current[course._id] = el; }}
                             >
                               <div className="flex items-center gap-2 mb-3">
                                 <Palette className="h-4 w-4 text-gray-600" />
@@ -514,7 +514,7 @@ export function Dashboard() {
                           {openIconPicker === course._id && (
                             <div 
                               className="absolute right-0 top-8 bg-white rounded-lg shadow-lg border border-gray-200 p-3 z-50 min-w-48" 
-                              ref={(el) => iconPickerRefs.current[course._id] = el}
+                              ref={(el) => { iconPickerRefs.current[course._id] = el; }}
                             >
                               <div className="flex items-center gap-2 mb-3">
                                 <Settings className="h-4 w-4 text-gray-600" />

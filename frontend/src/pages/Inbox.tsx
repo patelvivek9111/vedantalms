@@ -62,7 +62,7 @@ const Inbox: React.FC = () => {
   const composeToDropdownRef = useRef<HTMLDivElement>(null);
   const [composeToInput, setComposeToInput] = useState('');
   const [showGroupDropdown, setShowGroupDropdown] = useState(false);
-  const searchTimeout = useRef<NodeJS.Timeout | null>(null);
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Add state for send individually checkbox
   const [sendIndividually, setSendIndividually] = useState(false);
   // Add state for selected conversations

@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import CreateAssignmentForm from '../components/assignments/CreateAssignmentForm';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000';
 
 const AssignmentEditPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();

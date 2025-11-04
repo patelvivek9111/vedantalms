@@ -66,7 +66,7 @@ export default function GlobalSidebar() {
   const { unreadCount } = useUnreadMessages();
   const [showCourseDropdown, setShowCourseDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Close dropdown when clicking outside
   useEffect(() => {
