@@ -95,9 +95,12 @@ function hasOverlap(event: RBCEvent, allEvents: RBCEvent[]) {
       if (isNaN(eEnd.getTime())) eEnd = null;
     }
     if (!eStart || !eEnd) return false;
+    // TypeScript now knows eventStart and eventEnd are not null
+    const start = eventStart as Date;
+    const end = eventEnd as Date;
     return (
-      (eventStart!.getTime() < eEnd.getTime() && eventEnd!.getTime() > eStart.getTime()) ||
-      (eStart.getTime() < eventEnd!.getTime() && eEnd.getTime() > eventStart!.getTime())
+      (start.getTime() < eEnd.getTime() && end.getTime() > eStart.getTime()) ||
+      (eStart.getTime() < end.getTime() && eEnd.getTime() > start.getTime())
     );
   });
 }
@@ -132,11 +135,14 @@ const CustomEvent: React.FC<{ event: RBCEvent }> = ({ event }) => {
       if (isNaN(eEnd.getTime())) eEnd = null;
     }
     if (!eStart || !eEnd || !start || !end) return false;
+    // TypeScript now knows all are not null
+    const sStart = start as Date;
+    const sEnd = end as Date;
     // Same day, and overlap
     return (
-      eStart.toDateString() === start.toDateString() &&
-      ((start!.getTime() < eEnd.getTime() && end!.getTime() > eStart.getTime()) ||
-        (eStart.getTime() < end!.getTime() && eEnd.getTime() > start!.getTime()))
+      eStart.toDateString() === sStart.toDateString() &&
+      ((sStart.getTime() < eEnd.getTime() && sEnd.getTime() > eStart.getTime()) ||
+        (eStart.getTime() < sEnd.getTime() && eEnd.getTime() > sStart.getTime()))
     );
   });
   // Sort by start time
