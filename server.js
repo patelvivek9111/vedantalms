@@ -56,7 +56,7 @@ const mongoOptions = {
 };
 
 // Connect to MongoDB
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/lms';
+let MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/lms';
 
 // Validate MongoDB URI
 if (!MONGODB_URI || !MONGODB_URI.trim()) {
@@ -67,14 +67,33 @@ if (!MONGODB_URI || !MONGODB_URI.trim()) {
   process.exit(1);
 }
 
+// Clean and extract MongoDB URI (in case there are prefixes or extra characters)
+MONGODB_URI = MONGODB_URI.trim();
+
+// Try to extract a valid MongoDB URI if it's embedded in the string
 if (!MONGODB_URI.startsWith('mongodb://') && !MONGODB_URI.startsWith('mongodb+srv://')) {
-  console.error('❌ MongoDB connection error: Invalid connection string format');
-  console.error('MONGODB_URI must start with "mongodb://" or "mongodb+srv://"');
-  console.error(`Current value: ${MONGODB_URI.substring(0, 20)}...`);
-  process.exit(1);
+  // Look for mongodb:// or mongodb+srv:// in the string
+  const mongodbMatch = MONGODB_URI.match(/(mongodb(?:\+srv)?:\/\/[^\s]+)/);
+  if (mongodbMatch) {
+    console.warn('⚠️  Warning: Found MongoDB URI embedded in string, extracting it...');
+    MONGODB_URI = mongodbMatch[1];
+  } else {
+    console.error('❌ MongoDB connection error: Invalid connection string format');
+    console.error('MONGODB_URI must start with "mongodb://" or "mongodb+srv://"');
+    console.error(`Current value (first 50 chars): ${MONGODB_URI.substring(0, 50)}`);
+    console.error('Full value length:', MONGODB_URI.length);
+    console.error('\nPlease check your MONGODB_URI in Render dashboard:');
+    console.error('1. Go to your Render service dashboard');
+    console.error('2. Navigate to Environment tab');
+    console.error('3. Check the MONGODB_URI value');
+    console.error('4. Make sure it starts with "mongodb://" or "mongodb+srv://"');
+    console.error('5. Remove any extra characters, spaces, or prefixes');
+    console.error('\nExample format: mongodb+srv://username:password@cluster.mongodb.net/dbname');
+    process.exit(1);
+  }
 }
 
-mongoose.connect(MONGODB_URI.trim(), mongoOptions)
+mongoose.connect(MONGODB_URI, mongoOptions)
   .then(() => {
     console.log('✅ Connected to MongoDB');
     console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
