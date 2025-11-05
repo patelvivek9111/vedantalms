@@ -13,13 +13,30 @@ const app = express();
 
 // CORS configuration for production
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? [
-        process.env.FRONTEND_URL || 'https://vedantaed.com',
-        'https://www.vedantaed.com',
-        'https://vedantaed.com'
-      ]
-    : ['http://localhost:3000', 'http://localhost:5173'],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = process.env.NODE_ENV === 'production' 
+      ? [
+          process.env.FRONTEND_URL || 'https://vedantaed.com',
+          'https://www.vedantaed.com',
+          'https://vedantaed.com',
+          'https://vedantalms-backend.onrender.com',
+        ]
+      : ['http://localhost:3000', 'http://localhost:5173'];
+    
+    // Check if origin is in allowed list or matches patterns
+    const isAllowed = allowedOrigins.includes(origin) ||
+      origin.endsWith('.onrender.com') ||
+      origin.endsWith('.vercel.app');
+    
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   optionsSuccessStatus: 200
 };
