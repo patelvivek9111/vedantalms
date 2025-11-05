@@ -57,13 +57,31 @@ const mongoOptions = {
 
 // Connect to MongoDB
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/lms';
-mongoose.connect(MONGODB_URI, mongoOptions)
+
+// Validate MongoDB URI
+if (!MONGODB_URI || !MONGODB_URI.trim()) {
+  console.error('❌ MongoDB connection error: MONGODB_URI environment variable is not set or is empty');
+  console.error('Please set MONGODB_URI in your environment variables.');
+  console.error('For MongoDB Atlas, use: mongodb+srv://username:password@cluster.mongodb.net/dbname');
+  console.error('For local MongoDB, use: mongodb://localhost:27017/lms');
+  process.exit(1);
+}
+
+if (!MONGODB_URI.startsWith('mongodb://') && !MONGODB_URI.startsWith('mongodb+srv://')) {
+  console.error('❌ MongoDB connection error: Invalid connection string format');
+  console.error('MONGODB_URI must start with "mongodb://" or "mongodb+srv://"');
+  console.error(`Current value: ${MONGODB_URI.substring(0, 20)}...`);
+  process.exit(1);
+}
+
+mongoose.connect(MONGODB_URI.trim(), mongoOptions)
   .then(() => {
     console.log('✅ Connected to MongoDB');
     console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   })
   .catch((err) => {
-    console.error('❌ MongoDB connection error:', err);
+    console.error('❌ MongoDB connection error:', err.message);
+    console.error('Please check your MONGODB_URI environment variable in Render dashboard.');
     process.exit(1); // Exit if cannot connect to database
   });
 
