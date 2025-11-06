@@ -1,8 +1,16 @@
 import axios from 'axios';
 import { API_URL } from '../config';
 
+// Ensure baseURL is properly formatted
+const getBaseURL = () => {
+  if (!API_URL || API_URL === '') {
+    return '/api'; // Relative URL when served from same domain
+  }
+  return `${API_URL}/api`;
+};
+
 const api = axios.create({
-  baseURL: `${API_URL}/api`,
+  baseURL: getBaseURL(),
   headers: {
     'Content-Type': 'application/json',
   },

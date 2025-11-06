@@ -18,12 +18,12 @@ const corsOptions = {
     if (!origin) return callback(null, true);
     
     const allowedOrigins = process.env.NODE_ENV === 'production' 
-      ? [
-          process.env.FRONTEND_URL || 'https://vedantaed.com',
-          'https://www.vedantaed.com',
+    ? [
+        process.env.FRONTEND_URL || 'https://vedantaed.com',
+        'https://www.vedantaed.com',
           'https://vedantaed.com',
           'https://vedantalms-backend.onrender.com',
-        ]
+      ]
       : ['http://localhost:3000', 'http://localhost:5173'];
     
     // Check if origin is in allowed list or matches patterns
@@ -195,9 +195,9 @@ app.use((err, req, res, next) => {
   });
 });
 
-// API route not found handler
+// API route not found handler (must be after all API routes but before static files)
 app.use('/api/*', (req, res) => {
-  res.status(404).json({ message: 'API route not found' });
+  res.status(404).json({ message: 'API route not found', path: req.path });
 });
 
 // Serve frontend static files in production
@@ -205,8 +205,12 @@ if (process.env.NODE_ENV === 'production') {
   // Serve static files from the frontend/dist directory
   app.use(express.static(path.join(__dirname, 'frontend', 'dist')));
   
-  // Handle all non-API routes by serving the frontend
-  app.get('*', (req, res) => {
+  // Handle all non-API routes by serving the frontend (must be last)
+  app.get('*', (req, res, next) => {
+    // Don't serve frontend for API routes
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
     res.sendFile(path.join(__dirname, 'frontend', 'dist', 'index.html'));
   });
 }
