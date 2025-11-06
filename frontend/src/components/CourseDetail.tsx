@@ -3425,7 +3425,7 @@ const CourseDetail: React.FC = () => {
                                 <img 
                                   src={request.student.profilePicture.startsWith('http')
                                     ? request.student.profilePicture
-                                    : `http://localhost:5000${request.student.profilePicture}`}
+                                    : getImageUrl(request.student.profilePicture)}
                                   alt={`${request.student.firstName} ${request.student.lastName}`}
                                   className="w-10 h-10 rounded-full object-cover"
                                 />

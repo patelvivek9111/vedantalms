@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import { getImageUrl } from '../services/api';
 
 interface Student {
   _id: string;
@@ -155,7 +156,9 @@ const CoursePeople: React.FC = () => {
                     <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center">
                       {request.student.profilePicture ? (
                         <img 
-                          src={request.student.profilePicture} 
+                          src={request.student.profilePicture.startsWith('http') 
+                            ? request.student.profilePicture 
+                            : getImageUrl(request.student.profilePicture)} 
                           alt={`${request.student.firstName} ${request.student.lastName}`}
                           className="w-10 h-10 rounded-full object-cover"
                         />
@@ -208,7 +211,9 @@ const CoursePeople: React.FC = () => {
                   <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center">
                     {student.profilePicture ? (
                       <img 
-                        src={student.profilePicture} 
+                        src={student.profilePicture.startsWith('http') 
+                          ? student.profilePicture 
+                          : getImageUrl(student.profilePicture)} 
                         alt={`${student.firstName} ${student.lastName}`}
                         className="w-10 h-10 rounded-full object-cover"
                       />
