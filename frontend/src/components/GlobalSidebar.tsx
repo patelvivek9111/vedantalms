@@ -158,14 +158,27 @@ export default function GlobalSidebar() {
                       onError={(e) => {
                         // Hide image on error, fallback will show
                         e.currentTarget.style.display = 'none';
+                        const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                        if (fallback) {
+                          fallback.style.display = 'flex';
+                        }
+                      }}
+                      onLoad={(e) => {
+                        // Hide fallback when image loads successfully
+                        const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                        if (fallback) {
+                          fallback.style.display = 'none';
+                        }
                       }}
                     />
                   ) : null}
-                  {(!user?.profilePicture || !user.profilePicture.trim()) && (
-                    <span className="text-white text-sm font-bold">
-                      {user?.firstName?.charAt(0) || ''}{user?.lastName?.charAt(0) || 'U'}
-                    </span>
-                  )}
+                  {/* Fallback initials - always present, shown when no image or image fails */}
+                  <span 
+                    className="text-white text-sm font-bold"
+                    style={{ display: user?.profilePicture ? 'none' : 'flex' }}
+                  >
+                    {user?.firstName?.charAt(0) || ''}{user?.lastName?.charAt(0) || 'U'}
+                  </span>
                 </div>
                 <span className="text-xs font-medium">{label}</span>
               </Link>
