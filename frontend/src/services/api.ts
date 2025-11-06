@@ -92,6 +92,18 @@ export const updateOverviewConfig = async (courseId: string, config: {
 export const getImageUrl = (filename: string): string => {
   if (!filename) return '';
   if (filename.startsWith('http')) return filename;
+  
+  // If API_URL is empty (relative URL), use relative path
+  if (!API_URL || API_URL === '') {
+    // If the path already includes /uploads/, use as-is
+    if (filename.startsWith('/uploads/')) {
+      return filename;
+    }
+    // Otherwise, prepend /uploads/
+    return `/uploads/${filename}`;
+  }
+  
+  // If API_URL is set, construct full URL
   // If the path already includes /uploads/, just prepend the base URL
   if (filename.startsWith('/uploads/')) {
     return `${API_URL}${filename}`;

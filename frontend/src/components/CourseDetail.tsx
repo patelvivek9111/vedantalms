@@ -7,6 +7,7 @@ import ModuleList from './ModuleList';
 import CreateModuleForm from './CreateModuleForm';
 import api from '../services/api';
 import { API_URL } from '../config';
+import { getImageUrl } from '../services/api';
 import axios from 'axios';
 import { 
   Lock, 
@@ -158,7 +159,7 @@ const StudentCard = ({ student, isInstructor, isAdmin, handleUnenroll, isInstruc
         <img
           src={student.profilePicture.startsWith('http')
             ? student.profilePicture
-            : `http://localhost:5000${student.profilePicture}`}
+            : getImageUrl(student.profilePicture)}
           alt={student.firstName}
           className="w-12 h-12 object-cover rounded-full border"
           onError={() => setImgError(true)}
@@ -1274,7 +1275,7 @@ const CourseDetail: React.FC = () => {
       }
       // Save to backend
       const token = localStorage.getItem('token');
-      const baseUrl = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000';
+      const baseUrl = API_URL || '';
       const res = await axios.put(
         `${baseUrl}/api/courses/${course._id}`,
         {
@@ -1554,7 +1555,7 @@ const CourseDetail: React.FC = () => {
       }
       // Save to backend
       const token = localStorage.getItem('token');
-      const baseUrl = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000';
+      const baseUrl = API_URL || '';
       const res = await axios.put(
         `${baseUrl}/api/courses/${course._id}`,
         {
@@ -2834,7 +2835,7 @@ const CourseDetail: React.FC = () => {
                                     <img
                                       src={student.profilePicture.startsWith('http')
                                         ? student.profilePicture
-                                        : `http://localhost:5000${student.profilePicture}`}
+                                        : getImageUrl(student.profilePicture)}
                                       alt={`${student.firstName} ${student.lastName}`}
                                       className="w-8 h-8 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600"
                                       onError={(e) => {
