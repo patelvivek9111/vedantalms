@@ -131,8 +131,27 @@ app.get('/health', (req, res) => {
 });
 
 // Serve uploads directory for profile pictures and other files
-// IMPORTANT: This must be before the catch-all route for frontend
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// IMPORTANT: This must be BEFORE frontend static files and catch-all route
+const uploadsStatic = express.static(path.join(__dirname, 'uploads'), {
+  setHeaders: (res, filePath) => {
+    // Set proper headers for images
+    if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg') || filePath.endsWith('.png') || filePath.endsWith('.gif')) {
+      res.setHeader('Content-Type', filePath.endsWith('.png') ? 'image/png' : 'image/jpeg');
+      res.setHeader('Cache-Control', 'public, max-age=31536000');
+    }
+  }
+});
+
+app.use('/uploads', (req, res, next) => {
+  // Check if file exists before serving
+  const filePath = path.join(__dirname, 'uploads', req.path.replace('/uploads/', ''));
+  if (fs.existsSync(filePath)) {
+    uploadsStatic(req, res, next);
+  } else {
+    // File doesn't exist - return 404 (browser will handle fallback)
+    res.status(404).json({ message: 'File not found' });
+  }
+});
 
 // Routes
 app.use('/api/auth', require('./routes/auth.routes'));
