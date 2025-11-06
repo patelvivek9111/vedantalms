@@ -27,31 +27,25 @@ const ProfileImage: React.FC<ProfileImageProps> = ({
   const sizeClass = sizeClasses[size];
   
   return (
-    <div className={`relative ${className}`}>
-      {profilePicture ? (
+    <div className={`relative ${className} ${sizeClass} rounded-full overflow-hidden border-2 border-gray-200 shadow-sm bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center`}>
+      {/* Fallback initials - always present as background */}
+      <span className={`text-white font-bold absolute inset-0 flex items-center justify-center ${sizeClass.includes('text-sm') ? 'text-sm' : sizeClass.includes('text-base') ? 'text-base' : sizeClass.includes('text-lg') ? 'text-lg' : 'text-3xl'}`}>
+        {initials || 'U'}
+      </span>
+      {/* Profile picture - overlays fallback when loaded */}
+      {profilePicture && (
         <img
           src={profilePicture.startsWith('http')
             ? profilePicture
             : getImageUrl(profilePicture)}
           alt={`${firstName} ${lastName}`}
-          className={`${sizeClass} rounded-full object-cover border-2 border-gray-200 shadow-sm`}
+          className={`${sizeClass} rounded-full object-cover relative z-10`}
           onError={(e) => {
-            // Hide the failed image and show fallback
+            // Hide image on error - fallback will show through
             e.currentTarget.style.display = 'none';
-            const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-            if (fallback) {
-              fallback.style.display = 'flex';
-            }
           }}
         />
-      ) : null}
-      {/* Fallback avatar - always present but hidden when image loads */}
-      <div 
-        className={`${sizeClass} bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold ${profilePicture ? 'hidden' : 'flex'} shadow-sm`}
-        style={{ display: profilePicture ? 'none' : 'flex' }}
-      >
-        {initials}
-      </div>
+      )}
     </div>
   );
 };
