@@ -131,7 +131,8 @@ app.get('/health', (req, res) => {
 });
 
 // Serve uploads directory for profile pictures and other files
-app.use('/uploads', express.static('uploads'));
+// IMPORTANT: This must be before the catch-all route for frontend
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Routes
 app.use('/api/auth', require('./routes/auth.routes'));
@@ -207,8 +208,8 @@ if (process.env.NODE_ENV === 'production') {
   
   // Handle all non-API routes by serving the frontend (must be last)
   app.get('*', (req, res, next) => {
-    // Don't serve frontend for API routes
-    if (req.path.startsWith('/api')) {
+    // Don't serve frontend for API routes or uploads
+    if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
       return next();
     }
     res.sendFile(path.join(__dirname, 'frontend', 'dist', 'index.html'));
