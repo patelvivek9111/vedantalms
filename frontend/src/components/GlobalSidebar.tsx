@@ -147,38 +147,25 @@ export default function GlobalSidebar() {
                 to={to}
                 className={`flex flex-col items-center w-full py-2 transition-colors ${isActive ? 'bg-blue-800' : 'hover:bg-blue-800'} ${isActive ? 'text-blue-300' : 'text-white'}`}
               >
-                <div className="h-8 w-8 mb-1 rounded-full bg-blue-700 flex items-center justify-center overflow-hidden border-2 border-blue-600">
-                  {user?.profilePicture ? (
+                <div className="h-8 w-8 mb-1 rounded-full bg-blue-700 flex items-center justify-center overflow-hidden border-2 border-blue-600 relative">
+                  {/* Fallback initials - always present as background */}
+                  <span className="text-white text-sm font-bold absolute inset-0 flex items-center justify-center">
+                    {user?.firstName?.charAt(0) || ''}{user?.lastName?.charAt(0) || 'U'}
+                  </span>
+                  {/* Profile picture - overlays fallback when loaded */}
+                  {user?.profilePicture && (
                     <img 
                       src={user.profilePicture.startsWith('http') 
                         ? user.profilePicture 
                         : getImageUrl(user.profilePicture)} 
                       alt={`${user.firstName} ${user.lastName}`}
-                      className="w-full h-full object-cover rounded-full"
+                      className="w-full h-full object-cover rounded-full relative z-10"
                       onError={(e) => {
-                        // Hide image on error, fallback will show
+                        // Hide image on error - fallback will show through
                         e.currentTarget.style.display = 'none';
-                        const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                        if (fallback) {
-                          fallback.style.display = 'flex';
-                        }
-                      }}
-                      onLoad={(e) => {
-                        // Hide fallback when image loads successfully
-                        const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                        if (fallback) {
-                          fallback.style.display = 'none';
-                        }
                       }}
                     />
-                  ) : null}
-                  {/* Fallback initials - always present, shown when no image or image fails */}
-                  <span 
-                    className="text-white text-sm font-bold"
-                    style={{ display: user?.profilePicture ? 'none' : 'flex' }}
-                  >
-                    {user?.firstName?.charAt(0) || ''}{user?.lastName?.charAt(0) || 'U'}
-                  </span>
+                  )}
                 </div>
                 <span className="text-xs font-medium">{label}</span>
               </Link>
