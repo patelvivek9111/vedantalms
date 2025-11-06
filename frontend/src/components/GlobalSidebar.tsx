@@ -245,6 +245,7 @@ export default function GlobalSidebar() {
                     )}
                     {availableCourses.length > 0 ? availableCourses.map((course) => {
                       const isCurrentCourse = location.pathname.startsWith(`/courses/${course._id}`);
+                      const courseCode = course.catalog?.courseCode;
                       return (
                         <Link
                           key={course._id}
@@ -253,6 +254,7 @@ export default function GlobalSidebar() {
                           className={`block px-3 py-2 text-sm hover:bg-gray-50 transition-colors ${
                             isCurrentCourse ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
                           }`}
+                          title={courseCode ? `Course Code: ${courseCode}` : course.title}
                         >
                           <div className="flex items-center justify-between">
                             <span className="truncate">{course.title}</span>
