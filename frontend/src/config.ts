@@ -8,12 +8,16 @@ const getApiUrl = () => {
   
   // In production, check if we're on the same domain
   if ((import.meta as any).env?.MODE === 'production') {
-    // If frontend is served from Render backend, use relative URL (same domain)
+    // If frontend is served from same domain as backend, use relative URL (same domain)
     // Check window.location at runtime (safe for browser)
-    if (typeof window !== 'undefined' && window.location.hostname.includes('onrender.com')) {
-      return ''; // Use relative URL (same domain) - avoids CORS
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname;
+      // Use relative URL if on custom domain or Render domain (same origin)
+      if (hostname.includes('vedantaed.com') || hostname.includes('onrender.com')) {
+        return ''; // Use relative URL (same domain) - avoids CORS
+      }
     }
-    // Otherwise use the Render backend URL
+    // Fallback to Render backend URL (shouldn't happen if properly configured)
     return 'https://vedantalms-backend.onrender.com';
   }
   
