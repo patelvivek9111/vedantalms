@@ -273,7 +273,7 @@ const CourseDetail: React.FC = () => {
 
         // Fetch modules for the course
         const token = localStorage.getItem('token');
-        const modulesResponse = await api.get(`${API_URL}/api/modules/${id}`, {
+        const modulesResponse = await api.get(`/modules/${id}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -466,7 +466,7 @@ const CourseDetail: React.FC = () => {
 
           // Fetch modules for the course
           const token = localStorage.getItem('token');
-          const modulesResponse = await api.get(`${API_URL}/api/modules/${id}`, {
+          const modulesResponse = await api.get(`/modules/${id}`, {
             headers: {
               'Authorization': `Bearer ${token}`
             }

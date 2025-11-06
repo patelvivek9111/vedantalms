@@ -62,7 +62,7 @@ const CourseDiscussions: React.FC<CourseDiscussionsProps> = ({ courseId, courseG
       try {
         setLoading(true);
         const token = localStorage.getItem('token');
-        const response = await api.get(`${API_URL}/api/threads/course/${courseId}`, {
+        const response = await api.get(`/threads/course/${courseId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         

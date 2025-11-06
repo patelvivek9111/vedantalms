@@ -88,8 +88,8 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
       try {
         const token = localStorage.getItem('token');
         const [setsRes, studentsRes] = await Promise.all([
-          api.get(`${API_URL}/api/groups/sets/${courseId}`),
-          api.get(`${API_URL}/api/courses/${courseId}/students`)
+          api.get(`/groups/sets/${courseId}`),
+          api.get(`/courses/${courseId}/students`)
         ]);
         setGroupSets(setsRes.data);
         setStudents(studentsRes.data);
@@ -108,7 +108,7 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
       if (!selectedSet) return;
       try {
         const token = localStorage.getItem('token');
-        const response = await api.get(`${API_URL}/api/groups/sets/${selectedSet._id}/groups`);
+        const response = await api.get(`/groups/sets/${selectedSet._id}/groups`);
         setGroups(response.data);
       } catch (err: any) {
         setError(err.response?.data?.message || 'Error loading groups');
@@ -223,7 +223,7 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
     if (!confirm('Are you sure you want to delete this group?')) return;
     try {
       const token = localStorage.getItem('token');
-      await api.delete(`${API_URL}/api/groups/${groupId}`, {
+      await api.delete(`/groups/${groupId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setGroups(groups.filter(g => g._id !== groupId));
@@ -375,7 +375,7 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
             }
           );
           // Re-fetch groups to ensure sync
-          const response = await api.get(`${API_URL}/api/groups/sets/${selectedSet._id}/groups`);
+          const response = await api.get(`/groups/sets/${selectedSet._id}/groups`);
           setGroups(response.data);
         } catch (err: any) {
           setError(err.response?.data?.message || 'Error updating group');

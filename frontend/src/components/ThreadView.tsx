@@ -459,7 +459,7 @@ const ThreadView: React.FC = () => {
       if (groupId && !courseId) {
         try {
           const token = localStorage.getItem('token');
-          const response = await api.get(`${API_URL}/api/groups/${groupId}`, {
+          const response = await api.get(`/groups/${groupId}`, {
             headers: { Authorization: `Bearer ${token}` }
           });
           const course = response.data.course;
@@ -504,7 +504,7 @@ const ThreadView: React.FC = () => {
         const token = localStorage.getItem('token');
         
         // First, fetch the thread to check settings
-        const threadRes = await api.get(`${API_URL}/api/threads/${threadId}`, {
+        const threadRes = await api.get(`/threads/${threadId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         
@@ -517,7 +517,7 @@ const ThreadView: React.FC = () => {
           
           // If "post before see" is enabled and user is a student, use participant endpoint
           if (threadRes.data.data.settings?.requirePostBeforeSee && user?.role === 'student') {
-            const participantRes = await api.get(`${API_URL}/api/threads/${threadId}/participant/${user._id}`, {
+            const participantRes = await api.get(`/threads/${threadId}/participant/${user._id}`, {
               headers: { Authorization: `Bearer ${token}` }
             });
             if (participantRes.data.success) {
@@ -532,7 +532,7 @@ const ThreadView: React.FC = () => {
           setError('Failed to load thread');
         }
           // Fetch course to get students
-          const courseRes = await api.get(`${API_URL}/api/courses/${resolvedCourseId}`, {
+          const courseRes = await api.get(`/courses/${resolvedCourseId}`, {
             headers: { Authorization: `Bearer ${token}` }
           });
           if (courseRes.data.success) {
@@ -540,7 +540,7 @@ const ThreadView: React.FC = () => {
           }
           
           // Fetch modules for the course
-          const modulesRes = await api.get(`${API_URL}/api/modules/${resolvedCourseId}`, {
+          const modulesRes = await api.get(`/modules/${resolvedCourseId}`, {
             headers: { Authorization: `Bearer ${token}` }
           });
           if (modulesRes.data.success) {

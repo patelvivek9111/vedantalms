@@ -147,7 +147,7 @@ const GroupDiscussion: React.FC = () => {
       try {
         setLoading(true);
         const token = localStorage.getItem('token');
-        const response = await api.get(`${API_URL}/api/threads/groupset/${groupSetId}`, {
+        const response = await api.get(`/threads/groupset/${groupSetId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         
