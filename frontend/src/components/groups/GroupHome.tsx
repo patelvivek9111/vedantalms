@@ -268,7 +268,7 @@ const GroupHome: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-900 p-6">
       {/* 1. Welcome Section - For Both Teachers and Students */}
       <div className="mb-8">
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8 border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-all duration-300">
+        <div className="bg-white dark:bg-gray-800 dark:!bg-gray-800 rounded-2xl shadow-lg p-8 border border-gray-100 dark:border-gray-700 dark:!border-gray-700 hover:shadow-xl transition-all duration-300">
           <div className="flex items-center justify-center">
             <div className="text-center">
               <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100 mb-2">
@@ -290,7 +290,7 @@ const GroupHome: React.FC = () => {
 
       {/* 2. Quick Actions - Teacher Only */}
       {isTeacher && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 p-6 mb-8">
+        <div className="bg-white dark:bg-gray-800 dark:!bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 dark:!border-gray-700 p-6 mb-8">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-5 flex items-center">
             <div className="p-1.5 bg-yellow-50 dark:bg-yellow-900/50 rounded-lg mr-2.5">
               <Star className="h-4 w-4 text-yellow-500 dark:text-yellow-400" />
@@ -356,7 +356,7 @@ const GroupHome: React.FC = () => {
       {/* 3. Group Members & Upcoming Tasks - For Both Teachers and Students */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Group Members - Interactive */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 p-6">
+        <div className="bg-white dark:bg-gray-800 dark:!bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 dark:!border-gray-700 p-6">
           <div className="flex items-center justify-between mb-5 pb-4 border-b border-gray-100 dark:border-gray-700">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 flex items-center">
               <div className="p-1.5 bg-blue-50 dark:bg-blue-900/50 rounded-lg mr-2.5">
@@ -428,7 +428,7 @@ const GroupHome: React.FC = () => {
         </div>
 
         {/* Upcoming Tasks - Interactive */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 p-6">
+        <div className="bg-white dark:bg-gray-800 dark:!bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 dark:!border-gray-700 p-6">
           <div className="flex items-center justify-between mb-5 pb-4 border-b border-gray-100 dark:border-gray-700">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 flex items-center">
               <div className="p-1.5 bg-orange-50 dark:bg-orange-900/50 rounded-lg mr-2.5">

@@ -113,7 +113,7 @@ export default function GroupDashboard() {
   }, [groupSetId]);
 
   return (
-    <div className="max-w-6xl mx-auto py-8 flex flex-col gap-4">
+    <div className="max-w-6xl mx-auto py-8 flex flex-col gap-4 bg-transparent">
       {/* Simple Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4 px-1">
         <Link to="/groups" className="hover:underline text-gray-700 dark:text-gray-300 font-medium">Group Management</Link>
@@ -122,7 +122,7 @@ export default function GroupDashboard() {
       </div>
       <div className="flex gap-8">
         {/* Sidebar */}
-        <aside className="w-64 flex-shrink-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur rounded-2xl shadow-lg p-6 h-fit relative border border-gray-100 dark:border-gray-700 mt-2">
+        <aside className="w-64 flex-shrink-0 bg-white dark:bg-gray-800 backdrop-blur rounded-2xl shadow-lg p-6 h-fit relative border border-gray-100 dark:border-gray-700 mt-2">
           {/* Dropdown header */}
           <div className="mb-8 border-b border-gray-200 dark:border-gray-700 pb-3 relative">
             {(isInstructor || isAdmin) ? (
@@ -175,7 +175,7 @@ export default function GroupDashboard() {
           </nav>
         </aside>
         {/* Main Content */}
-        <main className="flex-1 min-w-0">
+        <main className="flex-1 min-w-0 bg-transparent">
           {/* Only show one section at a time based on current path */}
           {isAssignments && (
             <div className="p-4">
