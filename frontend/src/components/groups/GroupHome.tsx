@@ -240,13 +240,13 @@ const GroupHome: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-6">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-6">
         <div className="animate-pulse">
-          <div className="h-8 bg-white rounded-lg w-1/3 mb-4 shadow-sm"></div>
-          <div className="h-4 bg-white rounded-lg w-1/2 mb-6 shadow-sm"></div>
+          <div className="h-8 bg-white dark:bg-gray-800 rounded-lg w-1/3 mb-4 shadow-sm"></div>
+          <div className="h-4 bg-white dark:bg-gray-800 rounded-lg w-1/2 mb-6 shadow-sm"></div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-32 bg-white rounded-xl shadow-sm"></div>
+              <div key={i} className="h-32 bg-white dark:bg-gray-800 rounded-xl shadow-sm"></div>
             ))}
           </div>
         </div>
@@ -256,30 +256,30 @@ const GroupHome: React.FC = () => {
 
   if (!groupInfo) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-6">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-6">
         <div className="text-center py-12">
-          <div className="text-gray-500 text-lg">Group not found</div>
+          <div className="text-gray-500 dark:text-gray-400 text-lg">Group not found</div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-900 p-6">
       {/* 1. Welcome Section - For Both Teachers and Students */}
       <div className="mb-8">
-        <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-100 hover:shadow-xl transition-all duration-300">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8 border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-all duration-300">
           <div className="flex items-center justify-center">
             <div className="text-center">
-              <h1 className="text-4xl font-bold text-black mb-2">
+              <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100 mb-2">
                 Welcome to {groupInfo.name}
               </h1>
-              <p className="text-gray-600 text-lg mb-1">
+              <p className="text-gray-600 dark:text-gray-300 text-lg mb-1">
                 {groupInfo.groupSet.course.name} • {groupInfo.groupSet.name}
               </p>
               <div className="flex items-center justify-center mt-3 space-x-4">
-                <div className="flex items-center text-sm text-gray-500 bg-gray-50 px-3 py-1.5 rounded-full">
-                  <Users className="h-3.5 w-3.5 mr-1.5 text-gray-400" />
+                <div className="flex items-center text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 px-3 py-1.5 rounded-full border dark:border-gray-600">
+                  <Users className="h-3.5 w-3.5 mr-1.5 text-gray-500 dark:text-gray-400" />
                   <span className="font-medium">{stats.totalMembers} {stats.totalMembers === 1 ? 'member' : 'members'}</span>
                 </div>
               </div>
@@ -290,63 +290,63 @@ const GroupHome: React.FC = () => {
 
       {/* 2. Quick Actions - Teacher Only */}
       {isTeacher && (
-        <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6 mb-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-5 flex items-center">
-            <div className="p-1.5 bg-yellow-50 rounded-lg mr-2.5">
-              <Star className="h-4 w-4 text-yellow-500" />
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 p-6 mb-8">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-5 flex items-center">
+            <div className="p-1.5 bg-yellow-50 dark:bg-yellow-900/50 rounded-lg mr-2.5">
+              <Star className="h-4 w-4 text-yellow-500 dark:text-yellow-400" />
             </div>
             Quick Actions
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <button 
               onClick={handleCreateAssignment}
-              className="group flex flex-col items-center p-6 border-2 border-gray-200 rounded-xl hover:border-blue-400 hover:bg-blue-50/50 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-md"
+              className="group flex flex-col items-center p-6 border-2 border-gray-200 dark:border-gray-700 rounded-xl hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-md"
             >
-              <div className="p-3 bg-gradient-to-br from-blue-100 to-blue-50 rounded-full mb-3 group-hover:from-blue-200 group-hover:to-blue-100 transition-all duration-300 shadow-sm">
-                <Plus className="h-6 w-6 text-blue-600 group-hover:scale-110 transition-transform" />
+              <div className="p-3 bg-gradient-to-br from-blue-100 to-blue-50 dark:from-blue-900/50 dark:to-blue-800/50 rounded-full mb-3 group-hover:from-blue-200 group-hover:to-blue-100 dark:group-hover:from-blue-800 dark:group-hover:to-blue-700 transition-all duration-300 shadow-sm">
+                <Plus className="h-6 w-6 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform" />
               </div>
               <div className="text-center">
-                <div className="font-semibold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">Create Assignment</div>
-                <div className="text-sm text-gray-500">Add new group assignment</div>
+                <div className="font-semibold text-gray-900 dark:text-gray-100 mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">Create Assignment</div>
+                <div className="text-sm text-gray-500 dark:text-gray-400">Add new group assignment</div>
               </div>
             </button>
 
             <button 
               onClick={handleManageGroup}
-              className="group flex flex-col items-center p-6 border-2 border-gray-200 rounded-xl hover:border-green-400 hover:bg-green-50/50 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-md"
+              className="group flex flex-col items-center p-6 border-2 border-gray-200 dark:border-gray-700 rounded-xl hover:border-green-400 dark:hover:border-green-500 hover:bg-green-50/50 dark:hover:bg-green-900/20 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-md"
             >
-              <div className="p-3 bg-gradient-to-br from-green-100 to-green-50 rounded-full mb-3 group-hover:from-green-200 group-hover:to-green-100 transition-all duration-300 shadow-sm">
-                <Settings className="h-6 w-6 text-green-600 group-hover:scale-110 transition-transform" />
+              <div className="p-3 bg-gradient-to-br from-green-100 to-green-50 dark:from-green-900/50 dark:to-green-800/50 rounded-full mb-3 group-hover:from-green-200 group-hover:to-green-100 dark:group-hover:from-green-800 dark:group-hover:to-green-700 transition-all duration-300 shadow-sm">
+                <Settings className="h-6 w-6 text-green-600 dark:text-green-400 group-hover:scale-110 transition-transform" />
               </div>
               <div className="text-center">
-                <div className="font-semibold text-gray-900 mb-1 group-hover:text-green-600 transition-colors">Manage Group</div>
-                <div className="text-sm text-gray-500">Group settings & configuration</div>
+                <div className="font-semibold text-gray-900 dark:text-gray-100 mb-1 group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">Manage Group</div>
+                <div className="text-sm text-gray-500 dark:text-gray-400">Group settings & configuration</div>
               </div>
             </button>
 
             <button 
               onClick={handleAddMember}
-              className="group flex flex-col items-center p-6 border-2 border-gray-200 rounded-xl hover:border-orange-400 hover:bg-orange-50/50 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-md"
+              className="group flex flex-col items-center p-6 border-2 border-gray-200 dark:border-gray-700 rounded-xl hover:border-orange-400 dark:hover:border-orange-500 hover:bg-orange-50/50 dark:hover:bg-orange-900/20 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-md"
             >
-              <div className="p-3 bg-gradient-to-br from-orange-100 to-orange-50 rounded-full mb-3 group-hover:from-orange-200 group-hover:to-orange-100 transition-all duration-300 shadow-sm">
-                <UserPlus className="h-6 w-6 text-orange-600 group-hover:scale-110 transition-transform" />
+              <div className="p-3 bg-gradient-to-br from-orange-100 to-orange-50 dark:from-orange-900/50 dark:to-orange-800/50 rounded-full mb-3 group-hover:from-orange-200 group-hover:to-orange-100 dark:group-hover:from-orange-800 dark:group-hover:to-orange-700 transition-all duration-300 shadow-sm">
+                <UserPlus className="h-6 w-6 text-orange-600 dark:text-orange-400 group-hover:scale-110 transition-transform" />
               </div>
               <div className="text-center">
-                <div className="font-semibold text-gray-900 mb-1 group-hover:text-orange-600 transition-colors">Add Member</div>
-                <div className="text-sm text-gray-500">Invite students to group</div>
+                <div className="font-semibold text-gray-900 dark:text-gray-100 mb-1 group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors">Add Member</div>
+                <div className="text-sm text-gray-500 dark:text-gray-400">Invite students to group</div>
               </div>
             </button>
 
             <button 
               onClick={handleViewAnalytics}
-              className="group flex flex-col items-center p-6 border-2 border-gray-200 rounded-xl hover:border-purple-400 hover:bg-purple-50/50 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-md"
+              className="group flex flex-col items-center p-6 border-2 border-gray-200 dark:border-gray-700 rounded-xl hover:border-purple-400 dark:hover:border-purple-500 hover:bg-purple-50/50 dark:hover:bg-purple-900/20 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-md"
             >
-              <div className="p-3 bg-gradient-to-br from-purple-100 to-purple-50 rounded-full mb-3 group-hover:from-purple-200 group-hover:to-purple-100 transition-all duration-300 shadow-sm">
-                <BarChart3 className="h-6 w-6 text-purple-600 group-hover:scale-110 transition-transform" />
+              <div className="p-3 bg-gradient-to-br from-purple-100 to-purple-50 dark:from-purple-900/50 dark:to-purple-800/50 rounded-full mb-3 group-hover:from-purple-200 group-hover:to-purple-100 dark:group-hover:from-purple-800 dark:group-hover:to-purple-700 transition-all duration-300 shadow-sm">
+                <BarChart3 className="h-6 w-6 text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform" />
               </div>
               <div className="text-center">
-                <div className="font-semibold text-gray-900 mb-1 group-hover:text-purple-600 transition-colors">View Analytics</div>
-                <div className="text-sm text-gray-500">Group performance insights</div>
+                <div className="font-semibold text-gray-900 dark:text-gray-100 mb-1 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">View Analytics</div>
+                <div className="text-sm text-gray-500 dark:text-gray-400">Group performance insights</div>
               </div>
             </button>
           </div>
@@ -356,17 +356,17 @@ const GroupHome: React.FC = () => {
       {/* 3. Group Members & Upcoming Tasks - For Both Teachers and Students */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Group Members - Interactive */}
-        <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
-          <div className="flex items-center justify-between mb-5 pb-4 border-b border-gray-100">
-            <h2 className="text-xl font-semibold text-gray-900 flex items-center">
-              <div className="p-1.5 bg-blue-50 rounded-lg mr-2.5">
-                <Users className="h-4 w-4 text-blue-600" />
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 p-6">
+          <div className="flex items-center justify-between mb-5 pb-4 border-b border-gray-100 dark:border-gray-700">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 flex items-center">
+              <div className="p-1.5 bg-blue-50 dark:bg-blue-900/50 rounded-lg mr-2.5">
+                <Users className="h-4 w-4 text-blue-600 dark:text-blue-400" />
               </div>
               Group Members
             </h2>
             <button 
               onClick={handleViewMembers}
-              className="text-blue-600 hover:text-blue-800 text-sm font-medium hover:underline transition-colors"
+              className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm font-medium hover:underline transition-colors"
             >
               View all members
             </button>
@@ -377,7 +377,7 @@ const GroupHome: React.FC = () => {
                 {groupInfo.members.slice(0, 4).map((member, index) => (
                   <div 
                     key={member._id} 
-                    className="flex items-center p-4 bg-gradient-to-r from-gray-50/80 to-gray-100/80 rounded-xl hover:from-blue-50 hover:to-purple-50 hover:shadow-sm transition-all duration-300 cursor-pointer border border-transparent hover:border-gray-200"
+                    className="flex items-center p-4 bg-gradient-to-r from-gray-50/80 to-gray-100/80 dark:from-gray-700/50 dark:to-gray-800/50 rounded-xl hover:from-blue-50 hover:to-purple-50 dark:hover:from-blue-900/20 dark:hover:to-purple-900/20 hover:shadow-sm transition-all duration-300 cursor-pointer border border-transparent hover:border-gray-200 dark:hover:border-gray-600"
                     onClick={() => navigate(`/groups/${groupId}/people`)}
                   >
                     <div className="flex-shrink-0 mr-4">
@@ -389,17 +389,17 @@ const GroupHome: React.FC = () => {
                       />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-900 truncate mb-0.5">
+                      <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate mb-0.5">
                         {member.firstName} {member.lastName}
                       </p>
-                      <p className="text-xs text-gray-400 truncate">{member.email}</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{member.email}</p>
                     </div>
                     <div className="flex-shrink-0">
                       <div className="text-right">
                         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
                           index === 0 
-                            ? 'bg-blue-100 text-blue-700' 
-                            : 'bg-gray-100 text-gray-600'
+                            ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300' 
+                            : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
                         }`}>
                           {index === 0 ? 'Leader' : 'Member'}
                         </span>
@@ -409,7 +409,7 @@ const GroupHome: React.FC = () => {
                 ))}
                 {groupInfo.members.length > 4 && (
                   <div className="text-center pt-2">
-                    <span className="text-sm text-gray-500">
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
                       +{groupInfo.members.length - 4} more members
                     </span>
                   </div>
@@ -418,9 +418,9 @@ const GroupHome: React.FC = () => {
             ) : (
               <div className="text-center py-8">
                 <div className="flex flex-col items-center">
-                  <Users className="h-12 w-12 text-gray-400 mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No members yet</h3>
-                  <p className="text-sm text-gray-500">This group doesn't have any members</p>
+                  <Users className="h-12 w-12 text-gray-400 dark:text-gray-500 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No members yet</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">This group doesn't have any members</p>
                 </div>
               </div>
             )}
@@ -428,17 +428,17 @@ const GroupHome: React.FC = () => {
         </div>
 
         {/* Upcoming Tasks - Interactive */}
-        <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
-          <div className="flex items-center justify-between mb-5 pb-4 border-b border-gray-100">
-            <h2 className="text-xl font-semibold text-gray-900 flex items-center">
-              <div className="p-1.5 bg-orange-50 rounded-lg mr-2.5">
-                <Target className="h-4 w-4 text-orange-600" />
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 p-6">
+          <div className="flex items-center justify-between mb-5 pb-4 border-b border-gray-100 dark:border-gray-700">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 flex items-center">
+              <div className="p-1.5 bg-orange-50 dark:bg-orange-900/50 rounded-lg mr-2.5">
+                <Target className="h-4 w-4 text-orange-600 dark:text-orange-400" />
               </div>
               Upcoming Tasks
             </h2>
             <button 
               onClick={handleViewAssignments}
-              className="text-orange-600 hover:text-orange-800 text-sm font-medium hover:underline transition-colors"
+              className="text-orange-600 dark:text-orange-400 hover:text-orange-800 dark:hover:text-orange-300 text-sm font-medium hover:underline transition-colors"
             >
               View all tasks
             </button>
@@ -448,23 +448,23 @@ const GroupHome: React.FC = () => {
               upcomingTasks.map((task) => (
                 <div 
                   key={task.id} 
-                  className="p-4 bg-gradient-to-r from-gray-50/80 to-gray-50/50 rounded-lg hover:from-orange-50 hover:to-orange-50/50 transition-all duration-300 cursor-pointer border-l-4 border-transparent hover:border-orange-400 hover:shadow-sm"
+                  className="p-4 bg-gradient-to-r from-gray-50/80 to-gray-50/50 dark:from-gray-700/50 dark:to-gray-800/50 rounded-lg hover:from-orange-50 hover:to-orange-50/50 dark:hover:from-orange-900/20 dark:hover:to-orange-800/20 transition-all duration-300 cursor-pointer border-l-4 border-transparent hover:border-orange-400 dark:hover:border-orange-500 hover:shadow-sm"
                   onClick={() => navigate(`/groups/${groupId}/assignments`)}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 mb-1.5 truncate">
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1.5 truncate">
                         {task.title}
                       </p>
-                      <div className="flex items-center text-xs text-gray-500">
+                      <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
                         <Clock className="h-3 w-3 mr-1" />
                         <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
                       </div>
                     </div>
                     <span className={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap shadow-sm ${
-                      task.priority === 'high' ? 'bg-red-100 text-red-700' :
-                      task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                      'bg-green-100 text-green-700'
+                      task.priority === 'high' ? 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300' :
+                      task.priority === 'medium' ? 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-300' :
+                      'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300'
                     }`}>
                       {task.priority}
                     </span>
@@ -474,9 +474,9 @@ const GroupHome: React.FC = () => {
             ) : (
               <div className="text-center py-8">
                 <div className="flex flex-col items-center">
-                  <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">All caught up!</h3>
-                  <p className="text-sm text-gray-500">No upcoming assignments or discussions</p>
+                  <CheckCircle className="h-12 w-12 text-green-500 dark:text-green-400 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">All caught up!</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">No upcoming assignments or discussions</p>
                 </div>
               </div>
             )}
