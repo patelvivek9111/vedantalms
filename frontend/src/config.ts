@@ -14,7 +14,7 @@ const getApiUrl = () => {
       const hostname = window.location.hostname;
       // Use relative URL if on custom domain or Render domain (same origin)
       if (hostname.includes('vedantaed.com') || hostname.includes('onrender.com')) {
-        return ''; // Use relative URL (same domain) - avoids CORS
+      return ''; // Use relative URL (same domain) - avoids CORS
       }
     }
     // Fallback to Render backend URL (shouldn't happen if properly configured)

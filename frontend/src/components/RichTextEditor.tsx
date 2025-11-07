@@ -10,6 +10,9 @@ interface RichTextEditorProps {
 }
 
 const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, placeholder, className, height }) => {
+  // Get current domain for TinyMCE
+  const currentDomain = typeof window !== 'undefined' ? window.location.hostname : '';
+  
   return (
     <Editor
       apiKey="gm5axo7z7bcihdlgxc1cyco7y5fczucedjgtm419lvc1sk5s"
@@ -27,7 +30,14 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, plac
           alignleft aligncenter alignright alignjustify | \
           bullist numlist outdent indent | removeformat | help',
         placeholder: placeholder || 'Write something...',
-        content_style: 'body { font-family:Helvetica,Arial,sans-serif; font-size:14px }'
+        content_style: 'body { font-family:Helvetica,Arial,sans-serif; font-size:14px }',
+        // Configure domain settings
+        branding: false,
+        promotion: false,
+        // Suppress domain warning by using relative URLs
+        relative_urls: true,
+        remove_script_host: true,
+        document_base_url: typeof window !== 'undefined' ? window.location.origin : ''
       }}
       textareaName="content"
       className={className}

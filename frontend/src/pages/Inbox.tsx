@@ -418,7 +418,10 @@ const Inbox: React.FC = () => {
       return;
     }
     api.get('/courses').then(res => {
-      const userCourses = (res.data.data || []).map((c: any) => ({ value: c._id, label: c.title }));
+      const userCourses = (res.data.data || []).map((c: any) => ({ 
+        value: c._id, 
+        label: c.catalog?.courseCode || c.title 
+      }));
       setCourseOptions([{ value: 'all', label: 'All Courses' }, ...userCourses]);
     });
   }, [user]);
