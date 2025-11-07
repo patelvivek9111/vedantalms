@@ -82,16 +82,16 @@ const GroupPages: React.FC<GroupPagesProps> = ({ groupSetId, groupId, isInstruct
   }, [courseId, groupSetId]);
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border dark:border-gray-700">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">Group Pages</h2>
-          <p className="text-gray-600 mt-1">Pages shared with this group set</p>
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Group Pages</h2>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">Pages shared with this group set</p>
         </div>
         {isInstructor && (
           <button
             onClick={() => setShowCreate(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2"
+            className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors flex items-center gap-2"
           >
             + Create Page
           </button>
@@ -108,13 +108,13 @@ const GroupPages: React.FC<GroupPagesProps> = ({ groupSetId, groupId, isInstruct
         </ModuleProvider>
       )}
       {loading ? (
-        <div className="text-center py-8 text-gray-500">Loading pages...</div>
+        <div className="text-center py-8 text-gray-500 dark:text-gray-400">Loading pages...</div>
       ) : pages.length === 0 ? (
         <div className="text-center py-16">
           <div className="flex flex-col items-center">
-            <FileText className="h-16 w-16 text-gray-300 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No pages yet</h3>
-            <p className="text-sm text-gray-500 max-w-md">
+            <FileText className="h-16 w-16 text-gray-300 dark:text-gray-600 mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No pages yet</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md">
               {isInstructor 
                 ? "Get started by creating a page to share with this group set."
                 : "There are no pages available for this group set yet."}
@@ -122,12 +122,12 @@ const GroupPages: React.FC<GroupPagesProps> = ({ groupSetId, groupId, isInstruct
           </div>
         </div>
       ) : (
-        <div className="divide-y">
+        <div className="divide-y divide-gray-200 dark:divide-gray-700">
           {pages.map(page => (
-            <div key={page._id} className="p-4 hover:bg-gray-50 flex justify-between items-center group">
+            <div key={page._id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 flex justify-between items-center group">
               <div className="flex items-center space-x-2">
-                <FileText className="w-4 h-4 text-blue-500" />
-                <span className="group-hover:text-blue-500 font-medium">{page.title}</span>
+                <FileText className="w-4 h-4 text-blue-500 dark:text-blue-400" />
+                <span className="group-hover:text-blue-500 dark:group-hover:text-blue-400 font-medium text-gray-900 dark:text-gray-100">{page.title}</span>
               </div>
               {/* Add view/edit/delete buttons as needed */}
             </div>

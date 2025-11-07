@@ -303,29 +303,29 @@ const AssignmentGrading = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-32">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 dark:border-indigo-400"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+      <div className="bg-red-100 dark:bg-red-900/20 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded">
         {error}
       </div>
     );
   }
 
   if (!assignment) {
-    return <div>Assignment not found</div>;
+    return <div className="text-gray-900 dark:text-gray-100">Assignment not found</div>;
   }
 
   return (
     <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
-      <div className="bg-white shadow rounded-lg p-6">
+      <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 border dark:border-gray-700">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">{assignment.title} - Grading</h1>
-          <p className="text-sm text-gray-600">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">{assignment.title} - Grading</h1>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
             {submissions.length} submission{submissions.length !== 1 ? 's' : ''} to grade
           </p>
         </div>
@@ -333,7 +333,7 @@ const AssignmentGrading = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Submissions List */}
           <div className="lg:col-span-1">
-            <h2 className="text-lg font-semibold mb-4">Submissions</h2>
+            <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Submissions</h2>
             <div className="space-y-3 max-h-96 overflow-y-auto">
               {submissions.map((submission) => (
                 <div
@@ -341,39 +341,39 @@ const AssignmentGrading = () => {
                   onClick={() => setSelectedSubmission(submission)}
                   className={`p-4 border rounded-lg cursor-pointer transition-colors ${
                     selectedSubmission?._id === submission._id
-                      ? 'border-indigo-500 bg-indigo-50'
-                      : 'border-gray-200 hover:border-gray-300'
+                      ? 'border-indigo-500 dark:border-indigo-400 bg-indigo-50 dark:bg-indigo-900/30'
+                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-900'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <div className="font-medium">
+                    <div className="font-medium text-gray-900 dark:text-gray-100">
                       {submission.student?.firstName} {submission.student?.lastName}
                     </div>
                     <div className="flex items-center space-x-2">
                       {submission.autoGraded && (
-                        <div className="flex items-center text-blue-600">
+                        <div className="flex items-center text-blue-600 dark:text-blue-400">
                           <CheckCircle className="h-4 w-4 mr-1" />
                           <span className="text-xs">Auto</span>
                         </div>
                       )}
                       {submission.teacherApproved && (
-                        <div className="flex items-center text-green-600">
+                        <div className="flex items-center text-green-600 dark:text-green-400">
                           <CheckCircle className="h-4 w-4 mr-1" />
                           <span className="text-xs">Graded</span>
                         </div>
                       )}
                     </div>
                   </div>
-                  <div className="text-sm text-gray-600">
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
                     Submitted: {format(new Date(submission.submittedAt), 'MMM d, yyyy h:mm a')}
                   </div>
                   {submission.autoGraded && (
-                    <div className="text-sm text-blue-600 mt-1">
+                    <div className="text-sm text-blue-600 dark:text-blue-400 mt-1">
                       Auto-grade: {submission.autoGrade} points
                     </div>
                   )}
                   {submission.teacherApproved && (
-                    <div className="text-sm text-green-600 mt-1">
+                    <div className="text-sm text-green-600 dark:text-green-400 mt-1">
                       Final grade: {submission.finalGrade || submission.grade} points
                     </div>
                   )}
@@ -387,21 +387,21 @@ const AssignmentGrading = () => {
             {selectedSubmission ? (
               <div>
                 <div className="mb-6">
-                  <h2 className="text-lg font-semibold mb-2">
+                  <h2 className="text-lg font-semibold mb-2 text-gray-900 dark:text-gray-100">
                     Grading: {selectedSubmission.student?.firstName} {selectedSubmission.student?.lastName}
                   </h2>
                   
                   {/* Auto-grading status */}
                   {selectedSubmission.autoGraded && (
-                    <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                       <div className="flex items-center mb-2">
-                        <AlertCircle className="h-5 w-5 text-blue-600 mr-2" />
-                        <span className="font-medium text-blue-900">Auto-Graded Submission</span>
+                        <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 mr-2" />
+                        <span className="font-medium text-blue-900 dark:text-blue-200">Auto-Graded Submission</span>
                       </div>
-                      <div className="text-blue-800">
+                      <div className="text-blue-800 dark:text-blue-200">
                         <div>Auto-grade: {selectedSubmission.autoGrade} points</div>
                         {selectedSubmission.teacherApproved ? (
-                          <div className="text-green-700 font-medium">
+                          <div className="text-green-700 dark:text-green-300 font-medium">
                             Final grade: {selectedSubmission.finalGrade || selectedSubmission.grade} points
                           </div>
                         ) : (
@@ -423,16 +423,16 @@ const AssignmentGrading = () => {
                         const studentAnswer = getStudentAnswer(index);
                         
                         return (
-                          <div key={index} className="border border-gray-200 rounded-lg p-4">
+                          <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-900">
                             <div className="flex justify-between items-start mb-3">
                               <div>
-                                <h3 className="font-medium">Question {index + 1}</h3>
-                                <p className="text-sm text-gray-600">{question.text}</p>
+                                <h3 className="font-medium text-gray-900 dark:text-gray-100">Question {index + 1}</h3>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">{question.text}</p>
                               </div>
                               <div className="text-right">
-                                <div className="text-sm text-gray-600">{maxPoints} pts</div>
+                                <div className="text-sm text-gray-600 dark:text-gray-400">{maxPoints} pts</div>
                                 {(questionType === 'multiple-choice' || questionType === 'matching') && autoGrade !== null && (
-                                  <div className={`text-sm ${autoGrade > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                  <div className={`text-sm ${autoGrade > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                                     Auto: {autoGrade}/{maxPoints}
                                   </div>
                                 )}
@@ -441,9 +441,9 @@ const AssignmentGrading = () => {
 
                             {/* Student Answer */}
                             <div className="mb-3">
-                              <div className="text-sm font-medium text-gray-700 mb-1">Student Answer:</div>
+                              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Student Answer:</div>
                               {questionType === 'multiple-choice' ? (
-                                <div className="text-sm text-gray-900">{studentAnswer || 'No answer'}</div>
+                                <div className="text-sm text-gray-900 dark:text-gray-100">{studentAnswer || 'No answer'}</div>
                               ) : questionType === 'matching' ? (
                                 <div className="space-y-2">
                                   {question.leftItems && question.leftItems.map((leftItem, leftIndex) => {
@@ -456,26 +456,26 @@ const AssignmentGrading = () => {
                                     
                                     return (
                                       <div key={leftItem.id} className={`p-2 rounded border ${
-                                        isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+                                        isCorrect ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
                                       }`}>
                                         <div className="flex items-center justify-between">
-                                          <span className="font-medium text-gray-900">{leftItem.text}</span>
+                                          <span className="font-medium text-gray-900 dark:text-gray-100">{leftItem.text}</span>
                                           <div className="flex items-center space-x-2">
-                                            <span className="text-gray-500">→</span>
+                                            <span className="text-gray-500 dark:text-gray-400">→</span>
                                             <span className={`text-sm ${
-                                              isCorrect ? 'text-green-700' : 'text-red-700'
+                                              isCorrect ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'
                                             }`}>
                                               {studentMatch || 'No answer'}
                                             </span>
                                             {isCorrect ? (
-                                              <CheckCircle className="h-4 w-4 text-green-600" />
+                                              <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
                                             ) : (
-                                              <XCircle className="h-4 w-4 text-red-600" />
+                                              <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
                                             )}
                                           </div>
                                         </div>
                                         {!isCorrect && correctMatch && (
-                                          <div className="text-xs text-gray-600 mt-1">
+                                          <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
                                             Correct: {correctMatch.text}
                                           </div>
                                         )}
@@ -487,7 +487,7 @@ const AssignmentGrading = () => {
                                 <textarea
                                   value={studentAnswer}
                                   readOnly
-                                  className="w-full h-24 p-2 border border-gray-300 rounded text-sm"
+                                  className="w-full h-24 p-2 border border-gray-300 dark:border-gray-700 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                                   placeholder="No answer provided"
                                 />
                               )}
@@ -500,7 +500,7 @@ const AssignmentGrading = () => {
                               </div>
                             ) : questionType === 'matching' ? (
                               <div>
-                                <label htmlFor={`grade-${index}`} className="block text-sm font-medium text-gray-700 mb-1">
+                                <label htmlFor={`grade-${index}`} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                   Grade (0-{maxPoints}):
                                 </label>
                                 <div className="flex items-center space-x-3">
@@ -522,10 +522,10 @@ const AssignmentGrading = () => {
                                         e.target.select();
                                       }
                                     }}
-                                    className="w-20 p-2 border border-gray-300 rounded text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    className="w-20 p-2 border border-gray-300 dark:border-gray-700 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                   />
                                   {autoGrade !== null && (
-                                    <div className="text-sm text-gray-600">
+                                    <div className="text-sm text-gray-600 dark:text-gray-400">
                                       Auto: {autoGrade}/{maxPoints}
                                     </div>
                                   )}
@@ -533,7 +533,7 @@ const AssignmentGrading = () => {
                               </div>
                             ) : (
                               <div>
-                                <label htmlFor={`grade-${index}`} className="block text-sm font-medium text-gray-700 mb-1">
+                                <label htmlFor={`grade-${index}`} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                   Grade (0-{maxPoints}):
                                 </label>
                                 <div className="flex items-center space-x-3">
@@ -555,10 +555,10 @@ const AssignmentGrading = () => {
                                         e.target.select();
                                       }
                                     }}
-                                    className="w-20 p-2 border border-gray-300 rounded text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    className="w-20 p-2 border border-gray-300 dark:border-gray-700 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                   />
                                   {questionType === 'multiple-choice' && autoGrade !== null && (
-                                    <div className="text-sm text-gray-600">
+                                    <div className="text-sm text-gray-600 dark:text-gray-400">
                                       Auto: {autoGrade}/{maxPoints}
                                     </div>
                                   )}
@@ -573,7 +573,7 @@ const AssignmentGrading = () => {
 
                   {/* Feedback */}
                   <div className="mt-6">
-                    <label htmlFor="feedback" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="feedback" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Feedback:
                     </label>
                     <textarea
@@ -581,7 +581,7 @@ const AssignmentGrading = () => {
                       name="feedback"
                       value={feedback}
                       onChange={(e) => setFeedback(e.target.value)}
-                      className="w-full h-32 p-3 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                      className="w-full h-32 p-3 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-indigo-500 dark:focus:border-indigo-400"
                       placeholder="Provide feedback for the student..."
                     />
                   </div>
@@ -593,7 +593,7 @@ const AssignmentGrading = () => {
                         <button
                           onClick={() => handleGradeSubmission(true)}
                           disabled={isGrading}
-                          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
+                          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600"
                         >
                           {isGrading ? 'Approving...' : 'Approve Auto-Grade'}
                         </button>
@@ -601,7 +601,7 @@ const AssignmentGrading = () => {
                           <button
                             onClick={() => handleGradeSubmission(false)}
                             disabled={isGrading}
-                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600"
                           >
                             {isGrading ? 'Grading...' : 'Grade with Edits'}
                           </button>
@@ -611,7 +611,7 @@ const AssignmentGrading = () => {
                       <button
                         onClick={() => handleGradeSubmission(false)}
                         disabled={isGrading}
-                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600"
                       >
                         {isGrading ? 'Grading...' : 'Grade Submission'}
                       </button>
@@ -621,7 +621,7 @@ const AssignmentGrading = () => {
                     <button
                       onClick={handleDeleteSubmission}
                       disabled={isDeleting}
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700"
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 dark:bg-red-500 hover:bg-red-700 dark:hover:bg-red-600"
                     >
                       {isDeleting ? 'Deleting...' : 'Delete Submission'}
                     </button>
@@ -629,7 +629,7 @@ const AssignmentGrading = () => {
                 </div>
               </div>
             ) : (
-              <div className="text-center text-gray-500 py-12">
+              <div className="text-center text-gray-500 dark:text-gray-400 py-12">
                 Select a submission to grade
               </div>
             )}

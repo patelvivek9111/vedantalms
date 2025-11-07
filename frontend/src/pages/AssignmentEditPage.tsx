@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import axios from 'axios';
+import api from '../services/api';
 import CreateAssignmentForm from '../components/assignments/CreateAssignmentForm';
-
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000';
 
 const AssignmentEditPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -20,10 +18,7 @@ const AssignmentEditPage: React.FC = () => {
       if (!id) return;
       
       try {
-        const token = localStorage.getItem('token');
-        const response = await axios.get(`${API_URL}/api/assignments/${id}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const response = await api.get(`/assignments/${id}`);
 
         if (response.data) {
           const assignment = response.data;

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, NavLink, useNavigate, Outlet, Link } from 'react-router-dom';
+import { useParams, NavLink, useNavigate, Outlet, Link, useLocation } from 'react-router-dom';
 import { Home, FileText, MessageSquare, ClipboardList, Megaphone, Users, ChevronDown } from 'lucide-react';
 import axios from 'axios';
 import { API_URL } from '../../config';
@@ -18,6 +18,7 @@ const tabs = [
 
 export default function GroupDashboard() {
   const { groupId } = useParams();
+  const location = useLocation();
   const [groupName, setGroupName] = useState('Group');
   const [groupSetName, setGroupSetName] = useState('Group Set');
   const [groupSetId, setGroupSetId] = useState('');
@@ -32,6 +33,23 @@ export default function GroupDashboard() {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const isInstructor = user?.role === 'teacher';
   const isAdmin = user?.role === 'admin';
+
+  // Get the current active tab from the pathname - use more precise matching
+  const currentPath = location.pathname;
+  // Extract just the last segment after the groupId
+  const pathSegments = currentPath.split('/').filter(Boolean);
+  const groupIndex = pathSegments.findIndex(seg => seg === groupId);
+  const lastSegment = groupIndex >= 0 && groupIndex < pathSegments.length - 1 
+    ? pathSegments[groupIndex + 1] 
+    : pathSegments[pathSegments.length - 1];
+  
+  // Only show one section at a time based on the last path segment
+  const isAssignments = lastSegment === 'assignments';
+  const isPages = lastSegment === 'pages';
+  const isAnnouncements = lastSegment === 'announcements';
+  const isHome = lastSegment === 'home' || lastSegment === groupId || !lastSegment || groupIndex === pathSegments.length - 1;
+  const isDiscussion = lastSegment === 'discussion' && !currentPath.includes('/discussion/');
+  const isPeople = lastSegment === 'people';
 
   useEffect(() => {
     async function fetchGroup() {
@@ -97,33 +115,33 @@ export default function GroupDashboard() {
   return (
     <div className="max-w-6xl mx-auto py-8 flex flex-col gap-4">
       {/* Simple Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-gray-500 mb-4 px-1">
-        <Link to="/groups" className="hover:underline text-gray-700 font-medium">Group Management</Link>
-        <span className="mx-1 text-gray-300">&gt;</span>
-        <span className="text-gray-700 font-semibold">{groupName}</span>
+      <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4 px-1">
+        <Link to="/groups" className="hover:underline text-gray-700 dark:text-gray-300 font-medium">Group Management</Link>
+        <span className="mx-1 text-gray-300 dark:text-gray-600">&gt;</span>
+        <span className="text-gray-700 dark:text-gray-300 font-semibold">{groupName}</span>
       </div>
       <div className="flex gap-8">
         {/* Sidebar */}
-        <aside className="w-64 flex-shrink-0 bg-white/80 backdrop-blur rounded-2xl shadow-lg p-6 h-fit relative border border-gray-100 mt-2">
+        <aside className="w-64 flex-shrink-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur rounded-2xl shadow-lg p-6 h-fit relative border border-gray-100 dark:border-gray-700 mt-2">
           {/* Dropdown header */}
-          <div className="mb-8 border-b pb-3 relative">
+          <div className="mb-8 border-b border-gray-200 dark:border-gray-700 pb-3 relative">
             {(isInstructor || isAdmin) ? (
               <button
-                className="w-full flex items-center justify-between font-bold text-xl text-left focus:outline-none text-gray-900"
+                className="w-full flex items-center justify-between font-bold text-xl text-left focus:outline-none text-gray-900 dark:text-gray-100"
                 onClick={() => setDropdownOpen((open) => !open)}
               >
                 <span>{groupSetName} / {groupName}</span>
                 <ChevronDown className={`h-5 w-5 ml-2 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
               </button>
             ) : (
-              <div className="font-bold text-xl text-gray-900">{groupSetName} / {groupName}</div>
+              <div className="font-bold text-xl text-gray-900 dark:text-gray-100">{groupSetName} / {groupName}</div>
             )}
             {dropdownOpen && (isInstructor || isAdmin) && (
-              <div className="absolute left-0 right-0 z-10 bg-white border rounded shadow mt-2 max-h-60 overflow-y-auto">
+              <div className="absolute left-0 right-0 z-10 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow mt-2 max-h-60 overflow-y-auto">
                 {groupsInSet.map((g) => (
                   <div
                     key={g._id}
-                    className={`px-4 py-2 cursor-pointer hover:bg-blue-50 ${g._id === groupId ? 'bg-blue-100 font-semibold' : ''}`}
+                    className={`px-4 py-2 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/30 text-gray-900 dark:text-gray-100 ${g._id === groupId ? 'bg-blue-100 dark:bg-blue-900/50 font-semibold' : ''}`}
                     onClick={() => {
                       setDropdownOpen(false);
                       navigate(`/groups/${g._id}`);
@@ -141,11 +159,11 @@ export default function GroupDashboard() {
               return (
                 <NavLink
                   key={tab.path}
-                  to={tab.path}
+                  to={`/groups/${groupId}/${tab.path}`}
                   className={({ isActive }) =>
                     isActive
-                      ? 'flex items-center gap-3 font-semibold text-blue-700 bg-blue-100 rounded-lg px-4 py-2 shadow'
-                      : 'flex items-center gap-3 text-gray-700 hover:text-blue-700 hover:bg-blue-50 rounded-lg px-4 py-2 transition-colors'
+                      ? 'flex items-center gap-3 font-semibold text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/50 rounded-lg px-4 py-2 shadow'
+                      : 'flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg px-4 py-2 transition-colors'
                   }
                   end
                 >
@@ -158,18 +176,18 @@ export default function GroupDashboard() {
         </aside>
         {/* Main Content */}
         <main className="flex-1 min-w-0">
-          {/* Assignments Tab Content */}
-          {window.location.pathname.includes('/assignments') && (
+          {/* Only show one section at a time based on current path */}
+          {isAssignments && (
             <div className="p-4">
-              <h3 className="text-xl font-semibold mb-4">Group Assignments</h3>
+              <h3 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">Group Assignments</h3>
               {assignmentsLoading ? (
-                <div className="text-center py-8 text-gray-500">Loading assignments...</div>
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">Loading assignments...</div>
               ) : assignments.length === 0 ? (
                 <div className="text-center py-16">
                   <div className="flex flex-col items-center">
-                    <ClipboardList className="h-16 w-16 text-gray-300 mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No assignments yet</h3>
-                    <p className="text-sm text-gray-500">There are no assignments for this group set yet.</p>
+                    <ClipboardList className="h-16 w-16 text-gray-300 dark:text-gray-600 mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No assignments yet</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">There are no assignments for this group set yet.</p>
                   </div>
                 </div>
               ) : (
@@ -187,16 +205,14 @@ export default function GroupDashboard() {
               )}
             </div>
           )}
-          {/* Pages Tab Content */}
-          {window.location.pathname.includes('/pages') && groupId && (
+          {isPages && groupId && (
             <GroupPages groupSetId={groupSetId} groupId={groupId} isInstructor={isInstructor} />
           )}
-          {/* Announcements Tab Content */}
-          {window.location.pathname.includes('/announcements') && groupSetId && courseId && (
+          {isAnnouncements && groupSetId && courseId && (
             <GroupAnnouncements groupSetId={groupSetId} courseId={courseId} />
           )}
-          {/* Other tab content */}
-          <Outlet context={{ groupSetId }} />
+          {/* Other tab content (home, discussion, people) */}
+          {(isHome || isDiscussion || isPeople) && <Outlet context={{ groupSetId }} />}
         </main>
       </div>
     </div>

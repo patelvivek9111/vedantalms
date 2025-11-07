@@ -37,7 +37,7 @@ const GroupAnnouncements: React.FC<GroupAnnouncementsProps> = ({ courseId, group
   if (!courseId || !groupSetId || courseId === '' || groupSetId === '') {
     return (
       <div className="p-4">
-        <div className="text-gray-500 text-center">Loading announcements...</div>
+        <div className="text-gray-500 dark:text-gray-400 text-center">Loading announcements...</div>
       </div>
     );
   }
@@ -152,16 +152,16 @@ const GroupAnnouncements: React.FC<GroupAnnouncementsProps> = ({ courseId, group
               user?.role !== 'student';
             const visibleReplies = shouldShowReplies ? comment.replies : [];
             return (
-              <li key={parentKey + comment._id} className="bg-gray-50 rounded-lg p-4 border border-gray-100">
+              <li key={parentKey + comment._id} className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-100 dark:border-gray-700">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="font-semibold text-gray-800">{comment.author.firstName} {comment.author.lastName}</span>
-                  <span className="text-xs text-gray-400">{new Date(comment.createdAt).toLocaleString()}</span>
+                  <span className="font-semibold text-gray-800 dark:text-gray-200">{comment.author.firstName} {comment.author.lastName}</span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500">{new Date(comment.createdAt).toLocaleString()}</span>
                 </div>
-                <div className="mb-2 text-gray-700">{comment.text}</div>
+                <div className="mb-2 text-gray-700 dark:text-gray-300">{comment.text}</div>
                 <div className="flex gap-2 mb-2 items-center">
                   {user && selectedAnnouncement?.options?.allowLiking && !isOwnComment && (
                     <button
-                      className={`text-xs flex items-center gap-1 px-2 py-1 rounded ${isLiked ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
+                      className={`text-xs flex items-center gap-1 px-2 py-1 rounded ${isLiked ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300' : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'}`}
                       onClick={e => {
                         e.preventDefault();
                         isLiked ? handleUnlike(comment._id) : handleLike(comment._id);
@@ -174,7 +174,7 @@ const GroupAnnouncements: React.FC<GroupAnnouncementsProps> = ({ courseId, group
                   )}
                   {user && (
                     <button
-                      className="text-xs text-blue-600 hover:underline"
+                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
                       onClick={() => setReplyingTo(comment._id)}
                     >
                       Reply
@@ -184,7 +184,7 @@ const GroupAnnouncements: React.FC<GroupAnnouncementsProps> = ({ courseId, group
                 {replyingTo === comment._id && (
                   <div className="mb-2">
                     <textarea
-                      className="w-full border rounded px-2 py-1 text-sm"
+                      className="w-full border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
                       rows={2}
                       placeholder="Write a reply..."
                       value={replyText[comment._id] || ''}
@@ -193,14 +193,14 @@ const GroupAnnouncements: React.FC<GroupAnnouncementsProps> = ({ courseId, group
                     />
                     <div className="flex gap-2 mt-1 justify-end">
                       <button
-                        className="px-3 py-1 text-xs bg-gray-200 rounded hover:bg-gray-300"
+                        className="px-3 py-1 text-xs bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-600"
                         onClick={() => setReplyingTo(null)}
                         disabled={posting}
                       >
                         Cancel
                       </button>
                       <button
-                        className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                        className="px-3 py-1 text-xs bg-blue-600 dark:bg-blue-500 text-white rounded hover:bg-blue-700 dark:hover:bg-blue-600"
                         onClick={() => handlePostReply(comment._id)}
                         disabled={posting}
                       >
@@ -210,7 +210,7 @@ const GroupAnnouncements: React.FC<GroupAnnouncementsProps> = ({ courseId, group
                   </div>
                 )}
                 {!shouldShowReplies && comment.replies && comment.replies.length > 0 && (
-                  <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-700">
+                  <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-xs text-yellow-700 dark:text-yellow-300">
                     <span role="img" aria-label="Info">ℹ️</span> {comment.replies.length} repl{comment.replies.length === 1 ? 'y' : 'ies'} hidden. Post a comment first to see replies.
                   </div>
                 )}
@@ -224,48 +224,48 @@ const GroupAnnouncements: React.FC<GroupAnnouncementsProps> = ({ courseId, group
 
   return (
     <div className="max-w-4xl mx-auto py-8 space-y-8">
-      <h2 className="text-xl font-bold mb-4">Group Announcements</h2>
-      {error && <div className="text-red-500 mb-2">{error}</div>}
+      <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-gray-100">Group Announcements</h2>
+      {error && <div className="text-red-500 dark:text-red-400 mb-2">{error}</div>}
       {selectedAnnouncement ? (
-        <div className="bg-white rounded-lg shadow p-6 border border-gray-100 max-w-2xl mx-auto">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-100 dark:border-gray-700 max-w-2xl mx-auto">
           <button
-            className="mb-4 px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 text-xs"
+            className="mb-4 px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-600 text-xs"
             onClick={() => setSelectedAnnouncement(null)}
           >
             ← Back to Announcements
           </button>
           <div className="flex justify-between items-start mb-2">
-            <h3 className="text-lg font-bold text-gray-900">{selectedAnnouncement.title}</h3>
-            <span className="text-xs text-gray-400 mt-1">{new Date(selectedAnnouncement.createdAt).toLocaleString()}</span>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">{selectedAnnouncement.title}</h3>
+            <span className="text-xs text-gray-400 dark:text-gray-500 mt-1">{new Date(selectedAnnouncement.createdAt).toLocaleString()}</span>
           </div>
-          <div className="text-sm text-gray-800 mb-2 prose max-w-none" dangerouslySetInnerHTML={{ __html: selectedAnnouncement.body }} />
-          <div className="text-xs text-gray-500 mb-2">By {selectedAnnouncement.author.firstName} {selectedAnnouncement.author.lastName}</div>
+          <div className="text-sm text-gray-800 dark:text-gray-200 mb-2 prose max-w-none dark:prose-invert" dangerouslySetInnerHTML={{ __html: selectedAnnouncement.body }} />
+          <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">By {selectedAnnouncement.author.firstName} {selectedAnnouncement.author.lastName}</div>
           {selectedAnnouncement.options && Object.values(selectedAnnouncement.options).some(Boolean) && user && user.role !== 'student' && (
             <div className="mt-1 flex flex-wrap gap-2">
-              {selectedAnnouncement.options.delayPosting && <span className="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded text-xs font-semibold">Delay posting</span>}
-              {selectedAnnouncement.options.allowComments && <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs font-semibold">Comments enabled</span>}
-              {selectedAnnouncement.options.requirePostBeforeSeeingReplies && <span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded text-xs font-semibold">Post before seeing replies</span>}
-              {selectedAnnouncement.options.enablePodcastFeed && <span className="bg-green-100 text-green-800 px-2 py-0.5 rounded text-xs font-semibold">Podcast feed</span>}
-              {selectedAnnouncement.options.allowLiking && <span className="bg-pink-100 text-pink-800 px-2 py-0.5 rounded text-xs font-semibold">Liking enabled</span>}
+              {selectedAnnouncement.options.delayPosting && <span className="bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-300 px-2 py-0.5 rounded text-xs font-semibold">Delay posting</span>}
+              {selectedAnnouncement.options.allowComments && <span className="bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 px-2 py-0.5 rounded text-xs font-semibold">Comments enabled</span>}
+              {selectedAnnouncement.options.requirePostBeforeSeeingReplies && <span className="bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-300 px-2 py-0.5 rounded text-xs font-semibold">Post before seeing replies</span>}
+              {selectedAnnouncement.options.enablePodcastFeed && <span className="bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300 px-2 py-0.5 rounded text-xs font-semibold">Podcast feed</span>}
+              {selectedAnnouncement.options.allowLiking && <span className="bg-pink-100 dark:bg-pink-900/50 text-pink-800 dark:text-pink-300 px-2 py-0.5 rounded text-xs font-semibold">Liking enabled</span>}
             </div>
           )}
           {/* Comments Section */}
           <div className="mt-10">
-            <h4 className="text-lg font-bold mb-4">Comments</h4>
+            <h4 className="text-lg font-bold mb-4 text-gray-900 dark:text-gray-100">Comments</h4>
             {user && user.role === 'student' && selectedAnnouncement?.options?.requirePostBeforeSeeingReplies && !userHasPosted && (
-              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700">
+              <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded text-sm text-blue-700 dark:text-blue-300">
                 <span role="img" aria-label="Info">💡</span> Post a comment first to see replies from other students.
               </div>
             )}
             {commentsLoading ? (
-              <div>Loading comments...</div>
+              <div className="text-gray-500 dark:text-gray-400">Loading comments...</div>
             ) : (
               <>
                 {renderComments(comments)}
                 {user && (
                   <div className="mt-6">
                     <textarea
-                      className="w-full border rounded px-2 py-2 text-sm"
+                      className="w-full border border-gray-300 dark:border-gray-700 rounded px-2 py-2 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
                       rows={3}
                       placeholder="Write a comment..."
                       value={commentText}
@@ -274,7 +274,7 @@ const GroupAnnouncements: React.FC<GroupAnnouncementsProps> = ({ courseId, group
                     />
                     <div className="flex gap-2 mt-2 justify-end">
                       <button
-                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                        className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded hover:bg-blue-700 dark:hover:bg-blue-600"
                         onClick={handlePostComment}
                         disabled={posting}
                       >
@@ -289,7 +289,7 @@ const GroupAnnouncements: React.FC<GroupAnnouncementsProps> = ({ courseId, group
         </div>
       ) : (
         loading ? (
-          <div>Loading announcements...</div>
+          <div className="text-gray-500 dark:text-gray-400">Loading announcements...</div>
         ) : (
           <AnnouncementList announcements={announcements} onSelect={setSelectedAnnouncement} />
         )

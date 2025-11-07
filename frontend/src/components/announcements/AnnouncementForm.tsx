@@ -81,12 +81,12 @@ const AnnouncementForm: React.FC<AnnouncementFormProps> = ({ onSubmit, loading, 
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 bg-white rounded shadow p-6">
+    <form onSubmit={handleSubmit} className="space-y-4 bg-white dark:bg-gray-800 rounded shadow p-6 border dark:border-gray-700">
       <input
         type="text"
         id="announcement-title"
         name="title"
-        className="w-full border rounded px-3 py-2"
+        className="w-full border border-gray-300 dark:border-gray-700 rounded px-3 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
         placeholder="Topic Title"
         value={title}
         onChange={e => setTitle(e.target.value)}
@@ -94,11 +94,11 @@ const AnnouncementForm: React.FC<AnnouncementFormProps> = ({ onSubmit, loading, 
       />
       <RichTextEditor content={body} onChange={setBody} />
       <div>
-        <label className="block mb-1 font-medium">Post to</label>
+        <label className="block mb-1 font-medium text-gray-700 dark:text-gray-300">Post to</label>
         <select
           id="announcement-post-to"
           name="postTo"
-          className="border rounded px-2 py-1"
+          className="border border-gray-300 dark:border-gray-700 rounded px-2 py-1 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
           value={postTo}
           onChange={e => setPostTo(e.target.value)}
         >
@@ -109,23 +109,36 @@ const AnnouncementForm: React.FC<AnnouncementFormProps> = ({ onSubmit, loading, 
         </select>
       </div>
       <div>
-        <label className="block mb-1 font-medium">Attachments</label>
-        <input type="file" id="announcement-attachments" name="attachments" multiple onChange={e => setFiles(e.target.files)} />
+        <label className="block mb-1 font-medium text-gray-700 dark:text-gray-300">Attachments</label>
+        <input 
+          type="file" 
+          id="announcement-attachments" 
+          name="attachments" 
+          multiple 
+          onChange={e => setFiles(e.target.files)}
+          className="block w-full text-sm text-gray-700 dark:text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 dark:file:bg-blue-900/50 file:text-blue-700 dark:file:text-blue-300 hover:file:bg-blue-100 dark:hover:file:bg-blue-900/70"
+        />
       </div>
       <div className="space-y-2">
-        <label className="block font-medium">Options</label>
+        <label className="block font-medium text-gray-700 dark:text-gray-300">Options</label>
         <div>
-          <input type="checkbox" id="delayPosting" checked={options.delayPosting} onChange={e => setOptions(o => ({ ...o, delayPosting: e.target.checked }))} />
-          <label htmlFor="delayPosting" className="ml-2">Delay posting</label>
+          <input 
+            type="checkbox" 
+            id="delayPosting" 
+            checked={options.delayPosting} 
+            onChange={e => setOptions(o => ({ ...o, delayPosting: e.target.checked }))}
+            className="h-4 w-4 text-blue-600 dark:text-blue-400 border-gray-300 dark:border-gray-700 rounded focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-900"
+          />
+          <label htmlFor="delayPosting" className="ml-2 text-gray-700 dark:text-gray-300">Delay posting</label>
         </div>
         {options.delayPosting && (
           <div className="ml-6 mt-2">
-            <label className="block text-xs mb-1">Release date and time</label>
+            <label className="block text-xs mb-1 text-gray-600 dark:text-gray-400">Release date and time</label>
             <input
               type="datetime-local"
               id="announcement-delayed-until"
               name="delayedUntil"
-              className="border rounded px-2 py-1 text-sm"
+              className="border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
               value={delayedUntil}
               onChange={e => setDelayedUntil(e.target.value)}
               required
@@ -133,33 +146,58 @@ const AnnouncementForm: React.FC<AnnouncementFormProps> = ({ onSubmit, loading, 
           </div>
         )}
         <div>
-          <input type="checkbox" id="allowComments" checked={options.allowComments} onChange={e => setOptions(o => ({ ...o, allowComments: e.target.checked }))} />
-          <label htmlFor="allowComments" className="ml-2">Allow users to comment</label>
+          <input 
+            type="checkbox" 
+            id="allowComments" 
+            checked={options.allowComments} 
+            onChange={e => setOptions(o => ({ ...o, allowComments: e.target.checked }))}
+            className="h-4 w-4 text-blue-600 dark:text-blue-400 border-gray-300 dark:border-gray-700 rounded focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-900"
+          />
+          <label htmlFor="allowComments" className="ml-2 text-gray-700 dark:text-gray-300">Allow users to comment</label>
         </div>
         <div className="ml-6">
-          <input type="checkbox" id="requirePostBeforeSeeingReplies" checked={options.requirePostBeforeSeeingReplies} onChange={e => setOptions(o => ({ ...o, requirePostBeforeSeeingReplies: e.target.checked }))} disabled={!options.allowComments} />
-          <label htmlFor="requirePostBeforeSeeingReplies" className="ml-2">Users must post before seeing replies</label>
+          <input 
+            type="checkbox" 
+            id="requirePostBeforeSeeingReplies" 
+            checked={options.requirePostBeforeSeeingReplies} 
+            onChange={e => setOptions(o => ({ ...o, requirePostBeforeSeeingReplies: e.target.checked }))} 
+            disabled={!options.allowComments}
+            className="h-4 w-4 text-blue-600 dark:text-blue-400 border-gray-300 dark:border-gray-700 rounded focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-900 disabled:opacity-50"
+          />
+          <label htmlFor="requirePostBeforeSeeingReplies" className="ml-2 text-gray-700 dark:text-gray-300">Users must post before seeing replies</label>
         </div>
         <div>
-          <input type="checkbox" id="enablePodcastFeed" checked={options.enablePodcastFeed} onChange={e => setOptions(o => ({ ...o, enablePodcastFeed: e.target.checked }))} />
-          <label htmlFor="enablePodcastFeed" className="ml-2">Enable podcast feed</label>
+          <input 
+            type="checkbox" 
+            id="enablePodcastFeed" 
+            checked={options.enablePodcastFeed} 
+            onChange={e => setOptions(o => ({ ...o, enablePodcastFeed: e.target.checked }))}
+            className="h-4 w-4 text-blue-600 dark:text-blue-400 border-gray-300 dark:border-gray-700 rounded focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-900"
+          />
+          <label htmlFor="enablePodcastFeed" className="ml-2 text-gray-700 dark:text-gray-300">Enable podcast feed</label>
         </div>
         <div>
-          <input type="checkbox" id="allowLiking" checked={options.allowLiking} onChange={e => setOptions(o => ({ ...o, allowLiking: e.target.checked }))} />
-          <label htmlFor="allowLiking" className="ml-2">Allow liking</label>
+          <input 
+            type="checkbox" 
+            id="allowLiking" 
+            checked={options.allowLiking} 
+            onChange={e => setOptions(o => ({ ...o, allowLiking: e.target.checked }))}
+            className="h-4 w-4 text-blue-600 dark:text-blue-400 border-gray-300 dark:border-gray-700 rounded focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-900"
+          />
+          <label htmlFor="allowLiking" className="ml-2 text-gray-700 dark:text-gray-300">Allow liking</label>
         </div>
       </div>
       <div className="flex justify-end gap-2 mt-6">
         <button
           type="button"
-          className="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300"
+          className="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-4 py-2 rounded hover:bg-gray-300 dark:hover:bg-gray-600"
           onClick={onCancel}
         >
           Cancel
         </button>
         <button
           type="submit"
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          className="bg-blue-600 dark:bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700 dark:hover:bg-blue-600"
           disabled={loading}
         >
           {loading ? 'Saving...' : 'Save'}
