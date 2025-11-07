@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { updateUserProfile, uploadProfilePicture, getUserPreferences, updateUserPreferences, getLoginActivity, getImageUrl } from '../services/api';
+import api from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 
 const sections = [
@@ -282,11 +283,365 @@ function SettingsSection() {
 }
 
 function NotificationsSection() {
+  const [preferences, setPreferences] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [success, setSuccess] = React.useState(false);
+
+  React.useEffect(() => {
+    fetchPreferences();
+  }, []);
+
+  const fetchPreferences = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/notifications/preferences');
+      if (response.data.success) {
+        setPreferences(response.data.data);
+      }
+    } catch (err) {
+      setError('Failed to load notification preferences');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggle = async (category: string, key: string, value: boolean) => {
+    if (!preferences) return;
+    
+    const updated = {
+      ...preferences,
+      [category]: {
+        ...preferences[category],
+        [key]: value
+      }
+    };
+    
+    setPreferences(updated);
+    
+    try {
+      setSaving(true);
+      setError(null);
+      await api.put('/notifications/preferences', updated);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err) {
+      setError('Failed to save preferences');
+      // Revert on error
+      setPreferences(preferences);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleQuietHoursToggle = async (enabled: boolean) => {
+    if (!preferences) return;
+    
+    const updated = {
+      ...preferences,
+      quietHours: {
+        ...preferences.quietHours,
+        enabled
+      }
+    };
+    
+    setPreferences(updated);
+    
+    try {
+      setSaving(true);
+      await api.put('/notifications/preferences', updated);
+    } catch (err) {
+      setError('Failed to save preferences');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleQuietHoursChange = async (field: string, value: string) => {
+    if (!preferences) return;
+    
+    const updated = {
+      ...preferences,
+      quietHours: {
+        ...preferences.quietHours,
+        [field]: value
+      }
+    };
+    
+    setPreferences(updated);
+    
+    try {
+      setSaving(true);
+      await api.put('/notifications/preferences', updated);
+    } catch (err) {
+      setError('Failed to save preferences');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="text-gray-500 dark:text-gray-400">Loading notification preferences...</div>
+    );
+  }
+
+  if (!preferences) {
+    return (
+      <div className="text-red-500 dark:text-red-400">Failed to load preferences</div>
+    );
+  }
+
+  const notificationTypes = [
+    { key: 'messages', label: 'Messages', description: 'New messages in your inbox' },
+    { key: 'grades', label: 'Grades', description: 'When grades are posted or updated' },
+    { key: 'announcements', label: 'Announcements', description: 'New course announcements' },
+    { key: 'assignmentsDue', label: 'Assignments Due', description: 'Reminders for upcoming assignment due dates' },
+    { key: 'assignmentsGraded', label: 'Assignments Graded', description: 'When your assignments are graded' },
+    { key: 'enrollments', label: 'Enrollments', description: 'Enrollment requests and approvals' },
+    { key: 'discussions', label: 'Discussions', description: 'New discussion threads and replies' },
+    { key: 'submissions', label: 'Submissions', description: 'New student submissions (teachers only)' },
+    { key: 'system', label: 'System', description: 'System-wide notifications' }
+  ];
+
   return (
-    <div>
-      <h2 className="text-xl font-semibold mb-2">Notifications</h2>
-      <p className="text-gray-600">Set your email notification preferences.</p>
-      {/* TODO: Add notification toggles */}
+    <div className="text-gray-900 dark:text-gray-100">
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">Notifications</h2>
+        <p className="text-gray-600 dark:text-gray-400">Set your notification preferences for email, in-app, and browser push notifications.</p>
+      </div>
+
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-red-700 dark:text-red-400">
+          {error}
+        </div>
+      )}
+
+      {success && (
+        <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded text-green-700 dark:text-green-400">
+          Preferences saved successfully!
+        </div>
+      )}
+
+      {/* Email Notifications */}
+      <div className="mb-8">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Email Notifications</h3>
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <div className="space-y-4">
+            {notificationTypes.map((type) => (
+              <div key={type.key} className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900 dark:text-gray-100">{type.label}</div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">{type.description}</div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={preferences.email[type.key] || false}
+                    onChange={(e) => handleToggle('email', type.key, e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600 dark:peer-checked:bg-blue-500"></div>
+                </label>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* In-App Notifications */}
+      <div className="mb-8">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">In-App Notifications</h3>
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <div className="space-y-4">
+            {notificationTypes.map((type) => (
+              <div key={type.key} className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900 dark:text-gray-100">{type.label}</div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">{type.description}</div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={preferences.inApp[type.key] || false}
+                    onChange={(e) => handleToggle('inApp', type.key, e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600 dark:peer-checked:bg-blue-500"></div>
+                </label>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Browser Push Notifications */}
+      <div className="mb-8">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Browser Push Notifications</h3>
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <div className="font-medium text-gray-900 dark:text-gray-100">Enable Push Notifications</div>
+              <div className="text-sm text-gray-500 dark:text-gray-400">Receive notifications even when the app is closed</div>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={preferences.push.enabled || false}
+                onChange={async (e) => {
+                  if (e.target.checked) {
+                    // Request permission and subscribe
+                    try {
+                      const { subscribeToPushNotifications } = await import('../utils/pushNotifications');
+                      const subscription = await subscribeToPushNotifications();
+                      if (subscription) {
+                        const subData = {
+                          endpoint: subscription.endpoint,
+                          keys: {
+                            p256dh: btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('p256dh')!))),
+                            auth: btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('auth')!)))
+                          }
+                        };
+                        const updated = {
+                          ...preferences,
+                          push: { ...preferences.push, enabled: true },
+                          pushSubscription: subData
+                        };
+                        setPreferences(updated);
+                        await api.put('/notifications/preferences', updated);
+                      } else {
+                        alert('Failed to enable push notifications. Please check your browser settings.');
+                      }
+                    } catch (err) {
+                      console.error('Error enabling push notifications:', err);
+                      alert('Failed to enable push notifications.');
+                    }
+                  } else {
+                    // Unsubscribe
+                    try {
+                      const { unsubscribeFromPushNotifications } = await import('../utils/pushNotifications');
+                      await unsubscribeFromPushNotifications();
+                      const updated = {
+                        ...preferences,
+                        push: { ...preferences.push, enabled: false },
+                        pushSubscription: null
+                      };
+                      setPreferences(updated);
+                      await api.put('/notifications/preferences', updated);
+                    } catch (err) {
+                      console.error('Error disabling push notifications:', err);
+                    }
+                  }
+                }}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600 dark:peer-checked:bg-blue-500"></div>
+            </label>
+          </div>
+          {preferences.push.enabled && (
+            <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              {notificationTypes.map((type) => (
+                <div key={type.key} className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
+                  <div className="flex-1">
+                    <div className="font-medium text-gray-900 dark:text-gray-100">{type.label}</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">{type.description}</div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={preferences.push[type.key] || false}
+                      onChange={(e) => handleToggle('push', type.key, e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600 dark:peer-checked:bg-blue-500"></div>
+                  </label>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Quiet Hours */}
+      <div className="mb-8">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Quiet Hours</h3>
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <div className="font-medium text-gray-900 dark:text-gray-100">Enable Quiet Hours</div>
+              <div className="text-sm text-gray-500 dark:text-gray-400">Pause notifications during specified hours</div>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={preferences.quietHours?.enabled || false}
+                onChange={(e) => handleQuietHoursToggle(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600 dark:peer-checked:bg-blue-500"></div>
+            </label>
+          </div>
+          {preferences.quietHours?.enabled && (
+            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Start Time</label>
+                <input
+                  type="time"
+                  value={preferences.quietHours.start || '22:00'}
+                  onChange={(e) => handleQuietHoursChange('start', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">End Time</label>
+                <input
+                  type="time"
+                  value={preferences.quietHours.end || '08:00'}
+                  onChange={(e) => handleQuietHoursChange('end', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Assignment Reminders */}
+      <div className="mb-8">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Assignment Reminders</h3>
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="font-medium text-gray-900 dark:text-gray-100">Weekly Summary</div>
+                <div className="text-sm text-gray-500 dark:text-gray-400">Get a weekly summary of assignments due this week by Sunday</div>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={preferences.assignmentReminders?.weeklySummary || false}
+                  onChange={(e) => {
+                    const updated = {
+                      ...preferences,
+                      assignmentReminders: {
+                        ...preferences.assignmentReminders,
+                        weeklySummary: e.target.checked
+                      }
+                    };
+                    setPreferences(updated);
+                    api.put('/notifications/preferences', updated).catch(() => {
+                      setError('Failed to save preferences');
+                    });
+                  }}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600 dark:peer-checked:bg-blue-500"></div>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

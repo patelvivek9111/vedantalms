@@ -16,12 +16,15 @@ import {
   Shield,
   Database,
   Search,
-  FileText
+  FileText,
+  Bell
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCourse } from '../contexts/CourseContext';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import { getImageUrl } from '../services/api';
+import api from '../services/api';
+import NotificationCenter from './NotificationCenter';
 
 const getNavItems = (userRole: string) => {
   const baseItems = [
@@ -65,6 +68,8 @@ export default function GlobalSidebar() {
   const { courses } = useCourse();
   const { unreadCount } = useUnreadMessages();
   const [showCourseDropdown, setShowCourseDropdown] = useState(false);
+  const [showNotificationCenter, setShowNotificationCenter] = useState(false);
+  const [notificationCount, setNotificationCount] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -113,6 +118,25 @@ export default function GlobalSidebar() {
     // Force a page reload to clear any cached component state
     window.location.href = '/login';
   };
+
+  // Fetch notification count
+  useEffect(() => {
+    const fetchNotificationCount = async () => {
+      try {
+        const response = await api.get('/notifications/unread-count');
+        if (response.data.success) {
+          setNotificationCount(response.data.count || 0);
+        }
+      } catch (error) {
+        console.error('Error fetching notification count:', error);
+      }
+    };
+
+    fetchNotificationCount();
+    // Poll for new notifications every 30 seconds
+    const interval = setInterval(fetchNotificationCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Filter courses based on user role
   const isTeacherOrAdmin = user?.role === 'teacher' || user?.role === 'admin';
@@ -307,6 +331,24 @@ export default function GlobalSidebar() {
         })}
       </div>
       
+      {/* Notification Bell - Before Logout */}
+      <div className="mt-2 mb-2">
+        <button
+          onClick={() => setShowNotificationCenter(!showNotificationCenter)}
+          className="flex flex-col items-center w-full py-2 transition-colors hover:bg-blue-800 dark:hover:bg-gray-800 text-white dark:text-gray-300 relative"
+        >
+          <div className="relative">
+            <Bell className="h-5 w-5 mb-1" />
+            {notificationCount > 0 && (
+              <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center font-bold">
+                {notificationCount > 9 ? '9+' : notificationCount}
+              </div>
+            )}
+          </div>
+          <span className="text-xs font-medium">Notifications</span>
+        </button>
+      </div>
+      
       {/* Logout Button - Always visible at bottom */}
       <div className="mt-2">
         <button
@@ -317,6 +359,12 @@ export default function GlobalSidebar() {
           <span className="text-xs font-medium">Logout</span>
         </button>
       </div>
+      
+      {/* Notification Center */}
+      <NotificationCenter 
+        isOpen={showNotificationCenter} 
+        onClose={() => setShowNotificationCenter(false)}
+      />
     </nav>
   );
 } 

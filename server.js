@@ -173,6 +173,7 @@ app.use('/api', require('./routes/attendance.routes'));
 app.use('/api/polls', require('./routes/poll.routes'));
 app.use('/api/reports', require('./routes/reports.routes'));
 app.use('/api/admin', require('./routes/admin.routes'));
+app.use('/api/notifications', require('./routes/notification.routes').router);
 
 // Upload route for file uploads
 const upload = require('./middleware/upload');
