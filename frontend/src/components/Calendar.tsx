@@ -175,30 +175,45 @@ const CustomEvent: React.FC<{ event: RBCEvent }> = ({ event }) => {
       tooltip += `\n${format(start, 'h:mm a')} – ${format(end, 'h:mm a')}`;
     }
   }
+  // Determine text color based on background brightness
+  const getTextColor = (bgColor: string) => {
+    // Convert hex to RGB
+    const hex = bgColor.replace('#', '');
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    // Calculate brightness
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+    // Return dark text for light backgrounds, light text for dark backgrounds
+    return { color: brightness > 128 ? '#1f2937' : '#f9fafb', brightness };
+  };
+
+  const { color: textColor, brightness } = getTextColor(color);
+
   return (
     <div
       className={`relative px-1 py-0.5 rounded h-full flex flex-col justify-center shadow-sm transition-all duration-150 ${overlappingEvents.length > 1 ? 'border-l-4 border-pink-400 shadow' : 'border-l-4 border-transparent'} hover:ring-2 hover:ring-blue-400 ${isAssignment ? 'font-bold border-l-4 border-yellow-400' : ''}`}
-      style={{ background: color, color: '#222', minHeight: 28, fontSize: 13, cursor: 'pointer' }}
+      style={{ background: color, color: textColor, minHeight: 28, fontSize: 13, cursor: 'pointer' }}
       title={String(tooltip)}
     >
       <div className="flex items-center gap-1">
-        {isAssignment && <FileText className="w-3 h-3 mr-1" />}
-        <span className="font-semibold truncate" style={{ maxWidth: 80 }}>{title}</span>
+        {isAssignment && <FileText className="w-3 h-3 mr-1" style={{ color: textColor }} />}
+        <span className="font-semibold truncate" style={{ maxWidth: 80, color: textColor }}>{title}</span>
       </div>
       {start && end && (
         isAssignment && start.getTime() === end.getTime() ? (
-          <span className="text-xs text-gray-700 dark:text-gray-300">Due: {format(start, 'h:mm a')}</span>
+          <span className="text-xs" style={{ color: textColor, opacity: 0.9 }}>Due: {format(start, 'h:mm a')}</span>
         ) : start.getTime() === end.getTime() ? (
-          <span className="text-xs text-gray-700 dark:text-gray-300">{format(start, 'h:mm a')}</span>
+          <span className="text-xs" style={{ color: textColor, opacity: 0.9 }}>{format(start, 'h:mm a')}</span>
         ) : (event.allDay ? (
-          <span className="text-xs text-gray-700 dark:text-gray-300">All Day</span>
+          <span className="text-xs" style={{ color: textColor, opacity: 0.9 }}>All Day</span>
         ) : (
-          <span className="text-xs text-gray-700 dark:text-gray-300">{format(start, 'h:mm a')} – {format(end, 'h:mm a')}</span>
+          <span className="text-xs" style={{ color: textColor, opacity: 0.9 }}>{format(start, 'h:mm a')} – {format(end, 'h:mm a')}</span>
         ))
       )}
       {/* Show +N more only on the second overlapping event in the cell (month view only) */}
       {isSecondOverlap && (
-        <span className="absolute bottom-0 right-1 text-xs text-blue-700 dark:text-blue-300 bg-white dark:bg-gray-800 bg-opacity-80 dark:bg-opacity-90 rounded px-1">+{overlappingEvents.length - 1} more</span>
+        <span className="absolute bottom-0 right-1 text-xs bg-white dark:bg-gray-800 bg-opacity-90 dark:bg-opacity-90 rounded px-1" style={{ color: brightness > 128 ? '#1e40af' : '#60a5fa' }}>+{overlappingEvents.length - 1} more</span>
       )}
     </div>
   );
@@ -971,29 +986,31 @@ const CalendarPage: React.FC = () => {
     <div className="flex p-8 gap-8">
       {/* Main Calendar */}
       <div className="flex-1">
-        <Calendar
-          localizer={localizer}
-          events={events}
-          startAccessor="start"
-          endAccessor="end"
-          style={{ height: 600, borderRadius: '16px', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}
-          popup
-          selectable
-          date={currentDate}
-          onNavigate={handleNavigate}
-          onSelectSlot={handleSelectSlot}
-          onSelectEvent={handleSelectEvent}
-          eventPropGetter={eventPropGetter}
-          showMultiDayTimes={false}
-          components={{
-            toolbar: CustomToolbar,
-            event: CustomEvent,
-            month: { event: CustomEvent },
-            week: { event: CustomEvent },
-            day: { event: CustomEvent },
-            agenda: { event: CustomEvent },
-          }}
-        />
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4">
+          <Calendar
+            localizer={localizer}
+            events={events}
+            startAccessor="start"
+            endAccessor="end"
+            style={{ height: 600 }}
+            popup
+            selectable
+            date={currentDate}
+            onNavigate={handleNavigate}
+            onSelectSlot={handleSelectSlot}
+            onSelectEvent={handleSelectEvent}
+            eventPropGetter={eventPropGetter}
+            showMultiDayTimes={false}
+            components={{
+              toolbar: CustomToolbar,
+              event: CustomEvent,
+              month: { event: CustomEvent },
+              week: { event: CustomEvent },
+              day: { event: CustomEvent },
+              agenda: { event: CustomEvent },
+            }}
+          />
+        </div>
       </div>
       {/* Right Panel */}
       <div className="w-80 flex flex-col gap-4">
