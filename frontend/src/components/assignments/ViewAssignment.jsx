@@ -1062,57 +1062,121 @@ const ViewAssignment = () => {
                               <>
                                 {/* Only show reference columns for teachers/admins, not for students */}
                                 {(user?.role === 'teacher' || user?.role === 'admin') && (
-                                  <div className="grid grid-cols-2 gap-6">
+                                  <div className="grid grid-cols-2 gap-6 mb-6">
                                     {/* Left Column - Items to match */}
                                     <div>
-                                  <span className="text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">{option.text}</span>
-                                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                  </svg>
-                                  {isUploading ? 'Uploading...' : 'Upload File'}
-                                </label>
-                                {uploadedFiles.length > 0 && (
-                                  <button
-                                    onClick={() => document.getElementById('file-upload-final').click()}
-                                    className="inline-flex items-center px-4 py-2 border border-pink-500 rounded-md shadow-sm text-sm font-medium text-pink-600 bg-white dark:bg-gray-800 hover:bg-pink-50"
-                                  >
-                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                    </svg>
-                                    Add Another File
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Uploaded Files List */}
-                            {uploadedFiles.length > 0 && (
-                              <div className="mt-4">
-                                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Uploaded Files:</h4>
-                                <div className="space-y-2">
-                                  {uploadedFiles.map((file, index) => (
-                                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-700 rounded-md">
-                                      <div className="flex items-center space-x-3">
-                                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                        </svg>
-                                        <div>
-                                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{file.name}</p>
-                                          <p className="text-xs text-gray-500 dark:text-gray-400">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
-                                        </div>
+                                      <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Left Items</h4>
+                                      <div className="space-y-2">
+                                        {assignment.questions[currentQuestion].leftItems.map((leftItem, idx) => (
+                                          <div key={leftItem.id || idx} className="p-2 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
+                                            <span className="text-sm text-gray-900 dark:text-gray-100">{leftItem.text}</span>
+                                          </div>
+                                        ))}
                                       </div>
-                                      <button
-                                        onClick={() => removeFile(index)}
-                                        className="text-red-600 hover:text-red-800"
-                                      >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                        </svg>
-                                      </button>
                                     </div>
-                                  ))}
-                                </div>
-                              </div>
+                                    {/* Right Column - Correct matches */}
+                                    <div>
+                                      <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Right Items (Correct Matches)</h4>
+                                      <div className="space-y-2">
+                                        {assignment.questions[currentQuestion].rightItems.map((rightItem, idx) => {
+                                          const matchingLeft = assignment.questions[currentQuestion].leftItems.find(left => left.id === rightItem.id);
+                                          return (
+                                            <div key={rightItem.id || idx} className="p-2 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
+                                              <span className="text-sm text-gray-900 dark:text-gray-100">{rightItem.text}</span>
+                                              {matchingLeft && (
+                                                <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">← {matchingLeft.text}</span>
+                                              )}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {/* Student matching interface */}
+                                {isStudent && !submission && !isPastDue && (
+                                  <div className="space-y-3">
+                                    {assignment.questions[currentQuestion].leftItems.map((leftItem, leftIndex) => {
+                                      const questionShuffledOptions = shuffledOptions[currentQuestion] || 
+                                        (Array.isArray(assignment.questions[currentQuestion].rightItems) && 
+                                         assignment.questions[currentQuestion].rightItems.length > 0 ? 
+                                         shuffleArray([...assignment.questions[currentQuestion].rightItems]) : []);
+                                      
+                                      const currentAnswers = answers[currentQuestion] || {};
+                                      const selectedOptions = Object.values(currentAnswers).filter(option => option !== '');
+                                      const availableOptions = questionShuffledOptions.filter(option => 
+                                        currentAnswers[leftIndex] === option.text ||
+                                        !selectedOptions.includes(option.text)
+                                      );
+                                      
+                                      return (
+                                        <div key={leftItem.id} className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
+                                          <div className="flex-1">
+                                            <span className="font-medium text-gray-900 dark:text-gray-100 text-sm">{leftItem.text}</span>
+                                          </div>
+                                          <div className="flex items-center space-x-2 ml-4">
+                                            <select
+                                              value={answers[currentQuestion]?.[leftIndex] || ''}
+                                              onChange={(e) => {
+                                                const newAnswers = { ...answers };
+                                                if (!newAnswers[currentQuestion]) newAnswers[currentQuestion] = {};
+                                                newAnswers[currentQuestion][leftIndex] = e.target.value;
+                                                handleAnswerChange(currentQuestion, newAnswers[currentQuestion]);
+                                              }}
+                                              className="border border-gray-300 dark:border-gray-700 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-indigo-500 dark:focus:border-indigo-400 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-w-[150px]"
+                                            >
+                                              <option value="">Choose...</option>
+                                              {availableOptions.map((option, optionIndex) => (
+                                                <option key={optionIndex} value={option.text}>
+                                                  {option.text}
+                                                </option>
+                                              ))}
+                                            </select>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                                
+                                {/* Show answers for submitted assignments */}
+                                {submission && (
+                                  <div className="space-y-3">
+                                    {assignment.questions[currentQuestion].leftItems.map((leftItem, leftIndex) => {
+                                      const studentMatch = typeof answers[currentQuestion] === 'object' ? 
+                                        answers[currentQuestion][leftIndex] : '';
+                                      const correctRightItem = assignment.questions[currentQuestion].rightItems.find(rightItem => 
+                                        rightItem.id === leftItem.id
+                                      );
+                                      const isCorrect = studentMatch === (correctRightItem?.text || '');
+                                      
+                                      return (
+                                        <div key={leftItem.id} className={`flex items-center justify-between p-3 rounded-lg border ${
+                                          isCorrect 
+                                            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' 
+                                            : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                                        }`}>
+                                          <div className="flex items-center space-x-2">
+                                            <span className="font-medium text-gray-900 dark:text-gray-100 text-sm">{leftItem.text}</span>
+                                            <span className="text-gray-500 dark:text-gray-400">→</span>
+                                            <span className="text-gray-900 dark:text-gray-100">{studentMatch || 'No answer'}</span>
+                                          </div>
+                                          {isCorrect ? (
+                                            <span className="text-green-600 dark:text-green-400 text-sm">✓ Correct</span>
+                                          ) : (
+                                            <span className="text-red-600 dark:text-red-400 text-sm">
+                                              ✗ Should be: {correctRightItem?.text || 'N/A'}
+                                            </span>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <div className="text-gray-500 dark:text-gray-400 text-sm">Matching question data is incomplete.</div>
                             )}
                           </div>
                         )}
