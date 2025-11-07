@@ -148,12 +148,12 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-        <div className="flex justify-between items-center p-6 border-b flex-shrink-0">
-          <h2 className="text-2xl font-semibold text-gray-800">Create New Discussion Thread</h2>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+        <div className="flex justify-between items-center p-6 border-b dark:border-gray-700 flex-shrink-0">
+          <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-100">Create New Discussion Thread</h2>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 focus:outline-none"
+            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -164,13 +164,13 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
         <div className="flex-1 overflow-y-auto">
           <form id="create-thread-form" onSubmit={handleSubmit} className="p-6">
           {error && (
-            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+            <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/20 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 rounded">
               {error}
             </div>
           )}
 
           <div className="mb-4">
-            <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Title
             </label>
             <input
@@ -178,17 +178,17 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
               id="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
               placeholder="Enter thread title"
               required
             />
           </div>
 
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Content
             </label>
-            <div className="border border-gray-300 rounded-md">
+            <div className="border border-gray-300 dark:border-gray-700 rounded-md">
               <RichTextEditor
                 content={content}
                 onChange={setContent}
@@ -206,23 +206,23 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
                 id="isGroupDiscussion"
                 checked={isGroupDiscussion}
                 onChange={(e) => setIsGroupDiscussion(e.target.checked)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                className="h-4 w-4 text-blue-600 dark:text-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400 border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900"
               />
-              <label htmlFor="isGroupDiscussion" className="ml-2 block text-sm text-gray-700">
+              <label htmlFor="isGroupDiscussion" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
                 This is a group discussion
               </label>
             </div>
 
             {isGroupDiscussion && (
               <div>
-                <label htmlFor="groupSet" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="groupSet" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Group Set
                 </label>
                 <select
                   id="groupSet"
                   value={selectedGroupSet}
                   onChange={(e) => setSelectedGroupSet(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                   required={isGroupDiscussion}
                 >
                   <option value="">Select a group set</option>
@@ -233,7 +233,7 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
                   ))}
                 </select>
                 {isGroupDiscussion && !selectedGroupSet && (
-                  <p className="mt-1 text-sm text-red-600">
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">
                     Please select a group set for the group discussion
                   </p>
                 )}
@@ -249,9 +249,9 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
                 id="isGraded"
                 checked={isGraded}
                 onChange={(e) => setIsGraded(e.target.checked)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                className="h-4 w-4 text-blue-600 dark:text-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400 border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900"
               />
-              <label htmlFor="isGraded" className="ml-2 block text-sm text-gray-700">
+              <label htmlFor="isGraded" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
                 Make this a graded discussion
               </label>
             </div>
@@ -260,7 +260,7 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
               <>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="totalPoints" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="totalPoints" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Total Points
                     </label>
                     <input
@@ -268,13 +268,13 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
                       id="totalPoints"
                       value={totalPoints}
                       onChange={(e) => setTotalPoints(Math.max(0, parseInt(e.target.value) || 0))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                       min="0"
                       required={isGraded}
                     />
                   </div>
                   <div>
-                    <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Due Date
                     </label>
                     <input
@@ -282,20 +282,20 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
                       id="dueDate"
                       value={dueDate}
                       onChange={(e) => setDueDate(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label htmlFor="group" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="group" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Assignment Group
                   </label>
                   <select
                     id="group"
                     value={selectedGroup}
                     onChange={(e) => setSelectedGroup(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                     required={isGraded}
                   >
                     {courseGroups.map((group) => (
@@ -312,7 +312,7 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
 
           {/* Discussion Settings */}
           <div className="mb-4 space-y-4">
-            <h3 className="text-lg font-medium text-gray-800">Discussion Settings</h3>
+            <h3 className="text-lg font-medium text-gray-800 dark:text-gray-100">Discussion Settings</h3>
             
             <div className="space-y-3">
               <div className="flex items-center">
@@ -321,9 +321,9 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
                   id="requirePostBeforeSee"
                   checked={requirePostBeforeSee}
                   onChange={(e) => setRequirePostBeforeSee(e.target.checked)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-blue-600 dark:text-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400 border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900"
                 />
-                <label htmlFor="requirePostBeforeSee" className="ml-2 block text-sm text-gray-700">
+                <label htmlFor="requirePostBeforeSee" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
                   Users must post before seeing replies
                 </label>
               </div>
@@ -334,9 +334,9 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
                   id="allowLikes"
                   checked={allowLikes}
                   onChange={(e) => setAllowLikes(e.target.checked)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-blue-600 dark:text-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400 border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900"
                 />
-                <label htmlFor="allowLikes" className="ml-2 block text-sm text-gray-700">
+                <label htmlFor="allowLikes" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
                   Allow liking
                 </label>
               </div>
@@ -347,9 +347,9 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
                   id="allowComments"
                   checked={allowComments}
                   onChange={(e) => setAllowComments(e.target.checked)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-blue-600 dark:text-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400 border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900"
                 />
-                <label htmlFor="allowComments" className="ml-2 block text-sm text-gray-700">
+                <label htmlFor="allowComments" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
                   Allow comments
                 </label>
               </div>
@@ -357,14 +357,14 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
           </div>
 
           <div className="mb-4">
-            <label htmlFor="module" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="module" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Module (optional)
             </label>
             <select
               id="module"
               value={selectedModule}
               onChange={e => setSelectedModule(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
             >
               <option value="">No module</option>
               {modules && modules.map((mod: any) => (
@@ -375,11 +375,11 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
           </form>
         </div>
 
-        <div className="flex justify-end space-x-3 p-6 border-t bg-gray-50 flex-shrink-0">
+        <div className="flex justify-end space-x-3 p-6 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex-shrink-0">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400"
           >
             Cancel
           </button>
@@ -387,7 +387,7 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
             type="submit"
             form="create-thread-form"
             disabled={isSubmitting || !title.trim() || !content.trim() || (isGroupDiscussion && !selectedGroupSet)}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 border border-transparent rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? 'Creating...' : 'Create Thread'}
           </button>

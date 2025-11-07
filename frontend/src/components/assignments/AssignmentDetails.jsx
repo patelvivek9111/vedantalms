@@ -118,34 +118,34 @@ const AssignmentDetails = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-32">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 dark:border-indigo-400"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+      <div className="bg-red-100 dark:bg-red-900/20 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded">
         {error}
       </div>
     );
   }
 
   if (!assignment) {
-    return <div>Assignment not found</div>;
+    return <div className="text-gray-900 dark:text-gray-100">Assignment not found</div>;
   }
 
   return (
     <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
-      <div className="bg-white shadow rounded-lg p-6">
+      <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
         <div className="flex justify-between items-start mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{assignment.title}</h1>
-            <p className="mt-2 text-sm text-gray-600">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{assignment.title}</h1>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
               Due: {format(new Date(assignment.dueDate), 'PPp')}
             </p>
             {userRole === 'student' && assignment.submission && (
-              <span className="ml-4 text-green-600">
+              <span className="ml-4 text-green-600 dark:text-green-400">
                 Submitted: {format(new Date(assignment.submission.submittedAt), 'PPp')}
               </span>
             )}
@@ -158,9 +158,9 @@ const AssignmentDetails = () => {
                   disabled={isPublishing}
                   className={`inline-flex items-center px-4 py-2 border rounded-md shadow-sm text-sm font-medium 
                     ${assignment?.published 
-                      ? 'border-green-300 text-green-700 bg-green-50 hover:bg-green-100' 
-                      : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50'
-                    } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500`}
+                      ? 'border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/50 hover:bg-green-100 dark:hover:bg-green-900/70' 
+                      : 'border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-indigo-400`}
                 >
                   {assignment?.published ? (
                     <>
@@ -176,13 +176,13 @@ const AssignmentDetails = () => {
                 </button>
                 <button
                   onClick={() => navigate(`/assignments/${id}/edit`)}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-indigo-400"
                 >
                   Edit Assignment
                 </button>
                 <button
                   onClick={() => navigate(`/assignments/${id}/grade`)}
-                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-indigo-400"
                 >
                   Grade Submissions
                 </button>
@@ -191,7 +191,7 @@ const AssignmentDetails = () => {
             {userRole === 'student' && (
               <button
                 onClick={() => navigate(`/assignments/${id}/view`)}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-indigo-400"
               >
                 Start Assignment
               </button>
@@ -199,25 +199,25 @@ const AssignmentDetails = () => {
           </div>
         </div>
 
-        <div className="mt-6 prose max-w-none">
+        <div className="mt-6 prose max-w-none prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-p:text-gray-700 dark:prose-p:text-gray-300">
           <ReactMarkdown>{assignment.description}</ReactMarkdown>
         </div>
 
         {assignment.content && (
-          <div className="mt-6 prose max-w-none">
+          <div className="mt-6 prose max-w-none prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-p:text-gray-700 dark:prose-p:text-gray-300">
             <ReactMarkdown>{assignment.content}</ReactMarkdown>
           </div>
         )}
 
         {userRole === 'student' && !isSubmitting && assignment.questions && assignment.questions.length > 0 && (
           <div className="mt-8">
-            <h3 className="text-lg font-medium text-gray-900">Questions</h3>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Questions</h3>
             <div className="mt-4 space-y-6">
               {assignment.questions.map((q, index) => (
                 <div key={index}>
-                  <p className="font-semibold">{index + 1}. {q.text} ({q.points} pts)</p>
+                  <p className="font-semibold text-gray-900 dark:text-gray-100">{index + 1}. {q.text} ({q.points} pts)</p>
                   {q.type === 'multiple-choice' && (
-                    <ul className="list-disc ml-8 mt-2 space-y-1">
+                    <ul className="list-disc ml-8 mt-2 space-y-1 text-gray-700 dark:text-gray-300">
                       {q.options.map((opt, optIndex) => (
                         <li key={optIndex}>{opt.text}</li>
                       ))}
@@ -231,13 +231,13 @@ const AssignmentDetails = () => {
 
         {isSubmitting ? (
           <form onSubmit={handleSubmission} className="mt-8">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Your Submission</h3>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Your Submission</h3>
             {assignment.questions.map((q, index) => (
               <div key={index} className="mb-6">
-                <p className="font-semibold">{index + 1}. {q.text} ({q.points} pts)</p>
+                <p className="font-semibold text-gray-900 dark:text-gray-100">{index + 1}. {q.text} ({q.points} pts)</p>
                 {q.type === 'multiple-choice' && q.options.map((opt, optIndex) => (
                   <div key={optIndex} className="ml-4">
-                    <label className="flex items-center space-x-2">
+                    <label className="flex items-center space-x-2 text-gray-900 dark:text-gray-100">
                       <input
                         type="radio"
                         name={`question-${index}`}
@@ -254,17 +254,17 @@ const AssignmentDetails = () => {
                   <textarea
                     value={answers[index] || ''}
                     onChange={(e) => handleAnswerChange(index, e.target.value)}
-                    className="mt-2 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    className="mt-2 block w-full rounded-md border-gray-300 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 sm:text-sm"
                     rows="4"
                   />
                 )}
               </div>
             ))}
             <div className="flex justify-end space-x-2">
-              <button type="button" onClick={() => setIsSubmitting(false)} className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
+              <button type="button" onClick={() => setIsSubmitting(false)} className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700">
                 Cancel
               </button>
-              <button type="submit" className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">
+              <button type="submit" className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600">
                 Submit
               </button>
             </div>
@@ -273,15 +273,15 @@ const AssignmentDetails = () => {
           <>
             {assignment.attachments?.length > 0 && (
               <div className="mt-6">
-                <h3 className="text-lg font-medium text-gray-900">Attachments</h3>
-                <ul className="mt-2 divide-y divide-gray-200">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Attachments</h3>
+                <ul className="mt-2 divide-y divide-gray-200 dark:divide-gray-700">
                   {assignment.attachments.map((attachment, index) => (
                     <li key={index} className="py-3">
                       <a
                         href={attachment}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-indigo-600 hover:text-indigo-500"
+                        className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300"
                       >
                         {attachment.split('/').pop()}
                       </a>
@@ -293,24 +293,24 @@ const AssignmentDetails = () => {
 
             {(userRole === 'teacher' || userRole === 'admin') && (
               <div className="mt-8">
-                <h3 className="text-lg font-medium text-gray-900">Submissions</h3>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Submissions</h3>
                 {submission && submission.length === 0 ? (
-                  <p className="mt-2 text-gray-500">No submissions yet</p>
+                  <p className="mt-2 text-gray-500 dark:text-gray-400">No submissions yet</p>
                 ) : (
-                  <ul className="mt-2 divide-y divide-gray-200">
+                  <ul className="mt-2 divide-y divide-gray-200 dark:divide-gray-700">
                     {submission && submission.map((sub) => (
                       <li key={sub._id} className="py-4">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-sm font-medium text-gray-900">
+                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
                               {sub.student?.firstName} {sub.student?.lastName}
                             </p>
-                            <p className="text-sm text-gray-500">
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
                               Submitted at: {format(new Date(sub.submittedAt), 'PPp')}
                             </p>
                           </div>
                           <div className="text-right">
-                            <p className={`text-sm font-medium ${sub.grade ? 'text-green-600' : 'text-yellow-600'}`}>
+                            <p className={`text-sm font-medium ${sub.grade ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
                               {sub.grade !== null && sub.grade !== undefined ? `Grade: ${sub.grade}` : 'Not Graded'}
                             </p>
                           </div>

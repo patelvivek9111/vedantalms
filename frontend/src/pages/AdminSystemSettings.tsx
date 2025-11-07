@@ -151,7 +151,7 @@ export function AdminSystemSettings() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 dark:border-blue-400"></div>
       </div>
     );
   }
@@ -159,8 +159,8 @@ export function AdminSystemSettings() {
   if (!config) {
     return (
       <div className="p-6">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-red-800">Failed to load system settings. Please refresh the page.</p>
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <p className="text-red-800 dark:text-red-400">Failed to load system settings. Please refresh the page.</p>
         </div>
       </div>
     );
@@ -171,15 +171,15 @@ export function AdminSystemSettings() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">System Settings</h1>
-          <p className="text-gray-600">Configure system parameters and preferences</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">System Settings</h1>
+          <p className="text-gray-600 dark:text-gray-400">Configure system parameters and preferences</p>
         </div>
         <div className="flex items-center space-x-3">
           {saveMessage && (
             <div className={`px-4 py-2 rounded-lg ${
               saveMessage.type === 'success' 
-                ? 'bg-green-50 text-green-800 border border-green-200' 
-                : 'bg-red-50 text-red-800 border border-red-200'
+                ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-400 border border-green-200 dark:border-green-800' 
+                : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-400 border border-red-200 dark:border-red-800'
             }`}>
               {saveMessage.text}
             </div>
@@ -187,7 +187,7 @@ export function AdminSystemSettings() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50"
           >
             {saving ? (
               <RefreshCw className="w-4 h-4 animate-spin" />
@@ -200,7 +200,7 @@ export function AdminSystemSettings() {
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200">
+      <div className="border-b border-gray-200 dark:border-gray-700">
         <nav className="-mb-px flex space-x-8">
           {tabs.map((tab) => {
             const Icon = tab.icon;
@@ -210,8 +210,8 @@ export function AdminSystemSettings() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm ${
                   activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-blue-500 dark:border-blue-400 text-blue-600 dark:text-blue-400'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                 }`}
               >
                 <Icon className="w-4 h-4" />
@@ -223,49 +223,49 @@ export function AdminSystemSettings() {
       </div>
 
       {/* Tab Content */}
-      <div className="bg-white rounded-lg shadow">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
         {activeTab === 'general' && (
           <div className="p-6 space-y-6">
-            <h3 className="text-lg font-semibold text-gray-900">General Settings</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">General Settings</h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Site Name</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Site Name</label>
                 <input
                   type="text"
                   value={config.general.siteName}
                   onChange={(e) => handleConfigChange('general', 'siteName', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Site Description</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Site Description</label>
                 <input
                   type="text"
                   value={config.general.siteDescription}
                   onChange={(e) => handleConfigChange('general', 'siteDescription', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Maximum File Size (MB)</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Maximum File Size (MB)</label>
                 <input
                   type="number"
                   value={config.general.maxFileSize}
                   onChange={(e) => handleConfigChange('general', 'maxFileSize', parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Allowed File Types</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Allowed File Types</label>
                 <input
                   type="text"
                   value={config.general.allowedFileTypes.join(', ')}
                   onChange={(e) => handleConfigChange('general', 'allowedFileTypes', e.target.value.split(', '))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
                   placeholder="pdf, doc, docx, jpg, png"
                 />
               </div>
@@ -277,9 +277,9 @@ export function AdminSystemSettings() {
                 id="maintenanceMode"
                 checked={config.general.maintenanceMode}
                 onChange={(e) => handleConfigChange('general', 'maintenanceMode', e.target.checked)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
               />
-              <label htmlFor="maintenanceMode" className="text-sm font-medium text-gray-700">
+              <label htmlFor="maintenanceMode" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Enable Maintenance Mode
               </label>
             </div>
@@ -288,36 +288,36 @@ export function AdminSystemSettings() {
 
         {activeTab === 'security' && (
           <div className="p-6 space-y-6">
-            <h3 className="text-lg font-semibold text-gray-900">Security Settings</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Security Settings</h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Minimum Password Length</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Minimum Password Length</label>
                 <input
                   type="number"
                   value={config.security.passwordMinLength}
                   onChange={(e) => handleConfigChange('security', 'passwordMinLength', parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Session Timeout (minutes)</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Session Timeout (minutes)</label>
                 <input
                   type="number"
                   value={config.security.sessionTimeout}
                   onChange={(e) => handleConfigChange('security', 'sessionTimeout', parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Maximum Login Attempts</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Maximum Login Attempts</label>
                 <input
                   type="number"
                   value={config.security.maxLoginAttempts}
                   onChange={(e) => handleConfigChange('security', 'maxLoginAttempts', parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
                 />
               </div>
             </div>
@@ -329,9 +329,9 @@ export function AdminSystemSettings() {
                   id="requireStrongPassword"
                   checked={config.security.requireStrongPassword}
                   onChange={(e) => handleConfigChange('security', 'requireStrongPassword', e.target.checked)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
                 />
-                <label htmlFor="requireStrongPassword" className="text-sm font-medium text-gray-700">
+                <label htmlFor="requireStrongPassword" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Require Strong Passwords
                 </label>
               </div>
@@ -342,9 +342,9 @@ export function AdminSystemSettings() {
                   id="enableTwoFactor"
                   checked={config.security.enableTwoFactor}
                   onChange={(e) => handleConfigChange('security', 'enableTwoFactor', e.target.checked)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
                 />
-                <label htmlFor="enableTwoFactor" className="text-sm font-medium text-gray-700">
+                <label htmlFor="enableTwoFactor" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Enable Two-Factor Authentication
                 </label>
               </div>
@@ -354,75 +354,75 @@ export function AdminSystemSettings() {
 
         {activeTab === 'email' && (
           <div className="p-6 space-y-6">
-            <h3 className="text-lg font-semibold text-gray-900">Email Configuration</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Email Configuration</h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">SMTP Host</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">SMTP Host</label>
                 <input
                   type="text"
                   value={config.email.smtpHost}
                   onChange={(e) => handleConfigChange('email', 'smtpHost', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">SMTP Port</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">SMTP Port</label>
                 <input
                   type="number"
                   value={config.email.smtpPort}
                   onChange={(e) => handleConfigChange('email', 'smtpPort', parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">SMTP Username</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">SMTP Username</label>
                 <input
                   type="text"
                   value={config.email.smtpUser}
                   onChange={(e) => handleConfigChange('email', 'smtpUser', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">SMTP Password</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">SMTP Password</label>
                 <div className="relative">
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={config.email.smtpPassword}
                     onChange={(e) => handleConfigChange('email', 'smtpPassword', e.target.value)}
-                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute inset-y-0 right-0 pr-3 flex items-center"
                   >
-                    {showPassword ? <EyeOff className="w-4 h-4 text-gray-400" /> : <Eye className="w-4 h-4 text-gray-400" />}
+                    {showPassword ? <EyeOff className="w-4 h-4 text-gray-400 dark:text-gray-500" /> : <Eye className="w-4 h-4 text-gray-400 dark:text-gray-500" />}
                   </button>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">From Email</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">From Email</label>
                 <input
                   type="email"
                   value={config.email.fromEmail}
                   onChange={(e) => handleConfigChange('email', 'fromEmail', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">From Name</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">From Name</label>
                 <input
                   type="text"
                   value={config.email.fromName}
                   onChange={(e) => handleConfigChange('email', 'fromName', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
                 />
               </div>
             </div>
@@ -431,7 +431,7 @@ export function AdminSystemSettings() {
               <button
                 onClick={handleTestEmail}
                 disabled={loading}
-                className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                className="flex items-center space-x-2 px-4 py-2 bg-green-600 dark:bg-green-500 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600 disabled:opacity-50"
               >
                 {loading ? (
                   <RefreshCw className="w-4 h-4 animate-spin" />
@@ -446,25 +446,25 @@ export function AdminSystemSettings() {
 
         {activeTab === 'storage' && (
           <div className="p-6 space-y-6">
-            <h3 className="text-lg font-semibold text-gray-900">Storage Settings</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Storage Settings</h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Maximum Storage per User (GB)</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Maximum Storage per User (GB)</label>
                 <input
                   type="number"
                   value={config.storage.maxStoragePerUser}
                   onChange={(e) => handleConfigChange('storage', 'maxStoragePerUser', parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Backup Frequency</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Backup Frequency</label>
                 <select
                   value={config.storage.backupFrequency}
                   onChange={(e) => handleConfigChange('storage', 'backupFrequency', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
                 >
                   <option value="daily">Daily</option>
                   <option value="weekly">Weekly</option>
@@ -473,12 +473,12 @@ export function AdminSystemSettings() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Retention Days</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Retention Days</label>
                 <input
                   type="number"
                   value={config.storage.retentionDays}
                   onChange={(e) => handleConfigChange('storage', 'retentionDays', parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
                 />
               </div>
             </div>
@@ -489,9 +489,9 @@ export function AdminSystemSettings() {
                 id="compressionEnabled"
                 checked={config.storage.compressionEnabled}
                 onChange={(e) => handleConfigChange('storage', 'compressionEnabled', e.target.checked)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
               />
-              <label htmlFor="compressionEnabled" className="text-sm font-medium text-gray-700">
+              <label htmlFor="compressionEnabled" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Enable File Compression
               </label>
             </div>

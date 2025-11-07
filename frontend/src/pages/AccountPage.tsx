@@ -79,7 +79,7 @@ function ProfileSection() {
 
   return (
     <div className="max-w-xl">
-      <h2 className="text-xl font-semibold mb-4">Profile</h2>
+      <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">Profile</h2>
               <div className="flex items-center gap-6 mb-6">
           {/* Profile picture */}
           <div className="relative w-20 h-20">
@@ -91,7 +91,7 @@ function ProfileSection() {
                     : getImageUrl(user.profilePicture)
                 }
                 alt="Profile"
-                className="w-20 h-20 rounded-full object-cover border"
+                className="w-20 h-20 rounded-full object-cover border border-gray-300 dark:border-gray-600"
                 onError={(e) => {
                   // Hide the failed image and show fallback
                   e.currentTarget.style.display = 'none';
@@ -104,13 +104,13 @@ function ProfileSection() {
             ) : null}
             {/* Fallback avatar - always present but hidden when image loads */}
             <div 
-              className={`w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center text-3xl text-gray-400 ${user && user.profilePicture ? 'hidden' : ''}`}
+              className={`w-20 h-20 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-3xl text-gray-400 dark:text-gray-300 ${user && user.profilePicture ? 'hidden' : ''}`}
               style={{ display: user && user.profilePicture ? 'none' : 'flex' }}
             >
               <span>{user && user.firstName && user.lastName ? `${user.firstName[0]}${user.lastName[0]}` : ''}</span>
             </div>
 
-          <label className="absolute bottom-0 right-0 bg-white rounded-full p-1 shadow cursor-pointer border border-gray-300" title="Change profile picture">
+          <label className="absolute bottom-0 right-0 bg-white dark:bg-gray-800 rounded-full p-1 shadow cursor-pointer border border-gray-300 dark:border-gray-600" title="Change profile picture">
             <input
               type="file"
               accept="image/*"
@@ -122,38 +122,38 @@ function ProfileSection() {
           </label>
         </div>
         <div>
-          <div className="font-bold text-lg">{user?.firstName} {user?.lastName}</div>
-          <div className="text-gray-600">{user?.email}</div>
-          <div className="text-gray-500 text-sm mt-1">{user?.role?.charAt(0).toUpperCase() + user?.role?.slice(1)}</div>
+          <div className="font-bold text-lg text-gray-900 dark:text-gray-100">{user?.firstName} {user?.lastName}</div>
+          <div className="text-gray-600 dark:text-gray-400">{user?.email}</div>
+          <div className="text-gray-500 dark:text-gray-500 text-sm mt-1">{user?.role?.charAt(0).toUpperCase() + user?.role?.slice(1)}</div>
         </div>
       </div>
       {editMode ? (
         <form className="flex flex-col gap-4" onSubmit={e => { e.preventDefault(); handleSave(); }}>
           <div className="flex gap-4">
             <div className="flex-1">
-              <label htmlFor="firstName" className="block text-sm font-medium">First Name</label>
-              <input id="firstName" name="firstName" type="text" autoComplete="given-name" className="mt-1 w-full border rounded px-3 py-2" value={firstName} onChange={e => setFirstName(e.target.value)} />
+              <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">First Name</label>
+              <input id="firstName" name="firstName" type="text" autoComplete="given-name" className="mt-1 w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" value={firstName} onChange={e => setFirstName(e.target.value)} />
             </div>
             <div className="flex-1">
-              <label htmlFor="lastName" className="block text-sm font-medium">Last Name</label>
-              <input id="lastName" name="lastName" type="text" autoComplete="family-name" className="mt-1 w-full border rounded px-3 py-2" value={lastName} onChange={e => setLastName(e.target.value)} />
+              <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Last Name</label>
+              <input id="lastName" name="lastName" type="text" autoComplete="family-name" className="mt-1 w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" value={lastName} onChange={e => setLastName(e.target.value)} />
             </div>
           </div>
           <div>
-            <label htmlFor="email" className="block text-sm font-medium">Email</label>
-            <input id="email" name="email" type="email" autoComplete="email" className="mt-1 w-full border rounded px-3 py-2" value={email} onChange={e => setEmail(e.target.value)} disabled />
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Email</label>
+            <input id="email" name="email" type="email" autoComplete="email" className="mt-1 w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-gray-50 dark:bg-gray-900 text-gray-500 dark:text-gray-400 cursor-not-allowed" value={email} onChange={e => setEmail(e.target.value)} disabled />
           </div>
           <div>
-            <label htmlFor="bio" className="block text-sm font-medium">Bio</label>
-            <textarea id="bio" name="bio" autoComplete="off" className="mt-1 w-full border rounded px-3 py-2" value={bio} onChange={e => setBio(e.target.value)} placeholder="Tell us about yourself..." />
+            <label htmlFor="bio" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Bio</label>
+            <textarea id="bio" name="bio" autoComplete="off" className="mt-1 w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" value={bio} onChange={e => setBio(e.target.value)} placeholder="Tell us about yourself..." />
           </div>
           <div className="flex justify-end gap-2">
-            <button type="button" className="px-4 py-2 rounded bg-gray-200" onClick={handleCancel} disabled={saving}>Cancel</button>
-            <button type="submit" className="px-4 py-2 rounded bg-blue-600 text-white" disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
+            <button type="button" className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors" onClick={handleCancel} disabled={saving}>Cancel</button>
+            <button type="submit" className="px-4 py-2 rounded bg-blue-600 dark:bg-blue-500 text-white hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors disabled:opacity-50" disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
           </div>
         </form>
       ) : (
-        <div>
+        <div className="text-gray-900 dark:text-gray-100">
           <div className="mb-2">
             <span className="font-medium">Name:</span> {user?.firstName} {user?.lastName}
           </div>
@@ -161,9 +161,9 @@ function ProfileSection() {
             <span className="font-medium">Email:</span> {user?.email}
           </div>
           <div className="mb-2">
-            <span className="font-medium">Bio:</span> {user?.bio ? user.bio : <span className="text-gray-500">(not set)</span>}
+            <span className="font-medium">Bio:</span> {user?.bio ? user.bio : <span className="text-gray-500 dark:text-gray-400">(not set)</span>}
           </div>
-          <button className="mt-4 px-4 py-2 rounded bg-blue-600 text-white" onClick={() => setEditMode(true)}>Edit Profile</button>
+          <button className="mt-4 px-4 py-2 rounded bg-blue-600 dark:bg-blue-500 text-white hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors" onClick={() => setEditMode(true)}>Edit Profile</button>
         </div>
       )}
     </div>
@@ -227,24 +227,24 @@ function SettingsSection() {
   };
 
   return (
-    <div className="dark:text-white">
+    <div className="text-gray-900 dark:text-gray-100">
       <h2 className="text-xl font-semibold mb-2">Settings</h2>
-      <p className="text-gray-600 mb-4">Manage your password, language, time zone, and theme preferences.</p>
+      <p className="text-gray-600 dark:text-gray-400 mb-4">Manage your password, language, time zone, and theme preferences.</p>
       {/* Password Change Scaffold */}
       <div className="mb-8">
-        <h3 className="font-semibold mb-1">Change Password</h3>
+        <h3 className="font-semibold mb-1 text-gray-900 dark:text-gray-100">Change Password</h3>
         <form className="flex flex-col gap-2 max-w-md">
-          <input type="password" className="border rounded px-3 py-2" placeholder="Current Password" disabled />
-          <input type="password" className="border rounded px-3 py-2" placeholder="New Password" disabled />
-          <input type="password" className="border rounded px-3 py-2" placeholder="Confirm New Password" disabled />
-          <button type="button" className="bg-gray-300 text-gray-600 rounded px-4 py-2 mt-2 cursor-not-allowed" disabled>Change Password (Coming Soon)</button>
+          <input type="password" className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 cursor-not-allowed" placeholder="Current Password" disabled />
+          <input type="password" className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 cursor-not-allowed" placeholder="New Password" disabled />
+          <input type="password" className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 cursor-not-allowed" placeholder="Confirm New Password" disabled />
+          <button type="button" className="bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded px-4 py-2 mt-2 cursor-not-allowed" disabled>Change Password (Coming Soon)</button>
         </form>
       </div>
       {/* Preferences Form */}
-      <form className="flex flex-col gap-4 max-w-md dark:bg-gray-800 dark:border-gray-700 dark:text-white p-4 rounded border" onSubmit={handleSubmit}>
+      <form className="flex flex-col gap-4 max-w-md bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 p-6 rounded-lg shadow-sm" onSubmit={handleSubmit}>
         <div>
-          <label className="block text-sm font-medium mb-1">Language</label>
-          <select name="language" value={prefs.language} onChange={handleChange} className="w-full border rounded px-3 py-2">
+          <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Language</label>
+          <select name="language" value={prefs.language} onChange={handleChange} className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
             <option value="en">English</option>
             <option value="es">Spanish</option>
             <option value="fr">French</option>
@@ -253,8 +253,8 @@ function SettingsSection() {
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">Time Zone</label>
-          <select name="timeZone" value={prefs.timeZone} onChange={handleChange} className="w-full border rounded px-3 py-2">
+          <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Time Zone</label>
+          <select name="timeZone" value={prefs.timeZone} onChange={handleChange} className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
             <option value="UTC">UTC</option>
             <option value="America/New_York">America/New_York</option>
             <option value="Europe/London">Europe/London</option>
@@ -263,17 +263,19 @@ function SettingsSection() {
           </select>
         </div>
         <div className="flex items-center gap-4">
-          <label className="block text-sm font-medium">Theme</label>
-          <label className="flex items-center gap-2">
-            <input type="radio" name="theme" value="light" checked={prefs.theme === 'light'} onChange={handleChange} /> Light
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Theme</label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="radio" name="theme" value="light" checked={prefs.theme === 'light'} onChange={handleChange} className="text-blue-600 focus:ring-blue-500" /> 
+            <span className="text-gray-700 dark:text-gray-300">Light</span>
           </label>
-          <label className="flex items-center gap-2">
-            <input type="radio" name="theme" value="dark" checked={prefs.theme === 'dark'} onChange={handleChange} /> Dark
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="radio" name="theme" value="dark" checked={prefs.theme === 'dark'} onChange={handleChange} className="text-blue-600 focus:ring-blue-500" /> 
+            <span className="text-gray-700 dark:text-gray-300">Dark</span>
           </label>
         </div>
-        {error && <div className="text-red-500 text-sm">{error}</div>}
-        {success && <div className="text-green-600 text-sm">Preferences saved!</div>}
-        <button type="submit" className="bg-blue-600 text-white rounded px-4 py-2" disabled={saving || loading}>{saving ? 'Saving...' : 'Save Preferences'}</button>
+        {error && <div className="text-red-600 dark:text-red-400 text-sm bg-red-50 dark:bg-red-900/20 p-2 rounded">{error}</div>}
+        {success && <div className="text-green-600 dark:text-green-400 text-sm bg-green-50 dark:bg-green-900/20 p-2 rounded">Preferences saved!</div>}
+        <button type="submit" className="bg-blue-600 dark:bg-blue-500 text-white rounded px-4 py-2 hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled={saving || loading}>{saving ? 'Saving...' : 'Save Preferences'}</button>
       </form>
     </div>
   );
@@ -491,13 +493,17 @@ const AccountPage: React.FC = () => {
   const SectionComponent = sectionComponents[selected];
 
   return (
-    <div className="flex min-h-[70vh]">
+    <div className="flex min-h-[70vh] bg-gray-50 dark:bg-gray-900">
       {/* Sidebar */}
-      <nav className="w-56 bg-white border-r p-6 flex flex-col gap-4">
+      <nav className="w-56 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 p-6 flex flex-col gap-4">
         {sections.map((section) => (
           <button
             key={section.key}
-            className={`text-left px-3 py-2 rounded transition font-medium ${selected === section.key ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100 text-gray-700'}`}
+            className={`text-left px-3 py-2 rounded transition font-medium ${
+              selected === section.key 
+                ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300' 
+                : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+            }`}
             onClick={() => setSelected(section.key)}
           >
             {section.label}
@@ -505,7 +511,7 @@ const AccountPage: React.FC = () => {
         ))}
       </nav>
       {/* Main Content */}
-      <main className="flex-1 p-8">
+      <main className="flex-1 p-8 bg-gray-50 dark:bg-gray-900">
         <SectionComponent />
       </main>
     </div>

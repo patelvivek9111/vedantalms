@@ -194,7 +194,7 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
       }}
       className="mb-6"
     >
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200 overflow-hidden">
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow duration-200 overflow-hidden">
           <div className="p-4">
           {/* Header */}
           <div className="flex items-start justify-between mb-4">
@@ -207,19 +207,19 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
                         : getImageUrl(reply.author.profilePicture))
                     : '/default-avatar.png'}
                   alt={reply.author.firstName}
-                  className="w-10 h-10 rounded-full object-cover border-2 border-gray-100"
+                  className="w-10 h-10 rounded-full object-cover border-2 border-gray-100 dark:border-gray-700"
                   onError={e => (e.currentTarget.src = '/default-avatar.png')}
                 />
 
               </div>
               <div>
                 <div className="flex items-center space-x-2">
-                  <span className="font-semibold text-gray-900">
+                  <span className="font-semibold text-gray-900 dark:text-gray-100">
                     {reply.author.firstName} {reply.author.lastName}
                   </span>
 
                 </div>
-                <div className="flex items-center space-x-1 text-sm text-gray-500">
+                <div className="flex items-center space-x-1 text-sm text-gray-500 dark:text-gray-400">
                   <Clock className="w-3 h-3" />
                   <span>{formatDistanceToNow(new Date(reply.createdAt), { addSuffix: true })}</span>
                 </div>
@@ -230,21 +230,21 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
               <div className="relative" ref={menuRef}>
                 <button
                   onClick={() => setShowMenu(!showMenu)}
-                  className="p-2 rounded-full hover:bg-gray-100 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
+                  className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
                   title="More options"
                   aria-label="More options"
                 >
-                  <MoreVertical className="w-4 h-4 text-gray-600" />
+                  <MoreVertical className="w-4 h-4 text-gray-600 dark:text-gray-400" />
                 </button>
                 
                 {showMenu && (
-                  <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
+                  <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-10">
                     <button
                       onClick={() => {
                         setIsEditing(true);
                         setShowMenu(false);
                       }}
-                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center space-x-2"
                     >
                       <Edit3 className="w-4 h-4" />
                       <span>Edit</span>
@@ -254,7 +254,7 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
                         handleDelete();
                         setShowMenu(false);
                       }}
-                      className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2"
+                      className="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/50 flex items-center space-x-2"
                     >
                       <Trash2 className="w-4 h-4" />
                       <span>Delete</span>
@@ -281,14 +281,14 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
                     setIsEditing(false);
                     setEditContent(reply.content);
                   }}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting || !editContent.trim()}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {isSubmitting ? 'Saving...' : 'Save Changes'}
                 </button>
@@ -297,16 +297,16 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
           ) : (
             <>
               <div 
-                className="prose prose-gray max-w-none mb-4 text-gray-800 leading-relaxed"
+                className="prose prose-gray max-w-none mb-4 text-gray-800 dark:text-gray-300 leading-relaxed prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-p:text-gray-800 dark:prose-p:text-gray-300"
                 dangerouslySetInnerHTML={{ __html: reply.content }}
               />
               
               {/* Reply button */}
-              <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+              <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-gray-700">
                 <div className="flex items-center space-x-4">
                   <button
                     onClick={() => onReply(reply._id)}
-                    className="flex items-center space-x-2 text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                    className="flex items-center space-x-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition-colors"
                   >
                     <Reply className="w-4 h-4" />
                     <span>Reply</span>
@@ -315,7 +315,7 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
                   {allowLikes && (
                     <button
                       onClick={() => onLike(reply._id)}
-                      className="flex items-center space-x-2 text-sm text-gray-600 hover:text-red-600 font-medium transition-colors"
+                      className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 font-medium transition-colors"
                     >
                       <Heart 
                         className={`w-4 h-4 ${
@@ -337,8 +337,8 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
       {/* Nested reply form */}
       {isReplying && (
         <div className="mt-3 ml-6">
-          <div className="bg-blue-50 rounded-xl border border-blue-200 p-4">
-            <h4 className="text-sm font-medium text-blue-900 mb-4 flex items-center space-x-2">
+          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800 p-4">
+            <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-4 flex items-center space-x-2">
               <Reply className="w-4 h-4" />
               <span>Reply to {reply.author.firstName}</span>
             </h4>
@@ -362,14 +362,14 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
                       localStorage.removeItem(draftKey);
                     }
                   }}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting || !replyContent.trim()}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
                 >
                   <Send className="w-4 h-4" />
                   <span>{isSubmitting ? 'Posting...' : 'Post Reply'}</span>
@@ -833,14 +833,14 @@ const ThreadView: React.FC = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 dark:border-blue-400"></div>
       </div>
     );
   }
 
   if (error || !thread) {
     return (
-      <div className="text-red-500 text-center p-4">
+      <div className="text-red-500 dark:text-red-400 text-center p-4">
         {error || 'Thread not found'}
       </div>
     );
@@ -907,20 +907,20 @@ const ThreadView: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       {/* Main Thread Card */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b border-gray-100">
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 px-6 py-4 border-b border-gray-100 dark:border-gray-700">
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center space-x-3 mb-3">
                 {thread.isPinned && (
-                  <div className="flex items-center space-x-1 text-amber-600 bg-amber-50 px-3 py-1 rounded-full">
+                  <div className="flex items-center space-x-1 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/50 px-3 py-1 rounded-full">
                     <Pin className="w-4 h-4" />
                     <span className="text-sm font-medium">Pinned</span>
                   </div>
                 )}
                 {thread.isGraded && (
-                  <div className="flex items-center space-x-1 text-green-600 bg-green-50 px-3 py-1 rounded-full">
+                  <div className="flex items-center space-x-1 text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/50 px-3 py-1 rounded-full">
                     <Award className="w-4 h-4" />
                     <span className="text-sm font-medium">{thread.totalPoints} points</span>
                   </div>
@@ -933,7 +933,7 @@ const ThreadView: React.FC = () => {
                     type="text"
                     value={editTitle}
                     onChange={(e) => setEditTitle(e.target.value)}
-                    className="w-full text-2xl font-bold text-gray-900 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full text-2xl font-bold text-gray-900 dark:text-gray-100 p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                     placeholder="Thread title"
                   />
                   <RichTextEditor
@@ -950,14 +950,14 @@ const ThreadView: React.FC = () => {
                         setEditTitle(thread.title);
                         setEditContent(thread.content);
                       }}
-                      className="px-6 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                      className="px-6 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
                       disabled={isSubmitting || !editTitle.trim() || !editContent.trim()}
-                      className="px-6 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className="px-6 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                       {isSubmitting ? 'Saving...' : 'Save Changes'}
                     </button>
@@ -965,7 +965,7 @@ const ThreadView: React.FC = () => {
                 </form>
               ) : (
                 <>
-                  <h1 className="text-3xl font-bold text-gray-900 mb-4">{thread.title}</h1>
+                  <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">{thread.title}</h1>
                   
                   {/* Author info */}
                   <div className="flex items-center space-x-4">
@@ -982,26 +982,26 @@ const ThreadView: React.FC = () => {
                                 : getImageUrl(thread.author.avatarUrl))
                             : '/default-avatar.png'}
                           alt={thread.author.firstName}
-                          className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm"
+                          className="w-12 h-12 rounded-full object-cover border-2 border-white dark:border-gray-700 shadow-sm"
                           onError={e => (e.currentTarget.src = '/default-avatar.png')}
                         />
 
                       </div>
                       <div>
                         <div className="flex items-center space-x-2">
-                          <span className="font-semibold text-gray-900">
+                          <span className="font-semibold text-gray-900 dark:text-gray-100">
                             {thread.author.firstName} {thread.author.lastName}
                           </span>
                           
                         </div>
-                        <div className="flex items-center space-x-1 text-sm text-gray-500">
+                        <div className="flex items-center space-x-1 text-sm text-gray-500 dark:text-gray-400">
                           <Clock className="w-4 h-4" />
                           <span>{formatDistanceToNow(new Date(thread.createdAt), { addSuffix: true })}</span>
                           {thread.dueDate && (
                             <>
                               <span>•</span>
                               <Calendar className="w-4 h-4" />
-                              <span className="text-orange-600">
+                              <span className="text-orange-600 dark:text-orange-400">
                                 Due {formatDistanceToNow(new Date(thread.dueDate), { addSuffix: true })}
                               </span>
                             </>
@@ -1016,8 +1016,8 @@ const ThreadView: React.FC = () => {
                           onClick={handleTogglePin}
                           className={`p-2 rounded-lg transition-colors ${
                             thread.isPinned
-                              ? 'text-amber-600 bg-amber-50 hover:bg-amber-100'
-                              : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+                              ? 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/50 hover:bg-amber-100 dark:hover:bg-amber-900/70'
+                              : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                           }`}
                           title={thread.isPinned ? 'Unpin thread' : 'Pin thread'}
                         >
@@ -1029,7 +1029,7 @@ const ThreadView: React.FC = () => {
                             setEditTitle(thread.title);
                             setEditContent(thread.content);
                           }}
-                          className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                          className="p-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/50 rounded-lg transition-colors"
                           title="Edit thread"
                         >
                           <Edit3 className="w-5 h-5" />
@@ -1048,14 +1048,14 @@ const ThreadView: React.FC = () => {
                             });
                             setShowEditModal(true);
                           }}
-                          className="p-2 text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-colors"
+                          className="p-2 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/50 rounded-lg transition-colors"
                           title="Edit discussion settings"
                         >
                           <Settings className="w-5 h-5" />
                         </button>
                         <button
                           onClick={handleDeleteThread}
-                          className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                          className="p-2 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/50 rounded-lg transition-colors"
                           title="Delete thread"
                         >
                           <Trash2 className="w-5 h-5" />
@@ -1074,7 +1074,7 @@ const ThreadView: React.FC = () => {
           {!isEditing && (
             <>
               <div 
-                className="prose prose-lg prose-gray max-w-none mb-8 text-gray-800 leading-relaxed"
+                className="prose prose-lg prose-gray max-w-none mb-8 text-gray-800 dark:text-gray-300 leading-relaxed prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-p:text-gray-800 dark:prose-p:text-gray-300"
                 dangerouslySetInnerHTML={{ __html: thread.content }}
               />
               
@@ -1082,14 +1082,14 @@ const ThreadView: React.FC = () => {
               {!hasUserMainReply && (!showReplyEditor ? (
                 <button
                   onClick={() => setShowReplyEditor(true)}
-                  className="w-full px-6 py-4 text-lg font-medium text-blue-600 bg-blue-50 border-2 border-blue-200 border-dashed rounded-xl hover:bg-blue-100 hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 flex items-center justify-center space-x-2"
+                  className="w-full px-6 py-4 text-lg font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 border-dashed rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:border-blue-300 dark:hover:border-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all duration-200 flex items-center justify-center space-x-2"
                 >
                   <MessageSquare className="w-5 h-5" />
                   <span>Start the discussion</span>
                 </button>
               ) : (
-                <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center space-x-2">
+                <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center space-x-2">
                     <MessageSquare className="w-5 h-5" />
                     <span>Post a Reply</span>
                   </h3>
@@ -1115,14 +1115,14 @@ const ThreadView: React.FC = () => {
                             localStorage.removeItem(draftKey);
                           }
                         }}
-                        className="px-6 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                        className="px-6 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                       >
                         Cancel
                       </button>
                       <button
                         type="submit"
                         disabled={isSubmitting || !replyContent.trim()}
-                        className="px-6 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
+                        className="px-6 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
                       >
                         <Send className="w-4 h-4" />
                         <span>{isSubmitting ? 'Posting...' : 'Post Reply'}</span>
@@ -1139,15 +1139,15 @@ const ThreadView: React.FC = () => {
       {/* Grading Modal */}
       {showGradingModal && selectedStudent && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
-            <div className="flex justify-between items-center p-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-800 flex items-center space-x-2">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100 flex items-center space-x-2">
                 <Award className="w-5 h-5" />
                 <span>Grade Discussion - {selectedStudent.firstName} {selectedStudent.lastName}</span>
               </h2>
               <button
                 onClick={() => setShowGradingModal(false)}
-                className="text-gray-500 hover:text-gray-700 focus:outline-none p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1155,9 +1155,9 @@ const ThreadView: React.FC = () => {
 
             <div className="flex h-[calc(90vh-120px)]">
               {/* Left Panel - Student Posts */}
-              <div className="flex-1 p-6 border-r border-gray-200 overflow-y-auto">
+              <div className="flex-1 p-6 border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
                 <div className="mb-4">
-                  <h3 className="text-lg font-semibold text-gray-800 flex items-center space-x-2 mb-3">
+                  <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center space-x-2 mb-3">
                     <MessageSquare className="w-5 h-5" />
                     <span>Student's Posts in This Discussion</span>
                   </h3>
@@ -1170,8 +1170,8 @@ const ThreadView: React.FC = () => {
                     
                     if (studentReplies.length === 0) {
                       return (
-                        <div className="text-center py-8 text-gray-500">
-                          <MessageSquare className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                          <MessageSquare className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" />
                           <p className="text-lg font-medium">No posts yet</p>
                           <p className="text-sm">This student hasn't posted in this discussion.</p>
                         </div>
@@ -1181,27 +1181,27 @@ const ThreadView: React.FC = () => {
                     return (
                       <div className="space-y-4">
                         {studentReplies.map((reply, index) => (
-                          <div key={reply._id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                          <div key={reply._id} className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
                             <div className="flex items-center justify-between mb-3">
                               <div className="flex items-center space-x-2">
-                                <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
-                                  <span className="text-xs font-medium text-blue-600">{index + 1}</span>
+                                <div className="w-6 h-6 bg-blue-100 dark:bg-blue-900/50 rounded-full flex items-center justify-center">
+                                  <span className="text-xs font-medium text-blue-600 dark:text-blue-400">{index + 1}</span>
                                 </div>
-                                <span className="text-sm font-medium text-gray-700">Post #{index + 1}</span>
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Post #{index + 1}</span>
                               </div>
-                              <div className="flex items-center space-x-1 text-xs text-gray-500">
+                              <div className="flex items-center space-x-1 text-xs text-gray-500 dark:text-gray-400">
                                 <Clock className="w-3 h-3" />
                                 <span>{formatDistanceToNow(new Date(reply.createdAt), { addSuffix: true })}</span>
                               </div>
                             </div>
                             
                             <div 
-                              className="prose prose-sm max-w-none text-gray-700 leading-relaxed"
+                              className="prose prose-sm max-w-none text-gray-700 dark:text-gray-300 leading-relaxed prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-p:text-gray-700 dark:prose-p:text-gray-300"
                               dangerouslySetInnerHTML={{ __html: reply.content }}
                             />
                             
                             {reply.updatedAt !== reply.createdAt && (
-                              <div className="mt-2 text-xs text-gray-500 italic">
+                              <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 italic">
                                 Edited {formatDistanceToNow(new Date(reply.updatedAt), { addSuffix: true })}
                               </div>
                             )}
@@ -1217,14 +1217,14 @@ const ThreadView: React.FC = () => {
               <div className="w-96 p-6 overflow-y-auto">
                 <form onSubmit={handleGradeSubmit}>
                   {gradingError && (
-                    <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg flex items-center space-x-2">
+                    <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg flex items-center space-x-2">
                       <AlertCircle className="w-5 h-5" />
                       <span>{gradingError}</span>
                     </div>
                   )}
 
                   <div className="mb-4">
-                    <label htmlFor="grade" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="grade" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Grade (out of {thread?.totalPoints || 100})
                     </label>
                     <input
@@ -1235,13 +1235,13 @@ const ThreadView: React.FC = () => {
                       min="0"
                       max={thread?.totalPoints || 100}
                       step="0.01"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500"
                       required
                     />
                   </div>
 
                   <div className="mb-6">
-                    <label htmlFor="feedback" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="feedback" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Feedback
                     </label>
                     <textarea
@@ -1249,7 +1249,7 @@ const ThreadView: React.FC = () => {
                       value={feedback ?? ''}
                       onChange={(e) => setFeedback(e.target.value)}
                       rows={6}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500"
                       placeholder="Enter feedback for the student..."
                     />
                   </div>
@@ -1258,14 +1258,14 @@ const ThreadView: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setShowGradingModal(false)}
-                      className="px-6 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                      className="px-6 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
                       disabled={isGrading}
-                      className="px-6 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className="px-6 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 border border-transparent rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                       {isGrading ? 'Submitting...' : 'Submit Grade'}
                     </button>
@@ -1280,15 +1280,15 @@ const ThreadView: React.FC = () => {
       {/* Edit Settings Modal */}
       {showEditModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
-            <div className="flex justify-between items-center p-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-800 flex items-center space-x-2">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md">
+            <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100 flex items-center space-x-2">
                 <Settings className="w-5 h-5" />
                 <span>Edit Thread Settings</span>
               </h2>
               <button
                 onClick={() => setShowEditModal(false)}
-                className="text-gray-500 hover:text-gray-700 focus:outline-none p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1304,9 +1304,9 @@ const ThreadView: React.FC = () => {
                       ...prev,
                       isGraded: e.target.checked
                     }))}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="rounded border-gray-300 dark:border-gray-700 text-blue-600 dark:text-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-900"
                   />
-                  <span className="text-sm font-medium text-gray-700">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     Make this a graded discussion
                   </span>
                 </label>
@@ -1314,7 +1314,7 @@ const ThreadView: React.FC = () => {
 
               {/* Module Selection */}
               <div className="mb-4">
-                <label htmlFor="module" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="module" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Module
                 </label>
                 <select
@@ -1324,7 +1324,7 @@ const ThreadView: React.FC = () => {
                     ...prev,
                     module: e.target.value
                   }))}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500"
                 >
                   <option value="">No module</option>
                   {modules.map((module) => (
@@ -1336,7 +1336,7 @@ const ThreadView: React.FC = () => {
               {editSettings.isGraded && (
                 <>
                   <div className="mb-4">
-                    <label htmlFor="totalPoints" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="totalPoints" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Total Points
                     </label>
                     <input
@@ -1348,13 +1348,13 @@ const ThreadView: React.FC = () => {
                         totalPoints: parseInt(e.target.value) || 0
                       }))}
                       min="0"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500"
                       required
                     />
                   </div>
 
                   <div className="mb-4">
-                    <label htmlFor="group" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="group" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Assignment Group
                     </label>
                     <select
@@ -1364,7 +1364,7 @@ const ThreadView: React.FC = () => {
                         ...prev,
                         group: e.target.value
                       }))}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500"
                       required
                     >
                       <option value="Discussions">Discussions</option>
@@ -1375,7 +1375,7 @@ const ThreadView: React.FC = () => {
                   </div>
 
                   <div className="mb-6">
-                    <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Due Date
                     </label>
                     <input
@@ -1386,7 +1386,7 @@ const ThreadView: React.FC = () => {
                         ...prev,
                         dueDate: e.target.value
                       }))}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500"
                     />
                   </div>
                 </>
@@ -1394,7 +1394,7 @@ const ThreadView: React.FC = () => {
 
               {/* Discussion Settings */}
               <div className="mb-6">
-                <h3 className="text-lg font-medium text-gray-800 mb-4">Discussion Settings</h3>
+                <h3 className="text-lg font-medium text-gray-800 dark:text-gray-100 mb-4">Discussion Settings</h3>
                 
                 <div className="space-y-4">
                   <div className="flex items-center">
@@ -1406,9 +1406,9 @@ const ThreadView: React.FC = () => {
                         ...prev,
                         requirePostBeforeSee: e.target.checked
                       }))}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      className="h-4 w-4 text-blue-600 dark:text-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400 border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900"
                     />
-                    <label htmlFor="requirePostBeforeSee" className="ml-2 block text-sm text-gray-700">
+                    <label htmlFor="requirePostBeforeSee" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
                       Users must post before seeing replies
                     </label>
                   </div>
@@ -1422,9 +1422,9 @@ const ThreadView: React.FC = () => {
                         ...prev,
                         allowLikes: e.target.checked
                       }))}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      className="h-4 w-4 text-blue-600 dark:text-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400 border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900"
                     />
-                    <label htmlFor="allowLikes" className="ml-2 block text-sm text-gray-700">
+                    <label htmlFor="allowLikes" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
                       Allow liking
                     </label>
                   </div>
@@ -1438,9 +1438,9 @@ const ThreadView: React.FC = () => {
                         ...prev,
                         allowComments: e.target.checked
                       }))}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      className="h-4 w-4 text-blue-600 dark:text-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400 border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900"
                     />
-                    <label htmlFor="allowComments" className="ml-2 block text-sm text-gray-700">
+                    <label htmlFor="allowComments" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
                       Allow comments
                     </label>
                   </div>
@@ -1451,13 +1451,13 @@ const ThreadView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowEditModal(false)}
-                  className="px-6 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="px-6 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 transition-colors"
+                  className="px-6 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 border border-transparent rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
                 >
                   Save Changes
                 </button>
@@ -1469,29 +1469,29 @@ const ThreadView: React.FC = () => {
 
       {/* Student Grades Section (for teachers) */}
       {isTeacher && thread?.isGraded && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="bg-gradient-to-r from-green-50 to-emerald-50 px-4 py-3 border-b border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-800 flex items-center space-x-2">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center space-x-2">
               <Award className="w-5 h-5" />
               <span>Student Grades</span>
             </h3>
           </div>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-900">
                 <tr>
-                                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grade</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Feedback</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Graded By</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Student</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Grade</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Feedback</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Graded By</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {students.map((student) => {
                   const gradeObj = thread.studentGrades.find(g => g.student._id === student._id);
                   return (
-                    <tr key={student._id} className="hover:bg-gray-50">
+                    <tr key={student._id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex items-center space-x-3">
                           <div className="relative">
@@ -1501,7 +1501,7 @@ const ThreadView: React.FC = () => {
                                   ? student.profilePicture
                                   : getImageUrl(student.profilePicture)}
                                 alt={`${student.firstName} ${student.lastName}`}
-                                className="w-8 h-8 rounded-full object-cover border-2 border-gray-100"
+                                className="w-8 h-8 rounded-full object-cover border-2 border-gray-100 dark:border-gray-700"
                                 onError={(e) => {
                                   // Hide the failed image and show fallback
                                   e.currentTarget.style.display = 'none';
@@ -1514,31 +1514,31 @@ const ThreadView: React.FC = () => {
                             ) : null}
                             {/* Fallback avatar - always present but hidden when image loads */}
                             <div 
-                              className={`w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center ${student.profilePicture ? 'hidden' : ''}`}
+                              className={`w-8 h-8 bg-blue-100 dark:bg-blue-900/50 rounded-full flex items-center justify-center ${student.profilePicture ? 'hidden' : ''}`}
                               style={{ display: student.profilePicture ? 'none' : 'flex' }}
                             >
-                              <User className="w-4 h-4 text-blue-600" />
+                              <User className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                             </div>
                           </div>
-                          <div className="text-sm font-medium text-gray-900">{student.firstName} {student.lastName}</div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{student.firstName} {student.lastName}</div>
                         </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
+                        <div className="text-sm text-gray-900 dark:text-gray-100">
                           {gradeObj ? `${Number.isInteger(gradeObj.grade) ? gradeObj.grade : Number(gradeObj.grade).toFixed(2)} / ${thread.totalPoints}` : '-'}
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="text-sm text-gray-900 max-w-xs truncate">{gradeObj?.feedback || '-'}</div>
+                        <div className="text-sm text-gray-900 dark:text-gray-100 max-w-xs truncate">{gradeObj?.feedback || '-'}</div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{gradeObj?.gradedBy ? `${gradeObj.gradedBy.firstName} ${gradeObj.gradedBy.lastName}` : '-'}</div>
-                        <div className="text-xs text-gray-500">{gradeObj?.gradedAt ? new Date(gradeObj.gradedAt).toLocaleString() : ''}</div>
+                        <div className="text-sm text-gray-900 dark:text-gray-100">{gradeObj?.gradedBy ? `${gradeObj.gradedBy.firstName} ${gradeObj.gradedBy.lastName}` : '-'}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{gradeObj?.gradedAt ? new Date(gradeObj.gradedAt).toLocaleString() : ''}</div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
                         <button
                           onClick={() => openGradingModal(student)}
-                          className="text-blue-600 hover:text-blue-900 transition-colors"
+                          className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 transition-colors"
                         >
                           {gradeObj ? 'Edit Grade' : 'Add Grade'}
                         </button>
@@ -1555,8 +1555,8 @@ const ThreadView: React.FC = () => {
       {/* Replies Section */}
       <div className="space-y-6">
         <div className="flex items-center space-x-3">
-          <h2 className="text-2xl font-bold text-gray-900">Replies</h2>
-          <div className="flex items-center space-x-1 text-sm text-gray-500">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Replies</h2>
+          <div className="flex items-center space-x-1 text-sm text-gray-500 dark:text-gray-400">
             <MessageSquare className="w-4 h-4" />
             <span>{rootReplies.length} {rootReplies.length === 1 ? 'reply' : 'replies'}</span>
           </div>

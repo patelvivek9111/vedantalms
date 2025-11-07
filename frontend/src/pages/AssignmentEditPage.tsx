@@ -53,7 +53,7 @@ const AssignmentEditPage: React.FC = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 dark:border-indigo-400"></div>
       </div>
     );
   }
@@ -61,13 +61,13 @@ const AssignmentEditPage: React.FC = () => {
   if (error) {
     return (
       <div className="max-w-4xl mx-auto p-6">
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+        <div className="bg-red-100 dark:bg-red-900/20 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded relative" role="alert">
           <strong className="font-bold">Error: </strong>
           <span className="block sm:inline">{error}</span>
         </div>
         <button
           onClick={() => navigate(-1)}
-          className="mt-4 px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+          className="mt-4 px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
         >
           Go Back
         </button>
@@ -78,13 +78,13 @@ const AssignmentEditPage: React.FC = () => {
   if (!user || (user.role !== 'teacher' && user.role !== 'admin')) {
     return (
       <div className="max-w-4xl mx-auto p-6">
-        <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative" role="alert">
+        <div className="bg-yellow-100 dark:bg-yellow-900/20 border border-yellow-400 dark:border-yellow-800 text-yellow-700 dark:text-yellow-300 px-4 py-3 rounded relative" role="alert">
           <strong className="font-bold">Access Denied: </strong>
           <span className="block sm:inline">You don't have permission to edit assignments.</span>
         </div>
         <button
           onClick={() => navigate(-1)}
-          className="mt-4 px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+          className="mt-4 px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
         >
           Go Back
         </button>
@@ -95,13 +95,13 @@ const AssignmentEditPage: React.FC = () => {
   if (!moduleId) {
     return (
       <div className="max-w-4xl mx-auto p-6">
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+        <div className="bg-red-100 dark:bg-red-900/20 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded relative" role="alert">
           <strong className="font-bold">Error: </strong>
           <span className="block sm:inline">Could not determine module for this assignment.</span>
         </div>
         <button
           onClick={() => navigate(-1)}
-          className="mt-4 px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+          className="mt-4 px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
         >
           Go Back
         </button>
@@ -111,10 +111,10 @@ const AssignmentEditPage: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <div className="bg-white shadow rounded-lg p-6">
+      <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Edit Assignment</h1>
-          <p className="mt-2 text-sm text-gray-600">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Edit Assignment</h1>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             Editing: {assignment?.title}
           </p>
 

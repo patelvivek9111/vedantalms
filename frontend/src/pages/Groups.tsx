@@ -353,77 +353,77 @@ const Groups: React.FC = () => {
   return (
     <div className="max-w-6xl mx-auto py-8 px-4">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">{title}</h1>
-        <p className="text-gray-600">{subtitle}</p>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">{title}</h1>
+        <p className="text-gray-600 dark:text-gray-400">{subtitle}</p>
       </div>
 
       {/* Statistics Cards - Only for Teachers */}
       {isTeacher && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <div 
-            className={`bg-white rounded-lg shadow p-6 border-l-4 border-blue-500 cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 ${
-              selectedMetric === 'groupSets' ? 'ring-2 ring-blue-300 shadow-lg' : ''
+            className={`bg-white dark:bg-gray-800 rounded-lg shadow p-6 border-l-4 border-blue-500 dark:border-blue-400 cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 ${
+              selectedMetric === 'groupSets' ? 'ring-2 ring-blue-300 dark:ring-blue-600 shadow-lg' : ''
             }`}
             onClick={() => setSelectedMetric(selectedMetric === 'groupSets' ? null : 'groupSets')}
           >
             <div className="flex items-center">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Users className="w-6 h-6 text-blue-600" />
+              <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
+                <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Group Sets</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalGroupSets}</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Group Sets</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.totalGroupSets}</p>
               </div>
             </div>
           </div>
 
           <div 
-            className={`bg-white rounded-lg shadow p-6 border-l-4 border-green-500 cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 ${
-              selectedMetric === 'groups' ? 'ring-2 ring-green-300 shadow-lg' : ''
+            className={`bg-white dark:bg-gray-800 rounded-lg shadow p-6 border-l-4 border-green-500 dark:border-green-400 cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 ${
+              selectedMetric === 'groups' ? 'ring-2 ring-green-300 dark:ring-green-600 shadow-lg' : ''
             }`}
             onClick={() => setSelectedMetric(selectedMetric === 'groups' ? null : 'groups')}
           >
             <div className="flex items-center">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <BarChart3 className="w-6 h-6 text-green-600" />
+              <div className="p-2 bg-green-100 dark:bg-green-900/50 rounded-lg">
+                <BarChart3 className="w-6 h-6 text-green-600 dark:text-green-400" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Groups</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalGroups}</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Groups</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.totalGroups}</p>
               </div>
             </div>
           </div>
 
           <div 
-            className={`bg-white rounded-lg shadow p-6 border-l-4 border-purple-500 cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 ${
-              selectedMetric === 'members' ? 'ring-2 ring-purple-300 shadow-lg' : ''
+            className={`bg-white dark:bg-gray-800 rounded-lg shadow p-6 border-l-4 border-purple-500 dark:border-purple-400 cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 ${
+              selectedMetric === 'members' ? 'ring-2 ring-purple-300 dark:ring-purple-600 shadow-lg' : ''
             }`}
             onClick={() => setSelectedMetric(selectedMetric === 'members' ? null : 'members')}
           >
             <div className="flex items-center">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <UserPlus className="w-6 h-6 text-purple-600" />
+              <div className="p-2 bg-purple-100 dark:bg-purple-900/50 rounded-lg">
+                <UserPlus className="w-6 h-6 text-purple-600 dark:text-purple-400" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Members</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalMembers}</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Members</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.totalMembers}</p>
               </div>
             </div>
           </div>
 
           <div 
-            className={`bg-white rounded-lg shadow p-6 border-l-4 border-orange-500 cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 ${
-              selectedMetric === 'active' ? 'ring-2 ring-orange-300 shadow-lg' : ''
+            className={`bg-white dark:bg-gray-800 rounded-lg shadow p-6 border-l-4 border-orange-500 dark:border-orange-400 cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 ${
+              selectedMetric === 'active' ? 'ring-2 ring-orange-300 dark:ring-orange-600 shadow-lg' : ''
             }`}
             onClick={() => setSelectedMetric(selectedMetric === 'active' ? null : 'active')}
           >
             <div className="flex items-center">
-              <div className="p-2 bg-orange-100 rounded-lg">
-                <CheckCircle className="w-6 h-6 text-orange-600" />
+              <div className="p-2 bg-orange-100 dark:bg-orange-900/50 rounded-lg">
+                <CheckCircle className="w-6 h-6 text-orange-600 dark:text-orange-400" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Active Sets</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.activeGroupSets}</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Sets</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.activeGroupSets}</p>
               </div>
             </div>
           </div>
@@ -431,18 +431,18 @@ const Groups: React.FC = () => {
       )}
 
       {/* Filters and Search */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 mb-8">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
-            <div className="p-2 bg-blue-50 rounded-lg">
-              <Filter className="w-5 h-5 text-blue-600" />
+            <div className="p-2 bg-blue-50 dark:bg-blue-900/50 rounded-lg">
+              <Filter className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             </div>
-            <h2 className="text-xl font-semibold text-gray-900">Filters & Search</h2>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Filters & Search</h2>
           </div>
           {isTeacher && (
             <button 
               onClick={() => navigate('/groups/create')}
-              className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center space-x-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+              className="bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-500 dark:to-blue-600 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-blue-800 dark:hover:from-blue-600 dark:hover:to-blue-700 transition-all duration-200 flex items-center space-x-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
             >
               <Plus className="w-4 h-4" />
               <span className="font-medium">Create Group Set</span>
@@ -452,25 +452,25 @@ const Groups: React.FC = () => {
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="space-y-2">
-            <label className="block text-sm font-semibold text-gray-700">Search Groups</label>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Search Groups</label>
             <div className="relative">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4" />
               <input
                 type="text"
                 placeholder="Search by name or course..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-gray-50 hover:bg-white"
+                className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 transition-all duration-200 hover:bg-white dark:hover:bg-gray-800"
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm font-semibold text-gray-700">Filter by Course</label>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Filter by Course</label>
             <select
               value={courseFilter}
               onChange={(e) => setCourseFilter(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-gray-50 hover:bg-white appearance-none cursor-pointer"
+              className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 transition-all duration-200 hover:bg-white dark:hover:bg-gray-800 appearance-none cursor-pointer"
             >
               <option value="all">All Courses ({isTeacher ? groupSets.length : groups.length})</option>
               {uniqueCourses.map(course => {
@@ -487,14 +487,14 @@ const Groups: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm font-semibold text-gray-700">View Mode</label>
-            <div className="flex bg-gray-100 rounded-xl p-1">
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">View Mode</label>
+            <div className="flex bg-gray-100 dark:bg-gray-700 rounded-xl p-1">
               <button
                 onClick={() => setViewMode('grid')}
                 className={`flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
                   viewMode === 'grid' 
-                    ? 'bg-white text-blue-600 shadow-md transform scale-105' 
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                    ? 'bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-md transform scale-105' 
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600'
                 }`}
               >
                 <div className="flex items-center justify-center space-x-2">
@@ -511,8 +511,8 @@ const Groups: React.FC = () => {
                 onClick={() => setViewMode('list')}
                 className={`flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
                   viewMode === 'list' 
-                    ? 'bg-white text-blue-600 shadow-md transform scale-105' 
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                    ? 'bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-md transform scale-105' 
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600'
                 }`}
               >
                 <div className="flex items-center justify-center space-x-2">
@@ -531,35 +531,35 @@ const Groups: React.FC = () => {
         {(searchTerm || courseFilter !== 'all' || selectedMetric) && (
           <div className="mt-6 flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-500">Active filters:</span>
+              <span className="text-sm text-gray-500 dark:text-gray-400">Active filters:</span>
               {searchTerm && (
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200">
                   Search: "{searchTerm}"
                   <button 
                     onClick={() => setSearchTerm('')}
-                    className="ml-2 hover:text-blue-600"
+                    className="ml-2 hover:text-blue-600 dark:hover:text-blue-400"
                   >
                     <XCircle className="w-3 h-3" />
                   </button>
                 </span>
               )}
               {courseFilter !== 'all' && (
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200">
                   Course: {courseFilter}
                   <button 
                     onClick={() => setCourseFilter('all')}
-                    className="ml-2 hover:text-green-600"
+                    className="ml-2 hover:text-green-600 dark:hover:text-green-400"
                   >
                     <XCircle className="w-3 h-3" />
                   </button>
                 </span>
               )}
               {selectedMetric && (
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-200">
                   Metric: {selectedMetric}
                   <button 
                     onClick={() => setSelectedMetric(null)}
-                    className="ml-2 hover:text-purple-600"
+                    className="ml-2 hover:text-purple-600 dark:hover:text-purple-400"
                   >
                     <XCircle className="w-3 h-3" />
                   </button>
@@ -572,7 +572,7 @@ const Groups: React.FC = () => {
                 setCourseFilter('all');
                 setSelectedMetric(null);
               }}
-              className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+              className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
             >
               Clear all filters
             </button>
@@ -582,17 +582,17 @@ const Groups: React.FC = () => {
 
       {loading && (
         <div className="flex justify-center items-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 dark:border-blue-400"></div>
         </div>
       )}
 
       {!loading && isTeacher && filteredData.length > 0 && (
         <>
           <div className="flex items-center justify-between mb-4">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
               Showing {filteredData.length} of {isTeacher ? groupSets.length : groups.length} {isTeacher ? 'group sets' : 'groups'}
               {(searchTerm || courseFilter !== 'all') && (
-                <span className="ml-2 text-gray-400">
+                <span className="ml-2 text-gray-400 dark:text-gray-500">
                   (filtered)
                 </span>
               )}
@@ -607,7 +607,7 @@ const Groups: React.FC = () => {
             return (
             <div 
               key={groupSet._id} 
-                className={`bg-white rounded-xl shadow-lg overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300 border border-gray-100 ${
+                className={`bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-700 ${
                   viewMode === 'list' ? 'flex items-center' : ''
                 }`}
               onClick={() => navigate(`/groupsets/${groupSet._id}`)}
@@ -635,7 +635,7 @@ const Groups: React.FC = () => {
                   >
                     {groupSet.name}
                   </h3>
-                  <p className="text-gray-500 text-xs">
+                  <p className="text-gray-500 dark:text-gray-400 text-xs">
                     {groupSet.course?.title || 'Unknown Course'}
                   </p>
                 </div>
@@ -654,18 +654,18 @@ const Groups: React.FC = () => {
                         >
                           {groupSet.name}
                         </h3>
-                        <p className="text-gray-500 text-sm">
+                        <p className="text-gray-500 dark:text-gray-400 text-sm">
                           {groupSet.course?.title || 'Unknown Course'}
                         </p>
                       </div>
                       <div className="flex items-center space-x-4">
                         <div className="text-right">
-                          <p className="text-sm font-medium text-gray-900">{groupSet.totalGroups || 0}</p>
-                          <p className="text-xs text-gray-500">Groups</p>
+                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{groupSet.totalGroups || 0}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Groups</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-medium text-gray-900">{groupSet.totalMembers || 0}</p>
-                          <p className="text-xs text-gray-500">Members</p>
+                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{groupSet.totalMembers || 0}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Members</p>
                         </div>
 
                       </div>
@@ -682,10 +682,10 @@ const Groups: React.FC = () => {
       {!loading && !isTeacher && filteredData.length > 0 && (
         <>
           <div className="flex items-center justify-between mb-4">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
               Showing {filteredData.length} of {isTeacher ? groupSets.length : groups.length} {isTeacher ? 'group sets' : 'groups'}
               {(searchTerm || courseFilter !== 'all') && (
-                <span className="ml-2 text-gray-400">
+                <span className="ml-2 text-gray-400 dark:text-gray-500">
                   (filtered)
                 </span>
               )}
@@ -700,7 +700,7 @@ const Groups: React.FC = () => {
             return (
             <div 
               key={group._id} 
-                className={`bg-white rounded-xl shadow-lg overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border border-gray-100 ${
+                className={`bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border border-gray-100 dark:border-gray-700 ${
                   viewMode === 'list' ? 'flex items-center' : ''
                 }`}
               onClick={() => navigate(`/groups/${group._id}`)}
@@ -728,7 +728,7 @@ const Groups: React.FC = () => {
                   >
                     {group.name}
                   </h3>
-                  <p className="text-gray-500 text-xs">
+                  <p className="text-gray-500 dark:text-gray-400 text-xs">
                     {group.course?.title || 'Unknown Course'}
                   </p>
                 </div>
@@ -736,17 +736,17 @@ const Groups: React.FC = () => {
                 {/* Members section */}
                 {group.members && group.members.length > 0 && (
                   <div className="mb-3">
-                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
                       Members ({group.members.length})
                     </p>
                     <div className="flex flex-wrap gap-1">
                       {group.members.slice(0, 2).map((member, index) => (
-                        <span key={index} className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs bg-gray-100 text-gray-700">
+                        <span key={index} className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
                           {member.firstName} {member.lastName}
                         </span>
                       ))}
                       {group.members.length > 2 && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs bg-gray-100 text-gray-700">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
                           +{group.members.length - 2} more
                         </span>
                       )}
@@ -757,8 +757,8 @@ const Groups: React.FC = () => {
                 {/* Leader section */}
                 {group.leader && (
                   <div className="mb-3">
-                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Leader</p>
-                    <p className="text-xs text-gray-700 font-medium">{group.leader.firstName} {group.leader.lastName}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Leader</p>
+                    <p className="text-xs text-gray-700 dark:text-gray-300 font-medium">{group.leader.firstName} {group.leader.lastName}</p>
                   </div>
                 )}
                     </div>
@@ -774,11 +774,11 @@ const Groups: React.FC = () => {
                         >
                           {group.name}
                         </h3>
-                        <p className="text-gray-500 text-sm">
+                        <p className="text-gray-500 dark:text-gray-400 text-sm">
                           {group.course?.title || 'Unknown Course'}
                         </p>
                         {group.members && group.members.length > 0 && (
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                             {group.members.length} member{group.members.length !== 1 ? 's' : ''}
                           </p>
                         )}
@@ -786,14 +786,14 @@ const Groups: React.FC = () => {
                       <div className="flex items-center space-x-4">
                         {group.leader && (
                           <div className="text-right">
-                            <p className="text-sm font-medium text-gray-900">{group.leader.firstName} {group.leader.lastName}</p>
-                            <p className="text-xs text-gray-500">Leader</p>
+                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{group.leader.firstName} {group.leader.lastName}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Leader</p>
                           </div>
                         )}
                         {group.members && group.members.length > 0 && (
                           <div className="text-right">
-                            <p className="text-sm font-medium text-gray-900">{group.members.length}</p>
-                            <p className="text-xs text-gray-500">Members</p>
+                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{group.members.length}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Members</p>
                           </div>
                         )}
                       </div>
@@ -810,13 +810,13 @@ const Groups: React.FC = () => {
       {/* Empty State */}
       {!loading && filteredData.length === 0 && (
         <div className="text-center py-12">
-          <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-            <Users className="w-8 h-8 text-gray-400" />
+          <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
+            <Users className="w-8 h-8 text-gray-400 dark:text-gray-500" />
           </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
             {searchTerm || courseFilter !== 'all' ? 'No groups found' : 'No groups yet'}
           </h3>
-          <p className="text-gray-500 mb-6">
+          <p className="text-gray-500 dark:text-gray-400 mb-6">
             {searchTerm || courseFilter !== 'all' 
               ? 'Try adjusting your search or filters to find what you\'re looking for.'
               : isTeacher 
@@ -827,7 +827,7 @@ const Groups: React.FC = () => {
           {!searchTerm && courseFilter === 'all' && isTeacher && (
             <button 
               onClick={() => navigate('/groups/create')}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              className="bg-blue-600 dark:bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
             >
               Create Group Set
             </button>
@@ -838,14 +838,14 @@ const Groups: React.FC = () => {
       {/* Error State */}
       {error && (
         <div className="text-center py-12">
-          <div className="w-16 h-16 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
-            <AlertCircle className="w-8 h-8 text-red-400" />
+          <div className="w-16 h-16 mx-auto mb-4 bg-red-100 dark:bg-red-900/50 rounded-full flex items-center justify-center">
+            <AlertCircle className="w-8 h-8 text-red-400 dark:text-red-500" />
             </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Error loading groups</h3>
-          <p className="text-gray-500 mb-6">{error}</p>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Error loading groups</h3>
+          <p className="text-gray-500 dark:text-gray-400 mb-6">{error}</p>
           <button 
             onClick={() => window.location.reload()}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            className="bg-blue-600 dark:bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
           >
             Try Again
           </button>

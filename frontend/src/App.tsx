@@ -71,10 +71,10 @@ const CreateAssignmentFormWrapper = () => {
 
 function Unauthorized() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
       <div className="text-center">
-        <h1 className="text-4xl font-bold text-gray-900">401</h1>
-        <p className="mt-2 text-gray-600">You are not authorized to access this page.</p>
+        <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100">401</h1>
+        <p className="mt-2 text-gray-600 dark:text-gray-400">You are not authorized to access this page.</p>
       </div>
     </div>
   );

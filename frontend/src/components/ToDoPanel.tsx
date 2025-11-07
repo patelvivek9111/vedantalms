@@ -125,21 +125,21 @@ export const ToDoPanel: React.FC = () => {
   const regularTodos = personalTodosThisWeek.filter(todo => todo.type !== 'enrollment_request' && todo.type !== 'enrollment_summary' && todo.type !== 'waitlist_promotion');
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 mb-6 border border-gray-200">
-      <h2 className="text-xl font-semibold text-gray-800 mb-6">To Do</h2>
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6 border border-gray-200 dark:border-gray-700">
+      <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-6">To Do</h2>
       {/* Enrollment Summaries */}
       {enrollmentSummaries.length > 0 && (
         <div className="mb-6">
-          <h3 className="text-md font-semibold text-gray-600 mb-3">Enrollment Updates</h3>
+          <h3 className="text-md font-semibold text-gray-600 dark:text-gray-400 mb-3">Enrollment Updates</h3>
           <ul className="space-y-2">
             {enrollmentSummaries.map((todo) => (
-              <li key={todo._id} className="p-3 bg-green-50 rounded-lg hover:bg-green-100 transition-colors cursor-pointer" onClick={() => handleEnrollmentNotificationClick(todo)}>
+              <li key={todo._id} className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors cursor-pointer" onClick={() => handleEnrollmentNotificationClick(todo)}>
                 <div>
-                  <span className="font-medium text-gray-800">
+                  <span className="font-medium text-gray-800 dark:text-gray-200">
                     {todo.enrollmentCount} student{todo.enrollmentCount !== 1 ? 's' : ''} enrolled in {todo.courseName}
                   </span>
                   {todo.dueDate && (
-                    <span className="ml-2 text-xs text-gray-500">{new Date(todo.dueDate).toLocaleDateString()}</span>
+                    <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">{new Date(todo.dueDate).toLocaleDateString()}</span>
                   )}
                 </div>
               </li>
@@ -151,14 +151,14 @@ export const ToDoPanel: React.FC = () => {
       {/* Waitlist Promotions */}
       {waitlistPromotions.length > 0 && (
         <div className="mb-6">
-          <h3 className="text-md font-semibold text-gray-600 mb-3">Waitlist Promotions</h3>
+          <h3 className="text-md font-semibold text-gray-600 dark:text-gray-400 mb-3">Waitlist Promotions</h3>
           <ul className="space-y-2">
             {waitlistPromotions.map((todo) => (
-              <li key={todo._id} className="p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors cursor-pointer" onClick={() => handleEnrollmentNotificationClick(todo)}>
+              <li key={todo._id} className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors cursor-pointer" onClick={() => handleEnrollmentNotificationClick(todo)}>
                 <div>
-                  <span className="font-medium text-gray-800">{todo.title}</span>
+                  <span className="font-medium text-gray-800 dark:text-gray-200">{todo.title}</span>
                   {todo.dueDate && (
-                    <span className="ml-2 text-xs text-gray-500">{new Date(todo.dueDate).toLocaleDateString()}</span>
+                    <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">{new Date(todo.dueDate).toLocaleDateString()}</span>
                   )}
                 </div>
               </li>
@@ -170,14 +170,14 @@ export const ToDoPanel: React.FC = () => {
       {/* Enrollment Requests */}
       {enrollmentRequests.length > 0 && (
         <div className="mb-6">
-          <h3 className="text-md font-semibold text-gray-600 mb-3">Enrollment Requests</h3>
+          <h3 className="text-md font-semibold text-gray-600 dark:text-gray-400 mb-3">Enrollment Requests</h3>
           <ul className="space-y-2">
             {enrollmentRequests.map((todo) => (
-              <li key={todo._id} className="p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer" onClick={() => window.location.href = `/courses/${todo.courseId}/students`}>
+              <li key={todo._id} className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors cursor-pointer" onClick={() => window.location.href = `/courses/${todo.courseId}/students`}>
                 <div>
-                  <span className="font-medium text-gray-800">{todo.title}</span>
+                  <span className="font-medium text-gray-800 dark:text-gray-200">{todo.title}</span>
                   {todo.dueDate && (
-                    <span className="ml-2 text-xs text-gray-500">{new Date(todo.dueDate).toLocaleDateString()}</span>
+                    <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">{new Date(todo.dueDate).toLocaleDateString()}</span>
                   )}
                 </div>
               </li>
@@ -188,25 +188,25 @@ export const ToDoPanel: React.FC = () => {
 
       {/* Personal To-Dos */}
       <div className="mb-6">
-        <h3 className="text-md font-semibold text-gray-600 mb-3">My To Do</h3>
+        <h3 className="text-md font-semibold text-gray-600 dark:text-gray-400 mb-3">My To Do</h3>
         {personalLoading ? (
-          <div className="text-gray-500">Loading...</div>
+          <div className="text-gray-500 dark:text-gray-400">Loading...</div>
         ) : personalError ? (
-          <div className="text-red-500">{personalError}</div>
+          <div className="text-red-500 dark:text-red-400">{personalError}</div>
         ) : regularTodos.length === 0 ? (
-          <div className="text-gray-500 text-sm italic">No personal to-dos</div>
+          <div className="text-gray-500 dark:text-gray-400 text-sm italic">No personal to-dos</div>
         ) : (
           <ul className="space-y-2">
             {regularTodos.map((todo) => (
-              <li key={todo._id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+              <li key={todo._id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
                 <div className="flex-1">
-                  <span className="font-medium text-gray-800">{todo.title}</span>
+                  <span className="font-medium text-gray-800 dark:text-gray-200">{todo.title}</span>
                   {todo.dueDate && (
-                    <span className="ml-2 text-xs text-gray-500">{new Date(todo.dueDate).toLocaleDateString()}</span>
+                    <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">{new Date(todo.dueDate).toLocaleDateString()}</span>
                   )}
                 </div>
                 <button
-                  className="text-xs bg-green-100 text-green-700 rounded px-2 py-1 hover:bg-green-200 transition-colors"
+                  className="text-xs bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 rounded px-2 py-1 hover:bg-green-200 dark:hover:bg-green-900/70 transition-colors"
                   onClick={() => handleMarkDone(todo._id)}
                 >
                   Done
@@ -219,28 +219,28 @@ export const ToDoPanel: React.FC = () => {
       {/* Assignment To-Dos (role-based) */}
       {isTeacherOrAdmin ? (
         <>
-          <h3 className="text-md font-semibold text-gray-600 mb-3">Ungraded Assignments</h3>
+          <h3 className="text-md font-semibold text-gray-600 dark:text-gray-400 mb-3">Ungraded Assignments</h3>
           {todoLoading ? (
-            <div className="text-gray-500">Loading...</div>
+            <div className="text-gray-500 dark:text-gray-400">Loading...</div>
           ) : todoError ? (
-            <div className="text-red-500">{todoError}</div>
+            <div className="text-red-500 dark:text-red-400">{todoError}</div>
           ) : todoAssignments.length === 0 ? (
-            <div className="text-gray-500 text-sm italic">No ungraded assignments</div>
+            <div className="text-gray-500 dark:text-gray-400 text-sm italic">No ungraded assignments</div>
           ) : (
             <ul className="space-y-3">
               {todoAssignments.map((item) => (
-                <li key={item.id} className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                <li key={item.id} className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
                   <Link
                     to={`/assignments/${item.id}/grade`}
                     className="block"
                   >
                     <div className="flex justify-between items-center mb-1">
-                      <span className="font-medium text-gray-800" title={item.title}>
+                      <span className="font-medium text-gray-800 dark:text-gray-200" title={item.title}>
                         {item.title.length > 30 ? item.title.slice(0, 30) + '...' : item.title}
                       </span>
-                      <span className="text-xs bg-blue-100 text-blue-700 rounded px-2 py-1">{item.ungradedCount} to grade</span>
+                      <span className="text-xs bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded px-2 py-1">{item.ungradedCount} to grade</span>
                     </div>
-                    <div className="text-sm text-gray-500">{item.course.title}</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">{item.course.title}</div>
                   </Link>
                 </li>
               ))}
@@ -249,17 +249,17 @@ export const ToDoPanel: React.FC = () => {
         </>
       ) : (
         <>
-          <h3 className="text-md font-semibold text-gray-600 mb-3">Due This Week</h3>
+          <h3 className="text-md font-semibold text-gray-600 dark:text-gray-400 mb-3">Due This Week</h3>
           {studentDueLoading ? (
-            <div className="text-gray-500">Loading...</div>
+            <div className="text-gray-500 dark:text-gray-400">Loading...</div>
           ) : studentDueError ? (
-            <div className="text-red-500">{studentDueError}</div>
+            <div className="text-red-500 dark:text-red-400">{studentDueError}</div>
           ) : studentDueItems.length === 0 ? (
-            <div className="text-gray-500 text-sm italic">No items due this week</div>
+            <div className="text-gray-500 dark:text-gray-400 text-sm italic">No items due this week</div>
           ) : (
             <ul className="space-y-3">
               {studentDueItems.map((item) => (
-                <li key={item._id} className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                <li key={item._id} className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
                   <Link
                     to={item.type === 'assignment' 
                       ? `/assignments/${item._id}/view`
@@ -268,23 +268,23 @@ export const ToDoPanel: React.FC = () => {
                     className="block"
                   >
                     <div className="flex justify-between items-center mb-1">
-                      <span className="font-medium text-gray-800" title={item.title}>
+                      <span className="font-medium text-gray-800 dark:text-gray-200" title={item.title}>
                         {item.title.length > 30 ? item.title.slice(0, 30) + '...' : item.title}
                       </span>
                       <div className="flex items-center gap-2">
                         <span className={`text-xs rounded px-2 py-1 ${
                           item.type === 'assignment' 
-                            ? 'bg-blue-100 text-blue-700' 
-                            : 'bg-purple-100 text-purple-700'
+                            ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300' 
+                            : 'bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300'
                         }`}>
                           {item.itemType}
                         </span>
-                        <span className="text-xs bg-yellow-100 text-yellow-700 rounded px-2 py-1">
+                        <span className="text-xs bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-300 rounded px-2 py-1">
                           Due {new Date(item.dueDate).toLocaleDateString()}
                         </span>
                       </div>
                     </div>
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
                       {item.module?.course?.title || item.course?.title || ''}
                     </div>
                   </Link>

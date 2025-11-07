@@ -200,15 +200,15 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
         onClick={handleModuleClick}
       >
         <div className="flex items-center space-x-2">
-          {isExpanded ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
-          <h3 className="text-lg font-medium">{module.title}</h3>
+          {isExpanded ? <ChevronDown className="h-5 w-5 text-gray-900 dark:text-gray-100" /> : <ChevronRight className="h-5 w-5 text-gray-900 dark:text-gray-100" />}
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">{module.title}</h3>
         </div>
         <div className="flex items-center gap-2">
           {(user?.role === 'teacher' || user?.role === 'admin') && (
             <>
               <button
                 onClick={handleTogglePublish}
-                className={`p-1 rounded ${module.published ? 'text-green-600 hover:bg-green-100 dark:hover:bg-green-900' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+                className={`p-1 rounded ${module.published ? 'text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/50' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
                 title={module.published ? 'Unpublish Module (lock)' : 'Publish Module (unlock)'}
                 disabled={isPublishing}
               >
@@ -216,7 +216,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
               </button>
               <button
                 onClick={handleAddPageClick}
-                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
+                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded text-gray-900 dark:text-gray-100"
               >
                 <Plus className="h-5 w-5" />
               </button>
@@ -225,7 +225,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
                   e.stopPropagation();
                   navigate(`/modules/${module._id}/edit`);
                 }}
-                className="p-1 hover:bg-yellow-100 rounded text-yellow-600"
+                className="p-1 hover:bg-yellow-100 dark:hover:bg-yellow-900/50 rounded text-yellow-600 dark:text-yellow-400"
                 title="Edit Module"
               >
                 <Pencil className="h-5 w-5" />
@@ -237,7 +237,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
                     deleteModule(module._id, module.course);
                   }
                 }}
-                className="p-1 hover:bg-red-100 rounded text-red-600"
+                className="p-1 hover:bg-red-100 dark:hover:bg-red-900/50 rounded text-red-600 dark:text-red-400"
                 title="Delete Module"
               >
                 <Trash2 className="h-5 w-5" />
@@ -261,13 +261,13 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
           )}
           
           {isLoadingPages ? (
-            <div className="p-4 text-center text-gray-500">Loading pages...</div>
+            <div className="p-4 text-center text-gray-500 dark:text-gray-400">Loading pages...</div>
           ) : error ? (
-            <div className="p-4 text-center text-red-500">{error}</div>
+            <div className="p-4 text-center text-red-500 dark:text-red-400">{error}</div>
           ) : pages.length === 0 ? (
-            <div className="p-4 text-center text-gray-500">No pages available</div>
+            <div className="p-4 text-center text-gray-500 dark:text-gray-400">No pages available</div>
           ) : (
-            <div className="divide-y">
+            <div className="divide-y divide-gray-200 dark:divide-gray-700">
               {pages.map((page) => (
                 <div
                   key={page._id}
@@ -275,11 +275,11 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
                   onClick={(e) => handlePageClick(e, page._id)}
                 >
                   <div className="flex items-center space-x-2">
-                    <FileText className="h-5 w-5 text-gray-400 group-hover:text-blue-500" />
+                    <FileText className="h-5 w-5 text-gray-400 dark:text-gray-500 group-hover:text-blue-500 dark:group-hover:text-blue-400" />
                     <span className={
                       page._id === selectedPage
-                        ? 'text-blue-600 font-semibold'
-                        : 'text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                        ? 'text-blue-600 dark:text-blue-400 font-semibold'
+                        : 'text-gray-500 dark:text-gray-300'
                     }>{page.title}</span>
                   </div>
                   {(user?.role === 'teacher' || user?.role === 'admin') && (
@@ -289,7 +289,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
                           e.stopPropagation();
                           navigate(`/pages/${page._id}/edit`);
                         }}
-                        className="p-1 hover:bg-yellow-100 rounded text-yellow-600"
+                        className="p-1 hover:bg-yellow-100 dark:hover:bg-yellow-900/50 rounded text-yellow-600 dark:text-yellow-400"
                         title="Edit Page"
                       >
                         <Pencil className="h-4 w-4" />
@@ -299,7 +299,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
                           e.stopPropagation();
                           handleDeletePage(page._id);
                         }}
-                        className="p-1 hover:bg-red-100 rounded text-red-600"
+                        className="p-1 hover:bg-red-100 dark:hover:bg-red-900/50 rounded text-red-600 dark:text-red-400"
                         title="Delete Page"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -309,9 +309,9 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
                 </div>
               ))}
               {isLoadingAssignments ? (
-                <div className="p-4 text-center text-gray-500">Loading assignments...</div>
+                <div className="p-4 text-center text-gray-500 dark:text-gray-400">Loading assignments...</div>
               ) : assignmentsError ? (
-                <div className="p-4 text-center text-red-500">{assignmentsError}</div>
+                <div className="p-4 text-center text-red-500 dark:text-red-400">{assignmentsError}</div>
               ) : assignments.length === 0 ? null : (
                 assignments.map(a => (
                   <div
@@ -323,9 +323,9 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
                     }}
                   >
                     <div className="flex items-center space-x-2">
-                      <ClipboardList className="h-5 w-5 text-green-400 group-hover:text-green-600" />
-                      <span className="group-hover:text-green-600">{a.title}</span>
-                      <span className="text-xs text-gray-500">({a.questions ? a.questions.reduce((sum: number, q: any) => sum + (q.points || 0), 0) : 0} pts)</span>
+                      <ClipboardList className="h-5 w-5 text-green-400 dark:text-green-500 group-hover:text-green-600 dark:group-hover:text-green-400" />
+                      <span className="group-hover:text-green-600 dark:group-hover:text-green-400 text-gray-900 dark:text-gray-100">{a.title}</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">({a.questions ? a.questions.reduce((sum: number, q: any) => sum + (q.points || 0), 0) : 0} pts)</span>
                     </div>
                     {(user?.role === 'teacher' || user?.role === 'admin') && (
                       <div className="flex items-center gap-2">
@@ -336,8 +336,8 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
                           }}
                           className={`p-1 rounded ${
                             (assignmentPublished[a._id] ?? a.published)
-                              ? 'text-green-600 hover:bg-green-100'
-                              : 'text-gray-500 hover:bg-gray-100'
+                              ? 'text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/50'
+                              : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
                           }`}
                           title={
                             (assignmentPublished[a._id] ?? a.published)
@@ -355,7 +355,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
                             e.stopPropagation();
                             navigate(`/assignments/${a._id}/edit`);
                           }}
-                          className="p-1 hover:bg-yellow-100 rounded text-yellow-600"
+                          className="p-1 hover:bg-yellow-100 dark:hover:bg-yellow-900/50 rounded text-yellow-600 dark:text-yellow-400"
                           title="Edit Assignment"
                         >
                           <Pencil className="h-4 w-4" />
@@ -365,7 +365,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
                             e.stopPropagation();
                             handleDeleteAssignment(a._id);
                           }}
-                          className="p-1 hover:bg-red-100 rounded text-red-600"
+                          className="p-1 hover:bg-red-100 dark:hover:bg-red-900/50 rounded text-red-600 dark:text-red-400"
                           title="Delete Assignment"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -380,17 +380,17 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
           
           {/* Discussions Section - Moved outside assignments conditional */}
           {isLoadingDiscussions ? (
-            <div className="p-4 text-center text-gray-500">Loading discussions...</div>
+            <div className="p-4 text-center text-gray-500 dark:text-gray-400">Loading discussions...</div>
           ) : discussionsError ? (
-            <div className="p-4 text-center text-red-500">{discussionsError}</div>
+            <div className="p-4 text-center text-red-500 dark:text-red-400">{discussionsError}</div>
           ) : discussions.length === 0 ? (
-            <div className="p-4 text-center text-gray-500">No discussions available</div>
+            <div className="p-4 text-center text-gray-500 dark:text-gray-400">No discussions available</div>
           ) : (
-            <div className="divide-y">
+            <div className="divide-y divide-gray-200 dark:divide-gray-700">
               {discussions.map(d => (
                 <div
                   key={d._id}
-                  className="p-4 hover:bg-gray-50 flex justify-between items-center group"
+                  className="p-4 hover:bg-gray-50 dark:hover:bg-gray-800 flex justify-between items-center group"
                   onClick={e => {
                     e.stopPropagation();
                     navigate(`/courses/${d.course}/threads/${d._id}`);
@@ -398,9 +398,9 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
                 >
                   <div className="flex items-center space-x-2">
                     <DiscussionIcon />
-                    <span className="group-hover:text-blue-600">{d.title}</span>
+                    <span className="group-hover:text-blue-600 dark:group-hover:text-blue-400 text-gray-900 dark:text-gray-100">{d.title}</span>
                     {d.totalPoints ? (
-                      <span className="text-xs text-gray-500">({d.totalPoints} pts)</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">({d.totalPoints} pts)</span>
                     ) : null}
                   </div>
                 </div>

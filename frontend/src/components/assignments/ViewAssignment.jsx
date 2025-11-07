@@ -594,21 +594,21 @@ const ViewAssignment = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-32">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 dark:border-indigo-400"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+      <div className="bg-red-100 dark:bg-red-900/20 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded">
         {error}
       </div>
     );
   }
 
   if (!assignment) {
-    return <div>Assignment not found</div>;
+    return <div className="text-gray-900 dark:text-gray-100 dark:text-gray-100">Assignment not found</div>;
   }
 
   const isStudent = user?.role === 'student';
@@ -622,38 +622,38 @@ const ViewAssignment = () => {
 
   return (
     <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
-      <div className="bg-white shadow rounded-lg p-6">
+      <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 shadow rounded-lg p-6">
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{assignment.title}</h1>
-            <p className="mt-1 text-sm text-gray-500">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 dark:text-gray-100">{assignment.title}</h1>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 dark:text-gray-400">
               Due: {format(new Date(assignment.dueDate), 'PPp')}
               {submission && (
-                <span className="ml-4 text-green-600">Submitted: {format(new Date(submission.submittedAt), 'PPp')}</span>
+                <span className="ml-4 text-green-600 dark:text-green-400 dark:text-green-400">Submitted: {format(new Date(submission.submittedAt), 'PPp')}</span>
               )}
             </p>
             {/* Show feedback if student and feedback exists */}
             {isStudent && submission && typeof submission.feedback === 'string' && submission.feedback.trim() !== '' && (
-              <div className="mt-4 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
-                <div className="text-yellow-800 font-semibold mb-1">Instructor Feedback</div>
-                <div className="text-yellow-900 whitespace-pre-line">{submission.feedback}</div>
+              <div className="mt-4 bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 dark:border-yellow-600 p-4 rounded">
+                <div className="text-yellow-800 dark:text-yellow-200 font-semibold mb-1">Instructor Feedback</div>
+                <div className="text-yellow-900 dark:text-yellow-100 whitespace-pre-line">{submission.feedback}</div>
               </div>
             )}
             
             {/* Show auto-grading status for students */}
             {isStudent && submission && submission.autoGraded && (
-              <div className="mt-4 bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
-                <div className="text-blue-800 font-semibold mb-1">
+              <div className="mt-4 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-400 dark:border-blue-600 p-4 rounded">
+                <div className="text-blue-800 dark:text-blue-200 font-semibold mb-1">
                   {submission.teacherApproved ? 'Grading Complete' : 'Auto-Graded'}
                 </div>
-                <div className="text-blue-900">
+                <div className="text-blue-900 dark:text-blue-100">
                   {submission.teacherApproved ? (
                     <>
                       <div>Final Grade: {(() => {
                         const grade = Number(submission.finalGrade || submission.grade);
                         return Number.isInteger(grade) ? grade.toString() : grade.toFixed(2);
                       })()} points</div>
-                      <div className="text-sm text-blue-700 mt-1">
+                      <div className="text-sm text-blue-700 dark:text-blue-300 mt-1">
                         Multiple choice questions were auto-graded. Other questions were graded by your instructor.
                       </div>
                     </>
@@ -663,7 +663,7 @@ const ViewAssignment = () => {
                         const grade = Number(submission.autoGrade);
                         return Number.isInteger(grade) ? grade.toString() : grade.toFixed(2);
                       })()} points</div>
-                      <div className="text-sm text-blue-700 mt-1">
+                      <div className="text-sm text-blue-700 dark:text-blue-300 mt-1">
                         Multiple choice questions have been auto-graded. Your instructor will review and approve the final grade.
                       </div>
                     </>
@@ -679,7 +679,7 @@ const ViewAssignment = () => {
               <button
                 onClick={handleSubmit}
                 disabled={isSubmitting}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 dark:bg-indigo-500 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600 dark:hover:bg-indigo-600 dark:bg-indigo-500"
               >
                 {isSubmitting ? 'Submitting...' : 'Submit Assignment'}
               </button>
@@ -687,7 +687,7 @@ const ViewAssignment = () => {
             {isCreator && (
               <button
                 onClick={handleDelete}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700"
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 dark:bg-red-500 dark:bg-red-500 hover:bg-red-700 dark:hover:bg-red-600 dark:hover:bg-red-600 dark:bg-red-500"
               >
                 Delete
               </button>
@@ -699,16 +699,16 @@ const ViewAssignment = () => {
 
         {/* Timer for timed quizzes - Start Quiz button only */}
         {assignment.isTimedQuiz && assignment.quizTimeLimit && isStudent && !submission && !isPastDue && !quizStarted && (
-          <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
             <div className="text-center">
-              <h3 className="text-lg font-semibold text-blue-900 mb-2">Timed Quiz</h3>
-              <p className="text-blue-700 mb-4">
+              <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-2">Timed Quiz</h3>
+              <p className="text-blue-700 dark:text-blue-300 mb-4">
                 This quiz has a time limit of {assignment.quizTimeLimit} minutes. 
                 Once you start, the timer will begin and cannot be paused.
               </p>
               <button
                 onClick={startQuiz}
-                className="inline-flex items-center px-6 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                className="inline-flex items-center px-6 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600"
               >
                 Start Quiz
               </button>
@@ -720,15 +720,15 @@ const ViewAssignment = () => {
 
         {assignment.attachments?.length > 0 && (
           <div className="mt-6">
-            <h3 className="text-lg font-medium text-gray-900">Attachments</h3>
-            <ul className="mt-2 divide-y divide-gray-200">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 dark:text-gray-100">Attachments</h3>
+            <ul className="mt-2 divide-y divide-gray-200 dark:divide-gray-700">
               {assignment.attachments.map((attachment, index) => (
                 <li key={index} className="py-3">
                   <a
                     href={attachment}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-indigo-600 hover:text-indigo-500"
+                    className="text-indigo-600 dark:text-indigo-400 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 dark:hover:text-indigo-300"
                   >
                     {attachment.split('/').pop()}
                   </a>
@@ -751,20 +751,20 @@ const ViewAssignment = () => {
               {/* Teacher Analytics Dashboard */}
               {isTeacherPreview && (
                 <div className="mb-8">
-                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
                     <div className="flex items-center justify-between mb-6">
                       <div className="flex items-center space-x-3">
-                        <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-8 h-8 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                         </svg>
                         <div>
-                          <h3 className="text-xl font-bold text-blue-900">Assignment Analytics</h3>
-                          <p className="text-blue-700">Real-time statistics and performance metrics</p>
+                          <h3 className="text-xl font-bold text-blue-900 dark:text-blue-100">Assignment Analytics</h3>
+                          <p className="text-blue-700 dark:text-blue-300">Real-time statistics and performance metrics</p>
                         </div>
                       </div>
                       {loadingStats && (
-                        <div className="flex items-center space-x-2 text-blue-600">
-                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                        <div className="flex items-center space-x-2 text-blue-600 dark:text-blue-400">
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 dark:border-blue-400"></div>
                           <span>Loading stats...</span>
                         </div>
                       )}
@@ -772,56 +772,56 @@ const ViewAssignment = () => {
 
                     {/* Key Metrics */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                      <div className="bg-white rounded-lg p-4 border border-blue-200 shadow-sm">
+                      <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-lg p-4 border border-blue-200 dark:border-blue-800 shadow-sm">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-sm font-medium text-blue-600">Submissions</p>
-                            <p className="text-2xl font-bold text-blue-900">
+                            <p className="text-sm font-medium text-blue-600 dark:text-blue-400">Submissions</p>
+                            <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
                               {submissionStats.submittedCount}/{submissionStats.totalStudents}
                             </p>
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 dark:text-gray-400">
                               {submissionStats.totalStudents > 0 
                                 ? `${((submissionStats.submittedCount / submissionStats.totalStudents) * 100).toFixed(1)}% submitted`
                                 : '0% submitted'
                               }
                             </p>
                           </div>
-                          <svg className="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-8 h-8 text-blue-400 dark:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
                           </svg>
                         </div>
                       </div>
 
-                      <div className="bg-white rounded-lg p-4 border border-blue-200 shadow-sm">
+                      <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-lg p-4 border border-blue-200 dark:border-blue-800 shadow-sm">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-sm font-medium text-green-600">Submitted</p>
-                            <p className="text-2xl font-bold text-green-900">{submissionStats.submittedCount}</p>
-                            <p className="text-xs text-gray-500">
+                            <p className="text-sm font-medium text-green-600 dark:text-green-400 dark:text-green-400">Submitted</p>
+                            <p className="text-2xl font-bold text-green-900 dark:text-green-100">{submissionStats.submittedCount}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 dark:text-gray-400">
                               {submissionStats.totalStudents > 0 
                                 ? `${((submissionStats.submittedCount / submissionStats.totalStudents) * 100).toFixed(1)}% completion`
                                 : '0% completion'
                               }
                             </p>
                           </div>
-                          <svg className="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-8 h-8 text-green-400 dark:text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
                         </div>
                       </div>
 
-                      <div className="bg-white rounded-lg p-4 border border-blue-200 shadow-sm">
+                      <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-lg p-4 border border-blue-200 dark:border-blue-800 shadow-sm">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-sm font-medium text-purple-600">Average Grade</p>
-                            <p className="text-2xl font-bold text-purple-900">
+                            <p className="text-sm font-medium text-purple-600 dark:text-purple-400">Average Grade</p>
+                            <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
                               {submissionStats.averageGrade > 0 ? submissionStats.averageGrade.toFixed(1) : '0'} pts
                             </p>
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 dark:text-gray-400">
                               {assignment.questions.reduce((sum, q) => sum + (q.points || 0), 0)} total possible
                             </p>
                           </div>
-                          <svg className="w-8 h-8 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-8 h-8 text-purple-400 dark:text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                           </svg>
                         </div>
@@ -832,55 +832,55 @@ const ViewAssignment = () => {
 
                     {/* Engagement Metrics */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                      <div className="bg-white rounded-lg p-4 border border-blue-200 shadow-sm">
+                      <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-lg p-4 border border-blue-200 dark:border-blue-800 shadow-sm">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-sm font-medium text-indigo-600">Avg. Time Spent</p>
-                            <p className="text-2xl font-bold text-indigo-900">
+                            <p className="text-sm font-medium text-indigo-600 dark:text-indigo-400 dark:text-indigo-400">Avg. Time Spent</p>
+                            <p className="text-2xl font-bold text-indigo-900 dark:text-indigo-100">
                               {submissionStats.engagementStats.averageTimeSpent > 0 
                                 ? `${Math.floor(submissionStats.engagementStats.averageTimeSpent / 60)}:${(submissionStats.engagementStats.averageTimeSpent % 60).toString().padStart(2, '0')}`
                                 : '0:00'
                               }
                             </p>
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 dark:text-gray-400">
                               {assignment.isTimedQuiz ? 'Timed quiz' : 'Not timed'}
                             </p>
                           </div>
-                          <svg className="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-8 h-8 text-indigo-400 dark:text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
                         </div>
                       </div>
 
-                      <div className="bg-white rounded-lg p-4 border border-blue-200 shadow-sm">
+                      <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-lg p-4 border border-blue-200 dark:border-blue-800 shadow-sm">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-sm font-medium text-teal-600">Avg. Attempts</p>
-                            <p className="text-2xl font-bold text-teal-900">
+                            <p className="text-sm font-medium text-teal-600 dark:text-teal-400">Avg. Attempts</p>
+                            <p className="text-2xl font-bold text-teal-900 dark:text-teal-100">
                               {submissionStats.engagementStats.averageAttemptsPerStudent.toFixed(1)}
                             </p>
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 dark:text-gray-400">
                               per student
                             </p>
                           </div>
-                          <svg className="w-8 h-8 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-8 h-8 text-teal-400 dark:text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                           </svg>
                         </div>
                       </div>
 
-                      <div className="bg-white rounded-lg p-4 border border-blue-200 shadow-sm">
+                      <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-lg p-4 border border-blue-200 dark:border-blue-800 shadow-sm">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-sm font-medium text-pink-600">Peak Activity</p>
-                            <p className="text-2xl font-bold text-pink-900">
+                            <p className="text-sm font-medium text-pink-600 dark:text-pink-400">Peak Activity</p>
+                            <p className="text-2xl font-bold text-pink-900 dark:text-pink-100">
                               {submissionStats.engagementStats.peakDay}
                             </p>
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 dark:text-gray-400">
                               {submissionStats.engagementStats.peakHour}:00
                             </p>
                           </div>
-                          <svg className="w-8 h-8 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-8 h-8 text-pink-400 dark:text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                           </svg>
                         </div>
@@ -889,81 +889,81 @@ const ViewAssignment = () => {
 
                     {/* Assignment Details */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="bg-white rounded-lg p-4 border border-blue-200">
-                        <h4 className="text-lg font-semibold text-blue-900 mb-3">Assignment Info</h4>
+                      <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                        <h4 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-3">Assignment Info</h4>
                         <div className="space-y-2 text-sm">
                           <div className="flex justify-between">
-                            <span className="text-gray-600">Questions:</span>
-                            <span className="font-medium">{assignment.questions.length}</span>
+                            <span className="text-gray-600 dark:text-gray-400 dark:text-gray-400">Questions:</span>
+                            <span className="font-medium text-gray-900 dark:text-gray-100 dark:text-gray-100">{assignment.questions.length}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-gray-600">Total Points:</span>
-                            <span className="font-medium">{assignment.questions.reduce((sum, q) => sum + (q.points || 0), 0)}</span>
+                            <span className="text-gray-600 dark:text-gray-400 dark:text-gray-400">Total Points:</span>
+                            <span className="font-medium text-gray-900 dark:text-gray-100 dark:text-gray-100">{assignment.questions.reduce((sum, q) => sum + (q.points || 0), 0)}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-gray-600">Type:</span>
-                            <span className="font-medium">{assignment.group || 'Assignment'}</span>
+                            <span className="text-gray-600 dark:text-gray-400 dark:text-gray-400">Type:</span>
+                            <span className="font-medium text-gray-900 dark:text-gray-100 dark:text-gray-100">{assignment.group || 'Assignment'}</span>
                           </div>
                           {assignment.isTimedQuiz && (
                             <div className="flex justify-between">
-                              <span className="text-gray-600">Time Limit:</span>
-                              <span className="font-medium">{assignment.quizTimeLimit} minutes</span>
+                              <span className="text-gray-600 dark:text-gray-400 dark:text-gray-400">Time Limit:</span>
+                              <span className="font-medium text-gray-900 dark:text-gray-100 dark:text-gray-100">{assignment.quizTimeLimit} minutes</span>
                             </div>
                           )}
                         </div>
                       </div>
 
-                      <div className="bg-white rounded-lg p-4 border border-blue-200">
-                        <h4 className="text-lg font-semibold text-blue-900 mb-3">Submission Status</h4>
+                      <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                        <h4 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-3">Submission Status</h4>
                         <div className="space-y-2 text-sm">
                           <div className="flex justify-between">
-                            <span className="text-gray-600">Published:</span>
-                            <span className={`font-medium ${assignment.published ? 'text-green-600' : 'text-red-600'}`}>
+                            <span className="text-gray-600 dark:text-gray-400 dark:text-gray-400">Published:</span>
+                            <span className={`font-medium ${assignment.published ? 'text-green-600 dark:text-green-400 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                               {assignment.published ? 'Yes' : 'No'}
                             </span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-gray-600">Due Date:</span>
-                            <span className="font-medium">{format(new Date(assignment.dueDate), 'MMM d, yyyy')}</span>
+                            <span className="text-gray-600 dark:text-gray-400 dark:text-gray-400">Due Date:</span>
+                            <span className="font-medium text-gray-900 dark:text-gray-100 dark:text-gray-100">{format(new Date(assignment.dueDate), 'MMM d, yyyy')}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-gray-600">Past Due:</span>
-                            <span className={`font-medium ${isPastDue ? 'text-red-600' : 'text-green-600'}`}>
+                            <span className="text-gray-600 dark:text-gray-400 dark:text-gray-400">Past Due:</span>
+                            <span className={`font-medium ${isPastDue ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400 dark:text-green-400'}`}>
                               {isPastDue ? 'Yes' : 'No'}
                             </span>
                           </div>
                         </div>
                       </div>
 
-                      <div className="bg-white rounded-lg p-4 border border-blue-200">
-                        <h4 className="text-lg font-semibold text-blue-900 mb-3">Quick Actions</h4>
+                      <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                        <h4 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-3">Quick Actions</h4>
                         <div className="space-y-2">
                           <button
                             onClick={() => navigate(`/assignments/${id}/grade`)}
-                            className="w-full text-left px-3 py-2 text-sm bg-blue-50 hover:bg-blue-100 rounded-md transition-colors flex items-center space-x-2"
+                            className="w-full text-left px-3 py-2 text-sm bg-blue-50 dark:bg-blue-900/50 hover:bg-blue-100 dark:hover:bg-blue-900/70 rounded-md transition-colors flex items-center space-x-2 text-gray-900 dark:text-gray-100 dark:text-gray-100"
                           >
-                            <BarChart3 className="h-4 w-4 text-blue-600" />
+                            <BarChart3 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                             <span>Grade Submissions</span>
                           </button>
                           <button
                             onClick={() => navigate(`/assignments/${id}/edit`)}
-                            className="w-full text-left px-3 py-2 text-sm bg-green-50 hover:bg-green-100 rounded-md transition-colors flex items-center space-x-2"
+                            className="w-full text-left px-3 py-2 text-sm bg-green-50 dark:bg-green-900/50 hover:bg-green-100 dark:hover:bg-green-900/70 rounded-md transition-colors flex items-center space-x-2 text-gray-900 dark:text-gray-100 dark:text-gray-100"
                           >
-                            <Edit className="h-4 w-4 text-green-600" />
+                            <Edit className="h-4 w-4 text-green-600 dark:text-green-400 dark:text-green-400" />
                             <span>Edit Assignment</span>
                           </button>
                           <button
                             onClick={handleTogglePublish}
-                            className="w-full text-left px-3 py-2 text-sm bg-purple-50 hover:bg-purple-100 rounded-md transition-colors flex items-center space-x-2"
+                            className="w-full text-left px-3 py-2 text-sm bg-purple-50 dark:bg-purple-900/50 hover:bg-purple-100 dark:hover:bg-purple-900/70 rounded-md transition-colors flex items-center space-x-2 text-gray-900 dark:text-gray-100 dark:text-gray-100"
                           >
                             {assignment.published ? (
                               <>
-                                <Lock className="h-4 w-4 text-purple-600" />
+                                <Lock className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                                 <span>Unpublish</span>
                               </>
                             ) : (
                               <>
-                                <Unlock className="h-4 w-4 text-purple-600" />
+                                <Unlock className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                                 <span>Publish</span>
                               </>
                             )}
@@ -986,19 +986,19 @@ const ViewAssignment = () => {
                   <div className="flex-1">
                     {!showUploadSection ? (
                       // Questions view
-                      <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-                        <div className="bg-gray-100 rounded-lg p-3 mb-4">
+                      <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 dark:border-gray-700 rounded-lg p-6 shadow-sm">
+                        <div className="bg-gray-100 dark:bg-gray-700 dark:bg-gray-700 rounded-lg p-3 mb-4">
                           <div className="flex justify-between items-center">
                             <div className="flex items-center space-x-3">
-                              <h3 className="text-base font-semibold text-gray-900">
+                              <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 dark:text-gray-100">
                                 Question {currentQuestion + 1}
                               </h3>
                               <button
                                 onClick={() => toggleMarkQuestion(currentQuestion)}
                                 className={`p-1 rounded border ${
                                   markedQuestions.has(currentQuestion)
-                                    ? 'bg-yellow-100 border-yellow-300 text-yellow-700'
-                                    : 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200'
+                                    ? 'bg-yellow-100 dark:bg-yellow-900/50 border-yellow-300 dark:border-yellow-700 text-yellow-700 dark:text-yellow-300'
+                                    : 'bg-gray-100 dark:bg-gray-700 dark:bg-gray-600 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-50 dark:bg-gray-7000'
                                 }`}
                               >
                                 {markedQuestions.has(currentQuestion) ? (
@@ -1008,19 +1008,19 @@ const ViewAssignment = () => {
                                 )}
                               </button>
                             </div>
-                            <span className="text-base font-semibold text-gray-900">
+                            <span className="text-base font-semibold text-gray-900 dark:text-gray-100 dark:text-gray-100">
                               {assignment.questions[currentQuestion].points} pts
                             </span>
                           </div>
                         </div>
-                        <div className="border-b border-gray-200 mb-4"></div>
+                        <div className="border-b border-gray-200 dark:border-gray-700 dark:border-gray-700 mb-4"></div>
                         
                         <div className="mb-6">
-                          <p className="text-lg text-gray-900 leading-relaxed">{assignment.questions[currentQuestion].text}</p>
+                          <p className="text-lg text-gray-900 dark:text-gray-100 dark:text-gray-100 leading-relaxed">{assignment.questions[currentQuestion].text}</p>
                         </div>
                         
                         {assignment.questions[currentQuestion].type === 'multiple-choice' && assignment.questions[currentQuestion].options && (
-                          <div className="divide-y divide-gray-200">
+                          <div className="divide-y divide-gray-200 dark:divide-gray-700">
                             {assignment.questions[currentQuestion].options.map((option, optionIndex) => (
                               <div key={optionIndex} className="relative py-2">
                                 <input
@@ -1039,13 +1039,13 @@ const ViewAssignment = () => {
                                   <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
                                     answers[currentQuestion] === option.text
                                       ? 'border-indigo-500 bg-indigo-500'
-                                      : 'border-gray-300 bg-white'
+                                      : 'border-gray-300 bg-white dark:bg-gray-800'
                                   }`}>
                                     {answers[currentQuestion] === option.text && (
-                                      <div className="w-2 h-2 rounded-full bg-white"></div>
+                                      <div className="w-2 h-2 rounded-full bg-white dark:bg-gray-800"></div>
                                     )}
                                   </div>
-                                  <span className="text-sm text-gray-900">{option.text}</span>
+                                  <span className="text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">{option.text}</span>
                                 </label>
                               </div>
                             ))}
@@ -1065,160 +1065,7 @@ const ViewAssignment = () => {
                                   <div className="grid grid-cols-2 gap-6">
                                     {/* Left Column - Items to match */}
                                     <div>
-                                      <h4 className="text-sm font-medium text-gray-700 mb-3">Items to Match</h4>
-                                      <div className="space-y-2">
-                                        {assignment.questions[currentQuestion].leftItems.map((leftItem, leftIndex) => (
-                                          <div key={leftItem.id || leftIndex} className="p-3 bg-gray-50 rounded-lg border">
-                                            <span className="text-sm font-medium text-gray-900">{leftItem.text}</span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                    
-                                    {/* Right Column - All available options (shuffled) */}
-                                    <div>
-                                      <h4 className="text-sm font-medium text-gray-700 mb-3">Available Options</h4>
-                                      <div className="space-y-2">
-                                        {shuffledOptions[currentQuestion] && shuffledOptions[currentQuestion].map((rightItem, rightIndex) => (
-                                          <div key={rightItem.id || rightIndex} className="p-3 bg-gray-50 rounded-lg border">
-                                            <span className="text-sm font-medium text-gray-900">{rightItem.text}</span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-                                
-                                {/* Matching Interface - Always show for students */}
-                                <div className="mt-6">
-                                  <h4 className="text-sm font-medium text-gray-700 mb-3">Your Matches</h4>
-                                  <div className="space-y-3">
-                                    {assignment.questions[currentQuestion].leftItems.map((leftItem, leftIndex) => (
-                                      <div key={leftItem.id || leftIndex} className="flex items-center space-x-3">
-                                        <div className="flex-1 p-2 bg-gray-50 rounded border">
-                                          <span className="text-sm text-gray-900">{leftItem.text}</span>
-                                        </div>
-                                        <span className="text-gray-400">→</span>
-                                        <select
-                                          value={answers[currentQuestion] && answers[currentQuestion][leftIndex] ? answers[currentQuestion][leftIndex] : ''}
-                                          onChange={(e) => {
-                                            const newAnswer = { ...answers[currentQuestion] };
-                                            newAnswer[leftIndex] = e.target.value;
-                                            handleAnswerChange(currentQuestion, newAnswer);
-                                          }}
-                                          className="flex-1 p-2 border border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500"
-                                        >
-                                          <option value="">Select match...</option>
-                                          {shuffledOptions[currentQuestion] && shuffledOptions[currentQuestion].map((rightItem, rightIndex) => (
-                                            <option key={rightItem.id || rightIndex} value={rightItem.text}>
-                                              {rightItem.text}
-                                            </option>
-                                          ))}
-                                        </select>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              </>
-                            ) : (
-                              /* Show message when matching question has no data */
-                              <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded">
-                                <div className="flex items-center">
-                                  <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                                  </svg>
-                                  <div>
-                                    <p className="font-medium">Matching Question Not Configured</p>
-                                    <p className="text-sm">This matching question has no items to match. Please contact your instructor to fix this question.</p>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        
-                        {assignment.questions[currentQuestion].type === 'text' && (
-                          <div>
-                            <textarea
-                              id={`question-${currentQuestion}-answer`}
-                              name={`question-${currentQuestion}-answer`}
-                              className="w-full h-40 p-4 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-gray-900"
-                              value={answers[currentQuestion] || ''}
-                              onChange={(e) => handleAnswerChange(currentQuestion, e.target.value)}
-                              placeholder="Enter your answer here..."
-                            />
-                          </div>
-                        )}
-                        
-                        <div className="flex justify-between mt-8 pt-6 border-t border-gray-200">
-                          <button
-                            onClick={prevQuestion}
-                            disabled={currentQuestion === 0}
-                            className={`px-4 py-2 border rounded-md text-sm font-medium ${
-                              currentQuestion === 0
-                                ? 'border-gray-200 text-gray-400 cursor-not-allowed'
-                                : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50'
-                            }`}
-                          >
-                            Previous
-                          </button>
-                          
-                          {currentQuestion < assignment.questions.length - 1 ? (
-                            <button
-                              onClick={nextQuestion}
-                              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
-                            >
-                              Next
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => setShowUploadSection(true)}
-                              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
-                            >
-                              Continue to Upload Files
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      // Upload files view
-                      <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-                        <div className="bg-gray-100 rounded-lg p-3 mb-4">
-                          <div className="flex justify-between items-center">
-                            <h3 className="text-base font-semibold text-gray-900">
-                              Upload Files
-                            </h3>
-                          </div>
-                        </div>
-                        <div className="border-b border-gray-200 mb-4"></div>
-                        
-                        <div className="mb-6">
-                          <p className="text-lg text-gray-900 leading-relaxed">
-                            You have completed all questions. You can now upload any additional files if needed.
-                          </p>
-                        </div>
-                        
-                        {/* File Upload Section */}
-                        {assignment.allowStudentUploads && (
-                          <div className="space-y-4">
-                            {/* Upload Button */}
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">Upload File</label>
-                              <div className="flex items-center space-x-4">
-                                <input
-                                  type="file"
-                                  multiple
-                                  onChange={handleFileUpload}
-                                  disabled={isUploading}
-                                  className="hidden"
-                                  id="file-upload-final"
-                                />
-                                <label
-                                  htmlFor="file-upload-final"
-                                  className={`inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer ${
-                                    isUploading ? 'opacity-50 cursor-not-allowed' : ''
-                                  }`}
-                                >
+                                  <span className="text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">{option.text}</span>
                                   <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                                   </svg>
@@ -1227,7 +1074,7 @@ const ViewAssignment = () => {
                                 {uploadedFiles.length > 0 && (
                                   <button
                                     onClick={() => document.getElementById('file-upload-final').click()}
-                                    className="inline-flex items-center px-4 py-2 border border-pink-500 rounded-md shadow-sm text-sm font-medium text-pink-600 bg-white hover:bg-pink-50"
+                                    className="inline-flex items-center px-4 py-2 border border-pink-500 rounded-md shadow-sm text-sm font-medium text-pink-600 bg-white dark:bg-gray-800 hover:bg-pink-50"
                                   >
                                     <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -1241,17 +1088,17 @@ const ViewAssignment = () => {
                             {/* Uploaded Files List */}
                             {uploadedFiles.length > 0 && (
                               <div className="mt-4">
-                                <h4 className="text-sm font-medium text-gray-700 mb-2">Uploaded Files:</h4>
+                                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Uploaded Files:</h4>
                                 <div className="space-y-2">
                                   {uploadedFiles.map((file, index) => (
-                                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-md">
+                                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-700 rounded-md">
                                       <div className="flex items-center space-x-3">
                                         <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                         </svg>
                                         <div>
-                                          <p className="text-sm font-medium text-gray-900">{file.name}</p>
-                                          <p className="text-xs text-gray-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{file.name}</p>
+                                          <p className="text-xs text-gray-500 dark:text-gray-400">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
                                         </div>
                                       </div>
                                       <button
@@ -1270,10 +1117,10 @@ const ViewAssignment = () => {
                           </div>
                         )}
                         
-                        <div className="flex justify-between mt-8 pt-6 border-t border-gray-200">
+                        <div className="flex justify-between mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
                           <button
                             onClick={() => setShowUploadSection(false)}
-                            className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                            className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:bg-gray-700"
                           >
                             Back to Questions
                           </button>
@@ -1291,9 +1138,9 @@ const ViewAssignment = () => {
                   </div>
                   
                   {/* Sidebar */}
-                  <div className="w-80 bg-gray-50 rounded-lg p-4">
+                  <div className="w-80 bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                     <div className="mb-4">
-                      <h4 className="text-sm font-medium text-gray-900 mb-2">Questions</h4>
+                      <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Questions</h4>
                       <div className="space-y-2 max-h-64 overflow-y-auto">
                         {assignment.questions.map((question, index) => (
                           <button
@@ -1302,17 +1149,17 @@ const ViewAssignment = () => {
                             className={`w-full flex items-center justify-between p-2 rounded-md text-sm ${
                               currentQuestion === index
                                 ? 'bg-indigo-100 text-indigo-700 border border-indigo-200'
-                                : 'hover:bg-gray-100'
+                                : 'hover:bg-gray-100 dark:bg-gray-700'
                             }`}
                           >
                             <div className="flex items-center space-x-2">
                               {answeredQuestions.has(index) && markedQuestions.has(index) ? (
                                 <div className="relative">
-                                  <CheckCircle className="h-4 w-4 text-green-600" />
+                                  <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
                                   <Bookmark className="h-3 w-3 text-yellow-500 absolute -top-1 -right-1" />
                                 </div>
                               ) : answeredQuestions.has(index) ? (
-                                <CheckCircle className="h-4 w-4 text-green-600" />
+                                <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
                               ) : markedQuestions.has(index) ? (
                                 <Bookmark className="h-4 w-4 text-yellow-600" />
                               ) : (
@@ -1320,14 +1167,14 @@ const ViewAssignment = () => {
                               )}
                               <span>Question {index + 1}</span>
                             </div>
-                            <span className="text-xs text-gray-500">{question.points} pts</span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">{question.points} pts</span>
                           </button>
                         ))}
                       </div>
                     </div>
                     
                                           <div className="border-t pt-4">
-                        <div className="text-sm text-gray-600 mb-2">
+                        <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                           <div className="flex items-center justify-between">
                             <span>Progress</span>
                             <span>{answeredQuestions.size} of {assignment.questions.length} answered</span>
@@ -1335,7 +1182,7 @@ const ViewAssignment = () => {
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div 
-                            className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
+                            className="bg-indigo-600 dark:bg-indigo-500 h-2 rounded-full transition-all duration-300"
                             style={{ width: `${(answeredQuestions.size / assignment.questions.length) * 100}%` }}
                           ></div>
                         </div>
@@ -1343,8 +1190,8 @@ const ViewAssignment = () => {
                       
                       {/* Timer Display for timed quizzes - under the progress bar */}
                       {assignment.isTimedQuiz && (
-                        <div className="mt-4 p-3 bg-white border border-gray-200 rounded-lg">
-                          <div className="text-sm text-gray-600 mb-2">
+                        <div className="mt-4 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+                          <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                             <div className="flex items-center justify-between">
                               <span>Time Remaining:</span>
                               <button 
@@ -1357,22 +1204,22 @@ const ViewAssignment = () => {
                           </div>
                           {showTimer && (
                             <div className="space-y-1">
-                              <div className="text-xs text-gray-500">
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
                                 Attempt due: {format(new Date(assignment.dueDate), 'MMM d \'at\' h:mm a')}
                               </div>
                               {quizStarted && timeLeft !== null ? (
-                                <div className={`text-sm font-medium ${timeLeft <= 300 ? 'text-red-600' : 'text-gray-700'}`}>
+                                <div className={`text-sm font-medium ${timeLeft <= 300 ? 'text-red-600' : 'text-gray-700 dark:text-gray-300'}`}>
                                   {formatTime(timeLeft)}
                                 </div>
                               ) : (
-                                <div className="text-sm font-medium text-gray-700">
+                                <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                   {assignment.quizTimeLimit} minutes
                                 </div>
                               )}
                               {!quizStarted && (
                                 <button
                                   onClick={startQuiz}
-                                  className="mt-2 w-full bg-indigo-600 text-white text-sm py-2 px-3 rounded hover:bg-indigo-700"
+                                  className="mt-2 w-full bg-indigo-600 dark:bg-indigo-500 text-white text-sm py-2 px-3 rounded hover:bg-indigo-700 dark:hover:bg-indigo-600"
                                 >
                                   Start Quiz
                                 </button>
@@ -1452,7 +1299,7 @@ const ViewAssignment = () => {
 
                                                   
                                                   return (
-                            <div key={question.id || question._id || index} className={`bg-white border-2 rounded-lg p-6 shadow-sm ${
+                            <div key={question.id || question._id || index} className={`bg-white dark:bg-gray-800 border-2 rounded-lg p-6 shadow-sm ${
                               isTeacherPreview 
                                 ? 'border-blue-400 bg-blue-50 shadow-blue-100' 
                                 : (() => {
@@ -1483,13 +1330,13 @@ const ViewAssignment = () => {
                                     if (feedbackEnabled && showFeedback) {
                                       return isCorrect ? 'border-green-500' : 'border-yellow-500';
                                     }
-                                    return 'border-gray-200';
+                                    return 'border-gray-200 dark:border-gray-700';
                                   })()
                             }`}>
-                          <div className={`rounded-lg p-3 mb-3 ${isTeacherPreview ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                          <div className={`rounded-lg p-3 mb-3 ${isTeacherPreview ? 'bg-blue-100' : 'bg-gray-100 dark:bg-gray-700'}`}>
                             <div className="flex justify-between items-center">
                               <div className="flex items-center space-x-3">
-                                <h4 className="text-base font-semibold text-gray-900">Question {index + 1}</h4>
+                                <h4 className="text-base font-semibold text-gray-900 dark:text-gray-100">Question {index + 1}</h4>
                                 {isTeacherPreview && (
                                   <span className="px-3 py-1 text-xs font-medium bg-blue-500 text-white rounded-full font-bold">
                                     TEACHER PREVIEW
@@ -1501,7 +1348,7 @@ const ViewAssignment = () => {
                                     className={`p-1 rounded border ${
                                       markedQuestions.has(index)
                                         ? 'bg-yellow-100 border-yellow-300 text-yellow-700'
-                                        : 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200'
+                                        : 'bg-gray-100 dark:bg-gray-700 border-gray-300 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
                                     }`}
                                   >
                                     {markedQuestions.has(index) ? (
@@ -1519,7 +1366,7 @@ const ViewAssignment = () => {
                                       ? submission.autoQuestionGrades.get(index.toString())
                                       : submission.autoQuestionGrades?.[index.toString()];
                                     return (
-                                      <span className="text-base font-semibold text-gray-900">
+                                      <span className="text-base font-semibold text-gray-900 dark:text-gray-100">
                                         {(() => {
                                           const earned = Number(autoGrade || 0);
                                           const total = question.points;
@@ -1531,20 +1378,20 @@ const ViewAssignment = () => {
                                     );
                                   })()
                                 ) : (
-                                  <span className="text-base font-semibold text-gray-900">
+                                  <span className="text-base font-semibold text-gray-900 dark:text-gray-100">
                                     {question.points} pts
                                   </span>
                                 )}
                               </div>
                             </div>
                           </div>
-                          <div className="border-b border-gray-200 mb-3"></div>
+                          <div className="border-b border-gray-200 dark:border-gray-700 mb-3"></div>
                           
                           <div className="mb-4">
-                            <p className="text-lg text-gray-900 leading-relaxed">{question.text}</p>
+                            <p className="text-lg text-gray-900 dark:text-gray-100 leading-relaxed">{question.text}</p>
 
                             {question.type === 'multiple-choice' && (
-                              <p className="text-sm text-gray-600 mt-1">Select the correct answer.</p>
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Select the correct answer.</p>
                             )}
                           </div>
                           
@@ -1585,9 +1432,9 @@ const ViewAssignment = () => {
                                             return `${earnedFormatted} / ${totalFormatted} pts`;
                                           })()}
                                         </div>
-                                        <div className="text-sm font-medium text-gray-700 mb-1">Student Answer:</div>
-                                        <div className="text-sm text-gray-900 mb-2">{studentAnswer || 'No answer'}</div>
-                                        <div className={`text-sm ${isCorrect ? 'text-green-600' : 'text-red-600'}`}>
+                                        <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Student Answer:</div>
+                                        <div className="text-sm text-gray-900 dark:text-gray-100 mb-2">{studentAnswer || 'No answer'}</div>
+                                        <div className={`text-sm ${isCorrect ? 'text-green-600 dark:text-green-400' : 'text-red-600'}`}>
                                           {isCorrect ? 'Correct!' : `Incorrect. Correct answer: ${correctOption?.text || 'Unknown'}`}
                                         </div>
                                       </div>
@@ -1618,13 +1465,13 @@ const ViewAssignment = () => {
                                         <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
                                           answers[index] === option.text
                                             ? 'border-indigo-500 bg-indigo-500'
-                                            : 'border-gray-300 bg-white'
+                                            : 'border-gray-300 bg-white dark:bg-gray-800'
                                         }`}>
                                           {answers[index] === option.text && (
-                                            <div className="w-2 h-2 rounded-full bg-white"></div>
+                                            <div className="w-2 h-2 rounded-full bg-white dark:bg-gray-800"></div>
                                           )}
                                         </div>
-                                        <span className="text-sm text-gray-900">{option.text}</span>
+                                        <span className="text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">{option.text}</span>
                                         {isTeacherPreview && option.isCorrect && (
                                           <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                             Correct Answer
@@ -1643,7 +1490,7 @@ const ViewAssignment = () => {
                               <textarea
                                 id={`question-${index}-answer`}
                                 name={`question-${index}-answer`}
-                                className="w-full h-32 p-4 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-gray-900"
+                                className="w-full h-32 p-4 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 dark:text-gray-100"
                                 value={answers[index] || ''}
                                 onChange={(e) => !submission && isStudent && handleAnswerChange(index, e.target.value)}
                                 placeholder={isStudent ? "Enter your answer here" : "Student's answer will appear here"}
@@ -1696,7 +1543,7 @@ const ViewAssignment = () => {
                                             return `${earnedFormatted} / ${totalFormatted} pts`;
                                           })()}
                                         </div>
-                                        <div className="text-sm font-medium text-gray-700 mb-2">Student Answer:</div>
+                                        <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Student Answer:</div>
                                         {question.leftItems.map((leftItem, leftIndex) => {
                                           const studentMatch = typeof studentAnswer === 'object' ? 
                                             studentAnswer[leftIndex] : '';
@@ -1710,13 +1557,13 @@ const ViewAssignment = () => {
                                               isCorrect ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
                                             }`}>
                                               <div className="flex items-center space-x-2">
-                                                <span className="font-medium text-gray-900 text-sm">{leftItem.text}</span>
-                                                <span className="text-gray-500">→</span>
-                                                <span className="text-gray-900">{studentMatch || 'No answer'}</span>
+                                                <span className="font-medium text-gray-900 dark:text-gray-100 text-sm">{leftItem.text}</span>
+                                                <span className="text-gray-500 dark:text-gray-400">→</span>
+                                                <span className="text-gray-900 dark:text-gray-100">{studentMatch || 'No answer'}</span>
                                               </div>
                                               <div className="flex items-center space-x-2">
                                                 {isCorrect ? (
-                                                  <div className="flex items-center text-green-600">
+                                                  <div className="flex items-center text-green-600 dark:text-green-400">
                                                     <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                                     </svg>
@@ -1732,7 +1579,7 @@ const ViewAssignment = () => {
                                                 )}
                                               </div>
                                               {!isCorrect && correctRightItem && (
-                                                <div className="text-xs text-gray-600">
+                                                <div className="text-xs text-gray-600 dark:text-gray-400">
                                                   Correct: {correctRightItem.text}
                                                 </div>
                                               )}
@@ -1763,9 +1610,9 @@ const ViewAssignment = () => {
                                   );
                                   
                                   return (
-                                    <div key={leftItem.id} className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                                    <div key={leftItem.id} className="flex items-center justify-between p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-shadow">
                                       <div className="flex-1">
-                                        <span className="font-medium text-gray-900 text-sm">{leftItem.text}</span>
+                                        <span className="font-medium text-gray-900 dark:text-gray-100 text-sm">{leftItem.text}</span>
                                       </div>
                                       <div className="flex items-center space-x-2 ml-2">
                                         <select
@@ -1780,7 +1627,7 @@ const ViewAssignment = () => {
                                             }
                                           }}
                                           disabled={!!submission || !isStudent || isPastDue}
-                                          className="border border-gray-300 rounded-md px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white min-w-[120px]"
+                                          className="border border-gray-300 rounded-md px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-800 min-w-[120px]"
                                         >
                                           <option value="">Choose...</option>
                                           {availableOptions.map((option, optionIndex) => (
@@ -1803,12 +1650,12 @@ const ViewAssignment = () => {
                     
                     {/* File Upload Section for Students - at the bottom of scrollable mode */}
                     {assignment.allowStudentUploads && isStudent && !submission && !isPastDue && (
-                      <div className="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Upload Files</h3>
+                      <div className="mt-6 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Upload Files</h3>
                         <div className="space-y-4">
                           {/* Upload Button */}
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Upload File</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Upload File</label>
                             <div className="flex items-center space-x-4">
                               <input
                                 type="file"
@@ -1820,7 +1667,7 @@ const ViewAssignment = () => {
                               />
                               <label
                                 htmlFor="file-upload-scrollable"
-                                className={`inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer ${
+                                className={`inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:bg-gray-700 cursor-pointer ${
                                   isUploading ? 'opacity-50 cursor-not-allowed' : ''
                                 }`}
                               >
@@ -1832,7 +1679,7 @@ const ViewAssignment = () => {
                               {uploadedFiles.length > 0 && (
                                 <button
                                   onClick={() => document.getElementById('file-upload-scrollable').click()}
-                                  className="inline-flex items-center px-4 py-2 border border-pink-500 rounded-md shadow-sm text-sm font-medium text-pink-600 bg-white hover:bg-pink-50"
+                                  className="inline-flex items-center px-4 py-2 border border-pink-500 rounded-md shadow-sm text-sm font-medium text-pink-600 bg-white dark:bg-gray-800 hover:bg-pink-50"
                                 >
                                   <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -1846,17 +1693,17 @@ const ViewAssignment = () => {
                           {/* Uploaded Files List */}
                           {uploadedFiles.length > 0 && (
                             <div className="mt-4">
-                              <h4 className="text-sm font-medium text-gray-700 mb-2">Uploaded Files:</h4>
+                              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Uploaded Files:</h4>
                               <div className="space-y-2">
                                 {uploadedFiles.map((file, index) => (
-                                  <div key={index} className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-md">
+                                  <div key={index} className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md">
                                     <div className="flex items-center space-x-3">
                                       <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                       </svg>
                                       <div>
-                                        <p className="text-sm font-medium text-gray-900">{file.name}</p>
-                                        <p className="text-xs text-gray-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{file.name}</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
                                       </div>
                                     </div>
                                     <button
@@ -1882,7 +1729,7 @@ const ViewAssignment = () => {
                         <button
                           onClick={handleSubmit}
                           disabled={isSubmitting}
-                          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+                          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600"
                         >
                           {isSubmitting ? 'Submitting...' : 'Submit Assignment'}
                         </button>
@@ -1895,9 +1742,9 @@ const ViewAssignment = () => {
                   
                   {/* Sidebar for scrollable mode - only show for students answering */}
                   {isStudent && !submission && !isPastDue && (
-                    <div className="w-80 bg-gray-50 rounded-lg p-4 self-start">
+                    <div className="w-80 bg-gray-50 dark:bg-gray-700 rounded-lg p-4 self-start">
                       <div className="mb-4">
-                        <h4 className="text-sm font-medium text-gray-900 mb-2">Questions</h4>
+                        <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Questions</h4>
                         <div className="space-y-2 max-h-64 overflow-y-auto">
                           {assignment.questions.map((question, index) => (
                             <button
@@ -1910,16 +1757,16 @@ const ViewAssignment = () => {
                                   questionElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
                                 }
                               }}
-                              className={`w-full flex items-center justify-between p-2 rounded-md text-sm hover:bg-gray-100`}
+                              className={`w-full flex items-center justify-between p-2 rounded-md text-sm hover:bg-gray-100 dark:bg-gray-700`}
                             >
                               <div className="flex items-center space-x-2">
                                 {answeredQuestions.has(index) && markedQuestions.has(index) ? (
                                   <div className="relative">
-                                    <CheckCircle className="h-4 w-4 text-green-600" />
+                                    <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
                                     <Bookmark className="h-3 w-3 text-yellow-500 absolute -top-1 -right-1" />
                                   </div>
                                 ) : answeredQuestions.has(index) ? (
-                                  <CheckCircle className="h-4 w-4 text-green-600" />
+                                  <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
                                 ) : markedQuestions.has(index) ? (
                                   <Bookmark className="h-4 w-4 text-yellow-600" />
                                 ) : (
@@ -1927,14 +1774,14 @@ const ViewAssignment = () => {
                                 )}
                                 <span>Question {index + 1}</span>
                               </div>
-                              <span className="text-xs text-gray-500">{question.points} pts</span>
+                              <span className="text-xs text-gray-500 dark:text-gray-400">{question.points} pts</span>
                             </button>
                           ))}
                         </div>
                       </div>
                       
                       <div className="border-t pt-4">
-                        <div className="text-sm text-gray-600 mb-2">
+                        <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                           <div className="flex items-center justify-between">
                             <span>Progress</span>
                             <span>{answeredQuestions.size} of {assignment.questions.length} answered</span>
@@ -1942,7 +1789,7 @@ const ViewAssignment = () => {
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div 
-                            className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
+                            className="bg-indigo-600 dark:bg-indigo-500 h-2 rounded-full transition-all duration-300"
                             style={{ width: `${(answeredQuestions.size / assignment.questions.length) * 100}%` }}
                           ></div>
                         </div>
@@ -1950,8 +1797,8 @@ const ViewAssignment = () => {
                       
                       {/* Timer Display for timed quizzes - now under the progress bar */}
                       {assignment.isTimedQuiz && (
-                        <div className="mt-4 p-3 bg-white border border-gray-200 rounded-lg">
-                          <div className="text-sm text-gray-600 mb-2">
+                        <div className="mt-4 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+                          <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                             <div className="flex items-center justify-between">
                               <span>Time Remaining:</span>
                               <button 
@@ -1964,22 +1811,22 @@ const ViewAssignment = () => {
                           </div>
                           {showTimer && (
                             <div className="space-y-1">
-                              <div className="text-xs text-gray-500">
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
                                 Attempt due: {format(new Date(assignment.dueDate), 'MMM d \'at\' h:mm a')}
                               </div>
                               {quizStarted && timeLeft !== null ? (
-                                <div className={`text-sm font-medium ${timeLeft <= 300 ? 'text-red-600' : 'text-gray-700'}`}>
+                                <div className={`text-sm font-medium ${timeLeft <= 300 ? 'text-red-600' : 'text-gray-700 dark:text-gray-300'}`}>
                                   {formatTime(timeLeft)}
                                 </div>
                               ) : (
-                                <div className="text-sm font-medium text-gray-700">
+                                <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                   {assignment.quizTimeLimit} minutes
                                 </div>
                               )}
                               {!quizStarted && (
                                 <button
                                   onClick={startQuiz}
-                                  className="mt-2 w-full bg-indigo-600 text-white text-sm py-2 px-3 rounded hover:bg-indigo-700"
+                                  className="mt-2 w-full bg-indigo-600 dark:bg-indigo-500 text-white text-sm py-2 px-3 rounded hover:bg-indigo-700 dark:hover:bg-indigo-600"
                                 >
                                   Start Quiz
                                 </button>

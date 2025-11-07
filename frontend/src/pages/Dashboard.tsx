@@ -35,7 +35,7 @@ export function Dashboard() {
   // Safety check - ensure context is available
   if (!courseContext) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
       </div>
     );
@@ -225,7 +225,7 @@ export function Dashboard() {
     return (
       <button 
         key={iconId}
-        className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
         onClick={(e) => {
           e.stopPropagation();
           // Navigate to specific course section based on icon type
@@ -247,45 +247,45 @@ export function Dashboard() {
           }
         }}
       >
-        <IconComponent className="h-5 w-5 text-gray-600" />
+        <IconComponent className="h-5 w-5 text-gray-600 dark:text-gray-400" />
       </button>
     );
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="container mx-auto px-6 py-8 flex flex-col lg:flex-row gap-8">
         {/* Main dashboard content */}
         <div className="flex-1">
           <div className="mb-8">
-            <h1 className="text-4xl font-bold text-gray-800 mb-2">Dashboard</h1>
-            <p className="text-gray-600">Welcome back, {user?.firstName}!</p>
+            <h1 className="text-4xl font-bold text-gray-800 dark:text-gray-100 mb-2">Dashboard</h1>
+            <p className="text-gray-600 dark:text-gray-400">Welcome back, {user?.firstName}!</p>
           </div>
         {/* Published Courses Section */}
         <div className="mb-8">
           <div className="flex justify-between items-center mb-6">
             {isTeacherOrAdmin ? (
-              <h2 className="text-xl font-semibold text-gray-700">Published Courses ({publishedCourses.length})</h2>
+              <h2 className="text-xl font-semibold text-gray-700 dark:text-gray-300">Published Courses ({publishedCourses.length})</h2>
             ) : (
-              <h2 className="text-xl font-semibold text-gray-700">My Courses</h2>
+              <h2 className="text-xl font-semibold text-gray-700 dark:text-gray-300">My Courses</h2>
             )}
             {isTeacherOrAdmin && (
               <Link
                 to="/courses/create"
-                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md transition-colors"
+                className="bg-blue-500 dark:bg-blue-600 hover:bg-blue-600 dark:hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors"
               >
                 Create Course
               </Link>
             )}
           </div>
           {publishedCourses.length === 0 ? (
-            <div className="text-center text-gray-500 py-8">No published courses</div>
+            <div className="text-center text-gray-500 dark:text-gray-400 py-8">No published courses</div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {publishedCourses.map((course) => (
                 <div 
                   key={course._id} 
-                  className="bg-white rounded-xl shadow-lg overflow-visible cursor-pointer hover:shadow-xl transition-all duration-300 ml-4 border border-gray-100 group"
+                  className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-visible cursor-pointer hover:shadow-xl transition-all duration-300 ml-4 border border-gray-100 dark:border-gray-700 group"
                   onClick={() => handleCardClick(course._id)}
                   data-course-card
                 >
@@ -310,12 +310,12 @@ export function Dashboard() {
                         {/* Color picker dropdown */}
                         {openColorPicker === course._id && (
                           <div 
-                            className="absolute right-0 top-8 bg-white rounded-lg shadow-lg border border-gray-200 p-3 z-50 min-w-48" 
+                            className="absolute right-0 top-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-3 z-50 min-w-48" 
                             ref={(el) => { colorPickerRefs.current[course._id] = el; }}
                           >
                             <div className="flex items-center gap-2 mb-3">
-                              <Palette className="h-4 w-4 text-gray-600" />
-                              <span className="text-sm font-medium text-gray-700">Choose Color</span>
+                              <Palette className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Choose Color</span>
                             </div>
                             <div className="grid grid-cols-5 gap-2 mb-3">
                               {earthyColors.map((color) => (
@@ -338,7 +338,7 @@ export function Dashboard() {
                                 setOpenColorPicker(null);
                                 setOpenIconPicker(openIconPicker === course._id ? null : course._id);
                               }}
-                              className="flex items-center gap-2 w-full text-left text-sm text-gray-700 hover:bg-gray-50 p-2 rounded"
+                              className="flex items-center gap-2 w-full text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 p-2 rounded"
                             >
                               <Settings className="h-4 w-4" />
                               <span>Display Icons</span>
@@ -349,12 +349,12 @@ export function Dashboard() {
                         {/* Icon picker dropdown */}
                         {openIconPicker === course._id && (
                           <div 
-                            className="absolute right-0 top-8 bg-white rounded-lg shadow-lg border border-gray-200 p-3 z-50 min-w-48" 
+                            className="absolute right-0 top-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-3 z-50 min-w-48" 
                             ref={(el) => { iconPickerRefs.current[course._id] = el; }}
                           >
                             <div className="flex items-center gap-2 mb-3">
-                              <Settings className="h-4 w-4 text-gray-600" />
-                              <span className="text-sm font-medium text-gray-700">Display Icons (Max 3)</span>
+                              <Settings className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Display Icons (Max 3)</span>
                             </div>
                             <div className="space-y-2">
                               {availableIcons.map((iconConfig) => {
@@ -373,17 +373,17 @@ export function Dashboard() {
                                     }}
                                     className={`flex items-center gap-2 w-full text-left p-2 rounded transition-colors ${
                                       isSelected 
-                                        ? 'bg-blue-50 text-blue-700' 
+                                        ? 'bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300' 
                                         : isDisabled 
-                                          ? 'text-gray-400 cursor-not-allowed' 
-                                          : 'text-gray-700 hover:bg-gray-50'
+                                          ? 'text-gray-400 dark:text-gray-500 cursor-not-allowed' 
+                                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
                                     }`}
                                     disabled={isDisabled}
                                   >
                                     <IconComponent className="h-4 w-4" />
                                     <span className="text-sm">{iconConfig.name}</span>
                                     {isSelected && (
-                                      <span className="ml-auto text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                                      <span className="ml-auto text-xs bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 px-2 py-1 rounded">
                                         Selected
                                       </span>
                                     )}
@@ -398,7 +398,7 @@ export function Dashboard() {
                                 setOpenIconPicker(null);
                                 setOpenColorPicker(openColorPicker === course._id ? null : course._id);
                               }}
-                              className="flex items-center gap-2 w-full text-left text-sm text-gray-700 hover:bg-gray-50 p-2 rounded"
+                              className="flex items-center gap-2 w-full text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 p-2 rounded"
                             >
                               <Palette className="h-4 w-4" />
                               <span>Choose Color</span>
@@ -418,7 +418,7 @@ export function Dashboard() {
                       >
                         {course.catalog?.courseCode || course.title}
                       </h2>
-                      <p className="text-gray-500 text-sm">
+                      <p className="text-gray-500 dark:text-gray-400 text-sm">
                         Instructor: {course.instructor.firstName} {course.instructor.lastName}
                       </p>
                     </div>
@@ -440,15 +440,15 @@ export function Dashboard() {
         {/* Unpublished Courses Section (hide for students) */}
         {isTeacherOrAdmin && (
           <div>
-            <h2 className="text-xl font-semibold text-gray-700 mb-6">Unpublished Courses ({unpublishedCourses.length})</h2>
+            <h2 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-6">Unpublished Courses ({unpublishedCourses.length})</h2>
             {unpublishedCourses.length === 0 ? (
-              <div className="text-center text-gray-500 py-8">No unpublished courses</div>
+              <div className="text-center text-gray-500 dark:text-gray-400 py-8">No unpublished courses</div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {unpublishedCourses.map((course) => (
                   <div 
                     key={course._id} 
-                    className="bg-white rounded-xl shadow-lg overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border border-gray-100"
+                    className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border border-gray-100 dark:border-gray-700"
                     onClick={() => handleCardClick(course._id)}
                   >
                     {/* Top section - Dynamic color */}
@@ -474,7 +474,7 @@ export function Dashboard() {
                           {/* Color picker dropdown */}
                           {openColorPicker === course._id && (
                             <div 
-                              className="absolute right-0 top-8 bg-white rounded-lg shadow-lg border border-gray-200 p-3 z-50 min-w-48" 
+                              className="absolute right-0 top-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-3 z-50 min-w-48" 
                               ref={(el) => { colorPickerRefs.current[course._id] = el; }}
                             >
                               <div className="flex items-center gap-2 mb-3">
@@ -489,7 +489,7 @@ export function Dashboard() {
                                       e.stopPropagation();
                                       handleColorChange(course._id, color.value);
                                     }}
-                                    className="w-8 h-8 rounded-full border-2 border-gray-300 hover:border-gray-400 transition-colors"
+                                    className="w-8 h-8 rounded-full border-2 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 transition-colors"
                                     style={{ backgroundColor: color.value }}
                                     title={color.name}
                                   />
@@ -502,7 +502,7 @@ export function Dashboard() {
                                   setOpenColorPicker(null);
                                   setOpenIconPicker(openIconPicker === course._id ? null : course._id);
                                 }}
-                                className="flex items-center gap-2 w-full text-left text-sm text-gray-700 hover:bg-gray-50 p-2 rounded"
+                                className="flex items-center gap-2 w-full text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 p-2 rounded"
                               >
                                 <Settings className="h-4 w-4" />
                                 <span>Display Icons</span>
@@ -513,7 +513,7 @@ export function Dashboard() {
                           {/* Icon picker dropdown */}
                           {openIconPicker === course._id && (
                             <div 
-                              className="absolute right-0 top-8 bg-white rounded-lg shadow-lg border border-gray-200 p-3 z-50 min-w-48" 
+                              className="absolute right-0 top-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-3 z-50 min-w-48" 
                               ref={(el) => { iconPickerRefs.current[course._id] = el; }}
                             >
                               <div className="flex items-center gap-2 mb-3">
@@ -562,7 +562,7 @@ export function Dashboard() {
                                   setOpenIconPicker(null);
                                   setOpenColorPicker(openColorPicker === course._id ? null : course._id);
                                 }}
-                                className="flex items-center gap-2 w-full text-left text-sm text-gray-700 hover:bg-gray-50 p-2 rounded"
+                                className="flex items-center gap-2 w-full text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 p-2 rounded"
                               >
                                 <Palette className="h-4 w-4" />
                                 <span>Choose Color</span>

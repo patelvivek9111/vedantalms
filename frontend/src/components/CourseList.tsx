@@ -37,14 +37,14 @@ const CourseList: React.FC = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 dark:border-blue-400"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="text-red-500 text-center p-4">
+      <div className="text-red-500 dark:text-red-400 text-center p-4">
         {error}
       </div>
     );
@@ -60,16 +60,16 @@ const CourseList: React.FC = () => {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-800">Courses</h1>
+          <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">Courses</h1>
         </div>
         <div className="text-center py-12">
-          <h2 className="text-xl text-gray-600 mb-4">
+          <h2 className="text-xl text-gray-600 dark:text-gray-400 mb-4">
             {isTeacherOrAdmin ? 'No courses available' : 'No published courses available'}
           </h2>
           {isTeacherOrAdmin && (
             <Link
               to="/courses/create"
-              className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-md transition-colors"
+              className="bg-blue-500 dark:bg-blue-600 hover:bg-blue-600 dark:hover:bg-blue-700 text-white px-6 py-3 rounded-md transition-colors"
             >
               Create Your First Course
             </Link>
@@ -82,12 +82,12 @@ const CourseList: React.FC = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">Courses</h1>
+        <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">Courses</h1>
       </div>
       {/* Auto-redirecting to first course... */}
       <div className="text-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-        <p className="text-gray-600">Redirecting to your course...</p>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 dark:border-blue-400 mx-auto mb-4"></div>
+        <p className="text-gray-600 dark:text-gray-400">Redirecting to your course...</p>
       </div>
     </div>
   );

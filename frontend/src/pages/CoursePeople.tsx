@@ -121,7 +121,7 @@ const CoursePeople: React.FC = () => {
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto py-8">
-        <div className="text-center">Loading...</div>
+        <div className="text-center text-gray-900 dark:text-gray-100">Loading...</div>
       </div>
     );
   }
@@ -129,31 +129,31 @@ const CoursePeople: React.FC = () => {
   if (error) {
     return (
       <div className="max-w-4xl mx-auto py-8">
-        <div className="text-red-500 text-center">{error}</div>
+        <div className="text-red-500 dark:text-red-400 text-center">{error}</div>
       </div>
     );
   }
 
   return (
     <div className="max-w-4xl mx-auto py-8">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Course People</h1>
+      <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-8">Course People</h1>
 
       {/* Enrollment Requests */}
       {isTeacherOrAdmin && (
         <div className="mb-8">
-          <h3 className="text-lg font-semibold mb-4 text-orange-600">
+          <h3 className="text-lg font-semibold mb-4 text-orange-600 dark:text-orange-400">
             Pending Enrollment Requests ({enrollmentRequests.length})
           </h3>
           {enrollmentRequests.length === 0 ? (
-            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 text-center text-orange-700">
+            <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-4 text-center text-orange-700 dark:text-orange-300">
               No pending enrollment requests at this time.
             </div>
           ) : (
-            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+            <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
               {enrollmentRequests.map((request) => (
-                <div key={request._id} className="flex items-center justify-between p-3 bg-white rounded-lg mb-3">
+                <div key={request._id} className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg mb-3">
                   <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center">
+                    <div className="w-10 h-10 bg-gray-300 dark:bg-gray-700 rounded-full flex items-center justify-center">
                       {request.student.profilePicture ? (
                         <img 
                           src={request.student.profilePicture.startsWith('http') 
@@ -163,14 +163,14 @@ const CoursePeople: React.FC = () => {
                           className="w-10 h-10 rounded-full object-cover"
                         />
                       ) : (
-                        <span className="text-gray-600 font-medium">
+                        <span className="text-gray-600 dark:text-gray-300 font-medium">
                           {request.student.firstName.charAt(0)}{request.student.lastName.charAt(0)}
                         </span>
                       )}
                     </div>
                     <div>
-                      <p className="font-medium text-gray-800">{request.student.firstName} {request.student.lastName} wants to join</p>
-                      <p className="text-sm text-gray-500">
+                      <p className="font-medium text-gray-800 dark:text-gray-100">{request.student.firstName} {request.student.lastName} wants to join</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
                         Requested on {new Date(request.requestDate).toLocaleDateString()}
                       </p>
                     </div>
@@ -178,13 +178,13 @@ const CoursePeople: React.FC = () => {
                   <div className="flex space-x-2">
                     <button
                       onClick={() => handleApproveEnrollment(request.student._id)}
-                      className="px-4 py-2 bg-green-500 text-white rounded-lg text-sm hover:bg-green-600 transition-colors font-medium"
+                      className="px-4 py-2 bg-green-500 dark:bg-green-600 text-white rounded-lg text-sm hover:bg-green-600 dark:hover:bg-green-700 transition-colors font-medium"
                     >
                       Approve
                     </button>
                     <button
                       onClick={() => handleDenyEnrollment(request.student._id)}
-                      className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600 transition-colors font-medium"
+                      className="px-4 py-2 bg-red-500 dark:bg-red-600 text-white rounded-lg text-sm hover:bg-red-600 dark:hover:bg-red-700 transition-colors font-medium"
                     >
                       Deny
                     </button>
@@ -198,17 +198,17 @@ const CoursePeople: React.FC = () => {
 
       {/* Enrolled Students */}
       <div>
-        <h3 className="text-lg font-semibold mb-4">
+        <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">
           Enrolled Students ({students.length})
         </h3>
         {students.length === 0 ? (
-          <div className="text-gray-500 text-center py-8">No students enrolled yet.</div>
+          <div className="text-gray-500 dark:text-gray-400 text-center py-8">No students enrolled yet.</div>
         ) : (
-          <div className="bg-white border border-gray-200 rounded-lg">
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
             {students.map((student) => (
-              <div key={student._id} className="flex items-center justify-between p-4 border-b border-gray-100 last:border-b-0">
+              <div key={student._id} className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-700 last:border-b-0">
                 <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center">
+                  <div className="w-10 h-10 bg-gray-300 dark:bg-gray-700 rounded-full flex items-center justify-center">
                     {student.profilePicture ? (
                       <img 
                         src={student.profilePicture.startsWith('http') 
@@ -218,22 +218,22 @@ const CoursePeople: React.FC = () => {
                         className="w-10 h-10 rounded-full object-cover"
                       />
                     ) : (
-                      <span className="text-gray-600 font-medium">
+                      <span className="text-gray-600 dark:text-gray-300 font-medium">
                         {student.firstName.charAt(0)}{student.lastName.charAt(0)}
                       </span>
                     )}
                   </div>
                   <div>
-                    <p className="font-medium text-gray-800">
+                    <p className="font-medium text-gray-800 dark:text-gray-100">
                       {student.firstName} {student.lastName}
                     </p>
-                    <p className="text-sm text-gray-500">{student.email}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{student.email}</p>
                   </div>
                 </div>
                 {isTeacherOrAdmin && (
                   <button
                     onClick={() => handleRemoveStudent(student._id)}
-                    className="px-3 py-1 text-red-500 hover:text-red-700 text-sm font-medium hover:bg-red-50 rounded-lg transition-colors"
+                    className="px-3 py-1 text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 text-sm font-medium hover:bg-red-50 dark:hover:bg-red-900/50 rounded-lg transition-colors"
                   >
                     Remove
                   </button>

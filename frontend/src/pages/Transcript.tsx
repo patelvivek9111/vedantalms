@@ -272,7 +272,7 @@ const Transcript: React.FC = () => {
                 const [term, year] = e.target.value.split('-');
                 setSelectedSemester({ term, year: parseInt(year) });
               }}
-              className="block w-full max-w-xs rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              className="block w-full max-w-xs rounded-md border-gray-300 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 sm:text-sm"
             >
               <option value="">Select a semester</option>
               {availableSemesters.map((semester, index) => (
@@ -330,7 +330,7 @@ const Transcript: React.FC = () => {
 
           {loading && (
             <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 dark:border-indigo-400 mx-auto"></div>
               <p className="mt-2 text-gray-600 dark:text-gray-400">Loading transcript...</p>
             </div>
           )}

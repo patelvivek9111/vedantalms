@@ -187,18 +187,18 @@ const CustomEvent: React.FC<{ event: RBCEvent }> = ({ event }) => {
       </div>
       {start && end && (
         isAssignment && start.getTime() === end.getTime() ? (
-          <span className="text-xs text-gray-700">Due: {format(start, 'h:mm a')}</span>
+          <span className="text-xs text-gray-700 dark:text-gray-300">Due: {format(start, 'h:mm a')}</span>
         ) : start.getTime() === end.getTime() ? (
-          <span className="text-xs text-gray-700">{format(start, 'h:mm a')}</span>
+          <span className="text-xs text-gray-700 dark:text-gray-300">{format(start, 'h:mm a')}</span>
         ) : (event.allDay ? (
-          <span className="text-xs text-gray-700">All Day</span>
+          <span className="text-xs text-gray-700 dark:text-gray-300">All Day</span>
         ) : (
-          <span className="text-xs text-gray-700">{format(start, 'h:mm a')} – {format(end, 'h:mm a')}</span>
+          <span className="text-xs text-gray-700 dark:text-gray-300">{format(start, 'h:mm a')} – {format(end, 'h:mm a')}</span>
         ))
       )}
       {/* Show +N more only on the second overlapping event in the cell (month view only) */}
       {isSecondOverlap && (
-        <span className="absolute bottom-0 right-1 text-xs text-blue-700 bg-white bg-opacity-80 rounded px-1">+{overlappingEvents.length - 1} more</span>
+        <span className="absolute bottom-0 right-1 text-xs text-blue-700 dark:text-blue-300 bg-white dark:bg-gray-800 bg-opacity-80 dark:bg-opacity-90 rounded px-1">+{overlappingEvents.length - 1} more</span>
       )}
     </div>
   );
@@ -255,7 +255,7 @@ const ColorWheelPicker: React.FC<{
   const angleStep = (2 * Math.PI) / colors.length;
 
   return (
-    <div ref={pickerRef} style={style} className="bg-white rounded-full shadow-lg p-2 border border-gray-200" >
+    <div ref={pickerRef} style={style} className="bg-white dark:bg-gray-800 rounded-full shadow-lg p-2 border border-gray-200 dark:border-gray-700" >
       <svg width={center * 2} height={center * 2} style={{ display: 'block' }}>
         {colors.map((color, i) => {
           const angle = i * angleStep - Math.PI / 2;
@@ -270,6 +270,7 @@ const ColorWheelPicker: React.FC<{
               fill={color}
               stroke="#fff"
               strokeWidth={2}
+              className="dark:stroke-gray-700"
               style={{ cursor: 'pointer', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.08))' }}
               onClick={() => onSelect(color)}
             />
@@ -655,17 +656,17 @@ const CalendarPage: React.FC = () => {
   const CustomToolbar = (toolbarProps: any) => (
     <div className="rbc-toolbar flex items-center justify-between mb-2">
       <div className="flex gap-2">
-        <button type="button" className="rbc-btn px-3 py-1 rounded-lg bg-gray-100 hover:bg-blue-100 active:bg-blue-200 transition" onClick={() => toolbarProps.onNavigate('TODAY')}>Today</button>
-        <button type="button" className="rbc-btn px-3 py-1 rounded-lg bg-gray-100 hover:bg-blue-100 active:bg-blue-200 transition" onClick={() => toolbarProps.onNavigate('PREV')}>Back</button>
-        <button type="button" className="rbc-btn px-3 py-1 rounded-lg bg-gray-100 hover:bg-blue-100 active:bg-blue-200 transition" onClick={() => toolbarProps.onNavigate('NEXT')}>Next</button>
+        <button type="button" className="rbc-btn px-3 py-1 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-blue-100 dark:hover:bg-blue-900/50 active:bg-blue-200 dark:active:bg-blue-800 text-gray-700 dark:text-gray-300 transition" onClick={() => toolbarProps.onNavigate('TODAY')}>Today</button>
+        <button type="button" className="rbc-btn px-3 py-1 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-blue-100 dark:hover:bg-blue-900/50 active:bg-blue-200 dark:active:bg-blue-800 text-gray-700 dark:text-gray-300 transition" onClick={() => toolbarProps.onNavigate('PREV')}>Back</button>
+        <button type="button" className="rbc-btn px-3 py-1 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-blue-100 dark:hover:bg-blue-900/50 active:bg-blue-200 dark:active:bg-blue-800 text-gray-700 dark:text-gray-300 transition" onClick={() => toolbarProps.onNavigate('NEXT')}>Next</button>
       </div>
-      <span className="rbc-toolbar-label text-lg font-semibold">{toolbarProps.label}</span>
+      <span className="rbc-toolbar-label text-lg font-semibold text-gray-900 dark:text-gray-100">{toolbarProps.label}</span>
       <div className="flex gap-2 items-center">
         {['month', 'week', 'day', 'agenda'].map(view => (
           <button
             key={view}
             type="button"
-            className={`px-3 py-1 rounded-lg transition font-medium capitalize ${toolbarProps.view === view ? 'bg-blue-600 text-white shadow' : 'bg-gray-100 hover:bg-blue-100 active:bg-blue-200 text-gray-700'}`}
+            className={`px-3 py-1 rounded-lg transition font-medium capitalize ${toolbarProps.view === view ? 'bg-blue-600 dark:bg-blue-500 text-white shadow' : 'bg-gray-100 dark:bg-gray-700 hover:bg-blue-100 dark:hover:bg-blue-900/50 active:bg-blue-200 dark:active:bg-blue-800 text-gray-700 dark:text-gray-300'}`}
             onClick={() => toolbarProps.onView(view)}
           >
             {view.charAt(0).toUpperCase() + view.slice(1)}
@@ -673,7 +674,7 @@ const CalendarPage: React.FC = () => {
         ))}
         <button
           type="button"
-          className="px-3 py-1 bg-blue-600 text-white rounded-lg text-xl ml-2 shadow hover:bg-blue-700 transition"
+          className="px-3 py-1 bg-blue-600 dark:bg-blue-500 text-white rounded-lg text-xl ml-2 shadow hover:bg-blue-700 dark:hover:bg-blue-600 transition"
           onClick={() => {
             const now = new Date();
             const type = activeTab;
@@ -778,20 +779,20 @@ const CalendarPage: React.FC = () => {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm z-50">
         <form
-          className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-lg"
+          className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-2xl w-full max-w-lg"
           onSubmit={handleLocalSubmit}
           style={{ minWidth: 400 }}
         >
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-bold">{isEdit ? 'Edit Event' : 'Create Event'}</h2>
-            <button type="button" className="text-gray-400 hover:text-gray-700 text-2xl" onClick={() => { setModalOpen(false); setEditingEvent(null); }}>&times;</button>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">{isEdit ? 'Edit Event' : 'Create Event'}</h2>
+            <button type="button" className="text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-2xl" onClick={() => { setModalOpen(false); setEditingEvent(null); }}>&times;</button>
           </div>
-          <div className="flex border-b mb-4">
+          <div className="flex border-b border-gray-200 dark:border-gray-700 mb-4">
             {eventTypes.map(tab => (
               <button
                 key={tab.value}
                 type="button"
-                className={`px-4 py-2 font-semibold ${activeTab === tab.value ? 'border-b-4 border-purple-600 text-purple-700' : 'text-gray-500'}`}
+                className={`px-4 py-2 font-semibold ${activeTab === tab.value ? 'border-b-4 border-purple-600 dark:border-purple-400 text-purple-700 dark:text-purple-300' : 'text-gray-500 dark:text-gray-400'}`}
                 onClick={() => {
                   setActiveTab(tab.value);
                   setEditingEvent(editingEvent ? { ...editingEvent, type: tab.value } : null);
@@ -805,11 +806,11 @@ const CalendarPage: React.FC = () => {
             ))}
           </div>
           <div className="mb-3">
-            <label htmlFor="event-title" className="block text-sm font-medium mb-1">Title:</label>
+            <label htmlFor="event-title" className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Title:</label>
             <input
               id="event-title"
               name="title"
-              className="border p-2 w-full rounded"
+              className="border border-gray-300 dark:border-gray-700 p-2 w-full rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
               placeholder="Enter event title"
               type="text"
               value={localTitle}
@@ -819,7 +820,7 @@ const CalendarPage: React.FC = () => {
           </div>
           {activeTab !== 'My To Do' && (
             <div className="mb-3">
-              <label htmlFor="event-color" className="block text-sm font-medium mb-1">Color:</label>
+              <label htmlFor="event-color" className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Color:</label>
               <div className="flex items-center gap-2 flex-wrap">
                 <input
                   id="event-color"
@@ -832,7 +833,7 @@ const CalendarPage: React.FC = () => {
                 />
                 <button
                   type="button"
-                  className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded text-sm"
+                  className="px-3 py-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded text-sm text-gray-700 dark:text-gray-300"
                   onClick={() => {
                     const randomColor = colorPalette[Math.floor(Math.random() * colorPalette.length)];
                     setLocalColor(randomColor);
@@ -846,7 +847,7 @@ const CalendarPage: React.FC = () => {
                   <button
                     key={color + '-' + i}
                     type="button"
-                    className="w-6 h-6 rounded-full border-2 border-white shadow mx-0.5 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    className="w-6 h-6 rounded-full border-2 border-white dark:border-gray-700 shadow mx-0.5 focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500"
                     style={{ background: color, outline: localColor === color ? '2px solid #2563eb' : 'none' }}
                     onClick={() => { setLocalColor(color); setColorManuallySet(true); }}
                     aria-label={`Pick color ${color}`}
@@ -856,11 +857,11 @@ const CalendarPage: React.FC = () => {
             </div>
           )}
           <div className="mb-3">
-            <label htmlFor="event-date" className="block text-sm font-medium mb-1">Date:</label>
+            <label htmlFor="event-date" className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Date:</label>
             <input
               id="event-date"
               name="date"
-              className="border p-2 w-full rounded"
+              className="border border-gray-300 dark:border-gray-700 p-2 w-full rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
               type="date"
               value={localDate}
               onChange={e => setLocalDate(e.target.value)}
@@ -870,11 +871,11 @@ const CalendarPage: React.FC = () => {
           {activeTab !== 'My To Do' && (
             <div className="flex gap-2 mb-3">
               <div className="flex-1">
-                <label htmlFor="event-time-from" className="block text-sm font-medium mb-1">From:</label>
+                <label htmlFor="event-time-from" className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">From:</label>
                 <select
                   id="event-time-from"
                   name="startTime"
-                  className="border p-2 w-full rounded"
+                  className="border border-gray-300 dark:border-gray-700 p-2 w-full rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                   value={localStartTime}
                   onChange={e => setLocalStartTime(e.target.value)}
                   required
@@ -885,11 +886,11 @@ const CalendarPage: React.FC = () => {
                 </select>
               </div>
               <div className="flex-1">
-                <label htmlFor="event-time-to" className="block text-sm font-medium mb-1">To:</label>
+                <label htmlFor="event-time-to" className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">To:</label>
                 <select
                   id="event-time-to"
                   name="endTime"
-                  className="border p-2 w-full rounded"
+                  className="border border-gray-300 dark:border-gray-700 p-2 w-full rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                   value={localEndTime}
                   onChange={e => setLocalEndTime(e.target.value)}
                   required
@@ -901,14 +902,14 @@ const CalendarPage: React.FC = () => {
               </div>
             </div>
           )}
-          {error && <div className="text-red-600 text-sm mb-2">{error}</div>}
+          {error && <div className="text-red-600 dark:text-red-400 text-sm mb-2">{error}</div>}
           {activeTab !== 'My To Do' && (
             <div className="mb-3">
-              <label htmlFor="event-location" className="block text-sm font-medium mb-1">Location:</label>
+              <label htmlFor="event-location" className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Location:</label>
               <input
                 id="event-location"
                 name="location"
-                className="border p-2 w-full rounded"
+                className="border border-gray-300 dark:border-gray-700 p-2 w-full rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
                 placeholder="Location"
                 type="text"
                 value={localLocation}
@@ -919,11 +920,11 @@ const CalendarPage: React.FC = () => {
           {activeTab !== 'My To Do' && (
             isTeacherOrAdmin ? (
               <div className="mb-3">
-                <label htmlFor="event-calendar" className="block text-sm font-medium mb-1">Calendar:</label>
+                <label htmlFor="event-calendar" className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Calendar:</label>
                 <select
                   id="event-calendar"
                   name="calendar"
-                  className="border p-2 w-full rounded"
+                  className="border border-gray-300 dark:border-gray-700 p-2 w-full rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                   value={localCalendar}
                   onChange={e => {
                     setLocalCalendar(e.target.value);
@@ -942,21 +943,21 @@ const CalendarPage: React.FC = () => {
             ) : null
           )}
           <div className="flex justify-between mt-6">
-            <button type="button" className="bg-gray-200 px-4 py-2 rounded hover:bg-gray-300">More Options</button>
+            <button type="button" className="bg-gray-200 dark:bg-gray-700 px-4 py-2 rounded hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300">More Options</button>
             <div className="flex gap-2">
               {(() => {
                 const canDelete = isEdit && (isTeacherOrAdmin || (user && editingEvent?.calendar === user._id));
                 return canDelete ? (
                   <button
                     type="button"
-                    className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded"
+                    className="bg-red-500 dark:bg-red-600 hover:bg-red-600 dark:hover:bg-red-700 text-white px-4 py-2 rounded"
                     onClick={handleDelete}
                   >
                     Delete
                   </button>
                 ) : null;
               })()}
-              <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">Submit</button>
+              <button type="submit" className="bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600 text-white px-4 py-2 rounded">Submit</button>
             </div>
           </div>
         </form>
@@ -997,16 +998,16 @@ const CalendarPage: React.FC = () => {
       {/* Right Panel */}
       <div className="w-80 flex flex-col gap-4">
         {/* Mini Month Picker */}
-        <div className="bg-white border rounded-xl shadow-md p-4 mb-2">
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-md p-4 mb-2">
           <div className="flex items-center justify-between mb-2">
-            <button onClick={() => setMiniSelectedDate(prev => subMonths(prev, 1))} className="px-2 py-1 rounded-full bg-gray-100 hover:bg-blue-100 text-lg font-bold transition">{'<'}</button>
-            <div className="text-center font-semibold text-lg">{format(miniSelectedDate, 'MMMM yyyy')}</div>
-            <button onClick={() => setMiniSelectedDate(prev => addMonths(prev, 1))} className="px-2 py-1 rounded-full bg-gray-100 hover:bg-blue-100 text-lg font-bold transition">{'>'}</button>
+            <button onClick={() => setMiniSelectedDate(prev => subMonths(prev, 1))} className="px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-lg font-bold transition text-gray-700 dark:text-gray-300">{'<'}</button>
+            <div className="text-center font-semibold text-lg text-gray-900 dark:text-gray-100">{format(miniSelectedDate, 'MMMM yyyy')}</div>
+            <button onClick={() => setMiniSelectedDate(prev => addMonths(prev, 1))} className="px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-lg font-bold transition text-gray-700 dark:text-gray-300">{'>'}</button>
           </div>
           <table className="w-full text-xs select-none">
             <thead>
               <tr>
-                <th className="font-semibold text-gray-500">Su</th><th className="font-semibold text-gray-500">Mo</th><th className="font-semibold text-gray-500">Tu</th><th className="font-semibold text-gray-500">We</th><th className="font-semibold text-gray-500">Th</th><th className="font-semibold text-gray-500">Fr</th><th className="font-semibold text-gray-500">Sa</th>
+                <th className="font-semibold text-gray-500 dark:text-gray-400">Su</th><th className="font-semibold text-gray-500 dark:text-gray-400">Mo</th><th className="font-semibold text-gray-500 dark:text-gray-400">Tu</th><th className="font-semibold text-gray-500 dark:text-gray-400">We</th><th className="font-semibold text-gray-500 dark:text-gray-400">Th</th><th className="font-semibold text-gray-500 dark:text-gray-400">Fr</th><th className="font-semibold text-gray-500 dark:text-gray-400">Sa</th>
               </tr>
             </thead>
             <tbody>
@@ -1041,8 +1042,8 @@ const CalendarPage: React.FC = () => {
                         key={j}
                         className={
                           date && isSameMonth(date, miniSelectedDate)
-                            ? `cursor-pointer rounded-full w-8 h-8 text-center align-middle transition ${isSameDay(date, miniSelectedDate) ? 'bg-blue-200 text-blue-900 font-bold shadow' : 'hover:bg-blue-100 hover:text-blue-700'}`
-                            : 'text-gray-300'
+                            ? `cursor-pointer rounded-full w-8 h-8 text-center align-middle transition ${isSameDay(date, miniSelectedDate) ? 'bg-blue-200 dark:bg-blue-900/50 text-blue-900 dark:text-blue-200 font-bold shadow' : 'hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:text-blue-700 dark:hover:text-blue-300 text-gray-700 dark:text-gray-300'}`
+                            : 'text-gray-300 dark:text-gray-600'
                         }
                         onClick={() => date && setMiniSelectedDate(date)}
                       >
@@ -1056,9 +1057,9 @@ const CalendarPage: React.FC = () => {
           </table>
         </div>
         {/* Calendar List */}
-        <div className="bg-white border rounded p-4 relative">
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded p-4 relative">
           <div className="max-h-44 overflow-y-auto pr-1">
-            <div className="font-semibold mb-2">CALENDARS</div>
+            <div className="font-semibold mb-2 text-gray-900 dark:text-gray-100">CALENDARS</div>
             {calendarOptions.map((opt, idx) => (
               <div className="flex items-center mb-1" key={opt.value}>
                 <input
@@ -1072,13 +1073,13 @@ const CalendarPage: React.FC = () => {
                 <button
                   type="button"
                   ref={el => { colorDotRefs.current[opt.value] = el; }}
-                  className="w-3 h-3 rounded-full mr-2 border-2 border-white shadow focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  className="w-3 h-3 rounded-full mr-2 border-2 border-white dark:border-gray-700 shadow focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500"
                   style={{ background: getCalendarColor(opt.value, idx), outline: calendarColors[opt.value] ? '2px solid #2563eb' : 'none' }}
                   onClick={() => setColorWheelOpen(opt.value)}
                   aria-label={`Pick color for ${opt.label}`}
                   title="Change calendar color"
                 />
-                <span>{opt.label}</span>
+                <span className="text-gray-900 dark:text-gray-100">{opt.label}</span>
               </div>
             ))}
             {/* Render the color wheel below the calendar list if open */}

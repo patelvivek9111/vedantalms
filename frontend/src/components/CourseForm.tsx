@@ -173,12 +173,12 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-800 mb-6">
+        <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-6">
           {mode === 'create' ? 'Create Course' : 'Edit Course'}
         </h1>
 
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          <div className="bg-red-100 dark:bg-red-900/20 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded mb-4">
             {error}
           </div>
         )}
@@ -187,7 +187,7 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
           <div>
             <label
               htmlFor="title"
-              className="block text-sm font-medium text-gray-700 mb-1"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
             >
               Title
             </label>
@@ -197,20 +197,20 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
               name="title"
               value={formData.title}
               onChange={handleChange}
-              className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                formErrors.title ? 'border-red-500' : 'border-gray-300'
+              className={`w-full px-3 py-2 border rounded-md shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 ${
+                formErrors.title ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-700'
               }`}
               placeholder="Enter course title"
             />
             {formErrors.title && (
-              <p className="mt-1 text-sm text-red-600">{formErrors.title}</p>
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.title}</p>
             )}
           </div>
 
           <div>
             <label
               htmlFor="description"
-              className="block text-sm font-medium text-gray-700 mb-1"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
             >
               Description
             </label>
@@ -220,20 +220,20 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
               value={formData.description}
               onChange={handleChange}
               rows={4}
-              className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                formErrors.description ? 'border-red-500' : 'border-gray-300'
+              className={`w-full px-3 py-2 border rounded-md shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 ${
+                formErrors.description ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-700'
               }`}
               placeholder="Enter course description"
             />
             {formErrors.description && (
-              <p className="mt-1 text-sm text-red-600">{formErrors.description}</p>
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.description}</p>
             )}
           </div>
 
           <div>
             <label
               htmlFor="courseCode"
-              className="block text-sm font-medium text-gray-700 mb-1"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
             >
               Course Code
             </label>
@@ -243,20 +243,20 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
               name="courseCode"
               value={formData.courseCode}
               onChange={handleChange}
-              className="w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
               placeholder="e.g., CS101, MATH201"
             />
           </div>
 
                      {/* Catalog Section */}
-           <div className="border-t pt-6">
-             <h3 className="text-lg font-medium text-gray-900 mb-4">Catalog Information</h3>
+           <div className="border-t dark:border-gray-700 pt-6">
+             <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Catalog Information</h3>
              
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                <div>
                  <label
                    htmlFor="subject"
-                   className="block text-sm font-medium text-gray-700 mb-1"
+                   className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
                  >
                    Subject
                  </label>
@@ -266,20 +266,20 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
                    name="subject"
                    value={formData.subject}
                    onChange={handleChange}
-                   className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                     formErrors.subject ? 'border-red-500' : 'border-gray-300'
+                   className={`w-full px-3 py-2 border rounded-md shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 ${
+                     formErrors.subject ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-700'
                    }`}
                    placeholder="e.g., Computer Science, Mathematics"
                  />
                  {formErrors.subject && (
-                   <p className="mt-1 text-sm text-red-600">{formErrors.subject}</p>
+                   <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.subject}</p>
                  )}
                </div>
 
                <div>
                  <label
                    htmlFor="catalogDescription"
-                   className="block text-sm font-medium text-gray-700 mb-1"
+                   className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
                  >
                    Catalog Description
                  </label>
@@ -289,20 +289,20 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
                    value={formData.catalogDescription}
                    onChange={handleChange}
                    rows={3}
-                   className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                     formErrors.catalogDescription ? 'border-red-500' : 'border-gray-300'
+                   className={`w-full px-3 py-2 border rounded-md shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 ${
+                     formErrors.catalogDescription ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-700'
                    }`}
                    placeholder="Brief description for the course catalog"
                  />
                  {formErrors.catalogDescription && (
-                   <p className="mt-1 text-sm text-red-600">{formErrors.catalogDescription}</p>
+                   <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.catalogDescription}</p>
                  )}
                </div>
 
               <div>
                 <label
                   htmlFor="maxStudents"
-                  className="block text-sm font-medium text-gray-700 mb-1"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
                 >
                   Maximum Students
                 </label>
@@ -312,20 +312,20 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
                   name="maxStudents"
                   value={formData.maxStudents}
                   onChange={handleChange}
-                  className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    formErrors.maxStudents ? 'border-red-500' : 'border-gray-300'
+                  className={`w-full px-3 py-2 border rounded-md shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 ${
+                    formErrors.maxStudents ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-700'
                   }`}
                   placeholder="Leave empty for unlimited"
                 />
                 {formErrors.maxStudents && (
-                  <p className="mt-1 text-sm text-red-600">{formErrors.maxStudents}</p>
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.maxStudents}</p>
                 )}
               </div>
 
               <div>
                 <label
                   htmlFor="creditHours"
-                  className="block text-sm font-medium text-gray-700 mb-1"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
                 >
                   Credit Hours
                 </label>
@@ -337,21 +337,21 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
                   onChange={handleChange}
                   min="1"
                   max="10"
-                  className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    formErrors.creditHours ? 'border-red-500' : 'border-gray-300'
+                  className={`w-full px-3 py-2 border rounded-md shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 ${
+                    formErrors.creditHours ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-700'
                   }`}
                   placeholder="3"
                 />
-                <p className="mt-1 text-sm text-gray-500">Number of credit hours for this course</p>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Number of credit hours for this course</p>
                 {formErrors.creditHours && (
-                  <p className="mt-1 text-sm text-red-600">{formErrors.creditHours}</p>
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.creditHours}</p>
                 )}
               </div>
 
               <div>
                 <label
                   htmlFor="startDate"
-                  className="block text-sm font-medium text-gray-700 mb-1"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
                 >
                   Start Date
                 </label>
@@ -361,19 +361,19 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
                   name="startDate"
                   value={formData.startDate}
                   onChange={handleChange}
-                  className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    formErrors.startDate ? 'border-red-500' : 'border-gray-300'
+                  className={`w-full px-3 py-2 border rounded-md shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 ${
+                    formErrors.startDate ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-700'
                   }`}
                 />
                 {formErrors.startDate && (
-                  <p className="mt-1 text-sm text-red-600">{formErrors.startDate}</p>
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.startDate}</p>
                 )}
               </div>
 
               <div>
                 <label
                   htmlFor="endDate"
-                  className="block text-sm font-medium text-gray-700 mb-1"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
                 >
                   End Date
                 </label>
@@ -383,19 +383,19 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
                   name="endDate"
                   value={formData.endDate}
                   onChange={handleChange}
-                  className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    formErrors.endDate ? 'border-red-500' : 'border-gray-300'
+                  className={`w-full px-3 py-2 border rounded-md shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 ${
+                    formErrors.endDate ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-700'
                   }`}
                 />
                 {formErrors.endDate && (
-                  <p className="mt-1 text-sm text-red-600">{formErrors.endDate}</p>
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.endDate}</p>
                 )}
               </div>
 
               <div>
                 <label
                   htmlFor="enrollmentDeadline"
-                  className="block text-sm font-medium text-gray-700 mb-1"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
                 >
                   Enrollment Deadline
                 </label>
@@ -405,25 +405,25 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
                   name="enrollmentDeadline"
                   value={formData.enrollmentDeadline}
                   onChange={handleChange}
-                  className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    formErrors.enrollmentDeadline ? 'border-red-500' : 'border-gray-300'
+                  className={`w-full px-3 py-2 border rounded-md shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 ${
+                    formErrors.enrollmentDeadline ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-700'
                   }`}
                 />
                 {formErrors.enrollmentDeadline && (
-                  <p className="mt-1 text-sm text-red-600">{formErrors.enrollmentDeadline}</p>
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.enrollmentDeadline}</p>
                 )}
               </div>
             </div>
 
             {/* Semester Section */}
-            <div className="border-t pt-6 mt-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Semester Information</h3>
+            <div className="border-t dark:border-gray-700 pt-6 mt-6">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Semester Information</h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label
                     htmlFor="semesterTerm"
-                    className="block text-sm font-medium text-gray-700 mb-1"
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
                   >
                     Term
                   </label>
@@ -432,7 +432,7 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
                     name="semesterTerm"
                     value={formData.semesterTerm}
                     onChange={(e) => setFormData(prev => ({ ...prev, semesterTerm: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                   >
                     <option value="Fall">Fall</option>
                     <option value="Spring">Spring</option>
@@ -444,7 +444,7 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
                 <div>
                   <label
                     htmlFor="semesterYear"
-                    className="block text-sm font-medium text-gray-700 mb-1"
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
                   >
                     Year
                   </label>
@@ -456,7 +456,7 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
                     onChange={handleChange}
                     min="2020"
                     max="2100"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                     placeholder="2025"
                   />
                 </div>
@@ -471,9 +471,9 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
                   name="isPublic"
                   checked={formData.isPublic}
                   onChange={(e) => setFormData(prev => ({ ...prev, isPublic: e.target.checked }))}
-                  className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                  className="rounded border-gray-300 dark:border-gray-700 text-blue-600 dark:text-blue-400 bg-white dark:bg-gray-900 shadow-sm focus:border-blue-300 dark:focus:border-blue-600 focus:ring focus:ring-blue-200 dark:focus:ring-blue-800 focus:ring-opacity-50"
                 />
-                <span className="ml-2 text-sm text-gray-700">
+                <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
                   Make this course public in the catalog
                 </span>
               </label>
@@ -487,9 +487,9 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
                   name="allowTeacherEnrollment"
                   checked={formData.allowTeacherEnrollment}
                   onChange={(e) => setFormData(prev => ({ ...prev, allowTeacherEnrollment: e.target.checked }))}
-                  className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                  className="rounded border-gray-300 dark:border-gray-700 text-blue-600 dark:text-blue-400 bg-white dark:bg-gray-900 shadow-sm focus:border-blue-300 dark:focus:border-blue-600 focus:ring focus:ring-blue-200 dark:focus:ring-blue-800 focus:ring-opacity-50"
                 />
-                <span className="ml-2 text-sm text-gray-700">
+                <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
                   Allow teachers to enroll in this course
                 </span>
               </label>
@@ -500,14 +500,14 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
              <button
                type="button"
                onClick={() => navigate('/dashboard')}
-               className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+               className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400"
              >
                Cancel
              </button>
              <button
                type="submit"
                disabled={loading}
-               className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+               className="px-4 py-2 bg-blue-500 dark:bg-blue-600 text-white rounded-md hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50"
              >
                {loading ? (
                  <span className="flex items-center">

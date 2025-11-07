@@ -340,16 +340,16 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
     
     // Use the hash to select from a predefined set of colors
     const colors = [
-      'bg-blue-100 text-blue-700',
-      'bg-purple-100 text-purple-700', 
-      'bg-green-100 text-green-700',
-      'bg-orange-100 text-orange-700',
-      'bg-pink-100 text-pink-700',
-      'bg-indigo-100 text-indigo-700',
-      'bg-teal-100 text-teal-700',
-      'bg-yellow-100 text-yellow-700',
-      'bg-red-100 text-red-700',
-      'bg-gray-100 text-gray-700'
+      'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300',
+      'bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300', 
+      'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300',
+      'bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-300',
+      'bg-pink-100 dark:bg-pink-900/50 text-pink-700 dark:text-pink-300',
+      'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300',
+      'bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300',
+      'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-300',
+      'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300',
+      'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
     ];
     
     const colorIndex = Math.abs(hash) % colors.length;
@@ -364,7 +364,7 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
           {(isQuizzesView ? TABS.filter(tab => tab.value !== 'assignment' && tab.value !== 'discussion') : TABS).map(tab => (
             <button
               key={tab.value}
-              className={`px-4 py-2 -mb-px border-b-2 font-medium text-sm focus:outline-none ${selectedTab === tab.value ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-500 hover:text-indigo-600'}`}
+              className={`px-4 py-2 -mb-px border-b-2 font-medium text-sm focus:outline-none ${selectedTab === tab.value ? 'border-indigo-600 dark:border-indigo-400 text-indigo-700 dark:text-indigo-300' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400'}`}
               onClick={() => setSelectedTab(tab.value)}
             >
               {tab.label}
@@ -376,9 +376,9 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
       {/* Bulk Actions (only for teacher/admin) */}
       {isTeacherOrAdmin && selectedIds.length > 0 && (
         <div className="flex space-x-2 mb-2">
-          <button onClick={handleBulkPublish} className="px-3 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200">Publish</button>
-          <button onClick={handleBulkUnpublish} className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200">Unpublish</button>
-          <button onClick={handleBulkDelete} className="px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200">Delete</button>
+          <button onClick={handleBulkPublish} className="px-3 py-1 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 rounded hover:bg-green-200 dark:hover:bg-green-900/70 transition-colors">Publish</button>
+          <button onClick={handleBulkUnpublish} className="px-3 py-1 bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-300 rounded hover:bg-yellow-200 dark:hover:bg-yellow-900/70 transition-colors">Unpublish</button>
+          <button onClick={handleBulkDelete} className="px-3 py-1 bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 rounded hover:bg-red-200 dark:hover:bg-red-900/70 transition-colors">Delete</button>
         </div>
       )}
 
@@ -392,15 +392,15 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
                   <input type="checkbox" id="select-all-assignments" name="selectAll" checked={allSelected} onChange={toggleSelectAll} />
                 </th>
               )}
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
-              {!isQuizzesView && <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Group</th>}
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Due Date</th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{isQuizzesView ? 'Total Points' : 'Points'}</th>
-              {isTeacherOrAdmin && <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>}
-              {isTeacherOrAdmin && <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>}
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Title</th>
+              {!isQuizzesView && <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Group</th>}
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Due Date</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{isQuizzesView ? 'Total Points' : 'Points'}</th>
+              {isTeacherOrAdmin && <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>}
+              {isTeacherOrAdmin && <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
             {userRole === 'student' && filteredGroupedAssignments.length > 0 ? (
               filteredGroupedAssignments.map(group => [
                 <tr key={group.label}>
@@ -418,14 +418,14 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
                         <span className="text-indigo-700 font-medium hover:underline">{item.title}</span>
                       </td>
                       {!isQuizzesView && (
-                        <td className="px-4 py-2 text-sm text-gray-600">
+                        <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getGroupColor(item.group)}`}>
                             {item.group}
                           </span>
                         </td>
                       )}
-                      <td className="px-4 py-2 text-sm text-gray-600">{dueDate ? format(dueDate, 'PPp') : '-'}</td>
-                      <td className="px-4 py-2 text-sm text-gray-600">{item.totalPoints}</td>
+                      <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">{dueDate ? format(dueDate, 'PPp') : '-'}</td>
+                      <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">{item.totalPoints}</td>
                     </tr>
                   );
                 })
@@ -433,7 +433,7 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
             ) : isTeacherOrAdmin ? (
               flatList.length === 0 ? (
                 <tr>
-                  <td colSpan={isQuizzesView ? 6 : 7} className="text-center py-6 text-gray-400">No {isQuizzesView ? 'quizzes' : 'assignments'} found</td>
+                  <td colSpan={isQuizzesView ? 6 : 7} className="text-center py-6 text-gray-400 dark:text-gray-500">No {isQuizzesView ? 'quizzes' : 'assignments'} found</td>
                 </tr>
               ) : (
                 flatList.map(item => {
@@ -451,19 +451,19 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
                         <span className="text-indigo-700 font-medium hover:underline">{item.title}</span>
                       </td>
                       {!isQuizzesView && (
-                        <td className="px-4 py-2 text-sm text-gray-600">
+                        <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getGroupColor(item.group)}`}>
                             {item.group}
                           </span>
                         </td>
                       )}
-                      <td className="px-4 py-2 text-sm text-gray-600">{dueDate ? format(dueDate, 'PPp') : '-'}</td>
-                      <td className="px-4 py-2 text-sm text-gray-600">{item.totalPoints}</td>
+                      <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">{dueDate ? format(dueDate, 'PPp') : '-'}</td>
+                      <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">{item.totalPoints}</td>
                       <td className="px-4 py-2">
                         {item.published ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">Published</span>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300">Published</span>
                         ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-600">Unpublished</span>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300">Unpublished</span>
                         )}
                       </td>
                       <td className="px-4 py-2 space-x-2">

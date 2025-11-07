@@ -133,7 +133,7 @@ const CourseDiscussions: React.FC<CourseDiscussionsProps> = ({ courseId, courseG
 
   if (error) {
     return (
-      <div className="text-red-500 text-center p-4">
+      <div className="text-red-500 dark:text-red-400 text-center p-4">
         {error}
       </div>
     );
@@ -144,13 +144,13 @@ const CourseDiscussions: React.FC<CourseDiscussionsProps> = ({ courseId, courseG
       <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-gray-800">Discussions</h2>
-            <p className="text-gray-600 mt-1">Course discussion threads and conversations</p>
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Discussions</h2>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">Course discussion threads and conversations</p>
           </div>
           {isTeacher && (
             <button
               onClick={handleCreateThread}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2"
+              className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors flex items-center gap-2"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -165,8 +165,8 @@ const CourseDiscussions: React.FC<CourseDiscussionsProps> = ({ courseId, courseG
             <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No discussion threads</h3>
-            <p className="mt-1 text-sm text-gray-500">
+            <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">No discussion threads</h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               {isTeacher 
                 ? "Get started by creating a new discussion thread."
                 : "There are no discussion threads yet. Teachers will create threads here."}
@@ -175,7 +175,7 @@ const CourseDiscussions: React.FC<CourseDiscussionsProps> = ({ courseId, courseG
               <div className="mt-6">
                 <button
                   onClick={handleCreateThread}
-                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-900 transition-colors"
                 >
                   <svg className="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -190,7 +190,7 @@ const CourseDiscussions: React.FC<CourseDiscussionsProps> = ({ courseId, courseG
             {/* Pinned threads */}
             {threads.filter(thread => thread.isPinned).length > 0 && (
               <div className="mb-6">
-                <h3 className="text-sm font-medium text-gray-500 mb-3">Pinned Threads</h3>
+                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">Pinned Threads</h3>
                 <div className="space-y-4">
                   {threads
                     .filter(thread => thread.isPinned)
@@ -207,18 +207,18 @@ const CourseDiscussions: React.FC<CourseDiscussionsProps> = ({ courseId, courseG
                         </div>
                         <div className="flex justify-between items-start">
                           <div className="flex-1">
-                            <h3 className="text-lg font-semibold text-gray-800 mb-1">
+                            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-1">
                               {thread.title}
                               {thread.isGraded && (
-                                <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+                                <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300 rounded-full">
                                   Graded ({thread.totalPoints} points)
                                 </span>
                               )}
                             </h3>
-                            <div className="flex items-center text-sm text-gray-600 space-x-4">
+                            <div className="flex items-center text-sm text-gray-600 dark:text-gray-400 space-x-4">
                               <span>
                                 Posted by {thread.author.firstName} {thread.author.lastName}
-                                <span className="ml-1 px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                                <span className="ml-1 px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 rounded-full">
                                   {thread.author.role}
                                 </span>
                               </span>
@@ -229,7 +229,7 @@ const CourseDiscussions: React.FC<CourseDiscussionsProps> = ({ courseId, courseG
                               {thread.dueDate && (
                                 <>
                                   <span>•</span>
-                                  <span className="text-orange-600">
+                                  <span className="text-orange-600 dark:text-orange-400">
                                     Due {formatDistanceToNow(new Date(thread.dueDate), { addSuffix: true })}
                                   </span>
                                 </>
@@ -243,7 +243,7 @@ const CourseDiscussions: React.FC<CourseDiscussionsProps> = ({ courseId, courseG
                               </svg>
                               {thread.replyCount} {thread.replyCount === 1 ? 'reply' : 'replies'}
                             </div>
-                            <div className="text-gray-500" title={new Date(thread.lastActivity).toLocaleString()}>
+                            <div className="text-gray-500 dark:text-gray-400" title={new Date(thread.lastActivity).toLocaleString()}>
                               Last activity {formatDistanceToNow(new Date(thread.lastActivity), { addSuffix: true })}
                             </div>
                           </div>
@@ -257,7 +257,7 @@ const CourseDiscussions: React.FC<CourseDiscussionsProps> = ({ courseId, courseG
             {/* Regular threads */}
             {threads.filter(thread => !thread.isPinned).length > 0 && (
               <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-3">All Threads</h3>
+                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">All Threads</h3>
                 <div className="space-y-4">
                   {threads
                     .filter(thread => !thread.isPinned)
@@ -269,18 +269,18 @@ const CourseDiscussions: React.FC<CourseDiscussionsProps> = ({ courseId, courseG
                       >
                         <div className="flex justify-between items-start">
                           <div className="flex-1">
-                            <h3 className="text-lg font-semibold text-gray-800 mb-1">
+                            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-1">
                               {thread.title}
                               {thread.isGraded && (
-                                <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+                                <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300 rounded-full">
                                   Graded ({thread.totalPoints} points)
                                 </span>
                               )}
                             </h3>
-                            <div className="flex items-center text-sm text-gray-600 space-x-4">
+                            <div className="flex items-center text-sm text-gray-600 dark:text-gray-400 space-x-4">
                               <span>
                                 Posted by {thread.author.firstName} {thread.author.lastName}
-                                <span className="ml-1 px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                                <span className="ml-1 px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 rounded-full">
                                   {thread.author.role}
                                 </span>
                               </span>
@@ -291,7 +291,7 @@ const CourseDiscussions: React.FC<CourseDiscussionsProps> = ({ courseId, courseG
                               {thread.dueDate && (
                                 <>
                                   <span>•</span>
-                                  <span className="text-orange-600">
+                                  <span className="text-orange-600 dark:text-orange-400">
                                     Due {formatDistanceToNow(new Date(thread.dueDate), { addSuffix: true })}
                                   </span>
                                 </>
@@ -305,7 +305,7 @@ const CourseDiscussions: React.FC<CourseDiscussionsProps> = ({ courseId, courseG
                               </svg>
                               {thread.replyCount} {thread.replyCount === 1 ? 'reply' : 'replies'}
                             </div>
-                            <div className="text-gray-500" title={new Date(thread.lastActivity).toLocaleString()}>
+                            <div className="text-gray-500 dark:text-gray-400" title={new Date(thread.lastActivity).toLocaleString()}>
                               Last activity {formatDistanceToNow(new Date(thread.lastActivity), { addSuffix: true })}
                             </div>
                           </div>

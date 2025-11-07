@@ -172,7 +172,7 @@ const StudentCard = ({ student, isInstructor, isAdmin, handleUnenroll, isInstruc
         </div>
       )}
       <div>
-        <div className="font-semibold text-lg text-gray-800">{student.firstName} {student.lastName}</div>
+        <div className="font-semibold text-lg text-gray-800 dark:text-gray-200">{student.firstName} {student.lastName}</div>
         <div className="text-gray-500 text-sm">{student.email}</div>
       </div>
       {/* Only show Remove button for students, not instructor */}
@@ -1751,15 +1751,15 @@ const CourseDetail: React.FC = () => {
         return (
           <div className="space-y-6">
             {(isInstructor || isAdmin) && publishError && (
-              <div className="bg-red-100 text-red-700 px-4 py-2 rounded mb-2 font-medium border border-red-200">
+              <div className="bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 px-4 py-2 rounded mb-2 font-medium border border-red-200 dark:border-red-800">
                 {publishError}
               </div>
             )}
             {/* Course Header */}
             <div className="bg-white dark:bg-gray-900 rounded-xl shadow p-6 flex flex-col md:flex-row justify-between items-start md:items-center mb-4 border border-gray-200 dark:border-gray-700">
                 <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-1">{course.catalog?.courseCode || course.title}</h1>
-                <div className="text-sm text-gray-600">
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-1">{course.catalog?.courseCode || course.title}</h1>
+                <div className="text-sm text-gray-600 dark:text-gray-400">
                   Instructor: {course.instructor.firstName} {course.instructor.lastName}
                 </div>
                 </div>
@@ -1770,7 +1770,7 @@ const CourseDetail: React.FC = () => {
                     <button
                       onClick={handleToggleCoursePublish}
                       disabled={publishingCourse}
-                      className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-opacity-50 ${course.published ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200'} ${publishingCourse ? 'opacity-60 cursor-not-allowed' : ''}`}
+                      className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-opacity-50 ${course.published ? 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/70' : 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/70'} ${publishingCourse ? 'opacity-60 cursor-not-allowed' : ''}`}
                     >
                       {course.published ? (
                         <Unlock className="w-4 h-4 mr-2" />
@@ -1811,17 +1811,17 @@ const CourseDetail: React.FC = () => {
             {/* Course Overview Cards */}
             {(isInstructor || isAdmin) && (
               <div className="flex flex-col md:flex-row gap-4 mb-4">
-                <div className="flex-1 bg-blue-50 rounded-xl p-6 text-center shadow">
-                  <div className="text-lg font-semibold text-blue-800">Students</div>
-                  <div className="text-3xl font-bold text-blue-900">{course.students?.length || 0}</div>
+                <div className="flex-1 bg-blue-50 dark:bg-blue-900/20 rounded-xl p-6 text-center shadow">
+                  <div className="text-lg font-semibold text-blue-800 dark:text-blue-300">Students</div>
+                  <div className="text-3xl font-bold text-blue-900 dark:text-blue-200">{course.students?.length || 0}</div>
               </div>
-                <div className="flex-1 bg-green-50 rounded-xl p-6 text-center shadow">
-                  <div className="text-lg font-semibold text-green-800">Modules</div>
-                  <div className="text-3xl font-bold text-green-900">{modules.length}</div>
+                <div className="flex-1 bg-green-50 dark:bg-green-900/20 rounded-xl p-6 text-center shadow">
+                  <div className="text-lg font-semibold text-green-800 dark:text-green-300">Modules</div>
+                  <div className="text-3xl font-bold text-green-900 dark:text-green-200">{modules.length}</div>
             </div>
-                <div className="flex-1 bg-purple-50 rounded-xl p-6 text-center shadow">
-                  <div className="text-lg font-semibold text-purple-800">Assignments</div>
-                  <div className="text-3xl font-bold text-purple-900">{modules.reduce((acc, m) => acc + (m.assignments?.length || 0), 0)}</div>
+                <div className="flex-1 bg-purple-50 dark:bg-purple-900/20 rounded-xl p-6 text-center shadow">
+                  <div className="text-lg font-semibold text-purple-800 dark:text-purple-300">Assignments</div>
+                  <div className="text-3xl font-bold text-purple-900 dark:text-purple-200">{modules.reduce((acc, m) => acc + (m.assignments?.length || 0), 0)}</div>
                 </div>
               </div>
             )}
@@ -1829,7 +1829,7 @@ const CourseDetail: React.FC = () => {
             {/* Quick Actions (teachers/admins only) */}
             {(isInstructor || isAdmin) && (
               <div className="bg-white dark:bg-gray-900 rounded-xl shadow p-6 border border-gray-200 dark:border-gray-700">
-                <div className="font-semibold mb-4">Quick Actions</div>
+                <div className="font-semibold mb-4 text-gray-900 dark:text-gray-100">Quick Actions</div>
                 <div className="flex flex-col sm:flex-row gap-4">
                   <button className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors" onClick={() => navigate(`/courses/${id}/modules`)}>Create Module</button>
                   <button className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition-colors" onClick={() => navigate(`/courses/${id}/students`)}>Manage Students</button>
@@ -2146,7 +2146,7 @@ const CourseDetail: React.FC = () => {
         return (
           <div className="space-y-6">
             <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
-              <h2 className="text-2xl font-bold text-gray-800 mb-4">Course Modules</h2>
+              <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4">Course Modules</h2>
               <ModuleProvider>
                 <ModuleList courseId={course._id} />
               </ModuleProvider>
@@ -2211,7 +2211,7 @@ const CourseDetail: React.FC = () => {
             <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
               <div className="flex justify-between items-center mb-8">
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-800">Assignments</h2>
+                  <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Assignments</h2>
                   <p className="text-gray-600 mt-1">View and manage course assignments</p>
                 </div>
                 {(isInstructor || isAdmin) && (
@@ -3581,7 +3581,7 @@ const CourseDetail: React.FC = () => {
           {filteredNavigationItems.map((item: any) => (
             <button
               key={item.id}
-              className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-200 ${activeSection === item.id ? 'bg-blue-100 text-blue-700 font-semibold shadow' : ''}`}
+              className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors font-medium text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 ${activeSection === item.id ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-semibold shadow' : ''}`}
               onClick={() => navigate(`/courses/${id}/${item.id}`)}
             >
               <item.icon className="w-5 h-5" />

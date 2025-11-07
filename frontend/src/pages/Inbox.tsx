@@ -526,7 +526,7 @@ const Inbox: React.FC = () => {
         <div className="flex items-center gap-2 ml-4">
           {/* Compose (modern icon) */}
           <button
-            className="p-2 rounded hover:bg-blue-100 text-blue-600"
+            className="p-2 rounded hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400"
             title="Compose"
             onClick={() => setShowCompose(true)}
           >
@@ -534,7 +534,7 @@ const Inbox: React.FC = () => {
           </button>
           {/* Reply */}
           <button 
-            className={`p-2 rounded ${selectedConversations.length > 0 ? 'hover:bg-blue-200 text-blue-600' : 'hover:bg-gray-200 text-gray-400'}`} 
+            className={`p-2 rounded ${selectedConversations.length > 0 ? 'hover:bg-blue-200 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500'}`} 
             title="Reply" 
             onClick={handleReply}
             disabled={selectedConversations.length === 0 || bulkActionLoading}
@@ -543,7 +543,7 @@ const Inbox: React.FC = () => {
           </button>
           {/* Archive */}
           <button 
-            className={`p-2 rounded ${selectedConversations.length > 0 ? 'hover:bg-yellow-200 text-yellow-600' : 'hover:bg-gray-200 text-gray-400'}`} 
+            className={`p-2 rounded ${selectedConversations.length > 0 ? 'hover:bg-yellow-200 dark:hover:bg-yellow-900/50 text-yellow-600 dark:text-yellow-400' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500'}`} 
             title="Archive" 
             onClick={handleArchive}
             disabled={selectedConversations.length === 0 || bulkActionLoading}
@@ -552,7 +552,7 @@ const Inbox: React.FC = () => {
           </button>
           {/* Delete */}
           <button 
-            className={`p-2 rounded ${selectedConversations.length > 0 ? 'hover:bg-red-200 text-red-600' : 'hover:bg-gray-200 text-gray-400'}`} 
+            className={`p-2 rounded ${selectedConversations.length > 0 ? 'hover:bg-red-200 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500'}`} 
             title="Delete" 
             onClick={handleDelete}
             disabled={selectedConversations.length === 0 || bulkActionLoading}
@@ -569,7 +569,7 @@ const Inbox: React.FC = () => {
             id="inbox-search"
             name="search"
             ref={searchInputRef}
-            className="border border-gray-200 dark:border-gray-700 rounded-full pl-10 pr-4 py-2 text-sm bg-gray-50 dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-200 w-full shadow-sm"
+            className="border border-gray-200 dark:border-gray-700 rounded-full pl-10 pr-4 py-2 text-sm bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 w-full shadow-sm"
             type="text"
             placeholder="Search..."
             value={search}
@@ -586,17 +586,17 @@ const Inbox: React.FC = () => {
         {showCompose && (
           <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
             <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-0 w-full max-w-xl relative border border-gray-200 dark:border-gray-700">
-              <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 text-2xl" onClick={() => setShowCompose(false)}>&times;</button>
-              <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-4 text-xl font-semibold">Compose Message</div>
+              <button className="absolute top-2 right-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 text-2xl" onClick={() => setShowCompose(false)}>&times;</button>
+              <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-4 text-xl font-semibold text-gray-900 dark:text-gray-100">Compose Message</div>
               <form onSubmit={handleCompose} className="px-6 py-4">
                 {/* Course Dropdown - Hide for admins */}
                 {user?.role !== 'admin' && (
                   <div className="mb-4 flex items-center">
-                    <label htmlFor="compose-course" className="w-20 text-gray-700 font-medium">Course</label>
+                    <label htmlFor="compose-course" className="w-20 text-gray-700 dark:text-gray-300 font-medium">Course</label>
                     <select
                       id="compose-course"
                       name="course"
-                      className="border border-gray-200 dark:border-gray-700 rounded px-3 py-2 text-sm bg-white dark:bg-gray-900 flex-1"
+                      className="border border-gray-200 dark:border-gray-700 rounded px-3 py-2 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 flex-1"
                       value={composeCourse}
                       onChange={e => { setComposeCourse(e.target.value); setComposeToGroup(''); setComposeGroupUsers([]); }}
                     >
@@ -608,22 +608,22 @@ const Inbox: React.FC = () => {
                 )}
                 {/* To Field with group selection */}
                 <div className="mb-4 flex items-center relative" ref={composeToDropdownRef}>
-                  <span className="w-20 text-gray-700 font-medium">To</span>
+                  <span className="w-20 text-gray-700 dark:text-gray-300 font-medium">To</span>
                   <div className="flex-1 relative">
                     <div id="compose-to" className="flex items-center border border-gray-200 dark:border-gray-700 rounded px-3 py-2 bg-white dark:bg-gray-900 cursor-text">
                       <div className="flex flex-wrap gap-1 flex-1 min-w-0">
                         {composeToGroup === 'sections' && user?.role !== 'admin' ? (
                           composeCourse ? (
-                            <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs flex items-center">
+                            <span className="bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 px-2 py-1 rounded-full text-xs flex items-center">
                               All Students in {composeCourseOptions.find(c => c._id === composeCourse)?.title || 'Course'}
-                              <button type="button" className="ml-1 text-xs text-red-500" onClick={e => { e.stopPropagation(); setComposeToGroup(''); setComposeCourse(''); }}>&times;</button>
+                              <button type="button" className="ml-1 text-xs text-red-500 dark:text-red-400" onClick={e => { e.stopPropagation(); setComposeToGroup(''); setComposeCourse(''); }}>&times;</button>
                             </span>
                           ) : (
-                            <span className="text-gray-400 text-xs">Select a course...</span>
+                            <span className="text-gray-400 dark:text-gray-500 text-xs">Select a course...</span>
                           )
                         ) : (
                           composeRecipients.map((u) => (
-                            <span key={u._id} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs flex items-center gap-1.5">
+                            <span key={u._id} className="bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 px-2 py-1 rounded-full text-xs flex items-center gap-1.5">
                               <div className="relative flex-shrink-0">
                                 {u.profilePicture ? (
                                   <img
@@ -654,7 +654,7 @@ const Inbox: React.FC = () => {
                               </div>
                               <span>{u.firstName} {u.lastName}</span>
                               {u.role && <span className="text-[10px] opacity-75">({u.role})</span>}
-                              <button type="button" className="ml-0.5 text-xs text-red-500 hover:text-red-700" onClick={e => { e.stopPropagation(); handleRemoveRecipient(u._id); }}>&times;</button>
+                              <button type="button" className="ml-0.5 text-xs text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300" onClick={e => { e.stopPropagation(); handleRemoveRecipient(u._id); }}>&times;</button>
                             </span>
                           ))
                         )}
@@ -664,7 +664,7 @@ const Inbox: React.FC = () => {
                             type="text"
                             id="compose-to-input"
                             name="composeToInput"
-                            className="flex-1 min-w-24 outline-none border-none bg-transparent text-sm"
+                            className="flex-1 min-w-24 outline-none border-none bg-transparent text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
                             placeholder={composeRecipients.length === 0 ? (user?.role === 'admin' ? 'Type name or email to search users...' : 'Type name or email...') : ''}
                             value={composeToInput}
                             onChange={e => { setComposeToInput(e.target.value); setShowGroupDropdown(false); }}
@@ -675,7 +675,7 @@ const Inbox: React.FC = () => {
                       {/* Icon to open group dropdown */}
                       <button
                         type="button"
-                        className="ml-2 text-gray-400 hover:text-gray-600"
+                        className="ml-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                         tabIndex={-1}
                         aria-label="Choose group"
                         onClick={e => { e.stopPropagation(); setShowGroupDropdown(v => !v); }}
@@ -689,16 +689,16 @@ const Inbox: React.FC = () => {
                         {user?.role === 'admin' ? (
                           // Admin sees simplified options
                           <>
-                            <div className="px-4 py-2 text-blue-600 hover:bg-gray-100 cursor-pointer" onClick={() => { setComposeToGroup('teachers'); setShowGroupDropdown(false); }}>All Teachers</div>
-                            <div className="px-4 py-2 text-green-600 hover:bg-gray-100 cursor-pointer" onClick={() => { setComposeToGroup('students'); setShowGroupDropdown(false); }}>All Students</div>
-                            <div className="px-4 py-2 text-purple-600 hover:bg-gray-100 cursor-pointer" onClick={() => { setComposeToGroup('admins'); setShowGroupDropdown(false); }}>All Admins</div>
+                            <div className="px-4 py-2 text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer" onClick={() => { setComposeToGroup('teachers'); setShowGroupDropdown(false); }}>All Teachers</div>
+                            <div className="px-4 py-2 text-green-600 dark:text-green-400 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer" onClick={() => { setComposeToGroup('students'); setShowGroupDropdown(false); }}>All Students</div>
+                            <div className="px-4 py-2 text-purple-600 dark:text-purple-400 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer" onClick={() => { setComposeToGroup('admins'); setShowGroupDropdown(false); }}>All Admins</div>
                           </>
                         ) : (
                           // Non-admin users see course-based options
                           <>
-                            <div className="px-4 py-2 text-red-600 hover:bg-gray-100 cursor-pointer" onClick={() => { setComposeToGroup('teachers'); setShowGroupDropdown(false); }}>Teachers</div>
-                            <div className="px-4 py-2 text-red-600 hover:bg-gray-100 cursor-pointer" onClick={() => { setComposeToGroup('students'); setShowGroupDropdown(false); }}>Students</div>
-                            <div className="px-4 py-2 text-red-600 hover:bg-gray-100 cursor-pointer" onClick={() => { setComposeToGroup('sections'); setShowGroupDropdown(false); setComposeCourse(''); }}>Course Sections</div>
+                            <div className="px-4 py-2 text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer" onClick={() => { setComposeToGroup('teachers'); setShowGroupDropdown(false); }}>Teachers</div>
+                            <div className="px-4 py-2 text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer" onClick={() => { setComposeToGroup('students'); setShowGroupDropdown(false); }}>Students</div>
+                            <div className="px-4 py-2 text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer" onClick={() => { setComposeToGroup('sections'); setShowGroupDropdown(false); setComposeCourse(''); }}>Course Sections</div>
                           </>
                         )}
                       </div>
@@ -707,13 +707,13 @@ const Inbox: React.FC = () => {
                     {composeToInput.length >= 2 && composeUserResults.length > 0 && (
                       <div className="absolute left-0 top-12 w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded shadow z-20 max-h-48 overflow-y-auto">
                         {composeUserResults.map((u: any) => (
-                          <div key={u._id} className="px-4 py-2 hover:bg-blue-100 cursor-pointer flex items-center gap-3" onClick={() => { handleAddRecipient(u); setComposeToInput(''); setComposeUserResults([]); }}>
+                          <div key={u._id} className="px-4 py-2 hover:bg-blue-100 dark:hover:bg-blue-900/50 cursor-pointer flex items-center gap-3" onClick={() => { handleAddRecipient(u); setComposeToInput(''); setComposeUserResults([]); }}>
                             <div className="relative flex-shrink-0">
                               {u.profilePicture ? (
                                 <img
                                   src={u.profilePicture.startsWith('http') ? u.profilePicture : getImageUrl(u.profilePicture)}
                                   alt={`${u.firstName} ${u.lastName}`}
-                                  className="w-8 h-8 rounded-full object-cover border-2 border-gray-200"
+                                  className="w-8 h-8 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
                                   onError={(e) => {
                                     e.currentTarget.style.display = 'none';
                                     const fallback = e.currentTarget.nextElementSibling as HTMLElement;
@@ -737,10 +737,10 @@ const Inbox: React.FC = () => {
                               </div>
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium text-gray-900">
+                              <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
                                 {u.firstName} {u.lastName}
                               </div>
-                              <div className="text-xs text-gray-500 truncate">
+                              <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
                                 {u.email} {u.role && `• ${u.role}`}
                               </div>
                             </div>
@@ -751,18 +751,18 @@ const Inbox: React.FC = () => {
                     {/* Dropdown for users in group (for Teachers/Students/Admins) */}
                     {composeToGroup && composeToGroup !== 'sections' && composeGroupUsers.length > 0 && !composeToInput && (
                       <div className="absolute left-0 top-12 w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded shadow z-20 max-h-48 overflow-y-auto">
-                        <div className="flex items-center px-2 py-2 border-b cursor-pointer hover:bg-gray-100" onClick={() => setComposeToGroup('')}>
+                        <div className="flex items-center px-2 py-2 border-b border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800" onClick={() => setComposeToGroup('')}>
                           <ChevronLeft size={18} />
-                          <span className="ml-2 text-gray-600 text-sm">Back</span>
+                          <span className="ml-2 text-gray-600 dark:text-gray-400 text-sm">Back</span>
                         </div>
                         {composeGroupUsers.map((u: any) => (
-                          <div key={u._id} className="px-4 py-2 hover:bg-blue-100 cursor-pointer flex items-center gap-3" onClick={() => { handleAddRecipient(u); setComposeToGroup(''); }}>
+                          <div key={u._id} className="px-4 py-2 hover:bg-blue-100 dark:hover:bg-blue-900/50 cursor-pointer flex items-center gap-3" onClick={() => { handleAddRecipient(u); setComposeToGroup(''); }}>
                             <div className="relative flex-shrink-0">
                               {u.profilePicture ? (
                                 <img
                                   src={u.profilePicture.startsWith('http') ? u.profilePicture : getImageUrl(u.profilePicture)}
                                   alt={`${u.firstName} ${u.lastName}`}
-                                  className="w-8 h-8 rounded-full object-cover border-2 border-gray-200"
+                                  className="w-8 h-8 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
                                   onError={(e) => {
                                     e.currentTarget.style.display = 'none';
                                     const fallback = e.currentTarget.nextElementSibling as HTMLElement;
@@ -786,10 +786,10 @@ const Inbox: React.FC = () => {
                               </div>
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium text-gray-900">
+                              <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
                                 {u.firstName} {u.lastName}
                               </div>
-                              <div className="text-xs text-gray-500 truncate">
+                              <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
                                 {u.email} {u.role && `• ${u.role}`}
                               </div>
                             </div>
@@ -800,12 +800,12 @@ const Inbox: React.FC = () => {
                     {/* Dropdown for course selection when Course Sections is selected - Hide for admins */}
                     {user?.role !== 'admin' && composeToGroup === 'sections' && !composeCourse && (
                       <div className="absolute left-0 top-12 w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded shadow z-20 max-h-48 overflow-y-auto">
-                        <div className="flex items-center px-2 py-2 border-b cursor-pointer hover:bg-gray-100" onClick={() => setComposeToGroup('')}>
+                        <div className="flex items-center px-2 py-2 border-b border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800" onClick={() => setComposeToGroup('')}>
                           <ChevronLeft size={18} />
-                          <span className="ml-2 text-gray-600 text-sm">Back</span>
+                          <span className="ml-2 text-gray-600 dark:text-gray-400 text-sm">Back</span>
                         </div>
                         {composeCourseOptions.map((c: any) => (
-                          <div key={c._id} className="px-4 py-2 hover:bg-blue-100 cursor-pointer" onClick={() => setComposeCourse(c._id)}>
+                          <div key={c._id} className="px-4 py-2 hover:bg-blue-100 dark:hover:bg-blue-900/50 cursor-pointer text-gray-900 dark:text-gray-100" onClick={() => setComposeCourse(c._id)}>
                             {c.title}
                           </div>
                         ))}
@@ -815,12 +815,12 @@ const Inbox: React.FC = () => {
                 </div>
                 {/* Subject */}
                 <div className="mb-4 flex items-center">
-                  <label htmlFor="compose-subject" className="w-20 text-gray-700 font-medium">Subject</label>
+                  <label htmlFor="compose-subject" className="w-20 text-gray-700 dark:text-gray-300 font-medium">Subject</label>
                   <input
                     id="compose-subject"
                     name="subject"
                     type="text"
-                    className="border border-gray-200 dark:border-gray-700 rounded px-3 py-2 text-sm bg-white dark:bg-gray-900 flex-1"
+                    className="border border-gray-200 dark:border-gray-700 rounded px-3 py-2 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 flex-1"
                     value={composeSubject}
                     onChange={e => setComposeSubject(e.target.value)}
                     disabled={composeLoading}
@@ -837,13 +837,13 @@ const Inbox: React.FC = () => {
                     onChange={e => setSendIndividually(e.target.checked)}
                     disabled={composeLoading}
                   />
-                  <label htmlFor="send-individually" className="text-gray-700 text-sm select-none">
+                  <label htmlFor="send-individually" className="text-gray-700 dark:text-gray-300 text-sm select-none">
                     Send an individual message to each recipient
                   </label>
                 </div>
                 {/* Message */}
                 <div className="mb-4">
-                  <label htmlFor="compose-message" className="block text-gray-700 font-medium mb-1">Message</label>
+                  <label htmlFor="compose-message" className="block text-gray-700 dark:text-gray-300 font-medium mb-1">Message</label>
                   <textarea
                     id="compose-message"
                     name="message"
@@ -856,15 +856,15 @@ const Inbox: React.FC = () => {
                 </div>
                 {/* Attachment icon */}
                 <div className="flex items-center justify-between">
-                  <button type="button" className="p-2 text-gray-400 hover:text-gray-600" title="Attach file" disabled>
+                  <button type="button" className="p-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300" title="Attach file" disabled>
                     <Paperclip size={22} />
                   </button>
                   <div className="flex gap-2">
-                    <button type="button" className="px-4 py-2 rounded bg-gray-200" onClick={() => setShowCompose(false)} disabled={composeLoading}>Cancel</button>
-                    <button type="submit" className="px-4 py-2 rounded bg-red-600 text-white" disabled={composeLoading || (!composeRecipients.length && (composeToGroup !== 'sections' || !composeCourse)) || !composeSubject.trim() || !composeBody.trim()}>{composeLoading ? 'Sending...' : 'Send'}</button>
+                    <button type="button" className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600" onClick={() => setShowCompose(false)} disabled={composeLoading}>Cancel</button>
+                    <button type="submit" className="px-4 py-2 rounded bg-red-600 dark:bg-red-500 text-white hover:bg-red-700 dark:hover:bg-red-600" disabled={composeLoading || (!composeRecipients.length && (composeToGroup !== 'sections' || !composeCourse)) || !composeSubject.trim() || !composeBody.trim()}>{composeLoading ? 'Sending...' : 'Send'}</button>
                   </div>
                 </div>
-                {composeError && <div className="text-red-500 mt-2">{composeError}</div>}
+                {composeError && <div className="text-red-500 dark:text-red-400 mt-2">{composeError}</div>}
               </form>
             </div>
           </div>
@@ -888,9 +888,9 @@ const Inbox: React.FC = () => {
                 }}
                 className="mr-3 accent-blue-600 w-4 h-4"
               />
-                        <span className="text-sm text-gray-600">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
             {bulkActionLoading ? (
-              <span className="text-blue-600">Processing...</span>
+              <span className="text-blue-600 dark:text-blue-400">Processing...</span>
             ) : (
               selectedConversations.length > 0 
                 ? `${selectedConversations.length} selected` 
@@ -899,10 +899,10 @@ const Inbox: React.FC = () => {
           </span>
             </div>
           )}
-          {loading && <div className="p-4">Loading...</div>}
-          {error && <div className="p-4 text-red-500">{error}</div>}
+          {loading && <div className="p-4 text-gray-600 dark:text-gray-400">Loading...</div>}
+          {error && <div className="p-4 text-red-500 dark:text-red-400">{error}</div>}
           {!loading && !error && conversations.length === 0 && (
-            <div className="p-4 text-gray-400">No conversations yet.</div>
+            <div className="p-4 text-gray-400 dark:text-gray-500">No conversations yet.</div>
           )}
           <div className="flex-1 overflow-y-auto">
             {dateKeys.map(dateKey => (
@@ -957,10 +957,10 @@ const Inbox: React.FC = () => {
                             getInitials(otherParticipants[0])
                           )}
                         </div>
-                        <span className={`truncate font-medium ${unread ? 'font-bold text-blue-900' : 'text-gray-900'}`}>{participantNames || 'Unknown'}</span>
-                        {unread && <span className="ml-2 w-2 h-2 bg-blue-500 rounded-full"></span>}
+                        <span className={`truncate font-medium ${unread ? 'font-bold text-blue-900 dark:text-blue-300' : 'text-gray-900 dark:text-gray-100'}`}>{participantNames || 'Unknown'}</span>
+                        {unread && <span className="ml-2 w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full"></span>}
                         <div className="flex flex-col items-end ml-auto min-w-[48px]">
-                          <span className="text-xs text-gray-400">{conv.lastMessage ? format(new Date(conv.lastMessage.createdAt), 'p') : ''}</span>
+                          <span className="text-xs text-gray-400 dark:text-gray-500">{conv.lastMessage ? format(new Date(conv.lastMessage.createdAt), 'p') : ''}</span>
                         </div>
                       </div>
                       <div className="flex items-center min-h-[22px] mt-1">
@@ -975,28 +975,31 @@ const Inbox: React.FC = () => {
                             height="18"
                             viewBox="0 0 24 24"
                             fill={starred ? '#2563eb' : 'none'}
-                            stroke="#2563eb"
+                            stroke={starred ? '#2563eb' : '#9ca3af'}
                             strokeWidth="2"
                             strokeLinecap="round"
                             strokeLinejoin="round"
                             style={{ display: 'block' }}
+                            className="dark:stroke-blue-400"
                           >
                             <polygon
                               points="12 17.27 18.18 21 16.54 13.97 22 9.24 14.81 8.63 12 2 9.19 8.63 2 9.24 7.46 13.97 5.82 21 12 17.27"
                               fill={starred ? '#2563eb' : 'none'}
-                              stroke="#2563eb" />
+                              stroke={starred ? '#2563eb' : '#9ca3af'}
+                              className="dark:fill-blue-400 dark:stroke-blue-400"
+                            />
                           </svg>
                         </span>
-                        <span className={`truncate flex-1 ${unread ? 'font-bold text-blue-900' : 'text-gray-700'}`}>{conv.subject}</span>
+                        <span className={`truncate flex-1 ${unread ? 'font-bold text-blue-900 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'}`}>{conv.subject}</span>
                         {unread && (
-                          <span className="ml-2 bg-blue-500 text-white text-xs rounded-full px-2 py-0.5">{conv.unreadCount}</span>
+                          <span className="ml-2 bg-blue-500 dark:bg-blue-400 text-white text-xs rounded-full px-2 py-0.5">{conv.unreadCount}</span>
                         )}
                       </div>
-                      <div className="truncate text-xs text-gray-500 mt-1">
+                      <div className="truncate text-xs text-gray-500 dark:text-gray-400 mt-1">
                         {conv.lastMessage ? (
                           conv.lastMessage.body.replace(/<[^>]*>/g, '')
                         ) : (
-                          <span className="italic text-gray-400">No messages</span>
+                          <span className="italic text-gray-400 dark:text-gray-500">No messages</span>
                         )}
                       </div>
                     </div>
@@ -1009,22 +1012,22 @@ const Inbox: React.FC = () => {
         {/* Message View */}
         <div className="flex-1 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800 p-0 flex flex-col min-h-[600px]">
           {!selectedConversation && (
-            <div className="flex flex-col items-center justify-center h-full text-gray-400">
+            <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500">
               <svg width="96" height="96" fill="none" viewBox="0 0 24 24"><path d="M2 6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6Zm2 0 8 7 8-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              <div className="mt-4 text-lg">No Conversations Selected</div>
+              <div className="mt-4 text-lg text-gray-600 dark:text-gray-400">No Conversations Selected</div>
             </div>
           )}
           {selectedConversation && (
             <div className="flex flex-col h-full">
               {/* Sticky Subject Header */}
               <div className="mb-4 border-b border-gray-200 dark:border-gray-700 pb-2 flex items-center justify-between sticky top-0 z-10 bg-white dark:bg-gray-800 rounded-t-2xl shadow-sm px-6 pt-6">
-                <div className="font-bold text-2xl">{selectedConversation.subject}</div>
+                <div className="font-bold text-2xl text-gray-900 dark:text-gray-100">{selectedConversation.subject}</div>
               </div>
               <div className="flex-1 overflow-y-auto px-6 pb-6">
-                {messagesLoading && <div>Loading messages...</div>}
-                {messagesError && <div className="text-red-500">{messagesError}</div>}
+                {messagesLoading && <div className="text-gray-600 dark:text-gray-400">Loading messages...</div>}
+                {messagesError && <div className="text-red-500 dark:text-red-400">{messagesError}</div>}
                 {!messagesLoading && !messagesError && messages.length === 0 && (
-                  <div className="text-gray-400">No messages yet.</div>
+                  <div className="text-gray-400 dark:text-gray-500">No messages yet.</div>
                 )}
                 <div className="space-y-6 mb-6">
                   {messages.map((msg, idx) => {
@@ -1057,13 +1060,13 @@ const Inbox: React.FC = () => {
                               <div className="font-semibold text-gray-900 dark:text-gray-100">
                                 {senderName || 'Unknown User'}
                               </div>
-                              <div className="text-sm text-gray-500">
+                              <div className="text-sm text-gray-500 dark:text-gray-400">
                                 {capitalizeFirst(format(new Date(msg.createdAt), "MMMM d, yyyy 'at' h:mmaaa"))}
                               </div>
                             </div>
                           </div>
                           {isMe && (
-                            <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
+                            <span className="text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
                               Sent
                             </span>
                           )}
@@ -1101,7 +1104,7 @@ const Inbox: React.FC = () => {
                     </button>
                     <button
                       type="button"
-                      className="px-4 py-2 rounded bg-gray-200"
+                      className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
                       onClick={() => setShowReplyBox(false)}
                       disabled={sending}
                     >
@@ -1114,14 +1117,14 @@ const Inbox: React.FC = () => {
                 <div className="px-6 pb-6 flex justify-end">
                   <button
                     onClick={() => setShowReplyBox(true)}
-                    className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                   >
                     <Reply className="w-4 h-4 mr-2" />
                     Reply
                   </button>
                 </div>
               )}
-              {sendError && <div className="text-red-500 mt-2 px-6">{sendError}</div>}
+              {sendError && <div className="text-red-500 dark:text-red-400 mt-2 px-6">{sendError}</div>}
             </div>
           )}
         </div>

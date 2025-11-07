@@ -38,31 +38,31 @@ const ATTENDANCE_STATUSES = {
 const STATUS_CONFIG = {
   [ATTENDANCE_STATUSES.PRESENT]: {
     label: 'Present',
-    color: 'bg-green-100 text-green-800 border-green-200',
+    color: 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800',
     icon: CheckCircle,
     shortLabel: 'P'
   },
   [ATTENDANCE_STATUSES.ABSENT]: {
     label: 'Absent',
-    color: 'bg-red-100 text-red-800 border-red-200',
+    color: 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800',
     icon: XCircle,
     shortLabel: 'A'
   },
   [ATTENDANCE_STATUSES.LATE]: {
     label: 'Late',
-    color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+    color: 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800',
     icon: AlertCircle,
     shortLabel: 'L'
   },
   [ATTENDANCE_STATUSES.EXCUSED]: {
     label: 'Excused',
-    color: 'bg-blue-100 text-blue-800 border-blue-200',
+    color: 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-800',
     icon: MinusCircle,
     shortLabel: 'E'
   },
   [ATTENDANCE_STATUSES.UNMARKED]: {
     label: 'Unmarked',
-    color: 'bg-gray-100 text-gray-800 border-gray-200',
+    color: 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-600',
     icon: CheckSquare,
     shortLabel: '-'
   }
@@ -218,7 +218,7 @@ const CalendarDay: React.FC<CalendarDayProps> = ({ day, courseId, isInstructor, 
   };
 
   if (!day.isCurrentMonth) {
-    return <div className="p-3 text-center text-gray-300 bg-gray-50"></div>;
+    return <div className="p-3 text-center text-gray-300 dark:text-gray-600 bg-gray-50 dark:bg-gray-900"></div>;
   }
 
   const breakdown = getAttendanceBreakdown();
@@ -228,12 +228,12 @@ const CalendarDay: React.FC<CalendarDayProps> = ({ day, courseId, isInstructor, 
     <div 
       className={`p-3 text-center cursor-pointer border rounded-lg transition-all hover:shadow-sm ${
         isSelected 
-          ? 'bg-blue-100 border-blue-300 shadow-md' 
-          : 'bg-white border-gray-200'
+          ? 'bg-blue-100 dark:bg-blue-900/50 border-blue-300 dark:border-blue-700 shadow-md' 
+          : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
       }`}
       onClick={() => day.date && onDateSelect(day.date)}
     >
-      <div className="text-sm font-medium text-gray-900 mb-2">{day.dayNumber}</div>
+      <div className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">{day.dayNumber}</div>
       
       {loading ? (
         <div className="w-2 h-2 bg-gray-400 rounded-full mx-auto animate-pulse"></div>
@@ -259,7 +259,7 @@ const CalendarDay: React.FC<CalendarDayProps> = ({ day, courseId, isInstructor, 
                   <div className="bg-gray-400 w-full" title="Unmarked"></div>
                 )}
               </div>
-              <div className="text-xs text-gray-600">
+              <div className="text-xs text-gray-600 dark:text-gray-400">
                 {breakdown.studentStatus === 'present' && 'Present'}
                 {breakdown.studentStatus === 'absent' && 'Absent'}
                 {breakdown.studentStatus === 'late' && 'Late'}
@@ -311,7 +311,7 @@ const CalendarDay: React.FC<CalendarDayProps> = ({ day, courseId, isInstructor, 
               
               {/* Attendance count */}
               {!breakdown.isStudent && (
-                <div className="text-xs text-gray-600">
+                <div className="text-xs text-gray-600 dark:text-gray-400">
                   {(breakdown as any).present}/{(breakdown as any).total}
                 </div>
               )}
@@ -319,7 +319,7 @@ const CalendarDay: React.FC<CalendarDayProps> = ({ day, courseId, isInstructor, 
           )}
         </div>
       ) : (
-        <div className="w-2 h-2 bg-gray-300 rounded-full mx-auto"></div>
+        <div className="w-2 h-2 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto"></div>
       )}
     </div>
   );
@@ -924,7 +924,7 @@ const Attendance: React.FC = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 dark:border-blue-400"></div>
       </div>
     );
   }
@@ -934,12 +934,12 @@ const Attendance: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <CheckSquare className="h-8 w-8 text-blue-600" />
-          <h1 className="text-2xl font-bold text-gray-900">Attendance</h1>
+          <CheckSquare className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Attendance</h1>
           {user?.role === 'teacher' && !isInstructor && (
             <button
               onClick={assignInstructor}
-              className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium flex items-center gap-2"
+              className="px-4 py-2 bg-orange-600 dark:bg-orange-500 text-white rounded-lg hover:bg-orange-700 dark:hover:bg-orange-600 transition-colors font-medium flex items-center gap-2"
             >
               Assign as Instructor
             </button>
@@ -949,13 +949,13 @@ const Attendance: React.FC = () => {
 
       {/* View Mode Toggle and Export Buttons */}
       <div className="flex items-center justify-between">
-        <div className="flex bg-gray-100 rounded-lg p-1">
+        <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
           <button
             onClick={() => setViewMode('daily')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               viewMode === 'daily' 
-                ? 'bg-white text-blue-600 shadow-sm' 
-                : 'text-gray-600 hover:text-gray-800'
+                ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm' 
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
             }`}
           >
             Daily View
@@ -964,8 +964,8 @@ const Attendance: React.FC = () => {
             onClick={() => setViewMode('calendar')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               viewMode === 'calendar' 
-                ? 'bg-white text-blue-600 shadow-sm' 
-                : 'text-gray-600 hover:text-gray-800'
+                ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm' 
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
             }`}
           >
             Calendar View
@@ -976,14 +976,14 @@ const Attendance: React.FC = () => {
             <>
               <button
                 onClick={exportAttendance}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2"
+                className="px-4 py-2 bg-green-600 dark:bg-green-500 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600 transition-colors font-medium flex items-center gap-2"
               >
                 <Download className="h-4 w-4" />
                 Export Daily CSV
               </button>
               <button
                 onClick={() => setShowExportModal(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2"
+                className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors font-medium flex items-center gap-2"
               >
                 <Settings className="h-4 w-4" />
                 Custom Export
@@ -994,12 +994,12 @@ const Attendance: React.FC = () => {
       </div>
 
       {/* Date Selector and Controls */}
-      <div className="bg-white rounded-lg p-4 shadow-sm border">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border dark:border-gray-700">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
-              <Calendar className="h-5 w-5 text-gray-500" />
-              <label htmlFor="attendance-date" className="text-sm font-medium text-gray-700">
+              <Calendar className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+              <label htmlFor="attendance-date" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Select Date:
               </label>
               <input
@@ -1007,7 +1007,7 @@ const Attendance: React.FC = () => {
                 id="attendance-date"
                 value={selectedDate}
                 onChange={(e) => handleDateChange(e.target.value)}
-                className="border border-gray-300 rounded-md px-3 py-1 text-sm"
+                className="border border-gray-300 dark:border-gray-700 rounded-md px-3 py-1 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
               />
             </div>
           </div>
@@ -1015,19 +1015,19 @@ const Attendance: React.FC = () => {
           {isInstructor && (
             <div className="flex items-center gap-2">
               <div className="relative">
-                <Search className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <Search className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                 <input
                   type="text"
                   placeholder="Search students..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-md text-sm"
+                  className="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 text-sm"
                 />
               </div>
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+                className="border border-gray-300 dark:border-gray-700 rounded-md px-3 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm"
               >
                 <option value="all">All Status</option>
                 {Object.entries(STATUS_CONFIG).map(([status, config]) => (
@@ -1041,16 +1041,16 @@ const Attendance: React.FC = () => {
 
       {/* Bulk Actions */}
       {isInstructor && selectedStudents.size > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-blue-800">
+            <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
               {selectedStudents.size} student(s) selected
             </span>
             <div className="flex items-center gap-2">
               <select
                 value={bulkAction}
                 onChange={(e) => setBulkAction(e.target.value)}
-                className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+                className="border border-gray-300 dark:border-gray-700 rounded-md px-3 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm"
               >
                 <option value="">Select action...</option>
                 {Object.entries(STATUS_CONFIG).map(([status, config]) => (
@@ -1060,7 +1060,7 @@ const Attendance: React.FC = () => {
               <button
                 onClick={handleBulkAction}
                 disabled={!bulkAction}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
               >
                 Apply
               </button>
@@ -1078,33 +1078,33 @@ const Attendance: React.FC = () => {
               {Object.entries(STATUS_CONFIG).map(([status, config]) => {
                 const Icon = config.icon;
                 return (
-                  <div key={status} className="bg-white rounded-lg p-4 shadow-sm border text-center">
+                  <div key={status} className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border dark:border-gray-700 text-center">
                     <div className="flex items-center justify-center mb-2">
                       <Icon className={`h-6 w-6 ${config.color.split(' ')[1]}`} />
                     </div>
-                    <div className="text-2xl font-bold text-gray-900">{statusCounts[status]}</div>
-                    <div className="text-sm text-gray-500">{config.label}</div>
+                    <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{statusCounts[status]}</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">{config.label}</div>
                   </div>
                 );
               })}
               
               {/* Overall Attendance Percentage Card */}
-              <div className="bg-white rounded-lg p-4 shadow-sm border border-green-200 text-center">
+              <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-green-200 dark:border-green-800 text-center">
                 <div className="flex items-center justify-center mb-2">
                   <span className="text-2xl">📊</span>
                 </div>
-                <div className="text-2xl font-bold text-green-600">{attendancePercentage}%</div>
-                <div className="text-sm text-gray-500">Attendance Rate</div>
+                <div className="text-2xl font-bold text-green-600 dark:text-green-400">{attendancePercentage}%</div>
+                <div className="text-sm text-gray-500 dark:text-gray-400">Attendance Rate</div>
               </div>
             </div>
           )}
         </>
       ) : (
         /* Calendar View */
-        <div className="bg-white rounded-lg shadow-sm border">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700">
           <div className="p-6">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900">Monthly Attendance Calendar</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Monthly Attendance Calendar</h3>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => {
@@ -1117,11 +1117,11 @@ const Attendance: React.FC = () => {
                     const prevMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
                     setSelectedDate(prevMonth.toISOString().split('T')[0]);
                   }}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                 >
-                  <ChevronLeft className="h-5 w-5" />
+                  <ChevronLeft className="h-5 w-5 text-gray-900 dark:text-gray-100" />
                 </button>
-                <span className="text-lg font-medium text-gray-900 min-w-[150px] text-center">
+                <span className="text-lg font-medium text-gray-900 dark:text-gray-100 min-w-[150px] text-center">
                   {selectedDate 
                     ? new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
                     : 'Loading...'}
@@ -1137,14 +1137,14 @@ const Attendance: React.FC = () => {
                     const nextMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
                     setSelectedDate(nextMonth.toISOString().split('T')[0]);
                   }}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                 >
-                  <ChevronRight className="h-5 w-5" />
+                  <ChevronRight className="h-5 w-5 text-gray-900 dark:text-gray-100" />
                 </button>
                 {(isInstructor || user?.role === 'admin') && (
                   <button
                     onClick={exportMonthlyAttendance}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2"
+                    className="px-4 py-2 bg-green-600 dark:bg-green-500 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600 transition-colors font-medium flex items-center gap-2"
                   >
                     <Download className="h-4 w-4" />
                     Export CSV
@@ -1157,7 +1157,7 @@ const Attendance: React.FC = () => {
             <div className="grid grid-cols-7 gap-1">
               {/* Day Headers */}
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                <div key={day} className="p-3 text-center text-sm font-medium text-gray-500 bg-gray-50">
+                <div key={day} className="p-3 text-center text-sm font-medium text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900">
                   {day}
                 </div>
               ))}
@@ -1176,37 +1176,37 @@ const Attendance: React.FC = () => {
             </div>
             
             {/* Legend */}
-            <div className="mt-6 pt-4 border-t border-gray-200">
-              <h4 className="text-sm font-medium text-gray-700 mb-3">Attendance Legend</h4>
+            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Attendance Legend</h4>
               <div className="flex flex-wrap gap-4">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                  <CheckCircle className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm text-gray-600">Present</span>
+                  <CheckCircle className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Present</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                  <XCircle className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm text-gray-600">Absent</span>
+                  <XCircle className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Absent</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                  <AlertCircle className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm text-gray-600">Late</span>
+                  <AlertCircle className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Late</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                  <MinusCircle className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm text-gray-600">Excused</span>
+                  <MinusCircle className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Excused</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-gray-400"></div>
-                  <CheckSquare className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm text-gray-600">Unmarked</span>
+                  <CheckSquare className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Unmarked</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-gray-300"></div>
-                  <span className="text-sm text-gray-600">No Data</span>
+                  <div className="w-3 h-3 rounded-full bg-gray-300 dark:bg-gray-600"></div>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">No Data</span>
                 </div>
               </div>
             </div>
@@ -1216,19 +1216,19 @@ const Attendance: React.FC = () => {
 
       {/* Attendance List - Only show in Daily View */}
       {viewMode === 'daily' && (
-        <div className="bg-white rounded-lg shadow-sm border">
-          <div className="px-6 py-4 border-b border-gray-200">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-gray-500" />
-                <h2 className="text-lg font-semibold text-gray-900">
+                <Users className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                   {(isInstructor || user?.role === 'admin') ? 'Student Attendance' : 'My Attendance'}
                 </h2>
               </div>
               {isInstructor && (
                 <button
                   onClick={handleSelectAll}
-                  className="text-sm text-blue-600 hover:text-blue-800"
+                  className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
                 >
                   {selectedStudents.size === attendanceData.length ? 'Deselect All' : 'Select All'}
                 </button>
@@ -1236,7 +1236,7 @@ const Attendance: React.FC = () => {
             </div>
           </div>
           
-          <div className="divide-y divide-gray-200">
+          <div className="divide-y divide-gray-200 dark:divide-gray-700">
             {filteredAttendanceData.map((record) => {
               const statusConfig = STATUS_CONFIG[record.status];
               const StatusIcon = statusConfig.icon;
@@ -1249,20 +1249,20 @@ const Attendance: React.FC = () => {
                         type="checkbox"
                         checked={selectedStudents.has(record.studentId)}
                         onChange={() => handleStudentSelect(record.studentId)}
-                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        className="h-4 w-4 text-blue-600 dark:text-blue-400 border-gray-300 dark:border-gray-700 rounded focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-900"
                       />
                     )}
-                    <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-                      <span className="text-sm font-medium text-gray-600">
+                    <div className="w-8 h-8 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
+                      <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
                         {record.studentName.split(' ').map((n: string) => n[0]).join('')}
                       </span>
                     </div>
                     <div>
-                      <p className="font-medium text-gray-900">{record.studentName}</p>
-                      <p className="text-sm text-gray-500">{record.email}</p>
+                      <p className="font-medium text-gray-900 dark:text-gray-100">{record.studentName}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{record.email}</p>
                       <div className="flex items-center gap-2">
-                        <p className="text-xs text-gray-400">Current: {record.status}</p>
-                        <span className="text-xs text-blue-600 font-medium">
+                        <p className="text-xs text-gray-400 dark:text-gray-500">Current: {record.status}</p>
+                        <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
                           {getStudentAttendancePercentage(record.studentId)}% overall
                         </span>
                       </div>
@@ -1280,7 +1280,7 @@ const Attendance: React.FC = () => {
                             className={`p-2 rounded-lg border transition-colors ${
                               record.status === status 
                                 ? config.color 
-                                : 'bg-white border-gray-200 hover:bg-gray-50'
+                                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
                             }`}
                             title={config.label}
                           >
@@ -1310,12 +1310,12 @@ const Attendance: React.FC = () => {
       {/* Settings Modal */}
       {showSettings && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Attendance Settings</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Attendance Settings</h3>
               <button
                 onClick={() => setShowSettings(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
               >
                 <XCircle className="h-6 w-6" />
               </button>
@@ -1323,52 +1323,52 @@ const Attendance: React.FC = () => {
             
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">Auto-mark absent after threshold</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Auto-mark absent after threshold</label>
                 <input
                   type="checkbox"
                   checked={attendanceSettings.autoMarkAbsent}
                   onChange={(e) => setAttendanceSettings(prev => ({ ...prev, autoMarkAbsent: e.target.checked }))}
-                  className="rounded"
+                  className="rounded border-gray-300 dark:border-gray-700 text-blue-600 dark:text-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-900"
                 />
               </div>
               
               <div>
-                <label className="text-sm font-medium">Late threshold (minutes)</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Late threshold (minutes)</label>
                 <input
                   type="number"
                   value={attendanceSettings.lateThreshold}
                   onChange={(e) => setAttendanceSettings(prev => ({ ...prev, lateThreshold: parseInt(e.target.value) }))}
-                  className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2"
+                  className="mt-1 w-full border border-gray-300 dark:border-gray-700 rounded-md px-3 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                 />
               </div>
               
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">Allow excused absences</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Allow excused absences</label>
                 <input
                   type="checkbox"
                   checked={attendanceSettings.allowExcused}
                   onChange={(e) => setAttendanceSettings(prev => ({ ...prev, allowExcused: e.target.checked }))}
-                  className="rounded"
+                  className="rounded border-gray-300 dark:border-gray-700 text-blue-600 dark:text-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-900"
                 />
               </div>
               
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">Require reason for excused</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Require reason for excused</label>
                 <input
                   type="checkbox"
                   checked={attendanceSettings.requireReason}
                   onChange={(e) => setAttendanceSettings(prev => ({ ...prev, requireReason: e.target.checked }))}
-                  className="rounded"
+                  className="rounded border-gray-300 dark:border-gray-700 text-blue-600 dark:text-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-900"
                 />
               </div>
               
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">Integrate with grades</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Integrate with grades</label>
                 <input
                   type="checkbox"
                   checked={attendanceSettings.gradeIntegration}
                   onChange={(e) => setAttendanceSettings(prev => ({ ...prev, gradeIntegration: e.target.checked }))}
-                  className="rounded"
+                  className="rounded border-gray-300 dark:border-gray-700 text-blue-600 dark:text-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-900"
                 />
               </div>
             </div>
@@ -1376,13 +1376,13 @@ const Attendance: React.FC = () => {
             <div className="flex justify-end gap-2 mt-6">
               <button
                 onClick={() => setShowSettings(false)}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
               >
                 Cancel
               </button>
               <button
                 onClick={() => setShowSettings(false)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-md hover:bg-blue-700 dark:hover:bg-blue-600"
               >
                 Save Settings
               </button>
@@ -1394,12 +1394,12 @@ const Attendance: React.FC = () => {
       {/* Custom Export Modal */}
       {showExportModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-lg">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-lg">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Custom Export</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Custom Export</h3>
               <button
                 onClick={() => setShowExportModal(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
               >
                 <XCircle className="h-6 w-6" />
               </button>
@@ -1408,24 +1408,24 @@ const Attendance: React.FC = () => {
             <div className="space-y-4">
               {/* Date Range Selection */}
               <div>
-                <label className="text-sm font-medium text-gray-700">Date Range</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Date Range</label>
                 <div className="flex gap-2 mt-1">
                   <div>
-                    <label className="text-xs text-gray-500">Start Date</label>
+                    <label className="text-xs text-gray-500 dark:text-gray-400">Start Date</label>
                     <input
                       type="date"
                       value={exportDateRange.startDate}
                       onChange={(e) => setExportDateRange(prev => ({ ...prev, startDate: e.target.value }))}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                      className="w-full border border-gray-300 dark:border-gray-700 rounded-md px-3 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm"
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500">End Date</label>
+                    <label className="text-xs text-gray-500 dark:text-gray-400">End Date</label>
                     <input
                       type="date"
                       value={exportDateRange.endDate}
                       onChange={(e) => setExportDateRange(prev => ({ ...prev, endDate: e.target.value }))}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                      className="w-full border border-gray-300 dark:border-gray-700 rounded-md px-3 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm"
                     />
                   </div>
                 </div>
@@ -1433,7 +1433,7 @@ const Attendance: React.FC = () => {
 
               {/* Student Selection */}
               <div>
-                <label className="text-sm font-medium text-gray-700">Students</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Students</label>
                 <div className="mt-2 space-y-2 max-h-40 overflow-y-auto">
                   {attendanceData.map((record) => (
                     <div key={record.studentId} className="flex items-center">
@@ -1450,15 +1450,15 @@ const Attendance: React.FC = () => {
                           }
                           setSelectedStudentsForExport(newSelected);
                         }}
-                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        className="h-4 w-4 text-blue-600 dark:text-blue-400 border-gray-300 dark:border-gray-700 rounded focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-900"
                       />
-                      <label htmlFor={`student-${record.studentId}`} className="ml-2 text-sm text-gray-700">
+                      <label htmlFor={`student-${record.studentId}`} className="ml-2 text-sm text-gray-700 dark:text-gray-300">
                         {record.studentName} ({record.email})
                       </label>
                     </div>
                   ))}
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   Leave all unchecked to export all students
                 </p>
               </div>
@@ -1467,14 +1467,14 @@ const Attendance: React.FC = () => {
             <div className="flex justify-end gap-2 mt-6">
               <button
                 onClick={() => setShowExportModal(false)}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
               >
                 Cancel
               </button>
               <button
                 onClick={exportCustomAttendance}
                 disabled={loading}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-green-600 dark:bg-green-500 text-white rounded-md hover:bg-green-700 dark:hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Exporting...' : 'Export CSV'}
               </button>
