@@ -92,8 +92,8 @@ const GroupPeople: React.FC<GroupPeopleProps> = ({ groupId, groupSetId }) => {
       });
   };
 
-  if (loading) return <div>Loading group members...</div>;
-  if (error) return <div className="text-red-500">{error}</div>;
+  if (loading) return <div className="text-gray-500 dark:text-gray-400">Loading group members...</div>;
+  if (error) return <div className="text-red-500 dark:text-red-400">{error}</div>;
 
   return (
     <div className="space-y-4">
@@ -103,16 +103,16 @@ const GroupPeople: React.FC<GroupPeopleProps> = ({ groupId, groupSetId }) => {
           type="text"
           id="group-search-students"
           name="search"
-          className="w-full border rounded px-4 py-2 mb-2"
+          className="w-full border border-gray-300 dark:border-gray-700 rounded px-4 py-2 mb-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
           placeholder="Search students by name or email"
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
-        {searchLoading && <div className="text-gray-500">Searching...</div>}
+        {searchLoading && <div className="text-gray-500 dark:text-gray-400">Searching...</div>}
         {search && searchResults.length > 0 && (
-          <div className="bg-white border rounded shadow p-2 mt-1">
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow p-2 mt-1">
             {searchResults.map(student => (
-              <div key={student._id} className="flex justify-between items-center py-2 px-2 hover:bg-gray-50 rounded">
+              <div key={student._id} className="flex justify-between items-center py-2 px-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded">
                 <div className="flex items-center space-x-3">
                   <div className="relative">
                     {student.profilePicture ? (
@@ -121,7 +121,7 @@ const GroupPeople: React.FC<GroupPeopleProps> = ({ groupId, groupSetId }) => {
                           ? student.profilePicture
                           : getImageUrl(student.profilePicture)}
                         alt={`${student.firstName} ${student.lastName}`}
-                        className="w-8 h-8 rounded-full object-cover border-2 border-gray-200"
+                        className="w-8 h-8 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
                         onError={(e) => {
                           // Hide the failed image and show fallback
                           e.currentTarget.style.display = 'none';
@@ -141,12 +141,12 @@ const GroupPeople: React.FC<GroupPeopleProps> = ({ groupId, groupSetId }) => {
                     </div>
                   </div>
                   <div>
-                    <span className="font-medium">{student.firstName} {student.lastName}</span>
-                    <span className="text-gray-500 ml-2">{student.email}</span>
+                    <span className="font-medium text-gray-900 dark:text-gray-100">{student.firstName} {student.lastName}</span>
+                    <span className="text-gray-500 dark:text-gray-400 ml-2">{student.email}</span>
                   </div>
                 </div>
                 <button
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded"
+                  className="bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600 text-white px-3 py-1 rounded"
                   onClick={() => handleAdd(student._id)}
                   disabled={adding === student._id}
                 >
@@ -157,17 +157,17 @@ const GroupPeople: React.FC<GroupPeopleProps> = ({ groupId, groupSetId }) => {
           </div>
         )}
         {search && !searchLoading && searchResults.length === 0 && (
-          <div className="text-gray-500 p-2">No students found.</div>
+          <div className="text-gray-500 dark:text-gray-400 p-2">No students found.</div>
         )}
       </div>
       {/* Members list */}
       {members.length === 0 ? (
-        <div>No members in this group.</div>
+        <div className="text-gray-500 dark:text-gray-400">No members in this group.</div>
       ) : (
         members.map((member) => (
           <div
             key={member._id}
-            className="bg-white rounded shadow p-4 flex flex-col md:flex-row md:items-center md:justify-between"
+            className="bg-white dark:bg-gray-800 rounded shadow p-4 flex flex-col md:flex-row md:items-center md:justify-between border dark:border-gray-700"
           >
             <div className="flex items-center space-x-3">
               <div className="relative">
@@ -177,7 +177,7 @@ const GroupPeople: React.FC<GroupPeopleProps> = ({ groupId, groupSetId }) => {
                       ? member.profilePicture
                       : getImageUrl(member.profilePicture)}
                     alt={`${member.firstName} ${member.lastName}`}
-                    className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
+                    className="w-10 h-10 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
                     onError={(e) => {
                       // Hide the failed image and show fallback
                       e.currentTarget.style.display = 'none';
@@ -197,14 +197,14 @@ const GroupPeople: React.FC<GroupPeopleProps> = ({ groupId, groupSetId }) => {
                 </div>
               </div>
               <div>
-                <div className="font-semibold text-lg">
+                <div className="font-semibold text-lg text-gray-900 dark:text-gray-100">
                   {member.firstName} {member.lastName}
                 </div>
-                <div className="text-gray-500">{member.email}</div>
+                <div className="text-gray-500 dark:text-gray-400">{member.email}</div>
               </div>
             </div>
             <button
-              className="mt-2 md:mt-0 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded"
+              className="mt-2 md:mt-0 bg-red-600 dark:bg-red-500 hover:bg-red-700 dark:hover:bg-red-600 text-white px-4 py-2 rounded"
               onClick={() => handleRemove(member._id)}
               disabled={removing === member._id}
             >

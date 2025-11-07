@@ -187,14 +187,14 @@ const GroupDiscussion: React.FC = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 dark:border-blue-400"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="text-red-500 text-center p-4">
+      <div className="text-red-500 dark:text-red-400 text-center p-4">
         {error}
       </div>
     );
@@ -202,16 +202,16 @@ const GroupDiscussion: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border dark:border-gray-700">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-gray-800">Group Discussions</h2>
-            <p className="text-gray-600 mt-1">Group-specific discussion threads and conversations</p>
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Group Discussions</h2>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">Group-specific discussion threads and conversations</p>
           </div>
           {isTeacher && (
             <button
               onClick={handleCreateThread}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2"
+              className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors flex items-center gap-2"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -222,12 +222,12 @@ const GroupDiscussion: React.FC = () => {
         </div>
 
         {threads.length === 0 ? (
-          <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
-            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="text-center py-12 bg-gray-50 dark:bg-gray-700/50 rounded-lg border-2 border-dashed border-gray-200 dark:border-gray-600">
+            <svg className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No group discussion threads</h3>
-            <p className="mt-1 text-sm text-gray-500">
+            <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">No group discussion threads</h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               {isTeacher 
                 ? "Get started by creating a new discussion thread for this group."
                 : "There are no discussion threads yet for this group. Teachers will create threads here."}
@@ -236,7 +236,7 @@ const GroupDiscussion: React.FC = () => {
               <div className="mt-6">
                 <button
                   onClick={handleCreateThread}
-                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 >
                   <svg className="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -251,7 +251,7 @@ const GroupDiscussion: React.FC = () => {
             {/* Pinned threads */}
             {threads.filter(thread => thread.isPinned).length > 0 && (
               <div className="mb-6">
-                <h3 className="text-sm font-medium text-gray-500 mb-3">Pinned Threads</h3>
+                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">Pinned Threads</h3>
                 <div className="space-y-4">
                   {threads
                     .filter(thread => thread.isPinned)
@@ -259,24 +259,24 @@ const GroupDiscussion: React.FC = () => {
                       <div
                         key={thread._id}
                         onClick={() => handleThreadClick(thread._id)}
-                        className="p-4 bg-white border border-yellow-200 rounded-lg hover:shadow-md transition-shadow cursor-pointer relative"
+                        className="p-4 bg-white dark:bg-gray-900 border border-yellow-200 dark:border-yellow-800 rounded-lg hover:shadow-md transition-shadow cursor-pointer relative"
                       >
-                        <div className="absolute top-2 right-2 text-yellow-500">
+                        <div className="absolute top-2 right-2 text-yellow-500 dark:text-yellow-400">
                           <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                             <path d="M10 2a1 1 0 011 1v1.323l3.954 1.582 1.599-.8a1 1 0 01.894 1.79l-1.233.616 1.738 5.42a1 1 0 01-.285 1.05A3.989 3.989 0 0115 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.715-5.349L11 4.477V16h2a1 1 0 110 2H7a1 1 0 110-2h2V4.477L6.237 7.582l1.715 5.349a1 1 0 01-.285 1.05A3.989 3.989 0 015 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.738-5.42-1.233-.616a1 1 0 01.894-1.79l1.599.8L9 4.323V3a1 1 0 011-1z" />
                           </svg>
                         </div>
                         <div className="flex justify-between items-start">
                           <div className="flex-1">
-                            <h3 className="text-lg font-semibold text-gray-800 mb-1">
+                            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-1">
                               {thread.title}
                               {thread.isGraded && (
-                                <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+                                <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300 rounded-full">
                                   Graded ({thread.totalPoints} points)
                                 </span>
                               )}
                             </h3>
-                            <div className="flex items-center text-sm text-gray-600 space-x-4">
+                            <div className="flex items-center text-sm text-gray-600 dark:text-gray-400 space-x-4">
                               <div className="flex items-center space-x-2">
                                 <div className="relative">
                                   {thread.author.profilePicture || thread.author.avatarUrl ? (
@@ -293,7 +293,7 @@ const GroupDiscussion: React.FC = () => {
                                           : '/default-avatar.png'
                                       }
                                       alt={`${thread.author.firstName} ${thread.author.lastName}`}
-                                      className="w-8 h-8 rounded-full object-cover border-2 border-gray-200"
+                                      className="w-8 h-8 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
                                       onError={(e) => {
                                         e.currentTarget.style.display = 'none';
                                         const fallback = e.currentTarget.nextElementSibling as HTMLElement;
@@ -318,19 +318,19 @@ const GroupDiscussion: React.FC = () => {
                                 </div>
                                 <span>
                                   Posted by {thread.author.firstName} {thread.author.lastName}
-                                  <span className="ml-1 px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                                  <span className="ml-1 px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 rounded-full">
                                     {thread.author.role}
                                   </span>
                                 </span>
                               </div>
-                              <span>•</span>
+                              <span className="text-gray-400 dark:text-gray-500">•</span>
                               <span title={new Date(thread.createdAt).toLocaleString()}>
                                 {formatDistanceToNow(new Date(thread.createdAt), { addSuffix: true })}
                               </span>
                               {thread.dueDate && (
                                 <>
-                                  <span>•</span>
-                                  <span className="text-orange-600">
+                                  <span className="text-gray-400 dark:text-gray-500">•</span>
+                                  <span className="text-orange-600 dark:text-orange-400">
                                     Due {formatDistanceToNow(new Date(thread.dueDate), { addSuffix: true })}
                                   </span>
                                 </>
@@ -338,13 +338,13 @@ const GroupDiscussion: React.FC = () => {
                             </div>
                           </div>
                           <div className="flex items-center space-x-4">
-                            <div className="flex items-center">
+                            <div className="flex items-center text-gray-600 dark:text-gray-400">
                               <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                               </svg>
                               {thread.replyCount} {thread.replyCount === 1 ? 'reply' : 'replies'}
                             </div>
-                            <div className="text-gray-500" title={new Date(thread.lastActivity).toLocaleString()}>
+                            <div className="text-gray-500 dark:text-gray-400" title={new Date(thread.lastActivity).toLocaleString()}>
                               Last activity {formatDistanceToNow(new Date(thread.lastActivity), { addSuffix: true })}
                             </div>
                           </div>
@@ -358,7 +358,7 @@ const GroupDiscussion: React.FC = () => {
             {/* Regular threads */}
             {threads.filter(thread => !thread.isPinned).length > 0 && (
               <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-3">All Threads</h3>
+                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">All Threads</h3>
                 <div className="space-y-4">
                   {threads
                     .filter(thread => !thread.isPinned)
@@ -366,19 +366,19 @@ const GroupDiscussion: React.FC = () => {
                       <div
                         key={thread._id}
                         onClick={() => handleThreadClick(thread._id)}
-                        className="p-4 bg-white border border-gray-200 rounded-lg hover:shadow-md transition-shadow cursor-pointer"
+                        className="p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-md transition-shadow cursor-pointer"
                       >
                         <div className="flex justify-between items-start">
                           <div className="flex-1">
-                            <h3 className="text-lg font-semibold text-gray-800 mb-1">
+                            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-1">
                               {thread.title}
                               {thread.isGraded && (
-                                <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+                                <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300 rounded-full">
                                   Graded ({thread.totalPoints} points)
                                 </span>
                               )}
                             </h3>
-                            <div className="flex items-center text-sm text-gray-600 space-x-4">
+                            <div className="flex items-center text-sm text-gray-600 dark:text-gray-400 space-x-4">
                               <div className="flex items-center space-x-2">
                                 <div className="relative">
                                   {thread.author.profilePicture || thread.author.avatarUrl ? (
@@ -395,7 +395,7 @@ const GroupDiscussion: React.FC = () => {
                                           : '/default-avatar.png'
                                       }
                                       alt={`${thread.author.firstName} ${thread.author.lastName}`}
-                                      className="w-8 h-8 rounded-full object-cover border-2 border-gray-200"
+                                      className="w-8 h-8 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
                                       onError={(e) => {
                                         e.currentTarget.style.display = 'none';
                                         const fallback = e.currentTarget.nextElementSibling as HTMLElement;
@@ -420,19 +420,19 @@ const GroupDiscussion: React.FC = () => {
                                 </div>
                                 <span>
                                   Posted by {thread.author.firstName} {thread.author.lastName}
-                                  <span className="ml-1 px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                                  <span className="ml-1 px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 rounded-full">
                                     {thread.author.role}
                                   </span>
                                 </span>
                               </div>
-                              <span>•</span>
+                              <span className="text-gray-400 dark:text-gray-500">•</span>
                               <span title={new Date(thread.createdAt).toLocaleString()}>
                                 {formatDistanceToNow(new Date(thread.createdAt), { addSuffix: true })}
                               </span>
                               {thread.dueDate && (
                                 <>
-                                  <span>•</span>
-                                  <span className="text-orange-600">
+                                  <span className="text-gray-400 dark:text-gray-500">•</span>
+                                  <span className="text-orange-600 dark:text-orange-400">
                                     Due {formatDistanceToNow(new Date(thread.dueDate), { addSuffix: true })}
                                   </span>
                                 </>
@@ -440,13 +440,13 @@ const GroupDiscussion: React.FC = () => {
                             </div>
                           </div>
                           <div className="flex items-center space-x-4">
-                            <div className="flex items-center">
+                            <div className="flex items-center text-gray-600 dark:text-gray-400">
                               <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                               </svg>
                               {thread.replyCount} {thread.replyCount === 1 ? 'reply' : 'replies'}
                             </div>
-                            <div className="text-gray-500" title={new Date(thread.lastActivity).toLocaleString()}>
+                            <div className="text-gray-500 dark:text-gray-400" title={new Date(thread.lastActivity).toLocaleString()}>
                               Last activity {formatDistanceToNow(new Date(thread.lastActivity), { addSuffix: true })}
                             </div>
                           </div>
