@@ -259,9 +259,23 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
   const pupilRadius = 8;
   const eyeSpacing = 60;
 
-  // Calculate pupil position
-  const pupilX = eyePosition.x * (eyeRadius - pupilRadius - 2);
-  const pupilY = eyePosition.y * (eyeRadius - pupilRadius - 2);
+  // Calculate pupil position - ensure it follows eyePosition state
+  // For password peek, keep pupil centered when eye is closed
+  const getPupilPosition = () => {
+    if (isPasswordFocused && !peekAnimation.isPeeking) {
+      // Eyes are closed, keep pupil centered
+      return { x: 0, y: 0 };
+    }
+    // Normal movement - follow eyePosition
+    return {
+      x: eyePosition.x * (eyeRadius - pupilRadius - 2),
+      y: eyePosition.y * (eyeRadius - pupilRadius - 2)
+    };
+  };
+  
+  const pupilPos = getPupilPosition();
+  const pupilX = pupilPos.x;
+  const pupilY = pupilPos.y;
 
   // Eye close animation - smooth transition
   // For password: fully closed unless peeking
@@ -306,7 +320,8 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
             strokeWidth="2.5"
             className="text-gray-800 dark:text-gray-200 transition-all duration-300 ease-in-out"
           />
-           {(!isPasswordFocused || (peekAnimation.isPeeking && peekAnimation.eye === 'left' && peekAnimation.progress > 0.3)) && (
+           {/* Show pupil only when eye is open enough */}
+           {(!isPasswordFocused || (peekAnimation.isPeeking && peekAnimation.eye === 'left' && peekAnimation.progress > 0.4)) && (
              <circle
                cx={pupilX}
                cy={pupilY}
@@ -315,7 +330,7 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
                className="text-gray-800 dark:text-gray-200 transition-all duration-300 ease-out"
                style={{ 
                  opacity: isPasswordFocused && peekAnimation.isPeeking && peekAnimation.eye === 'left' 
-                   ? Math.max(0, (peekAnimation.progress - 0.3) / 0.2) 
+                   ? Math.max(0, (peekAnimation.progress - 0.4) / 0.1) 
                    : 1 
                }}
              />
@@ -332,30 +347,30 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
               style={{ animationDuration: '150ms' }}
             />
           )}
-           {/* Magnifying glass for peek - bigger and positioned above eye */}
-           {peekAnimation.isPeeking && peekAnimation.eye === 'left' && peekAnimation.progress > 0.3 && (
+           {/* Magnifying glass for peek - bigger and positioned directly above left eye */}
+           {peekAnimation.isPeeking && peekAnimation.eye === 'left' && peekAnimation.progress > 0.4 && (
              <g 
                className="transition-opacity duration-200"
                style={{ 
-                 opacity: Math.max(0, (peekAnimation.progress - 0.3) / 0.2)
+                 opacity: Math.max(0, (peekAnimation.progress - 0.4) / 0.1)
                }}
              >
-               {/* Magnifying glass handle - longer */}
+               {/* Magnifying glass handle - positioned above eye */}
                <line
-                 x1={eyeRadius * 0.5}
-                 y1={-eyeRadius * 0.8}
-                 x2={eyeRadius * 1.8}
-                 y2={-eyeRadius * 1.8}
+                 x1={0}
+                 y1={-eyeRadius * 1.2}
+                 x2={eyeRadius * 1.2}
+                 y2={-eyeRadius * 2.2}
                  stroke="currentColor"
                  strokeWidth="3"
                  strokeLinecap="round"
                  className="text-gray-600 dark:text-gray-400"
                />
-               {/* Magnifying glass circle - bigger */}
+               {/* Magnifying glass circle - bigger, centered above eye */}
                <circle
-                 cx={eyeRadius * 1.5}
-                 cy={-eyeRadius * 1.5}
-                 r={eyeRadius * 0.7}
+                 cx={eyeRadius * 0.9}
+                 cy={-eyeRadius * 2.0}
+                 r={eyeRadius * 0.8}
                  fill="none"
                  stroke="currentColor"
                  strokeWidth="3"
@@ -363,9 +378,9 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
                />
                {/* Inner circle for glass effect */}
                <circle
-                 cx={eyeRadius * 1.5}
-                 cy={-eyeRadius * 1.5}
-                 r={eyeRadius * 0.5}
+                 cx={eyeRadius * 0.9}
+                 cy={-eyeRadius * 2.0}
+                 r={eyeRadius * 0.6}
                  fill="none"
                  stroke="currentColor"
                  strokeWidth="1.5"
