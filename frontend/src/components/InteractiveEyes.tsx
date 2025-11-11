@@ -65,17 +65,22 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
     const updateEyePosition = () => {
       // Get cursor position in input
       const cursorPosition = usernameInput.selectionStart || 0;
-      const textLength = usernameInput.value.length || 1;
+      const textLength = usernameInput.value.length;
       
       // Calculate relative position (0 to 1) based on cursor position
-      // If no text, cursor is at start (0), if text exists, use cursor position
       let relativePosition = 0.5; // Default to center
-      if (textLength > 0) {
-        // Normalize cursor position to 0-1 range
-        relativePosition = Math.max(0, Math.min(1, cursorPosition / Math.max(1, textLength)));
-      } else if (cursorPosition > 0) {
-        // If cursor is at position but no text, it's at the start
+      
+      if (textLength === 0) {
+        // No text - cursor at start
         relativePosition = 0;
+      } else if (textLength === 1) {
+        // Single character - cursor can be at 0 (before) or 1 (after)
+        relativePosition = cursorPosition === 0 ? 0 : 1;
+      } else {
+        // Multiple characters - normalize cursor position
+        // cursorPosition can be 0 to textLength (inclusive)
+        // Map to 0-1 range where 0 = start, 1 = end
+        relativePosition = cursorPosition / textLength;
       }
       
       // Map to eye position (-0.35 to 0.35) for horizontal movement
@@ -120,16 +125,22 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
     const updateEyePosition = () => {
       // Get cursor position in input
       const cursorPosition = passwordInput.selectionStart || 0;
-      const textLength = passwordInput.value.length || 1;
+      const textLength = passwordInput.value.length;
       
-      // Calculate relative position (0 to 1)
+      // Calculate relative position (0 to 1) based on cursor position
       let relativePosition = 0.5; // Default to center
-      if (textLength > 0) {
-        // Normalize cursor position to 0-1 range
-        relativePosition = Math.max(0, Math.min(1, cursorPosition / Math.max(1, textLength)));
-      } else if (cursorPosition > 0) {
-        // If cursor is at position but no text, it's at the start
+      
+      if (textLength === 0) {
+        // No text - cursor at start
         relativePosition = 0;
+      } else if (textLength === 1) {
+        // Single character - cursor can be at 0 (before) or 1 (after)
+        relativePosition = cursorPosition === 0 ? 0 : 1;
+      } else {
+        // Multiple characters - normalize cursor position
+        // cursorPosition can be 0 to textLength (inclusive)
+        // Map to 0-1 range where 0 = start, 1 = end
+        relativePosition = cursorPosition / textLength;
       }
       
       // Map to eye position (-0.35 to 0.35) for horizontal movement
@@ -223,10 +234,15 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
           ? 2 * progress * progress
           : 1 - Math.pow(-2 * progress + 2, 2) / 2;
         
+        // Progress goes from 0 to 1, where 1 = fully open
+        // We want eye to open halfway, so multiply by 0.5
+        // But we'll use the full easedProgress (0-1) for better control
+        const eyeOpenProgress = easedProgress * 0.5; // 0 to 0.5 (halfway open)
+        
         setPeekAnimation({
           isPeeking: true,
           eye,
-          progress: easedProgress * 0.5, // Halfway open (0.5)
+          progress: easedProgress, // Store full progress (0-1) for timing checks
         });
 
         if (progress < 1 && isActive && isPasswordFocusedRef.current) {
@@ -284,7 +300,10 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
     if (isPasswordFocused) {
       if (peekAnimation.isPeeking && peekAnimation.eye === (isLeft ? 'left' : 'right')) {
         // Peeking eye opens halfway
-        return eyeRadius * 2 * (1 - peekAnimation.progress);
+        // progress is 0-1, we want eye to open to 50% height
+        // So: closed (0.05) to halfway open (0.5) = 0.05 + (0.5 - 0.05) * progress
+        const eyeOpenAmount = 0.05 + (0.5 - 0.05) * peekAnimation.progress;
+        return eyeRadius * 2 * eyeOpenAmount;
       }
       // Both eyes closed
       return eyeRadius * 2 * 0.05; // Almost closed
@@ -320,8 +339,8 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
             strokeWidth="2.5"
             className="text-gray-800 dark:text-gray-200 transition-all duration-300 ease-in-out"
           />
-           {/* Show pupil only when eye is open enough - for password peek, wait until 50% open */}
-           {(!isPasswordFocused || (peekAnimation.isPeeking && peekAnimation.eye === 'left' && peekAnimation.progress > 0.5)) && (
+           {/* Show pupil - for password peek, wait until eye is 30% open (progress > 0.3) */}
+           {(!isPasswordFocused || (peekAnimation.isPeeking && peekAnimation.eye === 'left' && peekAnimation.progress > 0.3)) && (
              <circle
                cx={pupilX}
                cy={pupilY}
@@ -330,7 +349,7 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
                className="text-gray-800 dark:text-gray-200 transition-all duration-300 ease-out"
                style={{ 
                  opacity: isPasswordFocused && peekAnimation.isPeeking && peekAnimation.eye === 'left' 
-                   ? Math.max(0, (peekAnimation.progress - 0.5) / 0.5) 
+                   ? Math.max(0, Math.min(1, (peekAnimation.progress - 0.3) / 0.2)) 
                    : 1 
                }}
              />
@@ -348,11 +367,11 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
             />
           )}
            {/* Magnifying glass for peek - bigger and positioned directly above left eye center */}
-           {peekAnimation.isPeeking && peekAnimation.eye === 'left' && peekAnimation.progress > 0.5 && (
+           {peekAnimation.isPeeking && peekAnimation.eye === 'left' && peekAnimation.progress > 0.4 && (
              <g 
                className="transition-opacity duration-200"
                style={{ 
-                 opacity: Math.max(0, (peekAnimation.progress - 0.5) / 0.5)
+                 opacity: Math.max(0, Math.min(1, (peekAnimation.progress - 0.4) / 0.3))
                }}
              >
                {/* Magnifying glass handle - starts from eye center, goes up and right */}
