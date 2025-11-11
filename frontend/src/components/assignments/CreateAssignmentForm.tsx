@@ -411,6 +411,11 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
       setError('Please select a group set for the group assignment');
       return;
     }
+    // For offline assignments, totalPoints is required
+    if (formData.isOfflineAssignment && (!formData.totalPoints || formData.totalPoints <= 0)) {
+      setError('Total points is required for offline assignments');
+      return;
+    }
 
     try {
       const formDataToSend = new FormData();
@@ -926,17 +931,102 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
         {/* Step 3: Questions & Files */}
         {currentStep === 3 && (
           <div className="space-y-6">
-            {/* Total Points Display */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Total Points</label>
-              <div className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 shadow-sm p-2">
-                {Number.isFinite(formData.totalPoints) ? formData.totalPoints : 0}
+            {/* For offline assignments, show simplified interface */}
+            {formData.isOfflineAssignment ? (
+              <div className="space-y-6">
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <div className="flex items-start">
+                    <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div>
+                      <h4 className="text-sm font-medium text-blue-900 dark:text-blue-200">Offline Assignment</h4>
+                      <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">
+                        Since this is a paper-based assignment, you only need to specify the total points. Students will complete the assignment on paper, and you can enter grades manually in the gradebook.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Total Points Input for Offline Assignments */}
+                <div>
+                  <label htmlFor="totalPoints" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Total Points <span className="text-red-500">*</span>
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      type="number"
+                      id="totalPoints"
+                      name="totalPoints"
+                      min="0"
+                      step="0.01"
+                      value={formData.totalPoints || ''}
+                      onChange={(e) => {
+                        const value = parseFloat(e.target.value) || 0;
+                        setFormData({ ...formData, totalPoints: value });
+                      }}
+                      className="block w-full rounded-md border-gray-300 dark:border-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      placeholder="Enter total points (e.g., 100)"
+                      required
+                    />
+                  </div>
+                  <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                    Enter the maximum points possible for this paper-based assignment or test.
+                  </p>
+                </div>
+
+                {/* Attachments Section - Still available for offline assignments */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Attachments (Optional)</label>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                    You can attach the question paper or any related documents here.
+                  </p>
+                  <input
+                    type="file"
+                    id="attachments"
+                    name="attachments"
+                    multiple
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      setFormData({ ...formData, attachments: [...formData.attachments, ...files] });
+                    }}
+                    className="block w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 dark:file:bg-indigo-900/50 file:text-indigo-700 dark:file:text-indigo-300 hover:file:bg-indigo-100 dark:hover:file:bg-indigo-900/70"
+                  />
+                  {formData.attachments.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {formData.attachments.map((file, index) => (
+                        <div key={index} className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
+                          <span>{file.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newAttachments = [...formData.attachments];
+                              newAttachments.splice(index, 1);
+                              setFormData({ ...formData, attachments: newAttachments });
+                            }}
+                            className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Questions</h3>
-                <div className="space-x-2">
+            ) : (
+              <>
+                {/* Total Points Display for regular assignments */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Total Points</label>
+                  <div className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 shadow-sm p-2">
+                    {Number.isFinite(formData.totalPoints) ? formData.totalPoints : 0}
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Questions</h3>
+                    <div className="space-x-2">
                   <button
                     type="button"
                     onClick={() => addQuestion('text')}
@@ -1210,6 +1300,10 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                 className="mt-1 block w-full"
               />
             </div>
+              </>
+            )}
+            
+            {/* Navigation buttons for both offline and regular assignments */}
             <div className="flex justify-between">
               <button
                 type="button"
