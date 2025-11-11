@@ -176,9 +176,10 @@ export function Login() {
             </button>
           </div>
         </form>
+        </div>
         
         {/* Mobile Lottie Animation */}
-        <div className="md:hidden flex items-center justify-center mt-8">
+        <div className="md:hidden flex items-center justify-center mt-8 col-span-2">
           <div className="w-full max-w-xs">
             <LottieLoginAnimation 
               animationState={animationState}
