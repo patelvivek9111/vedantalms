@@ -56,6 +56,7 @@ interface FormData {
   quizTimeLimit: number; // in minutes
   showCorrectAnswers: boolean; // Show correct answers to students after submission
   showStudentAnswers: boolean; // Show student answers after submission
+  isOfflineAssignment: boolean; // Offline/paper-based assignment (manual grade entry)
 }
 
 interface GroupSet {
@@ -87,7 +88,8 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
     isTimedQuiz: false,
     quizTimeLimit: 60,
     showCorrectAnswers: false,
-    showStudentAnswers: false
+    showStudentAnswers: false,
+    isOfflineAssignment: false
   });
   const [preview, setPreview] = useState(false);
   const [error, setError] = useState('');
@@ -242,7 +244,8 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
         isTimedQuiz: Boolean(assignmentData.isTimedQuiz),
         quizTimeLimit: assignmentData.quizTimeLimit || 60,
         showCorrectAnswers: Boolean(assignmentData.showCorrectAnswers),
-        showStudentAnswers: Boolean(assignmentData.showStudentAnswers)
+        showStudentAnswers: Boolean(assignmentData.showStudentAnswers),
+        isOfflineAssignment: Boolean(assignmentData.isOfflineAssignment)
       };
       
       setFormData(formDataToSet);
@@ -426,6 +429,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
       formDataToSend.append('quizTimeLimit', formData.quizTimeLimit.toString());
       formDataToSend.append('showCorrectAnswers', formData.showCorrectAnswers.toString());
       formDataToSend.append('showStudentAnswers', formData.showStudentAnswers.toString());
+      formDataToSend.append('isOfflineAssignment', formData.isOfflineAssignment.toString());
       if (formData.isGroupAssignment && formData.groupSetId) {
         formDataToSend.append('groupSet', formData.groupSetId);
       }
@@ -654,6 +658,20 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                 />
                 <label htmlFor="isGradedQuiz" className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
                   Graded Quiz
+                </label>
+              </div>
+              
+              {/* Offline Assignment Checkbox */}
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="isOfflineAssignment"
+                  checked={formData.isOfflineAssignment}
+                  onChange={(e) => setFormData({ ...formData, isOfflineAssignment: e.target.checked })}
+                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600 rounded"
+                />
+                <label htmlFor="isOfflineAssignment" className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
+                  Offline Assignment (Paper-based test/quiz - manual grade entry)
                 </label>
               </div>
             </div>

@@ -18,6 +18,10 @@ router.get('/student/:assignmentId', protect, submissionController.getStudentSub
 
 // Grade a submission (instructor only)
 router.put('/:id', protect, authorize(['teacher', 'admin']), submissionController.gradeSubmission);
+router.post('/:id/grade', protect, authorize(['teacher', 'admin']), submissionController.gradeSubmission);
+
+// Create or update manual grade for offline assignment (instructor only)
+router.post('/manual-grade', protect, authorize(['teacher', 'admin']), submissionController.createOrUpdateManualGrade);
 
 // Delete a submission
 router.delete('/:id', protect, submissionController.deleteSubmission);

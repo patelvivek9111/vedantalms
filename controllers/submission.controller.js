@@ -424,11 +424,38 @@ exports.getStudentSubmissionsForCourse = async (req, res) => {
 // Grade a submission
 exports.gradeSubmission = async (req, res) => {
   try {
-    const { grade, feedback, questionGrades, useIndividualGrades, memberGrades, approveGrade, showCorrectAnswers, showStudentAnswers } = req.body;
-    const submission = await Submission.findById(req.params.id).populate('group');
+    const { grade, feedback, questionGrades, useIndividualGrades, memberGrades, approveGrade, showCorrectAnswers, showStudentAnswers, studentId } = req.body;
+    let submission = await Submission.findById(req.params.id).populate('group');
 
+    // If submission doesn't exist, check if this is for an offline assignment
     if (!submission) {
-      return res.status(404).json({ message: 'Submission not found' });
+      // Try to find submission by assignment and student if studentId is provided
+      if (studentId) {
+        submission = await Submission.findOne({
+          assignment: req.body.assignmentId || req.params.assignmentId,
+          student: studentId
+        }).populate('group');
+      }
+      
+      // If still no submission and we have assignmentId and studentId, check if assignment is offline
+      if (!submission && req.body.assignmentId && studentId) {
+        const assignment = await Assignment.findById(req.body.assignmentId);
+        if (assignment && assignment.isOfflineAssignment) {
+          // Create a manual grade submission for offline assignment
+          submission = new Submission({
+            assignment: req.body.assignmentId,
+            student: studentId,
+            submittedBy: req.user._id, // Teacher is creating this
+            isManualGrade: true,
+            submittedAt: new Date()
+          });
+          await submission.save();
+        } else {
+          return res.status(404).json({ message: 'Submission not found' });
+        }
+      } else if (!submission) {
+        return res.status(404).json({ message: 'Submission not found' });
+      }
     }
 
     // Backwards compatibility: If submittedBy is missing, set it to the student
@@ -818,6 +845,84 @@ exports.getSubmissionById = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 }; 
+
+// Create or update a manual grade for an offline assignment
+exports.createOrUpdateManualGrade = async (req, res) => {
+  try {
+    const { assignmentId, studentId, grade, feedback } = req.body;
+    
+    if (!assignmentId || !studentId) {
+      return res.status(400).json({ message: 'Assignment ID and Student ID are required' });
+    }
+    
+    // Verify assignment exists and is offline
+    const assignment = await Assignment.findById(assignmentId);
+    if (!assignment) {
+      return res.status(404).json({ message: 'Assignment not found' });
+    }
+    
+    if (!assignment.isOfflineAssignment) {
+      return res.status(400).json({ message: 'This endpoint is only for offline assignments' });
+    }
+    
+    // Check if submission already exists
+    let submission = await Submission.findOne({
+      assignment: assignmentId,
+      student: studentId
+    });
+    
+    if (!submission) {
+      // Create new manual grade submission
+      submission = new Submission({
+        assignment: assignmentId,
+        student: studentId,
+        submittedBy: req.user._id, // Teacher is creating this
+        isManualGrade: true,
+        submittedAt: new Date()
+      });
+    }
+    
+    // Update grade if provided
+    if (grade !== undefined && grade !== null) {
+      const gradeNum = parseFloat(grade);
+      if (isNaN(gradeNum) || gradeNum < 0) {
+        return res.status(400).json({ message: 'Invalid grade format' });
+      }
+      
+      // Validate grade doesn't exceed max points
+      const maxPoints = assignment.questions && assignment.questions.length > 0
+        ? assignment.questions.reduce((sum, q) => sum + (q.points || 0), 0)
+        : assignment.totalPoints || 0;
+      
+      if (gradeNum > maxPoints) {
+        return res.status(400).json({ message: `Grade cannot exceed ${maxPoints} points` });
+      }
+      
+      submission.grade = gradeNum;
+      submission.gradedBy = req.user._id;
+      submission.gradedAt = new Date();
+    } else if (grade === null) {
+      // Remove grade
+      submission.grade = undefined;
+    }
+    
+    if (feedback !== undefined) {
+      submission.feedback = feedback;
+    }
+    
+    await submission.save();
+    
+    const populatedSubmission = await Submission.findById(submission._id)
+      .populate('student', 'firstName lastName email')
+      .populate('submittedBy', 'firstName lastName email')
+      .populate('gradedBy', 'firstName lastName');
+    
+    res.json(populatedSubmission);
+  } catch (error) {
+    console.error('Error creating/updating manual grade:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
 
 // Delete a submission
 exports.deleteSubmission = async (req, res) => {

@@ -1305,7 +1305,12 @@ const CourseDetail: React.FC = () => {
     const submissionKey = `${studentId}_${assignmentId}`;
     const submissionId = submissionMap[submissionKey];
     
-    if (!submissionId) {
+    // Find assignment to check if it's offline
+    const assignment = gradebookData.assignments.find((a: any) => a._id === assignmentId);
+    const isOfflineAssignment = assignment?.isOfflineAssignment === true;
+    
+    // For offline assignments, we can create a grade even without a submission
+    if (!submissionId && !isOfflineAssignment) {
       setGradeError('No submission found for this student');
       setSavingGrade(null);
       setEditingGrade(null);
@@ -1319,11 +1324,26 @@ const CourseDetail: React.FC = () => {
 
       try {
         const token = localStorage.getItem('token');
-        const res = await axios.post(
-          `${API_URL}/api/submissions/${submissionId}/grade`,
-          { grade: null },  // Send null to remove the grade
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        let res;
+        
+        // Use manual-grade endpoint for offline assignments
+        if (isOfflineAssignment) {
+          res = await axios.post(
+            `${API_URL}/api/submissions/manual-grade`,
+            { 
+              assignmentId,
+              studentId,
+              grade: null  // Send null to remove the grade
+            },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+        } else {
+          res = await axios.post(
+            `${API_URL}/api/submissions/${submissionId}/grade`,
+            { grade: null },  // Send null to remove the grade
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+        }
 
         if (res.data) {
           // Update local state to remove the grade
@@ -1376,11 +1396,35 @@ const CourseDetail: React.FC = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.post(
-        `${API_URL}/api/submissions/${submissionId}/grade`,
-        { grade: gradeNum },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      let res;
+      
+      // Use manual-grade endpoint for offline assignments without submissions
+      if (isOfflineAssignment && !submissionId) {
+        res = await axios.post(
+          `${API_URL}/api/submissions/manual-grade`,
+          { 
+            assignmentId,
+            studentId,
+            grade: gradeNum
+          },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        
+        // Update submission map with the newly created submission
+        if (res.data && res.data._id) {
+          setSubmissionMap((prev: any) => ({
+            ...prev,
+            [submissionKey]: res.data._id
+          }));
+        }
+      } else {
+        // Use regular grade endpoint
+        res = await axios.post(
+          `${API_URL}/api/submissions/${submissionId}/grade`,
+          { grade: gradeNum },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      }
 
       if (res.data) {
         // Update local state
@@ -2942,6 +2986,16 @@ const CourseDetail: React.FC = () => {
                                     0 (MA)
                                   </div>
                                 );
+                              } else if (assignment.isOfflineAssignment) {
+                                // Offline assignment - allow manual grade entry even without submission
+                                cellContent = (
+                                  <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300">
+                                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                    Add Grade
+                                  </div>
+                                );
                               } else {
                                 // Not submitted yet, due date not passed
                                 cellContent = (
@@ -2961,8 +3015,8 @@ const CourseDetail: React.FC = () => {
                                   return;
                                 }
 
-                                // If instructor/admin clicking on cell with submission, allow editing
-                                if ((isInstructor || isAdmin) && hasSubmission) {
+                                // If instructor/admin clicking on cell with submission OR offline assignment, allow editing
+                                if ((isInstructor || isAdmin) && (hasSubmission || assignment.isOfflineAssignment)) {
                                   handleGradeCellClick(student._id, assignment._id, grade?.toString() || '');
                                 } else {
                                   // Otherwise, navigate to assignment/discussion view
@@ -2977,7 +3031,7 @@ const CourseDetail: React.FC = () => {
                               return (
                                 <td
                                   key={`${student._id}-${assignment._id}-${assIdx}`}
-                                  className={`px-4 py-4 text-center whitespace-nowrap relative ${rowBg} ${cellBg} transition-all duration-150 ${hasSubmission || assignment.published ? 'cursor-pointer' : ''}`}
+                                  className={`px-4 py-4 text-center whitespace-nowrap relative ${rowBg} ${cellBg} transition-all duration-150 ${hasSubmission || assignment.published || assignment.isOfflineAssignment ? 'cursor-pointer' : ''}`}
                                   onClick={handleCellClick}
                                 >
                                   {editingGrade?.studentId === student._id && editingGrade?.assignmentId === assignment._id ? (

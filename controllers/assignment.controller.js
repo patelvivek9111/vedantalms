@@ -31,7 +31,8 @@ exports.createAssignment = async (req, res) => {
       allowStudentUploads: req.body.allowStudentUploads === 'true' || req.body.allowStudentUploads === true,
       displayMode: req.body.displayMode || 'single',
       showCorrectAnswers: req.body.showCorrectAnswers === 'true' || req.body.showCorrectAnswers === true,
-      showStudentAnswers: req.body.showStudentAnswers === 'true' || req.body.showStudentAnswers === true
+      showStudentAnswers: req.body.showStudentAnswers === 'true' || req.body.showStudentAnswers === true,
+      isOfflineAssignment: req.body.isOfflineAssignment === 'true' || req.body.isOfflineAssignment === true
     };
     // Only set module for non-group assignments
     if (moduleId && !assignmentData.isGroupAssignment) {
@@ -143,6 +144,7 @@ exports.updateAssignment = async (req, res) => {
     if (req.body.displayMode !== undefined) assignment.displayMode = req.body.displayMode;
     if (req.body.showCorrectAnswers !== undefined) assignment.showCorrectAnswers = req.body.showCorrectAnswers === 'true' || req.body.showCorrectAnswers === true;
     if (req.body.showStudentAnswers !== undefined) assignment.showStudentAnswers = req.body.showStudentAnswers === 'true' || req.body.showStudentAnswers === true;
+    if (req.body.isOfflineAssignment !== undefined) assignment.isOfflineAssignment = req.body.isOfflineAssignment === 'true' || req.body.isOfflineAssignment === true;
     
     // Update questions if provided
     if (questions) {

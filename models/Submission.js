@@ -115,6 +115,10 @@ const submissionSchema = new mongoose.Schema({
   showStudentAnswers: {
     type: Boolean,
     default: false
+  },
+  isManualGrade: {
+    type: Boolean,
+    default: false
   }
 }, {
   timestamps: true

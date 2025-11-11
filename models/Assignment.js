@@ -112,6 +112,10 @@ const assignmentSchema = new mongoose.Schema({
   showStudentAnswers: {
     type: Boolean,
     default: false
+  },
+  isOfflineAssignment: {
+    type: Boolean,
+    default: false
   }
 }, {
   timestamps: true
