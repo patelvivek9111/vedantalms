@@ -1324,7 +1324,7 @@ const CourseDetail: React.FC = () => {
 
       try {
         const token = localStorage.getItem('token');
-        let res;
+        let res: any;
         
         // Use manual-grade endpoint for offline assignments
         if (isOfflineAssignment) {
@@ -1380,8 +1380,7 @@ const CourseDetail: React.FC = () => {
       return;
     }
 
-    // Find assignment to get max points
-    const assignment = gradebookData.assignments.find((a: any) => a._id === assignmentId);
+    // Get max points from assignment (already found above)
     const maxPoints = assignment?.questions?.reduce((sum: number, q: any) => sum + (q.points || 0), 0) || assignment?.totalPoints || 0;
     
     if (gradeNum > maxPoints) {
@@ -1396,7 +1395,7 @@ const CourseDetail: React.FC = () => {
 
     try {
       const token = localStorage.getItem('token');
-      let res;
+      let res: any;
       
       // Use manual-grade endpoint for offline assignments without submissions
       if (isOfflineAssignment && !submissionId) {
