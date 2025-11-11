@@ -19,6 +19,7 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const peekIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const peekCountRef = useRef(0);
+  const isPasswordFocusedRef = useRef(isPasswordFocused);
 
   // Track mouse position globally when no input is focused
   useEffect(() => {
@@ -101,6 +102,11 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
     return () => clearInterval(blinkInterval);
   }, [isPasswordFocused]);
 
+  // Update ref when isPasswordFocused changes
+  useEffect(() => {
+    isPasswordFocusedRef.current = isPasswordFocused;
+  }, [isPasswordFocused]);
+
   // Password peek animation - one eye opens halfway with magnifying glass
   useEffect(() => {
     if (!isPasswordFocused) {
@@ -122,7 +128,7 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
     
     const startPeek = () => {
       // Check if still focused and haven't exceeded peek count
-      if (!isPasswordFocused || peekCountRef.current >= 3 || !isActive) {
+      if (!isPasswordFocusedRef.current || peekCountRef.current >= 3 || !isActive) {
         setPeekAnimation({ isPeeking: false, eye: 'left', progress: 0 });
         return;
       }
@@ -135,7 +141,7 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
       const startTime = Date.now();
       
       const animate = () => {
-        if (!isActive || !isPasswordFocused) {
+        if (!isActive || !isPasswordFocusedRef.current) {
           setPeekAnimation({ isPeeking: false, eye, progress: 0 });
           return;
         }
@@ -154,19 +160,19 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
           progress: easedProgress * 0.5, // Halfway open (0.5)
         });
 
-        if (progress < 1 && isActive && isPasswordFocused) {
+        if (progress < 1 && isActive && isPasswordFocusedRef.current) {
           animationFrameId = requestAnimationFrame(animate);
         } else {
           // Close eye after peek
-          if (isActive && isPasswordFocused) {
+          if (isActive && isPasswordFocusedRef.current) {
             setTimeout(() => {
-              if (!isActive || !isPasswordFocused) return;
+              if (!isActive || !isPasswordFocusedRef.current) return;
               
               setPeekAnimation({ isPeeking: false, eye, progress: 0 });
               peekCountRef.current++;
               
               // Wait 1 second before next peek
-              if (peekCountRef.current < 3 && isPasswordFocused && isActive) {
+              if (peekCountRef.current < 3 && isPasswordFocusedRef.current && isActive) {
                 peekIntervalRef.current = setTimeout(startPeek, 1000);
               }
             }, 300); // Show magnifying glass for 300ms
