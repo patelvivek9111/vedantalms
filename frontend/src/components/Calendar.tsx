@@ -987,29 +987,29 @@ const CalendarPage: React.FC = () => {
       {/* Main Calendar */}
       <div className="flex-1">
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4">
-          <Calendar
-            localizer={localizer}
-            events={events}
-            startAccessor="start"
-            endAccessor="end"
+        <Calendar
+          localizer={localizer}
+          events={events}
+          startAccessor="start"
+          endAccessor="end"
             style={{ height: 600 }}
-            popup
-            selectable
-            date={currentDate}
-            onNavigate={handleNavigate}
-            onSelectSlot={handleSelectSlot}
-            onSelectEvent={handleSelectEvent}
-            eventPropGetter={eventPropGetter}
-            showMultiDayTimes={false}
-            components={{
-              toolbar: CustomToolbar,
-              event: CustomEvent,
-              month: { event: CustomEvent },
-              week: { event: CustomEvent },
-              day: { event: CustomEvent },
-              agenda: { event: CustomEvent },
-            }}
-          />
+          popup
+          selectable
+          date={currentDate}
+          onNavigate={handleNavigate}
+          onSelectSlot={handleSelectSlot}
+          onSelectEvent={handleSelectEvent}
+          eventPropGetter={eventPropGetter}
+          showMultiDayTimes={false}
+          components={{
+            toolbar: CustomToolbar,
+            event: CustomEvent,
+            month: { event: CustomEvent },
+            week: { event: CustomEvent },
+            day: { event: CustomEvent },
+            agenda: { event: CustomEvent },
+          }}
+        />
         </div>
       </div>
       {/* Right Panel */}

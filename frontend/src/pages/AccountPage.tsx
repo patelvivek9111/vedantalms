@@ -613,7 +613,7 @@ function NotificationsSection() {
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <div>
+    <div>
                 <div className="font-medium text-gray-900 dark:text-gray-100">Weekly Summary</div>
                 <div className="text-sm text-gray-500 dark:text-gray-400">Get a weekly summary of assignments due this week by Sunday</div>
               </div>
