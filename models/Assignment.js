@@ -116,6 +116,11 @@ const assignmentSchema = new mongoose.Schema({
   isOfflineAssignment: {
     type: Boolean,
     default: false
+  },
+  totalPoints: {
+    type: Number,
+    min: 0,
+    default: 0
   }
 }, {
   timestamps: true

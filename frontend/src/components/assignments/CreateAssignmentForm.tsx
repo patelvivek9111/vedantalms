@@ -102,6 +102,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
   const [existingAttachments, setExistingAttachments] = useState<string[]>([]);
   const [submissionCount, setSubmissionCount] = useState(0);
   const [hasSubmissions, setHasSubmissions] = useState(false);
+  const [totalPointsInput, setTotalPointsInput] = useState<string>('');
 
   useEffect(() => {
     const fetchModules = async () => {
@@ -234,7 +235,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
         dueDate: assignmentData.dueDate ? format(new Date(assignmentData.dueDate), "yyyy-MM-dd'T'HH:mm") : '',
         attachments: [],
         moduleId: assignmentData.module || '',
-        totalPoints: assignmentData.questions?.reduce((sum: number, q: any) => sum + (q.points || 0), 0) || 0,
+        totalPoints: assignmentData.questions?.reduce((sum: number, q: any) => sum + (q.points || 0), 0) || assignmentData.totalPoints || 0,
         questions: assignmentData.questions || [],
         isGroupAssignment: Boolean(assignmentData.isGroupAssignment),
         groupSetId: assignmentData.groupSet || null,
@@ -254,6 +255,13 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
         setGroup(assignmentData.group || '');
       }
       setExistingAttachments(assignmentData.attachments || []);
+      // Set totalPointsInput for offline assignments in edit mode
+      if (assignmentData.isOfflineAssignment) {
+        const calculatedTotalPoints = assignmentData.questions?.reduce((sum: number, q: any) => sum + (q.points || 0), 0) || assignmentData.totalPoints || 0;
+        if (calculatedTotalPoints > 0) {
+          setTotalPointsInput(calculatedTotalPoints.toString());
+        }
+      }
     }
   }, [editMode, assignmentData]);
 
@@ -479,9 +487,9 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
           // Also check if it's a group assignment (which might not have a module)
           const isGroupAssignment = formData.isGroupAssignment && formData.groupSetId;
           
-          if (selectedModuleId && !isGroupAssignment) {
-            // If assignment has a module, navigate to that module's page
-            navigate(`/modules/${selectedModuleId}`);
+          if (selectedModuleId && !isGroupAssignment && courseId) {
+            // If assignment has a module, navigate to course modules page with module to expand
+            navigate(`/courses/${courseId}/modules?expand=${selectedModuleId}`);
           } else if (courseId) {
             // If no module or group assignment, navigate to appropriate page based on quiz type
             if (formData.isGradedQuiz) {
@@ -962,16 +970,29 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                       name="totalPoints"
                       min="0"
                       step="0.01"
-                      value={formData.totalPoints > 0 ? formData.totalPoints : ''}
+                      value={totalPointsInput}
                       onChange={(e) => {
-                        const inputValue = e.target.value.trim();
-                        if (inputValue === '') {
+                        const inputValue = e.target.value;
+                        setTotalPointsInput(inputValue);
+                        // Update formData with parsed value
+                        if (inputValue === '' || inputValue === null) {
                           setFormData({ ...formData, totalPoints: 0 });
                         } else {
                           const value = parseFloat(inputValue);
                           if (!isNaN(value) && value >= 0) {
                             setFormData({ ...formData, totalPoints: value });
                           }
+                        }
+                      }}
+                      onBlur={(e) => {
+                        // Ensure we have a valid value on blur
+                        const value = parseFloat(e.target.value);
+                        if (isNaN(value) || value <= 0) {
+                          setTotalPointsInput('');
+                          setFormData({ ...formData, totalPoints: 0 });
+                        } else {
+                          setTotalPointsInput(value.toString());
+                          setFormData({ ...formData, totalPoints: value });
                         }
                       }}
                       className="block w-full rounded-md border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2"

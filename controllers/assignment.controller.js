@@ -32,7 +32,8 @@ exports.createAssignment = async (req, res) => {
       displayMode: req.body.displayMode || 'single',
       showCorrectAnswers: req.body.showCorrectAnswers === 'true' || req.body.showCorrectAnswers === true,
       showStudentAnswers: req.body.showStudentAnswers === 'true' || req.body.showStudentAnswers === true,
-      isOfflineAssignment: req.body.isOfflineAssignment === 'true' || req.body.isOfflineAssignment === true
+      isOfflineAssignment: req.body.isOfflineAssignment === 'true' || req.body.isOfflineAssignment === true,
+      totalPoints: req.body.totalPoints ? parseFloat(req.body.totalPoints) : 0
     };
     // Only set module for non-group assignments
     if (moduleId && !assignmentData.isGroupAssignment) {
@@ -66,9 +67,16 @@ exports.getModuleAssignments = async (req, res) => {
       .sort({ createdAt: -1 });
     // Add totalPoints to each assignment
     const assignmentsWithPoints = assignments.map(a => {
-      const totalPoints = Array.isArray(a.questions)
-        ? a.questions.reduce((sum, q) => sum + (q.points || 0), 0)
-        : 0;
+      // For offline assignments, use the stored totalPoints field
+      // For regular assignments, calculate from questions
+      let totalPoints = 0;
+      if (a.isOfflineAssignment && a.totalPoints) {
+        totalPoints = a.totalPoints;
+      } else if (Array.isArray(a.questions) && a.questions.length > 0) {
+        totalPoints = a.questions.reduce((sum, q) => sum + (q.points || 0), 0);
+      } else if (a.totalPoints) {
+        totalPoints = a.totalPoints;
+      }
       const obj = a.toObject();
       obj.totalPoints = totalPoints;
       return obj;
@@ -145,6 +153,7 @@ exports.updateAssignment = async (req, res) => {
     if (req.body.showCorrectAnswers !== undefined) assignment.showCorrectAnswers = req.body.showCorrectAnswers === 'true' || req.body.showCorrectAnswers === true;
     if (req.body.showStudentAnswers !== undefined) assignment.showStudentAnswers = req.body.showStudentAnswers === 'true' || req.body.showStudentAnswers === true;
     if (req.body.isOfflineAssignment !== undefined) assignment.isOfflineAssignment = req.body.isOfflineAssignment === 'true' || req.body.isOfflineAssignment === true;
+    if (req.body.totalPoints !== undefined) assignment.totalPoints = req.body.totalPoints ? parseFloat(req.body.totalPoints) : 0;
     
     // Update questions if provided
     if (questions) {

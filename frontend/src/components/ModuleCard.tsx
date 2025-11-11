@@ -3,7 +3,7 @@ import { Module, useModule } from '../contexts/ModuleContext';
 import PageViewer from './PageViewer';
 import { useAuth } from '../context/AuthContext';
 import { ChevronDown, ChevronRight, FileText, Plus, ClipboardList, Trash2, Lock, Unlock, Pencil } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import CreatePageForm from './CreatePageForm';
 import axios from 'axios';
 import { API_URL } from '../config';
@@ -29,7 +29,9 @@ const DiscussionIcon = () => (
 );
 
 const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [searchParams] = useSearchParams();
+  const expandModuleId = searchParams.get('expand');
+  const [isExpanded, setIsExpanded] = useState(expandModuleId === module._id);
   const [selectedPage, setSelectedPage] = useState<string | null>(null);
   const [pages, setPages] = useState<any[]>([]);
   const [isLoadingPages, setIsLoadingPages] = useState(false);
