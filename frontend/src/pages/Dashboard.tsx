@@ -3,8 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useCourse } from '../contexts/CourseContext';
 import { useAuth } from '../context/AuthContext';
 import { ToDoPanel } from '../components/ToDoPanel';
-import { MoreVertical, Megaphone, FileText, MessageSquare, Palette, BookOpen, File, Settings } from 'lucide-react';
+import { MoreVertical, Megaphone, FileText, MessageSquare, Palette, BookOpen, File, Settings, Bell } from 'lucide-react';
 import api, { getUserPreferences, updateUserPreferences } from '../services/api';
+import NotificationCenter from '../components/NotificationCenter';
 
 // Earthy tone color palette
 const earthyColors = [
@@ -57,6 +58,10 @@ export function Dashboard() {
   });
   const [openIconPicker, setOpenIconPicker] = useState<string | null>(null);
   
+  // Notification state
+  const [showNotificationCenter, setShowNotificationCenter] = useState(false);
+  const [notificationCount, setNotificationCount] = useState(0);
+  
   // Refs for dropdown containers
   const colorPickerRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const iconPickerRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
@@ -92,6 +97,25 @@ export function Dashboard() {
     loadUserPreferences();
   }, [user?._id]); // Use user._id to ensure it reloads when user changes
 
+  // Fetch notification count
+  useEffect(() => {
+    const fetchNotificationCount = async () => {
+      try {
+        const response = await api.get('/notifications/unread-count');
+        if (response.data.success) {
+          setNotificationCount(response.data.count || 0);
+        }
+      } catch (error) {
+        console.error('Error fetching notification count:', error);
+      }
+    };
+
+    fetchNotificationCount();
+    // Poll for new notifications every 30 seconds
+    const interval = setInterval(fetchNotificationCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Click outside handler to close dropdowns - FIXED VERSION
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -117,6 +141,8 @@ export function Dashboard() {
       if (isOutsideIconPicker && !isOnCourseCard) {
         setOpenIconPicker(null);
       }
+      
+      // Note: NotificationCenter handles its own click outside detection
     };
 
     document.addEventListener('mousedown', handleClickOutside);
@@ -257,10 +283,32 @@ export function Dashboard() {
       <div className="container mx-auto px-6 py-8 flex flex-col lg:flex-row gap-8">
         {/* Main dashboard content */}
         <div className="flex-1">
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold text-gray-800 dark:text-gray-100 mb-2">Dashboard</h1>
-            <p className="text-gray-600 dark:text-gray-400">Welcome back, {user?.firstName}!</p>
+          <div className="mb-8 flex justify-between items-start">
+            <div>
+              <h1 className="text-4xl font-bold text-gray-800 dark:text-gray-100 mb-2">Dashboard</h1>
+              <p className="text-gray-600 dark:text-gray-400">Welcome back, {user?.firstName}!</p>
+            </div>
+            {/* Notification Bell */}
+            <div className="relative">
+              <button
+                onClick={() => setShowNotificationCenter(!showNotificationCenter)}
+                className="relative p-3 bg-white dark:bg-gray-800 rounded-full shadow-md hover:shadow-lg transition-all duration-200 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+                aria-label="Notifications"
+              >
+                <Bell className="h-6 w-6 text-gray-700 dark:text-gray-300" />
+                {notificationCount > 0 && (
+                  <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold shadow-lg">
+                    {notificationCount > 9 ? '9+' : notificationCount}
+                  </div>
+                )}
+              </button>
+            </div>
           </div>
+          {/* Notification Center - Rendered outside header for proper fixed positioning */}
+          <NotificationCenter 
+            isOpen={showNotificationCenter} 
+            onClose={() => setShowNotificationCenter(false)}
+          />
         {/* Published Courses Section */}
         <div className="mb-8">
           <div className="flex justify-between items-center mb-6">
