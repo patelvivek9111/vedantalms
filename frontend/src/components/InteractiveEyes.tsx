@@ -259,23 +259,10 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
   const pupilRadius = 8;
   const eyeSpacing = 60;
 
-  // Calculate pupil position - ensure it follows eyePosition state
-  // For password peek, keep pupil centered when eye is closed
-  const getPupilPosition = () => {
-    if (isPasswordFocused && !peekAnimation.isPeeking) {
-      // Eyes are closed, keep pupil centered
-      return { x: 0, y: 0 };
-    }
-    // Normal movement - follow eyePosition
-    return {
-      x: eyePosition.x * (eyeRadius - pupilRadius - 2),
-      y: eyePosition.y * (eyeRadius - pupilRadius - 2)
-    };
-  };
-  
-  const pupilPos = getPupilPosition();
-  const pupilX = pupilPos.x;
-  const pupilY = pupilPos.y;
+  // Calculate pupil position - always follow eyePosition state for both eyes
+  // This ensures pupils follow text cursor in both username and password fields
+  const pupilX = eyePosition.x * (eyeRadius - pupilRadius - 2);
+  const pupilY = eyePosition.y * (eyeRadius - pupilRadius - 2);
 
   // Eye close animation - smooth transition
   // For password: fully closed unless peeking
