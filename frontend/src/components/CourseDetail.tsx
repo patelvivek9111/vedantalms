@@ -2514,6 +2514,10 @@ const CourseDetail: React.FC = () => {
                             } else {
                               statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Submitted</span>;
                             }
+                          } else if (assignment.isOfflineAssignment) {
+                            // Offline assignment - don't show "Missing" status
+                            statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">Offline</span>;
+                            scoreCell = '-';
                           } else if (dueDate && now > dueDate) {
                             statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">Missing</span>;
                             scoreCell = '0';
