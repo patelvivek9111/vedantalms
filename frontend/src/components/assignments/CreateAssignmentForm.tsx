@@ -676,7 +676,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                   className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600 rounded"
                 />
                 <label htmlFor="isOfflineAssignment" className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
-                  Offline Assignment (Paper-based test/quiz - manual grade entry)
+                  Offline Assignment (Paper Based - manual grade entry)
                 </label>
               </div>
             </div>
@@ -804,6 +804,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                   name="availableFrom"
                   value={formData.availableFrom}
                   onChange={(e) => setFormData({ ...formData, availableFrom: e.target.value })}
+                  step="600"
                   required
                   className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 dark:text-gray-100 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400"
                 />
@@ -816,6 +817,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                   name="dueDate"
                   value={formData.dueDate}
                   onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                  step="600"
                   required
                   className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 dark:text-gray-100 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400"
                 />
@@ -960,12 +962,19 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                       name="totalPoints"
                       min="0"
                       step="0.01"
-                      value={formData.totalPoints || ''}
+                      value={formData.totalPoints > 0 ? formData.totalPoints : ''}
                       onChange={(e) => {
-                        const value = parseFloat(e.target.value) || 0;
-                        setFormData({ ...formData, totalPoints: value });
+                        const inputValue = e.target.value.trim();
+                        if (inputValue === '') {
+                          setFormData({ ...formData, totalPoints: 0 });
+                        } else {
+                          const value = parseFloat(inputValue);
+                          if (!isNaN(value) && value >= 0) {
+                            setFormData({ ...formData, totalPoints: value });
+                          }
+                        }
                       }}
-                      className="block w-full rounded-md border-gray-300 dark:border-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      className="block w-full rounded-md border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2"
                       placeholder="Enter total points (e.g., 100)"
                       required
                     />
