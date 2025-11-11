@@ -65,6 +65,7 @@ export function Login() {
             isPasswordFocused={isPasswordFocused}
             isUsernameFocused={isEmailFocused}
             usernameValue={email}
+            passwordValue={password}
           />
           
           <h2 className="mt-2 text-center text-3xl font-extrabold text-gray-900 dark:text-gray-100">
