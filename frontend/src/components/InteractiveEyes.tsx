@@ -55,7 +55,7 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
   // Track text cursor position in username field
   useEffect(() => {
     if (!isUsernameFocused || isPasswordFocused) {
-      setEyePosition({ x: 0, y: 0 });
+      setEyePosition({ x: 0, y: 0.3 }); // Look down when not focused
       return;
     }
 
@@ -65,30 +65,86 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
     const updateEyePosition = () => {
       // Get cursor position in input
       const cursorPosition = usernameInput.selectionStart || 0;
-      const textLength = usernameInput.value.length;
+      const textLength = usernameInput.value.length || 1;
       
-      // Calculate relative position (0 to 1)
-      const relativePosition = textLength > 0 ? cursorPosition / textLength : 0.5;
+      // Calculate relative position (0 to 1) based on cursor position
+      // If no text, cursor is at start (0), if text exists, use cursor position
+      const relativePosition = textLength > 0 
+        ? Math.max(0, Math.min(1, cursorPosition / textLength))
+        : 0;
       
-      // Map to eye position (-0.35 to 0.35)
+      // Map to eye position (-0.35 to 0.35) for horizontal movement
       const eyeX = (relativePosition - 0.5) * 0.7;
-      setEyePosition({ x: eyeX, y: 0 });
+      // Eyes look down since input field is below
+      const eyeY = 0.3; // Look down
+      setEyePosition({ x: eyeX, y: eyeY });
     };
 
-    // Update on selection change (cursor movement)
-    usernameInput.addEventListener('selectionchange', updateEyePosition);
-    usernameInput.addEventListener('keyup', updateEyePosition);
-    usernameInput.addEventListener('click', updateEyePosition);
+    // Update on various events to catch all cursor movements
+    const events = ['keyup', 'keydown', 'click', 'input', 'select', 'focus'];
+    events.forEach(event => {
+      usernameInput.addEventListener(event, updateEyePosition);
+    });
+    
+    // Also use interval to catch cursor movements that might be missed
+    const intervalId = setInterval(updateEyePosition, 50);
     
     // Initial position
     updateEyePosition();
 
     return () => {
-      usernameInput.removeEventListener('selectionchange', updateEyePosition);
-      usernameInput.removeEventListener('keyup', updateEyePosition);
-      usernameInput.removeEventListener('click', updateEyePosition);
+      events.forEach(event => {
+        usernameInput.removeEventListener(event, updateEyePosition);
+      });
+      clearInterval(intervalId);
     };
   }, [isUsernameFocused, isPasswordFocused, usernameValue]);
+
+  // Track text cursor position in password field (for eye position, not peeking)
+  useEffect(() => {
+    if (!isPasswordFocused) {
+      return;
+    }
+
+    const passwordInput = document.getElementById('password') as HTMLInputElement;
+    if (!passwordInput) return;
+
+    const updateEyePosition = () => {
+      // Get cursor position in input
+      const cursorPosition = passwordInput.selectionStart || 0;
+      const textLength = passwordInput.value.length || 1;
+      
+      // Calculate relative position (0 to 1)
+      const relativePosition = textLength > 0 
+        ? Math.max(0, Math.min(1, cursorPosition / textLength))
+        : 0;
+      
+      // Map to eye position (-0.35 to 0.35) for horizontal movement
+      const eyeX = (relativePosition - 0.5) * 0.7;
+      // Eyes look down since input field is below
+      const eyeY = 0.3; // Look down
+      setEyePosition({ x: eyeX, y: eyeY });
+    };
+
+    // Update on various events
+    const events = ['keyup', 'keydown', 'click', 'input', 'select', 'focus'];
+    events.forEach(event => {
+      passwordInput.addEventListener(event, updateEyePosition);
+    });
+    
+    // Also use interval to catch cursor movements
+    const intervalId = setInterval(updateEyePosition, 50);
+    
+    // Initial position
+    updateEyePosition();
+
+    return () => {
+      events.forEach(event => {
+        passwordInput.removeEventListener(event, updateEyePosition);
+      });
+      clearInterval(intervalId);
+    };
+  }, [isPasswordFocused, passwordValue]);
 
   // Blink animation (only when not typing password)
   useEffect(() => {
@@ -133,8 +189,8 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
         return;
       }
 
-      // Determine which eye to peek (alternate)
-      const eye = peekCountRef.current % 2 === 0 ? 'left' : 'right';
+      // Always use left eye for peeking
+      const eye = 'left';
       
       // Animate eye opening halfway
       const duration = 1000; // 1 second
@@ -250,15 +306,20 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
             strokeWidth="2.5"
             className="text-gray-800 dark:text-gray-200 transition-all duration-300 ease-in-out"
           />
-          {(!isPasswordFocused || (peekAnimation.isPeeking && peekAnimation.eye === 'left')) && (
-            <circle
-              cx={pupilX}
-              cy={pupilY}
-              r={pupilRadius}
-              fill="currentColor"
-              className="text-gray-800 dark:text-gray-200 transition-all duration-300 ease-out"
-            />
-          )}
+           {(!isPasswordFocused || (peekAnimation.isPeeking && peekAnimation.eye === 'left' && peekAnimation.progress > 0.3)) && (
+             <circle
+               cx={pupilX}
+               cy={pupilY}
+               r={pupilRadius}
+               fill="currentColor"
+               className="text-gray-800 dark:text-gray-200 transition-all duration-300 ease-out"
+               style={{ 
+                 opacity: isPasswordFocused && peekAnimation.isPeeking && peekAnimation.eye === 'left' 
+                   ? Math.max(0, (peekAnimation.progress - 0.3) / 0.2) 
+                   : 1 
+               }}
+             />
+           )}
           {/* Blink overlay */}
           {isBlinking && !isPasswordFocused && (
             <rect
@@ -271,31 +332,47 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
               style={{ animationDuration: '150ms' }}
             />
           )}
-          {/* Magnifying glass for peek */}
-          {peekAnimation.isPeeking && peekAnimation.eye === 'left' && peekAnimation.progress > 0.3 && (
-            <g className="transition-opacity duration-200">
-              {/* Magnifying glass handle */}
-              <line
-                x1={eyeRadius * 0.6}
-                y1={eyeRadius * 0.6}
-                x2={eyeRadius * 1.3}
-                y2={eyeRadius * 1.3}
-                stroke="currentColor"
-                strokeWidth="2"
-                className="text-gray-600 dark:text-gray-400"
-              />
-              {/* Magnifying glass circle */}
-              <circle
-                cx={eyeRadius * 1.1}
-                cy={eyeRadius * 1.1}
-                r={eyeRadius * 0.4}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                className="text-gray-600 dark:text-gray-400"
-              />
-            </g>
-          )}
+           {/* Magnifying glass for peek - bigger and positioned above eye */}
+           {peekAnimation.isPeeking && peekAnimation.eye === 'left' && peekAnimation.progress > 0.3 && (
+             <g 
+               className="transition-opacity duration-200"
+               style={{ 
+                 opacity: Math.max(0, (peekAnimation.progress - 0.3) / 0.2)
+               }}
+             >
+               {/* Magnifying glass handle - longer */}
+               <line
+                 x1={eyeRadius * 0.5}
+                 y1={-eyeRadius * 0.8}
+                 x2={eyeRadius * 1.8}
+                 y2={-eyeRadius * 1.8}
+                 stroke="currentColor"
+                 strokeWidth="3"
+                 strokeLinecap="round"
+                 className="text-gray-600 dark:text-gray-400"
+               />
+               {/* Magnifying glass circle - bigger */}
+               <circle
+                 cx={eyeRadius * 1.5}
+                 cy={-eyeRadius * 1.5}
+                 r={eyeRadius * 0.7}
+                 fill="none"
+                 stroke="currentColor"
+                 strokeWidth="3"
+                 className="text-gray-600 dark:text-gray-400"
+               />
+               {/* Inner circle for glass effect */}
+               <circle
+                 cx={eyeRadius * 1.5}
+                 cy={-eyeRadius * 1.5}
+                 r={eyeRadius * 0.5}
+                 fill="none"
+                 stroke="currentColor"
+                 strokeWidth="1.5"
+                 className="text-gray-500 dark:text-gray-500"
+               />
+             </g>
+           )}
         </g>
 
         {/* Right Eye */}
@@ -310,15 +387,15 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
             strokeWidth="2.5"
             className="text-gray-800 dark:text-gray-200 transition-all duration-300 ease-in-out"
           />
-          {(!isPasswordFocused || (peekAnimation.isPeeking && peekAnimation.eye === 'right')) && (
-            <circle
-              cx={pupilX}
-              cy={pupilY}
-              r={pupilRadius}
-              fill="currentColor"
-              className="text-gray-800 dark:text-gray-200 transition-all duration-300 ease-out"
-            />
-          )}
+           {!isPasswordFocused && (
+             <circle
+               cx={pupilX}
+               cy={pupilY}
+               r={pupilRadius}
+               fill="currentColor"
+               className="text-gray-800 dark:text-gray-200 transition-all duration-300 ease-out"
+             />
+           )}
           {/* Blink overlay */}
           {isBlinking && !isPasswordFocused && (
             <rect
@@ -330,31 +407,6 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
               className="text-gray-800 dark:text-gray-200 animate-pulse"
               style={{ animationDuration: '150ms' }}
             />
-          )}
-          {/* Magnifying glass for peek */}
-          {peekAnimation.isPeeking && peekAnimation.eye === 'right' && peekAnimation.progress > 0.3 && (
-            <g className="transition-opacity duration-200">
-              {/* Magnifying glass handle */}
-              <line
-                x1={eyeRadius * 0.6}
-                y1={eyeRadius * 0.6}
-                x2={eyeRadius * 1.3}
-                y2={eyeRadius * 1.3}
-                stroke="currentColor"
-                strokeWidth="2"
-                className="text-gray-600 dark:text-gray-400"
-              />
-              {/* Magnifying glass circle */}
-              <circle
-                cx={eyeRadius * 1.1}
-                cy={eyeRadius * 1.1}
-                r={eyeRadius * 0.4}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                className="text-gray-600 dark:text-gray-400"
-              />
-            </g>
           )}
         </g>
       </svg>
