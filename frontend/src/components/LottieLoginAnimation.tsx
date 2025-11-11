@@ -404,45 +404,31 @@ export const LottieLoginAnimation: React.FC<LottieLoginAnimationProps> = ({
   className = '' 
 }) => {
   const lottieRef = useRef<LottieRefCurrentProps>(null);
-  const [currentAnimation, setCurrentAnimation] = useState(createIdleAnimation());
+  const [currentAnimation, setCurrentAnimation] = useState<any>(createIdleAnimation());
+  const shouldLoop = animationState === 'idle' || animationState === 'loading' || animationState === 'typing';
 
   useEffect(() => {
     // Update animation based on state
     switch (animationState) {
       case 'typing':
         setCurrentAnimation(createTypingAnimation());
-        if (lottieRef.current) {
-          lottieRef.current.setLoop(true);
-          lottieRef.current.play();
-        }
         break;
       case 'success':
         setCurrentAnimation(createSuccessAnimation());
-        if (lottieRef.current) {
-          lottieRef.current.setLoop(false);
-          lottieRef.current.play();
-        }
         break;
       case 'error':
         setCurrentAnimation(createErrorAnimation());
-        if (lottieRef.current) {
-          lottieRef.current.setLoop(false);
-          lottieRef.current.play();
-        }
         break;
       case 'loading':
         setCurrentAnimation(createLoadingAnimation());
-        if (lottieRef.current) {
-          lottieRef.current.setLoop(true);
-          lottieRef.current.play();
-        }
         break;
       default:
         setCurrentAnimation(createIdleAnimation());
-        if (lottieRef.current) {
-          lottieRef.current.setLoop(true);
-          lottieRef.current.play();
-        }
+    }
+    
+    // Play animation when state changes
+    if (lottieRef.current) {
+      lottieRef.current.play();
     }
   }, [animationState]);
 
@@ -451,7 +437,7 @@ export const LottieLoginAnimation: React.FC<LottieLoginAnimationProps> = ({
       <Lottie
         lottieRef={lottieRef}
         animationData={currentAnimation}
-        loop={animationState === 'idle' || animationState === 'loading' || animationState === 'typing'}
+        loop={shouldLoop}
         autoplay={true}
         style={{ width: '100%', height: '100%', maxWidth: '300px', maxHeight: '300px' }}
       />
