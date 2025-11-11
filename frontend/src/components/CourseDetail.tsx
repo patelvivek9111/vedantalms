@@ -2975,24 +2975,25 @@ const CourseDetail: React.FC = () => {
                                     </div>
                                   );
                                 }
-                              } else if (dueDate && now.getTime() > dueDate.getTime()) {
-                                // Missing after due date
-                                cellContent = (
-                                  <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300">
-                                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                    0 (MA)
-                                  </div>
-                                );
                               } else if (assignment.isOfflineAssignment) {
                                 // Offline assignment - allow manual grade entry even without submission
+                                // Bypass "0 (MA)" logic for offline assignments
                                 cellContent = (
                                   <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300">
                                     <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                     </svg>
                                     Add Grade
+                                  </div>
+                                );
+                              } else if (dueDate && now.getTime() > dueDate.getTime()) {
+                                // Missing after due date (only for non-offline assignments)
+                                cellContent = (
+                                  <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300">
+                                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                    0 (MA)
                                   </div>
                                 );
                               } else {
