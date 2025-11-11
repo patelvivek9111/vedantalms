@@ -69,11 +69,19 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
       
       // Calculate relative position (0 to 1) based on cursor position
       // If no text, cursor is at start (0), if text exists, use cursor position
-      const relativePosition = textLength > 0 
-        ? Math.max(0, Math.min(1, cursorPosition / textLength))
-        : 0;
+      let relativePosition = 0.5; // Default to center
+      if (textLength > 0) {
+        // Normalize cursor position to 0-1 range
+        relativePosition = Math.max(0, Math.min(1, cursorPosition / Math.max(1, textLength)));
+      } else if (cursorPosition > 0) {
+        // If cursor is at position but no text, it's at the start
+        relativePosition = 0;
+      }
       
       // Map to eye position (-0.35 to 0.35) for horizontal movement
+      // When cursor is at start (0), eyes look left (-0.35)
+      // When cursor is at end (1), eyes look right (0.35)
+      // When cursor is in middle (0.5), eyes look center (0)
       const eyeX = (relativePosition - 0.5) * 0.7;
       // Eyes look down since input field is below
       const eyeY = 0.3; // Look down
@@ -115,9 +123,14 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
       const textLength = passwordInput.value.length || 1;
       
       // Calculate relative position (0 to 1)
-      const relativePosition = textLength > 0 
-        ? Math.max(0, Math.min(1, cursorPosition / textLength))
-        : 0;
+      let relativePosition = 0.5; // Default to center
+      if (textLength > 0) {
+        // Normalize cursor position to 0-1 range
+        relativePosition = Math.max(0, Math.min(1, cursorPosition / Math.max(1, textLength)));
+      } else if (cursorPosition > 0) {
+        // If cursor is at position but no text, it's at the start
+        relativePosition = 0;
+      }
       
       // Map to eye position (-0.35 to 0.35) for horizontal movement
       const eyeX = (relativePosition - 0.5) * 0.7;
@@ -307,8 +320,8 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
             strokeWidth="2.5"
             className="text-gray-800 dark:text-gray-200 transition-all duration-300 ease-in-out"
           />
-           {/* Show pupil only when eye is open enough */}
-           {(!isPasswordFocused || (peekAnimation.isPeeking && peekAnimation.eye === 'left' && peekAnimation.progress > 0.4)) && (
+           {/* Show pupil only when eye is open enough - for password peek, wait until 50% open */}
+           {(!isPasswordFocused || (peekAnimation.isPeeking && peekAnimation.eye === 'left' && peekAnimation.progress > 0.5)) && (
              <circle
                cx={pupilX}
                cy={pupilY}
@@ -317,7 +330,7 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
                className="text-gray-800 dark:text-gray-200 transition-all duration-300 ease-out"
                style={{ 
                  opacity: isPasswordFocused && peekAnimation.isPeeking && peekAnimation.eye === 'left' 
-                   ? Math.max(0, (peekAnimation.progress - 0.4) / 0.1) 
+                   ? Math.max(0, (peekAnimation.progress - 0.5) / 0.5) 
                    : 1 
                }}
              />
@@ -334,30 +347,30 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
               style={{ animationDuration: '150ms' }}
             />
           )}
-           {/* Magnifying glass for peek - bigger and positioned directly above left eye */}
-           {peekAnimation.isPeeking && peekAnimation.eye === 'left' && peekAnimation.progress > 0.4 && (
+           {/* Magnifying glass for peek - bigger and positioned directly above left eye center */}
+           {peekAnimation.isPeeking && peekAnimation.eye === 'left' && peekAnimation.progress > 0.5 && (
              <g 
                className="transition-opacity duration-200"
                style={{ 
-                 opacity: Math.max(0, (peekAnimation.progress - 0.4) / 0.1)
+                 opacity: Math.max(0, (peekAnimation.progress - 0.5) / 0.5)
                }}
              >
-               {/* Magnifying glass handle - positioned above eye */}
+               {/* Magnifying glass handle - starts from eye center, goes up and right */}
                <line
                  x1={0}
-                 y1={-eyeRadius * 1.2}
-                 x2={eyeRadius * 1.2}
-                 y2={-eyeRadius * 2.2}
+                 y1={0}
+                 x2={eyeRadius * 1.0}
+                 y2={-eyeRadius * 2.0}
                  stroke="currentColor"
                  strokeWidth="3"
                  strokeLinecap="round"
                  className="text-gray-600 dark:text-gray-400"
                />
-               {/* Magnifying glass circle - bigger, centered above eye */}
+               {/* Magnifying glass circle - bigger, positioned above eye center */}
                <circle
-                 cx={eyeRadius * 0.9}
+                 cx={eyeRadius * 1.0}
                  cy={-eyeRadius * 2.0}
-                 r={eyeRadius * 0.8}
+                 r={eyeRadius * 0.9}
                  fill="none"
                  stroke="currentColor"
                  strokeWidth="3"
@@ -365,9 +378,9 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
                />
                {/* Inner circle for glass effect */}
                <circle
-                 cx={eyeRadius * 0.9}
+                 cx={eyeRadius * 1.0}
                  cy={-eyeRadius * 2.0}
-                 r={eyeRadius * 0.6}
+                 r={eyeRadius * 0.65}
                  fill="none"
                  stroke="currentColor"
                  strokeWidth="1.5"
