@@ -20,6 +20,7 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
   const peekIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const peekCountRef = useRef(0);
   const isPasswordFocusedRef = useRef(isPasswordFocused);
+  const peekAnimationRef = useRef(peekAnimation);
 
   // Track mouse position globally when no input is focused
   useEffect(() => {
@@ -54,6 +55,8 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
 
   // Track text cursor position in username field
   useEffect(() => {
+    console.log('[Username] Effect running - isUsernameFocused:', isUsernameFocused, 'isPasswordFocused:', isPasswordFocused);
+    
     if (!isUsernameFocused || isPasswordFocused) {
       // Only reset if we're not tracking password
       if (!isPasswordFocused) {
@@ -71,15 +74,24 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
 
     const usernameInput = document.getElementById('email-address') as HTMLInputElement;
     if (!usernameInput) {
+      console.log('[Username] Input element not found!');
       document.body.removeChild(measureSpan);
       return;
     }
+    
+    console.log('[Username] Input element found, setting up tracking');
 
     const updateEyePosition = () => {
-      if (!usernameInput) return;
+      if (!usernameInput) {
+        console.log('[Username] No input element');
+        return;
+      }
       
       // Check if username input is actually focused (more reliable than state)
-      if (document.activeElement !== usernameInput) return;
+      if (document.activeElement !== usernameInput) {
+        console.log('[Username] Input not focused, activeElement:', document.activeElement?.id);
+        return;
+      }
       
       // Use requestAnimationFrame to ensure DOM is updated
       requestAnimationFrame(() => {
@@ -101,6 +113,8 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
         
         // Ensure cursor position is within valid range
         cursorPosition = Math.max(0, Math.min(cursorPosition, textLength));
+        
+        console.log('[Username] Update - cursor:', cursorPosition, 'textLength:', textLength, 'selectionStart:', usernameInput.selectionStart, 'selectionEnd:', usernameInput.selectionEnd, 'value:', usernameInput.value.substring(0, 20) + '...');
         
         // Get computed style to match input font exactly
         const computedStyle = window.getComputedStyle(usernameInput);
@@ -131,6 +145,8 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
         // Get scroll position - browser auto-scrolls to show cursor when typing
         const scrollLeft = usernameInput.scrollLeft || 0;
         
+        console.log('[Username] textWidth:', textWidth, 'inputWidth:', inputWidth, 'scrollLeft:', scrollLeft, 'paddingLeft:', paddingLeft);
+        
         // Calculate relative position (0 to 1) based on actual cursor pixel position
         let relativePosition = 0;
         if (inputWidth > 0 && textLength > 0) {
@@ -141,22 +157,28 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
           // Cursor pixel position relative to start of text
           const cursorPixelPos = textWidth;
           
+          console.log('[Username] visibleStart:', visibleStart, 'visibleEnd:', visibleEnd, 'cursorPixelPos:', cursorPixelPos);
+          
           // Calculate where cursor appears in the visible area
           // When browser auto-scrolls, cursor is usually at the right edge when at end
           if (cursorPixelPos < visibleStart) {
             // Cursor is to the left of visible area
             relativePosition = 0;
+            console.log('[Username] Cursor left of visible area');
           } else if (cursorPixelPos > visibleEnd) {
             // Cursor is to the right of visible area (shouldn't happen with auto-scroll, but handle it)
             relativePosition = 1;
+            console.log('[Username] Cursor right of visible area');
           } else {
             // Cursor is in visible area - map to 0-1
             relativePosition = (cursorPixelPos - visibleStart) / inputWidth;
             relativePosition = Math.max(0, Math.min(1, relativePosition));
+            console.log('[Username] Cursor in visible area, relativePosition:', relativePosition);
           }
         } else if (textLength === 0) {
           // No text - cursor at start
           relativePosition = 0;
+          console.log('[Username] No text, position 0');
         }
         
         // Map to eye position (-0.4 to 0.4) for horizontal movement
@@ -166,6 +188,8 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
         const eyeX = (relativePosition - 0.5) * 0.8;
         // Eyes look down since input field is below
         const eyeY = 0.3; // Look down
+        
+        console.log('[Username] Final - relativePosition:', relativePosition, 'eyeX:', eyeX, 'eyeY:', eyeY);
         
         setEyePosition({ x: eyeX, y: eyeY });
       });
@@ -194,7 +218,7 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
     };
   }, [isUsernameFocused, isPasswordFocused, usernameValue]);
 
-  // Track text cursor position in password field (for eye position, not peeking)
+  // Track text cursor position in password field (for eye position, only when peeking)
   useEffect(() => {
     if (!isPasswordFocused) {
       return;
@@ -216,9 +240,26 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
     const updateEyePosition = () => {
       if (!passwordInput) return;
       
+      // Only update eye position when peeking (eye is open enough)
+      const currentPeek = peekAnimationRef.current;
+      if (!currentPeek.isPeeking || currentPeek.progress < 0.4) {
+        if (currentPeek.isPeeking) {
+          console.log('[Password Eye Position] Skipping update - progress too low:', currentPeek.progress);
+        }
+        return;
+      }
+      
       // Use requestAnimationFrame to ensure DOM is updated
       requestAnimationFrame(() => {
         if (!passwordInput) return;
+        
+        // Double-check peek state (it might have changed)
+        const currentPeek = peekAnimationRef.current;
+        if (!currentPeek.isPeeking || currentPeek.progress < 0.4) {
+          return;
+        }
+        
+        console.log('[Password Eye Position] Updating position - progress:', currentPeek.progress);
         
         // Get cursor position in input
         // Use selectionEnd as it's more reliable for cursor position
@@ -319,7 +360,7 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
         document.body.removeChild(measureSpan);
       }
     };
-  }, [isPasswordFocused, passwordValue]);
+  }, [isPasswordFocused, passwordValue, peekAnimation.isPeeking, peekAnimation.progress]);
 
   // Blink animation (only when not typing password)
   useEffect(() => {
@@ -333,15 +374,20 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
     return () => clearInterval(blinkInterval);
   }, [isPasswordFocused]);
 
-  // Update ref when isPasswordFocused changes
+  // Update refs when state changes
   useEffect(() => {
     isPasswordFocusedRef.current = isPasswordFocused;
   }, [isPasswordFocused]);
+  
+  useEffect(() => {
+    peekAnimationRef.current = peekAnimation;
+  }, [peekAnimation]);
 
   // Password peek animation - one eye opens halfway (no magnifying glass)
   useEffect(() => {
     if (!isPasswordFocused) {
       // Reset peek animation when password field loses focus
+      console.log('[Password Peek] Field lost focus, resetting animation');
       setPeekAnimation({ isPeeking: false, eye: 'left', progress: 0 });
       peekCountRef.current = 0;
       if (peekIntervalRef.current) {
@@ -351,6 +397,8 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
       return;
     }
 
+    console.log('[Password Peek] Field focused, setting up peek animation');
+    
     // Start peek animation loop (3 times)
     peekCountRef.current = 0;
     let animationFrameId: number | null = null;
@@ -359,10 +407,13 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
     const startPeek = () => {
       // Check if still focused and haven't exceeded peek count
       if (!isPasswordFocusedRef.current || peekCountRef.current >= 3 || !isActive) {
+        console.log('[Password Peek] Stopping peek - focused:', isPasswordFocusedRef.current, 'count:', peekCountRef.current, 'active:', isActive);
         setPeekAnimation({ isPeeking: false, eye: 'left', progress: 0 });
         return;
       }
 
+      console.log('[Password Peek] Starting peek #', peekCountRef.current + 1);
+      
       // Always use left eye for peeking
       const eye = 'left';
       
@@ -389,10 +440,22 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
           eye,
           progress: easedProgress, // Store full progress (0-1) for timing checks
         });
+        
+        // Log every 10% progress
+        if (Math.floor(easedProgress * 10) !== Math.floor((peekAnimationRef.current.progress || 0) * 10)) {
+          const eyeOpenAmount = 0.05 + (0.5 - 0.05) * easedProgress;
+          const eyeHeight = 20 * 2 * eyeOpenAmount;
+          const pupilVisible = easedProgress > 0.4;
+          console.log('[Password Peek] Progress:', (easedProgress * 100).toFixed(1) + '%', 
+            '| Eye open:', (eyeOpenAmount * 100).toFixed(1) + '%', 
+            '| Eye height:', eyeHeight.toFixed(1), 
+            '| Pupil visible:', pupilVisible);
+        }
 
         if (progress < 1 && isActive && isPasswordFocusedRef.current) {
           animationFrameId = requestAnimationFrame(animate);
         } else {
+          console.log('[Password Peek] Animation complete, closing eye');
           // Close eye after peek
           if (isActive && isPasswordFocusedRef.current) {
             setTimeout(() => {
@@ -400,10 +463,14 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
               
               setPeekAnimation({ isPeeking: false, eye, progress: 0 });
               peekCountRef.current++;
+              console.log('[Password Peek] Eye closed, peek count:', peekCountRef.current);
               
               // Wait 1 second before next peek
               if (peekCountRef.current < 3 && isPasswordFocusedRef.current && isActive) {
+                console.log('[Password Peek] Scheduling next peek in 1 second');
                 peekIntervalRef.current = setTimeout(startPeek, 1000);
+              } else {
+                console.log('[Password Peek] All peeks complete');
               }
             }, 300); // Show peek for 300ms
           }
@@ -414,6 +481,7 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
     };
 
     // Start first peek after 1 second
+    console.log('[Password Peek] Scheduling first peek in 1 second');
     peekIntervalRef.current = setTimeout(startPeek, 1000);
 
     return () => {
@@ -429,9 +497,9 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
     };
   }, [isPasswordFocused]);
 
-  const eyeRadius = 15;
-  const pupilRadius = 6;
-  const eyeSpacing = 50;
+  const eyeRadius = 20;
+  const pupilRadius = 8;
+  const eyeSpacing = 60;
 
   // Calculate pupil position - always follow eyePosition state for both eyes
   // This ensures pupils follow text cursor in both username and password fields
@@ -448,7 +516,15 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
         // progress is 0-1, we want eye to open to 50% height
         // So: closed (0.05) to halfway open (0.5) = 0.05 + (0.5 - 0.05) * progress
         const eyeOpenAmount = 0.05 + (0.5 - 0.05) * peekAnimation.progress;
-        return eyeRadius * 2 * eyeOpenAmount;
+        const height = eyeRadius * 2 * eyeOpenAmount;
+        // Log only occasionally to avoid spam
+        if (Math.random() < 0.01) {
+          console.log('[Password Eye Height]', isLeft ? 'Left' : 'Right', 
+            '| Progress:', peekAnimation.progress.toFixed(2), 
+            '| Open amount:', eyeOpenAmount.toFixed(2), 
+            '| Height:', height.toFixed(1));
+        }
+        return height;
       }
       // Both eyes closed
       return eyeRadius * 2 * 0.05; // Almost closed
@@ -464,16 +540,16 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
     <div
       ref={containerRef}
       className="flex justify-center items-center mb-6 relative"
-      style={{ height: '70px' }}
+      style={{ height: '80px' }}
     >
       <svg
-        width="120"
-        height="70"
-        viewBox="0 0 120 70"
+        width="140"
+        height="80"
+        viewBox="0 0 140 80"
         className="transition-all duration-500 ease-in-out"
       >
         {/* Left Eye */}
-        <g transform="translate(30, 35)">
+        <g transform="translate(30, 40)">
           <ellipse
             cx="0"
             cy="0"
@@ -484,21 +560,33 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
             strokeWidth="2.5"
             className="text-gray-800 dark:text-gray-200 transition-all duration-300 ease-in-out"
           />
-           {/* Show pupil - for password peek, wait until eye is at least 60% open (progress > 0.7) */}
-           {(!isPasswordFocused || (peekAnimation.isPeeking && peekAnimation.eye === 'left' && peekAnimation.progress > 0.7)) && (
-             <circle
-               cx={pupilX}
-               cy={pupilY}
-               r={pupilRadius}
-               fill="currentColor"
-               className="text-gray-800 dark:text-gray-200 transition-all duration-300 ease-out"
-               style={{ 
-                 opacity: isPasswordFocused && peekAnimation.isPeeking && peekAnimation.eye === 'left' 
-                   ? Math.max(0, Math.min(1, (peekAnimation.progress - 0.7) / 0.2)) 
-                   : 1 
-               }}
-             />
-           )}
+           {/* Show pupil - for password peek, wait until eye is sufficiently open */}
+           {(() => {
+             const shouldShow = !isPasswordFocused || (peekAnimation.isPeeking && peekAnimation.eye === 'left' && peekAnimation.progress > 0.4);
+             const opacity = isPasswordFocused && peekAnimation.isPeeking && peekAnimation.eye === 'left' 
+               ? Math.max(0, Math.min(1, (peekAnimation.progress - 0.4) / 0.3)) 
+               : 1;
+             
+             // Log pupil visibility changes
+             if (isPasswordFocused && peekAnimation.isPeeking && peekAnimation.eye === 'left') {
+               if (Math.random() < 0.05) { // Log occasionally
+                 console.log('[Password Pupil] Should show:', shouldShow, 
+                   '| Progress:', peekAnimation.progress.toFixed(2), 
+                   '| Opacity:', opacity.toFixed(2));
+               }
+             }
+             
+             return shouldShow ? (
+               <circle
+                 cx={pupilX}
+                 cy={pupilY}
+                 r={pupilRadius}
+                 fill="currentColor"
+                 className="text-gray-800 dark:text-gray-200 transition-all duration-300 ease-out"
+                 style={{ opacity }}
+               />
+             ) : null;
+           })()}
           {/* Blink overlay */}
           {isBlinking && !isPasswordFocused && (
             <rect
@@ -514,7 +602,7 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
         </g>
 
         {/* Right Eye */}
-        <g transform="translate(90, 35)">
+        <g transform="translate(110, 40)">
           <ellipse
             cx="0"
             cy="0"
