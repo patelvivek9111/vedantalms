@@ -75,58 +75,90 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
     const updateEyePosition = () => {
       if (!usernameInput) return;
       
-      // Get cursor position in input
-      const cursorPosition = usernameInput.selectionStart || 0;
-      const textLength = usernameInput.value.length;
-      
-      // Get computed style to match input font exactly
-      const computedStyle = window.getComputedStyle(usernameInput);
-      measureSpan.style.font = `${computedStyle.fontStyle} ${computedStyle.fontVariant} ${computedStyle.fontWeight} ${computedStyle.fontSize} ${computedStyle.fontFamily}`;
-      measureSpan.style.letterSpacing = computedStyle.letterSpacing;
-      measureSpan.style.textTransform = computedStyle.textTransform;
-      
-      // Calculate actual pixel position of cursor
-      const textBeforeCursor = usernameInput.value.substring(0, cursorPosition);
-      let textWidth = 0;
-      if (textBeforeCursor.length > 0) {
-        measureSpan.textContent = textBeforeCursor;
-        textWidth = measureSpan.offsetWidth;
-      }
-      
-      // Get input field dimensions
-      const inputRect = usernameInput.getBoundingClientRect();
-      const paddingLeft = parseFloat(computedStyle.paddingLeft) || 0;
-      const paddingRight = parseFloat(computedStyle.paddingRight) || 0;
-      const inputWidth = inputRect.width - paddingLeft - paddingRight;
-      
-      // Calculate relative position (0 to 1) based on actual cursor pixel position
-      // When textWidth is 0, cursor is at start (position 0)
-      // When textWidth approaches inputWidth, cursor is at end (position 1)
-      let relativePosition = 0;
-      if (inputWidth > 0) {
-        // Calculate position: (textWidth + paddingLeft) / totalWidth
-        const totalWidth = inputWidth + paddingLeft + paddingRight;
-        relativePosition = Math.max(0, Math.min(1, (textWidth + paddingLeft) / totalWidth));
-      }
-      
-      // Map to eye position (-0.4 to 0.4) for horizontal movement
-      // When cursor is at start (0), eyes look left (-0.4)
-      // When cursor is at end (1), eyes look right (0.4)
-      // When cursor is in middle (0.5), eyes look center (0)
-      const eyeX = (relativePosition - 0.5) * 0.8;
-      // Eyes look down since input field is below
-      const eyeY = 0.3; // Look down
-      setEyePosition({ x: eyeX, y: eyeY });
+      // Use requestAnimationFrame to ensure DOM is updated
+      requestAnimationFrame(() => {
+        if (!usernameInput) return;
+        
+        // Get cursor position in input
+        const cursorPosition = usernameInput.selectionStart || 0;
+        const textLength = usernameInput.value.length;
+        
+        // Get computed style to match input font exactly
+        const computedStyle = window.getComputedStyle(usernameInput);
+        measureSpan.style.font = `${computedStyle.fontStyle} ${computedStyle.fontVariant} ${computedStyle.fontWeight} ${computedStyle.fontSize} ${computedStyle.fontFamily}`;
+        measureSpan.style.letterSpacing = computedStyle.letterSpacing;
+        measureSpan.style.textTransform = computedStyle.textTransform;
+        measureSpan.style.paddingLeft = '0px';
+        measureSpan.style.paddingRight = '0px';
+        measureSpan.style.boxSizing = 'content-box';
+        measureSpan.style.border = 'none';
+        measureSpan.style.margin = '0';
+        measureSpan.style.whiteSpace = 'pre';
+        
+        // Calculate actual pixel position of cursor
+        const textBeforeCursor = usernameInput.value.substring(0, cursorPosition);
+        let textWidth = 0;
+        if (textBeforeCursor.length > 0) {
+          measureSpan.textContent = textBeforeCursor;
+          textWidth = measureSpan.offsetWidth;
+        }
+        
+        // Get input field dimensions
+        const inputRect = usernameInput.getBoundingClientRect();
+        const paddingLeft = parseFloat(computedStyle.paddingLeft) || 0;
+        const paddingRight = parseFloat(computedStyle.paddingRight) || 0;
+        const inputWidth = inputRect.width - paddingLeft - paddingRight;
+        
+        // Get scroll position - browser auto-scrolls to show cursor when typing
+        const scrollLeft = usernameInput.scrollLeft || 0;
+        
+        // Calculate relative position (0 to 1) based on actual cursor pixel position
+        let relativePosition = 0;
+        if (inputWidth > 0 && textLength > 0) {
+          // Calculate visible text area
+          const visibleStart = scrollLeft;
+          const visibleEnd = scrollLeft + inputWidth;
+          
+          // Cursor pixel position relative to start of text
+          const cursorPixelPos = textWidth;
+          
+          // Calculate where cursor appears in the visible area
+          // When browser auto-scrolls, cursor is usually at the right edge when at end
+          if (cursorPixelPos < visibleStart) {
+            // Cursor is to the left of visible area
+            relativePosition = 0;
+          } else if (cursorPixelPos > visibleEnd) {
+            // Cursor is to the right of visible area (shouldn't happen with auto-scroll, but handle it)
+            relativePosition = 1;
+          } else {
+            // Cursor is in visible area - map to 0-1
+            relativePosition = (cursorPixelPos - visibleStart) / inputWidth;
+            relativePosition = Math.max(0, Math.min(1, relativePosition));
+          }
+        } else if (textLength === 0) {
+          // No text - cursor at start
+          relativePosition = 0;
+        }
+        
+        // Map to eye position (-0.4 to 0.4) for horizontal movement
+        // When cursor is at start (0), eyes look left (-0.4)
+        // When cursor is at end (1), eyes look right (0.4)
+        // When cursor is in middle (0.5), eyes look center (0)
+        const eyeX = (relativePosition - 0.5) * 0.8;
+        // Eyes look down since input field is below
+        const eyeY = 0.3; // Look down
+        setEyePosition({ x: eyeX, y: eyeY });
+      });
     };
 
     // Update on various events to catch all cursor movements
-    const events = ['keyup', 'keydown', 'keypress', 'click', 'input', 'select', 'focus', 'mousemove'];
+    const events = ['keyup', 'keydown', 'keypress', 'click', 'input', 'select', 'focus', 'mousemove', 'scroll'];
     events.forEach(event => {
       usernameInput.addEventListener(event, updateEyePosition);
     });
     
     // Also use interval to catch cursor movements that might be missed
-    const intervalId = setInterval(updateEyePosition, 50);
+    const intervalId = setInterval(updateEyePosition, 100);
     
     // Initial position
     setTimeout(updateEyePosition, 0);
@@ -164,55 +196,86 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
     const updateEyePosition = () => {
       if (!passwordInput) return;
       
-      // Get cursor position in input
-      const cursorPosition = passwordInput.selectionStart || 0;
-      const textLength = passwordInput.value.length;
-      
-      // Get computed style to match input font exactly
-      const computedStyle = window.getComputedStyle(passwordInput);
-      measureSpan.style.font = `${computedStyle.fontStyle} ${computedStyle.fontVariant} ${computedStyle.fontWeight} ${computedStyle.fontSize} ${computedStyle.fontFamily}`;
-      measureSpan.style.letterSpacing = computedStyle.letterSpacing;
-      measureSpan.style.textTransform = computedStyle.textTransform;
-      
-      // Calculate actual pixel position of cursor
-      // For password fields, use dots (•) to measure since text is hidden
-      const maskedText = '•'.repeat(textLength);
-      const textBeforeCursor = maskedText.substring(0, cursorPosition);
-      let textWidth = 0;
-      if (textBeforeCursor.length > 0) {
-        measureSpan.textContent = textBeforeCursor;
-        textWidth = measureSpan.offsetWidth;
-      }
-      
-      // Get input field dimensions
-      const inputRect = passwordInput.getBoundingClientRect();
-      const paddingLeft = parseFloat(computedStyle.paddingLeft) || 0;
-      const paddingRight = parseFloat(computedStyle.paddingRight) || 0;
-      const inputWidth = inputRect.width - paddingLeft - paddingRight;
-      
-      // Calculate relative position (0 to 1) based on actual cursor pixel position
-      let relativePosition = 0;
-      if (inputWidth > 0) {
-        // Calculate position: (textWidth + paddingLeft) / totalWidth
-        const totalWidth = inputWidth + paddingLeft + paddingRight;
-        relativePosition = Math.max(0, Math.min(1, (textWidth + paddingLeft) / totalWidth));
-      }
-      
-      // Map to eye position (-0.4 to 0.4) for horizontal movement
-      const eyeX = (relativePosition - 0.5) * 0.8;
-      // Eyes look down since input field is below
-      const eyeY = 0.3; // Look down
-      setEyePosition({ x: eyeX, y: eyeY });
+      // Use requestAnimationFrame to ensure DOM is updated
+      requestAnimationFrame(() => {
+        if (!passwordInput) return;
+        
+        // Get cursor position in input
+        const cursorPosition = passwordInput.selectionStart || 0;
+        const textLength = passwordInput.value.length;
+        
+        // Get computed style to match input font exactly
+        const computedStyle = window.getComputedStyle(passwordInput);
+        measureSpan.style.font = `${computedStyle.fontStyle} ${computedStyle.fontVariant} ${computedStyle.fontWeight} ${computedStyle.fontSize} ${computedStyle.fontFamily}`;
+        measureSpan.style.letterSpacing = computedStyle.letterSpacing;
+        measureSpan.style.textTransform = computedStyle.textTransform;
+        measureSpan.style.paddingLeft = '0px';
+        measureSpan.style.paddingRight = '0px';
+        measureSpan.style.boxSizing = 'content-box';
+        measureSpan.style.border = 'none';
+        measureSpan.style.margin = '0';
+        measureSpan.style.whiteSpace = 'pre';
+        
+        // Calculate actual pixel position of cursor
+        // For password fields, use dots (•) to measure since text is hidden
+        const maskedText = '•'.repeat(textLength);
+        const textBeforeCursor = maskedText.substring(0, cursorPosition);
+        let textWidth = 0;
+        if (textBeforeCursor.length > 0) {
+          measureSpan.textContent = textBeforeCursor;
+          textWidth = measureSpan.offsetWidth;
+        }
+        
+        // Get input field dimensions
+        const inputRect = passwordInput.getBoundingClientRect();
+        const paddingLeft = parseFloat(computedStyle.paddingLeft) || 0;
+        const paddingRight = parseFloat(computedStyle.paddingRight) || 0;
+        const inputWidth = inputRect.width - paddingLeft - paddingRight;
+        
+        // Get scroll position - browser auto-scrolls to show cursor when typing
+        const scrollLeft = passwordInput.scrollLeft || 0;
+        
+        // Calculate relative position (0 to 1) based on actual cursor pixel position
+        let relativePosition = 0;
+        if (inputWidth > 0 && textLength > 0) {
+          // Calculate visible text area
+          const visibleStart = scrollLeft;
+          const visibleEnd = scrollLeft + inputWidth;
+          
+          // Cursor pixel position relative to start of text
+          const cursorPixelPos = textWidth;
+          
+          // Calculate where cursor appears in the visible area
+          if (cursorPixelPos < visibleStart) {
+            relativePosition = 0;
+          } else if (cursorPixelPos > visibleEnd) {
+            relativePosition = 1;
+          } else {
+            // Cursor is in visible area - map to 0-1
+            relativePosition = (cursorPixelPos - visibleStart) / inputWidth;
+            relativePosition = Math.max(0, Math.min(1, relativePosition));
+          }
+        } else if (textLength === 0) {
+          // No text - cursor at start
+          relativePosition = 0;
+        }
+        
+        // Map to eye position (-0.4 to 0.4) for horizontal movement
+        const eyeX = (relativePosition - 0.5) * 0.8;
+        // Eyes look down since input field is below
+        const eyeY = 0.3; // Look down
+        setEyePosition({ x: eyeX, y: eyeY });
+      });
     };
 
     // Update on various events
-    const events = ['keyup', 'keydown', 'keypress', 'click', 'input', 'select', 'focus', 'mousemove'];
+    const events = ['keyup', 'keydown', 'keypress', 'click', 'input', 'select', 'focus', 'mousemove', 'scroll'];
     events.forEach(event => {
       passwordInput.addEventListener(event, updateEyePosition);
     });
     
     // Also use interval to catch cursor movements
-    const intervalId = setInterval(updateEyePosition, 50);
+    const intervalId = setInterval(updateEyePosition, 100);
     
     // Initial position
     setTimeout(updateEyePosition, 0);
