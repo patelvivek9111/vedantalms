@@ -240,11 +240,16 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
     const updateEyePosition = () => {
       if (!passwordInput) return;
       
-      // Only update eye position when peeking (eye is open enough)
+      // Only update eye position when peeking (eye is open enough - at least 30% open)
       const currentPeek = peekAnimationRef.current;
-      if (!currentPeek.isPeeking || currentPeek.progress < 0.4) {
+      const eyeOpenAmount = currentPeek.isPeeking 
+        ? 0.05 + (0.5 - 0.05) * currentPeek.progress 
+        : 0;
+      const minEyeOpenForTracking = 0.30; // Same as pupil visibility threshold
+      
+      if (!currentPeek.isPeeking || eyeOpenAmount < minEyeOpenForTracking) {
         if (currentPeek.isPeeking) {
-          console.log('[Password Eye Position] Skipping update - progress too low:', currentPeek.progress);
+          console.log('[Password Eye Position] Skipping update - eye not open enough. Progress:', currentPeek.progress.toFixed(2), 'Eye open:', (eyeOpenAmount * 100).toFixed(1) + '%');
         }
         return;
       }
@@ -255,11 +260,15 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
         
         // Double-check peek state (it might have changed)
         const currentPeek = peekAnimationRef.current;
-        if (!currentPeek.isPeeking || currentPeek.progress < 0.4) {
+        const eyeOpenAmount = currentPeek.isPeeking 
+          ? 0.05 + (0.5 - 0.05) * currentPeek.progress 
+          : 0;
+        
+        if (!currentPeek.isPeeking || eyeOpenAmount < minEyeOpenForTracking) {
           return;
         }
         
-        console.log('[Password Eye Position] Updating position - progress:', currentPeek.progress);
+        console.log('[Password Eye Position] Updating position - progress:', currentPeek.progress.toFixed(2), 'Eye open:', (eyeOpenAmount * 100).toFixed(1) + '%');
         
         // Get cursor position in input
         // Use selectionEnd as it's more reliable for cursor position
@@ -562,9 +571,22 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
           />
            {/* Show pupil - for password peek, wait until eye is sufficiently open */}
            {(() => {
-             const shouldShow = !isPasswordFocused || (peekAnimation.isPeeking && peekAnimation.eye === 'left' && peekAnimation.progress > 0.4);
+             // Calculate eye open amount to determine when pupil should appear
+             // Eye opens from 0.05 (5%) to 0.5 (50%) as progress goes from 0 to 1
+             const eyeOpenAmount = isPasswordFocused && peekAnimation.isPeeking && peekAnimation.eye === 'left'
+               ? 0.05 + (0.5 - 0.05) * peekAnimation.progress
+               : 1;
+             
+             // Pupil should appear when eye is at least 30% open (progress ~0.55)
+             // This ensures the eye opens first before the pupil appears
+             const minEyeOpenForPupil = 0.30;
+             const shouldShow = !isPasswordFocused || (peekAnimation.isPeeking && peekAnimation.eye === 'left' && eyeOpenAmount >= minEyeOpenForPupil);
+             
+             // Calculate opacity based on eye open amount (fade in as eye opens)
              const opacity = isPasswordFocused && peekAnimation.isPeeking && peekAnimation.eye === 'left' 
-               ? Math.max(0, Math.min(1, (peekAnimation.progress - 0.4) / 0.3)) 
+               ? eyeOpenAmount >= minEyeOpenForPupil
+                 ? Math.max(0, Math.min(1, (eyeOpenAmount - minEyeOpenForPupil) / (0.5 - minEyeOpenForPupil)))
+                 : 0
                : 1;
              
              // Log pupil visibility changes
@@ -572,6 +594,7 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
                if (Math.random() < 0.05) { // Log occasionally
                  console.log('[Password Pupil] Should show:', shouldShow, 
                    '| Progress:', peekAnimation.progress.toFixed(2), 
+                   '| Eye open:', (eyeOpenAmount * 100).toFixed(1) + '%',
                    '| Opacity:', opacity.toFixed(2));
                }
              }
