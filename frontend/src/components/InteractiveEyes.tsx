@@ -59,40 +59,55 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
       return;
     }
 
+    // Create a hidden span element for accurate text measurement
+    const measureSpan = document.createElement('span');
+    measureSpan.style.visibility = 'hidden';
+    measureSpan.style.position = 'absolute';
+    measureSpan.style.whiteSpace = 'pre';
+    document.body.appendChild(measureSpan);
+
     const usernameInput = document.getElementById('email-address') as HTMLInputElement;
-    if (!usernameInput) return;
+    if (!usernameInput) {
+      document.body.removeChild(measureSpan);
+      return;
+    }
 
     const updateEyePosition = () => {
+      if (!usernameInput) return;
+      
       // Get cursor position in input
       const cursorPosition = usernameInput.selectionStart || 0;
       const textLength = usernameInput.value.length;
       
-      // Create a temporary span to measure text width
-      const measureText = (text: string, font: string): number => {
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        if (!context) return 0;
-        context.font = font;
-        return context.measureText(text).width;
-      };
-      
-      // Get computed style to match input font
+      // Get computed style to match input font exactly
       const computedStyle = window.getComputedStyle(usernameInput);
-      const font = `${computedStyle.fontSize} ${computedStyle.fontFamily}`;
+      measureSpan.style.font = `${computedStyle.fontStyle} ${computedStyle.fontVariant} ${computedStyle.fontWeight} ${computedStyle.fontSize} ${computedStyle.fontFamily}`;
+      measureSpan.style.letterSpacing = computedStyle.letterSpacing;
+      measureSpan.style.textTransform = computedStyle.textTransform;
       
       // Calculate actual pixel position of cursor
       const textBeforeCursor = usernameInput.value.substring(0, cursorPosition);
-      const textWidth = measureText(textBeforeCursor, font);
+      let textWidth = 0;
+      if (textBeforeCursor.length > 0) {
+        measureSpan.textContent = textBeforeCursor;
+        textWidth = measureSpan.offsetWidth;
+      }
       
       // Get input field dimensions
       const inputRect = usernameInput.getBoundingClientRect();
-      const inputPadding = parseFloat(computedStyle.paddingLeft) + parseFloat(computedStyle.paddingRight);
-      const inputWidth = inputRect.width - inputPadding;
+      const paddingLeft = parseFloat(computedStyle.paddingLeft) || 0;
+      const paddingRight = parseFloat(computedStyle.paddingRight) || 0;
+      const inputWidth = inputRect.width - paddingLeft - paddingRight;
       
       // Calculate relative position (0 to 1) based on actual cursor pixel position
-      // Account for input padding
-      const paddingLeft = parseFloat(computedStyle.paddingLeft);
-      const relativePosition = Math.max(0, Math.min(1, (textWidth + paddingLeft) / inputWidth));
+      // When textWidth is 0, cursor is at start (position 0)
+      // When textWidth approaches inputWidth, cursor is at end (position 1)
+      let relativePosition = 0;
+      if (inputWidth > 0) {
+        // Calculate position: (textWidth + paddingLeft) / totalWidth
+        const totalWidth = inputWidth + paddingLeft + paddingRight;
+        relativePosition = Math.max(0, Math.min(1, (textWidth + paddingLeft) / totalWidth));
+      }
       
       // Map to eye position (-0.4 to 0.4) for horizontal movement
       // When cursor is at start (0), eyes look left (-0.4)
@@ -105,22 +120,25 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
     };
 
     // Update on various events to catch all cursor movements
-    const events = ['keyup', 'keydown', 'click', 'input', 'select', 'focus', 'mousemove'];
+    const events = ['keyup', 'keydown', 'keypress', 'click', 'input', 'select', 'focus', 'mousemove'];
     events.forEach(event => {
       usernameInput.addEventListener(event, updateEyePosition);
     });
     
     // Also use interval to catch cursor movements that might be missed
-    const intervalId = setInterval(updateEyePosition, 30);
+    const intervalId = setInterval(updateEyePosition, 50);
     
     // Initial position
-    updateEyePosition();
+    setTimeout(updateEyePosition, 0);
 
     return () => {
       events.forEach(event => {
         usernameInput.removeEventListener(event, updateEyePosition);
       });
       clearInterval(intervalId);
+      if (document.body.contains(measureSpan)) {
+        document.body.removeChild(measureSpan);
+      }
     };
   }, [isUsernameFocused, isPasswordFocused, usernameValue]);
 
@@ -130,41 +148,55 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
       return;
     }
 
+    // Create a hidden span element for accurate text measurement
+    const measureSpan = document.createElement('span');
+    measureSpan.style.visibility = 'hidden';
+    measureSpan.style.position = 'absolute';
+    measureSpan.style.whiteSpace = 'pre';
+    document.body.appendChild(measureSpan);
+
     const passwordInput = document.getElementById('password') as HTMLInputElement;
-    if (!passwordInput) return;
+    if (!passwordInput) {
+      document.body.removeChild(measureSpan);
+      return;
+    }
 
     const updateEyePosition = () => {
+      if (!passwordInput) return;
+      
       // Get cursor position in input
       const cursorPosition = passwordInput.selectionStart || 0;
       const textLength = passwordInput.value.length;
       
-      // Create a temporary span to measure text width
-      const measureText = (text: string, font: string): number => {
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        if (!context) return 0;
-        context.font = font;
-        return context.measureText(text).width;
-      };
-      
-      // Get computed style to match input font
+      // Get computed style to match input font exactly
       const computedStyle = window.getComputedStyle(passwordInput);
-      const font = `${computedStyle.fontSize} ${computedStyle.fontFamily}`;
+      measureSpan.style.font = `${computedStyle.fontStyle} ${computedStyle.fontVariant} ${computedStyle.fontWeight} ${computedStyle.fontSize} ${computedStyle.fontFamily}`;
+      measureSpan.style.letterSpacing = computedStyle.letterSpacing;
+      measureSpan.style.textTransform = computedStyle.textTransform;
       
       // Calculate actual pixel position of cursor
       // For password fields, use dots (•) to measure since text is hidden
       const maskedText = '•'.repeat(textLength);
       const textBeforeCursor = maskedText.substring(0, cursorPosition);
-      const textWidth = measureText(textBeforeCursor, font);
+      let textWidth = 0;
+      if (textBeforeCursor.length > 0) {
+        measureSpan.textContent = textBeforeCursor;
+        textWidth = measureSpan.offsetWidth;
+      }
       
       // Get input field dimensions
       const inputRect = passwordInput.getBoundingClientRect();
-      const inputPadding = parseFloat(computedStyle.paddingLeft) + parseFloat(computedStyle.paddingRight);
-      const inputWidth = inputRect.width - inputPadding;
+      const paddingLeft = parseFloat(computedStyle.paddingLeft) || 0;
+      const paddingRight = parseFloat(computedStyle.paddingRight) || 0;
+      const inputWidth = inputRect.width - paddingLeft - paddingRight;
       
       // Calculate relative position (0 to 1) based on actual cursor pixel position
-      const paddingLeft = parseFloat(computedStyle.paddingLeft);
-      const relativePosition = Math.max(0, Math.min(1, (textWidth + paddingLeft) / inputWidth));
+      let relativePosition = 0;
+      if (inputWidth > 0) {
+        // Calculate position: (textWidth + paddingLeft) / totalWidth
+        const totalWidth = inputWidth + paddingLeft + paddingRight;
+        relativePosition = Math.max(0, Math.min(1, (textWidth + paddingLeft) / totalWidth));
+      }
       
       // Map to eye position (-0.4 to 0.4) for horizontal movement
       const eyeX = (relativePosition - 0.5) * 0.8;
@@ -174,22 +206,25 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
     };
 
     // Update on various events
-    const events = ['keyup', 'keydown', 'click', 'input', 'select', 'focus', 'mousemove'];
+    const events = ['keyup', 'keydown', 'keypress', 'click', 'input', 'select', 'focus', 'mousemove'];
     events.forEach(event => {
       passwordInput.addEventListener(event, updateEyePosition);
     });
     
     // Also use interval to catch cursor movements
-    const intervalId = setInterval(updateEyePosition, 30);
+    const intervalId = setInterval(updateEyePosition, 50);
     
     // Initial position
-    updateEyePosition();
+    setTimeout(updateEyePosition, 0);
 
     return () => {
       events.forEach(event => {
         passwordInput.removeEventListener(event, updateEyePosition);
       });
       clearInterval(intervalId);
+      if (document.body.contains(measureSpan)) {
+        document.body.removeChild(measureSpan);
+      }
     };
   }, [isPasswordFocused, passwordValue]);
 
@@ -210,7 +245,7 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
     isPasswordFocusedRef.current = isPasswordFocused;
   }, [isPasswordFocused]);
 
-  // Password peek animation - one eye opens halfway with magnifying glass
+  // Password peek animation - one eye opens halfway (no magnifying glass)
   useEffect(() => {
     if (!isPasswordFocused) {
       // Reset peek animation when password field loses focus
@@ -220,7 +255,6 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
         clearTimeout(peekIntervalRef.current);
         peekIntervalRef.current = null;
       }
-      setEyePosition({ x: 0, y: 0 });
       return;
     }
 
@@ -257,11 +291,6 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
           ? 2 * progress * progress
           : 1 - Math.pow(-2 * progress + 2, 2) / 2;
         
-        // Progress goes from 0 to 1, where 1 = fully open
-        // We want eye to open halfway, so multiply by 0.5
-        // But we'll use the full easedProgress (0-1) for better control
-        const eyeOpenProgress = easedProgress * 0.5; // 0 to 0.5 (halfway open)
-        
         setPeekAnimation({
           isPeeking: true,
           eye,
@@ -283,7 +312,7 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
               if (peekCountRef.current < 3 && isPasswordFocusedRef.current && isActive) {
                 peekIntervalRef.current = setTimeout(startPeek, 1000);
               }
-            }, 300); // Show magnifying glass for 300ms
+            }, 300); // Show peek for 300ms
           }
         }
       };
@@ -389,56 +418,6 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
               style={{ animationDuration: '150ms' }}
             />
           )}
-           {/* Magnifying glass for peek - positioned directly above left eye center */}
-           {peekAnimation.isPeeking && peekAnimation.eye === 'left' && peekAnimation.progress > 0.4 && (
-             <g 
-               className="transition-opacity duration-200"
-               style={{ 
-                 opacity: Math.max(0, Math.min(1, (peekAnimation.progress - 0.4) / 0.3))
-               }}
-             >
-               {/* Magnifying glass handle - starts from eye center, goes up and slightly right */}
-               <line
-                 x1={0}
-                 y1={-leftEyeHeight / 2}
-                 x2={eyeRadius * 0.3}
-                 y2={-eyeRadius * 2.2}
-                 stroke="currentColor"
-                 strokeWidth="3"
-                 strokeLinecap="round"
-                 className="text-gray-600 dark:text-gray-400"
-               />
-               {/* Magnifying glass circle - positioned directly above eye center */}
-               <circle
-                 cx={0}
-                 cy={-eyeRadius * 2.2}
-                 r={eyeRadius * 0.9}
-                 fill="none"
-                 stroke="currentColor"
-                 strokeWidth="3"
-                 className="text-gray-600 dark:text-gray-400"
-               />
-               {/* Inner circle for glass effect */}
-               <circle
-                 cx={0}
-                 cy={-eyeRadius * 2.2}
-                 r={eyeRadius * 0.65}
-                 fill="none"
-                 stroke="currentColor"
-                 strokeWidth="1.5"
-                 className="text-gray-500 dark:text-gray-500"
-               />
-               {/* Glass highlight */}
-               <circle
-                 cx={-eyeRadius * 0.2}
-                 cy={-eyeRadius * 2.2 - eyeRadius * 0.2}
-                 r={eyeRadius * 0.15}
-                 fill="currentColor"
-                 className="text-gray-300 dark:text-gray-600"
-                 opacity="0.5"
-               />
-             </g>
-           )}
         </g>
 
         {/* Right Eye */}
