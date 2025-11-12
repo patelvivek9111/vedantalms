@@ -240,12 +240,12 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
     const updateEyePosition = () => {
       if (!passwordInput) return;
       
-      // Only update eye position when peeking (eye is open enough - at least 30% open)
+      // Only update eye position when peeking (eye is open enough - at least 40% open)
       const currentPeek = peekAnimationRef.current;
       const eyeOpenAmount = currentPeek.isPeeking 
         ? 0.05 + (0.5 - 0.05) * currentPeek.progress 
         : 0;
-      const minEyeOpenForTracking = 0.30; // Same as pupil visibility threshold
+      const minEyeOpenForTracking = 0.40; // Same as pupil visibility threshold
       
       if (!currentPeek.isPeeking || eyeOpenAmount < minEyeOpenForTracking) {
         if (currentPeek.isPeeking) {
@@ -454,11 +454,13 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
         if (Math.floor(easedProgress * 10) !== Math.floor((peekAnimationRef.current.progress || 0) * 10)) {
           const eyeOpenAmount = 0.05 + (0.5 - 0.05) * easedProgress;
           const eyeHeight = 20 * 2 * eyeOpenAmount;
-          const pupilVisible = easedProgress > 0.4;
+          const minEyeOpenForPupil = 0.40;
+          const pupilVisible = eyeOpenAmount >= minEyeOpenForPupil;
           console.log('[Password Peek] Progress:', (easedProgress * 100).toFixed(1) + '%', 
             '| Eye open:', (eyeOpenAmount * 100).toFixed(1) + '%', 
             '| Eye height:', eyeHeight.toFixed(1), 
-            '| Pupil visible:', pupilVisible);
+            '| Pupil visible:', pupilVisible,
+            '| (needs', (minEyeOpenForPupil * 100).toFixed(0) + '%+)');
         }
 
         if (progress < 1 && isActive && isPasswordFocusedRef.current) {
@@ -577,12 +579,13 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
                ? 0.05 + (0.5 - 0.05) * peekAnimation.progress
                : 1;
              
-             // Pupil should appear when eye is at least 30% open (progress ~0.55)
-             // This ensures the eye opens first before the pupil appears
-             const minEyeOpenForPupil = 0.30;
+             // Pupil should appear when eye is at least 40% open (progress ~0.78)
+             // This ensures the eye opens significantly before the pupil appears
+             const minEyeOpenForPupil = 0.40;
              const shouldShow = !isPasswordFocused || (peekAnimation.isPeeking && peekAnimation.eye === 'left' && eyeOpenAmount >= minEyeOpenForPupil);
              
              // Calculate opacity based on eye open amount (fade in as eye opens)
+             // Only show pupil when eye is open enough
              const opacity = isPasswordFocused && peekAnimation.isPeeking && peekAnimation.eye === 'left' 
                ? eyeOpenAmount >= minEyeOpenForPupil
                  ? Math.max(0, Math.min(1, (eyeOpenAmount - minEyeOpenForPupil) / (0.5 - minEyeOpenForPupil)))
@@ -595,11 +598,17 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
                  console.log('[Password Pupil] Should show:', shouldShow, 
                    '| Progress:', peekAnimation.progress.toFixed(2), 
                    '| Eye open:', (eyeOpenAmount * 100).toFixed(1) + '%',
+                   '| Needs:', (minEyeOpenForPupil * 100).toFixed(0) + '%+',
                    '| Opacity:', opacity.toFixed(2));
                }
              }
              
-             return shouldShow ? (
+             // Don't render pupil at all if it shouldn't be visible
+             if (!shouldShow || opacity === 0) {
+               return null;
+             }
+             
+             return (
                <circle
                  cx={pupilX}
                  cy={pupilY}
@@ -608,7 +617,7 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
                  className="text-gray-800 dark:text-gray-200 transition-all duration-300 ease-out"
                  style={{ opacity }}
                />
-             ) : null;
+             );
            })()}
           {/* Blink overlay */}
           {isBlinking && !isPasswordFocused && (
