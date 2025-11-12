@@ -240,17 +240,10 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
     const updateEyePosition = () => {
       if (!passwordInput) return;
       
-      // Only update eye position when peeking (eye is open enough - at least 40% open)
+      // Update eye position as soon as peeking starts (in sync with pupil)
       const currentPeek = peekAnimationRef.current;
-      const eyeOpenAmount = currentPeek.isPeeking 
-        ? 0.05 + (0.5 - 0.05) * currentPeek.progress 
-        : 0;
-      const minEyeOpenForTracking = 0.40; // Same as pupil visibility threshold
       
-      if (!currentPeek.isPeeking || eyeOpenAmount < minEyeOpenForTracking) {
-        if (currentPeek.isPeeking) {
-          console.log('[Password Eye Position] Skipping update - eye not open enough. Progress:', currentPeek.progress.toFixed(2), 'Eye open:', (eyeOpenAmount * 100).toFixed(1) + '%');
-        }
+      if (!currentPeek.isPeeking) {
         return;
       }
       
@@ -260,14 +253,12 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
         
         // Double-check peek state (it might have changed)
         const currentPeek = peekAnimationRef.current;
-        const eyeOpenAmount = currentPeek.isPeeking 
-          ? 0.05 + (0.5 - 0.05) * currentPeek.progress 
-          : 0;
         
-        if (!currentPeek.isPeeking || eyeOpenAmount < minEyeOpenForTracking) {
+        if (!currentPeek.isPeeking) {
           return;
         }
         
+        const eyeOpenAmount = 0.05 + (0.5 - 0.05) * currentPeek.progress;
         console.log('[Password Eye Position] Updating position - progress:', currentPeek.progress.toFixed(2), 'Eye open:', (eyeOpenAmount * 100).toFixed(1) + '%');
         
         // Get cursor position in input
@@ -454,7 +445,7 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
         if (Math.floor(easedProgress * 10) !== Math.floor((peekAnimationRef.current.progress || 0) * 10)) {
           const eyeOpenAmount = 0.05 + (0.5 - 0.05) * easedProgress;
           const eyeHeight = 20 * 2 * eyeOpenAmount;
-          const minEyeOpenForPupil = 0.40;
+          const minEyeOpenForPupil = 0.05; // Pupil appears as soon as eye starts opening
           const pupilVisible = eyeOpenAmount >= minEyeOpenForPupil;
           console.log('[Password Peek] Progress:', (easedProgress * 100).toFixed(1) + '%', 
             '| Eye open:', (eyeOpenAmount * 100).toFixed(1) + '%', 
@@ -579,17 +570,15 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
                ? 0.05 + (0.5 - 0.05) * peekAnimation.progress
                : 1;
              
-             // Pupil should appear when eye is at least 40% open (progress ~0.78)
-             // This ensures the eye opens significantly before the pupil appears
-             const minEyeOpenForPupil = 0.40;
-             const shouldShow = !isPasswordFocused || (peekAnimation.isPeeking && peekAnimation.eye === 'left' && eyeOpenAmount >= minEyeOpenForPupil);
+             // Pupil should appear as soon as the eye starts opening (in sync)
+             // Eye starts at 5% open, so pupil appears immediately when peeking starts
+             const minEyeOpenForPupil = 0.05; // Same as starting eye open amount
+             const shouldShow = !isPasswordFocused || (peekAnimation.isPeeking && peekAnimation.eye === 'left');
              
              // Calculate opacity based on eye open amount (fade in as eye opens)
-             // Only show pupil when eye is open enough
+             // Opacity scales from 0 to 1 as eye opens from 5% to 50%
              const opacity = isPasswordFocused && peekAnimation.isPeeking && peekAnimation.eye === 'left' 
-               ? eyeOpenAmount >= minEyeOpenForPupil
-                 ? Math.max(0, Math.min(1, (eyeOpenAmount - minEyeOpenForPupil) / (0.5 - minEyeOpenForPupil)))
-                 : 0
+               ? Math.max(0, Math.min(1, (eyeOpenAmount - 0.05) / (0.5 - 0.05)))
                : 1;
              
              // Log pupil visibility changes
