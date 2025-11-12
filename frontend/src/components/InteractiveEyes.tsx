@@ -55,7 +55,10 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
   // Track text cursor position in username field
   useEffect(() => {
     if (!isUsernameFocused || isPasswordFocused) {
-      setEyePosition({ x: 0, y: 0.3 }); // Look down when not focused
+      // Only reset if we're not tracking password
+      if (!isPasswordFocused) {
+        setEyePosition({ x: 0, y: 0.3 }); // Look down when not focused
+      }
       return;
     }
 
@@ -75,9 +78,15 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
     const updateEyePosition = () => {
       if (!usernameInput) return;
       
+      // Check if username input is actually focused (more reliable than state)
+      if (document.activeElement !== usernameInput) return;
+      
       // Use requestAnimationFrame to ensure DOM is updated
       requestAnimationFrame(() => {
         if (!usernameInput) return;
+        
+        // Double-check focus state
+        if (document.activeElement !== usernameInput) return;
         
         // Get cursor position in input
         const cursorPosition = usernameInput.selectionStart || 0;
