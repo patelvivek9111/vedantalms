@@ -100,10 +100,20 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
         if (document.activeElement !== usernameInput) return;
         
         // Get cursor position in input
-        const cursorPosition = usernameInput.selectionStart || 0;
+        // Use selectionEnd as it's more reliable for cursor position
+        // selectionStart can be 0 even when cursor is at the end
         const textLength = usernameInput.value.length;
+        let cursorPosition = usernameInput.selectionEnd ?? usernameInput.selectionStart ?? textLength;
         
-        console.log('[Username] Update - cursor:', cursorPosition, 'textLength:', textLength, 'value:', usernameInput.value.substring(0, 20) + '...');
+        // If both are 0 or null and there's text, assume cursor is at the end (most common when typing)
+        if ((cursorPosition === 0 || cursorPosition === null) && textLength > 0) {
+          cursorPosition = textLength;
+        }
+        
+        // Ensure cursor position is within valid range
+        cursorPosition = Math.max(0, Math.min(cursorPosition, textLength));
+        
+        console.log('[Username] Update - cursor:', cursorPosition, 'textLength:', textLength, 'selectionStart:', usernameInput.selectionStart, 'selectionEnd:', usernameInput.selectionEnd, 'value:', usernameInput.value.substring(0, 20) + '...');
         
         // Get computed style to match input font exactly
         const computedStyle = window.getComputedStyle(usernameInput);
@@ -234,8 +244,18 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
         if (!passwordInput) return;
         
         // Get cursor position in input
-        const cursorPosition = passwordInput.selectionStart || 0;
+        // Use selectionEnd as it's more reliable for cursor position
+        // selectionStart can be 0 even when cursor is at the end
         const textLength = passwordInput.value.length;
+        let cursorPosition = passwordInput.selectionEnd ?? passwordInput.selectionStart ?? textLength;
+        
+        // If both are 0 or null and there's text, assume cursor is at the end (most common when typing)
+        if ((cursorPosition === 0 || cursorPosition === null) && textLength > 0) {
+          cursorPosition = textLength;
+        }
+        
+        // Ensure cursor position is within valid range
+        cursorPosition = Math.max(0, Math.min(cursorPosition, textLength));
         
         // Get computed style to match input font exactly
         const computedStyle = window.getComputedStyle(passwordInput);
