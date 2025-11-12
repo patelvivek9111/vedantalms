@@ -54,6 +54,8 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
 
   // Track text cursor position in username field
   useEffect(() => {
+    console.log('[Username] Effect running - isUsernameFocused:', isUsernameFocused, 'isPasswordFocused:', isPasswordFocused);
+    
     if (!isUsernameFocused || isPasswordFocused) {
       // Only reset if we're not tracking password
       if (!isPasswordFocused) {
@@ -71,15 +73,24 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
 
     const usernameInput = document.getElementById('email-address') as HTMLInputElement;
     if (!usernameInput) {
+      console.log('[Username] Input element not found!');
       document.body.removeChild(measureSpan);
       return;
     }
+    
+    console.log('[Username] Input element found, setting up tracking');
 
     const updateEyePosition = () => {
-      if (!usernameInput) return;
+      if (!usernameInput) {
+        console.log('[Username] No input element');
+        return;
+      }
       
       // Check if username input is actually focused (more reliable than state)
-      if (document.activeElement !== usernameInput) return;
+      if (document.activeElement !== usernameInput) {
+        console.log('[Username] Input not focused, activeElement:', document.activeElement?.id);
+        return;
+      }
       
       // Use requestAnimationFrame to ensure DOM is updated
       requestAnimationFrame(() => {
@@ -91,6 +102,8 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
         // Get cursor position in input
         const cursorPosition = usernameInput.selectionStart || 0;
         const textLength = usernameInput.value.length;
+        
+        console.log('[Username] Update - cursor:', cursorPosition, 'textLength:', textLength, 'value:', usernameInput.value.substring(0, 20) + '...');
         
         // Get computed style to match input font exactly
         const computedStyle = window.getComputedStyle(usernameInput);
@@ -121,6 +134,8 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
         // Get scroll position - browser auto-scrolls to show cursor when typing
         const scrollLeft = usernameInput.scrollLeft || 0;
         
+        console.log('[Username] textWidth:', textWidth, 'inputWidth:', inputWidth, 'scrollLeft:', scrollLeft, 'paddingLeft:', paddingLeft);
+        
         // Calculate relative position (0 to 1) based on actual cursor pixel position
         let relativePosition = 0;
         if (inputWidth > 0 && textLength > 0) {
@@ -131,22 +146,28 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
           // Cursor pixel position relative to start of text
           const cursorPixelPos = textWidth;
           
+          console.log('[Username] visibleStart:', visibleStart, 'visibleEnd:', visibleEnd, 'cursorPixelPos:', cursorPixelPos);
+          
           // Calculate where cursor appears in the visible area
           // When browser auto-scrolls, cursor is usually at the right edge when at end
           if (cursorPixelPos < visibleStart) {
             // Cursor is to the left of visible area
             relativePosition = 0;
+            console.log('[Username] Cursor left of visible area');
           } else if (cursorPixelPos > visibleEnd) {
             // Cursor is to the right of visible area (shouldn't happen with auto-scroll, but handle it)
             relativePosition = 1;
+            console.log('[Username] Cursor right of visible area');
           } else {
             // Cursor is in visible area - map to 0-1
             relativePosition = (cursorPixelPos - visibleStart) / inputWidth;
             relativePosition = Math.max(0, Math.min(1, relativePosition));
+            console.log('[Username] Cursor in visible area, relativePosition:', relativePosition);
           }
         } else if (textLength === 0) {
           // No text - cursor at start
           relativePosition = 0;
+          console.log('[Username] No text, position 0');
         }
         
         // Map to eye position (-0.4 to 0.4) for horizontal movement
@@ -156,6 +177,9 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
         const eyeX = (relativePosition - 0.5) * 0.8;
         // Eyes look down since input field is below
         const eyeY = 0.3; // Look down
+        
+        console.log('[Username] Final - relativePosition:', relativePosition, 'eyeX:', eyeX, 'eyeY:', eyeY);
+        
         setEyePosition({ x: eyeX, y: eyeY });
       });
     };
