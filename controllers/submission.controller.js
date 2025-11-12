@@ -451,7 +451,7 @@ exports.gradeSubmission = async (req, res) => {
           });
           await submission.save();
         } else {
-          return res.status(404).json({ message: 'Submission not found' });
+      return res.status(404).json({ message: 'Submission not found' });
         }
       } else if (!submission) {
         return res.status(404).json({ message: 'Submission not found' });
@@ -922,7 +922,7 @@ exports.createOrUpdateManualGrade = async (req, res) => {
     console.error('Error creating/updating manual grade:', error);
     res.status(500).json({ message: error.message });
   }
-};
+}; 
 
 // Delete a submission
 exports.deleteSubmission = async (req, res) => {

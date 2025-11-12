@@ -1047,16 +1047,16 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
             ) : (
               <>
                 {/* Total Points Display for regular assignments */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Total Points</label>
-                  <div className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 shadow-sm p-2">
-                    {Number.isFinite(formData.totalPoints) ? formData.totalPoints : 0}
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Questions</h3>
-                    <div className="space-x-2">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Total Points</label>
+              <div className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 shadow-sm p-2">
+                {Number.isFinite(formData.totalPoints) ? formData.totalPoints : 0}
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Questions</h3>
+                <div className="space-x-2">
                   <button
                     type="button"
                     onClick={() => addQuestion('text')}

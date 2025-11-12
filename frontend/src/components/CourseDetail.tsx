@@ -1339,10 +1339,10 @@ const CourseDetail: React.FC = () => {
           );
         } else {
           res = await axios.post(
-            `${API_URL}/api/submissions/${submissionId}/grade`,
-            { grade: null },  // Send null to remove the grade
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
+          `${API_URL}/api/submissions/${submissionId}/grade`,
+          { grade: null },  // Send null to remove the grade
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
         }
 
         if (res.data) {
@@ -1419,10 +1419,10 @@ const CourseDetail: React.FC = () => {
       } else {
         // Use regular grade endpoint
         res = await axios.post(
-          `${API_URL}/api/submissions/${submissionId}/grade`,
-          { grade: gradeNum },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        `${API_URL}/api/submissions/${submissionId}/grade`,
+        { grade: gradeNum },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       }
 
       if (res.data) {
