@@ -601,7 +601,7 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
       
       // Check for button with type="button" near password field
       // Look for button with aria-label containing "password" or "Show"/"Hide"
-      const buttons = parent.querySelectorAll('button[type="button"]');
+      const buttons = Array.from(parent.querySelectorAll('button[type="button"]'));
       for (const btn of buttons) {
         const ariaLabel = btn.getAttribute('aria-label')?.toLowerCase() || '';
         const textContent = btn.textContent?.toLowerCase() || '';
