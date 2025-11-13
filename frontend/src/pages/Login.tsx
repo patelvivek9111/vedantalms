@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { BookOpen, Eye, EyeOff } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
+import { Eye, EyeOff } from 'lucide-react';
 import { InteractiveEyes } from '../components/InteractiveEyes';
 
 export function Login() {
@@ -14,8 +15,14 @@ export function Login() {
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
   const emailInputRef = useRef<HTMLInputElement>(null);
   const { login, user } = useAuth();
+  const { theme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
+  
+  // Determine which logo to use based on theme
+  const logoPath = theme === 'dark' 
+    ? '/assets/Vedanta_dark_logo.png' 
+    : '/assets/Vedanta_light_logo.png';
 
   // Redirect to dashboard if already logged in
   useEffect(() => {
@@ -49,39 +56,31 @@ export function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <div className="flex justify-center mb-4">
+          <div className="flex justify-center">
             <img 
-              src="/assets/vedanta-logo.png" 
+              src={logoPath} 
               alt="Vedanta Logo" 
-              className="h-16 w-auto"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none';
-                const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                if (fallback) fallback.style.display = 'block';
-              }}
+              className="h-42 w-60"
             />
-            <div className="flex items-center justify-center" style={{ display: 'none' }}>
-              <BookOpen className="h-12 w-12 text-blue-600 dark:text-blue-400" />
-            </div>
           </div>
           
           {/* Interactive Eyes */}
-          <InteractiveEyes
-            isPasswordFocused={isPasswordFocused}
-            isUsernameFocused={isEmailFocused}
-            usernameValue={email}
-            passwordValue={password}
-            hasError={!!error}
-            isLoading={isLoading}
-          />
+          <div className="mt-1">
+            <InteractiveEyes
+              isPasswordFocused={isPasswordFocused}
+              isUsernameFocused={isEmailFocused}
+              usernameValue={email}
+              passwordValue={password}
+              hasError={!!error}
+              isLoading={isLoading}
+            />
+          </div>
           
-          <h2 className="mt-2 text-center text-3xl font-extrabold text-gray-900 dark:text-gray-100">
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-gray-100">
             Sign in to Vedanta
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
-            Modern Learning. Ancient Wisdom.
-          </p>
-          <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
+          
+          <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
             Or{' '}
             <Link to="/signup" className="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300">
               create a new account
