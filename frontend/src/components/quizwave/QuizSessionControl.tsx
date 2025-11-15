@@ -397,11 +397,16 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
     }
   };
 
+  // Render full screen when quiz is active (waiting or active status)
+  const isQuizActive = session && (session.status === 'waiting' || session.status === 'active' || currentQuestion);
+
   if (!session) {
     return (
-      <div className="p-6 text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-        <p className="mt-4 text-gray-600 dark:text-gray-400">Loading session...</p>
+      <div className="fixed inset-0 bg-gray-50 dark:bg-gray-900 z-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading session...</p>
+        </div>
       </div>
     );
   }
@@ -417,7 +422,7 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
     return shapes[index % shapes.length];
   };
 
-  return (
+  const quizContent = (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Waiting Screen */}
       {isWaiting && (
@@ -891,6 +896,18 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
       )}
     </div>
   );
+
+  // Return with full screen wrapper when quiz is active
+  if (isQuizActive) {
+    return (
+      <div className="fixed inset-0 bg-gray-50 dark:bg-gray-900 z-50 overflow-auto">
+        {quizContent}
+      </div>
+    );
+  }
+
+  // Regular layout when quiz is ended
+  return quizContent;
 };
 
 export default QuizSessionControl;
