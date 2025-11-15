@@ -56,6 +56,9 @@ import CoursePeople from './pages/CoursePeople';
 import LandingPage from './pages/LandingPage';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ThemeProvider } from './context/ThemeContext';
+import QuizWaveDashboard from './components/quizwave/QuizWaveDashboard';
+import StudentJoinScreen from './components/quizwave/StudentJoinScreen';
+import StudentGameScreen from './components/quizwave/StudentGameScreen';
 
 
 // Wrapper components to handle moduleId prop
@@ -397,6 +400,32 @@ function AppContent() {
             element={
               <PrivateRoute allowedRoles={['student']}>
                 <Transcript />
+              </PrivateRoute>
+            }
+          />
+          
+          {/* QuizWave Routes */}
+          <Route
+            path="/courses/:courseId/quizwave"
+            element={
+              <PrivateRoute>
+                <QuizWaveDashboard />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/quizwave/join"
+            element={
+              <PrivateRoute>
+                <StudentJoinScreen />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/quizwave/play/:pin"
+            element={
+              <PrivateRoute>
+                <StudentGameScreen />
               </PrivateRoute>
             }
           />

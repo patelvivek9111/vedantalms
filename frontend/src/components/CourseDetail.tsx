@@ -27,7 +27,8 @@ import {
   Vote,
   Layout,
   ClipboardCheck,
-  GraduationCap
+  GraduationCap,
+  Gamepad2
 } from 'lucide-react';
 import WhatIfScores from './WhatIfScores';
 import StudentGradeSidebar from './StudentGradeSidebar';
@@ -46,6 +47,8 @@ import LatestAnnouncements from './LatestAnnouncements';
 import Attendance from './Attendance';
 import PollList from './polls/PollList';
 import RichTextEditor from './RichTextEditor';
+import QuizWaveDashboard from './quizwave/QuizWaveDashboard';
+import StudentQuizWaveView from './quizwave/StudentQuizWaveView';
 
 // EnrollmentRequestsHandler component
 const EnrollmentRequestsHandler: React.FC<{ courseId: string }> = ({ courseId }) => {
@@ -140,6 +143,7 @@ const navigationItems = [
   { id: 'pages', label: 'Pages', icon: FileText },
   { id: 'assignments', label: 'Assignments', icon: PenTool },
   { id: 'quizzes', label: 'Quizzes', icon: ClipboardCheck },
+  { id: 'quizwave', label: 'QuizWave', icon: Gamepad2 },
   { id: 'discussions', label: 'Discussions', icon: MessageSquare },
   { id: 'announcements', label: 'Announcements', icon: Megaphone },
   { id: 'polls', label: 'Polls', icon: BarChart3 },
@@ -267,9 +271,11 @@ const CourseDetail: React.FC = () => {
 
   // 1. Move fetchCourseAndModulesWithAssignments outside of useEffect so it can be called from multiple places
   const fetchCourseAndModulesWithAssignments = useCallback(async () => {
-    if (id) {
+    if (id && id !== 'undefined' && id !== 'null' && id.trim() !== '') {
       try {
+        console.log('Fetching course with ID:', id);
         const courseData = await getCourseRef.current(id);
+        console.log('Course data received:', courseData);
         setCourse(courseData);
 
         // Fetch modules for the course
@@ -299,6 +305,11 @@ const CourseDetail: React.FC = () => {
         }
       } catch (err) {
         console.error('Error fetching course or modules:', err);
+        // Log more details for debugging
+        if (err instanceof Error) {
+          console.error('Error message:', err.message);
+          console.error('Error stack:', err.stack);
+        }
       }
     }
   }, [id, getCourseRef]);
@@ -407,6 +418,7 @@ const CourseDetail: React.FC = () => {
       pages: true,
       assignments: true,
       quizzes: true,
+      quizwave: true,
       discussions: true,
       announcements: true,
       polls: true,
@@ -1891,6 +1903,29 @@ const CourseDetail: React.FC = () => {
                     <Layout className="w-4 h-4" />
                     Customize Sidebar
                   </button>
+                  <button 
+                    className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded hover:from-blue-700 hover:to-purple-700 transition-colors flex items-center gap-2" 
+                    onClick={() => setActiveSection('quizwave')}
+                  >
+                    <Gamepad2 className="w-4 h-4" />
+                    QuizWave
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Student Quick Actions */}
+            {!isInstructor && !isAdmin && (
+              <div className="bg-white dark:bg-gray-900 rounded-xl shadow p-6 border border-gray-200 dark:border-gray-700">
+                <div className="font-semibold mb-4 text-gray-900 dark:text-gray-100">Quick Actions</div>
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <button 
+                    className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded hover:from-blue-700 hover:to-purple-700 transition-colors flex items-center gap-2" 
+                    onClick={() => setActiveSection('quizwave')}
+                  >
+                    <Gamepad2 className="w-4 h-4" />
+                    Join QuizWave
+                  </button>
                 </div>
               </div>
             )}
@@ -2375,6 +2410,32 @@ const CourseDetail: React.FC = () => {
             </div>
           </div>
         );
+
+      case 'quizwave':
+        // Wait for course to load
+        if (loading || !course || !course._id) {
+          return (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="mt-4 text-gray-600 dark:text-gray-400">Loading course...</p>
+            </div>
+          );
+        }
+        // Show different views for teachers and students
+        if (isInstructor || isAdmin) {
+          return (
+            <div className="space-y-6">
+              <QuizWaveDashboard courseId={course._id.toString()} />
+            </div>
+          );
+        } else {
+          // Student view
+          return (
+            <div className="space-y-6">
+              <StudentQuizWaveView courseId={course._id.toString()} />
+            </div>
+          );
+        }
 
       case 'grades':
         if (isInstructor || isAdmin) {

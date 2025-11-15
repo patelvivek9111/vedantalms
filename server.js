@@ -4,12 +4,17 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
 const fs = require('fs');
+const http = require('http');
+const { Server } = require('socket.io');
 
 // Load environment variables
 dotenv.config();
 
 // Create Express app
 const app = express();
+
+// Create HTTP server for Socket.io
+const server = http.createServer(app);
 
 // CORS configuration for production
 const corsOptions = {
@@ -174,6 +179,7 @@ app.use('/api/polls', require('./routes/poll.routes'));
 app.use('/api/reports', require('./routes/reports.routes'));
 app.use('/api/admin', require('./routes/admin.routes'));
 app.use('/api/notifications', require('./routes/notification.routes').router);
+app.use('/api/quizwave', require('./routes/quizwave.routes'));
 
 // Upload route for file uploads
 const upload = require('./middleware/upload');
@@ -236,27 +242,53 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
+// Initialize Socket.io
+const io = new Server(server, {
+  cors: {
+    origin: process.env.NODE_ENV === 'production' 
+      ? [process.env.FRONTEND_URL || 'https://vedantaed.com', 'https://www.vedantaed.com']
+      : ['http://localhost:3000', 'http://localhost:5173'],
+    credentials: true,
+    methods: ['GET', 'POST']
+  }
+});
+
+// Initialize QuizWave socket handlers
+const { initializeQuizWaveSocket } = require('./socket/quizwave.socket');
+initializeQuizWaveSocket(io);
+
+console.log('✅ Socket.io initialized for QuizWave');
+
+// Start QuizWave auto-cleanup scheduler
+const { startCleanupScheduler } = require('./utils/quizwaveCleanup');
+startCleanupScheduler();
+
 // Start server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📱 Health check: http://localhost:${PORT}/health`);
   console.log(`🔗 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🎮 QuizWave Socket.io ready`);
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('🛑 SIGTERM received, shutting down gracefully');
-  mongoose.connection.close(() => {
-    console.log('✅ MongoDB connection closed');
-    process.exit(0);
+  io.close(() => {
+    mongoose.connection.close(() => {
+      console.log('✅ MongoDB connection closed');
+      process.exit(0);
+    });
   });
 });
 
 process.on('SIGINT', () => {
   console.log('🛑 SIGINT received, shutting down gracefully');
-  mongoose.connection.close(() => {
-    console.log('✅ MongoDB connection closed');
-    process.exit(0);
+  io.close(() => {
+    mongoose.connection.close(() => {
+      console.log('✅ MongoDB connection closed');
+      process.exit(0);
+    });
   });
 }); 
