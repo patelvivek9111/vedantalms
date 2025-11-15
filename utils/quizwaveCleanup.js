@@ -1,14 +1,14 @@
 const { QuizSession, QuizResponse } = require('../models/quizwave.model');
 
-// Cleanup old quiz sessions (older than 90 days - keep data for 3 months)
+// Cleanup old quiz sessions (older than 1 day - keep data for 1 day)
 const cleanupOldSessions = async () => {
   try {
-    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    const oneDayAgo = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000);
     
     // Find old ended sessions
     const oldSessions = await QuizSession.find({
       status: 'ended',
-      createdAt: { $lt: ninetyDaysAgo }
+      createdAt: { $lt: oneDayAgo }
     });
 
     if (oldSessions.length === 0) {
@@ -26,7 +26,7 @@ const cleanupOldSessions = async () => {
     // Delete old sessions
     const sessionResult = await QuizSession.deleteMany({
       status: 'ended',
-      createdAt: { $lt: ninetyDaysAgo }
+      createdAt: { $lt: oneDayAgo }
     });
 
     console.log(`✅ QuizWave: Cleaned up ${sessionResult.deletedCount} old sessions and ${responseResult.deletedCount} responses`);
