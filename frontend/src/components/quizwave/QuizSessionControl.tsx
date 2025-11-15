@@ -132,7 +132,7 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
           clearInterval(countdownRef.current);
         }
         // Update session status to active
-        setSession((prev) => prev ? { ...prev, status: 'active', currentQuestionIndex: 0 } : null);
+        setSession((prev) => prev ? { ...prev, status: 'active' as const, currentQuestionIndex: 0 } : null);
         // Also reload session to get latest state
         loadSession();
       });
@@ -169,7 +169,7 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
         setShowCorrectAnswer(false);
         setTimeRemaining(data.timeLimit || 30);
         // Update session status to active
-        setSession((prev) => prev ? { ...prev, status: 'active', currentQuestionIndex: data.questionIndex || 0 } : null);
+        setSession((prev) => prev ? { ...prev, status: 'active' as const, currentQuestionIndex: data.questionIndex || 0 } : null);
       });
 
       sock.on('quizwave:ended', (data) => {
@@ -201,7 +201,7 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
         // Update session status to ended so isEnded becomes true
         setSession((prev) => {
           if (prev) {
-            const updated = { ...prev, status: 'ended' };
+            const updated: QuizSession = { ...prev, status: 'ended' as const };
             console.log('Updated session status to ended:', updated);
             return updated;
           }
