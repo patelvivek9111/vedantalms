@@ -78,7 +78,10 @@ jspm_packages/
 
 # Gatsby files
 .cache/
-public
+# Don't ignore frontend/public (needed for Vite static assets)
+# public
+# But ignore root-level public if it exists
+/public
 
 # Storybook build outputs
 .out
