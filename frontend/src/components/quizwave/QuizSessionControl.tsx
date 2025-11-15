@@ -150,9 +150,11 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
         // Clear any existing timers
         if (timerRef.current) {
           clearInterval(timerRef.current);
+          timerRef.current = null;
         }
         if (countdownRef.current) {
           clearInterval(countdownRef.current);
+          countdownRef.current = null;
         }
       });
 
@@ -172,7 +174,7 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
 
       sock.on('quizwave:ended', (data) => {
         console.log('Quiz ended, leaderboard:', data);
-        setLeaderboard(data.leaderboard);
+        setLeaderboard(data.leaderboard || []);
         setShowFullLeaderboard(false);
         // Clear any timers
         if (timerRef.current) {
@@ -183,7 +185,16 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
           clearInterval(countdownRef.current);
           countdownRef.current = null;
         }
+        // Clear countdown and answer states
+        setCountdown(0);
+        setShowCorrectAnswer(false);
+        setShowAnswerDistribution(false);
+        // Update session status to ended so isEnded becomes true
+        setSession((prev) => prev ? { ...prev, status: 'ended' } : null);
         // After 10 seconds, show full leaderboard
+        if (podiumTimerRef.current) {
+          clearTimeout(podiumTimerRef.current);
+        }
         podiumTimerRef.current = setTimeout(() => {
           setShowFullLeaderboard(true);
         }, 10000);
@@ -320,20 +331,22 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
 
   // Countdown effect - separate to manage countdown independently
   useEffect(() => {
-    if (showCorrectAnswer && countdown > 0) {
-      // Clear any existing countdown
-      if (countdownRef.current) {
-        clearInterval(countdownRef.current);
-      }
-      
+    // Only start countdown if showCorrectAnswer is true and countdown is greater than 0
+    // Don't re-run if countdown is already running
+    if (showCorrectAnswer && countdown > 0 && !countdownRef.current) {
+      console.log('Starting countdown from:', countdown);
       countdownRef.current = setInterval(() => {
         setCountdown((prev) => {
-          if (prev <= 1) {
+          const newCount = prev - 1;
+          console.log('Countdown:', newCount);
+          
+          if (newCount <= 0) {
             // Clear interval before advancing
             if (countdownRef.current) {
               clearInterval(countdownRef.current);
               countdownRef.current = null;
             }
+            
             // Countdown finished - advance
             const nextIndex = currentQuestionIndex;
             const totalQuestions = quiz.questions.length;
@@ -344,33 +357,37 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
               setShowAnswerDistribution(false);
               setAnswerDistribution({});
               setAnswerCount(0);
+              setCountdown(0);
               
               if (socket) {
                 socket.emit('quizwave:next-question', { sessionId });
               }
             } else {
-              // End quiz
+              // End quiz - last question
+              setShowCorrectAnswer(false);
+              setShowAnswerDistribution(false);
+              setCountdown(0);
+              
               if (socket) {
                 socket.emit('quizwave:end', { sessionId });
-                setTimeout(() => {
-                  onEnd();
-                }, 1000);
               }
             }
             return 0;
           }
-          return prev - 1;
+          return newCount;
         });
       }, 1000);
     }
 
     return () => {
-      if (countdownRef.current) {
+      // Don't clear the interval here - let it run until countdown reaches 0
+      // Only clear if showCorrectAnswer becomes false
+      if (!showCorrectAnswer && countdownRef.current) {
         clearInterval(countdownRef.current);
         countdownRef.current = null;
       }
     };
-  }, [showCorrectAnswer, countdown, currentQuestionIndex, quiz.questions.length, socket, sessionId, onEnd]);
+  }, [showCorrectAnswer, countdown, currentQuestionIndex, quiz.questions.length, socket, sessionId]);
 
   const copyGamePin = () => {
     if (session?.gamePin) {
