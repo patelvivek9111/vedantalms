@@ -113,9 +113,23 @@ const StudentGameScreen: React.FC = () => {
         });
 
         sock.on('quizwave:error', (data) => {
-          alert(data.message || 'An error occurred');
+          console.error('QuizWave error:', data);
+          const errorMessage = data.message || 'An error occurred';
+          
+          // Don't show alert for "Question not found" - it might be a timing issue
+          // Instead, try to reload the session
+          if (errorMessage.includes('Question not found')) {
+            console.warn('Question not found, attempting to reload session...');
+            loadSession().catch(err => {
+              console.error('Failed to reload session:', err);
+              alert('Error loading question. Please refresh the page.');
+            });
+            return;
+          }
+          
+          alert(errorMessage);
           // If it's a critical error, redirect back to join
-          if (data.message?.includes('not found') || data.message?.includes('ended')) {
+          if (errorMessage.includes('Session not found') || errorMessage.includes('ended')) {
             setTimeout(() => navigate('/quizwave/join'), 2000);
           }
         });

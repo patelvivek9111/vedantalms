@@ -87,9 +87,15 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
       });
 
       sock.on('quizwave:participant-joined', (data) => {
+        console.log('Participant joined:', data);
         setParticipantCount(data.participantCount);
-        // Reload session to get updated participants list
-        loadSession();
+        // Update participants list directly from socket data if available
+        if (data.participants && Array.isArray(data.participants)) {
+          setParticipants(data.participants);
+        } else {
+          // Fallback: reload session to get updated participants list
+          loadSession();
+        }
       });
 
       sock.on('quizwave:answer-submitted', (data) => {
@@ -125,6 +131,7 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
       });
 
       sock.on('quizwave:question-advanced', (data) => {
+        console.log('Question advanced:', data);
         setCurrentQuestionIndex(data.questionIndex);
         setCurrentQuestion(data.questionData);
         setAnswerCount(0);
@@ -136,8 +143,17 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
       });
 
       sock.on('quizwave:question-started', (data) => {
+        console.log('Question started (teacher view):', data);
+        // This event is also sent to teacher, update accordingly
+        setCurrentQuestionIndex(data.questionIndex || 0);
         setCurrentQuestion(data);
         setAnswerCount(0);
+        setAnswerDistribution({});
+        setShowAnswerDistribution(false);
+        setShowCorrectAnswer(false);
+        setTimeRemaining(data.timeLimit || 30);
+        // Update session status to active
+        setSession((prev) => prev ? { ...prev, status: 'active', currentQuestionIndex: data.questionIndex || 0 } : null);
       });
 
       sock.on('quizwave:ended', (data) => {

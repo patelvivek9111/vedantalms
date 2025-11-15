@@ -93,7 +93,23 @@ const initializeQuizWaveSocket = (io) => {
         // Notify all in room (including teacher)
         io.to(`quizwave:${gamePin}`).emit('quizwave:participant-joined', {
           participantCount: session.participants.length,
-          nickname
+          nickname,
+          participants: session.participants.map(p => ({
+            studentId: p.student.toString(),
+            nickname: p.nickname,
+            totalScore: p.totalScore
+          }))
+        });
+        
+        // Also notify teacher room specifically
+        io.to(`quizwave:teacher:${gamePin}`).emit('quizwave:participant-joined', {
+          participantCount: session.participants.length,
+          nickname,
+          participants: session.participants.map(p => ({
+            studentId: p.student.toString(),
+            nickname: p.nickname,
+            totalScore: p.totalScore
+          }))
         });
 
         socket.emit('quizwave:joined', {
@@ -134,6 +150,20 @@ const initializeQuizWaveSocket = (io) => {
           return;
         }
 
+        // Get first question and determine question order
+        const quiz = session.quiz;
+        let questions = quiz.questions;
+        let questionOrder = quiz.questions.map((_, idx) => idx); // Default order
+        
+        if (quiz.settings?.randomizeQuestions) {
+          // Create randomized order and store it
+          questionOrder = [...Array(quiz.questions.length).keys()].sort(() => Math.random() - 0.5);
+          questions = questionOrder.map(idx => quiz.questions[idx]);
+        }
+        
+        // Store question order in session (we'll add this field to the model)
+        session.questionOrder = questionOrder;
+        
         // Start session
         session.status = 'active';
         session.currentQuestionIndex = 0;
@@ -147,12 +177,6 @@ const initializeQuizWaveSocket = (io) => {
           currentQuestionIndex: 0,
           participantCount: session.participants.length
         });
-
-        // Get first question
-        const quiz = session.quiz;
-        const questions = quiz.settings?.randomizeQuestions 
-          ? [...quiz.questions].sort(() => Math.random() - 0.5)
-          : quiz.questions;
 
         const firstQuestion = questions[0];
         
@@ -180,13 +204,17 @@ const initializeQuizWaveSocket = (io) => {
           points: firstQuestion.points
         };
 
-        // Broadcast to all participants (students)
+        // Broadcast to all participants (students) - this includes teacher if they're in the room
         io.to(`quizwave:${session.gamePin}`).emit('quizwave:question-started', studentQuestionData);
+        
+        // Also broadcast to teacher room
+        io.to(`quizwave:teacher:${session.gamePin}`).emit('quizwave:question-started', studentQuestionData);
 
-        // Send to teacher with correct answers
+        // Send to teacher with correct answers (separate event)
         socket.emit('quizwave:started', {
           sessionId: session._id,
-          questionData: teacherQuestionData
+          questionData: teacherQuestionData,
+          participantCount: session.participants.length
         });
       } catch (error) {
         console.error('Start error:', error);
@@ -230,14 +258,20 @@ const initializeQuizWaveSocket = (io) => {
           return;
         }
 
-        // Get question
-        const questions = session.quiz.settings?.randomizeQuestions 
-          ? [...session.quiz.questions].sort(() => Math.random() - 0.5)
-          : session.quiz.questions;
+        // Get question using stored order if available, otherwise use original order
+        let questions = session.quiz.questions;
+        if (session.questionOrder && Array.isArray(session.questionOrder)) {
+          // Use stored randomized order
+          questions = session.questionOrder.map(idx => session.quiz.questions[idx]);
+        } else if (session.quiz.settings?.randomizeQuestions) {
+          // Fallback: randomize (shouldn't happen if order was stored)
+          questions = [...session.quiz.questions].sort(() => Math.random() - 0.5);
+        }
 
         const question = questions[questionIndex];
         if (!question) {
-          socket.emit('quizwave:error', { message: 'Question not found' });
+          console.error('Question not found:', { questionIndex, totalQuestions: questions.length, sessionId });
+          socket.emit('quizwave:error', { message: `Question not found at index ${questionIndex}` });
           return;
         }
 
@@ -311,9 +345,19 @@ const initializeQuizWaveSocket = (io) => {
         }
 
         const quiz = session.quiz;
-        const questions = quiz.settings?.randomizeQuestions 
-          ? [...quiz.questions].sort(() => Math.random() - 0.5)
-          : quiz.questions;
+        let questions = quiz.questions;
+        let questionOrder = session.questionOrder || quiz.questions.map((_, idx) => idx);
+        
+        // If no order stored and randomization is enabled, create and store it
+        if (quiz.settings?.randomizeQuestions && (!session.questionOrder || !Array.isArray(session.questionOrder))) {
+          questionOrder = [...Array(quiz.questions.length).keys()].sort(() => Math.random() - 0.5);
+          questions = questionOrder.map(idx => quiz.questions[idx]);
+          session.questionOrder = questionOrder;
+          await session.save();
+        } else if (session.questionOrder && Array.isArray(session.questionOrder)) {
+          // Use stored order
+          questions = questionOrder.map(idx => quiz.questions[idx]);
+        }
 
         const nextIndex = session.currentQuestionIndex + 1;
 
@@ -367,10 +411,25 @@ const initializeQuizWaveSocket = (io) => {
           participantCount: session.participants.length
         });
 
-        // Broadcast to all participants
+        // Broadcast to all participants (students)
         io.to(`quizwave:${session.gamePin}`).emit('quizwave:question-started', questionData);
+        
+        // Also broadcast to teacher room
+        io.to(`quizwave:teacher:${session.gamePin}`).emit('quizwave:question-started', questionData);
 
-        socket.emit('quizwave:question-advanced', questionData);
+        // Send to teacher with correct answers (separate event)
+        const teacherQuestionData = {
+          questionIndex: nextIndex,
+          questionText: nextQuestion.questionText,
+          questionType: nextQuestion.questionType,
+          options: quiz.settings?.randomizeAnswers && nextQuestion.questionType === 'multiple-choice'
+            ? [...nextQuestion.options].sort(() => Math.random() - 0.5).map(opt => ({ text: opt.text, isCorrect: opt.isCorrect }))
+            : nextQuestion.options.map(opt => ({ text: opt.text, isCorrect: opt.isCorrect })),
+          timeLimit: nextQuestion.timeLimit,
+          points: nextQuestion.points
+        };
+        
+        socket.emit('quizwave:question-advanced', teacherQuestionData);
       } catch (error) {
         console.error('Next question error:', error);
         socket.emit('quizwave:error', { message: 'Error advancing to next question' });
@@ -438,7 +497,9 @@ const initializeQuizWaveSocket = (io) => {
           return;
         }
 
+        // Join both teacher room and regular room (for receiving broadcasts)
         socket.join(`quizwave:teacher:${gamePin}`);
+        socket.join(`quizwave:${gamePin}`);
         socket.gamePin = gamePin;
 
         // Send current session state

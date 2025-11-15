@@ -122,6 +122,10 @@ const quizSessionSchema = new mongoose.Schema({
     type: Number,
     default: -1
   },
+  questionOrder: {
+    type: [Number],
+    default: null // Stores the randomized order of questions if randomization is enabled
+  },
   startedAt: {
     type: Date
   },
