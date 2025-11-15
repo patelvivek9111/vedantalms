@@ -348,10 +348,13 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
             }
             
             // Countdown finished - advance
-            const nextIndex = currentQuestionIndex;
+            // Check if there's a next question (currentQuestionIndex + 1)
+            const nextIndex = currentQuestionIndex + 1;
             const totalQuestions = quiz.questions.length;
             
-            if (nextIndex < totalQuestions - 1) {
+            console.log('Countdown finished. Current index:', currentQuestionIndex, 'Next index:', nextIndex, 'Total questions:', totalQuestions);
+            
+            if (nextIndex < totalQuestions) {
               // Reset state before advancing
               setShowCorrectAnswer(false);
               setShowAnswerDistribution(false);
@@ -898,9 +901,10 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
   );
 
   // Return with full screen wrapper when quiz is active
+  // Account for global sidebar width (80px) on the left
   if (isQuizActive) {
     return (
-      <div className="fixed inset-0 bg-gray-50 dark:bg-gray-900 z-50 overflow-auto">
+      <div className="fixed inset-0 bg-gray-50 dark:bg-gray-900 z-[60] overflow-auto" style={{ left: '80px' }}>
         {quizContent}
       </div>
     );
