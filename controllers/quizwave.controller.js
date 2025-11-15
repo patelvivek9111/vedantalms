@@ -116,7 +116,6 @@ const createQuiz = async (req, res) => {
         questionType: q.questionType,
         options: cleanedOptions,
         timeLimit: q.timeLimit && !isNaN(q.timeLimit) ? parseInt(q.timeLimit) : 30,
-        points: q.points && !isNaN(q.points) && parseInt(q.points) > 0 ? parseInt(q.points) : 5,
         order: q.order !== undefined ? q.order : index
       };
     });

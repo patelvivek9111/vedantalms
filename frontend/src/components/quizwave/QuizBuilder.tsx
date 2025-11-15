@@ -44,7 +44,6 @@ const QuizBuilder: React.FC<QuizBuilderProps> = ({ courseId, quiz, onClose }) =>
             { text: '', isCorrect: false }
           ],
       timeLimit: 30,
-      points: 5,
       order: questions.length
     };
     setQuestions([...questions, newQuestion]);
@@ -147,7 +146,6 @@ const QuizBuilder: React.FC<QuizBuilderProps> = ({ courseId, quiz, onClose }) =>
         description: description.trim() || undefined,
         questions: questions.map((q, idx) => ({
           ...q,
-          points: (q.points && q.points > 0) ? q.points : 5, // Default to 5 if not set or invalid
           order: idx
         })),
         settings
@@ -325,44 +323,18 @@ const QuizBuilder: React.FC<QuizBuilderProps> = ({ courseId, quiz, onClose }) =>
                       placeholder="Enter question text"
                     />
 
-                    <div className="grid grid-cols-2 gap-4 mb-3">
-                      <div>
-                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-                          Time Limit (seconds)
-                        </label>
-                        <input
-                          type="number"
-                          min="5"
-                          max="300"
-                          value={question.timeLimit}
-                          onChange={(e) => updateQuestion(qIndex, { timeLimit: parseInt(e.target.value) || 30 })}
-                          className="w-full px-3 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-                          Points
-                        </label>
-                        <input
-                          type="number"
-                          min="1"
-                          value={question.points && question.points > 0 ? question.points.toString() : ''}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            if (value === '') {
-                              // Allow blank - will default to 5 on save
-                              updateQuestion(qIndex, { points: 0 });
-                            } else {
-                              const numValue = parseInt(value);
-                              if (!isNaN(numValue) && numValue > 0) {
-                                updateQuestion(qIndex, { points: numValue });
-                              }
-                            }
-                          }}
-                          placeholder="5"
-                          className="w-full px-3 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                        />
-                      </div>
+                    <div className="mb-3">
+                      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                        Time Limit (seconds)
+                      </label>
+                      <input
+                        type="number"
+                        min="5"
+                        max="300"
+                        value={question.timeLimit}
+                        onChange={(e) => updateQuestion(qIndex, { timeLimit: parseInt(e.target.value) || 30 })}
+                        className="w-full px-3 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                      />
                     </div>
 
                     <div className="space-y-2">

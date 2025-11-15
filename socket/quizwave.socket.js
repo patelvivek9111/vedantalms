@@ -174,8 +174,7 @@ const initializeQuizWaveSocket = (io) => {
           questionText: firstQuestion.questionText,
           questionType: firstQuestion.questionType,
           options: firstQuestion.options.map(opt => ({ text: opt.text })),
-          timeLimit: firstQuestion.timeLimit,
-          points: firstQuestion.points
+          timeLimit: firstQuestion.timeLimit
         };
         
         // For teacher - include correct answers
@@ -184,8 +183,7 @@ const initializeQuizWaveSocket = (io) => {
           questionText: firstQuestion.questionText,
           questionType: firstQuestion.questionType,
           options: firstQuestion.options.map(opt => ({ text: opt.text, isCorrect: opt.isCorrect })),
-          timeLimit: firstQuestion.timeLimit,
-          points: firstQuestion.points
+          timeLimit: firstQuestion.timeLimit
         };
 
         // Broadcast to all participants (students) - this includes teacher if they're in the room
@@ -258,12 +256,35 @@ const initializeQuizWaveSocket = (io) => {
 
         const isCorrect = JSON.stringify(selectedOptions.sort()) === JSON.stringify(correctOptions);
 
-        // Calculate points (speed-based)
+        // Calculate streak (consecutive correct answers before this question)
+        // Streak is the number of consecutive correct answers ending with the previous question
+        let streak = 0;
+        const sortedAnswers = [...participant.answers].sort((a, b) => a.questionIndex - b.questionIndex);
+        // Count backwards from the most recent answer (before current question)
+        for (let i = sortedAnswers.length - 1; i >= 0; i--) {
+          if (sortedAnswers[i].isCorrect) {
+            streak++;
+          } else {
+            break;
+          }
+        }
+        // If current answer is correct, it will be part of the streak for the next question
+
+        // Calculate points using new formula
         let points = 0;
         if (isCorrect) {
-          const timeLimit = question.timeLimit * 1000; // Convert to milliseconds
-          const timeRatio = Math.max(0, (timeLimit - timeTaken) / timeLimit);
-          points = Math.floor(question.points * (0.5 + 0.5 * timeRatio)); // 50-100% of points based on speed
+          const maxTime = question.timeLimit * 1000; // Convert to milliseconds
+          // points = 500 * (1 - (time_taken / max_time))
+          points = 500 * (1 - (timeTaken / maxTime));
+          // Ensure points is not negative
+          if (points < 0) {
+            points = 0;
+          }
+          // Add streak bonus
+          points += (streak * 50);
+        } else {
+          // Incorrect answer = 0 points
+          points = 0;
         }
 
         // Save answer
@@ -358,8 +379,7 @@ const initializeQuizWaveSocket = (io) => {
           questionText: nextQuestion.questionText,
           questionType: nextQuestion.questionType,
           options: nextQuestion.options.map(opt => ({ text: opt.text })),
-          timeLimit: nextQuestion.timeLimit,
-          points: nextQuestion.points
+          timeLimit: nextQuestion.timeLimit
         };
 
         // Update active sessions
@@ -382,8 +402,7 @@ const initializeQuizWaveSocket = (io) => {
           questionText: nextQuestion.questionText,
           questionType: nextQuestion.questionType,
           options: nextQuestion.options.map(opt => ({ text: opt.text, isCorrect: opt.isCorrect })),
-          timeLimit: nextQuestion.timeLimit,
-          points: nextQuestion.points
+          timeLimit: nextQuestion.timeLimit
         };
         
         socket.emit('quizwave:question-advanced', teacherQuestionData);

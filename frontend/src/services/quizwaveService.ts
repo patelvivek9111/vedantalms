@@ -8,7 +8,7 @@ export interface QuizQuestion {
     isCorrect: boolean;
   }>;
   timeLimit: number;
-  points: number;
+  points?: number; // Optional, kept for backward compatibility but not used in scoring
   order?: number;
 }
 
