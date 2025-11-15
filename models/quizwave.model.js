@@ -63,14 +63,6 @@ const quizSchema = new mongoose.Schema({
       type: Boolean,
       default: true
     },
-    randomizeQuestions: {
-      type: Boolean,
-      default: false
-    },
-    randomizeAnswers: {
-      type: Boolean,
-      default: false
-    },
     showCorrectAnswer: {
       type: Boolean,
       default: true
@@ -121,10 +113,6 @@ const quizSessionSchema = new mongoose.Schema({
   currentQuestionIndex: {
     type: Number,
     default: -1
-  },
-  questionOrder: {
-    type: [Number],
-    default: null // Stores the randomized order of questions if randomization is enabled
   },
   startedAt: {
     type: Date

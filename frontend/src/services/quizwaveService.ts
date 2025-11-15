@@ -14,8 +14,6 @@ export interface QuizQuestion {
 
 export interface QuizSettings {
   showLeaderboard?: boolean;
-  randomizeQuestions?: boolean;
-  randomizeAnswers?: boolean;
   showCorrectAnswer?: boolean;
   maxSessionDuration?: number;
 }

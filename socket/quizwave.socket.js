@@ -150,19 +150,9 @@ const initializeQuizWaveSocket = (io) => {
           return;
         }
 
-        // Get first question and determine question order
+        // Get first question
         const quiz = session.quiz;
-        let questions = quiz.questions;
-        let questionOrder = quiz.questions.map((_, idx) => idx); // Default order
-        
-        if (quiz.settings?.randomizeQuestions) {
-          // Create randomized order and store it
-          questionOrder = [...Array(quiz.questions.length).keys()].sort(() => Math.random() - 0.5);
-          questions = questionOrder.map(idx => quiz.questions[idx]);
-        }
-        
-        // Store question order in session (we'll add this field to the model)
-        session.questionOrder = questionOrder;
+        const firstQuestion = quiz.questions[0];
         
         // Start session
         session.status = 'active';
@@ -177,17 +167,13 @@ const initializeQuizWaveSocket = (io) => {
           currentQuestionIndex: 0,
           participantCount: session.participants.length
         });
-
-        const firstQuestion = questions[0];
         
         // For students - hide correct answers
         const studentQuestionData = {
           questionIndex: 0,
           questionText: firstQuestion.questionText,
           questionType: firstQuestion.questionType,
-          options: quiz.settings?.randomizeAnswers && firstQuestion.questionType === 'multiple-choice'
-            ? [...firstQuestion.options].sort(() => Math.random() - 0.5).map(opt => ({ text: opt.text }))
-            : firstQuestion.options.map(opt => ({ text: opt.text })),
+          options: firstQuestion.options.map(opt => ({ text: opt.text })),
           timeLimit: firstQuestion.timeLimit,
           points: firstQuestion.points
         };
@@ -197,9 +183,7 @@ const initializeQuizWaveSocket = (io) => {
           questionIndex: 0,
           questionText: firstQuestion.questionText,
           questionType: firstQuestion.questionType,
-          options: quiz.settings?.randomizeAnswers && firstQuestion.questionType === 'multiple-choice'
-            ? [...firstQuestion.options].sort(() => Math.random() - 0.5).map(opt => ({ text: opt.text, isCorrect: opt.isCorrect }))
-            : firstQuestion.options.map(opt => ({ text: opt.text, isCorrect: opt.isCorrect })),
+          options: firstQuestion.options.map(opt => ({ text: opt.text, isCorrect: opt.isCorrect })),
           timeLimit: firstQuestion.timeLimit,
           points: firstQuestion.points
         };
@@ -258,19 +242,10 @@ const initializeQuizWaveSocket = (io) => {
           return;
         }
 
-        // Get question using stored order if available, otherwise use original order
-        let questions = session.quiz.questions;
-        if (session.questionOrder && Array.isArray(session.questionOrder)) {
-          // Use stored randomized order
-          questions = session.questionOrder.map(idx => session.quiz.questions[idx]);
-        } else if (session.quiz.settings?.randomizeQuestions) {
-          // Fallback: randomize (shouldn't happen if order was stored)
-          questions = [...session.quiz.questions].sort(() => Math.random() - 0.5);
-        }
-
-        const question = questions[questionIndex];
+        // Get question
+        const question = session.quiz.questions[questionIndex];
         if (!question) {
-          console.error('Question not found:', { questionIndex, totalQuestions: questions.length, sessionId });
+          console.error('Question not found:', { questionIndex, totalQuestions: session.quiz.questions.length, sessionId });
           socket.emit('quizwave:error', { message: `Question not found at index ${questionIndex}` });
           return;
         }
@@ -345,23 +320,9 @@ const initializeQuizWaveSocket = (io) => {
         }
 
         const quiz = session.quiz;
-        let questions = quiz.questions;
-        let questionOrder = session.questionOrder || quiz.questions.map((_, idx) => idx);
-        
-        // If no order stored and randomization is enabled, create and store it
-        if (quiz.settings?.randomizeQuestions && (!session.questionOrder || !Array.isArray(session.questionOrder))) {
-          questionOrder = [...Array(quiz.questions.length).keys()].sort(() => Math.random() - 0.5);
-          questions = questionOrder.map(idx => quiz.questions[idx]);
-          session.questionOrder = questionOrder;
-          await session.save();
-        } else if (session.questionOrder && Array.isArray(session.questionOrder)) {
-          // Use stored order
-          questions = questionOrder.map(idx => quiz.questions[idx]);
-        }
-
         const nextIndex = session.currentQuestionIndex + 1;
 
-        if (nextIndex >= questions.length) {
+        if (nextIndex >= quiz.questions.length) {
           // End quiz
           session.status = 'ended';
           session.endedAt = new Date();
@@ -391,14 +352,12 @@ const initializeQuizWaveSocket = (io) => {
         session.currentQuestionIndex = nextIndex;
         await session.save();
 
-        const nextQuestion = questions[nextIndex];
+        const nextQuestion = quiz.questions[nextIndex];
         const questionData = {
           questionIndex: nextIndex,
           questionText: nextQuestion.questionText,
           questionType: nextQuestion.questionType,
-          options: quiz.settings?.randomizeAnswers && nextQuestion.questionType === 'multiple-choice'
-            ? [...nextQuestion.options].sort(() => Math.random() - 0.5).map(opt => ({ text: opt.text }))
-            : nextQuestion.options.map(opt => ({ text: opt.text })),
+          options: nextQuestion.options.map(opt => ({ text: opt.text })),
           timeLimit: nextQuestion.timeLimit,
           points: nextQuestion.points
         };
@@ -422,9 +381,7 @@ const initializeQuizWaveSocket = (io) => {
           questionIndex: nextIndex,
           questionText: nextQuestion.questionText,
           questionType: nextQuestion.questionType,
-          options: quiz.settings?.randomizeAnswers && nextQuestion.questionType === 'multiple-choice'
-            ? [...nextQuestion.options].sort(() => Math.random() - 0.5).map(opt => ({ text: opt.text, isCorrect: opt.isCorrect }))
-            : nextQuestion.options.map(opt => ({ text: opt.text, isCorrect: opt.isCorrect })),
+          options: nextQuestion.options.map(opt => ({ text: opt.text, isCorrect: opt.isCorrect })),
           timeLimit: nextQuestion.timeLimit,
           points: nextQuestion.points
         };

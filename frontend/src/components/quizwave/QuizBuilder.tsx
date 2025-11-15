@@ -14,8 +14,6 @@ const QuizBuilder: React.FC<QuizBuilderProps> = ({ courseId, quiz, onClose }) =>
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [settings, setSettings] = useState({
     showLeaderboard: true,
-    randomizeQuestions: false,
-    randomizeAnswers: false,
     showCorrectAnswer: true,
     maxSessionDuration: 120
   });
@@ -243,24 +241,6 @@ const QuizBuilder: React.FC<QuizBuilderProps> = ({ courseId, quiz, onClose }) =>
                   className="rounded"
                 />
                 <span className="text-sm text-gray-700 dark:text-gray-300">Show leaderboard</span>
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={settings.randomizeQuestions}
-                  onChange={(e) => setSettings({ ...settings, randomizeQuestions: e.target.checked })}
-                  className="rounded"
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">Randomize question order</span>
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={settings.randomizeAnswers}
-                  onChange={(e) => setSettings({ ...settings, randomizeAnswers: e.target.checked })}
-                  className="rounded"
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">Randomize answer order</span>
               </label>
               <label className="flex items-center gap-2">
                 <input
