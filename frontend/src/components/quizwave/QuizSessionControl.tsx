@@ -124,6 +124,13 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
         setShowCorrectAnswer(false);
         setCountdown(0);
         setTimeRemaining(data.questionData.timeLimit || 30);
+        // Clear any existing timers
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+        }
+        if (countdownRef.current) {
+          clearInterval(countdownRef.current);
+        }
         // Update session status to active
         setSession((prev) => prev ? { ...prev, status: 'active', currentQuestionIndex: 0 } : null);
         // Also reload session to get latest state
@@ -140,6 +147,13 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
         setShowCorrectAnswer(false);
         setCountdown(0);
         setTimeRemaining(data.questionData.timeLimit || 30);
+        // Clear any existing timers
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+        }
+        if (countdownRef.current) {
+          clearInterval(countdownRef.current);
+        }
       });
 
       sock.on('quizwave:question-started', (data) => {
@@ -199,6 +213,13 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
   };
 
   const handleNextQuestion = () => {
+    // Reset state before advancing
+    setShowCorrectAnswer(false);
+    setShowAnswerDistribution(false);
+    setCountdown(0);
+    setAnswerDistribution({});
+    setAnswerCount(0);
+    
     if (socket) {
       socket.emit('quizwave:next-question', { sessionId });
     }
@@ -218,52 +239,48 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
   const isWaiting = session?.status === 'waiting' && !currentQuestion;
   const isActive = (session?.status === 'active' || currentQuestion) && !isEnded;
 
+  // Handle time's up - separate effect to ensure it runs
+  useEffect(() => {
+    if (isActive && currentQuestion && timeRemaining === 0 && !showCorrectAnswer && !showAnswerDistribution && !countdown) {
+      // Time's up - load session to get final answer distribution
+      loadSession().then((sessionData) => {
+        // Calculate distribution from session data
+        if (sessionData?.participants) {
+          const dist: { [key: number]: number } = {};
+          sessionData.participants.forEach((p: any) => {
+            const answer = p.answers.find((a: any) => a.questionIndex === currentQuestionIndex);
+            if (answer && answer.selectedOptions) {
+              answer.selectedOptions.forEach((optIdx: number) => {
+                dist[optIdx] = (dist[optIdx] || 0) + 1;
+              });
+            }
+          });
+          setAnswerDistribution(dist);
+        }
+        // Show answer distribution first
+        setShowAnswerDistribution(true);
+        // After 3 seconds, show correct answer and start countdown
+        setTimeout(() => {
+          setShowCorrectAnswer(true);
+          setShowAnswerDistribution(false);
+          // Start countdown from 3
+          setCountdown(3);
+        }, 3000);
+      }).catch((error) => {
+        console.error('Error loading session on time up:', error);
+        // Still show correct answer even if loading fails
+        setShowCorrectAnswer(true);
+        setCountdown(3);
+      });
+    }
+  }, [isActive, currentQuestion, timeRemaining, showCorrectAnswer, showAnswerDistribution, countdown, currentQuestionIndex]);
+
   // Timer effect for teacher view
   useEffect(() => {
     if (isActive && currentQuestion && timeRemaining > 0 && !showCorrectAnswer && !showAnswerDistribution) {
       timerRef.current = setInterval(() => {
         setTimeRemaining((prev) => {
           if (prev <= 1) {
-            // Time's up - load session to get final answer distribution
-            loadSession().then((sessionData) => {
-              // Calculate distribution from session data
-              if (sessionData?.participants) {
-                const dist: { [key: number]: number } = {};
-                sessionData.participants.forEach((p: any) => {
-                  const answer = p.answers.find((a: any) => a.questionIndex === currentQuestionIndex);
-                  if (answer && answer.selectedOptions) {
-                    answer.selectedOptions.forEach((optIdx: number) => {
-                      dist[optIdx] = (dist[optIdx] || 0) + 1;
-                    });
-                  }
-                });
-                setAnswerDistribution(dist);
-              }
-              // Show answer distribution first
-              setShowAnswerDistribution(true);
-              // After 3 seconds, show correct answer and start countdown
-              setTimeout(() => {
-                setShowCorrectAnswer(true);
-                setShowAnswerDistribution(false);
-                // Start countdown from 3
-                setCountdown(3);
-                // Countdown effect
-                countdownRef.current = setInterval(() => {
-                  setCountdown((prev) => {
-                    if (prev <= 1) {
-                      // Countdown finished - advance
-                      if (currentQuestionIndex < quiz.questions.length - 1) {
-                        handleNextQuestion();
-                      } else {
-                        handleEnd();
-                      }
-                      return 0;
-                    }
-                    return prev - 1;
-                  });
-                }, 1000);
-              }, 3000);
-            });
             return 0;
           }
           return prev - 1;
@@ -275,14 +292,34 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
+    };
+  }, [isActive, currentQuestion, timeRemaining, showCorrectAnswer, showAnswerDistribution]);
+
+  // Countdown effect - separate to manage countdown independently
+  useEffect(() => {
+    if (showCorrectAnswer && countdown > 0) {
+      countdownRef.current = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            // Countdown finished - advance
+            if (currentQuestionIndex < quiz.questions.length - 1) {
+              handleNextQuestion();
+            } else {
+              handleEnd();
+            }
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
+    return () => {
       if (countdownRef.current) {
         clearInterval(countdownRef.current);
       }
-      if (podiumTimerRef.current) {
-        clearTimeout(podiumTimerRef.current);
-      }
     };
-  }, [isActive, currentQuestion, timeRemaining, showCorrectAnswer, showAnswerDistribution, currentQuestionIndex, quiz.questions.length, handleNextQuestion, handleEnd]);
+  }, [showCorrectAnswer, countdown, currentQuestionIndex, quiz.questions.length, handleNextQuestion, handleEnd]);
 
   const copyGamePin = () => {
     if (session?.gamePin) {
@@ -602,17 +639,19 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
             {currentQuestionIndex < quiz.questions.length - 1 ? (
               <button
                 onClick={handleNextQuestion}
-                className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-lg"
+                disabled={timeRemaining > 0 && !showCorrectAnswer}
+                className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <SkipForward className="w-5 h-5" />
-                Next Question
+                {timeRemaining > 0 && !showCorrectAnswer ? 'Wait for timer...' : 'Next Question'}
               </button>
             ) : (
               <button
                 onClick={handleEnd}
-                className="bg-red-600 text-white px-8 py-3 rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 text-lg"
+                disabled={timeRemaining > 0 && !showCorrectAnswer}
+                className="bg-red-600 text-white px-8 py-3 rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                End Quiz
+                {timeRemaining > 0 && !showCorrectAnswer ? 'Wait for timer...' : 'End Quiz'}
               </button>
             )}
           </div>
