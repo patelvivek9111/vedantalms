@@ -412,7 +412,11 @@ const initializeQuizWaveSocket = (io) => {
 
         session.status = 'ended';
         session.endedAt = new Date();
+        
+        // Save session with all participant data and answers
         await session.save();
+        console.log(`✅ Quiz session ${sessionId} ended and saved with ${session.participants.length} participants`);
+        console.log(`   Total answers recorded: ${session.participants.reduce((sum, p) => sum + p.answers.length, 0)}`);
 
         activeSessions.delete(session.gamePin);
 

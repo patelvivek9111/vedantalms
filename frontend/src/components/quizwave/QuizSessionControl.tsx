@@ -171,12 +171,24 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
       });
 
       sock.on('quizwave:ended', (data) => {
+        console.log('Quiz ended, leaderboard:', data);
         setLeaderboard(data.leaderboard);
         setShowFullLeaderboard(false);
+        // Clear any timers
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+        if (countdownRef.current) {
+          clearInterval(countdownRef.current);
+          countdownRef.current = null;
+        }
         // After 10 seconds, show full leaderboard
         podiumTimerRef.current = setTimeout(() => {
           setShowFullLeaderboard(true);
         }, 10000);
+        // Reload session to get final state with all saved data
+        loadSession();
       });
 
       // Join as teacher after session is loaded
@@ -226,11 +238,22 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
   };
 
   const handleEnd = () => {
+    // Clear any timers
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
+    
     if (socket) {
       socket.emit('quizwave:end', { sessionId });
-      setTimeout(() => {
-        onEnd();
-      }, 1000);
+      // Don't wait for response - the socket event will handle state update
+    } else {
+      // If no socket, just call onEnd directly
+      onEnd();
     }
   };
 
@@ -298,14 +321,41 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
   // Countdown effect - separate to manage countdown independently
   useEffect(() => {
     if (showCorrectAnswer && countdown > 0) {
+      // Clear any existing countdown
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current);
+      }
+      
       countdownRef.current = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
+            // Clear interval before advancing
+            if (countdownRef.current) {
+              clearInterval(countdownRef.current);
+              countdownRef.current = null;
+            }
             // Countdown finished - advance
-            if (currentQuestionIndex < quiz.questions.length - 1) {
-              handleNextQuestion();
+            const nextIndex = currentQuestionIndex;
+            const totalQuestions = quiz.questions.length;
+            
+            if (nextIndex < totalQuestions - 1) {
+              // Reset state before advancing
+              setShowCorrectAnswer(false);
+              setShowAnswerDistribution(false);
+              setAnswerDistribution({});
+              setAnswerCount(0);
+              
+              if (socket) {
+                socket.emit('quizwave:next-question', { sessionId });
+              }
             } else {
-              handleEnd();
+              // End quiz
+              if (socket) {
+                socket.emit('quizwave:end', { sessionId });
+                setTimeout(() => {
+                  onEnd();
+                }, 1000);
+              }
             }
             return 0;
           }
@@ -317,9 +367,10 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
     return () => {
       if (countdownRef.current) {
         clearInterval(countdownRef.current);
+        countdownRef.current = null;
       }
     };
-  }, [showCorrectAnswer, countdown, currentQuestionIndex, quiz.questions.length, handleNextQuestion, handleEnd]);
+  }, [showCorrectAnswer, countdown, currentQuestionIndex, quiz.questions.length, socket, sessionId, onEnd]);
 
   const copyGamePin = () => {
     if (session?.gamePin) {
