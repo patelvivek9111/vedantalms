@@ -174,8 +174,13 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
 
       sock.on('quizwave:ended', (data) => {
         console.log('Quiz ended, leaderboard:', data);
+        console.log('Leaderboard data:', data.leaderboard);
+        console.log('Leaderboard length:', data.leaderboard?.length);
+        
+        // Set leaderboard first
         setLeaderboard(data.leaderboard || []);
         setShowFullLeaderboard(false);
+        
         // Clear any timers
         if (timerRef.current) {
           clearInterval(timerRef.current);
@@ -185,12 +190,24 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
           clearInterval(countdownRef.current);
           countdownRef.current = null;
         }
+        
         // Clear countdown and answer states
         setCountdown(0);
         setShowCorrectAnswer(false);
         setShowAnswerDistribution(false);
+        setCurrentQuestion(null);
+        setTimeRemaining(0);
+        
         // Update session status to ended so isEnded becomes true
-        setSession((prev) => prev ? { ...prev, status: 'ended' } : null);
+        setSession((prev) => {
+          if (prev) {
+            const updated = { ...prev, status: 'ended' };
+            console.log('Updated session status to ended:', updated);
+            return updated;
+          }
+          return null;
+        });
+        
         // After 10 seconds, show full leaderboard
         if (podiumTimerRef.current) {
           clearTimeout(podiumTimerRef.current);
@@ -198,8 +215,23 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
         podiumTimerRef.current = setTimeout(() => {
           setShowFullLeaderboard(true);
         }, 10000);
+        
         // Reload session to get final state with all saved data
-        loadSession();
+        loadSession().then((sessionData) => {
+          console.log('Reloaded session after end:', sessionData);
+          if (sessionData) {
+            // Recalculate leaderboard from session data
+            const lb = sessionData.participants
+              .map((p: any) => ({
+                nickname: p.nickname,
+                totalScore: p.totalScore,
+                answers: p.answers.length
+              }))
+              .sort((a: any, b: any) => b.totalScore - a.totalScore);
+            console.log('Recalculated leaderboard:', lb);
+            setLeaderboard(lb);
+          }
+        });
       });
 
       // Join as teacher after session is loaded
@@ -269,7 +301,8 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
   };
 
   // Calculate status flags (before useEffects that use them)
-  const isEnded = session?.status === 'ended';
+  // Also check if we have leaderboard data as a fallback indicator that quiz ended
+  const isEnded = session?.status === 'ended' || (leaderboard.length > 0 && !currentQuestion && session?.status !== 'waiting');
   const isWaiting = session?.status === 'waiting' && !currentQuestion;
   const isActive = (session?.status === 'active' || currentQuestion) && !isEnded;
 
@@ -751,13 +784,23 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
                 </button>
               </div>
 
+              {/* Show message if no leaderboard data yet */}
+              {leaderboard.length === 0 && (
+                <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+                  <p className="text-white text-lg">Loading leaderboard...</p>
+                </div>
+              )}
+
               {/* Podium View - Top 3 Only */}
               {!showFullLeaderboard && leaderboard.length > 0 && (
                 <div className="flex flex-col items-center">
-                  <h3 className="text-2xl font-bold text-white mb-8">Top 3 Winners!</h3>
+                  <h3 className="text-2xl font-bold text-white mb-8">
+                    {leaderboard.length === 1 ? 'Winner!' : leaderboard.length >= 3 ? 'Top 3 Winners!' : 'Winners!'}
+                  </h3>
                   <div className="flex items-end justify-center gap-4 mb-8" style={{ height: '400px' }}>
-                    {/* 2nd Place (Left) */}
-                    {leaderboard[1] && (
+                    {/* 2nd Place (Left) - only show if there are at least 2 participants */}
+                    {leaderboard.length >= 2 && leaderboard[1] && (
                       <div className="flex flex-col items-center">
                         <div className="relative mb-4">
                           {/* Character/Avatar with emote */}
@@ -793,8 +836,8 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
                       </div>
                     )}
 
-                    {/* 3rd Place (Right) */}
-                    {leaderboard[2] && (
+                    {/* 3rd Place (Right) - only show if there are at least 3 participants */}
+                    {leaderboard.length >= 3 && leaderboard[2] && (
                       <div className="flex flex-col items-center">
                         <div className="relative mb-4">
                           {/* Character/Avatar with emote */}
