@@ -60,6 +60,15 @@ import QuizWaveDashboard from './components/quizwave/QuizWaveDashboard';
 import StudentJoinScreen from './components/quizwave/StudentJoinScreen';
 import StudentGameScreen from './components/quizwave/StudentGameScreen';
 
+// Wrapper to get courseId from URL params
+const QuizWaveDashboardWrapper: React.FC = () => {
+  const { courseId } = useParams<{ courseId: string }>();
+  if (!courseId) {
+    return <div>Course ID is required</div>;
+  }
+  return <QuizWaveDashboard courseId={courseId} />;
+};
+
 
 // Wrapper components to handle moduleId prop
 const AssignmentListWrapper = () => {
@@ -409,7 +418,7 @@ function AppContent() {
             path="/courses/:courseId/quizwave"
             element={
               <PrivateRoute>
-                <QuizWaveDashboard />
+                <QuizWaveDashboardWrapper />
               </PrivateRoute>
             }
           />

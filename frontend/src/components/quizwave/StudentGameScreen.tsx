@@ -20,7 +20,7 @@ const StudentGameScreen: React.FC = () => {
   const [answerResult, setAnswerResult] = useState<{ isCorrect: boolean; points: number } | null>(null);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [socket, setSocket] = useState<any>(null);
-  const [status, setStatus] = useState<'waiting' | 'active' | 'ended'>('waiting');
+  const [status, setStatus] = useState<'waiting' | 'active' | 'paused' | 'ended'>('waiting');
   const [showColorAnimation, setShowColorAnimation] = useState(false);
   const [currentColorIndex, setCurrentColorIndex] = useState(0);
   const [timeUp, setTimeUp] = useState(false);
@@ -75,7 +75,7 @@ const StudentGameScreen: React.FC = () => {
           // Reload session to get full quiz data if quiz has started
           if (data.currentQuestionIndex >= 0) {
             loadSession().then((sessionData) => {
-              if (sessionData?.quiz?.questions && data.currentQuestionIndex >= 0) {
+              if (sessionData?.quiz && typeof sessionData.quiz === 'object' && 'questions' in sessionData.quiz && data.currentQuestionIndex >= 0) {
                 const question = sessionData.quiz.questions[data.currentQuestionIndex];
                 if (question) {
                   setCurrentQuestion(question);
