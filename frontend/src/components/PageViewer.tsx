@@ -35,16 +35,16 @@ const PageViewer: React.FC<PageViewerProps> = ({ pageId }) => {
   if (!page) return null;
 
   return (
-    <div className="bg-gray-50 p-4 rounded">
-      <h4 className="text-md font-bold mb-2">{page.title}</h4>
-      <div className="prose max-w-none mb-2" dangerouslySetInnerHTML={{ __html: sanitizeHtml(page.content) }} />
+    <div className="bg-gray-50 dark:bg-gray-800 p-3 sm:p-4 rounded">
+      <h4 className="text-base sm:text-lg font-bold mb-2 text-gray-900 dark:text-gray-100 break-words">{page.title}</h4>
+      <div className="prose prose-sm sm:prose-base max-w-none mb-2 dark:prose-invert" dangerouslySetInnerHTML={{ __html: sanitizeHtml(page.content) }} />
       {page.attachments && page.attachments.length > 0 && (
-        <div className="mt-2">
-          <div className="font-semibold text-sm mb-1">Attachments:</div>
-          <ul className="list-disc ml-5">
+        <div className="mt-2 sm:mt-3">
+          <div className="font-semibold text-xs sm:text-sm mb-1 text-gray-900 dark:text-gray-100">Attachments:</div>
+          <ul className="list-disc ml-4 sm:ml-5 space-y-1">
             {page.attachments.map((url, idx) => (
-              <li key={idx}>
-                <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+              <li key={idx} className="text-xs sm:text-sm">
+                <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 underline break-all">
                   {url.split('/').pop()}
                 </a>
               </li>

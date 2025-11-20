@@ -948,11 +948,11 @@ const Attendance: React.FC = () => {
       </div>
 
       {/* View Mode Toggle and Export Buttons */}
-      <div className="flex items-center justify-between">
-        <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1 w-full sm:w-auto">
           <button
             onClick={() => setViewMode('daily')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors ${
               viewMode === 'daily' 
                 ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm' 
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
@@ -962,7 +962,7 @@ const Attendance: React.FC = () => {
           </button>
           <button
             onClick={() => setViewMode('calendar')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors ${
               viewMode === 'calendar' 
                 ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm' 
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
@@ -971,63 +971,61 @@ const Attendance: React.FC = () => {
             Calendar View
           </button>
         </div>
-        <div className="flex gap-2">
-          {(isInstructor || user?.role === 'admin') && (
-            <>
-              <button
-                onClick={exportAttendance}
-                className="px-4 py-2 bg-green-600 dark:bg-green-500 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600 transition-colors font-medium flex items-center gap-2"
-              >
-                <Download className="h-4 w-4" />
-                Export Daily CSV
-              </button>
-              <button
-                onClick={() => setShowExportModal(true)}
-                className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors font-medium flex items-center gap-2"
-              >
-                <Settings className="h-4 w-4" />
-                Custom Export
-              </button>
-            </>
-          )}
-        </div>
+        {(isInstructor || user?.role === 'admin') && (
+          <div className="flex gap-2 w-full sm:w-auto">
+            <button
+              onClick={exportAttendance}
+              className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-green-600 dark:bg-green-500 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600 transition-colors font-medium flex items-center justify-center gap-2 text-xs sm:text-sm"
+            >
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Export Daily CSV</span>
+              <span className="sm:hidden">Export CSV</span>
+            </button>
+            <button
+              onClick={() => setShowExportModal(true)}
+              className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors font-medium flex items-center justify-center gap-2 text-xs sm:text-sm"
+            >
+              <Settings className="h-4 w-4" />
+              <span className="hidden sm:inline">Custom Export</span>
+              <span className="sm:hidden">Custom</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Date Selector and Controls */}
       <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border dark:border-gray-700">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3">
-              <Calendar className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-              <label htmlFor="attendance-date" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Select Date:
-              </label>
-              <input
-                type="date"
-                id="attendance-date"
-                value={selectedDate}
-                onChange={(e) => handleDateChange(e.target.value)}
-                className="border border-gray-300 dark:border-gray-700 rounded-md px-3 py-1 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
-              />
-            </div>
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Calendar className="h-5 w-5 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+            <label htmlFor="attendance-date" className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+              Select Date:
+            </label>
+            <input
+              type="date"
+              id="attendance-date"
+              value={selectedDate}
+              onChange={(e) => handleDateChange(e.target.value)}
+              className="flex-1 border border-gray-300 dark:border-gray-700 rounded-md px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+            />
           </div>
           
           {isInstructor && (
-            <div className="flex items-center gap-2">
-              <div className="relative">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <div className="relative flex-1">
                 <Search className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                 <input
                   type="text"
                   placeholder="Search students..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 text-sm"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 text-xs sm:text-sm"
                 />
               </div>
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="border border-gray-300 dark:border-gray-700 rounded-md px-3 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm"
+                className="w-full sm:w-auto border border-gray-300 dark:border-gray-700 rounded-md px-3 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-xs sm:text-sm"
               >
                 <option value="all">All Status</option>
                 {Object.entries(STATUS_CONFIG).map(([status, config]) => (
@@ -1042,15 +1040,15 @@ const Attendance: React.FC = () => {
       {/* Bulk Actions */}
       {isInstructor && selectedStudents.size > 0 && (
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <span className="text-xs sm:text-sm font-medium text-blue-800 dark:text-blue-200 text-center sm:text-left">
               {selectedStudents.size} student(s) selected
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <select
                 value={bulkAction}
                 onChange={(e) => setBulkAction(e.target.value)}
-                className="border border-gray-300 dark:border-gray-700 rounded-md px-3 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm"
+                className="flex-1 sm:flex-none border border-gray-300 dark:border-gray-700 rounded-md px-3 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-xs sm:text-sm"
               >
                 <option value="">Select action...</option>
                 {Object.entries(STATUS_CONFIG).map(([status, config]) => (
@@ -1060,7 +1058,7 @@ const Attendance: React.FC = () => {
               <button
                 onClick={handleBulkAction}
                 disabled={!bulkAction}
-                className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                className="w-full sm:w-auto px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm"
               >
                 Apply
               </button>
@@ -1074,27 +1072,27 @@ const Attendance: React.FC = () => {
         <>
           {/* Status Summary - Only show for teachers/admins */}
           {(isInstructor || user?.role === 'admin') && (
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 sm:gap-4">
               {Object.entries(STATUS_CONFIG).map(([status, config]) => {
                 const Icon = config.icon;
                 return (
-                  <div key={status} className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border dark:border-gray-700 text-center">
-                    <div className="flex items-center justify-center mb-2">
-                      <Icon className={`h-6 w-6 ${config.color.split(' ')[1]}`} />
+                  <div key={status} className="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4 shadow-sm border dark:border-gray-700 text-center">
+                    <div className="flex items-center justify-center mb-1 sm:mb-2">
+                      <Icon className={`h-5 w-5 sm:h-6 sm:w-6 ${config.color.split(' ')[1]}`} />
                     </div>
-                    <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{statusCounts[status]}</div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">{config.label}</div>
+                    <div className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">{statusCounts[status]}</div>
+                    <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">{config.label}</div>
                   </div>
                 );
               })}
               
               {/* Overall Attendance Percentage Card */}
-              <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-green-200 dark:border-green-800 text-center">
-                <div className="flex items-center justify-center mb-2">
-                  <span className="text-2xl">📊</span>
+              <div className="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4 shadow-sm border border-green-200 dark:border-green-800 text-center">
+                <div className="flex items-center justify-center mb-1 sm:mb-2">
+                  <span className="text-xl sm:text-2xl">📊</span>
                 </div>
-                <div className="text-2xl font-bold text-green-600 dark:text-green-400">{attendancePercentage}%</div>
-                <div className="text-sm text-gray-500 dark:text-gray-400">Attendance Rate</div>
+                <div className="text-xl sm:text-2xl font-bold text-green-600 dark:text-green-400">{attendancePercentage}%</div>
+                <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Attendance Rate</div>
               </div>
             </div>
           )}
@@ -1102,49 +1100,51 @@ const Attendance: React.FC = () => {
       ) : (
         /* Calendar View */
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700">
-          <div className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Monthly Attendance Calendar</h3>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    if (!selectedDate) {
-                      const today = new Date();
-                      setSelectedDate(today.toISOString().split('T')[0]);
-                      return;
-                    }
-                    const currentDate = new Date(selectedDate + 'T00:00:00'); // Add time to avoid timezone issues
-                    const prevMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
-                    setSelectedDate(prevMonth.toISOString().split('T')[0]);
-                  }}
-                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                >
-                  <ChevronLeft className="h-5 w-5 text-gray-900 dark:text-gray-100" />
-                </button>
-                <span className="text-lg font-medium text-gray-900 dark:text-gray-100 min-w-[150px] text-center">
-                  {selectedDate 
-                    ? new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-                    : 'Loading...'}
-                </span>
-                <button
-                  onClick={() => {
-                    if (!selectedDate) {
-                      const today = new Date();
-                      setSelectedDate(today.toISOString().split('T')[0]);
-                      return;
-                    }
-                    const currentDate = new Date(selectedDate + 'T00:00:00'); // Add time to avoid timezone issues
-                    const nextMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
-                    setSelectedDate(nextMonth.toISOString().split('T')[0]);
-                  }}
-                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                >
-                  <ChevronRight className="h-5 w-5 text-gray-900 dark:text-gray-100" />
-                </button>
+          <div className="p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-4 sm:mb-6">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 text-center sm:text-left">Monthly Attendance Calendar</h3>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <div className="flex items-center justify-center gap-2">
+                  <button
+                    onClick={() => {
+                      if (!selectedDate) {
+                        const today = new Date();
+                        setSelectedDate(today.toISOString().split('T')[0]);
+                        return;
+                      }
+                      const currentDate = new Date(selectedDate + 'T00:00:00'); // Add time to avoid timezone issues
+                      const prevMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+                      setSelectedDate(prevMonth.toISOString().split('T')[0]);
+                    }}
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                  >
+                    <ChevronLeft className="h-5 w-5 text-gray-900 dark:text-gray-100" />
+                  </button>
+                  <span className="text-sm sm:text-lg font-medium text-gray-900 dark:text-gray-100 min-w-[120px] sm:min-w-[150px] text-center">
+                    {selectedDate 
+                      ? new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                      : 'Loading...'}
+                  </span>
+                  <button
+                    onClick={() => {
+                      if (!selectedDate) {
+                        const today = new Date();
+                        setSelectedDate(today.toISOString().split('T')[0]);
+                        return;
+                      }
+                      const currentDate = new Date(selectedDate + 'T00:00:00'); // Add time to avoid timezone issues
+                      const nextMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
+                      setSelectedDate(nextMonth.toISOString().split('T')[0]);
+                    }}
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                  >
+                    <ChevronRight className="h-5 w-5 text-gray-900 dark:text-gray-100" />
+                  </button>
+                </div>
                 {(isInstructor || user?.role === 'admin') && (
                   <button
                     onClick={exportMonthlyAttendance}
-                    className="px-4 py-2 bg-green-600 dark:bg-green-500 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600 transition-colors font-medium flex items-center gap-2"
+                    className="w-full sm:w-auto px-4 py-2 bg-green-600 dark:bg-green-500 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600 transition-colors font-medium flex items-center justify-center gap-2 text-xs sm:text-sm"
                   >
                     <Download className="h-4 w-4" />
                     Export CSV
@@ -1217,18 +1217,18 @@ const Attendance: React.FC = () => {
       {/* Attendance List - Only show in Daily View */}
       {viewMode === 'daily' && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between">
+          <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100">
                   {(isInstructor || user?.role === 'admin') ? 'Student Attendance' : 'My Attendance'}
                 </h2>
               </div>
               {isInstructor && (
                 <button
                   onClick={handleSelectAll}
-                  className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+                  className="text-xs sm:text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-left sm:text-right"
                 >
                   {selectedStudents.size === attendanceData.length ? 'Deselect All' : 'Select All'}
                 </button>
@@ -1242,26 +1242,26 @@ const Attendance: React.FC = () => {
               const StatusIcon = statusConfig.icon;
               
               return (
-                <div key={record.studentId} className="px-6 py-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+                <div key={record.studentId} className="px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
                     {isInstructor && (
                       <input
                         type="checkbox"
                         checked={selectedStudents.has(record.studentId)}
                         onChange={() => handleStudentSelect(record.studentId)}
-                        className="h-4 w-4 text-blue-600 dark:text-blue-400 border-gray-300 dark:border-gray-700 rounded focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-900"
+                        className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 dark:text-blue-400 border-gray-300 dark:border-gray-700 rounded focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-900 flex-shrink-0"
                       />
                     )}
-                    <div className="w-8 h-8 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
-                      <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                    <div className="w-10 h-10 sm:w-8 sm:h-8 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center flex-shrink-0">
+                      <span className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">
                         {record.studentName.split(' ').map((n: string) => n[0]).join('')}
                       </span>
                     </div>
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-gray-100">{record.studentName}</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">{record.email}</p>
-                      <div className="flex items-center gap-2">
-                        <p className="text-xs text-gray-400 dark:text-gray-500">Current: {record.status}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm sm:text-base text-gray-900 dark:text-gray-100 truncate">{record.studentName}</p>
+                      <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 truncate">{record.email}</p>
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                        <p className="text-xs text-gray-400 dark:text-gray-500">Current: <span className="capitalize">{record.status}</span></p>
                         <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
                           {getStudentAttendancePercentage(record.studentId)}% overall
                         </span>
@@ -1270,33 +1270,36 @@ const Attendance: React.FC = () => {
                   </div>
                   
                   {(isInstructor || user?.role === 'admin') ? (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
                       {Object.entries(STATUS_CONFIG).map(([status, config]) => {
                         const Icon = config.icon;
                         return (
                           <button
                             key={status}
                             onClick={() => handleAttendanceChange(record.studentId, status)}
-                            className={`p-2 rounded-lg border transition-colors ${
+                            className={`p-2.5 sm:p-2 rounded-lg border transition-colors flex items-center gap-1.5 sm:gap-0 ${
                               record.status === status 
                                 ? config.color 
                                 : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
                             }`}
                             title={config.label}
                           >
-                            <Icon className="h-4 w-4" />
+                            <Icon className="h-4 w-4 sm:h-4 sm:w-4" />
                             {record.status === status && (
-                              <span className="text-xs ml-1">{config.shortLabel}</span>
+                              <span className="text-xs sm:hidden">{config.label}</span>
+                            )}
+                            {record.status === status && (
+                              <span className="hidden sm:inline text-xs ml-1">{config.shortLabel}</span>
                             )}
                           </button>
                         );
                       })}
                     </div>
                   ) : (
-                    <div className={`px-4 py-2 rounded-lg border ${statusConfig.color}`}>
-                      <div className="flex items-center gap-2">
+                    <div className={`px-3 sm:px-4 py-2 rounded-lg border ${statusConfig.color} w-full sm:w-auto`}>
+                      <div className="flex items-center justify-center sm:justify-start gap-2">
                         <StatusIcon className="h-4 w-4" />
-                        <span className="text-sm font-medium">{statusConfig.label}</span>
+                        <span className="text-xs sm:text-sm font-medium">{statusConfig.label}</span>
                       </div>
                     </div>
                   )}
@@ -1309,15 +1312,15 @@ const Attendance: React.FC = () => {
 
       {/* Settings Modal */}
       {showSettings && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 w-full max-w-md max-h-[95vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Attendance Settings</h3>
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100">Attendance Settings</h3>
               <button
                 onClick={() => setShowSettings(false)}
-                className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0"
               >
-                <XCircle className="h-6 w-6" />
+                <XCircle className="h-5 w-5 sm:h-6 sm:w-6" />
               </button>
             </div>
             
@@ -1393,15 +1396,15 @@ const Attendance: React.FC = () => {
 
       {/* Custom Export Modal */}
       {showExportModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-lg">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 w-full max-w-lg max-h-[95vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Custom Export</h3>
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100">Custom Export</h3>
               <button
                 onClick={() => setShowExportModal(false)}
-                className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0"
               >
-                <XCircle className="h-6 w-6" />
+                <XCircle className="h-5 w-5 sm:h-6 sm:w-6" />
               </button>
             </div>
             

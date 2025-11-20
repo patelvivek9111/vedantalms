@@ -16,7 +16,10 @@ import {
   UserPlus,
   CheckSquare,
   ClipboardCheck,
-  GraduationCap
+  GraduationCap,
+  Menu,
+  X,
+  ArrowLeft
 } from 'lucide-react';
 
 // Navigation items for the course sidebar
@@ -42,6 +45,7 @@ const PageViewWrapper: React.FC = () => {
   const { user } = useAuth();
   const [course, setCourse] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
 
   useEffect(() => {
@@ -181,15 +185,53 @@ const PageViewWrapper: React.FC = () => {
   }
 
   return (
-    <div className="flex w-full max-w-7xl mx-auto">
+    <div className="flex flex-col lg:flex-row w-full max-w-7xl mx-auto">
+      {/* Top Navigation Bar (Mobile Only) */}
+      <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+        <div className="relative flex items-center justify-between px-4 py-3">
+          <button
+            onClick={() => navigate(`/courses/${courseId}/pages`)}
+            className="text-gray-700 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
+            aria-label="Go back to pages"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Page</h1>
+          <div className="w-10"></div> {/* Spacer for centering */}
+        </div>
+      </nav>
+
+      {/* Mobile Overlay */}
+      {isMobileMenuOpen && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-[90]"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
       {/* Course Sidebar */}
-      <aside className="w-64 mr-8 mt-4">
-        <nav className="bg-white/80 dark:bg-gray-900/80 backdrop-blur rounded-2xl shadow-lg p-4 flex flex-col gap-1 border border-gray-100 dark:border-gray-700">
+      <aside className={`w-full lg:w-64 lg:mr-8 mt-4 lg:mt-4 self-start lg:sticky lg:top-4 h-[calc(100vh-4rem-4rem)] lg:h-fit z-[95] lg:z-auto transition-transform duration-300 ease-in-out ${
+        isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+      } fixed lg:relative left-0 top-16 lg:top-0 bg-white dark:bg-gray-900 lg:bg-transparent pt-16 lg:pt-0`}>
+        <nav className="bg-white/80 dark:bg-gray-900/80 backdrop-blur rounded-2xl shadow-lg p-4 flex flex-col gap-1 border border-gray-100 dark:border-gray-700 m-4 lg:m-0 h-full lg:h-auto overflow-y-auto pb-20 lg:pb-4">
+          <div className="flex justify-between items-center mb-2 lg:hidden">
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Course Menu</h3>
+            <button
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+              aria-label="Close menu"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
           {filteredNavigationItems.map((item: any) => (
             <button
               key={item.id}
-              className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-200 ${item.id === 'pages' ? 'bg-blue-100 text-blue-700 font-semibold shadow' : ''}`}
-              onClick={() => navigate(`/courses/${course._id}/${item.id}`)}
+              className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors font-medium text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 ${item.id === 'pages' ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-semibold shadow' : ''}`}
+              onClick={() => {
+                navigate(`/courses/${course._id}/${item.id}`);
+                setIsMobileMenuOpen(false);
+              }}
             >
               <item.icon className="w-5 h-5" />
               <span className="text-base">{item.label}</span>
@@ -199,7 +241,7 @@ const PageViewWrapper: React.FC = () => {
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto w-full pt-16 lg:pt-0">
         <div className="container mx-auto px-4 py-6">
           <PageView />
         </div>

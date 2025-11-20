@@ -4,6 +4,7 @@ const Group = require('../models/Group');
 const fs = require('fs').promises;
 const path = require('path');
 const Module = require('../models/module.model');
+const { deleteFromCloudinary, extractPublicId, isCloudinaryConfigured } = require('../utils/cloudinary');
 
 // Submit an assignment
 exports.submitAssignment = async (req, res) => {
@@ -55,18 +56,33 @@ exports.submitAssignment = async (req, res) => {
       // If there's an existing submission, delete its files
       if (existingSubmission.files.length > 0) {
         await Promise.all(existingSubmission.files.map(async (file) => {
+          // Check if file is from Cloudinary or local
+          if (typeof file === 'string' && file.includes('cloudinary.com') && isCloudinaryConfigured()) {
+            // Delete from Cloudinary
+            const publicId = extractPublicId(file);
+            if (publicId) {
+              try {
+                await deleteFromCloudinary(publicId, 'auto');
+              } catch (err) {
+                console.error('Error deleting file from Cloudinary:', err);
+              }
+            }
+          } else {
+            // Delete local file
           const filePath = path.join(__dirname, '..', file);
           try {
             await fs.unlink(filePath);
           } catch (err) {
-            console.error('Error deleting file:', err);
+              console.error('Error deleting local file:', err);
+            }
           }
         }));
       }
       
       // Update existing submission
       existingSubmission.submissionText = submissionText;
-      existingSubmission.files = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
+      // Files are already uploaded via /api/upload endpoint, so we get URLs from req.body
+      existingSubmission.files = req.body.uploadedFiles || (req.files ? req.files.map(file => `/uploads/${file.filename}`) : []);
       existingSubmission.submittedAt = new Date();
       existingSubmission.submittedBy = req.user._id;
       
@@ -74,8 +90,8 @@ exports.submitAssignment = async (req, res) => {
       return res.json(existingSubmission);
     }
     
-    // Get file URLs from uploaded files
-    const files = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
+    // Get file URLs from uploaded files (already uploaded via /api/upload)
+    const files = req.body.uploadedFiles || (req.files ? req.files.map(file => `/uploads/${file.filename}`) : []);
     
     const submission = new Submission({
       assignment: assignmentId,

@@ -119,6 +119,25 @@ mongoose.connect(MONGODB_URI, mongoOptions)
   .then(() => {
     console.log('✅ Connected to MongoDB');
     console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+    
+    // Log connection details (without password)
+    const connection = mongoose.connection;
+    const dbName = connection.db.databaseName;
+    const host = connection.host;
+    const port = connection.port;
+    
+    // Extract cluster name from URI if it's Atlas
+    let clusterInfo = '';
+    if (MONGODB_URI.includes('mongodb+srv://')) {
+      const clusterMatch = MONGODB_URI.match(/@([^.]+)\.mongodb\.net/);
+      if (clusterMatch) {
+        clusterInfo = ` (Cluster: ${clusterMatch[1]})`;
+      }
+    }
+    
+    console.log(`📊 Database: ${dbName}`);
+    console.log(`🔗 Connection: ${host}${port ? ':' + port : ''}${clusterInfo}`);
+    console.log(`📝 MongoDB URI: ${MONGODB_URI.replace(/:[^:@]+@/, ':****@')}`); // Hide password
   })
   .catch((err) => {
     console.error('❌ MongoDB connection error:', err.message);
@@ -184,18 +203,51 @@ app.use('/api/quizwave', require('./routes/quizwave.routes'));
 // Upload route for file uploads
 const upload = require('./middleware/upload');
 const { protect } = require('./middleware/auth');
-app.post('/api/upload', protect, upload.array('files', 10), (req, res) => {
+const { uploadMultipleToCloudinary, isCloudinaryConfigured } = require('./utils/cloudinary');
+
+app.post('/api/upload', protect, upload.array('files', 10), async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ message: 'No files uploaded' });
     }
     
-    const files = req.files.map(file => ({
+    let files;
+    
+    // Use Cloudinary if configured, otherwise use local storage
+    if (isCloudinaryConfigured()) {
+      try {
+        const cloudinaryResults = await uploadMultipleToCloudinary(req.files, {
+          folder: 'lms/uploads'
+        });
+        
+        files = cloudinaryResults.map((result, index) => ({
+          originalname: req.files[index].originalname,
+          filename: result.public_id.split('/').pop(),
+          path: result.url, // Cloudinary URL
+          size: result.bytes,
+          cloudinary: true
+        }));
+      } catch (cloudinaryError) {
+        console.error('Cloudinary upload failed, falling back to local storage:', cloudinaryError);
+        // Fallback to local storage
+        files = req.files.map(file => ({
+          originalname: file.originalname,
+          filename: file.filename,
+          path: `/uploads/${file.filename}`,
+          size: file.size,
+          cloudinary: false
+        }));
+      }
+    } else {
+      // Local storage
+      files = req.files.map(file => ({
       originalname: file.originalname,
       filename: file.filename,
       path: `/uploads/${file.filename}`,
-      size: file.size
+        size: file.size,
+        cloudinary: false
     }));
+    }
     
     res.json({ 
       message: 'Files uploaded successfully',

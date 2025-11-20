@@ -169,19 +169,19 @@ const PollList: React.FC<PollListProps> = ({ courseId }) => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Content Polls</h2>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Content Polls</h2>
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">
             Vote on upcoming content and topics
           </p>
         </div>
         {isInstructor && (
           <button
             onClick={() => setShowCreateModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors text-sm sm:text-base"
           >
             <Vote className="w-4 h-4" />
             Create Poll
@@ -202,7 +202,7 @@ const PollList: React.FC<PollListProps> = ({ courseId }) => {
           </p>
         </div>
       ) : (
-        <div className="grid gap-6">
+        <div className="grid gap-4 sm:gap-6">
           {polls.map((poll) => {
             const status = getPollStatus(poll);
             const winningOptions = getWinningOptions(poll);
@@ -211,68 +211,72 @@ const PollList: React.FC<PollListProps> = ({ courseId }) => {
             return (
               <div key={poll._id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
                 {/* Poll Header */}
-                <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                <div className="p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-start gap-3 sm:gap-0">
+                    <div className="flex-1 min-w-0 w-full sm:w-auto">
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
+                        <h3 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100 break-words flex-1 min-w-0">
                           {poll.title}
                         </h3>
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-${status.color}-100 text-${status.color}-800 dark:bg-${status.color}-900 dark:text-${status.color}-200`}>
-                          {status.text}
-                        </span>
-                        {poll.hasVoted && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                            <CheckCircle className="w-3 h-3 mr-1" />
-                            Voted
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`inline-flex items-center px-2 py-0.5 sm:px-2.5 rounded-full text-xs font-medium bg-${status.color}-100 text-${status.color}-800 dark:bg-${status.color}-900 dark:text-${status.color}-200`}>
+                            {status.text}
                           </span>
-                        )}
-                      </div>
-                      <p className="text-gray-600 dark:text-gray-400 mb-3">
-                        {poll.description}
-                      </p>
-                      <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="w-4 h-4" />
-                          Ends: {formatDate(poll.endDate)}
+                          {poll.hasVoted && (
+                            <span className="inline-flex items-center px-2 py-0.5 sm:px-2.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                              <CheckCircle className="w-3 h-3 mr-1" />
+                              Voted
+                            </span>
+                          )}
                         </div>
-                                                 <div className="flex items-center gap-1">
-                           <Users className="w-4 h-4" />
-                           {poll.totalVotes || 0} votes
-                         </div>
+                      </div>
+                      {poll.description && (
+                        <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-3">
+                          {poll.description}
+                        </p>
+                      )}
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-3 md:gap-4 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                         <div className="flex items-center gap-1">
-                          <Vote className="w-4 h-4" />
-                          {poll.options.length} options
+                          <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                          <span className="whitespace-nowrap">Ends: {formatDate(poll.endDate)}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Users className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                          <span>{poll.totalVotes || 0} votes</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Vote className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                          <span>{poll.options.length} opt</span>
                         </div>
                       </div>
                     </div>
                     
                     {isInstructor && (
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                         <button
                           onClick={() => handleToggleResults(poll._id, poll.resultsVisible)}
-                          className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+                          className="p-2 sm:p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
                           title={poll.resultsVisible ? 'Hide results' : 'Show results'}
                         >
-                          {poll.resultsVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          {poll.resultsVisible ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5" />}
                         </button>
                         <button
                           onClick={() => setEditingPoll(poll)}
-                          className="p-2 text-blue-500 hover:text-blue-700 transition-colors"
+                          className="p-2 sm:p-2 text-blue-500 hover:text-blue-700 transition-colors"
                           title="Edit poll"
                         >
-                          <Edit className="w-4 h-4" />
+                          <Edit className="w-4 h-4 sm:w-5 sm:h-5" />
                         </button>
                         <button
                           onClick={() => handleDeletePoll(poll._id)}
                           disabled={deletingPoll === poll._id}
-                          className="p-2 text-red-500 hover:text-red-700 transition-colors disabled:opacity-50"
+                          className="p-2 sm:p-2 text-red-500 hover:text-red-700 transition-colors disabled:opacity-50"
                           title="Delete poll"
                         >
                           {deletingPoll === poll._id ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-500"></div>
+                            <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-red-500"></div>
                           ) : (
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
                           )}
                         </button>
                       </div>
@@ -281,7 +285,7 @@ const PollList: React.FC<PollListProps> = ({ courseId }) => {
                 </div>
 
                                  {/* Poll Options */}
-                 <div className="p-6">
+                 <div className="p-4 sm:p-6">
                    {/* Show voting interface for students if poll is active and they haven't voted */}
                    {!isInstructor && status.status === 'active' && !poll.hasVoted ? (
                      <PollVote poll={poll} onVoteSuccess={handleVoteSuccess} />
@@ -302,7 +306,7 @@ const PollList: React.FC<PollListProps> = ({ courseId }) => {
                          </div>
                        )}
                        
-                       <div className="space-y-3">
+                       <div className="space-y-2 sm:space-y-3">
                      {poll.options.map((option, index) => {
                        const votePercentage = poll.totalVotes && poll.totalVotes > 0 
                          ? ((option.votes || 0) / poll.totalVotes) * 100 
@@ -312,13 +316,13 @@ const PollList: React.FC<PollListProps> = ({ courseId }) => {
                        
                        return (
                          <div key={index} className="relative">
-                           <div className={`flex items-center justify-between p-3 rounded-lg border ${
+                           <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg border gap-2 sm:gap-0 ${
                              isSelected 
                                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' 
                                : 'border-gray-200 dark:border-gray-600'
                            }`}>
-                             <div className="flex items-center gap-3 flex-1">
-                               <div className={`w-4 h-4 rounded-full border-2 ${
+                             <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                               <div className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full border-2 flex-shrink-0 ${
                                  isSelected 
                                    ? 'border-blue-500 bg-blue-500' 
                                    : 'border-gray-300 dark:border-gray-500'
@@ -327,25 +331,29 @@ const PollList: React.FC<PollListProps> = ({ courseId }) => {
                                    <div className="w-2 h-2 bg-white rounded-full m-0.5"></div>
                                  )}
                                </div>
-                               <span className="text-gray-900 dark:text-gray-100">
-                                 {option.text}
-                               </span>
-                               {isWinning && canSeeResults && (
-                                 <span className="text-green-600 dark:text-green-400 text-sm font-medium">
-                                   🏆 Winner
-                                 </span>
-                               )}
+                               <div className="flex-1 min-w-0">
+                                 <div className="flex items-center gap-2 flex-wrap">
+                                   <span className="text-sm sm:text-base text-gray-900 dark:text-gray-100 break-words">
+                                     {option.text}
+                                   </span>
+                                   {isWinning && canSeeResults && (
+                                     <span className="text-xs sm:text-sm text-green-600 dark:text-green-400 font-medium whitespace-nowrap">
+                                       🏆 Winner
+                                     </span>
+                                   )}
+                                 </div>
+                               </div>
                              </div>
                              
                              {canSeeResults && (
-                               <div className="flex items-center gap-2">
-                                 <div className="w-24 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2">
+                                 <div className="w-full sm:w-24 bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 sm:h-2">
                                    <div 
-                                     className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                                     className="bg-blue-500 h-2.5 sm:h-2 rounded-full transition-all duration-300"
                                      style={{ width: `${votePercentage}%` }}
                                    ></div>
                                  </div>
-                                 <span className="text-sm text-gray-600 dark:text-gray-400 min-w-[3rem] text-right">
+                                 <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 text-left sm:text-right whitespace-nowrap">
                                    {option.votes || 0} ({votePercentage.toFixed(1)}%)
                                  </span>
                                </div>

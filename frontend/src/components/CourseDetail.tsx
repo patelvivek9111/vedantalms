@@ -28,7 +28,14 @@ import {
   Layout,
   ClipboardCheck,
   GraduationCap,
-  Gamepad2
+  Gamepad2,
+  Menu,
+  X,
+  ChevronDown,
+  Folder,
+  HelpCircle,
+  User as UserIcon,
+  LogOut
 } from 'lucide-react';
 import WhatIfScores from './WhatIfScores';
 import StudentGradeSidebar from './StudentGradeSidebar';
@@ -49,6 +56,7 @@ import PollList from './polls/PollList';
 import RichTextEditor from './RichTextEditor';
 import QuizWaveDashboard from './quizwave/QuizWaveDashboard';
 import StudentQuizWaveView from './quizwave/StudentQuizWaveView';
+import { ChangeUserModal } from './ChangeUserModal';
 
 // EnrollmentRequestsHandler component
 const EnrollmentRequestsHandler: React.FC<{ courseId: string }> = ({ courseId }) => {
@@ -143,7 +151,6 @@ const navigationItems = [
   { id: 'pages', label: 'Pages', icon: FileText },
   { id: 'assignments', label: 'Assignments', icon: PenTool },
   { id: 'quizzes', label: 'Quizzes', icon: ClipboardCheck },
-  { id: 'quizwave', label: 'QuizWave', icon: Gamepad2 },
   { id: 'discussions', label: 'Discussions', icon: MessageSquare },
   { id: 'announcements', label: 'Announcements', icon: Megaphone },
   { id: 'polls', label: 'Polls', icon: BarChart3 },
@@ -158,35 +165,35 @@ const navigationItems = [
 const StudentCard = ({ student, isInstructor, isAdmin, handleUnenroll, isInstructorCard }: any) => {
   const [imgError, setImgError] = React.useState(false);
   return (
-    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 flex items-center gap-4">
+    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 flex items-center gap-3 sm:gap-4">
       {student.profilePicture && !imgError ? (
         <img
           src={student.profilePicture.startsWith('http')
             ? student.profilePicture
             : getImageUrl(student.profilePicture)}
           alt={student.firstName}
-          className="w-12 h-12 object-cover rounded-full border"
+          className="w-10 h-10 sm:w-12 sm:h-12 object-cover rounded-full border flex-shrink-0"
           onError={() => setImgError(true)}
         />
       ) : (
-        <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-xl font-bold text-gray-600 border">
+        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-base sm:text-xl font-bold text-gray-600 dark:text-gray-300 border flex-shrink-0">
           {student.firstName && student.lastName
             ? `${student.firstName[0]}${student.lastName[0]}`.toUpperCase()
             : ''}
         </div>
       )}
-      <div>
-        <div className="font-semibold text-lg text-gray-800 dark:text-gray-200">{student.firstName} {student.lastName}</div>
-        <div className="text-gray-500 text-sm">{student.email}</div>
+      <div className="flex-1 min-w-0">
+        <div className="font-semibold text-base sm:text-lg text-gray-800 dark:text-gray-200 truncate">{student.firstName} {student.lastName}</div>
+        <div className="text-gray-500 dark:text-gray-400 text-xs sm:text-sm truncate">{student.email}</div>
       </div>
       {/* Only show Remove button for students, not instructor */}
       {!isInstructorCard && (isInstructor || isAdmin) && handleUnenroll && (
         <button
-          className="ml-auto p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          className="ml-auto flex-shrink-0 p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
           onClick={() => handleUnenroll(student._id)}
           title="Remove student"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
           </svg>
         </button>
@@ -200,7 +207,7 @@ const CourseDetail: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { getCourse, getCourses, loading, error, enrollStudent, unenrollStudent } = useCourse();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [course, setCourse] = useState<any>(null);
   const [modules, setModules] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -245,6 +252,8 @@ const CourseDetail: React.FC = () => {
   const [groupAssignments, setGroupAssignments] = useState<any[]>([]);
   // Syllabus state
   const [editingSyllabus, setEditingSyllabus] = useState(false);
+  // State for expanded students in mobile gradebook view
+  const [expandedStudents, setExpandedStudents] = useState<Set<string>>(new Set());
   const [syllabusFields, setSyllabusFields] = useState({
     courseTitle: '',
     courseCode: '',
@@ -260,6 +269,41 @@ const CourseDetail: React.FC = () => {
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const [showOverviewConfigModal, setShowOverviewConfigModal] = useState(false);
   const [showSidebarConfigModal, setShowSidebarConfigModal] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showBurgerMenu, setShowBurgerMenu] = useState(false);
+  const [showChangeUserModal, setShowChangeUserModal] = useState(false);
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
+
+  // Check if it's actually a mobile phone (not tablet/iPad)
+  useEffect(() => {
+    const checkMobile = () => {
+      const userAgent = navigator.userAgent.toLowerCase();
+      const screenWidth = window.screen.width;
+      const viewportWidth = window.innerWidth;
+      
+      // Detect tablets/iPads more accurately
+      // Modern iPads report as Macintosh, so check for touch support and screen size
+      const isTablet = /ipad|tablet|playbook|silk|(android(?!.*mobile))|kindle/i.test(userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) || // iPad on iOS 13+
+        (screenWidth >= 768 && screenWidth <= 1024 && 'ontouchstart' in window);
+      
+      // Detect phones - must be mobile user agent AND not a tablet AND small screen
+      const isPhone = (
+        /android|webos|iphone|ipod|blackberry|iemobile|opera mini/i.test(userAgent) ||
+        (/mobile/i.test(userAgent) && !isTablet)
+      ) && !isTablet;
+      
+      // Only show mobile view on actual phones with small screens (< 768px)
+      // Tablets/iPads should show desktop view even if screen is smaller
+      // Also check viewport to handle desktop with dev tools
+      const shouldShowMobile = isPhone && screenWidth < 768 && viewportWidth < 768;
+      
+      setIsMobileDevice(shouldShowMobile);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const initialSection = section || 'overview';
 
@@ -267,7 +311,30 @@ const CourseDetail: React.FC = () => {
   useEffect(() => {
     const urlSection = (location.pathname.split('/')[3] || 'overview');
     setActiveSection(urlSection);
+    setIsMobileMenuOpen(false); // Close mobile menu on route change
   }, [location.pathname]);
+
+  // Prevent body scroll when mobile sidebar is open, but allow sidebar to scroll
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      const originalOverflow = window.getComputedStyle(document.body).overflow;
+      const originalPosition = window.getComputedStyle(document.body).position;
+      const scrollY = window.scrollY;
+      
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      
+      return () => {
+        document.body.style.overflow = originalOverflow;
+        document.body.style.position = originalPosition;
+        document.body.style.top = '';
+        document.body.style.width = '';
+        window.scrollTo(0, scrollY);
+      };
+    }
+  }, [isMobileMenuOpen]);
 
   // 1. Move fetchCourseAndModulesWithAssignments outside of useEffect so it can be called from multiple places
   const fetchCourseAndModulesWithAssignments = useCallback(async () => {
@@ -2286,23 +2353,24 @@ const CourseDetail: React.FC = () => {
         });
         return (
           <div className="space-y-6">
-            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
-              <div className="flex justify-between items-center mb-8">
+            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 sm:mb-8">
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Assignments</h2>
-                  <p className="text-gray-600 mt-1">View and manage course assignments</p>
+                  <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100">Assignments</h2>
+                  <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">View and manage course assignments</p>
                 </div>
                 {(isInstructor || isAdmin) && (
                   <>
                     {modules.length > 0 ? (
                       <button
                         onClick={() => navigate(`/modules/${modules[0]._id}/assignments/create`)}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
+                        className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center gap-1.5 sm:gap-2 shadow-sm text-sm sm:text-base"
                       >
-                        <span>+</span> Create Assignment
+                        <span className="text-base sm:text-lg">+</span>
+                        <span>Create Assignment</span>
                       </button>
                     ) : (
-                      <div className="text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 px-4 py-2 rounded-md">
+                      <div className="w-full sm:w-auto text-xs sm:text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 px-3 sm:px-4 py-2 rounded-md text-center sm:text-left">
                         Create a module first to add assignments
                       </div>
                     )}
@@ -2351,23 +2419,24 @@ const CourseDetail: React.FC = () => {
         
         return (
           <div className="space-y-6">
-            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
-              <div className="flex justify-between items-center mb-8">
+            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 sm:mb-8">
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Quizzes</h2>
-                  <p className="text-gray-600 dark:text-gray-400 mt-1">View and manage course quizzes</p>
+                  <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100">Quizzes</h2>
+                  <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">View and manage course quizzes</p>
                 </div>
                 {(isInstructor || isAdmin) && (
                   <>
                     {modules.length > 0 ? (
                       <button
                         onClick={() => navigate(`/modules/${modules[0]._id}/assignments/create?isGradedQuiz=true`)}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
+                        className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center gap-1.5 sm:gap-2 shadow-sm text-sm sm:text-base"
                       >
-                        <span>+</span> Create Quiz
+                        <span className="text-base sm:text-lg">+</span>
+                        <span>Create Quiz</span>
                       </button>
                     ) : (
-                      <div className="text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 px-4 py-2 rounded-md">
+                      <div className="w-full sm:w-auto text-xs sm:text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 px-3 sm:px-4 py-2 rounded-md text-center sm:text-left">
                         Create a module first to add quizzes
                       </div>
                     )}
@@ -2501,7 +2570,125 @@ const CourseDetail: React.FC = () => {
                   </div>
                 </div>
                 {/* Show calculated grade using backend API result */}
-                <div className="overflow-x-auto">
+                {/* Mobile Card View */}
+                <div className="md:hidden space-y-3">
+                  {studentAssignments.map((assignment: any, idx: number) => {
+                    const submissionKey = `${String(studentId)}_${String(assignment._id)}`;
+                    let hasSubmission = assignment.isDiscussion 
+                      ? assignment.hasSubmitted || (Array.isArray(assignment.replies) && assignment.replies.some((r: any) => r.author && (r.author._id === String(studentId) || r.author === String(studentId))))
+                      : !!submissionMap[submissionKey];
+                    
+                    let grade = assignment.isDiscussion
+                      ? assignment.grade
+                      : gradebookData.grades[String(studentId)]?.[String(assignment._id)];
+                    const maxPoints = assignment.questions?.reduce((sum: number, q: any) => sum + (q.points || 0), 0) || assignment.totalPoints || 0;
+                    const submission = studentSubmissions.find(s => s.assignment && s.assignment._id === assignment._id);
+                    const feedback = typeof submission?.feedback === 'string' ? submission.feedback : '';
+                    const dueDate = assignment.dueDate ? new Date(assignment.dueDate) : null;
+                    const now = new Date();
+                    let statusCell: React.ReactNode = null;
+                    let scoreCell: string | number = typeof grade === 'number' ? 
+                      (Number.isInteger(grade) ? grade.toString() : Number(grade).toFixed(2)) : '-';
+                    let submittedAt: Date | null = null;
+                    
+                    if (assignment.isDiscussion) {
+                      if (grade === null || grade === undefined) {
+                        if (Array.isArray(assignment.studentGrades)) {
+                          const studentGradeObj = assignment.studentGrades.find((g: any) => g.student && (g.student._id === String(studentId) || g.student === String(studentId)));
+                          if (studentGradeObj && typeof studentGradeObj.grade === 'number') {
+                            grade = studentGradeObj.grade;
+                            scoreCell = Number.isInteger(grade) ? grade.toString() : Number(grade).toFixed(2);
+                            submittedAt = studentGradeObj.gradedAt ? new Date(studentGradeObj.gradedAt) : null;
+                            hasSubmission = true;
+                          }
+                        }
+                      }
+                      if (!hasSubmission && Array.isArray(assignment.replies)) {
+                        const reply = assignment.replies.find((r: any) => r.author && (r.author._id === studentId || r.author === studentId));
+                        if (reply && reply.createdAt) {
+                          submittedAt = new Date(reply.createdAt);
+                          hasSubmission = true;
+                        }
+                      }
+                      if (hasSubmission) {
+                        if (dueDate && submittedAt && submittedAt > dueDate) {
+                          statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">Late</span>;
+                        } else {
+                          statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Submitted</span>;
+                        }
+                      } else if (dueDate && now > dueDate) {
+                        statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">Missing</span>;
+                        scoreCell = '0';
+                      }
+                    } else {
+                      if (!assignment.published) {
+                        statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">Not Published</span>;
+                        scoreCell = '-';
+                      } else if (hasSubmission) {
+                        if (submission && submission.submittedAt && dueDate && new Date(submission.submittedAt) > dueDate) {
+                          statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">Late</span>;
+                        } else {
+                          statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Submitted</span>;
+                        }
+                      } else if (assignment.isOfflineAssignment) {
+                        statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">Offline</span>;
+                        scoreCell = '-';
+                      } else if (dueDate && now > dueDate) {
+                        statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">Missing</span>;
+                        scoreCell = '0';
+                      }
+                    }
+                    let feedbackForDiscussion = '';
+                    if (assignment.isDiscussion && Array.isArray(assignment.studentGrades)) {
+                      const studentGradeObj = assignment.studentGrades.find((g: any) => g.student && (g.student._id === studentId || g.student === studentId));
+                      if (studentGradeObj && typeof studentGradeObj.feedback === 'string' && studentGradeObj.feedback.trim() !== '') {
+                        feedbackForDiscussion = studentGradeObj.feedback;
+                      }
+                    }
+                    
+                    return (
+                      <div key={`student-assignment-mobile-${assignment._id}-${idx}`} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-base mb-1">{assignment.title}</h3>
+                            {assignment.group && (
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">{assignment.group}</div>
+                            )}
+                          </div>
+                          {statusCell}
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 mt-3">
+                          <div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Due Date</div>
+                            <div className="text-sm text-gray-900 dark:text-gray-100">
+                              {assignment.dueDate ? new Date(assignment.dueDate).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Score</div>
+                            <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                              {scoreCell} / {maxPoints}
+                            </div>
+                          </div>
+                        </div>
+                        {(feedbackForDiscussion || (hasSubmission && typeof feedback === 'string' && feedback.trim() !== '')) && (
+                          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                            <button
+                              className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 transition-colors duration-150 text-sm font-medium flex items-center"
+                              onClick={() => assignment.isDiscussion ? navigate(`/courses/${course._id}/threads/${assignment._id}`) : navigate(`/assignments/${assignment._id}/view`)}
+                            >
+                              <span className="mr-2">💬</span>
+                              View Feedback
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                {/* Desktop Table View */}
+                <div className="hidden md:block overflow-x-auto">
                   <table className="min-w-full">
                     <thead>
                       <tr className="border-b border-gray-200 dark:border-gray-700">
@@ -2534,7 +2721,6 @@ const CourseDetail: React.FC = () => {
                         let submittedAt: Date | null = null;
                         
                         if (assignment.isDiscussion) {
-                          // For discussions, extract grade from studentGrades if not present
                           if (grade === null || grade === undefined) {
                             if (Array.isArray(assignment.studentGrades)) {
                               const studentGradeObj = assignment.studentGrades.find((g: any) => g.student && (g.student._id === String(studentId) || g.student === String(studentId)));
@@ -2546,7 +2732,6 @@ const CourseDetail: React.FC = () => {
                               }
                             }
                           }
-                          // If still no grade, check for reply
                           if (!hasSubmission && Array.isArray(assignment.replies)) {
                             const reply = assignment.replies.find((r: any) => r.author && (r.author._id === studentId || r.author === studentId));
                             if (reply && reply.createdAt) {
@@ -2554,7 +2739,6 @@ const CourseDetail: React.FC = () => {
                               hasSubmission = true;
                             }
                           }
-                          // Status logic
                           if (hasSubmission) {
                             if (dueDate && submittedAt && submittedAt > dueDate) {
                               statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">Late</span>;
@@ -2576,7 +2760,6 @@ const CourseDetail: React.FC = () => {
                               statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Submitted</span>;
                             }
                           } else if (assignment.isOfflineAssignment) {
-                            // Offline assignment - don't show "Missing" status
                             statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">Offline</span>;
                             scoreCell = '-';
                           } else if (dueDate && now > dueDate) {
@@ -2654,7 +2837,89 @@ const CourseDetail: React.FC = () => {
                       </div>
                     </div>
                     
-                    <div className="bg-white dark:bg-gray-900 rounded-lg overflow-hidden shadow-sm">
+                    {/* Mobile Card View */}
+                    <div className="md:hidden space-y-3">
+                      {(course.groups || []).map((group: any, idx: number) => {
+                        const groupAssignments = studentAssignments.filter((assignment: any) => assignment.group === group.name);
+                        let totalEarned = 0;
+                        let totalPossible = 0;
+                        let gradedAssignments = 0;
+                        
+                        groupAssignments.forEach((assignment: any) => {
+                          const maxPoints = assignment.questions?.reduce((sum: number, q: any) => sum + (q.points || 0), 0) || assignment.totalPoints || 0;
+                          let grade = assignment.isDiscussion
+                            ? assignment.grade
+                            : gradebookData.grades[String(studentId)]?.[String(assignment._id)];
+                          
+                          if (assignment.isDiscussion && (grade === null || grade === undefined)) {
+                            if (Array.isArray(assignment.studentGrades)) {
+                              const studentGradeObj = assignment.studentGrades.find((g: any) => g.student && (g.student._id === String(studentId) || g.student === String(studentId)));
+                              if (studentGradeObj && typeof studentGradeObj.grade === 'number') {
+                                grade = studentGradeObj.grade;
+                              }
+                            }
+                          }
+                          
+                          if (typeof grade === 'number') {
+                            totalEarned += grade;
+                            totalPossible += maxPoints;
+                            gradedAssignments++;
+                          } else {
+                            const dueDate = assignment.dueDate ? new Date(assignment.dueDate) : null;
+                            const now = new Date();
+                            const submissionKey = `${String(studentId)}_${String(assignment._id)}`;
+                            const hasSubmission = assignment.isDiscussion 
+                              ? assignment.hasSubmitted || (Array.isArray(assignment.replies) && assignment.replies.some((r: any) => r.author && (r.author._id === String(studentId) || r.author === String(studentId))))
+                              : !!submissionMap[submissionKey];
+                            
+                            if (dueDate && now > dueDate && !hasSubmission) {
+                              totalEarned += 0;
+                              totalPossible += maxPoints;
+                              gradedAssignments++;
+                            }
+                          }
+                        });
+                        
+                        const percentage = totalPossible > 0 ? (totalEarned / totalPossible) * 100 : 0;
+                        const percentageColor = percentage >= 90 ? 'text-green-600 dark:text-green-400' : 
+                                             percentage >= 80 ? 'text-blue-600 dark:text-blue-400' : 
+                                             percentage >= 70 ? 'text-yellow-600 dark:text-yellow-400' : 
+                                             'text-red-600 dark:text-red-400';
+                        
+                        return (
+                          <div key={idx} className="bg-white dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                            <div className="font-semibold text-gray-900 dark:text-gray-100 mb-3">{group.name}</div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Assignments</div>
+                                <div className="text-sm text-gray-900 dark:text-gray-100">{gradedAssignments}/{groupAssignments.length}</div>
+                              </div>
+                              <div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Weight</div>
+                                <div className="text-sm text-gray-900 dark:text-gray-100">{group.weight}%</div>
+                              </div>
+                              <div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Points Earned</div>
+                                <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">{totalEarned.toFixed(1)}</div>
+                              </div>
+                              <div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Points</div>
+                                <div className="text-sm text-gray-900 dark:text-gray-100">{totalPossible.toFixed(1)}</div>
+                              </div>
+                            </div>
+                            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Percentage</div>
+                              <div className={`text-lg font-bold ${percentageColor}`}>
+                                {totalPossible > 0 ? percentage.toFixed(1) : '-'}%
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    
+                    {/* Desktop Table View */}
+                    <div className="hidden md:block bg-white dark:bg-gray-900 rounded-lg overflow-hidden shadow-sm">
                       <table className="w-full">
                         <thead className="bg-gray-50 dark:bg-gray-800">
                           <tr>
@@ -2668,7 +2933,6 @@ const CourseDetail: React.FC = () => {
                         </thead>
                         <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                           {(course.groups || []).map((group: any, idx: number) => {
-                            // Calculate group performance
                             const groupAssignments = studentAssignments.filter((assignment: any) => assignment.group === group.name);
                             let totalEarned = 0;
                             let totalPossible = 0;
@@ -2680,7 +2944,6 @@ const CourseDetail: React.FC = () => {
                                 ? assignment.grade
                                 : gradebookData.grades[String(studentId)]?.[String(assignment._id)];
                               
-                              // For discussions, check studentGrades
                               if (assignment.isDiscussion && (grade === null || grade === undefined)) {
                                 if (Array.isArray(assignment.studentGrades)) {
                                   const studentGradeObj = assignment.studentGrades.find((g: any) => g.student && (g.student._id === String(studentId) || g.student === String(studentId)));
@@ -2695,7 +2958,6 @@ const CourseDetail: React.FC = () => {
                                 totalPossible += maxPoints;
                                 gradedAssignments++;
                               } else {
-                                // Check if assignment is past due and no submission
                                 const dueDate = assignment.dueDate ? new Date(assignment.dueDate) : null;
                                 const now = new Date();
                                 const submissionKey = `${String(studentId)}_${String(assignment._id)}`;
@@ -2704,7 +2966,6 @@ const CourseDetail: React.FC = () => {
                                   : !!submissionMap[submissionKey];
                                 
                                 if (dueDate && now > dueDate && !hasSubmission) {
-                                  // Count as 0 for missing submissions
                                   totalEarned += 0;
                                   totalPossible += maxPoints;
                                   gradedAssignments++;
@@ -2830,34 +3091,172 @@ const CourseDetail: React.FC = () => {
         return (
           <div className="space-y-6">
             {/* Header Section */}
-            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="bg-gray-100 dark:bg-gray-800 rounded-full p-3">
-                    <svg className="w-8 h-8 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-center space-x-3 sm:space-x-4">
+                  <div className="bg-gray-100 dark:bg-gray-800 rounded-full p-2 sm:p-3">
+                    <svg className="w-6 h-6 sm:w-8 sm:h-8 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                   </div>
                   <div>
-                    <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Gradebook</h2>
-                    <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">Track student performance and manage grades</p>
+                    <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">Gradebook</h2>
+                    <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm mt-1">Track student performance and manage grades</p>
                   </div>
                 </div>
-                <div className="flex items-center space-x-3">
-                  <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-4 py-2 border border-gray-200 dark:border-gray-700 text-center">
-                    <div className="text-sm text-gray-600 dark:text-gray-400">Students</div>
-                    <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{students.length}</div>
+                <div className="flex items-center space-x-2 sm:space-x-3 w-full sm:w-auto">
+                  <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-3 sm:px-4 py-2 border border-gray-200 dark:border-gray-700 text-center flex-1 sm:flex-none">
+                    <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Students</div>
+                    <div className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">{students.length}</div>
                   </div>
-                  <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-4 py-2 border border-gray-200 dark:border-gray-700 text-center">
-                    <div className="text-sm text-gray-600 dark:text-gray-400">Assignments</div>
-                    <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{assignments.length}</div>
+                  <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-3 sm:px-4 py-2 border border-gray-200 dark:border-gray-700 text-center flex-1 sm:flex-none">
+                    <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Assignments</div>
+                    <div className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">{assignments.length}</div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Gradebook Table */}
-            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            {/* Mobile Card View for Gradebook */}
+            <div className="lg:hidden space-y-4">
+              {students.map((student: any, rowIdx: number) => {
+                const weightedPercent = getWeightedGrade(student);
+                const letter = getLetterGrade(weightedPercent, course?.gradeScale);
+                let gradeColor = 'text-gray-700 dark:text-gray-300';
+                if (letter === 'A') gradeColor = 'text-green-600 dark:text-green-400';
+                else if (letter === 'B') gradeColor = 'text-blue-600 dark:text-blue-400';
+                else if (letter === 'C') gradeColor = 'text-yellow-600 dark:text-yellow-400';
+                else if (letter === 'D') gradeColor = 'text-orange-600 dark:text-orange-400';
+                else if (letter === 'F') gradeColor = 'text-red-600 dark:text-red-400';
+                
+                const isExpanded = expandedStudents.has(student._id);
+                const toggleStudent = () => {
+                  setExpandedStudents(prev => {
+                    const newSet = new Set(prev);
+                    if (newSet.has(student._id)) {
+                      newSet.delete(student._id);
+                    } else {
+                      newSet.add(student._id);
+                    }
+                    return newSet;
+                  });
+                };
+                
+                return (
+                  <div key={`student-mobile-${student._id}`} className="bg-white dark:bg-gray-900 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden">
+                    <div 
+                      className="flex items-center space-x-3 p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                      onClick={toggleStudent}
+                    >
+                      <div className="relative">
+                        {student.profilePicture ? (
+                          <img
+                            src={student.profilePicture.startsWith('http') ? student.profilePicture : getImageUrl(student.profilePicture)}
+                            alt={`${student.firstName} ${student.lastName}`}
+                            className="w-10 h-10 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                              if (fallback) fallback.style.display = 'flex';
+                            }}
+                          />
+                        ) : null}
+                        <div 
+                          className={`w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-sm font-bold ${student.profilePicture ? 'hidden' : ''}`}
+                          style={{ display: student.profilePicture ? 'none' : 'flex' }}
+                        >
+                          {student.firstName.charAt(0)}{student.lastName.charAt(0)}
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-gray-900 dark:text-gray-100">{student.firstName} {student.lastName}</h3>
+                        <div className="text-sm">
+                          <span className={`font-bold ${gradeColor}`}>
+                            {weightedPercent.toFixed(2)}% [{letter}]
+                          </span>
+                        </div>
+                      </div>
+                      <ChevronDown 
+                        className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform duration-200 ${isExpanded ? 'transform rotate-180' : ''}`}
+                      />
+                    </div>
+                    {isExpanded && (
+                      <div className="px-4 pt-4 pb-4 space-y-2 max-h-96 overflow-y-auto border-t border-gray-200 dark:border-gray-700">
+                      {assignments.map((assignment: any, assIdx: number) => {
+                        const submissionKey = `${student._id}_${assignment._id}`;
+                        const hasSubmission = assignment.isDiscussion 
+                          ? Array.isArray(assignment.replies) && assignment.replies.some((r: any) => r.author && (r.author._id === student._id || r.author === student._id))
+                          : !!submissionMap[submissionKey];
+                        const grade = grades[student._id]?.[assignment._id];
+                        const maxPoints = assignment.questions?.reduce((sum: number, q: any) => sum + (q.points || 0), 0) || assignment.totalPoints || 0;
+                        
+                        let cellContent: React.ReactNode;
+                        if (!assignment.isDiscussion && !assignment.published) {
+                          cellContent = <span className="text-xs text-gray-500 dark:text-gray-400 italic">Not Published</span>;
+                        } else if (typeof grade === 'number') {
+                          const percentage = (grade / maxPoints) * 100;
+                          let gradeBg = 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300';
+                          if (percentage < 60) gradeBg = 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300';
+                          else if (percentage < 70) gradeBg = 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300';
+                          else if (percentage < 80) gradeBg = 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300';
+                          cellContent = (
+                            <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${gradeBg}`}>
+                              {Number.isInteger(grade) ? grade : Number(grade).toFixed(2)} / {maxPoints}
+                            </span>
+                          );
+                        } else if (hasSubmission) {
+                          cellContent = (
+                            <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300">
+                              Not Graded
+                            </span>
+                          );
+                        } else if (assignment.isOfflineAssignment) {
+                          cellContent = (
+                            <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300">
+                              Offline
+                            </span>
+                          );
+                        } else {
+                          cellContent = (
+                            <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
+                              No Submission
+                            </span>
+                          );
+                        }
+                        
+                        return (
+                          <div 
+                            key={`${student._id}-${assignment._id}-${assIdx}`}
+                            className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                            onClick={() => {
+                              if (assignment.isDiscussion) {
+                                navigate(`/courses/${id}/threads/${assignment._id}`);
+                              } else {
+                                navigate(`/assignments/${assignment._id}/view`);
+                              }
+                            }}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{assignment.title}</div>
+                              {assignment.group && (
+                                <div className="text-xs text-gray-500 dark:text-gray-400">{assignment.group}</div>
+                              )}
+                            </div>
+                            <div className="ml-2 flex-shrink-0">
+                              {cellContent}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop Gradebook Table */}
+            <div className="hidden lg:block bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
               <div className="relative w-full">
                 <div className="overflow-x-auto w-full relative">
                   <table className="min-w-max w-full">
@@ -3197,23 +3596,23 @@ const CourseDetail: React.FC = () => {
             )}
             {/* Assignment Group Weights Display & Edit Button */}
             <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden mt-6">
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700 px-6 py-4 border-b border-gray-200 dark:border-gray-600">
-                <div className="flex items-center justify-between">
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700 px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-600">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div className="flex items-center space-x-3">
-                    <div className="bg-blue-100 dark:bg-blue-900 rounded-lg p-2">
+                    <div className="bg-blue-100 dark:bg-blue-900 rounded-lg p-2 flex-shrink-0">
                       <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                       </svg>
                     </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Assignment Weights</h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Configure how different assignment types contribute to final grades</p>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100">Assignment Weights</h3>
+                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">Configure how different assignment types contribute to final grades</p>
                     </div>
                   </div>
                   {(isInstructor || isAdmin) && (
                     <button
                       onClick={handleOpenGroupModal}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center space-x-2 shadow-sm"
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center justify-center space-x-2 shadow-sm w-full sm:w-auto"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -3224,7 +3623,26 @@ const CourseDetail: React.FC = () => {
                 </div>
               </div>
               
-              <div className="p-6">
+              {/* Mobile Card View */}
+              <div className="md:hidden p-4 space-y-3">
+                {(course.groups || []).map((group: any, idx: number) => (
+                  <div key={idx} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{group.name}</div>
+                      <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">{group.weight}%</div>
+                    </div>
+                  </div>
+                ))}
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border-2 border-blue-200 dark:border-blue-700">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-bold text-blue-900 dark:text-blue-100">Total</div>
+                    <div className="text-sm font-bold text-blue-900 dark:text-blue-100">{(course.groups || []).reduce((sum: number, g: any) => sum + Number(g.weight), 0)}%</div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Desktop Table View */}
+              <div className="hidden md:block p-6">
                 <div className="bg-gray-50 dark:bg-gray-800 rounded-lg overflow-hidden">
                   <table className="w-full">
                     <thead className="bg-gray-100 dark:bg-gray-700">
@@ -3665,10 +4083,11 @@ const CourseDetail: React.FC = () => {
                 <Announcements courseId={course._id} />
                 {(isInstructor || isAdmin) && (
                   <button
-                    className="fixed bottom-8 right-8 z-50 bg-blue-600 text-white px-6 py-3 rounded-full shadow-lg hover:bg-blue-700 text-lg font-bold flex items-center gap-2"
+                    className="fixed bottom-4 right-4 sm:bottom-8 sm:right-8 z-50 bg-blue-600 text-white px-4 py-2.5 sm:px-6 sm:py-3 rounded-full shadow-lg hover:bg-blue-700 text-sm sm:text-lg font-bold flex items-center gap-1.5 sm:gap-2"
                     onClick={() => setShowAnnouncementModal(true)}
                   >
-                    + Announcement
+                    <span className="text-lg sm:text-xl">+</span>
+                    <span className="hidden sm:inline">Announcement</span>
                   </button>
                 )}
               </>
@@ -3693,25 +4112,218 @@ const CourseDetail: React.FC = () => {
   };
 
   return (
-    <div className="flex w-full max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Mobile Top Navigation */}
+      {isMobileDevice && (
+      <nav className="fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+        <div className="relative flex items-center justify-between px-4 py-3">
+          <button
+            onClick={() => setShowBurgerMenu(!showBurgerMenu)}
+            className="text-gray-700 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
+            aria-label="Open menu"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+            {course?.title || 'Course'}
+          </h1>
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="text-blue-600 dark:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
+            aria-label="Toggle course menu"
+          >
+            <BookOpen className="w-6 h-6" />
+          </button>
+          
+          {/* Burger Menu Dropdown */}
+          {showBurgerMenu && (
+            <>
+              {/* Overlay */}
+              <div
+                className="fixed inset-0 bg-black bg-opacity-50 z-[151]"
+                onClick={() => setShowBurgerMenu(false)}
+              />
+              {/* Menu */}
+              <div className="absolute top-full left-0 mt-2 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 w-[280px] z-[152] overflow-hidden">
+                {/* Profile Information */}
+                <div className="px-4 py-4 border-b border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center gap-3">
+                    <div className="relative flex-shrink-0">
+                      {user?.profilePicture ? (
+                        <img
+                          src={user.profilePicture.startsWith('http') 
+                            ? user.profilePicture 
+                            : getImageUrl(user.profilePicture)}
+                          alt={`${user.firstName} ${user.lastName}`}
+                          className="w-12 h-12 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                            if (fallback) {
+                              fallback.style.display = 'flex';
+                            }
+                          }}
+                        />
+                      ) : null}
+                      {/* Fallback avatar */}
+                      <div
+                        className={`w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-base font-bold ${
+                          user?.profilePicture ? 'hidden' : 'flex'
+                        }`}
+                        style={{
+                          display: user?.profilePicture ? 'none' : 'flex'
+                        }}
+                      >
+                        {user?.firstName?.charAt(0) || ''}{user?.lastName?.charAt(0) || 'U'}
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-gray-900 dark:text-gray-100 text-sm truncate">
+                        {user?.firstName} {user?.lastName}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        {user?.email}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {/* Main Options */}
+                <div className="py-2">
+                  <button
+                    onClick={() => {
+                      setShowBurgerMenu(false);
+                      navigate('/account');
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+                  >
+                    <Folder className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                    <span>Files</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowBurgerMenu(false);
+                      navigate('/account');
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+                  >
+                    <Settings className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                    <span>Settings</span>
+                  </button>
+                </div>
+                {/* Separator */}
+                <div className="border-t border-gray-200 dark:border-gray-700"></div>
+                {/* Account Actions */}
+                <div className="py-2">
+                  <button
+                    onClick={() => {
+                      setShowBurgerMenu(false);
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+                  >
+                    <HelpCircle className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                    <span>Help</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowBurgerMenu(false);
+                      setShowChangeUserModal(true);
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+                  >
+                    <UserIcon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                    <span>Change User</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowBurgerMenu(false);
+                      logout();
+                      navigate('/login');
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+                  >
+                    <LogOut className="h-5 w-5" />
+                    <span>Log Out</span>
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </nav>
+      )}
+
+      <div className={`flex ${isMobileDevice ? 'flex-col pt-16' : 'flex-row pt-0'} w-full max-w-7xl mx-auto`}>
+
+      {/* Mobile Overlay */}
+      {isMobileMenuOpen && isMobileDevice && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-[90]"
+          onClick={() => setIsMobileMenuOpen(false)}
+          style={{ touchAction: 'none', pointerEvents: 'auto' }}
+        />
+      )}
+
       {/* Modern Sidebar */}
-      <aside className="w-64 mr-8 mt-4 self-start sticky top-4 h-fit">
-        <nav className="bg-white/80 dark:bg-gray-900/80 backdrop-blur rounded-2xl shadow-lg p-4 flex flex-col gap-1 border border-gray-100 dark:border-gray-700">
-          {filteredNavigationItems.map((item: any) => (
+      <aside 
+        className={`${isMobileDevice 
+          ? 'w-full fixed left-0 top-20 bottom-16 z-[95]' 
+          : 'w-64 relative mr-8 mt-4 self-start sticky top-4 z-auto'
+        } transition-transform duration-300 ease-in-out ${
+          isMobileMenuOpen && isMobileDevice ? 'translate-x-0' : isMobileDevice ? '-translate-x-full' : 'translate-x-0'
+        } bg-transparent`}
+        style={{ 
+          height: isMobileDevice ? 'calc(100vh - 80px - 64px)' : undefined // Only apply height on actual mobile devices
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <nav 
+          className={`bg-white/80 dark:bg-gray-900/80 backdrop-blur ${isMobileDevice ? 'rounded-t-2xl' : 'rounded-2xl'} shadow-lg p-4 flex flex-col gap-1 border border-gray-100 dark:border-gray-700 ${isMobileDevice ? '' : 'm-0 h-auto pb-4'}`} 
+          style={{ 
+            height: '100%',
+            maxHeight: '100%',
+            overflow: 'hidden'
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {isMobileDevice && (
+          <div className="flex justify-between items-center mb-2 flex-shrink-0">
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Course Menu</h3>
             <button
-              key={item.id}
-              className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors font-medium text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 ${activeSection === item.id ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-semibold shadow' : ''}`}
-              onClick={() => navigate(`/courses/${id}/${item.id}`)}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+              aria-label="Close menu"
             >
-              <item.icon className="w-5 h-5" />
-              <span className="text-base">{item.label}</span>
+              <X className="h-5 w-5" />
             </button>
-          ))}
+          </div>
+          )}
+          <div 
+            className={`flex-1 min-h-0 ${isMobileDevice ? 'overflow-y-auto' : 'overflow-visible'}`}
+            style={{
+              WebkitOverflowScrolling: 'touch',
+              touchAction: 'pan-y',
+              overscrollBehavior: 'contain'
+            }}
+          >
+            {filteredNavigationItems.map((item: any) => (
+              <button
+                key={item.id}
+                className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors font-medium text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 ${activeSection === item.id ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-semibold shadow' : ''}`}
+                onClick={() => {
+                  navigate(`/courses/${id}/${item.id}`);
+                  setIsMobileMenuOpen(false);
+                }}
+              >
+                <item.icon className="w-5 h-5" />
+                <span className="text-base">{item.label}</span>
+              </button>
+            ))}
+          </div>
         </nav>
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-auto">
+      <div className={`flex-1 overflow-auto w-full ${isMobileMenuOpen ? 'lg:overflow-auto overflow-hidden' : ''}`}>
         <div className="container mx-auto px-4 py-6">
           {renderContent()}
         </div>
@@ -3733,6 +4345,13 @@ const CourseDetail: React.FC = () => {
         currentConfig={course?.sidebarConfig || {}}
         onConfigUpdated={handleSidebarConfigUpdated}
       />
+
+      {/* Change User Modal */}
+      <ChangeUserModal
+        isOpen={showChangeUserModal}
+        onClose={() => setShowChangeUserModal(false)}
+      />
+      </div>
     </div>
   );
 };

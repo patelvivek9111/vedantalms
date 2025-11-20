@@ -184,7 +184,7 @@ const QuizWaveDashboard: React.FC<QuizWaveDashboardProps> = ({ courseId }) => {
   // Don't render if courseId is missing
   if (!courseId || courseId.trim() === '') {
     return (
-      <div className="p-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
+      <div className="p-4 sm:p-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
         <div className="max-w-7xl mx-auto">
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
@@ -198,21 +198,21 @@ const QuizWaveDashboard: React.FC<QuizWaveDashboardProps> = ({ courseId }) => {
   return (
     <div className="p-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
       <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
               QuizWave
             </h1>
-            <p className="text-gray-600 dark:text-gray-400">
+            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
               Create and manage interactive quizzes for your students
             </p>
           </div>
           <button
             onClick={handleCreateQuiz}
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+            className="w-full sm:w-auto bg-blue-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
           >
-            <Plus className="w-5 h-5" />
-            Create Quiz
+            <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="text-sm sm:text-base">Create Quiz</span>
           </button>
         </div>
 
@@ -238,27 +238,27 @@ const QuizWaveDashboard: React.FC<QuizWaveDashboardProps> = ({ courseId }) => {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {quizzes.map((quiz) => (
               <div
                 key={quiz._id}
-                className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow"
+                className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 sm:p-6 hover:shadow-xl transition-shadow"
               >
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
                   {quiz.title}
                 </h3>
                 {quiz.description && (
-                  <p className="text-gray-600 dark:text-gray-400 text-sm mb-4 line-clamp-2">
+                  <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm mb-3 sm:mb-4 line-clamp-2">
                     {quiz.description}
                   </p>
                 )}
-                <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400 mb-4">
+                <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm text-gray-500 dark:text-gray-400 mb-3 sm:mb-4">
                   <div className="flex items-center gap-1">
-                    <List className="w-4 h-4" />
+                    <List className="w-3 h-3 sm:w-4 sm:h-4" />
                     <span>{quiz.questions.length} questions</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Clock className="w-4 h-4" />
+                    <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
                     <span>
                       {Math.round(
                         quiz.questions.reduce((sum, q) => sum + q.timeLimit, 0) / 60
@@ -267,7 +267,7 @@ const QuizWaveDashboard: React.FC<QuizWaveDashboardProps> = ({ courseId }) => {
                     </span>
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <button
                     onClick={() => handleStartSession(quiz)}
                     disabled={retryingQuiz === quiz._id}

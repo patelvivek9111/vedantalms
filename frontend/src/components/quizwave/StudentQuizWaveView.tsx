@@ -81,12 +81,12 @@ const StudentQuizWaveView: React.FC<StudentQuizWaveViewProps> = ({ courseId }) =
                     setGamePin(value);
                     setError('');
                   }}
-                  className="w-full px-4 py-3 text-2xl text-center font-bold tracking-widest border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 sm:px-4 py-2 sm:py-3 text-xl sm:text-2xl text-center font-bold tracking-widest border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
                   placeholder="000000"
                   maxLength={6}
                   disabled={loading}
                 />
-                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                <p className="mt-2 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                   Enter the 6-digit PIN provided by your instructor
                 </p>
               </div>
@@ -102,12 +102,12 @@ const StudentQuizWaveView: React.FC<StudentQuizWaveViewProps> = ({ courseId }) =
                     setNickname(e.target.value);
                     setError('');
                   }}
-                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 sm:px-4 py-2 sm:py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
                   placeholder="Enter your nickname"
                   maxLength={50}
                   disabled={loading}
                 />
-                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                <p className="mt-2 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                   This name will appear on the leaderboard
                 </p>
               </div>
@@ -137,33 +137,33 @@ const StudentQuizWaveView: React.FC<StudentQuizWaveViewProps> = ({ courseId }) =
               </button>
             </form>
 
-            <div className="mt-8 pt-8 border-t border-gray-200 dark:border-gray-700">
+            <div className="mt-6 sm:mt-8 pt-6 sm:pt-8 border-t border-gray-200 dark:border-gray-700">
               <div className="text-center">
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-3 sm:mb-4">
                   How to join a quiz:
                 </p>
-                <div className="space-y-3 text-left max-w-sm mx-auto">
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0 w-6 h-6 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400 font-semibold text-sm">
+                <div className="space-y-2 sm:space-y-3 text-left max-w-sm mx-auto">
+                  <div className="flex items-start gap-2 sm:gap-3">
+                    <div className="flex-shrink-0 w-5 h-5 sm:w-6 sm:h-6 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400 font-semibold text-xs sm:text-sm">
                       1
                     </div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                       Get the 6-digit game PIN from your instructor
                     </p>
                   </div>
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0 w-6 h-6 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400 font-semibold text-sm">
+                  <div className="flex items-start gap-2 sm:gap-3">
+                    <div className="flex-shrink-0 w-5 h-5 sm:w-6 sm:h-6 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400 font-semibold text-xs sm:text-sm">
                       2
                     </div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                       Enter the PIN and choose a nickname
                     </p>
                   </div>
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0 w-6 h-6 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400 font-semibold text-sm">
+                  <div className="flex items-start gap-2 sm:gap-3">
+                    <div className="flex-shrink-0 w-5 h-5 sm:w-6 sm:h-6 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400 font-semibold text-xs sm:text-sm">
                       3
                     </div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                       Wait for the quiz to start and answer questions
                     </p>
                   </div>

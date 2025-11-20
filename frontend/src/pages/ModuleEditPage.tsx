@@ -90,8 +90,8 @@ const ModuleEditPage: React.FC = () => {
 
   if (error) {
     return (
-      <div className="max-w-2xl mx-auto p-6">
-        <div className="bg-red-100 dark:bg-red-900/20 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded relative" role="alert">
+      <div className="max-w-2xl mx-auto p-3 sm:p-4 lg:p-6">
+        <div className="bg-red-100 dark:bg-red-900/20 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 px-3 sm:px-4 py-2 sm:py-3 rounded relative text-sm sm:text-base" role="alert">
           <strong className="font-bold">Error: </strong>
           <span className="block sm:inline">{error}</span>
         </div>
@@ -123,11 +123,11 @@ const ModuleEditPage: React.FC = () => {
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-6">
-      <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Edit Module</h1>
+    <div className="max-w-2xl mx-auto p-3 sm:p-4 lg:p-6">
+      <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-4 sm:p-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4 sm:mb-6">Edit Module</h1>
         
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
           <div>
             <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Title
@@ -155,18 +155,18 @@ const ModuleEditPage: React.FC = () => {
             />
           </div>
 
-          <div className="flex justify-end space-x-3">
+          <div className="flex flex-col sm:flex-row justify-end gap-2 sm:space-x-3">
             <button
               type="button"
               onClick={() => navigate(-1)}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
+              className="w-full sm:w-auto px-3 sm:px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 disabled:opacity-50"
+              className="w-full sm:w-auto px-3 sm:px-4 py-2 border border-transparent rounded-md shadow-sm text-xs sm:text-sm font-medium text-white bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 disabled:opacity-50"
             >
               {isSubmitting ? 'Saving...' : 'Save Changes'}
             </button>

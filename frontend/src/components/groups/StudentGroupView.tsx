@@ -99,63 +99,63 @@ const StudentGroupView: React.FC<StudentGroupViewProps> = ({ courseId, userId })
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold text-gray-900">My Groups</h2>
-        <p className="mt-2 text-sm text-gray-600">
+    <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
+      <div className="mb-6 sm:mb-8">
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">My Groups</h2>
+        <p className="mt-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
           Groups you are enrolled in for this course
         </p>
       </div>
 
       {error && (
-        <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+        <div className="mb-4 bg-red-100 dark:bg-red-900/20 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 px-3 sm:px-4 py-2 sm:py-3 rounded text-sm sm:text-base">
           {error}
         </div>
       )}
 
       {enrolledGroups.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
-          <Users className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900">No groups enrolled</h3>
-          <p className="mt-1 text-sm text-gray-500">
+        <div className="text-center py-8 sm:py-12 bg-gray-50 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-200 dark:border-gray-700">
+          <Users className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-gray-400 dark:text-gray-500" />
+          <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">No groups enrolled</h3>
+          <p className="mt-1 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
             You are not enrolled in any groups for this course.
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {enrolledGroups.map(({ groupSet, group }) => (
-            <div key={group._id} className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">{group.name}</h3>
-                  <p className="text-sm text-gray-500">{groupSet.name}</p>
+            <div key={group._id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 sm:p-6 hover:shadow-md transition-shadow">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-start gap-3 mb-4">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 break-words">{group.name}</h3>
+                  <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">{groupSet.name}</p>
                 </div>
                 <button
                   onClick={() => handleNavigateToGroup(group._id)}
-                  className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-blue-600 bg-blue-50 hover:bg-blue-100"
+                  className="w-full sm:w-auto inline-flex items-center justify-center px-3 py-1.5 border border-transparent text-xs sm:text-sm font-medium rounded-md text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/50 hover:bg-blue-100 dark:hover:bg-blue-900/70"
                 >
-                  <ExternalLink className="h-4 w-4 mr-1" />
+                  <ExternalLink className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                   View
                 </button>
               </div>
               
-              <div className="space-y-3">
+              <div className="space-y-2 sm:space-y-3">
                 <div>
-                  <p className="text-sm font-medium text-gray-700 mb-2">Members ({group.members.length}):</p>
-                  <ul className="space-y-1">
+                  <p className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Members ({group.members.length}):</p>
+                  <ul className="space-y-1.5">
                     {group.members.map(member => (
-                      <li key={member._id} className="flex items-center text-sm text-gray-600">
-                        <Users className="h-4 w-4 mr-2 text-gray-400" />
-                        <span className="flex-1">
+                      <li key={member._id} className="flex items-center text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                        <Users className="h-3 w-3 sm:h-4 sm:w-4 mr-2 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                        <span className="flex-1 truncate">
                           {member.firstName} {member.lastName}
                         </span>
                         {group.leader._id === member._id && (
-                          <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                          <span className="ml-2 text-xs bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 px-2 py-0.5 rounded flex-shrink-0">
                             Leader
                           </span>
                         )}
                         {member._id === userId && (
-                          <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                          <span className="ml-2 text-xs bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300 px-2 py-0.5 rounded flex-shrink-0">
                             You
                           </span>
                         )}

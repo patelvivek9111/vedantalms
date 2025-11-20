@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
 import { format } from 'date-fns';
-import { Lock, Unlock, HelpCircle, CheckCircle, Circle, Bookmark, BarChart3, Edit, Eye } from 'lucide-react';
+import { Lock, Unlock, HelpCircle, CheckCircle, Circle, Bookmark, BarChart3, Edit, Eye, ArrowLeft } from 'lucide-react';
 import { API_URL } from '../../config';
 
 // Fisher-Yates shuffle algorithm for proper randomization
@@ -621,15 +621,31 @@ const ViewAssignment = () => {
 
 
   return (
-    <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
-      <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 shadow rounded-lg p-6">
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 dark:text-gray-100">{assignment.title}</h1>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 dark:text-gray-400">
-              Due: {format(new Date(assignment.dueDate), 'PPp')}
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Top Navigation Bar (Mobile Only) */}
+      <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+        <div className="relative flex items-center justify-between px-4 py-3">
+          <button
+            onClick={() => navigate(-1)}
+            className="text-gray-700 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
+            aria-label="Go back"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100 truncate px-2">{assignment.title}</h1>
+          <div className="w-10"></div> {/* Spacer for centering */}
+        </div>
+      </nav>
+
+      <div className="w-full px-2 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8 pt-16 lg:pt-4">
+        <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 shadow rounded-lg p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+            <div className="flex-1 min-w-0">
+              <h1 className="hidden lg:block text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 dark:text-gray-100 break-words">{assignment.title}</h1>
+            <p className="mt-1 text-xs sm:text-sm text-gray-500 dark:text-gray-400 dark:text-gray-400">
+              <span className="block sm:inline">Due: {format(new Date(assignment.dueDate), 'PPp')}</span>
               {submission && (
-                <span className="ml-4 text-green-600 dark:text-green-400 dark:text-green-400">Submitted: {format(new Date(submission.submittedAt), 'PPp')}</span>
+                <span className="block sm:inline sm:ml-4 mt-1 sm:mt-0 text-green-600 dark:text-green-400 dark:text-green-400">Submitted: {format(new Date(submission.submittedAt), 'PPp')}</span>
               )}
             </p>
             {/* Show feedback if student and feedback exists */}
@@ -738,20 +754,10 @@ const ViewAssignment = () => {
           </div>
         )}
 
-        {/* Assignment Questions Section */}
-        {assignment.questions && assignment.questions.length > 0 && (() => {
-          // Check if we should show questions to students after submission
-          const shouldShowQuestions = !isStudent || !submission || isPastDue || 
-            (assignment.group === 'Quizzes' && 
-             (submission.showCorrectAnswers || assignment.showCorrectAnswers || 
-              submission.showStudentAnswers || assignment.showStudentAnswers));
-          
-          return (
-            <div className="mt-8">
-              {/* Teacher Analytics Dashboard */}
-              {isTeacherPreview && (
-                <div className="mb-8">
-                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+        {/* Teacher Analytics Dashboard - Always show for teachers */}
+        {isTeacherPreview && (
+          <div className="mt-8">
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
                     <div className="flex items-center justify-between mb-6">
                       <div className="flex items-center space-x-3">
                         <svg className="w-8 h-8 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -818,7 +824,11 @@ const ViewAssignment = () => {
                               {submissionStats.averageGrade > 0 ? submissionStats.averageGrade.toFixed(1) : '0'} pts
                             </p>
                             <p className="text-xs text-gray-500 dark:text-gray-400 dark:text-gray-400">
-                              {assignment.questions.reduce((sum, q) => sum + (q.points || 0), 0)} total possible
+                              {assignment.questions && assignment.questions.length > 0 
+                                ? `${assignment.questions.reduce((sum, q) => sum + (q.points || 0), 0)} total possible`
+                                : assignment.totalPoints 
+                                  ? `${assignment.totalPoints} total possible`
+                                  : 'No points specified'}
                             </p>
                           </div>
                           <svg className="w-8 h-8 text-purple-400 dark:text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -892,17 +902,27 @@ const ViewAssignment = () => {
                       <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
                         <h4 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-3">Assignment Info</h4>
                         <div className="space-y-2 text-sm">
-                          <div className="flex justify-between">
-                            <span className="text-gray-600 dark:text-gray-400 dark:text-gray-400">Questions:</span>
-                            <span className="font-medium text-gray-900 dark:text-gray-100 dark:text-gray-100">{assignment.questions.length}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600 dark:text-gray-400 dark:text-gray-400">Total Points:</span>
-                            <span className="font-medium text-gray-900 dark:text-gray-100 dark:text-gray-100">{assignment.questions.reduce((sum, q) => sum + (q.points || 0), 0)}</span>
-                          </div>
+                          {assignment.questions && assignment.questions.length > 0 && (
+                            <>
+                              <div className="flex justify-between">
+                                <span className="text-gray-600 dark:text-gray-400 dark:text-gray-400">Questions:</span>
+                                <span className="font-medium text-gray-900 dark:text-gray-100 dark:text-gray-100">{assignment.questions.length}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-600 dark:text-gray-400 dark:text-gray-400">Total Points:</span>
+                                <span className="font-medium text-gray-900 dark:text-gray-100 dark:text-gray-100">{assignment.questions.reduce((sum, q) => sum + (q.points || 0), 0)}</span>
+                              </div>
+                            </>
+                          )}
+                          {(!assignment.questions || assignment.questions.length === 0) && assignment.totalPoints && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-600 dark:text-gray-400 dark:text-gray-400">Total Points:</span>
+                              <span className="font-medium text-gray-900 dark:text-gray-100 dark:text-gray-100">{assignment.totalPoints}</span>
+                            </div>
+                          )}
                           <div className="flex justify-between">
                             <span className="text-gray-600 dark:text-gray-400 dark:text-gray-400">Type:</span>
-                            <span className="font-medium text-gray-900 dark:text-gray-100 dark:text-gray-100">{assignment.group || 'Assignment'}</span>
+                            <span className="font-medium text-gray-900 dark:text-gray-100 dark:text-gray-100">{assignment.group || (assignment.isOfflineAssignment ? 'Offline Assignment' : 'Assignment')}</span>
                           </div>
                           {assignment.isTimedQuiz && (
                             <div className="flex justify-between">
@@ -972,9 +992,19 @@ const ViewAssignment = () => {
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
-              
+            </div>
+        )}
+
+        {/* Assignment Questions Section */}
+        {assignment.questions && assignment.questions.length > 0 && (() => {
+          // Check if we should show questions to students after submission
+          const shouldShowQuestions = !isStudent || !submission || isPastDue || 
+            (assignment.group === 'Quizzes' && 
+             (submission?.showCorrectAnswers || assignment.showCorrectAnswers || 
+              submission?.showStudentAnswers || assignment.showStudentAnswers));
+          
+          return (
+            <div className="mt-8">
               {/* Show questions for students, but not in teacher preview */}
               {(
                 !isTeacherPreview && (!assignment.isTimedQuiz || quizStarted || !isStudent || submission || isPastDue) && shouldShowQuestions
@@ -1998,7 +2028,7 @@ const ViewAssignment = () => {
           );
         })()}
 
-
+        </div>
       </div>
     </div>
   );

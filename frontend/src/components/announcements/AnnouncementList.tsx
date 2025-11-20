@@ -38,16 +38,16 @@ const AnnouncementList: React.FC<AnnouncementListProps> = ({ announcements, onSe
     );
   }
   return (
-    <ul className="space-y-4">
+    <ul className="space-y-3 sm:space-y-4">
       {announcements.map(a => (
         <li
           key={a._id}
-          className="bg-white dark:bg-gray-900 rounded-lg shadow p-4 hover:shadow-md transition cursor-pointer border border-gray-100 dark:border-gray-700"
+          className="bg-white dark:bg-gray-900 rounded-lg shadow p-3 sm:p-4 hover:shadow-md transition cursor-pointer border border-gray-100 dark:border-gray-700"
           onClick={() => onSelect?.(a)}
         >
-          <div className="flex justify-between items-start mb-1">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white leading-tight">{a.title}</h3>
-            <span className="text-xs text-gray-400 dark:text-gray-300 mt-1">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-2">
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white leading-tight break-words">{a.title}</h3>
+            <span className="text-xs text-gray-400 dark:text-gray-300 whitespace-nowrap">
               {(() => {
                 const d = new Date(a.createdAt);
                 const date = d.toLocaleDateString();
@@ -56,7 +56,7 @@ const AnnouncementList: React.FC<AnnouncementListProps> = ({ announcements, onSe
               })()}
             </span>
           </div>
-          <div className="text-sm text-gray-800 dark:text-gray-200 mb-1 prose max-w-none">
+          <div className="text-xs sm:text-sm text-gray-800 dark:text-gray-200 mb-1 prose max-w-none">
             {(() => {
               const plain = a.body.replace(/<[^>]+>/g, '');
               const firstLine = plain.split(/\r?\n|\r|<br\s*\/?>/i)[0];

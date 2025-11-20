@@ -905,35 +905,35 @@ const ThreadView: React.FC = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className="max-w-4xl mx-auto space-y-4 sm:space-y-8 px-2 sm:px-4">
       {/* Main Thread Card */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 px-6 py-4 border-b border-gray-100 dark:border-gray-700">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="flex items-center space-x-3 mb-3">
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-100 dark:border-gray-700">
+          <div className="flex flex-col sm:flex-row items-start justify-between gap-3">
+            <div className="flex-1 w-full">
+              <div className="flex flex-wrap items-center gap-2 mb-2 sm:mb-3">
                 {thread.isPinned && (
-                  <div className="flex items-center space-x-1 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/50 px-3 py-1 rounded-full">
-                    <Pin className="w-4 h-4" />
-                    <span className="text-sm font-medium">Pinned</span>
+                  <div className="flex items-center space-x-1 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/50 px-2 sm:px-3 py-1 rounded-full">
+                    <Pin className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <span className="text-xs sm:text-sm font-medium">Pinned</span>
                   </div>
                 )}
                 {thread.isGraded && (
-                  <div className="flex items-center space-x-1 text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/50 px-3 py-1 rounded-full">
-                    <Award className="w-4 h-4" />
-                    <span className="text-sm font-medium">{thread.totalPoints} points</span>
+                  <div className="flex items-center space-x-1 text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/50 px-2 sm:px-3 py-1 rounded-full">
+                    <Award className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <span className="text-xs sm:text-sm font-medium">{thread.totalPoints} points</span>
                   </div>
                 )}
               </div>
               
               {isEditing ? (
-                <form onSubmit={handleEditThread} className="space-y-4">
+                <form onSubmit={handleEditThread} className="space-y-3 sm:space-y-4">
                   <input
                     type="text"
                     value={editTitle}
                     onChange={(e) => setEditTitle(e.target.value)}
-                    className="w-full text-2xl font-bold text-gray-900 dark:text-gray-100 p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                    className="w-full text-lg sm:text-2xl font-bold text-gray-900 dark:text-gray-100 p-2 sm:p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                     placeholder="Thread title"
                   />
                   <RichTextEditor
@@ -965,11 +965,11 @@ const ThreadView: React.FC = () => {
                 </form>
               ) : (
                 <>
-                  <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">{thread.title}</h1>
+                  <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-3 sm:mb-4 break-words">{thread.title}</h1>
                   
                   {/* Author info */}
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 gap-2 sm:gap-0">
+                    <div className="flex items-center space-x-2 sm:space-x-3">
                       <div className="relative">
                         <img
                           src={thread.author.profilePicture
@@ -982,28 +982,32 @@ const ThreadView: React.FC = () => {
                                 : getImageUrl(thread.author.avatarUrl))
                             : '/default-avatar.png'}
                           alt={thread.author.firstName}
-                          className="w-12 h-12 rounded-full object-cover border-2 border-white dark:border-gray-700 shadow-sm"
+                          className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-white dark:border-gray-700 shadow-sm"
                           onError={e => (e.currentTarget.src = '/default-avatar.png')}
                         />
 
                       </div>
                       <div>
                         <div className="flex items-center space-x-2">
-                          <span className="font-semibold text-gray-900 dark:text-gray-100">
+                          <span className="font-semibold text-sm sm:text-base text-gray-900 dark:text-gray-100">
                             {thread.author.firstName} {thread.author.lastName}
                           </span>
                           
                         </div>
-                        <div className="flex items-center space-x-1 text-sm text-gray-500 dark:text-gray-400">
-                          <Clock className="w-4 h-4" />
+                        <div className="flex flex-wrap items-center gap-1 sm:gap-0 sm:space-x-1 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                          <div className="flex items-center space-x-1">
+                            <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
                           <span>{formatDistanceToNow(new Date(thread.createdAt), { addSuffix: true })}</span>
+                          </div>
                           {thread.dueDate && (
                             <>
-                              <span>•</span>
-                              <Calendar className="w-4 h-4" />
+                              <span className="hidden sm:inline">•</span>
+                              <div className="flex items-center space-x-1">
+                                <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
                               <span className="text-orange-600 dark:text-orange-400">
                                 Due {formatDistanceToNow(new Date(thread.dueDate), { addSuffix: true })}
                               </span>
+                              </div>
                             </>
                           )}
                         </div>
@@ -1011,17 +1015,17 @@ const ThreadView: React.FC = () => {
                     </div>
                     
                     {user?.role === 'teacher' && (
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
                         <button
                           onClick={handleTogglePin}
-                          className={`p-2 rounded-lg transition-colors ${
+                          className={`p-1.5 sm:p-2 rounded-lg transition-colors touch-manipulation ${
                             thread.isPinned
                               ? 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/50 hover:bg-amber-100 dark:hover:bg-amber-900/70'
                               : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                           }`}
                           title={thread.isPinned ? 'Unpin thread' : 'Pin thread'}
                         >
-                          <Pin className="w-5 h-5" />
+                          <Pin className="w-4 h-4 sm:w-5 sm:h-5" />
                         </button>
                         <button
                           onClick={() => {
@@ -1029,10 +1033,10 @@ const ThreadView: React.FC = () => {
                             setEditTitle(thread.title);
                             setEditContent(thread.content);
                           }}
-                          className="p-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/50 rounded-lg transition-colors"
+                          className="p-1.5 sm:p-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/50 rounded-lg transition-colors touch-manipulation"
                           title="Edit thread"
                         >
-                          <Edit3 className="w-5 h-5" />
+                          <Edit3 className="w-4 h-4 sm:w-5 sm:h-5" />
                         </button>
                         <button
                           onClick={() => {
@@ -1048,17 +1052,17 @@ const ThreadView: React.FC = () => {
                             });
                             setShowEditModal(true);
                           }}
-                          className="p-2 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/50 rounded-lg transition-colors"
+                          className="p-1.5 sm:p-2 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/50 rounded-lg transition-colors touch-manipulation"
                           title="Edit discussion settings"
                         >
-                          <Settings className="w-5 h-5" />
+                          <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
                         </button>
                         <button
                           onClick={handleDeleteThread}
-                          className="p-2 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/50 rounded-lg transition-colors"
+                          className="p-1.5 sm:p-2 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/50 rounded-lg transition-colors touch-manipulation"
                           title="Delete thread"
                         >
-                          <Trash2 className="w-5 h-5" />
+                          <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
                         </button>
                       </div>
                     )}
@@ -1070,7 +1074,7 @@ const ThreadView: React.FC = () => {
         </div>
 
         {/* Content */}
-        <div className="p-6">
+        <div className="p-3 sm:p-6">
           {!isEditing && (
             <>
               <div 
@@ -1082,15 +1086,15 @@ const ThreadView: React.FC = () => {
               {!hasUserMainReply && (!showReplyEditor ? (
                 <button
                   onClick={() => setShowReplyEditor(true)}
-                  className="w-full px-6 py-4 text-lg font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 border-dashed rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:border-blue-300 dark:hover:border-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all duration-200 flex items-center justify-center space-x-2"
+                  className="w-full px-4 sm:px-6 py-3 sm:py-4 text-base sm:text-lg font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 border-dashed rounded-lg sm:rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:border-blue-300 dark:hover:border-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all duration-200 flex items-center justify-center space-x-2 touch-manipulation"
                 >
-                  <MessageSquare className="w-5 h-5" />
+                  <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
                   <span>Start the discussion</span>
                 </button>
               ) : (
-                <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center space-x-2">
-                    <MessageSquare className="w-5 h-5" />
+                <div className="bg-gray-50 dark:bg-gray-900 rounded-lg sm:rounded-xl p-3 sm:p-4 border border-gray-200 dark:border-gray-700">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3 sm:mb-4 flex items-center space-x-2">
+                    <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
                     <span>Post a Reply</span>
                   </h3>
                   <form onSubmit={e => handleSubmitReply(e, null)}>
@@ -1102,7 +1106,7 @@ const ThreadView: React.FC = () => {
                         className="mb-4"
                       />
                     </div>
-                    <div className="flex justify-end space-x-3">
+                    <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 sm:space-x-0">
                       <button
                         type="button"
                         onClick={() => {
@@ -1115,14 +1119,14 @@ const ThreadView: React.FC = () => {
                             localStorage.removeItem(draftKey);
                           }
                         }}
-                        className="px-6 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                        className="w-full sm:w-auto px-4 sm:px-6 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors touch-manipulation"
                       >
                         Cancel
                       </button>
                       <button
                         type="submit"
                         disabled={isSubmitting || !replyContent.trim()}
-                        className="px-6 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
+                        className="w-full sm:w-auto px-4 sm:px-6 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-2 touch-manipulation"
                       >
                         <Send className="w-4 h-4" />
                         <span>{isSubmitting ? 'Posting...' : 'Post Reply'}</span>
@@ -1138,24 +1142,24 @@ const ThreadView: React.FC = () => {
 
       {/* Grading Modal */}
       {showGradingModal && selectedStudent && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
-            <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
-              <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100 flex items-center space-x-2">
-                <Award className="w-5 h-5" />
-                <span>Grade Discussion - {selectedStudent.firstName} {selectedStudent.lastName}</span>
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+              <h2 className="text-base sm:text-xl font-semibold text-gray-800 dark:text-gray-100 flex items-center space-x-2">
+                <Award className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="truncate">Grade Discussion - {selectedStudent.firstName} {selectedStudent.lastName}</span>
               </h2>
               <button
                 onClick={() => setShowGradingModal(false)}
-                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="flex h-[calc(90vh-120px)]">
+            <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
               {/* Left Panel - Student Posts */}
-              <div className="flex-1 p-6 border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
+              <div className="flex-1 p-4 sm:p-6 border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
                 <div className="mb-4">
                   <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center space-x-2 mb-3">
                     <MessageSquare className="w-5 h-5" />
@@ -1214,7 +1218,7 @@ const ThreadView: React.FC = () => {
               </div>
 
               {/* Right Panel - Grading Form */}
-              <div className="w-96 p-6 overflow-y-auto">
+              <div className="w-full lg:w-96 p-4 sm:p-6 overflow-y-auto bg-gray-50 dark:bg-gray-900">
                 <form onSubmit={handleGradeSubmit}>
                   {gradingError && (
                     <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg flex items-center space-x-2">
@@ -1279,16 +1283,16 @@ const ThreadView: React.FC = () => {
 
       {/* Edit Settings Modal */}
       {showEditModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md">
-            <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
-              <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100 flex items-center space-x-2">
-                <Settings className="w-5 h-5" />
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md max-h-[95vh] overflow-y-auto">
+            <div className="flex justify-between items-center p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-gray-100 flex items-center space-x-2">
+                <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
                 <span>Edit Thread Settings</span>
               </h2>
               <button
                 onClick={() => setShowEditModal(false)}
-                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
               >
                 <X className="w-5 h-5" />
               </button>

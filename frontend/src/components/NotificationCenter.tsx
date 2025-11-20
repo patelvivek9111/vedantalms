@@ -151,7 +151,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-end pt-16 pr-4 pointer-events-none">
+    <div className="fixed inset-0 z-50 flex items-start justify-end pt-16 lg:pt-16 pt-20 pr-2 sm:pr-4 pointer-events-none">
       <div 
         ref={notificationRef}
         className="w-full max-w-md bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 pointer-events-auto max-h-[calc(100vh-5rem)] flex flex-col"

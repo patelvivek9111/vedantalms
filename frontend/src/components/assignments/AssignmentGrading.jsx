@@ -321,20 +321,20 @@ const AssignmentGrading = () => {
   }
 
   return (
-    <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
-      <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 border dark:border-gray-700">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">{assignment.title} - Grading</h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+    <div className="w-full px-2 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
+      <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-4 sm:p-6 border dark:border-gray-700">
+        <div className="mb-4 sm:mb-6">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2 break-words">{assignment.title} - Grading</h1>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
             {submissions.length} submission{submissions.length !== 1 ? 's' : ''} to grade
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Submissions List */}
-          <div className="lg:col-span-1">
-            <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Submissions</h2>
-            <div className="space-y-3 max-h-96 overflow-y-auto">
+          <div className="lg:col-span-1 order-2 lg:order-1">
+            <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-gray-900 dark:text-gray-100">Submissions</h2>
+            <div className="space-y-2 sm:space-y-3 max-h-96 overflow-y-auto">
               {submissions.map((submission) => (
                 <div
                   key={submission._id}

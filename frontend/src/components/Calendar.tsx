@@ -2,14 +2,15 @@ import React, { useEffect, useState, useRef } from 'react';
 // Make sure to run: npm install react-big-calendar date-fns
 import { Calendar, dateFnsLocalizer, Event as RBCEvent, SlotInfo, NavigateAction, Views } from 'react-big-calendar';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
-import { parse, startOfWeek, getDay, format, addMonths, subMonths, getDaysInMonth, startOfMonth, endOfMonth, isSameMonth, isSameDay } from 'date-fns';
+import { parse, startOfWeek, getDay, format, addMonths, subMonths, getDaysInMonth, startOfMonth, endOfMonth, isSameMonth, isSameDay, addWeeks, subWeeks, startOfDay, endOfDay, eachDayOfInterval, isSameWeek, getWeek } from 'date-fns';
 import { enUS } from 'date-fns/locale';
 import { useAuth } from '../context/AuthContext';
 import { useCourse } from '../contexts/CourseContext';
-import api from '../services/api';
+import api, { getImageUrl } from '../services/api';
 import { ToDoPanel } from './ToDoPanel';
 import { useNavigate } from 'react-router-dom';
-import { FileText } from 'lucide-react';
+import { FileText, Menu, Folder, Settings, HelpCircle, User as UserIcon, LogOut, Plus, ChevronDown, Calendar as CalendarIcon } from 'lucide-react';
+import { ChangeUserModal } from './ChangeUserModal';
 
 const locales = {
   'en-US': enUS,
@@ -233,7 +234,8 @@ const ColorWheelPicker: React.FC<{
   onSelect: (color: string) => void;
   onClose: () => void;
   anchorRef: React.RefObject<HTMLButtonElement>;
-}> = ({ colors, onSelect, onClose, anchorRef }) => {
+  positionRight?: boolean; // For mobile view to position on right side
+}> = ({ colors, onSelect, onClose, anchorRef, positionRight = false }) => {
   const pickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -246,8 +248,16 @@ const ColorWheelPicker: React.FC<{
         onClose();
       }
     }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    // Use a small delay to prevent immediate closing when opening
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside as any);
+    }, 100);
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside as any);
+    };
   }, [onClose, anchorRef]);
 
   // Position the wheel near the anchor
@@ -255,18 +265,32 @@ const ColorWheelPicker: React.FC<{
   useEffect(() => {
     if (anchorRef.current && pickerRef.current) {
       const rect = anchorRef.current.getBoundingClientRect();
-      setStyle({
-        position: 'absolute',
-        top: rect.bottom + window.scrollY + 8,
-        left: rect.left + window.scrollX - 40,
-        zIndex: 1000,
-      });
+      // Smaller wheel for mobile view
+      const wheelSize = positionRight ? 80 : 112; // 40 * 2 for mobile, 56 * 2 for desktop
+      if (positionRight) {
+        // Position all the way to the right edge of the screen
+        setStyle({
+          position: 'fixed',
+          top: rect.top + (rect.height / 2) - (wheelSize / 2),
+          right: 16, // 16px padding from right edge
+          zIndex: 9999,
+        });
+      } else {
+        // Default: position below the anchor
+        setStyle({
+          position: 'fixed',
+          top: rect.bottom + 8,
+          left: rect.left - 40,
+          zIndex: 9999,
+        });
+      }
     }
-  }, [anchorRef]);
+  }, [anchorRef, positionRight]);
 
-  // Arrange colors in a wheel
-  const radius = 48;
-  const center = 56;
+  // Arrange colors in a wheel - smaller for mobile
+  const radius = positionRight ? 32 : 48;
+  const center = positionRight ? 40 : 56;
+  const circleRadius = positionRight ? 10 : 14;
   const angleStep = (2 * Math.PI) / colors.length;
 
   return (
@@ -281,10 +305,10 @@ const ColorWheelPicker: React.FC<{
               key={color + '-' + i}
               cx={x}
               cy={y}
-              r={14}
+              r={circleRadius}
               fill={color}
               stroke="#fff"
-              strokeWidth={2}
+              strokeWidth={positionRight ? 1.5 : 2}
               className="dark:stroke-gray-700"
               style={{ cursor: 'pointer', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.08))' }}
               onClick={() => onSelect(color)}
@@ -297,7 +321,7 @@ const ColorWheelPicker: React.FC<{
 };
 
 const CalendarPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { courses } = useCourse();
   const [events, setEvents] = useState<RBCEvent[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -314,6 +338,12 @@ const CalendarPage: React.FC = () => {
   const [colorWheelOpen, setColorWheelOpen] = useState<string | null>(null); // calendarId or null
   const colorDotRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const navigate = useNavigate();
+  // Mobile view state
+  const [showBurgerMenu, setShowBurgerMenu] = useState(false);
+  const [showChangeUserModal, setShowChangeUserModal] = useState(false);
+  const [mobileViewMode, setMobileViewMode] = useState<'week' | 'month'>('month');
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showCalendarsModal, setShowCalendarsModal] = useState(false);
 
   // Only show for teachers/admins
   const isTeacherOrAdmin = user && (user.role === 'teacher' || user.role === 'admin');
@@ -340,6 +370,25 @@ const CalendarPage: React.FC = () => {
   // Handler to change a calendar's color
   const handleCalendarColorChange = (calendarId: string, color: string) => {
     setCalendarColors(prev => ({ ...prev, [calendarId]: color }));
+    // Update colors on existing events for this calendar
+    setEvents(prevEvents => 
+      prevEvents.map(event => {
+        const eventCalendar = (event.resource as any)?.calendar || (event as any).calendar;
+        const eventCourseId = (event.resource as any)?.courseId;
+        // Check if this event belongs to the calendar (either direct calendar match or courseId match)
+        if (eventCalendar === calendarId || eventCourseId === calendarId) {
+          return {
+            ...event,
+            color: color,
+            resource: {
+              ...(event.resource || {}),
+              color: color,
+            }
+          };
+        }
+        return event;
+      })
+    );
   };
 
   // Fetch events for all selected calendars
@@ -357,6 +406,7 @@ const CalendarPage: React.FC = () => {
         try {
           const res = await api.get('/events?calendar=' + user._id);
           const data = res.data.data || res.data; // Handle both new and old response formats
+          const calIdx = calendarOptions.findIndex(opt => opt.value === user._id);
           allEvents.push(...data
             .filter((event: any) => event.calendar === user._id)
             .map((event: any) => ({
@@ -365,7 +415,8 @@ const CalendarPage: React.FC = () => {
               end: new Date(event.end),
               title: event.title,
               allDay: false,
-              resource: event,
+              color: getCalendarColor(user._id, calIdx),
+              resource: { ...event, color: getCalendarColor(user._id, calIdx) },
             })));
         } catch (error) {
           console.error('Error fetching personal events:', error);
@@ -388,7 +439,8 @@ const CalendarPage: React.FC = () => {
             end: new Date(event.end),
             title: event.title,
             allDay: false,
-            resource: event,
+            color: getCalendarColor(calId, idx),
+            resource: { ...event, color: getCalendarColor(calId, idx) },
           }));
         
         // Fetch assignments for all modules in this course
@@ -634,6 +686,7 @@ const CalendarPage: React.FC = () => {
   // Sync main calendar navigation
   const handleNavigate = (date: Date) => {
     setCurrentDate(date);
+    setSelectedDate(date);
   };
 
   // Mini calendar navigation
@@ -687,24 +740,26 @@ const CalendarPage: React.FC = () => {
             {view.charAt(0).toUpperCase() + view.slice(1)}
           </button>
         ))}
-        <button
-          type="button"
-          className="px-3 py-1 bg-blue-600 dark:bg-blue-500 text-white rounded-lg text-xl ml-2 shadow hover:bg-blue-700 dark:hover:bg-blue-600 transition"
-          onClick={() => {
-            const now = new Date();
-            const type = activeTab;
-            setEditingEvent({
-              ...defaultEvent,
-              start: now,
-              end: new Date(now.getTime() + 60 * 60 * 1000), // +1 hour
-              type,
-              color: lightColors[type] || lightColors.Default,
-              calendar: user ? user._id : '',
-            });
-            setActiveTab('Event');
-            setModalOpen(true);
-          }}
-        >+</button>
+        {!showCalendarsModal && (
+          <button
+            type="button"
+            className="px-3 py-1 bg-blue-600 dark:bg-blue-500 text-white rounded-lg text-xl ml-2 shadow hover:bg-blue-700 dark:hover:bg-blue-600 transition"
+            onClick={() => {
+              const now = new Date();
+              const type = activeTab;
+              setEditingEvent({
+                ...defaultEvent,
+                start: now,
+                end: new Date(now.getTime() + 60 * 60 * 1000), // +1 hour
+                type,
+                color: lightColors[type] || lightColors.Default,
+                calendar: user ? user._id : '',
+              });
+              setActiveTab('Event');
+              setModalOpen(true);
+            }}
+          >+</button>
+        )}
       </div>
     </div>
   );
@@ -792,154 +847,195 @@ const CalendarPage: React.FC = () => {
     };
 
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm z-50">
+      <div 
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] lg:flex lg:items-center lg:justify-center lg:p-4 animate-in fade-in duration-200"
+        onClick={() => { setModalOpen(false); setEditingEvent(null); }}
+      >
         <form
-          className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-2xl w-full max-w-lg"
+          className="bg-white dark:bg-gray-800 w-full h-full flex flex-col shadow-2xl lg:h-auto lg:max-w-lg lg:max-h-[90vh] lg:rounded-2xl animate-in slide-in-from-bottom-full duration-300 lg:slide-in-from-bottom-0"
           onSubmit={handleLocalSubmit}
-          style={{ minWidth: 400 }}
+          onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">{isEdit ? 'Edit Event' : 'Create Event'}</h2>
-            <button type="button" className="text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-2xl" onClick={() => { setModalOpen(false); setEditingEvent(null); }}>&times;</button>
+          {/* Mobile Header - Sticky with gradient */}
+          <div className="flex justify-between items-center px-5 py-5 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-800 dark:to-gray-800 border-b border-gray-200/50 dark:border-gray-700 flex-shrink-0 lg:px-6 lg:py-4 lg:bg-white lg:dark:bg-gray-800">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 lg:text-lg">{isEdit ? 'Edit Event' : 'Create Event'}</h2>
+            <button 
+              type="button" 
+              className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 text-2xl w-10 h-10 flex items-center justify-center rounded-full transition-all touch-manipulation active:scale-95 lg:text-2xl lg:w-auto lg:h-auto" 
+              onClick={() => { setModalOpen(false); setEditingEvent(null); }}
+            >
+              &times;
+            </button>
           </div>
-          <div className="flex border-b border-gray-200 dark:border-gray-700 mb-4">
-            {eventTypes.map(tab => (
-              <button
-                key={tab.value}
-                type="button"
-                className={`px-4 py-2 font-semibold ${activeTab === tab.value ? 'border-b-4 border-purple-600 dark:border-purple-400 text-purple-700 dark:text-purple-300' : 'text-gray-500 dark:text-gray-400'}`}
-                onClick={() => {
-                  setActiveTab(tab.value);
-                  setEditingEvent(editingEvent ? { ...editingEvent, type: tab.value } : null);
-                  if (!colorManuallySet) {
-                    setLocalColor(lightColors[tab.value] || lightColors.Default);
-                  }
-                }}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-          <div className="mb-3">
-            <label htmlFor="event-title" className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Title:</label>
-            <input
-              id="event-title"
-              name="title"
-              className="border border-gray-300 dark:border-gray-700 p-2 w-full rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
-              placeholder="Enter event title"
-              type="text"
-              value={localTitle}
-              onChange={e => setLocalTitle(e.target.value)}
-              required
-            />
-          </div>
-          {activeTab !== 'My To Do' && (
-            <div className="mb-3">
-              <label htmlFor="event-color" className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Color:</label>
-              <div className="flex items-center gap-2 flex-wrap">
-                <input
-                  id="event-color"
-                  name="color"
-                  type="color"
-                  className="w-10 h-10 p-0 border-none bg-transparent cursor-pointer"
-                  value={localColor}
-                  onChange={e => { setLocalColor(e.target.value); setColorManuallySet(true); }}
-                  style={{ background: 'none' }}
-                />
+
+          {/* Scrollable Content */}
+          <div className="flex-1 overflow-y-auto px-5 py-6 bg-gray-50/50 dark:bg-gray-900/50 lg:px-6 lg:py-4 lg:bg-white lg:dark:bg-gray-800">
+            {/* Tabs */}
+            <div className="flex gap-2 mb-6 overflow-x-auto -mx-5 px-5 pb-2 lg:mx-0 lg:px-0 lg:border-b lg:border-gray-200 lg:dark:border-gray-700">
+              {eventTypes.map(tab => (
                 <button
+                  key={tab.value}
                   type="button"
-                  className="px-3 py-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded text-sm text-gray-700 dark:text-gray-300"
+                  className={`px-5 py-3 font-semibold whitespace-nowrap flex-shrink-0 touch-manipulation text-sm rounded-xl transition-all active:scale-95 lg:px-4 lg:py-2 lg:text-sm lg:rounded-none lg:border-b-4 ${
+                    activeTab === tab.value 
+                      ? 'bg-blue-600 dark:bg-blue-500 text-white lg:bg-transparent lg:shadow-none lg:border-purple-600 dark:lg:border-purple-400 lg:text-purple-700 dark:lg:text-purple-300' 
+                      : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 lg:border-0 lg:hover:bg-transparent'
+                  }`}
                   onClick={() => {
-                    const randomColor = colorPalette[Math.floor(Math.random() * colorPalette.length)];
-                    setLocalColor(randomColor);
-                    setColorManuallySet(true);
+                    setActiveTab(tab.value);
+                    setEditingEvent(editingEvent ? { ...editingEvent, type: tab.value } : null);
+                    if (!colorManuallySet) {
+                      setLocalColor(lightColors[tab.value] || lightColors.Default);
+                    }
                   }}
                 >
-                  Random
+                  {tab.label}
                 </button>
-                {/* Palette for event color */}
-                {colorPalette.map((color, i) => (
-                  <button
-                    key={color + '-' + i}
-                    type="button"
-                    className="w-6 h-6 rounded-full border-2 border-white dark:border-gray-700 shadow mx-0.5 focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500"
-                    style={{ background: color, outline: localColor === color ? '2px solid #2563eb' : 'none' }}
-                    onClick={() => { setLocalColor(color); setColorManuallySet(true); }}
-                    aria-label={`Pick color ${color}`}
-                  />
-                ))}
-              </div>
+              ))}
             </div>
-          )}
-          <div className="mb-3">
-            <label htmlFor="event-date" className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Date:</label>
-            <input
-              id="event-date"
-              name="date"
-              className="border border-gray-300 dark:border-gray-700 p-2 w-full rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
-              type="date"
-              value={localDate}
-              onChange={e => setLocalDate(e.target.value)}
-              required
-            />
-          </div>
-          {activeTab !== 'My To Do' && (
-            <div className="flex gap-2 mb-3">
-              <div className="flex-1">
-                <label htmlFor="event-time-from" className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">From:</label>
-                <select
-                  id="event-time-from"
-                  name="startTime"
-                  className="border border-gray-300 dark:border-gray-700 p-2 w-full rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
-                  value={localStartTime}
-                  onChange={e => setLocalStartTime(e.target.value)}
-                  required
-                >
-                  {timeOptions.map(opt => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex-1">
-                <label htmlFor="event-time-to" className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">To:</label>
-                <select
-                  id="event-time-to"
-                  name="endTime"
-                  className="border border-gray-300 dark:border-gray-700 p-2 w-full rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
-                  value={localEndTime}
-                  onChange={e => setLocalEndTime(e.target.value)}
-                  required
-                >
-                  {timeOptions.map(opt => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          )}
-          {error && <div className="text-red-600 dark:text-red-400 text-sm mb-2">{error}</div>}
-          {activeTab !== 'My To Do' && (
-            <div className="mb-3">
-              <label htmlFor="event-location" className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Location:</label>
+
+            {/* Title Field */}
+            <div className="mb-6">
+              <label htmlFor="event-title" className="block text-sm font-semibold mb-2.5 text-gray-700 dark:text-gray-300 lg:text-sm lg:mb-1">
+                Title <span className="text-red-500">*</span>
+              </label>
               <input
-                id="event-location"
-                name="location"
-                className="border border-gray-300 dark:border-gray-700 p-2 w-full rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
-                placeholder="Location"
+                id="event-title"
+                name="title"
+                className="border-2 border-gray-200 dark:border-gray-700 p-4 w-full rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm lg:p-2 lg:text-sm lg:rounded-lg"
+                placeholder="Enter event title"
                 type="text"
-                value={localLocation}
-                onChange={e => setLocalLocation(e.target.value)}
+                value={localTitle}
+                onChange={e => setLocalTitle(e.target.value)}
+                required
               />
             </div>
-          )}
-          {activeTab !== 'My To Do' && (
-            isTeacherOrAdmin ? (
-              <div className="mb-3">
-                <label htmlFor="event-calendar" className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Calendar:</label>
+
+            {/* Color Picker - Only for non-ToDo */}
+            {activeTab !== 'My To Do' && (
+              <div className="mb-6">
+                <label htmlFor="event-color" className="block text-sm font-semibold mb-3 text-gray-700 dark:text-gray-300 lg:text-sm lg:mb-1">Color</label>
+                <div className="flex items-center gap-3">
+                  <div className="relative flex-shrink-0">
+                    <input
+                      id="event-color"
+                      name="color"
+                      type="color"
+                      className="w-12 h-12 p-0 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-transparent cursor-pointer touch-manipulation lg:w-10 lg:h-10 lg:rounded-lg"
+                      value={localColor}
+                      onChange={e => { setLocalColor(e.target.value); setColorManuallySet(true); }}
+                      style={{ background: 'none' }}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    className="flex-1 px-5 py-3.5 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-300 touch-manipulation transition-all active:scale-95 shadow-sm lg:px-3 lg:py-1 lg:text-sm lg:rounded-lg"
+                    onClick={() => {
+                      const randomColor = colorPalette[Math.floor(Math.random() * colorPalette.length)];
+                      setLocalColor(randomColor);
+                      setColorManuallySet(true);
+                    }}
+                  >
+                    🎲 Random
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Date Field */}
+            <div className="mb-6">
+              <label htmlFor="event-date" className="block text-sm font-semibold mb-2.5 text-gray-700 dark:text-gray-300 lg:text-sm lg:mb-1">
+                Date <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="event-date"
+                name="date"
+                className="border-2 border-gray-200 dark:border-gray-700 p-4 w-full rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm lg:p-2 lg:text-sm lg:rounded-lg"
+                type="date"
+                value={localDate}
+                onChange={e => setLocalDate(e.target.value)}
+                required
+              />
+            </div>
+
+            {/* Time Fields - Only for non-ToDo */}
+            {activeTab !== 'My To Do' && (
+              <div className="mb-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="event-time-from" className="block text-sm font-semibold mb-2.5 text-gray-700 dark:text-gray-300 lg:text-sm lg:mb-1">
+                      From <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      id="event-time-from"
+                      name="startTime"
+                      className="border-2 border-gray-200 dark:border-gray-700 p-4 w-full rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm lg:p-2 lg:text-sm lg:rounded-lg"
+                      value={localStartTime}
+                      onChange={e => setLocalStartTime(e.target.value)}
+                      required
+                    >
+                      {timeOptions.map(opt => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="event-time-to" className="block text-sm font-semibold mb-2.5 text-gray-700 dark:text-gray-300 lg:text-sm lg:mb-1">
+                      To <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      id="event-time-to"
+                      name="endTime"
+                      className="border-2 border-gray-200 dark:border-gray-700 p-4 w-full rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm lg:p-2 lg:text-sm lg:rounded-lg"
+                      value={localEndTime}
+                      onChange={e => setLocalEndTime(e.target.value)}
+                      required
+                    >
+                      {timeOptions.map(opt => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Error Message */}
+            {error && (
+              <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800 rounded-xl shadow-sm">
+                <div className="text-red-600 dark:text-red-400 text-sm font-medium flex items-center gap-2">
+                  <span>⚠️</span>
+                  <span>{error}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Location Field - Only for non-ToDo */}
+            {activeTab !== 'My To Do' && (
+              <div className="mb-6">
+                <label htmlFor="event-location" className="block text-sm font-semibold mb-2.5 text-gray-700 dark:text-gray-300 lg:text-sm lg:mb-1">Location</label>
+                <input
+                  id="event-location"
+                  name="location"
+                  className="border-2 border-gray-200 dark:border-gray-700 p-4 w-full rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm lg:p-2 lg:text-sm lg:rounded-lg"
+                  placeholder="Add location (optional)"
+                  type="text"
+                  value={localLocation}
+                  onChange={e => setLocalLocation(e.target.value)}
+                />
+              </div>
+            )}
+
+            {/* Calendar Select - Only for non-ToDo and teachers/admins */}
+            {activeTab !== 'My To Do' && isTeacherOrAdmin && (
+              <div className="mb-6">
+                <label htmlFor="event-calendar" className="block text-sm font-semibold mb-2.5 text-gray-700 dark:text-gray-300 lg:text-sm lg:mb-1">
+                  Calendar <span className="text-red-500">*</span>
+                </label>
                 <select
                   id="event-calendar"
                   name="calendar"
-                  className="border border-gray-300 dark:border-gray-700 p-2 w-full rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+                  className="border-2 border-gray-200 dark:border-gray-700 p-4 w-full rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm lg:p-2 lg:text-sm lg:rounded-lg"
                   value={localCalendar}
                   onChange={e => {
                     setLocalCalendar(e.target.value);
@@ -955,24 +1051,36 @@ const CalendarPage: React.FC = () => {
                   ))}
                 </select>
               </div>
-            ) : null
-          )}
-          <div className="flex justify-between mt-6">
-            <button type="button" className="bg-gray-200 dark:bg-gray-700 px-4 py-2 rounded hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300">More Options</button>
-            <div className="flex gap-2">
+            )}
+          </div>
+
+          {/* Footer - Sticky */}
+          <div className="flex justify-between items-center px-5 py-5 bg-white dark:bg-gray-800 border-t-2 border-gray-100 dark:border-gray-700 gap-3 flex-shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] lg:px-6 lg:py-4 lg:mt-6 lg:border-t-0 lg:shadow-none">
+            <button 
+              type="button" 
+              className="bg-gray-100 dark:bg-gray-700 px-5 py-3.5 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 text-sm font-medium touch-manipulation flex-1 transition-all active:scale-95 shadow-sm lg:flex-none lg:px-4 lg:py-2 lg:text-sm lg:rounded-lg"
+            >
+              More Options
+            </button>
+            <div className="flex gap-3">
               {(() => {
                 const canDelete = isEdit && (isTeacherOrAdmin || (user && editingEvent?.calendar === user._id));
                 return canDelete ? (
                   <button
                     type="button"
-                    className="bg-red-500 dark:bg-red-600 hover:bg-red-600 dark:hover:bg-red-700 text-white px-4 py-2 rounded"
+                    className="bg-red-500 dark:bg-red-600 hover:bg-red-600 dark:hover:bg-red-700 text-white px-5 py-3.5 rounded-xl text-sm font-semibold touch-manipulation transition-all active:scale-95 shadow-lg shadow-red-500/30 lg:px-4 lg:py-2 lg:text-sm lg:rounded-lg lg:shadow-none"
                     onClick={handleDelete}
                   >
                     Delete
                   </button>
                 ) : null;
               })()}
-              <button type="submit" className="bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600 text-white px-4 py-2 rounded">Submit</button>
+              <button 
+                type="submit" 
+                className="bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600 text-white px-6 py-3.5 rounded-xl text-sm font-bold touch-manipulation transition-all active:scale-95 lg:px-4 lg:py-2 lg:text-sm lg:rounded-lg"
+              >
+                ✓ {isEdit ? 'Save Changes' : 'Create Event'}
+              </button>
             </div>
           </div>
         </form>
@@ -980,10 +1088,353 @@ const CalendarPage: React.FC = () => {
     );
   };
 
+  // Helper to get events for a specific date
+  const getEventsForDate = (date: Date) => {
+    return events.filter(event => {
+      if (!event.start) return false;
+      const eventStart = event.start instanceof Date ? event.start : new Date(event.start);
+      return isSameDay(eventStart, date);
+    });
+  };
+
+  // Generate calendar grid for mobile view
+  const generateMobileCalendarGrid = () => {
+    if (mobileViewMode === 'week') {
+      const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 });
+      const days = eachDayOfInterval({
+        start: weekStart,
+        end: addWeeks(weekStart, 1)
+      }).slice(0, 7);
+      return [days];
+    } else {
+      // Month view
+      const start = startOfMonth(selectedDate);
+      const daysInMonth = getDaysInMonth(selectedDate);
+      const startDay = start.getDay();
+      const weeks: Date[][] = [];
+      let week: Date[] = [];
+      
+      // Fill first week with previous month days if needed
+      for (let i = 0; i < startDay; i++) {
+        const daysToSubtract = startDay - i;
+        const prevDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), -daysToSubtract + 1);
+        week.push(prevDate);
+      }
+      
+      // Fill current month days
+      for (let day = 1; day <= daysInMonth; day++) {
+        week.push(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), day));
+        if (week.length === 7) {
+          weeks.push(week);
+          week = [];
+        }
+      }
+      
+      // Fill last week with next month days if needed
+      if (week.length > 0) {
+        let nextMonthDay = 1;
+        while (week.length < 7) {
+          week.push(new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, nextMonthDay++));
+        }
+        weeks.push(week);
+      }
+      
+      return weeks;
+    }
+  };
+
+  // Get events for selected date (for events list)
+  const selectedDateEvents = getEventsForDate(selectedDate);
+
   // Before rendering Calendar, set all events globally for overlap detection
   (window as any).allCalendarEvents = events;
+  
+  const calendarGrid = generateMobileCalendarGrid();
+  
   return (
-    <div className="flex p-8 gap-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Mobile Top Navigation */}
+      <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+        <div className="relative flex items-center justify-between px-4 py-3">
+          <button
+            onClick={() => setShowBurgerMenu(!showBurgerMenu)}
+            className="text-gray-700 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
+            aria-label="Open menu"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Calendar</h1>
+          <button
+            onClick={() => setShowCalendarsModal(true)}
+            className="text-blue-600 dark:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
+            aria-label="Manage calendars"
+          >
+            <CalendarIcon className="w-6 h-6" />
+          </button>
+          
+          {/* Burger Menu Dropdown */}
+          {showBurgerMenu && (
+            <>
+              {/* Overlay */}
+              <div
+                className="fixed inset-0 bg-black bg-opacity-50 z-[151]"
+                onClick={() => setShowBurgerMenu(false)}
+              />
+              {/* Menu */}
+              <div className="absolute top-full left-0 mt-2 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 w-[280px] z-[152] overflow-hidden">
+                {/* Profile Information */}
+                <div className="px-4 py-4 border-b border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center gap-3">
+                    <div className="relative flex-shrink-0">
+                      {user?.profilePicture ? (
+                        <img
+                          src={user.profilePicture.startsWith('http') 
+                            ? user.profilePicture 
+                            : getImageUrl(user.profilePicture)}
+                          alt={`${user.firstName} ${user.lastName}`}
+                          className="w-12 h-12 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                            if (fallback) {
+                              fallback.style.display = 'flex';
+                            }
+                          }}
+                        />
+                      ) : null}
+                      {/* Fallback avatar */}
+                      <div
+                        className={`w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-base font-bold ${
+                          user?.profilePicture ? 'hidden' : 'flex'
+                        }`}
+                        style={{
+                          display: user?.profilePicture ? 'none' : 'flex'
+                        }}
+                      >
+                        {user?.firstName?.charAt(0) || ''}{user?.lastName?.charAt(0) || 'U'}
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-gray-900 dark:text-gray-100 text-sm truncate">
+                        {user?.firstName} {user?.lastName}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        {user?.email}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {/* Main Options */}
+                <div className="py-2">
+                  <button
+                    onClick={() => {
+                      setShowBurgerMenu(false);
+                      navigate('/account');
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+                  >
+                    <Folder className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                    <span>Files</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowBurgerMenu(false);
+                      navigate('/account');
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+                  >
+                    <Settings className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                    <span>Settings</span>
+                  </button>
+                </div>
+                {/* Separator */}
+                <div className="border-t border-gray-200 dark:border-gray-700"></div>
+                {/* Account Actions */}
+                <div className="py-2">
+                  <button
+                    onClick={() => {
+                      setShowBurgerMenu(false);
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+                  >
+                    <HelpCircle className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                    <span>Help</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowBurgerMenu(false);
+                      setShowChangeUserModal(true);
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+                  >
+                    <UserIcon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                    <span>Change User</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowBurgerMenu(false);
+                      logout();
+                      navigate('/login');
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+                  >
+                    <LogOut className="h-5 w-5" />
+                    <span>Log Out</span>
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </nav>
+
+      {/* Mobile View */}
+      <div className="lg:hidden pt-20 pb-24 bg-gray-50 dark:bg-gray-900 min-h-screen">
+        {/* Calendar Header */}
+        <div className="px-4 py-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => {
+                if (mobileViewMode === 'month') {
+                  setSelectedDate(prev => subMonths(prev, 1));
+                } else {
+                  setSelectedDate(prev => subWeeks(prev, 1));
+                }
+              }}
+              className="p-2.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-all active:scale-95"
+            >
+              <span className="text-gray-700 dark:text-gray-300 font-bold text-lg">‹</span>
+            </button>
+            <button
+              onClick={() => setMobileViewMode(mobileViewMode === 'month' ? 'week' : 'month')}
+              className="flex items-center gap-1.5 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-all active:scale-95"
+            >
+              <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                {format(selectedDate, 'yyyy')}
+              </span>
+              <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                {format(selectedDate, 'MMMM')}
+              </span>
+              <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+            </button>
+            <button
+              onClick={() => {
+                if (mobileViewMode === 'month') {
+                  setSelectedDate(prev => addMonths(prev, 1));
+                } else {
+                  setSelectedDate(prev => addWeeks(prev, 1));
+                }
+              }}
+              className="p-2.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-all active:scale-95"
+            >
+              <span className="text-gray-700 dark:text-gray-300 font-bold text-lg">›</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Calendar Grid */}
+        <div className="bg-white dark:bg-gray-800 px-4 py-6 shadow-sm">
+          {/* Day headers */}
+          <div className="grid grid-cols-7 gap-2 mb-3">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, idx) => (
+              <div key={day} className="text-center text-xs font-semibold text-gray-500 dark:text-gray-400 py-2">
+                {day.substring(0, 3)}
+              </div>
+            ))}
+          </div>
+          
+          {/* Calendar days */}
+          <div className="space-y-2">
+            {calendarGrid.map((week, weekIdx) => (
+              <div key={weekIdx} className="grid grid-cols-7 gap-2">
+                {week.map((date, dayIdx) => {
+                  const isSelected = isSameDay(date, selectedDate);
+                  const isCurrentMonth = isSameMonth(date, selectedDate);
+                  const isToday = isSameDay(date, new Date());
+                  const dayEvents = getEventsForDate(date);
+                  const hasEvents = dayEvents.length > 0;
+                  
+                  return (
+                    <button
+                      key={dayIdx}
+                      onClick={() => setSelectedDate(date)}
+                      className={`
+                        relative aspect-square flex flex-col items-center justify-center rounded-xl transition-all duration-200
+                        ${isSelected 
+                          ? 'bg-blue-600 dark:bg-blue-500 text-white shadow-lg scale-105' 
+                          : isCurrentMonth 
+                            ? isToday
+                              ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-2 border-blue-200 dark:border-blue-800 font-semibold'
+                              : 'text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-95'
+                            : 'text-gray-300 dark:text-gray-600'
+                        }
+                      `}
+                    >
+                      <span className={`text-sm ${isSelected ? 'font-bold' : isToday ? 'font-semibold' : ''}`}>
+                        {format(date, 'd')}
+                      </span>
+                      {hasEvents && !isSelected && (
+                        <div className="absolute bottom-1.5 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-blue-500 dark:bg-blue-400 rounded-full"></div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Events List */}
+        <div className="px-4 py-5 bg-white dark:bg-gray-800 mt-3 shadow-sm">
+          <h3 className="text-base font-semibold text-gray-800 dark:text-gray-200 mb-4">
+            {format(selectedDate, 'EEEE, MMMM d')}
+          </h3>
+          {selectedDateEvents.length === 0 ? (
+            <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-8">
+              No events scheduled
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {selectedDateEvents.map((event, idx) => {
+                const eventColor = (event as any).color || (event.resource && event.resource.color) || '#93c5fd';
+                const isAssignment = event.resource?.type === 'Assignment';
+                return (
+                  <div
+                    key={idx}
+                    onClick={() => handleSelectEvent(event)}
+                    className="flex items-start gap-3 p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-all cursor-pointer border border-gray-100 dark:border-gray-700 active:scale-[0.98]"
+                  >
+                    <div 
+                      className="w-3 h-3 rounded-full flex-shrink-0 mt-1.5 shadow-sm"
+                      style={{ backgroundColor: eventColor }}
+                    ></div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+                        {typeof event.title === 'string' ? event.title : 'Untitled Event'}
+                      </div>
+                      {event.start && (() => {
+                        const startDate = event.start instanceof Date ? event.start : new Date(event.start);
+                        const endDate = event.end ? (event.end instanceof Date ? event.end : new Date(event.end)) : null;
+                        return (
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            {format(startDate, 'h:mm a')}
+                            {endDate && startDate.getTime() !== endDate.getTime() && (
+                              <> – {format(endDate, 'h:mm a')}</>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Desktop View */}
+      <div className="hidden lg:flex p-8 gap-8">
       {/* Main Calendar */}
       <div className="flex-1">
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4">
@@ -1092,7 +1543,11 @@ const CalendarPage: React.FC = () => {
                   ref={el => { colorDotRefs.current[opt.value] = el; }}
                   className="w-3 h-3 rounded-full mr-2 border-2 border-white dark:border-gray-700 shadow focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500"
                   style={{ background: getCalendarColor(opt.value, idx), outline: calendarColors[opt.value] ? '2px solid #2563eb' : 'none' }}
-                  onClick={() => setColorWheelOpen(opt.value)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setColorWheelOpen(opt.value);
+                  }}
                   aria-label={`Pick color for ${opt.label}`}
                   title="Change calendar color"
                 />
@@ -1120,10 +1575,115 @@ const CalendarPage: React.FC = () => {
           <ToDoPanel />
         </div>
       </div>
-      {/* Modal for create/edit */}
+      </div>
+
+      {/* Modal for create/edit - Outside both mobile and desktop views */}
       {modalOpen && editingEvent && user && (
         <EventModal isEdit={!!editingEvent._id} />
       )}
+
+      {/* Floating Action Button (Mobile Only) */}
+      {!showCalendarsModal && (
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            // Use selectedDate instead of now, but set time to current time
+            const selectedDateTime = new Date(selectedDate);
+            const now = new Date();
+            selectedDateTime.setHours(now.getHours());
+            selectedDateTime.setMinutes(now.getMinutes());
+            
+            const endTime = new Date(selectedDateTime);
+            endTime.setHours(endTime.getHours() + 1); // +1 hour
+            
+            const type = activeTab;
+            setEditingEvent({
+              ...defaultEvent,
+              start: selectedDateTime,
+              end: endTime,
+              type,
+              color: lightColors[type] || lightColors.Default,
+              calendar: user ? user._id : '',
+            });
+            setActiveTab('Event');
+            setModalOpen(true);
+          }}
+          className="lg:hidden fixed bottom-24 right-4 w-14 h-14 bg-blue-600 dark:bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-700 dark:hover:bg-blue-600 active:bg-blue-800 dark:active:bg-blue-700 transition-all flex items-center justify-center z-[100] active:scale-95 touch-manipulation"
+          aria-label="Create event"
+          type="button"
+        >
+          <Plus className="w-6 h-6" strokeWidth={2.5} />
+        </button>
+      )}
+
+      {/* Calendars Modal (Mobile Only) */}
+      {showCalendarsModal && (
+        <div className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-50" style={{ bottom: '64px' }}>
+          <div className="absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-800 w-full rounded-t-xl shadow-xl flex flex-col" style={{ maxHeight: 'calc(100vh - 64px)' }}>
+            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between z-10 flex-shrink-0">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Calendars</h2>
+              <button
+                onClick={() => setShowCalendarsModal(false)}
+                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-xl w-8 h-8 flex items-center justify-center"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="overflow-y-auto" style={{ maxHeight: 'calc(3 * (1.25rem + 0.75rem) + 1rem)' }}>
+              <div className="p-4 space-y-4">
+                {calendarOptions.map((opt, idx) => (
+                  <div className="flex items-center gap-3 min-h-[1.25rem]" key={opt.value}>
+                    <input
+                      type="checkbox"
+                      id={`mobile-calendar-${opt.value}`}
+                      checked={selectedCalendars.includes(opt.value)}
+                      onChange={() => handleCalendarToggle(opt.value)}
+                      className="w-5 h-5 rounded border-gray-300 dark:border-gray-600"
+                    />
+                    <button
+                      type="button"
+                      ref={el => { colorDotRefs.current[opt.value] = el; }}
+                      className="w-3 h-3 rounded-full border border-white dark:border-gray-700 shadow flex-shrink-0"
+                      style={{ background: getCalendarColor(opt.value, idx) }}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setColorWheelOpen(opt.value);
+                      }}
+                      aria-label={`Pick color for ${opt.label}`}
+                    />
+                    <label
+                      htmlFor={`mobile-calendar-${opt.value}`}
+                      className="flex-1 text-gray-900 dark:text-gray-100 cursor-pointer"
+                    >
+                      {opt.label}
+                    </label>
+                  </div>
+                ))}
+                {colorWheelOpen && (
+                  <ColorWheelPicker
+                    colors={colorPalette}
+                    onSelect={color => {
+                      handleCalendarColorChange(colorWheelOpen, color);
+                      setColorWheelOpen(null);
+                    }}
+                    onClose={() => setColorWheelOpen(null)}
+                    anchorRef={{ current: colorDotRefs.current[colorWheelOpen] ?? null }}
+                    positionRight={true}
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Change User Modal */}
+      <ChangeUserModal
+        isOpen={showChangeUserModal}
+        onClose={() => setShowChangeUserModal(false)}
+      />
     </div>
   );
 };

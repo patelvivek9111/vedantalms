@@ -1,11 +1,13 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { fetchConversations, fetchMessages, sendMessage, createConversation, searchUsers, toggleStar, moveConversation, bulkMoveConversations, bulkDeleteForever } from '../services/inboxService';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import api from '../services/api';
 import { getImageUrl } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { Edit, Reply, Archive, Trash2, Search, ChevronLeft, CheckSquare, Paperclip, CheckSquare2 } from 'lucide-react';
+import { Edit, Reply, Archive, Trash2, Search, ChevronLeft, CheckSquare, Paperclip, CheckSquare2, Menu, Folder, Settings, HelpCircle, User as UserIcon, LogOut } from 'lucide-react';
 import RichTextEditor from '../components/RichTextEditor';
+import { ChangeUserModal } from '../components/ChangeUserModal';
 
 function capitalizeFirst(str: string) {
   return str.charAt(0).toUpperCase() + str.slice(1);
@@ -34,6 +36,8 @@ const getAvatarColor = (id: string) => {
 };
 
 const Inbox: React.FC = () => {
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const [conversations, setConversations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +48,8 @@ const Inbox: React.FC = () => {
   const [reply, setReply] = useState('');
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [showBurgerMenu, setShowBurgerMenu] = useState(false);
+  const [showChangeUserModal, setShowChangeUserModal] = useState(false);
 
   // Compose modal state
   const [showCompose, setShowCompose] = useState(false);
@@ -85,7 +91,6 @@ const Inbox: React.FC = () => {
   const [search, setSearch] = useState('');
 
   // Use the logged-in user's ID from AuthContext
-  const { user } = useAuth();
   const currentUserId = user?._id || '';
 
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -482,121 +487,260 @@ const Inbox: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full min-h-[80vh] bg-gray-100 dark:bg-gray-900">
+      {/* Top Navigation Bar (Mobile Only) */}
+      <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+        <div className="relative flex items-center justify-between px-4 py-3">
+          <button
+            onClick={() => setShowBurgerMenu(!showBurgerMenu)}
+            className="text-gray-700 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
+            aria-label="Open menu"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Inbox</h1>
+          <div className="w-10"></div> {/* Spacer for centering */}
+          
+          {/* Burger Menu Dropdown */}
+          {showBurgerMenu && (
+            <>
+              {/* Overlay */}
+              <div
+                className="fixed inset-0 bg-black bg-opacity-50 z-[151]"
+                onClick={() => setShowBurgerMenu(false)}
+              />
+              {/* Menu */}
+              <div className="absolute top-full left-0 mt-2 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 w-[280px] z-[152] overflow-hidden">
+                {/* Profile Information */}
+                <div className="px-4 py-4 border-b border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center gap-3">
+                    <div className="relative flex-shrink-0">
+                      {user?.profilePicture ? (
+                        <img
+                          src={user.profilePicture.startsWith('http') 
+                            ? user.profilePicture 
+                            : getImageUrl(user.profilePicture)}
+                          alt={`${user.firstName} ${user.lastName}`}
+                          className="w-12 h-12 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                            if (fallback) {
+                              fallback.style.display = 'flex';
+                            }
+                          }}
+                        />
+                      ) : null}
+                      {/* Fallback avatar */}
+                      <div
+                        className={`w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-base font-bold ${
+                          user?.profilePicture ? 'hidden' : 'flex'
+                        }`}
+                        style={{
+                          display: user?.profilePicture ? 'none' : 'flex'
+                        }}
+                      >
+                        {user?.firstName?.charAt(0) || ''}{user?.lastName?.charAt(0) || 'U'}
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-gray-900 dark:text-gray-100 text-sm truncate">
+                        {user?.firstName} {user?.lastName}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        {user?.email}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Main Options */}
+                <div className="py-2">
+                  <button
+                    onClick={() => {
+                      setShowBurgerMenu(false);
+                      navigate('/account');
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+                  >
+                    <Folder className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                    <span>Files</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowBurgerMenu(false);
+                      navigate('/account');
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+                  >
+                    <Settings className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                    <span>Settings</span>
+                  </button>
+                </div>
+
+                {/* Separator */}
+                <div className="border-t border-gray-200 dark:border-gray-700"></div>
+
+                {/* Account Actions */}
+                <div className="py-2">
+                  <button
+                    onClick={() => {
+                      setShowBurgerMenu(false);
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+                  >
+                    <HelpCircle className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                    <span>Help</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowBurgerMenu(false);
+                      setShowChangeUserModal(true);
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+                  >
+                    <UserIcon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                    <span>Change User</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowBurgerMenu(false);
+                      logout();
+                      navigate('/login');
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+                  >
+                    <LogOut className="h-5 w-5" />
+                    <span>Log Out</span>
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </nav>
+      
+      <ChangeUserModal
+        isOpen={showChangeUserModal}
+        onClose={() => setShowChangeUserModal(false)}
+      />
+      
       {/* Top Bar */}
-      <div className="flex items-center gap-2 px-6 py-3 border-b bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-sm sticky top-0 z-20" style={{ minHeight: 64 }}>
-        {/* Course Dropdown - Hide for admins */}
-        {user?.role !== 'admin' && (
-          <div className="relative">
+      <div className="flex flex-col gap-2 px-3 sm:px-4 lg:px-6 py-2 sm:py-3 border-b bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-sm sticky top-0 lg:sticky z-20 pt-20 lg:pt-2">
+        {/* First Row: Dropdowns */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Course Dropdown - Hide for admins */}
+          {user?.role !== 'admin' && (
+            <div className="relative flex-1 min-w-[120px]">
+              <select
+                id="topbar-course-dropdown"
+                name="topbarCourseDropdown"
+                className="appearance-none border border-gray-200 dark:border-gray-700 rounded px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm bg-white dark:bg-gray-900 pr-7 sm:pr-8 focus:outline-none focus:ring-2 focus:ring-blue-200 w-full"
+                value={selectedCourse}
+                onChange={e => setSelectedCourse(e.target.value)}
+              >
+                {courseOptions.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                ▼
+              </span>
+            </div>
+          )}
+          {/* Folder Dropdown */}
+          <div className="relative flex-1 min-w-[100px]">
             <select
-              id="topbar-course-dropdown"
-              name="topbarCourseDropdown"
-              className="appearance-none border border-gray-200 dark:border-gray-700 rounded px-3 py-2 text-sm bg-white dark:bg-gray-900 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-200"
-              value={selectedCourse}
-              onChange={e => setSelectedCourse(e.target.value)}
-              style={{ minWidth: 140 }}
+              id="topbar-folder-dropdown"
+              name="topbarFolderDropdown"
+              className="appearance-none border border-gray-200 dark:border-gray-700 rounded px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm bg-white dark:bg-gray-900 pr-7 sm:pr-8 focus:outline-none focus:ring-2 focus:ring-blue-200 w-full"
+              value={selectedFolder}
+              onChange={e => setSelectedFolder(e.target.value)}
             >
-              {courseOptions.map(opt => (
+              {folderOptions.map(opt => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
-            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400">
+            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
               ▼
             </span>
           </div>
-        )}
-        {/* Folder Dropdown */}
-        <div className="relative">
-          <select
-            id="topbar-folder-dropdown"
-            name="topbarFolderDropdown"
-            className="appearance-none border border-gray-200 dark:border-gray-700 rounded px-3 py-2 text-sm bg-white dark:bg-gray-900 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-200"
-            value={selectedFolder}
-            onChange={e => setSelectedFolder(e.target.value)}
-            style={{ minWidth: 110 }}
-          >
-            {folderOptions.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-          <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400">
-            ▼
-          </span>
         </div>
-        {/* Icon Row */}
-        <div className="flex items-center gap-2 ml-4">
-          {/* Compose (modern icon) */}
-          <button
-            className="p-2 rounded hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400"
-            title="Compose"
-            onClick={() => setShowCompose(true)}
-          >
-            <Edit size={22} />
-          </button>
-          {/* Reply */}
-          <button 
-            className={`p-2 rounded ${selectedConversations.length > 0 ? 'hover:bg-blue-200 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500'}`} 
-            title="Reply" 
-            onClick={handleReply}
-            disabled={selectedConversations.length === 0 || bulkActionLoading}
-          >
-            <Reply size={22} />
-          </button>
-          {/* Archive */}
-          <button 
-            className={`p-2 rounded ${selectedConversations.length > 0 ? 'hover:bg-yellow-200 dark:hover:bg-yellow-900/50 text-yellow-600 dark:text-yellow-400' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500'}`} 
-            title="Archive" 
-            onClick={handleArchive}
-            disabled={selectedConversations.length === 0 || bulkActionLoading}
-          >
-            <Archive size={22} />
-          </button>
-          {/* Delete */}
-          <button 
-            className={`p-2 rounded ${selectedConversations.length > 0 ? 'hover:bg-red-200 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500'}`} 
-            title="Delete" 
-            onClick={handleDelete}
-            disabled={selectedConversations.length === 0 || bulkActionLoading}
-          >
-            <Trash2 size={22} />
-          </button>
-        </div>
-        {/* Spacer */}
-        <div className="flex-1" />
-        {/* Search Bar */}
-        <div className="relative flex items-center" style={{ minWidth: 260 }}>
-          <label htmlFor="inbox-search" className="sr-only">Search conversations</label>
-          <input
-            id="inbox-search"
-            name="search"
-            ref={searchInputRef}
-            className="border border-gray-200 dark:border-gray-700 rounded-full pl-10 pr-4 py-2 text-sm bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 w-full shadow-sm"
-            type="text"
-            placeholder="Search..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-            <Search size={18} />
-          </span>
+        {/* Second Row: Action Icons and Search */}
+        <div className="flex items-center gap-2">
+          {/* Icon Row */}
+          <div className="flex items-center gap-1 sm:gap-2">
+            {/* Compose (modern icon) */}
+            <button
+              className="p-1.5 sm:p-2 rounded hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400 touch-manipulation"
+              title="Compose"
+              onClick={() => setShowCompose(true)}
+            >
+              <Edit size={18} className="sm:w-[22px] sm:h-[22px]" />
+            </button>
+            {/* Reply */}
+            <button 
+              className={`p-1.5 sm:p-2 rounded touch-manipulation ${selectedConversations.length > 0 ? 'hover:bg-blue-200 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500'}`} 
+              title="Reply" 
+              onClick={handleReply}
+              disabled={selectedConversations.length === 0 || bulkActionLoading}
+            >
+              <Reply size={18} className="sm:w-[22px] sm:h-[22px]" />
+            </button>
+            {/* Archive */}
+            <button 
+              className={`p-1.5 sm:p-2 rounded touch-manipulation ${selectedConversations.length > 0 ? 'hover:bg-yellow-200 dark:hover:bg-yellow-900/50 text-yellow-600 dark:text-yellow-400' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500'}`} 
+              title="Archive" 
+              onClick={handleArchive}
+              disabled={selectedConversations.length === 0 || bulkActionLoading}
+            >
+              <Archive size={18} className="sm:w-[22px] sm:h-[22px]" />
+            </button>
+            {/* Delete */}
+            <button 
+              className={`p-1.5 sm:p-2 rounded touch-manipulation ${selectedConversations.length > 0 ? 'hover:bg-red-200 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500'}`} 
+              title="Delete" 
+              onClick={handleDelete}
+              disabled={selectedConversations.length === 0 || bulkActionLoading}
+            >
+              <Trash2 size={18} className="sm:w-[22px] sm:h-[22px]" />
+            </button>
+          </div>
+          {/* Search Bar */}
+          <div className="relative flex items-center flex-1 min-w-0">
+            <label htmlFor="inbox-search" className="sr-only">Search conversations</label>
+            <input
+              id="inbox-search"
+              name="search"
+              ref={searchInputRef}
+              className="border border-gray-200 dark:border-gray-700 rounded-full pl-8 sm:pl-10 pr-3 sm:pr-4 py-1.5 sm:py-2 text-xs sm:text-sm bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 w-full shadow-sm"
+              type="text"
+              placeholder="Search..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+            <span className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 text-gray-400">
+              <Search size={16} className="sm:w-[18px] sm:h-[18px]" />
+            </span>
+          </div>
         </div>
       </div>
       {/* Main Content */}
-      <div className="flex flex-1 gap-6 px-6 py-6">
+      <div className="flex flex-col lg:flex-row flex-1 gap-4 lg:gap-6 px-2 sm:px-4 lg:px-6 py-4 lg:py-6">
         {/* Compose Modal */}
         {showCompose && (
-          <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-0 w-full max-w-xl relative border border-gray-200 dark:border-gray-700">
-              <button className="absolute top-2 right-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 text-2xl" onClick={() => setShowCompose(false)}>&times;</button>
-              <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-4 text-xl font-semibold text-gray-900 dark:text-gray-100">Compose Message</div>
-              <form onSubmit={handleCompose} className="px-6 py-4">
+          <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-[100] p-2 sm:p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-0 w-full max-w-xl relative border border-gray-200 dark:border-gray-700 max-h-[95vh] overflow-y-auto">
+              <button className="absolute top-2 right-2 sm:top-3 sm:right-3 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 text-xl sm:text-2xl p-1 touch-manipulation" onClick={() => setShowCompose(false)}>&times;</button>
+              <div className="border-b border-gray-200 dark:border-gray-700 px-3 sm:px-4 lg:px-6 py-2.5 sm:py-3 lg:py-4 text-base sm:text-lg lg:text-xl font-semibold text-gray-900 dark:text-gray-100">Compose Message</div>
+              <form onSubmit={handleCompose} className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
                 {/* Course Dropdown - Hide for admins */}
                 {user?.role !== 'admin' && (
-                  <div className="mb-4 flex items-center">
-                    <label htmlFor="compose-course" className="w-20 text-gray-700 dark:text-gray-300 font-medium">Course</label>
+                  <div className="mb-3 sm:mb-4 flex flex-col sm:flex-row sm:items-center gap-2">
+                    <label htmlFor="compose-course" className="w-full sm:w-20 text-gray-700 dark:text-gray-300 font-medium text-xs sm:text-sm">Course</label>
                     <select
                       id="compose-course"
                       name="course"
-                      className="border border-gray-200 dark:border-gray-700 rounded px-3 py-2 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 flex-1"
+                      className="border border-gray-200 dark:border-gray-700 rounded px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 flex-1"
                       value={composeCourse}
                       onChange={e => { setComposeCourse(e.target.value); setComposeToGroup(''); setComposeGroupUsers([]); }}
                     >
@@ -607,29 +751,29 @@ const Inbox: React.FC = () => {
                   </div>
                 )}
                 {/* To Field with group selection */}
-                <div className="mb-4 flex items-center relative" ref={composeToDropdownRef}>
-                  <span className="w-20 text-gray-700 dark:text-gray-300 font-medium">To</span>
+                <div className="mb-3 sm:mb-4 flex flex-col sm:flex-row sm:items-center gap-2 relative" ref={composeToDropdownRef}>
+                  <span className="w-full sm:w-20 text-gray-700 dark:text-gray-300 font-medium text-xs sm:text-sm">To</span>
                   <div className="flex-1 relative">
-                    <div id="compose-to" className="flex items-center border border-gray-200 dark:border-gray-700 rounded px-3 py-2 bg-white dark:bg-gray-900 cursor-text">
+                    <div id="compose-to" className="flex items-center border border-gray-200 dark:border-gray-700 rounded px-2 sm:px-3 py-1.5 sm:py-2 bg-white dark:bg-gray-900 cursor-text">
                       <div className="flex flex-wrap gap-1 flex-1 min-w-0">
                         {composeToGroup === 'sections' && user?.role !== 'admin' ? (
                           composeCourse ? (
-                            <span className="bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 px-2 py-1 rounded-full text-xs flex items-center">
+                            <span className="bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs flex items-center">
                               All Students in {composeCourseOptions.find(c => c._id === composeCourse)?.title || 'Course'}
-                              <button type="button" className="ml-1 text-xs text-red-500 dark:text-red-400" onClick={e => { e.stopPropagation(); setComposeToGroup(''); setComposeCourse(''); }}>&times;</button>
+                              <button type="button" className="ml-1 text-[10px] sm:text-xs text-red-500 dark:text-red-400 touch-manipulation" onClick={e => { e.stopPropagation(); setComposeToGroup(''); setComposeCourse(''); }}>&times;</button>
                             </span>
                           ) : (
-                            <span className="text-gray-400 dark:text-gray-500 text-xs">Select a course...</span>
+                            <span className="text-gray-400 dark:text-gray-500 text-[10px] sm:text-xs">Select a course...</span>
                           )
                         ) : (
                           composeRecipients.map((u) => (
-                            <span key={u._id} className="bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 px-2 py-1 rounded-full text-xs flex items-center gap-1.5">
+                            <span key={u._id} className="bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs flex items-center gap-1">
                               <div className="relative flex-shrink-0">
                                 {u.profilePicture ? (
                                   <img
                                     src={u.profilePicture.startsWith('http') ? u.profilePicture : getImageUrl(u.profilePicture)}
                                     alt={`${u.firstName} ${u.lastName}`}
-                                    className="w-5 h-5 rounded-full object-cover border border-blue-300"
+                                    className="w-4 h-4 sm:w-5 sm:h-5 rounded-full object-cover border border-blue-300"
                                     onError={(e) => {
                                       e.currentTarget.style.display = 'none';
                                       const fallback = e.currentTarget.nextElementSibling as HTMLElement;
@@ -641,7 +785,7 @@ const Inbox: React.FC = () => {
                                 ) : null}
                                 {/* Fallback avatar with initials */}
                                 <div
-                                  className={`w-5 h-5 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center text-white text-[10px] font-bold ${
+                                  className={`w-4 h-4 sm:w-5 sm:h-5 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center text-white text-[8px] sm:text-[10px] font-bold ${
                                     u.profilePicture ? 'hidden' : 'flex'
                                   }`}
                                   style={{
@@ -652,9 +796,9 @@ const Inbox: React.FC = () => {
                                   {u.lastName?.charAt(0) || ''}
                                 </div>
                               </div>
-                              <span>{u.firstName} {u.lastName}</span>
-                              {u.role && <span className="text-[10px] opacity-75">({u.role})</span>}
-                              <button type="button" className="ml-0.5 text-xs text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300" onClick={e => { e.stopPropagation(); handleRemoveRecipient(u._id); }}>&times;</button>
+                              <span className="truncate max-w-[80px] sm:max-w-none">{u.firstName} {u.lastName}</span>
+                              {u.role && <span className="text-[8px] sm:text-[10px] opacity-75 hidden sm:inline">({u.role})</span>}
+                              <button type="button" className="ml-0.5 text-[10px] sm:text-xs text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 touch-manipulation" onClick={e => { e.stopPropagation(); handleRemoveRecipient(u._id); }}>&times;</button>
                             </span>
                           ))
                         )}
@@ -664,7 +808,7 @@ const Inbox: React.FC = () => {
                             type="text"
                             id="compose-to-input"
                             name="composeToInput"
-                            className="flex-1 min-w-24 outline-none border-none bg-transparent text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+                            className="flex-1 min-w-24 outline-none border-none bg-transparent text-xs sm:text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
                             placeholder={composeRecipients.length === 0 ? (user?.role === 'admin' ? 'Type name or email to search users...' : 'Type name or email...') : ''}
                             value={composeToInput}
                             onChange={e => { setComposeToInput(e.target.value); setShowGroupDropdown(false); }}
@@ -675,12 +819,12 @@ const Inbox: React.FC = () => {
                       {/* Icon to open group dropdown */}
                       <button
                         type="button"
-                        className="ml-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                        className="ml-1 sm:ml-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 touch-manipulation flex-shrink-0"
                         tabIndex={-1}
                         aria-label="Choose group"
                         onClick={e => { e.stopPropagation(); setShowGroupDropdown(v => !v); }}
                       >
-                        <CheckSquare2 size={20} />
+                        <CheckSquare2 size={18} className="sm:w-5 sm:h-5" />
                       </button>
                     </div>
                     {/* Group dropdown only when icon is clicked - Hide for admins or show modified options */}
@@ -814,40 +958,40 @@ const Inbox: React.FC = () => {
                   </div>
                 </div>
                 {/* Subject */}
-                <div className="mb-4 flex items-center">
-                  <label htmlFor="compose-subject" className="w-20 text-gray-700 dark:text-gray-300 font-medium">Subject</label>
+                <div className="mb-3 sm:mb-4 flex flex-col sm:flex-row sm:items-center gap-2">
+                  <label htmlFor="compose-subject" className="w-full sm:w-20 text-gray-700 dark:text-gray-300 font-medium text-xs sm:text-sm">Subject</label>
                   <input
                     id="compose-subject"
                     name="subject"
                     type="text"
-                    className="border border-gray-200 dark:border-gray-700 rounded px-3 py-2 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 flex-1"
+                    className="border border-gray-200 dark:border-gray-700 rounded px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 flex-1"
                     value={composeSubject}
                     onChange={e => setComposeSubject(e.target.value)}
                     disabled={composeLoading}
                   />
                 </div>
                 {/* Send individually checkbox */}
-                <div className="mb-4 flex items-center">
+                <div className="mb-3 sm:mb-4 flex items-start sm:items-center gap-2">
                   <input
                     id="send-individually"
                     name="sendIndividually"
                     type="checkbox"
-                    className="mr-2"
+                    className="mt-0.5 sm:mt-0 mr-0 sm:mr-2 w-4 h-4 touch-manipulation"
                     checked={sendIndividually}
                     onChange={e => setSendIndividually(e.target.checked)}
                     disabled={composeLoading}
                   />
-                  <label htmlFor="send-individually" className="text-gray-700 dark:text-gray-300 text-sm select-none">
+                  <label htmlFor="send-individually" className="text-gray-700 dark:text-gray-300 text-xs sm:text-sm select-none">
                     Send an individual message to each recipient
                   </label>
                 </div>
                 {/* Message */}
-                <div className="mb-4">
-                  <label htmlFor="compose-message" className="block text-gray-700 dark:text-gray-300 font-medium mb-1">Message</label>
+                <div className="mb-3 sm:mb-4">
+                  <label htmlFor="compose-message" className="block text-gray-700 dark:text-gray-300 font-medium mb-1 text-xs sm:text-sm">Message</label>
                   <textarea
                     id="compose-message"
                     name="message"
-                    className="w-full border border-gray-200 dark:border-gray-700 rounded p-2 resize-none bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+                    className="w-full border border-gray-200 dark:border-gray-700 rounded p-2 resize-none bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-xs sm:text-sm"
                     rows={6}
                     value={composeBody}
                     onChange={e => setComposeBody(e.target.value)}
@@ -855,13 +999,13 @@ const Inbox: React.FC = () => {
                   />
                 </div>
                 {/* Attachment icon */}
-                <div className="flex items-center justify-between">
-                  <button type="button" className="p-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300" title="Attach file" disabled>
-                    <Paperclip size={22} />
+                <div className="flex items-center justify-between gap-2">
+                  <button type="button" className="p-1.5 sm:p-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 touch-manipulation" title="Attach file" disabled>
+                    <Paperclip size={18} className="sm:w-[22px] sm:h-[22px]" />
                   </button>
                   <div className="flex gap-2">
-                    <button type="button" className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600" onClick={() => setShowCompose(false)} disabled={composeLoading}>Cancel</button>
-                    <button type="submit" className="px-4 py-2 rounded bg-red-600 dark:bg-red-500 text-white hover:bg-red-700 dark:hover:bg-red-600" disabled={composeLoading || (!composeRecipients.length && (composeToGroup !== 'sections' || !composeCourse)) || !composeSubject.trim() || !composeBody.trim()}>{composeLoading ? 'Sending...' : 'Send'}</button>
+                    <button type="button" className="px-3 sm:px-4 py-1.5 sm:py-2 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 text-xs sm:text-sm touch-manipulation" onClick={() => setShowCompose(false)} disabled={composeLoading}>Cancel</button>
+                    <button type="submit" className="px-3 sm:px-4 py-1.5 sm:py-2 rounded bg-red-600 dark:bg-red-500 text-white hover:bg-red-700 dark:hover:bg-red-600 text-xs sm:text-sm touch-manipulation" disabled={composeLoading || (!composeRecipients.length && (composeToGroup !== 'sections' || !composeCourse)) || !composeSubject.trim() || !composeBody.trim()}>{composeLoading ? 'Sending...' : 'Send'}</button>
                   </div>
                 </div>
                 {composeError && <div className="text-red-500 dark:text-red-400 mt-2">{composeError}</div>}
@@ -870,10 +1014,10 @@ const Inbox: React.FC = () => {
           </div>
         )}
         {/* Conversation List */}
-        <div className="w-80 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800 p-0 overflow-y-auto flex flex-col">
+        <div className={`w-full lg:w-80 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800 p-0 overflow-y-auto flex flex-col ${selectedConversation ? 'hidden lg:flex' : 'flex'}`}>
           {/* Header with select all */}
           {!loading && !error && conversations.length > 0 && (
-            <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex items-center">
+            <div className="px-3 sm:px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex items-center">
               <input
                 type="checkbox"
                 id="select-all-conversations"
@@ -886,17 +1030,17 @@ const Inbox: React.FC = () => {
                     setSelectedConversations([]);
                   }
                 }}
-                className="mr-3 accent-blue-600 w-4 h-4"
+                className="mr-2 sm:mr-3 accent-blue-600 w-4 h-4 touch-manipulation"
               />
-                        <span className="text-sm text-gray-600 dark:text-gray-400">
-            {bulkActionLoading ? (
-              <span className="text-blue-600 dark:text-blue-400">Processing...</span>
-            ) : (
-              selectedConversations.length > 0 
-                ? `${selectedConversations.length} selected` 
-                : `${filteredConversations.length} conversations`
-            )}
-          </span>
+              <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                {bulkActionLoading ? (
+                  <span className="text-blue-600 dark:text-blue-400">Processing...</span>
+                ) : (
+                  selectedConversations.length > 0 
+                    ? `${selectedConversations.length} selected` 
+                    : `${filteredConversations.length} conversations`
+                )}
+              </span>
             </div>
           )}
           {loading && <div className="p-4 text-gray-600 dark:text-gray-400">Loading...</div>}
@@ -907,7 +1051,7 @@ const Inbox: React.FC = () => {
           <div className="flex-1 overflow-y-auto">
             {dateKeys.map(dateKey => (
               <div key={dateKey}>
-                <div className="px-4 py-2 text-xs text-gray-500 dark:text-gray-300 font-semibold bg-gray-50 dark:bg-gray-900 sticky top-0 z-10 rounded-t-2xl">{formatDateHeader(dateKey)}</div>
+                <div className="px-3 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs text-gray-500 dark:text-gray-300 font-semibold bg-gray-50 dark:bg-gray-900 sticky top-0 z-10 rounded-t-2xl">{formatDateHeader(dateKey)}</div>
                 {grouped[dateKey].map((conv: any) => {
                   const unread = conv.unreadCount > 0;
                   const participant = conv.participants.find((p: any) => p._id?.toString() === currentUserId?.toString()) || conv.participants[0];
@@ -921,7 +1065,7 @@ const Inbox: React.FC = () => {
                   return (
                     <div
                       key={conv._id}
-                      className={`flex flex-col px-4 py-3 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 cursor-pointer transition-all duration-150 hover:bg-blue-50 dark:hover:bg-blue-900 ${selectedConversation && selectedConversation._id === conv._id ? 'bg-blue-100 dark:bg-blue-900 border-l-4 border-l-blue-500' : ''}`}
+                      className={`flex flex-col px-3 sm:px-4 py-2.5 sm:py-3 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 cursor-pointer transition-all duration-150 active:bg-blue-50 dark:active:bg-blue-900 hover:bg-blue-50 dark:hover:bg-blue-900 ${selectedConversation && selectedConversation._id === conv._id ? 'bg-blue-100 dark:bg-blue-900 border-l-4 border-l-blue-500' : ''}`}
                       onClick={e => {
                         if ((e.target as HTMLElement).tagName === 'INPUT') return;
                         handleSelectConversation(conv);
@@ -940,39 +1084,43 @@ const Inbox: React.FC = () => {
                               return prev.filter(id => id !== conv._id);
                             }
                           })}
-                          className="mr-2 accent-blue-600 w-4 h-4"
+                          className="mr-1.5 sm:mr-2 accent-blue-600 w-4 h-4 touch-manipulation flex-shrink-0"
                           onClick={e => e.stopPropagation()}
                         />
                         {/* Avatar */}
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm mr-2 overflow-hidden ${getAvatarColor(conv._id)}`}>
+                        <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white font-bold text-xs sm:text-sm mr-1.5 sm:mr-2 overflow-hidden flex-shrink-0 ${getAvatarColor(conv._id)}`}>
                           {otherParticipants[0]?.profilePicture ? (
                             <img
                               src={otherParticipants[0].profilePicture.startsWith('http')
                                 ? otherParticipants[0].profilePicture
                                 : getImageUrl(otherParticipants[0].profilePicture)}
                               alt={participantNames}
-                              className="w-8 h-8 object-cover rounded-full"
+                              className="w-8 h-8 sm:w-10 sm:h-10 object-cover rounded-full"
                             />
                           ) : (
                             getInitials(otherParticipants[0])
                           )}
                         </div>
-                        <span className={`truncate font-medium ${unread ? 'font-bold text-blue-900 dark:text-blue-300' : 'text-gray-900 dark:text-gray-100'}`}>{participantNames || 'Unknown'}</span>
-                        {unread && <span className="ml-2 w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full"></span>}
-                        <div className="flex flex-col items-end ml-auto min-w-[48px]">
-                          <span className="text-xs text-gray-400 dark:text-gray-500">{conv.lastMessage ? format(new Date(conv.lastMessage.createdAt), 'p') : ''}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 sm:gap-2">
+                            <span className={`truncate text-xs sm:text-sm font-medium ${unread ? 'font-bold text-blue-900 dark:text-blue-300' : 'text-gray-900 dark:text-gray-100'}`}>{participantNames || 'Unknown'}</span>
+                            {unread && <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-blue-500 dark:bg-blue-400 rounded-full flex-shrink-0"></span>}
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end ml-auto min-w-[50px] sm:min-w-[60px] flex-shrink-0">
+                          <span className="text-[10px] sm:text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">{conv.lastMessage ? format(new Date(conv.lastMessage.createdAt), 'p') : ''}</span>
                         </div>
                       </div>
-                      <div className="flex items-center min-h-[22px] mt-1">
+                      <div className="flex items-center min-h-[22px] mt-1 gap-1.5 sm:gap-2">
                         <span
-                          className="cursor-pointer flex items-center justify-center mr-2 transition-colors"
+                          className="cursor-pointer flex items-center justify-center transition-colors touch-manipulation flex-shrink-0"
                           title={starred ? 'Unstar' : 'Star'}
                           onClick={e => { e.stopPropagation(); handleToggleStar(conv); }}
-                          style={{ width: 18, height: 18 }}
+                          style={{ width: 16, height: 16 }}
                         >
                           <svg
-                            width="18"
-                            height="18"
+                            width="16"
+                            height="16"
                             viewBox="0 0 24 24"
                             fill={starred ? '#2563eb' : 'none'}
                             stroke={starred ? '#2563eb' : '#9ca3af'}
@@ -990,14 +1138,14 @@ const Inbox: React.FC = () => {
                             />
                           </svg>
                         </span>
-                        <span className={`truncate flex-1 ${unread ? 'font-bold text-blue-900 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'}`}>{conv.subject}</span>
+                        <span className={`truncate flex-1 text-xs sm:text-sm ${unread ? 'font-bold text-blue-900 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'}`}>{conv.subject}</span>
                         {unread && (
-                          <span className="ml-2 bg-blue-500 dark:bg-blue-400 text-white text-xs rounded-full px-2 py-0.5">{conv.unreadCount}</span>
+                          <span className="ml-1 sm:ml-2 bg-blue-500 dark:bg-blue-400 text-white text-[10px] sm:text-xs rounded-full px-1.5 sm:px-2 py-0.5 flex-shrink-0">{conv.unreadCount}</span>
                         )}
                       </div>
-                      <div className="truncate text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      <div className="truncate text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 mt-0.5 sm:mt-1">
                         {conv.lastMessage ? (
-                          conv.lastMessage.body.replace(/<[^>]*>/g, '')
+                          conv.lastMessage.body.replace(/<[^>]*>/g, '').substring(0, 60) + (conv.lastMessage.body.replace(/<[^>]*>/g, '').length > 60 ? '...' : '')
                         ) : (
                           <span className="italic text-gray-400 dark:text-gray-500">No messages</span>
                         )}
@@ -1010,7 +1158,7 @@ const Inbox: React.FC = () => {
           </div>
         </div>
         {/* Message View */}
-        <div className="flex-1 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800 p-0 flex flex-col min-h-[600px]">
+        <div className={`flex-1 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800 p-0 flex flex-col min-h-[400px] lg:min-h-[600px] ${!selectedConversation ? 'hidden lg:flex' : 'flex'}`}>
           {!selectedConversation && (
             <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500">
               <svg width="96" height="96" fill="none" viewBox="0 0 24 24"><path d="M2 6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6Zm2 0 8 7 8-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -1020,16 +1168,24 @@ const Inbox: React.FC = () => {
           {selectedConversation && (
             <div className="flex flex-col h-full">
               {/* Sticky Subject Header */}
-              <div className="mb-4 border-b border-gray-200 dark:border-gray-700 pb-2 flex items-center justify-between sticky top-0 z-10 bg-white dark:bg-gray-800 rounded-t-2xl shadow-sm px-6 pt-6">
-                <div className="font-bold text-2xl text-gray-900 dark:text-gray-100">{selectedConversation.subject}</div>
+              <div className="mb-3 sm:mb-4 border-b border-gray-200 dark:border-gray-700 pb-2 flex items-center justify-between sticky top-0 z-10 bg-white dark:bg-gray-800 rounded-t-2xl shadow-sm px-3 sm:px-4 lg:px-6 pt-3 sm:pt-4 lg:pt-6">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <button
+                    onClick={() => setSelectedConversation(null)}
+                    className="lg:hidden text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 mr-1 sm:mr-2 p-1 touch-manipulation"
+                  >
+                    <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
+                  </button>
+                  <div className="font-bold text-base sm:text-lg lg:text-2xl text-gray-900 dark:text-gray-100 truncate">{selectedConversation.subject}</div>
+                </div>
               </div>
-              <div className="flex-1 overflow-y-auto px-6 pb-6">
-                {messagesLoading && <div className="text-gray-600 dark:text-gray-400">Loading messages...</div>}
-                {messagesError && <div className="text-red-500 dark:text-red-400">{messagesError}</div>}
+              <div className="flex-1 overflow-y-auto px-3 sm:px-4 lg:px-6 pb-4 sm:pb-6">
+                {messagesLoading && <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 py-4">Loading messages...</div>}
+                {messagesError && <div className="text-xs sm:text-sm text-red-500 dark:text-red-400 py-4">{messagesError}</div>}
                 {!messagesLoading && !messagesError && messages.length === 0 && (
-                  <div className="text-gray-400 dark:text-gray-500">No messages yet.</div>
+                  <div className="text-xs sm:text-sm text-gray-400 dark:text-gray-500 py-4">No messages yet.</div>
                 )}
-                <div className="space-y-6 mb-6">
+                <div className="space-y-4 sm:space-y-6 mb-4 sm:mb-6">
                   {messages.map((msg, idx) => {
                     const hasName = (msg.senderId?.firstName && msg.senderId?.firstName.trim()) || (msg.senderId?.lastName && msg.senderId?.lastName.trim());
                     const senderName = hasName
@@ -1038,44 +1194,44 @@ const Inbox: React.FC = () => {
                     const isLast = idx === messages.length - 1;
                     const isMe = msg.senderId?._id === currentUserId;
                     return (
-                      <div key={msg._id} className="border-b border-gray-200 dark:border-gray-700 pb-6 last:border-b-0">
+                      <div key={msg._id} className="border-b border-gray-200 dark:border-gray-700 pb-4 sm:pb-6 last:border-b-0">
                         {/* Email Header */}
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="flex items-center space-x-3">
+                        <div className="flex items-start justify-between mb-3 sm:mb-4 gap-2">
+                          <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
                             {/* Avatar */}
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg overflow-hidden ${getAvatarColor(msg.senderId?._id)}`}>
+                            <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white font-bold text-sm sm:text-lg overflow-hidden flex-shrink-0 ${getAvatarColor(msg.senderId?._id)}`}>
                               {msg.senderId?.profilePicture ? (
                                 <img
                                   src={msg.senderId.profilePicture.startsWith('http')
                                     ? msg.senderId.profilePicture
                                     : getImageUrl(msg.senderId.profilePicture)}
                                   alt={senderName}
-                                  className="w-10 h-10 object-cover rounded-full"
+                                  className="w-8 h-8 sm:w-10 sm:h-10 object-cover rounded-full"
                                 />
                               ) : (
                                 getInitials(msg.senderId)
                               )}
                             </div>
-                            <div>
-                              <div className="font-semibold text-gray-900 dark:text-gray-100">
+                            <div className="min-w-0 flex-1">
+                              <div className="font-semibold text-sm sm:text-base text-gray-900 dark:text-gray-100 truncate">
                                 {senderName || 'Unknown User'}
                               </div>
-                              <div className="text-sm text-gray-500 dark:text-gray-400">
-                                {capitalizeFirst(format(new Date(msg.createdAt), "MMMM d, yyyy 'at' h:mmaaa"))}
+                              <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                                {capitalizeFirst(format(new Date(msg.createdAt), "MMM d, yyyy 'at' h:mmaaa"))}
                               </div>
                             </div>
                           </div>
                           {isMe && (
-                            <span className="text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
+                            <span className="text-[10px] sm:text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded flex-shrink-0">
                               Sent
                             </span>
                           )}
                         </div>
                         
                         {/* Email Body */}
-                        <div className="pl-13">
+                        <div className="pl-0 sm:pl-13">
                           <div 
-                            className="text-gray-900 dark:text-gray-100 break-words leading-relaxed prose prose-sm max-w-none"
+                            className="text-xs sm:text-sm text-gray-900 dark:text-gray-100 break-words leading-relaxed prose prose-sm max-w-none"
                             dangerouslySetInnerHTML={{ __html: msg.body }}
                           />
                         </div>
@@ -1086,45 +1242,45 @@ const Inbox: React.FC = () => {
               </div>
               {/* Reply Box */}
               {showReplyBox && (
-                <form className="flex flex-col gap-2 mt-2 px-6 pb-6" onSubmit={handleSendReply}>
+                <form className="flex flex-col gap-2 mt-2 px-3 sm:px-4 lg:px-6 pb-3 sm:pb-4 lg:pb-6" onSubmit={handleSendReply}>
                   <label htmlFor="reply-message" className="sr-only">Reply</label>
                   <RichTextEditor
                     content={reply}
                     onChange={setReply}
                     placeholder="Type your reply..."
-                    className="flex-1 border border-gray-200 dark:border-gray-700 rounded p-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+                    className="flex-1 border border-gray-200 dark:border-gray-700 rounded p-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm sm:text-base min-h-[100px] sm:min-h-[120px]"
                   />
                   <div className="flex justify-end gap-2 mt-2">
                     <button
-                      type="submit"
-                      className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50 shadow"
-                      disabled={sending || !reply.trim()}
-                    >
-                      {sending ? 'Sending...' : 'Send'}
-                    </button>
-                    <button
                       type="button"
-                      className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                      className="px-3 sm:px-4 py-1.5 sm:py-2 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 text-xs sm:text-sm touch-manipulation"
                       onClick={() => setShowReplyBox(false)}
                       disabled={sending}
                     >
                       Cancel
                     </button>
+                    <button
+                      type="submit"
+                      className="bg-blue-600 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded disabled:opacity-50 shadow text-xs sm:text-sm touch-manipulation"
+                      disabled={sending || !reply.trim()}
+                    >
+                      {sending ? 'Sending...' : 'Send'}
+                    </button>
                   </div>
                 </form>
               )}
               {!showReplyBox && (
-                <div className="px-6 pb-6 flex justify-end">
+                <div className="px-3 sm:px-4 lg:px-6 pb-3 sm:pb-4 lg:pb-6 flex justify-end">
                   <button
                     onClick={() => setShowReplyBox(true)}
-                    className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                    className="inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-xs sm:text-sm leading-4 font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400 touch-manipulation"
                   >
-                    <Reply className="w-4 h-4 mr-2" />
+                    <Reply className="w-3 h-3 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
                     Reply
                   </button>
                 </div>
               )}
-              {sendError && <div className="text-red-500 dark:text-red-400 mt-2 px-6">{sendError}</div>}
+              {sendError && <div className="text-red-500 dark:text-red-400 mt-2 px-3 sm:px-4 lg:px-6 text-xs sm:text-sm">{sendError}</div>}
             </div>
           )}
         </div>

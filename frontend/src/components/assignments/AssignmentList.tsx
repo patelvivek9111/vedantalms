@@ -357,14 +357,14 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       {/* Tabs */}
       {isTeacherOrAdmin && (
-        <div className="flex space-x-2 border-b border-gray-200 dark:border-gray-700 mb-4">
+        <div className="flex flex-wrap gap-1 sm:gap-2 border-b border-gray-200 dark:border-gray-700 mb-3 sm:mb-4 overflow-x-auto pb-1">
           {(isQuizzesView ? TABS.filter(tab => tab.value !== 'assignment' && tab.value !== 'discussion') : TABS).map(tab => (
             <button
               key={tab.value}
-              className={`px-4 py-2 -mb-px border-b-2 font-medium text-sm focus:outline-none ${selectedTab === tab.value ? 'border-indigo-600 dark:border-indigo-400 text-indigo-700 dark:text-indigo-300' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400'}`}
+              className={`px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 -mb-px border-b-2 font-medium text-xs sm:text-sm focus:outline-none whitespace-nowrap transition-colors ${selectedTab === tab.value ? 'border-indigo-600 dark:border-indigo-400 text-indigo-700 dark:text-indigo-300' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400'}`}
               onClick={() => setSelectedTab(tab.value)}
             >
               {tab.label}
@@ -375,36 +375,127 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
 
       {/* Bulk Actions (only for teacher/admin) */}
       {isTeacherOrAdmin && selectedIds.length > 0 && (
-        <div className="flex space-x-2 mb-2">
-          <button onClick={handleBulkPublish} className="px-3 py-1 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 rounded hover:bg-green-200 dark:hover:bg-green-900/70 transition-colors">Publish</button>
-          <button onClick={handleBulkUnpublish} className="px-3 py-1 bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-300 rounded hover:bg-yellow-200 dark:hover:bg-yellow-900/70 transition-colors">Unpublish</button>
-          <button onClick={handleBulkDelete} className="px-3 py-1 bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 rounded hover:bg-red-200 dark:hover:bg-red-900/70 transition-colors">Delete</button>
+        <div className="flex flex-wrap gap-2 mb-2">
+          <button onClick={handleBulkPublish} className="px-2 sm:px-3 py-1 text-xs sm:text-sm bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 rounded hover:bg-green-200 dark:hover:bg-green-900/70 transition-colors">Publish</button>
+          <button onClick={handleBulkUnpublish} className="px-2 sm:px-3 py-1 text-xs sm:text-sm bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-300 rounded hover:bg-yellow-200 dark:hover:bg-yellow-900/70 transition-colors">Unpublish</button>
+          <button onClick={handleBulkDelete} className="px-2 sm:px-3 py-1 text-xs sm:text-sm bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 rounded hover:bg-red-200 dark:hover:bg-red-900/70 transition-colors">Delete</button>
         </div>
       )}
 
-      {/* Table View */}
-      <div className="overflow-x-auto bg-white dark:bg-gray-900 shadow rounded-lg border border-gray-200 dark:border-gray-700">
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-3">
+        {userRole === 'student' && filteredGroupedAssignments.length > 0 ? (
+          filteredGroupedAssignments.map(group => (
+            <div key={group.label}>
+              <div className="bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-semibold py-2 px-3 text-xs sm:text-sm rounded-t-lg">{group.label}</div>
+              {group.items.map(item => {
+                const dueDate = item.dueDate ? new Date(item.dueDate) : null;
+                return (
+                  <div key={item._id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-3 mb-2 last:mb-0">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <h3 className="text-sm font-medium text-indigo-700 dark:text-indigo-400 flex-1">{item.title}</h3>
+                      <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{item.totalPoints} pts</span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                      {!isQuizzesView && (
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded font-medium ${getGroupColor(item.group)}`}>
+                          {item.group}
+                        </span>
+                      )}
+                      {dueDate && (
+                        <span>{format(dueDate, 'PPp')}</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))
+        ) : isTeacherOrAdmin ? (
+          flatList.length === 0 ? (
+            <div className="text-center py-6 text-gray-400 dark:text-gray-500 text-sm">No {isQuizzesView ? 'quizzes' : 'assignments'} found</div>
+          ) : (
+            flatList.map(item => {
+              const dueDate = item.dueDate ? new Date(item.dueDate) : null;
+              return (
+                <div key={item._id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex items-start gap-2 flex-1 min-w-0">
+                      <input 
+                        type="checkbox" 
+                        id={`select-assignment-mobile-${item._id}`} 
+                        checked={selectedIds.includes(item._id)} 
+                        onChange={() => toggleSelect(item._id)} 
+                        className="w-4 h-4 mt-0.5 flex-shrink-0"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <h3 
+                        className="text-sm font-medium text-indigo-700 dark:text-indigo-400 flex-1 cursor-pointer"
+                        onClick={(e) => handleRowClick(item, e)}
+                      >
+                        {item.title}
+                      </h3>
+                    </div>
+                    <span className="text-xs font-medium text-gray-600 dark:text-gray-300 flex-shrink-0">{item.totalPoints} pts</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mb-2">
+                    {!isQuizzesView && (
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded font-medium ${getGroupColor(item.group)}`}>
+                        {item.group}
+                      </span>
+                    )}
+                    {dueDate && (
+                      <span>{format(dueDate, 'PPp')}</span>
+                    )}
+                    {item.published ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded font-medium bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300">Published</span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded font-medium bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300">Unpublished</span>
+                    )}
+                  </div>
+                  {isTeacherOrAdmin && item.type === 'assignment' && (
+                    <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                      <Link
+                        to={`/assignments/${item._id}/edit`}
+                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-blue-700 dark:text-blue-200 bg-blue-100 dark:bg-blue-900 hover:bg-blue-200 dark:hover:bg-blue-800"
+                        style={{ textDecoration: 'none' }}
+                      >
+                        Edit
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )
+        ) : (
+          <div className="text-center py-6 text-gray-400 dark:text-gray-500 text-sm">No {isQuizzesView ? 'quizzes' : 'assignments'} found</div>
+        )}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden md:block overflow-x-auto -mx-2 sm:mx-0 bg-white dark:bg-gray-900 shadow rounded-lg border border-gray-200 dark:border-gray-700">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50 dark:bg-gray-800">
             <tr>
               {isTeacherOrAdmin && (
-                <th className="px-4 py-2">
-                  <input type="checkbox" id="select-all-assignments" name="selectAll" checked={allSelected} onChange={toggleSelectAll} />
+                <th className="px-2 sm:px-4 py-2">
+                  <input type="checkbox" id="select-all-assignments" name="selectAll" checked={allSelected} onChange={toggleSelectAll} className="w-4 h-4" />
                 </th>
               )}
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Title</th>
-              {!isQuizzesView && <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Group</th>}
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Due Date</th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{isQuizzesView ? 'Total Points' : 'Points'}</th>
-              {isTeacherOrAdmin && <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>}
-              {isTeacherOrAdmin && <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>}
+              <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Title</th>
+              {!isQuizzesView && <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">Group</th>}
+              <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden md:table-cell">Due Date</th>
+              <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{isQuizzesView ? 'Total Points' : 'Points'}</th>
+              {isTeacherOrAdmin && <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden lg:table-cell">Status</th>}
+              {isTeacherOrAdmin && <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
             {userRole === 'student' && filteredGroupedAssignments.length > 0 ? (
               filteredGroupedAssignments.map(group => [
                 <tr key={group.label}>
-                  <td colSpan={isQuizzesView ? 3 : 4} className="bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-semibold py-2 pl-2">{group.label}</td>
+                  <td colSpan={isQuizzesView ? 3 : 4} className="bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-semibold py-2 pl-2 text-xs sm:text-sm">{group.label}</td>
                 </tr>,
                 ...group.items.map(item => {
                   const dueDate = item.dueDate ? new Date(item.dueDate) : null;
@@ -414,18 +505,28 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
                       className="hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
                       onClick={(e) => handleRowClick(item, e)}
                     >
-                      <td className="px-4 py-2">
-                        <span className="text-indigo-700 font-medium hover:underline">{item.title}</span>
+                      <td className="px-2 sm:px-4 py-2">
+                        <span className="text-indigo-700 dark:text-indigo-400 font-medium hover:underline text-xs sm:text-sm break-words">{item.title}</span>
+                        {!isQuizzesView && (
+                          <div className="sm:hidden mt-1">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getGroupColor(item.group)}`}>
+                              {item.group}
+                            </span>
+                          </div>
+                        )}
+                        <div className="md:hidden mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          {dueDate ? format(dueDate, 'PPp') : '-'}
+                        </div>
                       </td>
                       {!isQuizzesView && (
-                        <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">
+                        <td className="px-2 sm:px-4 py-2 text-xs sm:text-sm text-gray-600 dark:text-gray-300 hidden sm:table-cell">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getGroupColor(item.group)}`}>
                             {item.group}
                           </span>
                         </td>
                       )}
-                      <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">{dueDate ? format(dueDate, 'PPp') : '-'}</td>
-                      <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">{item.totalPoints}</td>
+                      <td className="px-2 sm:px-4 py-2 text-xs sm:text-sm text-gray-600 dark:text-gray-300 hidden md:table-cell">{dueDate ? format(dueDate, 'PPp') : '-'}</td>
+                      <td className="px-2 sm:px-4 py-2 text-xs sm:text-sm text-gray-600 dark:text-gray-300">{item.totalPoints}</td>
                     </tr>
                   );
                 })
@@ -444,29 +545,46 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
                       className="hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
                       onClick={(e) => handleRowClick(item, e)}
                     >
-                      <td className="px-4 py-2">
-                        <input type="checkbox" id={`select-assignment-${item._id}`} name={`select-${item._id}`} checked={selectedIds.includes(item._id)} onChange={() => toggleSelect(item._id)} />
+                      <td className="px-2 sm:px-4 py-2">
+                        <input type="checkbox" id={`select-assignment-${item._id}`} name={`select-${item._id}`} checked={selectedIds.includes(item._id)} onChange={() => toggleSelect(item._id)} className="w-4 h-4" />
                       </td>
-                      <td className="px-4 py-2">
-                        <span className="text-indigo-700 font-medium hover:underline">{item.title}</span>
+                      <td className="px-2 sm:px-4 py-2">
+                        <span className="text-indigo-700 dark:text-indigo-400 font-medium hover:underline text-xs sm:text-sm break-words">{item.title}</span>
+                        {!isQuizzesView && (
+                          <div className="sm:hidden mt-1">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getGroupColor(item.group)}`}>
+                              {item.group}
+                            </span>
+                          </div>
+                        )}
+                        <div className="md:hidden mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          {dueDate ? format(dueDate, 'PPp') : '-'}
+                        </div>
+                        <div className="lg:hidden mt-1">
+                          {item.published ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300">Published</span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300">Unpublished</span>
+                          )}
+                        </div>
                       </td>
                       {!isQuizzesView && (
-                        <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">
+                        <td className="px-2 sm:px-4 py-2 text-xs sm:text-sm text-gray-600 dark:text-gray-300 hidden sm:table-cell">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getGroupColor(item.group)}`}>
                             {item.group}
                           </span>
                         </td>
                       )}
-                      <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">{dueDate ? format(dueDate, 'PPp') : '-'}</td>
-                      <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">{item.totalPoints}</td>
-                      <td className="px-4 py-2">
+                      <td className="px-2 sm:px-4 py-2 text-xs sm:text-sm text-gray-600 dark:text-gray-300 hidden md:table-cell">{dueDate ? format(dueDate, 'PPp') : '-'}</td>
+                      <td className="px-2 sm:px-4 py-2 text-xs sm:text-sm text-gray-600 dark:text-gray-300">{item.totalPoints}</td>
+                      <td className="px-2 sm:px-4 py-2 hidden lg:table-cell">
                         {item.published ? (
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300">Published</span>
                         ) : (
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300">Unpublished</span>
                         )}
                       </td>
-                      <td className="px-4 py-2 space-x-2">
+                      <td className="px-2 sm:px-4 py-2 space-x-1 sm:space-x-2">
                         {/* Edit button (only for teacher/admin) */}
                         {isTeacherOrAdmin && item.type === 'assignment' && (
                           <Link

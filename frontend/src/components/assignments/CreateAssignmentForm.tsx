@@ -518,9 +518,9 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
   };
 
   return (
-    <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
-      <div className="max-w-4xl mx-auto bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-      <h2 className="text-2xl font-bold mb-6 text-gray-800 dark:text-gray-100">
+    <div className="w-full px-2 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
+      <div className="max-w-4xl mx-auto bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 sm:p-6">
+      <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 text-gray-800 dark:text-gray-100">
         {editMode 
           ? (formData.isGradedQuiz ? 'Edit Quiz' : 'Edit Assignment')
           : (formData.isGradedQuiz ? 'Create New Quiz' : 'Create New Assignment')
@@ -528,27 +528,27 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
       </h2>
       
       {/* Step Indicator */}
-      <div className="mb-8">
-        <div className="flex items-center justify-center space-x-4">
+      <div className="mb-6 sm:mb-8">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4">
           <div className={`flex items-center ${currentStep >= 1 ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400 dark:text-gray-500 dark:text-gray-400'}`}>
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${currentStep >= 1 ? 'bg-indigo-600 dark:bg-indigo-500 border-indigo-600 dark:border-indigo-500 text-white' : 'border-gray-300 dark:border-gray-700 dark:border-gray-600'}`}>
+            <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center border-2 text-xs sm:text-sm ${currentStep >= 1 ? 'bg-indigo-600 dark:bg-indigo-500 border-indigo-600 dark:border-indigo-500 text-white' : 'border-gray-300 dark:border-gray-700 dark:border-gray-600'}`}>
               1
             </div>
-            <span className="ml-2 text-sm font-medium">Basic Details</span>
+            <span className="ml-2 text-xs sm:text-sm font-medium">Basic Details</span>
           </div>
-          <div className={`w-12 h-0.5 ${currentStep >= 2 ? 'bg-indigo-600 dark:bg-indigo-500' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
+          <div className={`hidden sm:block w-12 h-0.5 ${currentStep >= 2 ? 'bg-indigo-600 dark:bg-indigo-500' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
           <div className={`flex items-center ${currentStep >= 2 ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400 dark:text-gray-500 dark:text-gray-400'}`}>
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${currentStep >= 2 ? 'bg-indigo-600 dark:bg-indigo-500 border-indigo-600 dark:border-indigo-500 text-white' : 'border-gray-300 dark:border-gray-700 dark:border-gray-600'}`}>
+            <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center border-2 text-xs sm:text-sm ${currentStep >= 2 ? 'bg-indigo-600 dark:bg-indigo-500 border-indigo-600 dark:border-indigo-500 text-white' : 'border-gray-300 dark:border-gray-700 dark:border-gray-600'}`}>
               2
             </div>
-            <span className="ml-2 text-sm font-medium">Description</span>
+            <span className="ml-2 text-xs sm:text-sm font-medium">Description</span>
           </div>
-          <div className={`w-12 h-0.5 ${currentStep >= 3 ? 'bg-indigo-600 dark:bg-indigo-500' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
+          <div className={`hidden sm:block w-12 h-0.5 ${currentStep >= 3 ? 'bg-indigo-600 dark:bg-indigo-500' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
           <div className={`flex items-center ${currentStep >= 3 ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400 dark:text-gray-500 dark:text-gray-400'}`}>
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${currentStep >= 3 ? 'bg-indigo-600 dark:bg-indigo-500 border-indigo-600 dark:border-indigo-500 text-white' : 'border-gray-300 dark:border-gray-700 dark:border-gray-600'}`}>
+            <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center border-2 text-xs sm:text-sm ${currentStep >= 3 ? 'bg-indigo-600 dark:bg-indigo-500 border-indigo-600 dark:border-indigo-500 text-white' : 'border-gray-300 dark:border-gray-700 dark:border-gray-600'}`}>
               3
             </div>
-            <span className="ml-2 text-sm font-medium">Questions & Files</span>
+            <span className="ml-2 text-xs sm:text-sm font-medium">Questions & Files</span>
           </div>
         </div>
       </div>

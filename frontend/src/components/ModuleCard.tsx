@@ -196,41 +196,42 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
   };
 
   return (
-    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden mb-4">
+    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden mb-3 sm:mb-4">
       <div 
-        className="p-4 bg-white dark:bg-gray-900 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center justify-between"
+        className="p-3 sm:p-4 bg-white dark:bg-gray-900 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center justify-between gap-2 sm:gap-3"
         onClick={handleModuleClick}
       >
-        <div className="flex items-center space-x-2">
-          {isExpanded ? <ChevronDown className="h-5 w-5 text-gray-900 dark:text-gray-100" /> : <ChevronRight className="h-5 w-5 text-gray-900 dark:text-gray-100" />}
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">{module.title}</h3>
+        <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+          {isExpanded ? <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-gray-900 dark:text-gray-100 flex-shrink-0" /> : <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5 text-gray-900 dark:text-gray-100 flex-shrink-0" />}
+          <h3 className="text-sm sm:text-base md:text-lg font-medium text-gray-900 dark:text-gray-100 truncate">{module.title}</h3>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-1.5 md:gap-2 flex-shrink-0">
           {(user?.role === 'teacher' || user?.role === 'admin') && (
             <>
               <button
                 onClick={handleTogglePublish}
-                className={`p-1 rounded ${module.published ? 'text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/50' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+                className={`p-1.5 sm:p-1 rounded touch-manipulation ${module.published ? 'text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/50 active:bg-green-200 dark:active:bg-green-900/70' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 active:bg-gray-200 dark:active:bg-gray-700'}`}
                 title={module.published ? 'Unpublish Module (lock)' : 'Publish Module (unlock)'}
                 disabled={isPublishing}
               >
-                {module.published ? <Unlock className="h-5 w-5" /> : <Lock className="h-5 w-5" />}
+                {module.published ? <Unlock className="h-4 w-4 sm:h-5 sm:w-5" /> : <Lock className="h-4 w-4 sm:h-5 sm:w-5" />}
               </button>
               <button
                 onClick={handleAddPageClick}
-                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded text-gray-900 dark:text-gray-100"
+                className="p-1.5 sm:p-1 hover:bg-gray-100 dark:hover:bg-gray-800 active:bg-gray-200 dark:active:bg-gray-700 rounded text-gray-900 dark:text-gray-100 touch-manipulation"
+                title="Add Content"
               >
-                <Plus className="h-5 w-5" />
+                <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
               </button>
               <button
                 onClick={e => {
                   e.stopPropagation();
                   navigate(`/modules/${module._id}/edit`);
                 }}
-                className="p-1 hover:bg-yellow-100 dark:hover:bg-yellow-900/50 rounded text-yellow-600 dark:text-yellow-400"
+                className="p-1.5 sm:p-1 hover:bg-yellow-100 dark:hover:bg-yellow-900/50 active:bg-yellow-200 dark:active:bg-yellow-900/70 rounded text-yellow-600 dark:text-yellow-400 touch-manipulation"
                 title="Edit Module"
               >
-                <Pencil className="h-5 w-5" />
+                <Pencil className="h-4 w-4 sm:h-5 sm:w-5" />
               </button>
               <button
                 onClick={e => {
@@ -239,10 +240,10 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
                     deleteModule(module._id, module.course);
                   }
                 }}
-                className="p-1 hover:bg-red-100 dark:hover:bg-red-900/50 rounded text-red-600 dark:text-red-400"
+                className="p-1.5 sm:p-1 hover:bg-red-100 dark:hover:bg-red-900/50 active:bg-red-200 dark:active:bg-red-900/70 rounded text-red-600 dark:text-red-400 touch-manipulation"
                 title="Delete Module"
               >
-                <Trash2 className="h-5 w-5" />
+                <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
               </button>
             </>
           )}
@@ -252,7 +253,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
       {isExpanded && (
         <div className="border-t border-gray-200 dark:border-gray-700">
           {showCreatePageForm && (
-            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700">
               <CreatePageForm
                 modules={[module]}
                 courseId={module.course}
@@ -262,157 +263,194 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
             </div>
           )}
           
+          {/* Pages Section */}
           {isLoadingPages ? (
-            <div className="p-4 text-center text-gray-500 dark:text-gray-400">Loading pages...</div>
+            <div className="p-3 sm:p-4 text-center text-xs sm:text-sm text-gray-500 dark:text-gray-400">Loading pages...</div>
           ) : error ? (
-            <div className="p-4 text-center text-red-500 dark:text-red-400">{error}</div>
-          ) : pages.length === 0 ? (
-            <div className="p-4 text-center text-gray-500 dark:text-gray-400">No pages available</div>
-          ) : (
+            <div className="p-3 sm:p-4 text-center text-xs sm:text-sm text-red-500 dark:text-red-400">{error}</div>
+          ) : pages.length === 0 ? null : (
             <div className="divide-y divide-gray-200 dark:divide-gray-700">
               {pages.map((page) => (
                 <div
                   key={page._id}
-                  className="p-4 hover:bg-gray-50 dark:hover:bg-gray-800 flex justify-between items-center group"
+                  className="p-3 sm:p-4 hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-700 flex justify-between items-center group gap-2 sm:gap-3"
                   onClick={(e) => handlePageClick(e, page._id)}
                 >
-                  <div className="flex items-center space-x-2">
-                    <FileText className="h-5 w-5 text-gray-400 dark:text-gray-500 group-hover:text-blue-500 dark:group-hover:text-blue-400" />
-                    <span className={
+                  <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+                    <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400 dark:text-gray-500 group-hover:text-blue-500 dark:group-hover:text-blue-400 flex-shrink-0" />
+                    <span className={`text-xs sm:text-sm md:text-base truncate ${
                       page._id === selectedPage
                         ? 'text-blue-600 dark:text-blue-400 font-semibold'
                         : 'text-gray-500 dark:text-gray-300'
-                    }>{page.title}</span>
+                    }`}>{page.title}</span>
                   </div>
                   {(user?.role === 'teacher' || user?.role === 'admin') && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                       <button
                         onClick={e => {
                           e.stopPropagation();
                           navigate(`/pages/${page._id}/edit`);
                         }}
-                        className="p-1 hover:bg-yellow-100 dark:hover:bg-yellow-900/50 rounded text-yellow-600 dark:text-yellow-400"
+                        className="p-1.5 sm:p-1 hover:bg-yellow-100 dark:hover:bg-yellow-900/50 active:bg-yellow-200 dark:active:bg-yellow-900/70 rounded text-yellow-600 dark:text-yellow-400 touch-manipulation"
                         title="Edit Page"
                       >
-                        <Pencil className="h-4 w-4" />
+                        <Pencil className="h-4 w-4 sm:h-4 sm:w-4" />
                       </button>
                       <button
                         onClick={e => {
                           e.stopPropagation();
                           handleDeletePage(page._id);
                         }}
-                        className="p-1 hover:bg-red-100 dark:hover:bg-red-900/50 rounded text-red-600 dark:text-red-400"
+                        className="p-1.5 sm:p-1 hover:bg-red-100 dark:hover:bg-red-900/50 active:bg-red-200 dark:active:bg-red-900/70 rounded text-red-600 dark:text-red-400 touch-manipulation"
                         title="Delete Page"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-4 w-4 sm:h-4 sm:w-4" />
                       </button>
                     </div>
                   )}
                 </div>
               ))}
-              {isLoadingAssignments ? (
-                <div className="p-4 text-center text-gray-500 dark:text-gray-400">Loading assignments...</div>
-              ) : assignmentsError ? (
-                <div className="p-4 text-center text-red-500 dark:text-red-400">{assignmentsError}</div>
-              ) : assignments.length === 0 ? null : (
-                assignments.map(a => (
-                  <div
-                    key={a._id}
-                    className="p-4 hover:bg-gray-50 dark:hover:bg-gray-800 flex justify-between items-center group"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(`/assignments/${a._id}/view`);
-                    }}
-                  >
-                    <div className="flex items-center space-x-2">
-                      <ClipboardList className="h-5 w-5 text-green-400 dark:text-green-500 group-hover:text-green-600 dark:group-hover:text-green-400" />
-                      <span className="group-hover:text-green-600 dark:group-hover:text-green-400 text-gray-900 dark:text-gray-100">{a.title}</span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        ({a.isOfflineAssignment && a.totalPoints 
-                          ? a.totalPoints 
-                          : (a.questions ? a.questions.reduce((sum: number, q: any) => sum + (q.points || 0), 0) : (a.totalPoints || 0))} pts)
-                      </span>
-                    </div>
-                    {(user?.role === 'teacher' || user?.role === 'admin') && (
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={e => {
-                            e.stopPropagation();
-                            handleToggleAssignmentPublish(a);
-                          }}
-                          className={`p-1 rounded ${
-                            (assignmentPublished[a._id] ?? a.published)
-                              ? 'text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/50'
-                              : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-                          }`}
-                          title={
-                            (assignmentPublished[a._id] ?? a.published)
-                              ? 'Unpublish Assignment (lock)'
-                              : 'Publish Assignment (unlock)'
-                          }
-                          disabled={assignmentPublishing === a._id}
-                        >
-                          {(assignmentPublished[a._id] ?? a.published)
-                            ? <Unlock className="h-5 w-5" />
-                            : <Lock className="h-5 w-5" />}
-                        </button>
-                        <button
-                          onClick={e => {
-                            e.stopPropagation();
-                            navigate(`/assignments/${a._id}/edit`);
-                          }}
-                          className="p-1 hover:bg-yellow-100 dark:hover:bg-yellow-900/50 rounded text-yellow-600 dark:text-yellow-400"
-                          title="Edit Assignment"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={e => {
-                            e.stopPropagation();
-                            handleDeleteAssignment(a._id);
-                          }}
-                          className="p-1 hover:bg-red-100 dark:hover:bg-red-900/50 rounded text-red-600 dark:text-red-400"
-                          title="Delete Assignment"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+            </div>
+          )}
+
+          {/* Assignments and Discussions Section - Sorted by Due Date */}
+          {isLoadingAssignments || isLoadingDiscussions ? (
+            <div className={`p-3 sm:p-4 text-center text-xs sm:text-sm text-gray-500 dark:text-gray-400 ${pages.length > 0 ? 'border-t border-gray-200 dark:border-gray-700' : ''}`}>
+              {isLoadingAssignments && isLoadingDiscussions ? 'Loading assignments and discussions...' : isLoadingAssignments ? 'Loading assignments...' : 'Loading discussions...'}
+            </div>
+          ) : assignmentsError || discussionsError ? (
+            <div className={`p-3 sm:p-4 text-center text-xs sm:text-sm text-red-500 dark:text-red-400 ${pages.length > 0 ? 'border-t border-gray-200 dark:border-gray-700' : ''}`}>
+              {assignmentsError || discussionsError}
+            </div>
+          ) : (() => {
+            // Combine assignments and discussions
+            const combinedItems = [
+              ...assignments.map(a => ({
+                ...a,
+                type: 'assignment' as const,
+                dueDateValue: a.dueDate ? new Date(a.dueDate).getTime() : null
+              })),
+              ...discussions.map(d => ({
+                ...d,
+                type: 'discussion' as const,
+                dueDateValue: (d.dueDate || (d as any).due_date || (d as any).discussionDueDate) ? new Date(d.dueDate || (d as any).due_date || (d as any).discussionDueDate).getTime() : null
+              }))
+            ];
+
+            // Sort by due date (closest first), items without due dates go to the end
+            combinedItems.sort((a, b) => {
+              // Items with due dates come first
+              if (a.dueDateValue && !b.dueDateValue) return -1;
+              if (!a.dueDateValue && b.dueDateValue) return 1;
+              // Both have due dates - sort ascending (closest first)
+              if (a.dueDateValue && b.dueDateValue) {
+                return a.dueDateValue - b.dueDateValue;
+              }
+              // Both don't have due dates - maintain original order
+              return 0;
+            });
+
+            return combinedItems.length === 0 ? null : (
+              <div className={`divide-y divide-gray-200 dark:divide-gray-700 ${pages.length > 0 ? 'border-t border-gray-200 dark:border-gray-700' : ''}`}>
+                {combinedItems.map(item => {
+                  if (item.type === 'assignment') {
+                    const a = item as any;
+                    return (
+                      <div
+                        key={a._id}
+                        className="p-3 sm:p-4 hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-700 flex justify-between items-center group gap-2 sm:gap-3"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/assignments/${a._id}/view`);
+                        }}
+                      >
+                        <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+                          <ClipboardList className="h-4 w-4 sm:h-5 sm:w-5 text-green-400 dark:text-green-500 group-hover:text-green-600 dark:group-hover:text-green-400 flex-shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <span className="block group-hover:text-green-600 dark:group-hover:text-green-400 text-gray-900 dark:text-gray-100 text-xs sm:text-sm md:text-base truncate">{a.title}</span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              ({a.isOfflineAssignment && a.totalPoints 
+                                ? a.totalPoints 
+                                : (a.questions ? a.questions.reduce((sum: number, q: any) => sum + (q.points || 0), 0) : (a.totalPoints || 0))} pts)
+                            </span>
+                          </div>
+                        </div>
+                        {(user?.role === 'teacher' || user?.role === 'admin') && (
+                          <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                            <button
+                              onClick={e => {
+                                e.stopPropagation();
+                                handleToggleAssignmentPublish(a);
+                              }}
+                              className={`p-1.5 sm:p-1 rounded touch-manipulation ${
+                                (assignmentPublished[a._id] ?? a.published)
+                                  ? 'text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/50 active:bg-green-200 dark:active:bg-green-900/70'
+                                  : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 dark:active:bg-gray-600'
+                              }`}
+                              title={
+                                (assignmentPublished[a._id] ?? a.published)
+                                  ? 'Unpublish Assignment (lock)'
+                                  : 'Publish Assignment (unlock)'
+                              }
+                              disabled={assignmentPublishing === a._id}
+                            >
+                              {(assignmentPublished[a._id] ?? a.published)
+                                ? <Unlock className="h-4 w-4 sm:h-5 sm:w-5" />
+                                : <Lock className="h-4 w-4 sm:h-5 sm:w-5" />}
+                            </button>
+                            <button
+                              onClick={e => {
+                                e.stopPropagation();
+                                navigate(`/assignments/${a._id}/edit`);
+                              }}
+                              className="p-1.5 sm:p-1 hover:bg-yellow-100 dark:hover:bg-yellow-900/50 active:bg-yellow-200 dark:active:bg-yellow-900/70 rounded text-yellow-600 dark:text-yellow-400 touch-manipulation"
+                              title="Edit Assignment"
+                            >
+                              <Pencil className="h-4 w-4 sm:h-4 sm:w-4" />
+                            </button>
+                            <button
+                              onClick={e => {
+                                e.stopPropagation();
+                                handleDeleteAssignment(a._id);
+                              }}
+                              className="p-1.5 sm:p-1 hover:bg-red-100 dark:hover:bg-red-900/50 active:bg-red-200 dark:active:bg-red-900/70 rounded text-red-600 dark:text-red-400 touch-manipulation"
+                              title="Delete Assignment"
+                            >
+                              <Trash2 className="h-4 w-4 sm:h-4 sm:w-4" />
+                            </button>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-          
-          {/* Discussions Section - Moved outside assignments conditional */}
-          {isLoadingDiscussions ? (
-            <div className="p-4 text-center text-gray-500 dark:text-gray-400">Loading discussions...</div>
-          ) : discussionsError ? (
-            <div className="p-4 text-center text-red-500 dark:text-red-400">{discussionsError}</div>
-          ) : discussions.length === 0 ? (
-            <div className="p-4 text-center text-gray-500 dark:text-gray-400">No discussions available</div>
-          ) : (
-            <div className="divide-y divide-gray-200 dark:divide-gray-700">
-              {discussions.map(d => (
-                <div
-                  key={d._id}
-                  className="p-4 hover:bg-gray-50 dark:hover:bg-gray-800 flex justify-between items-center group"
-                  onClick={e => {
-                    e.stopPropagation();
-                    navigate(`/courses/${d.course}/threads/${d._id}`);
-                  }}
-                >
-                  <div className="flex items-center space-x-2">
-                    <DiscussionIcon />
-                    <span className="group-hover:text-blue-600 dark:group-hover:text-blue-400 text-gray-900 dark:text-gray-100">{d.title}</span>
-                    {d.totalPoints ? (
-                      <span className="text-xs text-gray-500 dark:text-gray-400">({d.totalPoints} pts)</span>
-                    ) : null}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+                    );
+                  } else {
+                    const d = item as any;
+                    return (
+                      <div
+                        key={d._id}
+                        className="p-3 sm:p-4 hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-700 flex justify-between items-center group gap-2 sm:gap-3"
+                        onClick={e => {
+                          e.stopPropagation();
+                          navigate(`/courses/${d.course}/threads/${d._id}`);
+                        }}
+                      >
+                        <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+                          <div className="flex-shrink-0">
+                            <DiscussionIcon />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <span className="block group-hover:text-blue-600 dark:group-hover:text-blue-400 text-gray-900 dark:text-gray-100 text-xs sm:text-sm md:text-base truncate">{d.title}</span>
+                            {d.totalPoints ? (
+                              <span className="text-xs text-gray-500 dark:text-gray-400">({d.totalPoints} pts)</span>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+                })}
+              </div>
+            );
+          })()}
         </div>
       )}
 

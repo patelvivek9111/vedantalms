@@ -256,10 +256,10 @@ const AnnouncementDetailModal: React.FC<AnnouncementDetailModalProps> = ({
   if (!isOpen || !announcement) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-700">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-4xl w-full mx-2 sm:mx-4 max-h-[95vh] sm:max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-700">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg">
               <MessageSquare className="w-6 h-6 text-white" />
@@ -282,12 +282,12 @@ const AnnouncementDetailModal: React.FC<AnnouncementDetailModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="overflow-y-auto max-h-[calc(90vh-200px)]">
-          <div className="p-6 space-y-6">
+        <div className="overflow-y-auto max-h-[calc(95vh-200px)] sm:max-h-[calc(90vh-200px)]">
+          <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
             {/* Announcement Content */}
-            <div className="bg-white dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-              <div className="flex items-start justify-between mb-4">
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+            <div className="bg-white dark:bg-gray-900 rounded-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
+              <div className="flex items-start justify-between mb-3 sm:mb-4">
+                <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white break-words">
                   {announcement.title}
                 </h3>
                 <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full">
@@ -311,7 +311,7 @@ const AnnouncementDetailModal: React.FC<AnnouncementDetailModalProps> = ({
 
             {/* Comments Section */}
             {announcement.options?.allowComments && (
-              <div className="bg-white dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+              <div className="bg-white dark:bg-gray-900 rounded-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
                 <h4 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white flex items-center gap-2">
                   <MessageSquare className="w-5 h-5 text-blue-600" />
                   Comments
@@ -347,7 +347,7 @@ const AnnouncementDetailModal: React.FC<AnnouncementDetailModalProps> = ({
                         />
                         <div className="flex gap-3 mt-3 justify-end">
                           <button
-                            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full sm:w-auto px-4 sm:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
                             onClick={handlePostComment}
                             disabled={posting || !commentText.trim()}
                           >

@@ -58,23 +58,23 @@ const CoursePages: React.FC<CoursePagesProps> = ({ courseId, modules, isInstruct
   };
 
   return (
-    <div className="flex justify-center items-start py-8">
+    <div className="flex justify-center items-start py-4 sm:py-6 lg:py-8 px-2 sm:px-4">
       <div className="w-full max-w-3xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-0">
-        <div className="flex justify-between items-center px-8 pt-8 pb-4 border-b border-gray-100 dark:border-gray-800">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 lg:pt-8 pb-4 border-b border-gray-100 dark:border-gray-800">
           <div>
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Pages</h2>
-            <p className="text-gray-500 dark:text-gray-300 mt-1">All pages for this course</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white">Pages</h2>
+            <p className="text-sm sm:text-base text-gray-500 dark:text-gray-300 mt-1">All pages for this course</p>
           </div>
           {(isInstructor || isAdmin) && modules.length > 0 && (
-            <div className="relative">
+            <div className="relative w-full sm:w-auto">
               <button
                 onClick={handleCreateClick}
-                className="px-5 py-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow transition-colors text-base"
+                className="w-full sm:w-auto px-4 sm:px-5 py-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow transition-colors text-sm sm:text-base"
               >
                 + Page
               </button>
               {showCreate && (
-                <div className="absolute right-0 mt-2 w-96 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded shadow-lg z-10 p-4">
+                <div className="absolute right-0 mt-2 w-full sm:w-96 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded shadow-lg z-10 p-3 sm:p-4">
                   <ModuleProvider>
                     <CreatePageForm
                       modules={modules}
@@ -99,17 +99,17 @@ const CoursePages: React.FC<CoursePagesProps> = ({ courseId, modules, isInstruct
             {pages.map(page => (
               <li
                 key={page._id}
-                className="flex items-center px-8 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition group cursor-pointer"
+                className="flex items-center px-4 sm:px-6 lg:px-8 py-3 sm:py-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition group cursor-pointer"
               >
-                <span className="mr-4 text-gray-400 group-hover:text-blue-500">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <span className="mr-3 sm:mr-4 text-gray-400 group-hover:text-blue-500 flex-shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" strokeWidth="2" fill="none" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 8h8M8 12h8M8 16h4" />
                   </svg>
                 </span>
                 <Link
                   to={`/courses/${courseId}/pages/${page._id}`}
-                  className="font-medium text-blue-700 dark:text-blue-400 group-hover:underline text-lg truncate"
+                  className="font-medium text-blue-700 dark:text-blue-400 group-hover:underline text-base sm:text-lg truncate min-w-0 flex-1"
                 >
                   {page.title}
                 </Link>

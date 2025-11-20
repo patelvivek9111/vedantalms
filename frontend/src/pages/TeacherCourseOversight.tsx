@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { API_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
+import { getImageUrl } from '../services/api';
+import { ChangeUserModal } from '../components/ChangeUserModal';
 import { 
   BookOpen, 
   Search, 
@@ -13,7 +15,13 @@ import {
   Users,
   CheckCircle,
   XCircle,
-  TrendingUp
+  TrendingUp,
+  Menu,
+  Folder,
+  Settings,
+  HelpCircle,
+  User as UserIcon,
+  LogOut
 } from 'lucide-react';
 
 interface Course {
@@ -35,7 +43,7 @@ interface Course {
 
 export function TeacherCourseOversight() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [courses, setCourses] = useState<Course[]>([]);
   const [filteredCourses, setFilteredCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,6 +58,8 @@ export function TeacherCourseOversight() {
     status: 'active' as 'active' | 'draft' | 'archived'
   });
   const [saving, setSaving] = useState(false);
+  const [showBurgerMenu, setShowBurgerMenu] = useState(false);
+  const [showChangeUserModal, setShowChangeUserModal] = useState(false);
 
   useEffect(() => {
     const fetchCourses = async () => {
@@ -266,21 +276,160 @@ export function TeacherCourseOversight() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">My Courses</h1>
-          <p className="text-gray-600 dark:text-gray-400">Manage and monitor your courses</p>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Top Navigation Bar (Mobile Only) */}
+      <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+        <div className="relative flex items-center justify-between px-4 py-3">
+          <button
+            onClick={() => setShowBurgerMenu(!showBurgerMenu)}
+            className="text-gray-700 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
+            aria-label="Open menu"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">My Course</h1>
+          <div className="w-10"></div> {/* Spacer for centering */}
+          
+          {/* Burger Menu Dropdown */}
+          {showBurgerMenu && (
+            <>
+              {/* Overlay */}
+              <div
+                className="fixed inset-0 bg-black bg-opacity-50 z-[151]"
+                onClick={() => setShowBurgerMenu(false)}
+              />
+              {/* Menu */}
+              <div className="absolute top-full left-0 mt-2 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 w-[280px] z-[152] overflow-hidden">
+                {/* Profile Information */}
+                <div className="px-4 py-4 border-b border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center gap-3">
+                    <div className="relative flex-shrink-0">
+                      {user?.profilePicture ? (
+                        <img
+                          src={user.profilePicture.startsWith('http') 
+                            ? user.profilePicture 
+                            : getImageUrl(user.profilePicture)}
+                          alt={`${user.firstName} ${user.lastName}`}
+                          className="w-12 h-12 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                            if (fallback) {
+                              fallback.style.display = 'flex';
+                            }
+                          }}
+                        />
+                      ) : null}
+                      {/* Fallback avatar */}
+                      <div
+                        className={`w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-base font-bold ${
+                          user?.profilePicture ? 'hidden' : 'flex'
+                        }`}
+                        style={{
+                          display: user?.profilePicture ? 'none' : 'flex'
+                        }}
+                      >
+                        {user?.firstName?.charAt(0) || ''}{user?.lastName?.charAt(0) || 'U'}
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-gray-900 dark:text-gray-100 text-sm truncate">
+                        {user?.firstName} {user?.lastName}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        {user?.email}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Main Options */}
+                <div className="py-2">
+                  <button
+                    onClick={() => {
+                      setShowBurgerMenu(false);
+                      navigate('/account');
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+                  >
+                    <Folder className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                    <span>Files</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowBurgerMenu(false);
+                      navigate('/account');
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+                  >
+                    <Settings className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                    <span>Settings</span>
+                  </button>
+                </div>
+
+                {/* Separator */}
+                <div className="border-t border-gray-200 dark:border-gray-700"></div>
+
+                {/* Account Actions */}
+                <div className="py-2">
+                  <button
+                    onClick={() => {
+                      setShowBurgerMenu(false);
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+                  >
+                    <HelpCircle className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                    <span>Help</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowBurgerMenu(false);
+                      setShowChangeUserModal(true);
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+                  >
+                    <UserIcon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                    <span>Change User</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowBurgerMenu(false);
+                      logout();
+                      navigate('/login');
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+                  >
+                    <LogOut className="h-5 w-5" />
+                    <span>Log Out</span>
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
-        <div className="flex items-center gap-4">
+      </nav>
+      
+      <ChangeUserModal
+        isOpen={showChangeUserModal}
+        onClose={() => setShowChangeUserModal(false)}
+      />
+      
+      <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 pt-20 lg:pt-3">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
+          <div>
+            <h1 className="hidden lg:block text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">My Courses</h1>
+            <p className="hidden lg:block text-sm sm:text-base text-gray-600 dark:text-gray-400">Manage and monitor your courses</p>
+            <p className="lg:hidden text-sm text-gray-600 dark:text-gray-400 mt-2">Manage and monitor your courses</p>
+          </div>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
           <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-            <BookOpen className="h-5 w-5" />
-            <span className="text-sm font-medium">{courses.length} course{courses.length !== 1 ? 's' : ''}</span>
+            <BookOpen className="h-4 w-4 sm:h-5 sm:w-5" />
+            <span className="text-xs sm:text-sm font-medium">{courses.length} course{courses.length !== 1 ? 's' : ''}</span>
           </div>
           <button
             onClick={() => navigate('/courses/create')}
-            className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors font-medium flex items-center gap-2"
+            className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors font-medium flex items-center justify-center gap-2 text-sm sm:text-base"
           >
             <BookOpen className="h-4 w-4" />
             Create Course
@@ -289,8 +438,8 @@ export function TeacherCourseOversight() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-4">
-        <div className="flex items-center gap-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-3 sm:p-4">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
           <div className="flex-1 relative">
             <Search className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" />
             <input
@@ -328,25 +477,25 @@ export function TeacherCourseOversight() {
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-900">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Course
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Published
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Enrollment
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Average
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Updated
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -354,7 +503,7 @@ export function TeacherCourseOversight() {
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {filteredCourses.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={7} className="px-3 sm:px-4 lg:px-6 py-8 sm:py-12 text-center text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                     {searchTerm || statusFilter !== 'all' || publishedFilter !== 'all'
                       ? 'No courses match your filters'
                       : 'You haven\'t created any courses yet. Click "Create Course" to get started.'}
@@ -363,7 +512,7 @@ export function TeacherCourseOversight() {
               ) : (
                 filteredCourses.map((course) => (
                   <tr key={course._id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
                       <button
                         onClick={() => navigate(`/courses/${course._id}`)}
                         className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium text-left"
@@ -371,23 +520,23 @@ export function TeacherCourseOversight() {
                         {course.catalog?.courseCode || course.title}
                       </button>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(course.status)}`}>
                         {course.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${getPublishedColor(course.published)}`}>
                         {course.published ? 'Published' : 'Unpublished'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
                       <div className="flex items-center gap-2">
                         <Users className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                         <span className="text-sm text-gray-900 dark:text-gray-100">{course.enrollmentCount || 0}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
                       <div className="flex items-center gap-2">
                         <TrendingUp className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                         <span className={`text-sm font-medium ${getAverageColor(course.classAverage)}`}>
@@ -492,6 +641,7 @@ export function TeacherCourseOversight() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

@@ -80,9 +80,9 @@ const CourseList: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">Courses</h1>
+    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+      <div className="flex justify-between items-center mb-4 sm:mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-gray-100">Courses</h1>
       </div>
       {/* Auto-redirecting to first course... */}
       <div className="text-center py-12">

@@ -141,7 +141,7 @@ const GroupAnnouncements: React.FC<GroupAnnouncementsProps> = ({ courseId, group
       visibleComments = comments.filter((comment) => comment.author._id === user._id);
     }
     return (
-      <ul className={level === 0 ? 'space-y-6 mt-8' : 'ml-8 space-y-4 mt-4'}>
+      <ul className={level === 0 ? 'space-y-4 sm:space-y-6 mt-4 sm:mt-8' : 'ml-4 sm:ml-8 space-y-3 sm:space-y-4 mt-3 sm:mt-4'}>
         {visibleComments
           .filter(comment => comment._id)
           .map((comment) => {
@@ -152,13 +152,13 @@ const GroupAnnouncements: React.FC<GroupAnnouncementsProps> = ({ courseId, group
               user?.role !== 'student';
             const visibleReplies = shouldShowReplies ? comment.replies : [];
             return (
-              <li key={parentKey + comment._id} className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-100 dark:border-gray-700">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="font-semibold text-gray-800 dark:text-gray-200">{comment.author.firstName} {comment.author.lastName}</span>
+              <li key={parentKey + comment._id} className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 sm:p-4 border border-gray-100 dark:border-gray-700">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-2">
+                  <span className="font-semibold text-sm sm:text-base text-gray-800 dark:text-gray-200">{comment.author.firstName} {comment.author.lastName}</span>
                   <span className="text-xs text-gray-400 dark:text-gray-500">{new Date(comment.createdAt).toLocaleString()}</span>
                 </div>
-                <div className="mb-2 text-gray-700 dark:text-gray-300">{comment.text}</div>
-                <div className="flex gap-2 mb-2 items-center">
+                <div className="mb-2 text-sm sm:text-base text-gray-700 dark:text-gray-300 break-words">{comment.text}</div>
+                <div className="flex flex-wrap gap-2 mb-2 items-center">
                   {user && selectedAnnouncement?.options?.allowLiking && !isOwnComment && (
                     <button
                       className={`text-xs flex items-center gap-1 px-2 py-1 rounded ${isLiked ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300' : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'}`}
@@ -223,20 +223,20 @@ const GroupAnnouncements: React.FC<GroupAnnouncementsProps> = ({ courseId, group
   };
 
   return (
-    <div className="max-w-4xl mx-auto py-8 space-y-8">
-      <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-gray-100">Group Announcements</h2>
-      {error && <div className="text-red-500 dark:text-red-400 mb-2">{error}</div>}
+    <div className="max-w-4xl mx-auto py-4 sm:py-6 lg:py-8 space-y-4 sm:space-y-6 lg:space-y-8 px-2 sm:px-4">
+      <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 text-gray-900 dark:text-gray-100">Group Announcements</h2>
+      {error && <div className="text-sm text-red-500 dark:text-red-400 mb-2">{error}</div>}
       {selectedAnnouncement ? (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-100 dark:border-gray-700 max-w-2xl mx-auto">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 border border-gray-100 dark:border-gray-700 max-w-2xl mx-auto">
           <button
-            className="mb-4 px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-600 text-xs"
+            className="mb-3 sm:mb-4 px-3 py-1.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-600 text-xs sm:text-sm"
             onClick={() => setSelectedAnnouncement(null)}
           >
             ← Back to Announcements
           </button>
-          <div className="flex justify-between items-start mb-2">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">{selectedAnnouncement.title}</h3>
-            <span className="text-xs text-gray-400 dark:text-gray-500 mt-1">{new Date(selectedAnnouncement.createdAt).toLocaleString()}</span>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-start gap-2 mb-2">
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100 break-words">{selectedAnnouncement.title}</h3>
+            <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">{new Date(selectedAnnouncement.createdAt).toLocaleString()}</span>
           </div>
           <div className="text-sm text-gray-800 dark:text-gray-200 mb-2 prose max-w-none dark:prose-invert" dangerouslySetInnerHTML={{ __html: selectedAnnouncement.body }} />
           <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">By {selectedAnnouncement.author.firstName} {selectedAnnouncement.author.lastName}</div>

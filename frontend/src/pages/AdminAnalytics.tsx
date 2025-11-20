@@ -98,25 +98,25 @@ export function AdminAnalytics() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Analytics Dashboard</h1>
-          <p className="text-gray-600 dark:text-gray-400">System performance and user engagement insights</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">Analytics Dashboard</h1>
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">System performance and user engagement insights</p>
         </div>
-        <div className="flex items-center space-x-4">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:space-x-4 w-full sm:w-auto">
           <select
             value={timeRange}
             onChange={(e) => setTimeRange(e.target.value)}
-            className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
+            className="w-full sm:w-auto px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm"
           >
             <option value="7d">Last 7 days</option>
             <option value="30d">Last 30 days</option>
             <option value="90d">Last 90 days</option>
             <option value="1y">Last year</option>
           </select>
-          <button className="flex items-center space-x-2 px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors">
+          <button className="w-full sm:w-auto flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors text-sm sm:text-base">
             <Download className="w-4 h-4" />
             <span>Export Report</span>
           </button>
@@ -124,72 +124,72 @@ export function AdminAnalytics() {
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Users</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{analyticsData.userGrowth.reduce((sum, m) => sum + m.users, 0)}</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Total registered</p>
+              <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Total Users</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">{analyticsData.userGrowth.reduce((sum, m) => sum + m.users, 0)}</p>
+              <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Total registered</p>
             </div>
-            <div className="p-3 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
-              <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            <div className="p-2 sm:p-3 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
+              <Users className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 dark:text-blue-400" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Courses</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{analyticsData.courseEngagement.length}</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Published courses</p>
+              <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Active Courses</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">{analyticsData.courseEngagement.length}</p>
+              <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Published courses</p>
             </div>
-            <div className="p-3 bg-green-100 dark:bg-green-900/50 rounded-lg">
-              <BookOpen className="w-6 h-6 text-green-600 dark:text-green-400" />
+            <div className="p-2 sm:p-3 bg-green-100 dark:bg-green-900/50 rounded-lg">
+              <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 text-green-600 dark:text-green-400" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Daily Active Users</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+              <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Daily Active Users</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
                 {analyticsData.systemUsage.length > 0 
                   ? analyticsData.systemUsage[analyticsData.systemUsage.length - 1].activeUsers 
                   : 0}
               </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Today</p>
+              <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Today</p>
             </div>
-            <div className="p-3 bg-purple-100 dark:bg-purple-900/50 rounded-lg">
-              <Activity className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+            <div className="p-2 sm:p-3 bg-purple-100 dark:bg-purple-900/50 rounded-lg">
+              <Activity className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600 dark:text-purple-400" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Storage Used</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+              <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Storage Used</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
                 {analyticsData.systemUsage.length > 0 
                   ? `${analyticsData.systemUsage[0]?.storageUsed || 0} GB`
                   : '0 GB'}
               </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Total used</p>
+              <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Total used</p>
             </div>
-            <div className="p-3 bg-orange-100 dark:bg-orange-900/50 rounded-lg">
-              <BarChart3 className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+            <div className="p-2 sm:p-3 bg-orange-100 dark:bg-orange-900/50 rounded-lg">
+              <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600 dark:text-orange-400" />
             </div>
           </div>
         </div>
       </div>
 
       {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* User Growth Chart */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">User Growth</h3>
             <div className="flex items-center space-x-2">

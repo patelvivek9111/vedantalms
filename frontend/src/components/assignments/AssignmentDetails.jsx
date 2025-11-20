@@ -136,21 +136,21 @@ const AssignmentDetails = () => {
   }
 
   return (
-    <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
-      <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-        <div className="flex justify-between items-start mb-8">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{assignment.title}</h1>
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              Due: {format(new Date(assignment.dueDate), 'PPp')}
+    <div className="w-full px-2 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
+      <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6 sm:mb-8">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 break-words">{assignment.title}</h1>
+            <p className="mt-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+              <span className="block sm:inline">Due: {format(new Date(assignment.dueDate), 'PPp')}</span>
+              {userRole === 'student' && assignment.submission && (
+                <span className="block sm:inline sm:ml-4 mt-1 sm:mt-0 text-green-600 dark:text-green-400">
+                  Submitted: {format(new Date(assignment.submission.submittedAt), 'PPp')}
+                </span>
+              )}
             </p>
-            {userRole === 'student' && assignment.submission && (
-              <span className="ml-4 text-green-600 dark:text-green-400">
-                Submitted: {format(new Date(assignment.submission.submittedAt), 'PPp')}
-              </span>
-            )}
           </div>
-          <div className="flex space-x-4">
+          <div className="flex flex-wrap gap-2 sm:gap-4 w-full sm:w-auto">
             {(userRole === 'teacher' || userRole === 'admin') && (
               <>
                 <button

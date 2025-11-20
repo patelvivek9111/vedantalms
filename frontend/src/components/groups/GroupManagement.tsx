@@ -393,42 +393,42 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex justify-between items-center mb-8">
-        <h2 className="text-2xl font-bold text-gray-900">Group Management</h2>
+    <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-6 sm:mb-8">
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Group Management</h2>
         <button
           onClick={() => setShowCreateSetModal(true)}
-          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+          className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
         >
-          <Plus className="h-5 w-5 mr-2" />
+          <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
           Create Group Set
         </button>
       </div>
 
       {error && (
-        <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+        <div className="mb-4 bg-red-100 dark:bg-red-900/20 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 px-3 sm:px-4 py-2 sm:py-3 rounded text-sm sm:text-base">
           {error}
         </div>
       )}
 
       {/* Group Sets List */}
-      <div className="mb-8">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Group Sets</h3>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mb-6 sm:mb-8">
+        <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 mb-3 sm:mb-4">Group Sets</h3>
+        <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {groupSets.map(set => (
             <div
               key={set._id}
-              className={`p-4 border rounded-lg cursor-pointer ${
+              className={`p-3 sm:p-4 border rounded-lg cursor-pointer ${
                 selectedSet?._id === set._id
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-200 hover:border-blue-300'
+                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                  : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600'
               }`}
               onClick={() => setSelectedSet(set)}
             >
               <div className="flex justify-between items-start">
-                <div>
-                  <h4 className="font-medium text-gray-900">{set.name}</h4>
-                  <p className="text-sm text-gray-500">
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-medium text-sm sm:text-base text-gray-900 dark:text-gray-100 break-words">{set.name}</h4>
+                  <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                     {set.allowSelfSignup ? 'Self-signup enabled' : 'Self-signup disabled'}
                   </p>
                 </div>
@@ -441,10 +441,10 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
       {/* Groups List */}
       {selectedSet && (
         <DragDropContext onDragEnd={onDragEnd}>
-          <div className="flex gap-6">
+          <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
             {/* Sidebar: Student List (only for manual group sets) */}
             {selectedSet.groupStructure === 'manual' && (
-              <div className="w-64 bg-gray-50 border rounded-lg p-4 h-fit">
+              <div className="w-full lg:w-64 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 sm:p-4 h-fit">
                 <h4 className="font-medium text-gray-900 mb-2">Students</h4>
                 <Droppable droppableId="students-list">
                   {(provided) => (
@@ -565,8 +565,8 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
 
       {/* Create Group Set Modal */}
       {showCreateSetModal && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 max-w-md w-full max-h-[95vh] overflow-y-auto">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Create Group Set</h3>
             <form onSubmit={handleCreateSet}>
               <div className="mb-4">
@@ -665,8 +665,8 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
 
       {/* Create Group Modal */}
       {showCreateGroupModal && selectedSet && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 max-w-md w-full max-h-[95vh] overflow-y-auto">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Create Group</h3>
             <form onSubmit={handleCreateGroup}>
               <div className="mb-4">
@@ -729,8 +729,8 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
 
       {/* Auto-split Modal */}
       {showAutoSplitModal && selectedSet && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 max-w-md w-full max-h-[95vh] overflow-y-auto">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Auto-split Students</h3>
             <form onSubmit={handleAutoSplit}>
               <div className="mb-4">
@@ -772,8 +772,8 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
 
       {/* Edit Group Modal */}
       {showEditGroupModal && selectedGroup && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 max-w-md w-full max-h-[95vh] overflow-y-auto">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Edit Group</h3>
             <form onSubmit={handleEditGroup}>
               <div className="mb-4">
@@ -836,8 +836,8 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
 
       {/* Message Group Modal */}
       {showMessageModal && selectedGroup && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 max-w-md w-full max-h-[95vh] overflow-y-auto">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Message Group: {selectedGroup.name}</h3>
             <form onSubmit={handleSendMessage}>
               <div className="mb-4">
@@ -885,8 +885,8 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
 
       {/* Group Activity Modal */}
       {showActivityModal && groupActivity && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 max-w-2xl w-full max-h-[95vh] sm:max-h-[80vh] overflow-y-auto">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Group Activity</h3>
             
             <div className="mb-6">

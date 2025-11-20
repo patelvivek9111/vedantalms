@@ -129,78 +129,78 @@ export function AdminDashboard() {
   }
 
   return (
-    <div className="p-6 space-y-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Admin Dashboard</h1>
-          <p className="text-gray-600 dark:text-gray-400">System overview and administrative controls</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">Admin Dashboard</h1>
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">System overview and administrative controls</p>
         </div>
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
             <div className={`w-3 h-3 rounded-full ${getHealthColor(systemStats.systemHealth)}`}></div>
-            <span className="text-sm text-gray-600 dark:text-gray-400">System Status: {systemStats.systemHealth}</span>
+            <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">System Status: {systemStats.systemHealth}</span>
           </div>
         </div>
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border-l-4 border-blue-500 dark:border-blue-400">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 border-l-4 border-blue-500 dark:border-blue-400">
           <div className="flex items-center">
             <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
-              <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+              <Users className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 dark:text-blue-400" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Users</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{systemStats.totalUsers.toLocaleString()}</p>
+            <div className="ml-3 sm:ml-4">
+              <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Total Users</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">{systemStats.totalUsers.toLocaleString()}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border-l-4 border-green-500 dark:border-green-400">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 border-l-4 border-green-500 dark:border-green-400">
           <div className="flex items-center">
             <div className="p-2 bg-green-100 dark:bg-green-900/50 rounded-lg">
-              <BookOpen className="w-6 h-6 text-green-600 dark:text-green-400" />
+              <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 text-green-600 dark:text-green-400" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Courses</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{systemStats.totalCourses}</p>
+            <div className="ml-3 sm:ml-4">
+              <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Total Courses</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">{systemStats.totalCourses}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border-l-4 border-purple-500 dark:border-purple-400">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 border-l-4 border-purple-500 dark:border-purple-400">
           <div className="flex items-center">
             <div className="p-2 bg-purple-100 dark:bg-purple-900/50 rounded-lg">
-              <Activity className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+              <Activity className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600 dark:text-purple-400" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Users</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{systemStats.activeUsers}</p>
+            <div className="ml-3 sm:ml-4">
+              <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Active Users</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">{systemStats.activeUsers}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border-l-4 border-orange-500 dark:border-orange-400">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 border-l-4 border-orange-500 dark:border-orange-400">
           <div className="flex items-center">
             <div className="p-2 bg-orange-100 dark:bg-orange-900/50 rounded-lg">
-              <FileText className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+              <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600 dark:text-orange-400" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Assignments</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{systemStats.totalAssignments}</p>
+            <div className="ml-3 sm:ml-4">
+              <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Total Assignments</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">{systemStats.totalAssignments}</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Storage Usage */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Storage Usage</h3>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6">
+        <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Storage Usage</h3>
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm text-gray-600 dark:text-gray-400">Used: {systemStats.storageUsed}GB / {systemStats.storageTotal}GB</span>
-          <span className="text-sm text-gray-600 dark:text-gray-400">{Math.round((systemStats.storageUsed / systemStats.storageTotal) * 100)}%</span>
+          <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Used: {systemStats.storageUsed}GB / {systemStats.storageTotal}GB</span>
+          <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">{Math.round((systemStats.storageUsed / systemStats.storageTotal) * 100)}%</span>
         </div>
         <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
           <div 
@@ -211,20 +211,20 @@ export function AdminDashboard() {
       </div>
 
       {/* Admin Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Link to="/admin/users" className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 hover:shadow-lg dark:hover:shadow-gray-700/50 transition-shadow">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+        <Link to="/admin/users" className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 hover:shadow-lg dark:hover:shadow-gray-700/50 transition-shadow">
           <div className="flex items-center">
-            <div className="p-3 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
-              <Users className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+            <div className="p-2 sm:p-3 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
+              <Users className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600 dark:text-blue-400" />
             </div>
-            <div className="ml-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">User Management</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Manage users, roles, and permissions</p>
+            <div className="ml-3 sm:ml-4">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100">User Management</h3>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Manage users, roles, and permissions</p>
             </div>
           </div>
         </Link>
 
-        <Link to="/admin/courses" className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 hover:shadow-lg dark:hover:shadow-gray-700/50 transition-shadow">
+        <Link to="/admin/courses" className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 hover:shadow-lg dark:hover:shadow-gray-700/50 transition-shadow">
           <div className="flex items-center">
             <div className="p-3 bg-green-100 dark:bg-green-900/50 rounded-lg">
               <BookOpen className="w-8 h-8 text-green-600 dark:text-green-400" />
@@ -236,26 +236,26 @@ export function AdminDashboard() {
           </div>
         </Link>
 
-        <Link to="/admin/analytics" className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 hover:shadow-lg dark:hover:shadow-gray-700/50 transition-shadow">
+        <Link to="/admin/analytics" className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 hover:shadow-lg dark:hover:shadow-gray-700/50 transition-shadow">
           <div className="flex items-center">
-            <div className="p-3 bg-purple-100 dark:bg-purple-900/50 rounded-lg">
-              <BarChart3 className="w-8 h-8 text-purple-600 dark:text-purple-400" />
+            <div className="p-2 sm:p-3 bg-purple-100 dark:bg-purple-900/50 rounded-lg">
+              <BarChart3 className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600 dark:text-purple-400" />
             </div>
-            <div className="ml-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Analytics</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">System analytics and reports</p>
+            <div className="ml-3 sm:ml-4">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100">Analytics</h3>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">System analytics and reports</p>
             </div>
           </div>
         </Link>
 
-        <Link to="/admin/settings" className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 hover:shadow-lg dark:hover:shadow-gray-700/50 transition-shadow">
+        <Link to="/admin/settings" className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 hover:shadow-lg dark:hover:shadow-gray-700/50 transition-shadow">
           <div className="flex items-center">
-            <div className="p-3 bg-orange-100 dark:bg-orange-900/50 rounded-lg">
-              <Settings className="w-8 h-8 text-orange-600 dark:text-orange-400" />
+            <div className="p-2 sm:p-3 bg-orange-100 dark:bg-orange-900/50 rounded-lg">
+              <Settings className="w-6 h-6 sm:w-8 sm:h-8 text-orange-600 dark:text-orange-400" />
             </div>
-            <div className="ml-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">System Settings</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Configure system parameters</p>
+            <div className="ml-3 sm:ml-4">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100">System Settings</h3>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Configure system parameters</p>
             </div>
           </div>
         </Link>

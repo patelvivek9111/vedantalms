@@ -83,34 +83,34 @@ const GradeSubmissions = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <div className="bg-white shadow rounded-lg p-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Grade Submission</h1>
+    <div className="max-w-4xl mx-auto p-4 sm:p-6">
+      <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-4 sm:p-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4 sm:mb-6">Grade Submission</h1>
 
         {success && (
-          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+          <div className="bg-green-100 dark:bg-green-900/20 border border-green-400 dark:border-green-800 text-green-700 dark:text-green-400 px-3 sm:px-4 py-2 sm:py-3 rounded mb-4 text-sm sm:text-base">
             {success}
           </div>
         )}
 
-        <div className="mb-6">
-          <h2 className="text-lg font-medium text-gray-900">Student Information</h2>
-          <p className="mt-1">
+        <div className="mb-4 sm:mb-6">
+          <h2 className="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100">Student Information</h2>
+          <p className="mt-1 text-sm sm:text-base text-gray-800 dark:text-gray-200">
             {submission.student.firstName} {submission.student.lastName}
           </p>
-          <p className="text-sm text-gray-500">
+          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
             Submitted: {format(new Date(submission.submittedAt), 'PPp')}
           </p>
         </div>
 
-        <div className="mb-6">
-          <h2 className="text-lg font-medium text-gray-900">Submission</h2>
-          <div className="mt-2 prose max-w-none">
-            <p className="text-gray-700">{submission.submissionText}</p>
+        <div className="mb-4 sm:mb-6">
+          <h2 className="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100">Submission</h2>
+          <div className="mt-2 prose max-w-none text-sm sm:text-base">
+            <p className="text-gray-700 dark:text-gray-300">{submission.submissionText}</p>
           </div>
           {submission.files?.length > 0 && (
-            <div className="mt-4">
-              <h3 className="text-sm font-medium text-gray-900">Files:</h3>
+            <div className="mt-3 sm:mt-4">
+              <h3 className="text-xs sm:text-sm font-medium text-gray-900 dark:text-gray-100">Files:</h3>
               <ul className="mt-2 space-y-2">
                 {submission.files.map((file, index) => (
                   <li key={index}>
@@ -118,7 +118,7 @@ const GradeSubmissions = () => {
                       href={file}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-indigo-600 hover:text-indigo-500"
+                      className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 text-sm sm:text-base break-all"
                     >
                       {file.split('/').pop()}
                     </a>
@@ -129,7 +129,7 @@ const GradeSubmissions = () => {
           )}
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
           <div>
             <label htmlFor="grade" className="block text-sm font-medium text-gray-700">Grade</label>
             <input

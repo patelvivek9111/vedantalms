@@ -4,6 +4,7 @@ import { useModule } from '../contexts/ModuleContext';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
+import { ArrowLeft, Menu } from 'lucide-react';
 
 const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000';
 
@@ -97,8 +98,8 @@ const PageEditPage: React.FC = () => {
 
   if (error) {
     return (
-      <div className="max-w-4xl mx-auto p-6">
-        <div className="bg-red-100 dark:bg-red-900/20 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded relative" role="alert">
+      <div className="max-w-4xl mx-auto p-3 sm:p-4 lg:p-6">
+        <div className="bg-red-100 dark:bg-red-900/20 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 px-3 sm:px-4 py-2 sm:py-3 rounded relative text-sm sm:text-base" role="alert">
           <strong className="font-bold">Error: </strong>
           <span className="block sm:inline">{error}</span>
         </div>
@@ -130,14 +131,30 @@ const PageEditPage: React.FC = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 border dark:border-gray-700">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Edit Page</h1>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Top Navigation Bar (Mobile Only) */}
+      <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+        <div className="relative flex items-center justify-between px-4 py-3">
+          <button
+            onClick={() => navigate(-1)}
+            className="text-gray-700 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
+            aria-label="Go back"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Edit Page</h1>
+          <div className="w-10"></div> {/* Spacer for centering */}
+        </div>
+      </nav>
+
+      <div className="max-w-4xl mx-auto p-3 sm:p-4 lg:p-6 pt-16 lg:pt-6">
+      <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-4 sm:p-6 border dark:border-gray-700">
+          <div className="hidden lg:flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-4 sm:mb-6">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Edit Page</h1>
           <button
             type="button"
             onClick={() => setPreview(!preview)}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
+            className="w-full sm:w-auto px-3 sm:px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
           >
             {preview ? 'Edit' : 'Preview'}
           </button>
@@ -149,7 +166,7 @@ const PageEditPage: React.FC = () => {
             <ReactMarkdown>{formData.content}</ReactMarkdown>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
             <div>
               <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Title
@@ -177,24 +194,25 @@ const PageEditPage: React.FC = () => {
               />
             </div>
 
-            <div className="flex justify-end space-x-3">
+            <div className="flex flex-col sm:flex-row justify-end gap-2 sm:space-x-3">
               <button
                 type="button"
                 onClick={() => navigate(-1)}
-                className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
+                className="w-full sm:w-auto px-3 sm:px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 touch-manipulation"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 disabled:opacity-50"
+                className="w-full sm:w-auto px-3 sm:px-4 py-2 border border-transparent rounded-md shadow-sm text-xs sm:text-sm font-medium text-white bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 disabled:opacity-50"
               >
                 {isSubmitting ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </form>
         )}
+      </div>
       </div>
     </div>
   );

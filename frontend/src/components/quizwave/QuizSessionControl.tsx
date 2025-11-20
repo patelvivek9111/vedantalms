@@ -462,34 +462,34 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Waiting Screen */}
       {isWaiting && (
-        <div className="p-6">
+        <div className="p-3 sm:p-4 lg:p-6">
           <div className="max-w-6xl mx-auto">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-6">
-              <div className="flex justify-between items-center mb-6">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 sm:p-6 mb-4 sm:mb-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-4 sm:mb-6">
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+                  <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2 break-words">
                     {quiz.title}
                   </h2>
-                  <p className="text-gray-600 dark:text-gray-400">
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                     Session Status: <span className="font-semibold capitalize">{session.status}</span>
                   </p>
                 </div>
                 <button
                   onClick={onEnd}
-                  className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600"
+                  className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 text-sm sm:text-base"
                 >
                   Close Session
                 </button>
               </div>
 
               {/* Game PIN */}
-              <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg p-6 mb-6 text-center">
-                <p className="text-white text-sm mb-2">Game PIN</p>
-                <div className="flex items-center justify-center gap-4">
-                  <p className="text-5xl font-bold text-white">{session.gamePin}</p>
+              <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg p-4 sm:p-6 mb-4 sm:mb-6 text-center">
+                <p className="text-white text-xs sm:text-sm mb-2">Game PIN</p>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
+                  <p className="text-4xl sm:text-5xl font-bold text-white">{session.gamePin}</p>
                   <button
                     onClick={copyGamePin}
-                    className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+                    className="w-full sm:w-auto bg-white/20 hover:bg-white/30 text-white px-3 sm:px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors text-sm sm:text-base"
                   >
                     {copied ? (
                       <>
@@ -504,28 +504,28 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
                     )}
                   </button>
                 </div>
-                <p className="text-white/80 text-sm mt-2">
+                <p className="text-white/80 text-xs sm:text-sm mt-2">
                   Share this PIN with your students to join the quiz
                 </p>
               </div>
 
               {/* Stats */}
-              <div className="grid grid-cols-3 gap-4 mb-6">
-                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 text-center">
-                  <Users className="w-8 h-8 text-blue-600 dark:text-blue-400 mx-auto mb-2" />
-                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{participantCount}</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Participants</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 sm:p-4 text-center">
+                  <Users className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600 dark:text-blue-400 mx-auto mb-2" />
+                  <p className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-400">{participantCount}</p>
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Participants</p>
                 </div>
-                <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 text-center">
-                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3 sm:p-4 text-center">
+                  <p className="text-xl sm:text-2xl font-bold text-green-600 dark:text-green-400">
                     {quiz.questions.length}
                   </p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Questions</p>
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Questions</p>
                 </div>
-                <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4 text-center">
-                  <Trophy className="w-8 h-8 text-purple-600 dark:text-purple-400 mx-auto mb-2" />
-                  <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">0</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Top Score</p>
+                <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3 sm:p-4 text-center">
+                  <Trophy className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600 dark:text-purple-400 mx-auto mb-2" />
+                  <p className="text-xl sm:text-2xl font-bold text-purple-600 dark:text-purple-400">0</p>
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Top Score</p>
                 </div>
               </div>
 
@@ -533,9 +533,9 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
               <div className="flex flex-col items-center gap-4">
                 <button
                   onClick={handleStart}
-                  className="bg-green-600 text-white px-8 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 text-lg"
+                  className="bg-green-600 text-white px-4 sm:px-6 lg:px-8 py-2 sm:py-2.5 lg:py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 text-sm sm:text-base lg:text-lg"
                 >
-                  <Play className="w-5 h-5" />
+                  <Play className="w-4 h-4 sm:w-5 sm:h-5" />
                   Start Quiz
                 </button>
 
@@ -574,11 +574,11 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
       {isActive && currentQuestion && (
         <div className="min-h-screen bg-white dark:bg-gray-900 flex flex-col">
           {/* Top Bar */}
-          <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 flex justify-between items-center">
-            <div className="flex items-center gap-6">
+          <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-3 sm:p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
+            <div className="flex flex-wrap items-center gap-3 sm:gap-6">
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Question</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Question</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
                   {currentQuestionIndex + 1} / {quiz.questions.length}
                 </p>
               </div>
@@ -610,19 +610,19 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
           </div>
 
           {/* Main Question Display */}
-          <div className="flex-1 flex flex-col items-center justify-center p-8">
+          <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8">
             <div className="max-w-4xl w-full">
               {/* Question Text */}
-              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 mb-8 text-center">
-                <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-4 sm:p-6 lg:p-8 mb-4 sm:mb-6 lg:mb-8 text-center">
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-100 mb-3 sm:mb-4 break-words">
                   {currentQuestion.questionText}
                 </h1>
               </div>
 
               {/* Answer Distribution Chart */}
               {showAnswerDistribution && (
-                <div className="mb-8 w-full">
-                  <div className="grid grid-cols-2 gap-6">
+                <div className="mb-4 sm:mb-6 lg:mb-8 w-full">
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:gap-6">
                     {currentQuestion.options.map((opt: any, idx: number) => {
                       const colorClass = getAnswerColor(idx);
                       const shape = getAnswerShape(idx);
@@ -635,7 +635,7 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
                         <div key={idx} className="flex flex-col items-center">
                           {/* Count above bar */}
                           <div className="mb-2">
-                            <span className="text-3xl font-bold text-gray-900 dark:text-gray-100">{count}</span>
+                            <span className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100">{count}</span>
                             {isCorrect && (
                               <Check className="w-6 h-6 text-green-500 inline-block ml-2" />
                             )}
@@ -686,7 +686,7 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
 
               {/* Answer Options - Kahoot Style */}
               {!showAnswerDistribution && (
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                   {currentQuestion.options.map((opt: any, idx: number) => {
                     const colorClass = getAnswerColor(idx);
                     const shape = getAnswerShape(idx);
@@ -697,26 +697,26 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
                     return (
                       <div
                         key={idx}
-                        className={`${finalColorClass} rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 cursor-pointer ${isCorrect ? 'ring-4 ring-green-300 ring-offset-4' : ''}`}
+                        className={`${finalColorClass} rounded-2xl p-4 sm:p-6 lg:p-8 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 cursor-pointer ${isCorrect ? 'ring-2 sm:ring-4 ring-green-300 ring-offset-2 sm:ring-offset-4' : ''}`}
                       >
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-3 sm:gap-4">
                             {/* Shape Icon */}
-                            <div className="w-16 h-16 bg-white/30 rounded-lg flex items-center justify-center">
+                            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white/30 rounded-lg flex items-center justify-center flex-shrink-0">
                               {shape === 'triangle' && (
-                                <div className="w-0 h-0 border-l-[12px] border-l-transparent border-r-[12px] border-r-transparent border-b-[20px] border-b-white"></div>
+                                <div className="w-0 h-0 border-l-[10px] sm:border-l-[12px] border-l-transparent border-r-[10px] sm:border-r-[12px] border-r-transparent border-b-[16px] sm:border-b-[20px] border-b-white"></div>
                               )}
                               {shape === 'diamond' && (
-                                <div className="w-6 h-6 bg-white rotate-45"></div>
+                                <div className="w-5 h-5 sm:w-6 sm:h-6 bg-white rotate-45"></div>
                               )}
                               {shape === 'circle' && (
-                                <div className="w-6 h-6 bg-white rounded-full"></div>
+                                <div className="w-5 h-5 sm:w-6 sm:h-6 bg-white rounded-full"></div>
                               )}
                               {shape === 'square' && (
-                                <div className="w-6 h-6 bg-white"></div>
+                                <div className="w-5 h-5 sm:w-6 sm:h-6 bg-white"></div>
                               )}
                             </div>
-                            <span className="text-white text-2xl font-bold">{opt.text}</span>
+                            <span className="text-white text-lg sm:text-xl lg:text-2xl font-bold break-words">{opt.text}</span>
                           </div>
                           {isCorrect && (
                             <div className="bg-white/30 rounded-full p-2">
@@ -733,8 +733,8 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
               {/* Countdown Overlay */}
               {showCorrectAnswer && countdown > 0 && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                  <div className="bg-white dark:bg-gray-800 rounded-full w-32 h-32 flex items-center justify-center shadow-2xl">
-                    <span className="text-6xl font-bold text-gray-900 dark:text-gray-100 animate-pulse">
+                  <div className="bg-white dark:bg-gray-800 rounded-full w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 flex items-center justify-center shadow-2xl">
+                    <span className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-gray-100 animate-pulse">
                       {countdown}
                     </span>
                   </div>
@@ -749,16 +749,16 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
               <button
                 onClick={handleNextQuestion}
                 disabled={timeRemaining > 0 && !showCorrectAnswer}
-                className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-blue-600 text-white px-4 sm:px-6 lg:px-8 py-2 sm:py-2.5 lg:py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm sm:text-base lg:text-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <SkipForward className="w-5 h-5" />
+                <SkipForward className="w-4 h-4 sm:w-5 sm:h-5" />
                 {timeRemaining > 0 && !showCorrectAnswer ? 'Wait for timer...' : 'Next Question'}
               </button>
             ) : (
               <button
                 onClick={handleEnd}
                 disabled={timeRemaining > 0 && !showCorrectAnswer}
-                className="bg-red-600 text-white px-8 py-3 rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-red-600 text-white px-4 sm:px-6 lg:px-8 py-2 sm:py-2.5 lg:py-3 rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 text-sm sm:text-base lg:text-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {timeRemaining > 0 && !showCorrectAnswer ? 'Wait for timer...' : 'End Quiz'}
               </button>
@@ -769,11 +769,11 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
 
       {/* Ended Screen */}
       {isEnded && (
-        <div className="min-h-screen bg-gradient-to-b from-indigo-900 via-blue-900 to-purple-900 p-6">
+        <div className="min-h-screen bg-gradient-to-b from-indigo-900 via-blue-900 to-purple-900 p-3 sm:p-4 lg:p-6">
           <div className="max-w-6xl mx-auto">
-            <div className="bg-white/10 backdrop-blur-lg rounded-xl shadow-2xl p-8">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-3xl font-bold text-white">
+            <div className="bg-white/10 backdrop-blur-lg rounded-xl shadow-2xl p-4 sm:p-6 lg:p-8">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-4 sm:mb-6">
+                <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white">
                   Quiz Complete! 🎉
                 </h2>
                 <button
@@ -809,8 +809,8 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
                           </div>
                           <div className="absolute -top-2 -right-2 text-3xl animate-pulse">🎉</div>
                         </div>
-                        <div className="bg-red-500 rounded-t-lg px-6 py-4 text-center min-w-[150px]" style={{ height: '200px' }}>
-                          <div className="text-white text-5xl font-bold mb-2">2</div>
+                        <div className="bg-red-500 rounded-t-lg px-3 sm:px-4 lg:px-6 py-3 sm:py-4 text-center min-w-[120px] sm:min-w-[140px] lg:min-w-[150px]" style={{ height: '200px' }}>
+                          <div className="text-white text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold mb-2">2</div>
                           <div className="text-white text-lg font-semibold">{leaderboard[1].nickname}</div>
                           <div className="text-white/90 text-sm mt-2">{leaderboard[1].totalScore} pts</div>
                         </div>
@@ -822,16 +822,16 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
                       <div className="flex flex-col items-center">
                         <div className="relative mb-4">
                           {/* Character/Avatar with emote */}
-                          <div className="w-32 h-32 bg-yellow-400 rounded-full flex items-center justify-center text-5xl font-bold animate-bounce shadow-2xl">
+                          <div className="w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 bg-yellow-400 rounded-full flex items-center justify-center text-3xl sm:text-4xl lg:text-5xl font-bold animate-bounce shadow-2xl">
                             {leaderboard[0].nickname.charAt(0).toUpperCase()}
                           </div>
                           <div className="absolute -top-4 -right-4 text-5xl animate-pulse">👑</div>
                           <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 text-4xl animate-bounce">🏆</div>
                         </div>
-                        <div className="bg-orange-500 rounded-t-lg px-8 py-6 text-center min-w-[180px]" style={{ height: '280px' }}>
-                          <div className="text-white text-6xl font-bold mb-2">1</div>
-                          <div className="text-white text-xl font-bold">{leaderboard[0].nickname}</div>
-                          <div className="text-white/90 text-base mt-2 font-semibold">{leaderboard[0].totalScore} pts</div>
+                        <div className="bg-orange-500 rounded-t-lg px-4 sm:px-6 lg:px-8 py-4 sm:py-5 lg:py-6 text-center min-w-[140px] sm:min-w-[160px] lg:min-w-[180px]" style={{ height: '280px' }}>
+                          <div className="text-white text-4xl sm:text-5xl lg:text-6xl font-bold mb-2">1</div>
+                          <div className="text-white text-base sm:text-lg lg:text-xl font-bold break-words">{leaderboard[0].nickname}</div>
+                          <div className="text-white/90 text-xs sm:text-sm lg:text-base mt-2 font-semibold">{leaderboard[0].totalScore} pts</div>
                         </div>
                       </div>
                     )}
@@ -846,10 +846,10 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
                           </div>
                           <div className="absolute -top-2 -right-2 text-3xl animate-pulse">🎊</div>
                         </div>
-                        <div className="bg-blue-500 rounded-t-lg px-6 py-4 text-center min-w-[150px]" style={{ height: '160px' }}>
-                          <div className="text-white text-5xl font-bold mb-2">3</div>
-                          <div className="text-white text-lg font-semibold">{leaderboard[2].nickname}</div>
-                          <div className="text-white/90 text-sm mt-2">{leaderboard[2].totalScore} pts</div>
+                        <div className="bg-blue-500 rounded-t-lg px-3 sm:px-4 lg:px-6 py-3 sm:py-4 text-center min-w-[120px] sm:min-w-[140px] lg:min-w-[150px]" style={{ height: '160px' }}>
+                          <div className="text-white text-3xl sm:text-4xl lg:text-5xl font-bold mb-2">3</div>
+                          <div className="text-white text-sm sm:text-base lg:text-lg font-semibold break-words">{leaderboard[2].nickname}</div>
+                          <div className="text-white/90 text-xs sm:text-sm mt-2">{leaderboard[2].totalScore} pts</div>
                         </div>
                       </div>
                     )}
@@ -868,10 +868,10 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
                         <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center text-3xl font-bold mb-2">
                           {leaderboard[1].nickname.charAt(0).toUpperCase()}
                         </div>
-                        <div className="bg-red-500 rounded-t-lg px-6 py-4 text-center min-w-[140px]" style={{ height: '180px' }}>
-                          <div className="text-white text-4xl font-bold mb-2">2</div>
-                          <div className="text-white text-base font-semibold">{leaderboard[1].nickname}</div>
-                          <div className="text-white/90 text-sm mt-2">{leaderboard[1].totalScore} pts</div>
+                        <div className="bg-red-500 rounded-t-lg px-3 sm:px-4 lg:px-6 py-3 sm:py-4 text-center min-w-[110px] sm:min-w-[130px] lg:min-w-[140px]" style={{ height: '180px' }}>
+                          <div className="text-white text-3xl sm:text-4xl font-bold mb-2">2</div>
+                          <div className="text-white text-sm sm:text-base font-semibold break-words">{leaderboard[1].nickname}</div>
+                          <div className="text-white/90 text-xs sm:text-sm mt-2">{leaderboard[1].totalScore} pts</div>
                         </div>
                       </div>
                     )}
@@ -882,10 +882,10 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
                         <div className="w-24 h-24 bg-yellow-400 rounded-full flex items-center justify-center text-4xl font-bold mb-2 shadow-lg">
                           {leaderboard[0].nickname.charAt(0).toUpperCase()}
                         </div>
-                        <div className="bg-orange-500 rounded-t-lg px-8 py-5 text-center min-w-[160px]" style={{ height: '240px' }}>
-                          <div className="text-white text-5xl font-bold mb-2">1</div>
-                          <div className="text-white text-lg font-bold">{leaderboard[0].nickname}</div>
-                          <div className="text-white/90 text-base mt-2 font-semibold">{leaderboard[0].totalScore} pts</div>
+                        <div className="bg-orange-500 rounded-t-lg px-4 sm:px-6 lg:px-8 py-3 sm:py-4 lg:py-5 text-center min-w-[130px] sm:min-w-[150px] lg:min-w-[160px]" style={{ height: '240px' }}>
+                          <div className="text-white text-4xl sm:text-5xl font-bold mb-2">1</div>
+                          <div className="text-white text-sm sm:text-base lg:text-lg font-bold break-words">{leaderboard[0].nickname}</div>
+                          <div className="text-white/90 text-xs sm:text-sm lg:text-base mt-2 font-semibold">{leaderboard[0].totalScore} pts</div>
                         </div>
                       </div>
                     )}
@@ -896,10 +896,10 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
                         <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center text-3xl font-bold mb-2">
                           {leaderboard[2].nickname.charAt(0).toUpperCase()}
                         </div>
-                        <div className="bg-blue-500 rounded-t-lg px-6 py-4 text-center min-w-[140px]" style={{ height: '140px' }}>
-                          <div className="text-white text-4xl font-bold mb-2">3</div>
-                          <div className="text-white text-base font-semibold">{leaderboard[2].nickname}</div>
-                          <div className="text-white/90 text-sm mt-2">{leaderboard[2].totalScore} pts</div>
+                        <div className="bg-blue-500 rounded-t-lg px-3 sm:px-4 lg:px-6 py-3 sm:py-4 text-center min-w-[110px] sm:min-w-[130px] lg:min-w-[140px]" style={{ height: '140px' }}>
+                          <div className="text-white text-3xl sm:text-4xl font-bold mb-2">3</div>
+                          <div className="text-white text-sm sm:text-base font-semibold break-words">{leaderboard[2].nickname}</div>
+                          <div className="text-white/90 text-xs sm:text-sm mt-2">{leaderboard[2].totalScore} pts</div>
                         </div>
                       </div>
                     )}
@@ -944,10 +944,10 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
   );
 
   // Return with full screen wrapper when quiz is active
-  // Account for global sidebar width (80px) on the left
+  // Account for global sidebar width (80px) on the left for desktop only
   if (isQuizActive) {
     return (
-      <div className="fixed inset-0 bg-gray-50 dark:bg-gray-900 z-[60] overflow-auto" style={{ left: '80px' }}>
+      <div className="fixed inset-0 bg-gray-50 dark:bg-gray-900 z-[60] overflow-auto lg:left-20 left-0">
         {quizContent}
       </div>
     );

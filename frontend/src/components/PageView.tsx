@@ -78,10 +78,10 @@ const PageView: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border dark:border-gray-700">
-        <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-6">{page.title}</h1>
-        <div className="prose max-w-none prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-p:text-gray-700 dark:prose-p:text-gray-300" dangerouslySetInnerHTML={{ __html: sanitizeHtml(page.content) }} />
+    <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6 lg:py-8 max-w-4xl">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 sm:p-6 border dark:border-gray-700">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-gray-100 mb-4 sm:mb-6 break-words">{page.title}</h1>
+        <div className="prose prose-sm sm:prose-base max-w-none prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-p:text-gray-700 dark:prose-p:text-gray-300" dangerouslySetInnerHTML={{ __html: sanitizeHtml(page.content) }} />
       </div>
     </div>
   );

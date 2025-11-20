@@ -262,12 +262,12 @@ const StudentGameScreen: React.FC = () => {
   if (status === 'waiting') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-500 via-purple-600 to-pink-500 flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 text-center max-w-md">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 sm:p-8 text-center w-full max-w-md">
+          <div className="animate-spin rounded-full h-12 w-12 sm:h-16 sm:w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
             Waiting for quiz to start...
           </h2>
-          <p className="text-gray-600 dark:text-gray-400">
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
             The teacher will begin the quiz shortly
           </p>
         </div>
@@ -294,18 +294,18 @@ const StudentGameScreen: React.FC = () => {
       return (
         <div className="min-h-screen bg-gradient-to-b from-indigo-900 via-blue-900 to-purple-900 flex items-center justify-center p-4">
           <div className="w-full max-w-2xl">
-            <div className="bg-white/10 backdrop-blur-lg rounded-xl shadow-2xl p-8">
-              <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold text-white mb-2">
+            <div className="bg-white/10 backdrop-blur-lg rounded-xl shadow-2xl p-4 sm:p-6 lg:p-8">
+              <div className="text-center mb-6 sm:mb-8">
+                <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">
                   Quiz Complete! 🎉
                 </h2>
-                <p className="text-xl text-white/90">
+                <p className="text-lg sm:text-xl text-white/90">
                   You finished in <span className="font-bold text-yellow-400">#{myRank}</span> place!
                 </p>
               </div>
 
               {/* Podium Display - Only Student's Position */}
-              <div className="flex items-end justify-center mb-8" style={{ height: '400px' }}>
+              <div className="flex items-end justify-center mb-6 sm:mb-8" style={{ height: '300px', minHeight: '300px' }}>
                 <div className="flex flex-col items-center">
                   <div className="relative mb-4">
                     {/* Character/Avatar with emote */}
@@ -349,36 +349,36 @@ const StudentGameScreen: React.FC = () => {
     return (
       <div className="min-h-screen bg-gradient-to-b from-indigo-900 via-blue-900 to-purple-900 flex items-center justify-center p-4">
         <div className="w-full max-w-2xl">
-          <div className="bg-white/10 backdrop-blur-lg rounded-xl shadow-2xl p-8">
+          <div className="bg-white/10 backdrop-blur-lg rounded-xl shadow-2xl p-4 sm:p-6 lg:p-8">
             <div className="text-center">
-              <h2 className="text-3xl font-bold text-white mb-8">
+              <h2 className="text-2xl sm:text-3xl font-bold text-white mb-6 sm:mb-8">
                 Quiz Complete! 🎉
               </h2>
               
               {/* Avatar */}
-              <div className="mb-6">
-                <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center text-4xl font-bold mx-auto">
+              <div className="mb-4 sm:mb-6">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 bg-white rounded-full flex items-center justify-center text-2xl sm:text-3xl lg:text-4xl font-bold mx-auto">
                   {myEntry?.nickname.charAt(0).toUpperCase() || '?'}
                 </div>
               </div>
 
               {/* Rank Display */}
-              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-8 mb-6">
-                <p className="text-white text-sm mb-2">Your Rank</p>
-                <p className="text-7xl font-bold text-white">#{myRank}</p>
-                <p className="text-white/80 text-sm mt-2">out of {leaderboard.length} participants</p>
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 sm:p-6 lg:p-8 mb-4 sm:mb-6">
+                <p className="text-white text-xs sm:text-sm mb-2">Your Rank</p>
+                <p className="text-5xl sm:text-6xl lg:text-7xl font-bold text-white">#{myRank}</p>
+                <p className="text-white/80 text-xs sm:text-sm mt-2">out of {leaderboard.length} participants</p>
               </div>
 
               {/* Score Display */}
-              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-8 mb-8">
-                <p className="text-white text-sm mb-2">Your Score</p>
-                <p className="text-5xl font-bold text-white">{myScore}</p>
-                <p className="text-white/80 text-sm mt-2">points</p>
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 sm:p-6 lg:p-8 mb-6 sm:mb-8">
+                <p className="text-white text-xs sm:text-sm mb-2">Your Score</p>
+                <p className="text-4xl sm:text-5xl font-bold text-white">{myScore}</p>
+                <p className="text-white/80 text-xs sm:text-sm mt-2">points</p>
               </div>
 
               <button
                 onClick={() => navigate('/quizwave/join')}
-                className="w-full bg-white/20 hover:bg-white/30 text-white py-3 rounded-lg font-semibold transition-colors"
+                className="w-full bg-white/20 hover:bg-white/30 text-white py-2 sm:py-3 rounded-lg font-semibold transition-colors text-sm sm:text-base"
               >
                 Join Another Game
               </button>
@@ -411,17 +411,17 @@ const StudentGameScreen: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-500 via-purple-600 to-pink-500 flex flex-col">
       {/* Top Bar - Minimal */}
-      <div className="bg-white/10 backdrop-blur-lg p-4 flex justify-end items-center">
-        <div className="text-white text-sm">
+      <div className="bg-white/10 backdrop-blur-lg p-3 sm:p-4 flex justify-end items-center">
+        <div className="text-white text-xs sm:text-sm">
           {nickname}
         </div>
       </div>
 
       {/* Main Content - Only Colored Blocks */}
-      <div className={`flex-1 flex items-center justify-center p-4 ${showColorAnimation ? colors[currentColorIndex] : 'bg-gradient-to-br from-blue-500 via-purple-600 to-pink-500'} transition-colors duration-200`}>
+      <div className={`flex-1 flex items-center justify-center p-3 sm:p-4 ${showColorAnimation ? colors[currentColorIndex] : 'bg-gradient-to-br from-blue-500 via-purple-600 to-pink-500'} transition-colors duration-200`}>
         <div className="w-full max-w-md">
           {/* Answer Options - Only Colored Blocks (No Text) */}
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:gap-6">
             {currentQuestion.options.map((option: any, index: number) => {
               const isSelected = selectedAnswer.includes(index);
               // Use animated color if animation is active, otherwise use normal color
@@ -435,7 +435,7 @@ const StudentGameScreen: React.FC = () => {
                   key={index}
                   onClick={() => handleSelectAnswer(index)}
                   disabled={answered || timeRemaining === 0}
-                  className={`${colorClass} rounded-2xl p-12 shadow-2xl transition-all transform ${
+                  className={`${colorClass} rounded-2xl p-8 sm:p-10 lg:p-12 shadow-2xl transition-all transform ${
                     isSelected && !showColorAnimation
                       ? 'scale-110 ring-4 ring-white ring-offset-4 ring-offset-transparent'
                       : showColorAnimation

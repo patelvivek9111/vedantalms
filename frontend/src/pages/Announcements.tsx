@@ -200,7 +200,7 @@ const Announcements: React.FC<AnnouncementsProps> = ({ courseId }) => {
               user?.role !== 'student';
             const visibleReplies = shouldShowReplies ? comment.replies : [];
             return (
-              <li key={parentKey + comment._id} className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 shadow-sm">
+              <li key={parentKey + comment._id} className="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 border border-gray-200 dark:border-gray-700 shadow-sm">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/50 rounded-full flex items-center justify-center">
                     <span className="text-blue-600 dark:text-blue-300 font-semibold text-sm">
@@ -278,10 +278,10 @@ const Announcements: React.FC<AnnouncementsProps> = ({ courseId }) => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto py-8 space-y-8">
+    <div className="max-w-5xl mx-auto py-4 sm:py-6 lg:py-8 px-2 sm:px-4 space-y-4 sm:space-y-6 lg:space-y-8">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">Announcements</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">Announcements</h2>
           <p className="text-gray-600 dark:text-gray-400">Stay updated with the latest course information</p>
         </div>
         {/* Top "New Announcement" button removed; creation is available via the bottom "+ Announcement" button */}
@@ -300,7 +300,7 @@ const Announcements: React.FC<AnnouncementsProps> = ({ courseId }) => {
       
       {selectedAnnouncement ? (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 max-w-4xl mx-auto overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 px-3 sm:px-4 lg:px-6 py-3 sm:py-4 border-b border-gray-200 dark:border-gray-700">
             <button
               className="mb-4 px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium border border-gray-200 dark:border-gray-700 flex items-center gap-2 shadow-sm"
               onClick={() => setSelectedAnnouncement(null)}
@@ -312,7 +312,7 @@ const Announcements: React.FC<AnnouncementsProps> = ({ courseId }) => {
             </button>
           </div>
           
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             {user && (user.role === 'teacher' || user.role === 'admin') && !editMode && (
               <div className="flex gap-2 mb-6 justify-end">
                 <button
@@ -348,7 +348,7 @@ const Announcements: React.FC<AnnouncementsProps> = ({ courseId }) => {
               <>
                 <div className="mb-6">
                   <div className="flex justify-between items-start mb-4">
-                    <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{selectedAnnouncement.title}</h3>
+                    <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 break-words">{selectedAnnouncement.title}</h3>
                     <span className="text-sm text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full">
                       {new Date(selectedAnnouncement.createdAt).toLocaleString()}
                     </span>
@@ -380,7 +380,7 @@ const Announcements: React.FC<AnnouncementsProps> = ({ courseId }) => {
                     </div>
                   )}
                   {commentsLoading ? (
-                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">Loading comments...</div>
+                    <div className="text-center py-6 sm:py-8 text-sm sm:text-base text-gray-500 dark:text-gray-400">Loading comments...</div>
                   ) : (
                     <>
                       {renderComments(comments)}
@@ -396,7 +396,7 @@ const Announcements: React.FC<AnnouncementsProps> = ({ courseId }) => {
                           />
                           <div className="flex gap-3 mt-3 justify-end">
                             <button
-                              className="px-6 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors font-medium"
+                              className="w-full sm:w-auto px-4 sm:px-6 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors font-medium text-sm sm:text-base"
                               onClick={handlePostComment}
                               disabled={posting}
                             >

@@ -65,18 +65,18 @@ const LandingPage: React.FC = () => {
               <div className="flex items-center" style={{ display: 'none' }}>
                 <BookOpen className="h-8 w-8 text-blue-600 mr-3" />
               </div>
-              <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">VEDANTA</span>
+              <span className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">VEDANTA</span>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-4">
               <Link 
                 to="/login" 
-                className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium"
+                className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm font-medium"
               >
                 Sign In
               </Link>
               <Link 
                 to="/signup" 
-                className="bg-blue-600 dark:bg-blue-500 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
+                className="bg-blue-600 dark:bg-blue-500 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm font-medium hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
               >
                 Get Started
               </Link>
@@ -86,37 +86,37 @@ const LandingPage: React.FC = () => {
       </nav>
 
       {/* Hero Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8">
+      <section className="py-12 sm:py-16 lg:py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto text-center">
-          <div className="mb-8 flex justify-center">
+          <div className="mb-6 sm:mb-8 flex justify-center">
             <img 
               src="/assets/vedanta-logo.png" 
               alt="Vedanta Logo" 
-              className="h-32 w-auto"
+              className="h-24 sm:h-28 lg:h-32 w-auto"
               onError={(e) => {
                 e.currentTarget.style.display = 'none';
               }}
             />
           </div>
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold text-gray-900 dark:text-gray-100 mb-3 sm:mb-4">
             Modern Learning.
             <span className="text-blue-600 dark:text-blue-400 block">Ancient Wisdom.</span>
           </h1>
-          <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto">
+          <p className="text-base sm:text-lg lg:text-xl text-gray-600 dark:text-gray-300 mb-6 sm:mb-8 max-w-3xl mx-auto">
             Vedanta Learning Management System combines cutting-edge technology with timeless educational principles. 
             Empower educators and inspire students with a platform designed for meaningful learning experiences.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link 
               to="/signup" 
-              className="bg-blue-600 dark:bg-blue-500 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors inline-flex items-center justify-center"
+              className="bg-blue-600 dark:bg-blue-500 text-white px-4 sm:px-6 lg:px-8 py-3 sm:py-3.5 lg:py-4 rounded-lg text-sm sm:text-base lg:text-lg font-semibold hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors inline-flex items-center justify-center"
             >
               Get Started
               <ArrowRight className="ml-2 h-5 w-5" />
             </Link>
             <Link 
               to="/login" 
-              className="border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 px-8 py-4 rounded-lg text-lg font-semibold hover:border-gray-400 dark:hover:border-gray-500 transition-colors"
+              className="border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 px-4 sm:px-6 lg:px-8 py-3 sm:py-3.5 lg:py-4 rounded-lg text-sm sm:text-base lg:text-lg font-semibold hover:border-gray-400 dark:hover:border-gray-500 transition-colors"
             >
               Sign In
             </Link>
@@ -125,26 +125,26 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* Features Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white dark:bg-gray-800">
+      <section className="py-12 sm:py-16 lg:py-20 px-4 sm:px-6 lg:px-8 bg-white dark:bg-gray-800">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+          <div className="text-center mb-8 sm:mb-12 lg:mb-16">
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-100 mb-3 sm:mb-4">
               Everything You Need to Succeed
             </h2>
-            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+            <p className="text-base sm:text-lg lg:text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
               Our comprehensive platform provides all the tools educators and students need 
               for an exceptional learning experience.
             </p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
             {features.map((feature, index) => (
-              <div key={index} className="text-center p-6 rounded-lg hover:shadow-lg dark:hover:shadow-gray-700/50 transition-shadow bg-gray-50 dark:bg-gray-700/50">
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 dark:bg-blue-900/50 rounded-full mb-4">
-                  <feature.icon className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+              <div key={index} className="text-center p-4 sm:p-5 lg:p-6 rounded-lg hover:shadow-lg dark:hover:shadow-gray-700/50 transition-shadow bg-gray-50 dark:bg-gray-700/50">
+                <div className="inline-flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 bg-blue-100 dark:bg-blue-900/50 rounded-full mb-3 sm:mb-4">
+                  <feature.icon className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-blue-600 dark:text-blue-400" />
                 </div>
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">{feature.title}</h3>
-                <p className="text-gray-600 dark:text-gray-300">{feature.description}</p>
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">{feature.title}</h3>
+                <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300">{feature.description}</p>
               </div>
             ))}
           </div>
@@ -152,25 +152,25 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-900">
+      <section className="py-12 sm:py-16 lg:py-20 px-4 sm:px-6 lg:px-8 bg-gray-900">
         <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-3 sm:mb-4">
             Ready to Begin Your Learning Journey?
           </h2>
-          <p className="text-xl text-gray-300 mb-8">
+          <p className="text-base sm:text-lg lg:text-xl text-gray-300 mb-6 sm:mb-8">
             Join Vedanta and experience a learning management system that bridges modern technology 
             with educational excellence.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
             <Link 
               to="/signup" 
-              className="bg-blue-600 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-blue-700 transition-colors"
+              className="bg-blue-600 text-white px-4 sm:px-6 lg:px-8 py-3 sm:py-3.5 lg:py-4 rounded-lg text-sm sm:text-base lg:text-lg font-semibold hover:bg-blue-700 transition-colors"
             >
               Get Started Today
             </Link>
             <Link 
               to="/login" 
-              className="border-2 border-white text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-white hover:text-gray-900 transition-colors"
+              className="border-2 border-white text-white px-4 sm:px-6 lg:px-8 py-3 sm:py-3.5 lg:py-4 rounded-lg text-sm sm:text-base lg:text-lg font-semibold hover:bg-white hover:text-gray-900 transition-colors"
             >
               Sign In
             </Link>
@@ -179,9 +179,9 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-800 py-12 px-4 sm:px-6 lg:px-8">
+      <footer className="bg-gray-800 py-8 sm:py-10 lg:py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
             <div>
               <div className="flex items-center mb-4">
                 <img 

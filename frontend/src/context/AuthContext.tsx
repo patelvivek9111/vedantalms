@@ -15,6 +15,7 @@ interface AuthContextType {
   user: User | null;
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
   token: string | null;
+  setToken: React.Dispatch<React.SetStateAction<string | null>>;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (firstName: string, lastName: string, email: string, password: string, role: string) => Promise<void>;
@@ -84,6 +85,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(user));
+    
+    // Save to stored users for quick switching
+    try {
+      const storedUsersKey = 'storedUsers';
+      const stored = localStorage.getItem(storedUsersKey);
+      let users: any[] = stored ? JSON.parse(stored) : [];
+      
+      // Remove existing user with same email
+      users = users.filter((u: any) => u.email !== user.email);
+      
+      // Add new user
+      users.push({
+        _id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role,
+        profilePicture: user.profilePicture,
+        token: token,
+        lastUsed: Date.now()
+      });
+      
+      // Keep only last 5 users
+      if (users.length > 5) {
+        users = users
+          .sort((a: any, b: any) => b.lastUsed - a.lastUsed)
+          .slice(0, 5);
+      }
+      
+      localStorage.setItem(storedUsersKey, JSON.stringify(users));
+    } catch (error) {
+      console.error('Error saving user to stored users:', error);
+    }
+    
     setToken(token);
     setUser(user);
   };
@@ -104,6 +139,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
+      
+      // Save to stored users for quick switching
+      try {
+        const storedUsersKey = 'storedUsers';
+        const stored = localStorage.getItem(storedUsersKey);
+        let users: any[] = stored ? JSON.parse(stored) : [];
+        
+        // Remove existing user with same email
+        users = users.filter((u: any) => u.email !== user.email);
+        
+        // Add new user
+        users.push({
+          _id: user._id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          role: user.role,
+          profilePicture: user.profilePicture,
+          token: token,
+          lastUsed: Date.now()
+        });
+        
+        // Keep only last 5 users
+        if (users.length > 5) {
+          users = users
+            .sort((a: any, b: any) => b.lastUsed - a.lastUsed)
+            .slice(0, 5);
+        }
+        
+        localStorage.setItem(storedUsersKey, JSON.stringify(users));
+      } catch (error) {
+        console.error('Error saving user to stored users:', error);
+      }
+      
       setToken(token);
       setUser(user);
     } catch (error: any) {
@@ -123,7 +192,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, setUser, token, loading, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, setUser, token, setToken, loading, login, signup, logout }}>
       {children}
     </AuthContext.Provider>
   );

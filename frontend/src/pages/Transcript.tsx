@@ -247,11 +247,11 @@ const Transcript: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-4 sm:py-6 lg:py-8 px-2 sm:px-4 lg:px-8">
       <div className="max-w-5xl mx-auto">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-          <div className="mb-6">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 sm:p-6">
+          <div className="mb-4 sm:mb-6">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
               Unofficial Transcript
             </h1>
             {user && (
@@ -262,8 +262,8 @@ const Transcript: React.FC = () => {
           </div>
 
           {/* Semester Selector */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <div className="mb-4 sm:mb-6">
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Select Semester
             </label>
             <select
@@ -272,7 +272,7 @@ const Transcript: React.FC = () => {
                 const [term, year] = e.target.value.split('-');
                 setSelectedSemester({ term, year: parseInt(year) });
               }}
-              className="block w-full max-w-xs rounded-md border-gray-300 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 sm:text-sm"
+              className="block w-full max-w-xs rounded-md border-gray-300 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 text-sm"
             >
               <option value="">Select a semester</option>
               {availableSemesters.map((semester, index) => (
@@ -291,28 +291,28 @@ const Transcript: React.FC = () => {
 
           {/* Overall CGPA Section - Always visible if data is available */}
           {allCoursesData && allCoursesData.courses.length > 0 && (
-            <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 rounded-lg border-2 border-purple-200 dark:border-purple-800">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+            <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 rounded-lg border-2 border-purple-200 dark:border-purple-800">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100 mb-3 sm:mb-4">
                 Overall Academic Performance
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">CGPA</p>
-                  <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4 shadow-sm">
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-1">CGPA</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-purple-600 dark:text-purple-400">
                     {formatGPA(calculateCGPA(allCoursesData.courses))}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">(10-point scale)</p>
                 </div>
-                <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Overall GPA</p>
-                  <p className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4 shadow-sm">
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-1">Overall GPA</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-indigo-600 dark:text-indigo-400">
                     {formatGPA(calculateOverallGPA(allCoursesData.courses))}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">(4-point scale)</p>
                 </div>
-                <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Credits</p>
-                  <p className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4 shadow-sm">
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-1">Total Credits</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-indigo-600 dark:text-indigo-400">
                     {allCoursesData.totalCredits}
                   </p>
                 </div>
@@ -338,28 +338,28 @@ const Transcript: React.FC = () => {
           {!loading && transcriptData && selectedSemester && (
             <>
               {/* Semester Performance Section */}
-              <div className="mb-6 p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+              <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
+                <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
                   {selectedSemester.term} {selectedSemester.year}
                 </h2>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mt-3 sm:mt-4">
                   <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">SGPA</p>
-                    <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">SGPA</p>
+                    <p className="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400">
                       {formatGPA(calculateSGPA(transcriptData.courses))}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">(10-point scale)</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Semester GPA</p>
-                    <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Semester GPA</p>
+                    <p className="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400">
                       {formatGPA(calculateSemesterGPA(transcriptData.courses))}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">(4-point scale)</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Semester Credits</p>
-                    <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Semester Credits</p>
+                    <p className="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400">
                       {transcriptData.courses.reduce((sum, course) => sum + (course.creditHours || 0), 0)}
                     </p>
                   </div>
@@ -375,22 +375,22 @@ const Transcript: React.FC = () => {
                   <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                     <thead className="bg-gray-50 dark:bg-gray-700">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                           Course Code
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                           Course Title
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                           Credits
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                           Grade
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                           Letter Grade
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                           Grade Points
                         </th>
                       </tr>
@@ -398,22 +398,22 @@ const Transcript: React.FC = () => {
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                       {transcriptData.courses.map((course, index) => (
                         <tr key={course.courseId} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                          <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-gray-100">
                             {course.courseCode || 'N/A'}
                           </td>
-                          <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
+                          <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 text-xs sm:text-sm text-gray-900 dark:text-gray-100">
                             {course.courseTitle}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                          <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                             {course.creditHours || 0}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                          <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                             {course.finalGrade.toFixed(2)}%
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                          <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-900 dark:text-gray-100">
                             {course.letterGrade}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                          <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                             {getIndianGradePoints(course.letterGrade).toFixed(1)}
                           </td>
                         </tr>

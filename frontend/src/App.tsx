@@ -46,8 +46,10 @@ import GroupPeopleWrapper from './components/groups/GroupPeopleWrapper';
 import GroupHome from './components/groups/GroupHome';
 import Announcements from './pages/Announcements';
 import GlobalSidebar from './components/GlobalSidebar';
+import BottomNav from './components/BottomNav';
 import CalendarPage from './components/Calendar';
 import Inbox from './pages/Inbox';
+import ToDoPage from './pages/ToDoPage';
 import AccountPage from './pages/AccountPage';
 import Groups from './pages/Groups';
 import GroupSetView from './components/groups/GroupSetView';
@@ -126,7 +128,8 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 dark:text-white">
       {isAuthenticated && <GlobalSidebar />}
-      <main className={isAuthenticated ? "pb-10 pl-20" : "pb-10"}>
+      {isAuthenticated && <BottomNav />}
+      <main className={isAuthenticated ? "pb-20 lg:pb-10 lg:pl-20" : "pb-10"}>
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
@@ -316,6 +319,14 @@ function AppContent() {
             }
           />
           <Route path="/inbox" element={<PrivateRoute><Inbox /></PrivateRoute>} />
+          <Route
+            path="/todo"
+            element={
+              <PrivateRoute>
+                <ToDoPage />
+              </PrivateRoute>
+            }
+          />
           <Route
             path="/catalog"
             element={

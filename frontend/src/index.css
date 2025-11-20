@@ -6,6 +6,14 @@
   html {
     font-size: 14px;
   }
+  
+  /* Improve touch targets on mobile for interactive elements */
+  @media (max-width: 1024px) {
+    button:not(.icon-only):not([class*="p-"]):not([class*="px-"]):not([class*="py-"]),
+    a:not(.icon-only):not([class*="p-"]):not([class*="px-"]):not([class*="py-"]) {
+      padding: 0.75rem 1rem;
+    }
+  }
 }
 
 .rbc-event-label {

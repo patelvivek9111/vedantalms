@@ -113,16 +113,16 @@ export default function GroupDashboard() {
   }, [groupSetId]);
 
   return (
-    <div className="max-w-6xl mx-auto py-8 flex flex-col gap-4 bg-transparent">
+    <div className="max-w-6xl mx-auto py-4 sm:py-6 lg:py-8 flex flex-col gap-4 bg-transparent px-4 sm:px-6">
       {/* Simple Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4 px-1">
+      <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-500 dark:text-gray-400 mb-4 px-1">
         <Link to="/groups" className="hover:underline text-gray-700 dark:text-gray-300 font-medium">Group Management</Link>
         <span className="mx-1 text-gray-300 dark:text-gray-600">&gt;</span>
-        <span className="text-gray-700 dark:text-gray-300 font-semibold">{groupName}</span>
+        <span className="text-gray-700 dark:text-gray-300 font-semibold truncate">{groupName}</span>
       </div>
-      <div className="flex gap-8">
+      <div className="flex flex-col lg:flex-row gap-4 lg:gap-8">
         {/* Sidebar */}
-        <aside className="w-64 flex-shrink-0 bg-white dark:bg-gray-800 backdrop-blur rounded-2xl shadow-lg p-6 h-fit relative border border-gray-100 dark:border-gray-700 mt-2">
+        <aside className="w-full lg:w-64 flex-shrink-0 bg-white dark:bg-gray-800 backdrop-blur rounded-2xl shadow-lg p-4 sm:p-6 h-fit relative border border-gray-100 dark:border-gray-700 mt-2">
           {/* Dropdown header */}
           <div className="mb-8 border-b border-gray-200 dark:border-gray-700 pb-3 relative">
             {(isInstructor || isAdmin) ? (

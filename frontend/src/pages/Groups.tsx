@@ -3,7 +3,8 @@ import api from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCourse } from '../contexts/CourseContext';
-import { getUserPreferences } from '../services/api';
+import { getUserPreferences, getImageUrl } from '../services/api';
+import { ChangeUserModal } from '../components/ChangeUserModal';
 import { 
   Users, 
   Plus, 
@@ -18,7 +19,12 @@ import {
   BarChart3,
   Clock,
   CheckCircle,
-  XCircle
+  XCircle,
+  Menu,
+  Folder,
+  HelpCircle,
+  User as UserIcon,
+  LogOut
 } from 'lucide-react';
 
 interface Group {
@@ -54,8 +60,10 @@ const Groups: React.FC = () => {
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
   const [userCourseColors, setUserCourseColors] = useState<{ [key: string]: string }>({});
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, logout } = useAuth();
   const { courses } = useCourse();
+  const [showBurgerMenu, setShowBurgerMenu] = useState(false);
+  const [showChangeUserModal, setShowChangeUserModal] = useState(false);
 
   useEffect(() => {
     // Don't fetch if still loading auth or if user is not authenticated
@@ -351,79 +359,218 @@ const Groups: React.FC = () => {
   const stats = getStats();
 
   return (
-    <div className="max-w-6xl mx-auto py-8 px-4">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">{title}</h1>
-        <p className="text-gray-600 dark:text-gray-400">{subtitle}</p>
-      </div>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Top Navigation Bar (Mobile Only) */}
+      <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+        <div className="relative flex items-center justify-between px-4 py-3">
+          <button
+            onClick={() => setShowBurgerMenu(!showBurgerMenu)}
+            className="text-gray-700 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
+            aria-label="Open menu"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Groups</h1>
+          <div className="w-10"></div> {/* Spacer for centering */}
+          
+          {/* Burger Menu Dropdown */}
+          {showBurgerMenu && (
+            <>
+              {/* Overlay */}
+              <div
+                className="fixed inset-0 bg-black bg-opacity-50 z-[151]"
+                onClick={() => setShowBurgerMenu(false)}
+              />
+              {/* Menu */}
+              <div className="absolute top-full left-0 mt-2 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 w-[280px] z-[152] overflow-hidden">
+                {/* Profile Information */}
+                <div className="px-4 py-4 border-b border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center gap-3">
+                    <div className="relative flex-shrink-0">
+                      {user?.profilePicture ? (
+                        <img
+                          src={user.profilePicture.startsWith('http') 
+                            ? user.profilePicture 
+                            : getImageUrl(user.profilePicture)}
+                          alt={`${user.firstName} ${user.lastName}`}
+                          className="w-12 h-12 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                            if (fallback) {
+                              fallback.style.display = 'flex';
+                            }
+                          }}
+                        />
+                      ) : null}
+                      {/* Fallback avatar */}
+                      <div
+                        className={`w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-base font-bold ${
+                          user?.profilePicture ? 'hidden' : 'flex'
+                        }`}
+                        style={{
+                          display: user?.profilePicture ? 'none' : 'flex'
+                        }}
+                      >
+                        {user?.firstName?.charAt(0) || ''}{user?.lastName?.charAt(0) || 'U'}
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-gray-900 dark:text-gray-100 text-sm truncate">
+                        {user?.firstName} {user?.lastName}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        {user?.email}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Main Options */}
+                <div className="py-2">
+                  <button
+                    onClick={() => {
+                      setShowBurgerMenu(false);
+                      navigate('/account');
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+                  >
+                    <Folder className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                    <span>Files</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowBurgerMenu(false);
+                      navigate('/account');
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+                  >
+                    <Settings className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                    <span>Settings</span>
+                  </button>
+                </div>
+
+                {/* Separator */}
+                <div className="border-t border-gray-200 dark:border-gray-700"></div>
+
+                {/* Account Actions */}
+                <div className="py-2">
+                  <button
+                    onClick={() => {
+                      setShowBurgerMenu(false);
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+                  >
+                    <HelpCircle className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                    <span>Help</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowBurgerMenu(false);
+                      setShowChangeUserModal(true);
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+                  >
+                    <UserIcon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                    <span>Change User</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowBurgerMenu(false);
+                      logout();
+                      navigate('/login');
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+                  >
+                    <LogOut className="h-5 w-5" />
+                    <span>Log Out</span>
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </nav>
+      
+      <ChangeUserModal
+        isOpen={showChangeUserModal}
+        onClose={() => setShowChangeUserModal(false)}
+      />
+      
+      <div className="max-w-6xl mx-auto py-4 sm:py-6 lg:py-8 px-4 sm:px-6 pt-20 lg:pt-4">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="hidden lg:block text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">{title}</h1>
+          <p className="hidden lg:block text-sm sm:text-base text-gray-600 dark:text-gray-400">{subtitle}</p>
+          <p className="lg:hidden text-sm text-gray-600 dark:text-gray-400 mt-2">{subtitle}</p>
+        </div>
 
       {/* Statistics Cards - Only for Teachers */}
       {isTeacher && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <div 
-            className={`bg-white dark:bg-gray-800 rounded-lg shadow p-6 border-l-4 border-blue-500 dark:border-blue-400 cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 ${
+            className={`bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 border-l-4 border-blue-500 dark:border-blue-400 cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 ${
               selectedMetric === 'groupSets' ? 'ring-2 ring-blue-300 dark:ring-blue-600 shadow-lg' : ''
             }`}
             onClick={() => setSelectedMetric(selectedMetric === 'groupSets' ? null : 'groupSets')}
           >
             <div className="flex items-center">
               <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
-                <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                <Users className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 dark:text-blue-400" />
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Group Sets</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.totalGroupSets}</p>
+              <div className="ml-3 sm:ml-4">
+                <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Total Group Sets</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.totalGroupSets}</p>
               </div>
             </div>
           </div>
 
           <div 
-            className={`bg-white dark:bg-gray-800 rounded-lg shadow p-6 border-l-4 border-green-500 dark:border-green-400 cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 ${
+            className={`bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 border-l-4 border-green-500 dark:border-green-400 cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 ${
               selectedMetric === 'groups' ? 'ring-2 ring-green-300 dark:ring-green-600 shadow-lg' : ''
             }`}
             onClick={() => setSelectedMetric(selectedMetric === 'groups' ? null : 'groups')}
           >
             <div className="flex items-center">
               <div className="p-2 bg-green-100 dark:bg-green-900/50 rounded-lg">
-                <BarChart3 className="w-6 h-6 text-green-600 dark:text-green-400" />
+                <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-green-600 dark:text-green-400" />
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Groups</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.totalGroups}</p>
+              <div className="ml-3 sm:ml-4">
+                <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Total Groups</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.totalGroups}</p>
               </div>
             </div>
           </div>
 
           <div 
-            className={`bg-white dark:bg-gray-800 rounded-lg shadow p-6 border-l-4 border-purple-500 dark:border-purple-400 cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 ${
+            className={`bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 border-l-4 border-purple-500 dark:border-purple-400 cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 ${
               selectedMetric === 'members' ? 'ring-2 ring-purple-300 dark:ring-purple-600 shadow-lg' : ''
             }`}
             onClick={() => setSelectedMetric(selectedMetric === 'members' ? null : 'members')}
           >
             <div className="flex items-center">
               <div className="p-2 bg-purple-100 dark:bg-purple-900/50 rounded-lg">
-                <UserPlus className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                <UserPlus className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600 dark:text-purple-400" />
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Members</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.totalMembers}</p>
+              <div className="ml-3 sm:ml-4">
+                <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Total Members</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.totalMembers}</p>
               </div>
             </div>
           </div>
 
           <div 
-            className={`bg-white dark:bg-gray-800 rounded-lg shadow p-6 border-l-4 border-orange-500 dark:border-orange-400 cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 ${
+            className={`bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 border-l-4 border-orange-500 dark:border-orange-400 cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 ${
               selectedMetric === 'active' ? 'ring-2 ring-orange-300 dark:ring-orange-600 shadow-lg' : ''
             }`}
             onClick={() => setSelectedMetric(selectedMetric === 'active' ? null : 'active')}
           >
             <div className="flex items-center">
               <div className="p-2 bg-orange-100 dark:bg-orange-900/50 rounded-lg">
-                <CheckCircle className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+                <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600 dark:text-orange-400" />
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Sets</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.activeGroupSets}</p>
+              <div className="ml-3 sm:ml-4">
+                <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Active Sets</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.activeGroupSets}</p>
               </div>
             </div>
           </div>
@@ -431,26 +578,26 @@ const Groups: React.FC = () => {
       )}
 
       {/* Filters and Search */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 mb-8">
-        <div className="flex items-center justify-between mb-6">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 sm:p-6 mb-6 sm:mb-8">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-6 gap-4">
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-blue-50 dark:bg-blue-900/50 rounded-lg">
               <Filter className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             </div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Filters & Search</h2>
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100">Filters & Search</h2>
           </div>
           {isTeacher && (
             <button 
               onClick={() => navigate('/groups/create')}
-              className="bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-500 dark:to-blue-600 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-blue-800 dark:hover:from-blue-600 dark:hover:to-blue-700 transition-all duration-200 flex items-center space-x-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+              className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-500 dark:to-blue-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-xl hover:from-blue-700 hover:to-blue-800 dark:hover:from-blue-600 dark:hover:to-blue-700 transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
             >
               <Plus className="w-4 h-4" />
-              <span className="font-medium">Create Group Set</span>
+              <span className="font-medium text-sm sm:text-base">Create Group Set</span>
             </button>
           )}
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
           <div className="space-y-2">
             <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Search Groups</label>
             <div className="relative">
@@ -851,6 +998,7 @@ const Groups: React.FC = () => {
           </button>
         </div>
       )}
+      </div>
     </div>
   );
 };

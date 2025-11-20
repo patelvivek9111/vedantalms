@@ -102,8 +102,46 @@ exports.uploadProfilePicture = async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
+    
+    const { uploadToCloudinary, isCloudinaryConfigured, deleteFromCloudinary, extractPublicId } = require('../utils/cloudinary');
+    
     const userId = req.user._id;
-    const profilePictureUrl = `/uploads/${req.file.filename}`;
+    let profilePictureUrl;
+    
+    // Get current user to delete old profile picture if exists
+    const currentUser = await User.findById(userId);
+    
+    // Use Cloudinary if configured, otherwise use local storage
+    if (isCloudinaryConfigured()) {
+      try {
+        const result = await uploadToCloudinary(req.file, {
+          folder: 'lms/profile-pictures',
+          resource_type: 'image',
+          transformation: [
+            { width: 400, height: 400, crop: 'fill', gravity: 'face' } // Optimize for profile pictures
+          ]
+        });
+        profilePictureUrl = result.url;
+        
+        // Delete old profile picture from Cloudinary if it exists
+        if (currentUser.profilePicture && currentUser.profilePicture.includes('cloudinary.com')) {
+          const oldPublicId = extractPublicId(currentUser.profilePicture);
+          if (oldPublicId) {
+            try {
+              await deleteFromCloudinary(oldPublicId, 'image');
+            } catch (deleteErr) {
+              console.error('Error deleting old profile picture from Cloudinary:', deleteErr);
+            }
+          }
+        }
+      } catch (cloudinaryError) {
+        console.error('Cloudinary upload failed, falling back to local storage:', cloudinaryError);
+        profilePictureUrl = `/uploads/${req.file.filename}`;
+      }
+    } else {
+      profilePictureUrl = `/uploads/${req.file.filename}`;
+    }
+    
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       { profilePicture: profilePictureUrl },
