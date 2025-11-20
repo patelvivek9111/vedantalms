@@ -371,34 +371,10 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
                 <option key={mod._id} value={mod._id}>{mod.title}</option>
               ))}
             </select>
-          </div>
+        </div>
 
           {/* Action Buttons */}
           <div className="flex justify-end space-x-3 mt-6 pt-4 border-t dark:border-gray-700">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting || !title.trim() || !content.trim() || (isGroupDiscussion && !selectedGroupSet)}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 border border-transparent rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSubmitting ? 'Creating...' : 'Create Thread'}
-            </button>
-          </div>
-          </form>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default CreateThreadModal; 
-        <div className="flex justify-end space-x-3 p-6 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex-shrink-0">
           <button
             type="button"
             onClick={onClose}
@@ -408,12 +384,13 @@ export default CreateThreadModal;
           </button>
           <button
             type="submit"
-            form="create-thread-form"
             disabled={isSubmitting || !title.trim() || !content.trim() || (isGroupDiscussion && !selectedGroupSet)}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 border border-transparent rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? 'Creating...' : 'Create Thread'}
           </button>
+          </div>
+          </form>
         </div>
       </div>
     </div>
