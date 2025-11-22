@@ -1,99 +1,8 @@
 # CodeRabbit Configuration
 # This file configures CodeRabbit's code review behavior for your repository
 
-# Language settings
-language: en
-
-# Review settings
-reviews:
-  # Enable or disable reviews
-  enabled: true
-  
-  # Review types
-  review_type: full  # Options: full, brief, or diff
-  
-  # Paths to include/exclude from reviews
-  paths:
-    include:
-      - "**/*.js"
-      - "**/*.jsx"
-      - "**/*.ts"
-      - "**/*.tsx"
-      - "**/*.py"
-      - "**/*.java"
-      - "**/*.go"
-      - "**/*.rs"
-    exclude:
-      - "**/node_modules/**"
-      - "**/dist/**"
-      - "**/build/**"
-      - "**/*.min.js"
-      - "**/*.min.css"
-      - "**/package-lock.json"
-      - "**/yarn.lock"
-
-# Code quality checks
-quality:
-  # Enable code quality checks
-  enabled: true
-  
-  # Check for security vulnerabilities
-  security: true
-  
-  # Check for performance issues
-  performance: true
-  
-  # Check for best practices
-  best_practices: true
-  
-  # Check for code smells
-  code_smells: true
-
-# Pull request settings
-pull_requests:
-  # Automatically review pull requests
-  auto_review: true
-  
-  # Review on draft PRs
-  review_drafts: false
-  
-  # Minimum number of reviewers (CodeRabbit will still review)
-  min_reviewers: 0
-
-# Chat settings
-chat:
-  # Enable chat functionality
-  enabled: true
-  
-  # Allow asking questions about code
-  questions: true
-
-# Summaries
-summaries:
-  # Generate PR summaries
-  enabled: true
-  
-  # Include file change summary
-  file_summary: true
-  
-  # Include commit message suggestions
-  commit_suggestions: true
-
-# Ignore patterns (files/paths to skip)
-ignore:
-  - "**/node_modules/**"
-  - "**/dist/**"
-  - "**/build/**"
-  - "**/.git/**"
-  - "**/coverage/**"
-  - "**/*.min.js"
-  - "**/*.min.css"
-  - "**/package-lock.json"
-  - "**/yarn.lock"
-  - "**/.env*"
-  - "**/uploads/**"
-
 # Custom instructions for CodeRabbit
+# These instructions help CodeRabbit understand your codebase and review priorities
 instructions: |
   This is a Learning Management System (LMS) built with:
   - Frontend: React 18, TypeScript, Vite, Tailwind CSS
@@ -108,3 +17,16 @@ instructions: |
   - Express.js best practices
   - MongoDB query optimization
 
+# Paths to ignore during reviews
+ignore:
+  - "**/node_modules/**"
+  - "**/dist/**"
+  - "**/build/**"
+  - "**/.git/**"
+  - "**/coverage/**"
+  - "**/*.min.js"
+  - "**/*.min.css"
+  - "**/package-lock.json"
+  - "**/yarn.lock"
+  - "**/.env*"
+  - "**/uploads/**"
