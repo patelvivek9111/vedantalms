@@ -533,6 +533,12 @@ For issues, questions, or support, please open an issue on GitHub or contact the
 
 ---
 
+## 🤖 Code Quality
+
+This project uses [CodeRabbit](https://coderabbit.ai) for automated code reviews on pull requests. CodeRabbit provides AI-powered code analysis, security checks, and best practice recommendations to maintain high code quality standards.
+
+---
+
 ## 🙏 Acknowledgments
 
 Built with modern web technologies to provide an exceptional learning management experience.
