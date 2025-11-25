@@ -22,11 +22,90 @@ exports.createPage = async (req, res) => {
       });
     }
     const { title, module, groupSet, content } = req.body;
+    const userId = req.user._id || req.user.id;
+    
+    // Validate user ID
+    if (!userId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'User ID is required' 
+      });
+    }
+    
+    // Validate title
+    if (!title || !title.trim()) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Title is required and cannot be empty' 
+      });
+    }
+    
+    // Validate content
+    if (!content || !content.trim()) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Content is required and cannot be empty' 
+      });
+    }
+    
+    // Validate module or groupSet
+    if (!module && !groupSet) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Either module or groupSet is required' 
+      });
+    }
+    
+    // Validate ObjectIds if provided
+    if (module && !mongoose.Types.ObjectId.isValid(module)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid module ID format' 
+      });
+    }
+    
+    if (groupSet && !mongoose.Types.ObjectId.isValid(groupSet)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid groupSet ID format' 
+      });
+    }
+    
+    // Check authorization if module is provided
+    if (module) {
+      const foundModule = await Module.findById(module);
+      if (!foundModule) {
+        return res.status(404).json({ 
+          success: false, 
+          message: 'Module not found' 
+        });
+      }
+      
+      const course = await Course.findById(foundModule.course);
+      if (!course) {
+        return res.status(404).json({ 
+          success: false, 
+          message: 'Course not found' 
+        });
+      }
+      
+      if (req.user.role !== 'admin' && course.instructor.toString() !== userId.toString()) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Not authorized to add page to this module' 
+        });
+      }
+    }
+    
     let attachments = [];
     if (req.files && req.files.length > 0) {
       attachments = req.files.map(file => `/uploads/${file.filename}`);
     }
-    const pageData = { title, content, attachments };
+    const pageData = { 
+      title: title.trim(), 
+      content: content.trim(), 
+      attachments 
+    };
     if (module) pageData.module = module;
     if (groupSet) pageData.groupSet = groupSet;
     const page = await Page.create(pageData);
@@ -102,9 +181,22 @@ exports.getPagesByModule = async (req, res) => {
 // @access  Private
 exports.getPageById = async (req, res) => {
   try {
-    const page = await Page.findById(req.params.id);
+    const { id } = req.params;
+    
+    // Validate page ID
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid page ID format' 
+      });
+    }
+    
+    const page = await Page.findById(id);
     if (!page) {
-      return res.status(404).json({ success: false, message: 'Page not found' });
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Page not found' 
+      });
     }
     res.json({ success: true, data: page });
   } catch (err) {
@@ -136,6 +228,30 @@ exports.updatePage = async (req, res) => {
       });
     }
 
+    const userId = req.user._id || req.user.id;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+    
+    // Validate title if provided
+    if (title !== undefined && (!title || !title.trim())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Title cannot be empty'
+      });
+    }
+    
+    // Validate content if provided
+    if (content !== undefined && (!content || !content.trim())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Content cannot be empty'
+      });
+    }
+    
     // Get the module to check authorization
     const module = await Module.findById(page.module);
     if (!module) {
@@ -155,7 +271,7 @@ exports.updatePage = async (req, res) => {
     }
 
     // Check if user is authorized to update
-    if (req.user.role !== 'admin' && course.instructor.toString() !== req.user.id) {
+    if (req.user.role !== 'admin' && course.instructor.toString() !== userId.toString()) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to update this page'
@@ -163,15 +279,20 @@ exports.updatePage = async (req, res) => {
     }
 
     // Handle file attachments if any
-    let attachments = page.attachments;
+    let attachments = page.attachments || [];
     if (req.files && req.files.length > 0) {
       // Delete old attachments
-      for (const attachment of page.attachments) {
-        const filePath = path.join(__dirname, '..', attachment);
-        try {
-          await fs.unlink(filePath);
-        } catch (err) {
-          console.error('Error deleting old attachment:', err);
+      if (page.attachments && Array.isArray(page.attachments)) {
+        for (const attachment of page.attachments) {
+          if (attachment && typeof attachment === 'string') {
+            const filePath = path.join(__dirname, '..', attachment);
+            try {
+              await fs.promises.unlink(filePath);
+            } catch (err) {
+              // File might not exist, ignore error
+              console.error('Error deleting old attachment:', err);
+            }
+          }
         }
       }
       // Add new attachments
@@ -179,8 +300,12 @@ exports.updatePage = async (req, res) => {
     }
 
     // Update the page
-    page.title = title;
-    page.content = content;
+    if (title !== undefined) {
+      page.title = title.trim();
+    }
+    if (content !== undefined) {
+      page.content = content.trim();
+    }
     page.attachments = attachments;
     await page.save();
 

@@ -1,8 +1,44 @@
 const { QuizSession, QuizWave } = require('../models/quizwave.model');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
+const Course = require('../models/course.model');
 
 // Store active sessions in memory (for quick access)
 const activeSessions = new Map(); // gamePin -> session data
+
+// Simple rate limiting: track event counts per socket
+const rateLimitMap = new Map(); // socketId -> { eventCount, resetTime }
+const RATE_LIMIT_WINDOW = 60000; // 1 minute
+const RATE_LIMIT_MAX_EVENTS = 100; // max events per window
+
+// Helper function to check rate limit
+const checkRateLimit = (socketId) => {
+  const now = Date.now();
+  const limit = rateLimitMap.get(socketId);
+  
+  if (!limit || now > limit.resetTime) {
+    rateLimitMap.set(socketId, { eventCount: 1, resetTime: now + RATE_LIMIT_WINDOW });
+    return true;
+  }
+  
+  if (limit.eventCount >= RATE_LIMIT_MAX_EVENTS) {
+    return false;
+  }
+  
+  limit.eventCount++;
+  return true;
+};
+
+// Helper function to sanitize nickname (prevent XSS)
+const sanitizeNickname = (nickname) => {
+  if (!nickname || typeof nickname !== 'string') {
+    return null;
+  }
+  // Remove HTML tags and limit length
+  return nickname.trim()
+    .replace(/<[^>]*>/g, '')
+    .substring(0, 50);
+};
 
 // Authenticate socket connection
 const authenticateSocket = (socket, next) => {
@@ -14,8 +50,14 @@ const authenticateSocket = (socket, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-super-secret-jwt-key-123');
+    
+    // Validate decoded.id exists
+    if (!decoded.id) {
+      return next(new Error('Authentication error: Invalid token payload'));
+    }
+    
     socket.userId = decoded.id;
-    socket.userRole = decoded.role;
+    socket.userRole = decoded.role || 'student';
     next();
   } catch (error) {
     next(new Error('Authentication error: Invalid token'));
@@ -33,10 +75,24 @@ const initializeQuizWaveSocket = (io) => {
     // Join a game session (student)
     socket.on('quizwave:join', async (data) => {
       try {
+        // Rate limiting
+        if (!checkRateLimit(socket.id)) {
+          socket.emit('quizwave:error', { message: 'Too many requests. Please wait a moment.' });
+          return;
+        }
+
         const { gamePin, nickname } = data;
 
-        if (!gamePin || !nickname) {
-          socket.emit('quizwave:error', { message: 'Game PIN and nickname are required' });
+        // Validate gamePin format (should be 6-digit numeric string)
+        if (!gamePin || typeof gamePin !== 'string' || !/^\d{6}$/.test(gamePin)) {
+          socket.emit('quizwave:error', { message: 'Invalid game PIN format. Must be 6 digits.' });
+          return;
+        }
+
+        // Validate and sanitize nickname
+        const sanitizedNickname = sanitizeNickname(nickname);
+        if (!sanitizedNickname || sanitizedNickname.length === 0) {
+          socket.emit('quizwave:error', { message: 'Nickname is required and must be between 1-50 characters.' });
           return;
         }
 
@@ -47,6 +103,29 @@ const initializeQuizWaveSocket = (io) => {
 
         if (!session) {
           socket.emit('quizwave:error', { message: 'Session not found or has ended' });
+          return;
+        }
+
+        // Validate course exists
+        if (!session.course) {
+          socket.emit('quizwave:error', { message: 'Session course not found' });
+          return;
+        }
+
+        // Check if student is enrolled in course
+        const course = await Course.findById(session.course._id || session.course);
+        if (!course) {
+          socket.emit('quizwave:error', { message: 'Course not found' });
+          return;
+        }
+
+        // Verify student is enrolled (check students array)
+        const isEnrolled = course.students && course.students.some(
+          studentId => studentId.toString() === socket.userId.toString()
+        );
+        
+        if (!isEnrolled && socket.userRole !== 'admin' && socket.userRole !== 'teacher') {
+          socket.emit('quizwave:error', { message: 'You must be enrolled in this course to join the quiz session' });
           return;
         }
 
@@ -72,7 +151,7 @@ const initializeQuizWaveSocket = (io) => {
         // Add participant
         session.participants.push({
           student: socket.userId,
-          nickname: nickname.trim(),
+          nickname: sanitizedNickname,
           joinedAt: new Date()
         });
 
@@ -93,7 +172,7 @@ const initializeQuizWaveSocket = (io) => {
         // Notify all in room (including teacher)
         io.to(`quizwave:${gamePin}`).emit('quizwave:participant-joined', {
           participantCount: session.participants.length,
-          nickname,
+          nickname: sanitizedNickname,
           participants: session.participants.map(p => ({
             studentId: p.student.toString(),
             nickname: p.nickname,
@@ -104,7 +183,7 @@ const initializeQuizWaveSocket = (io) => {
         // Also notify teacher room specifically
         io.to(`quizwave:teacher:${gamePin}`).emit('quizwave:participant-joined', {
           participantCount: session.participants.length,
-          nickname,
+          nickname: sanitizedNickname,
           participants: session.participants.map(p => ({
             studentId: p.student.toString(),
             nickname: p.nickname,
@@ -128,7 +207,19 @@ const initializeQuizWaveSocket = (io) => {
     // Start game (teacher)
     socket.on('quizwave:start', async (data) => {
       try {
+        // Rate limiting
+        if (!checkRateLimit(socket.id)) {
+          socket.emit('quizwave:error', { message: 'Too many requests. Please wait a moment.' });
+          return;
+        }
+
         const { sessionId } = data;
+
+        // Validate sessionId is a valid ObjectId
+        if (!sessionId || !mongoose.Types.ObjectId.isValid(sessionId)) {
+          socket.emit('quizwave:error', { message: 'Invalid session ID format' });
+          return;
+        }
 
         const session = await QuizSession.findById(sessionId)
           .populate('quiz')
@@ -136,6 +227,18 @@ const initializeQuizWaveSocket = (io) => {
 
         if (!session) {
           socket.emit('quizwave:error', { message: 'Session not found' });
+          return;
+        }
+
+        // Validate quiz exists
+        if (!session.quiz) {
+          socket.emit('quizwave:error', { message: 'Quiz not found' });
+          return;
+        }
+
+        // Validate quiz has questions
+        if (!session.quiz.questions || session.quiz.questions.length === 0) {
+          socket.emit('quizwave:error', { message: 'Quiz has no questions' });
           return;
         }
 
@@ -207,7 +310,37 @@ const initializeQuizWaveSocket = (io) => {
     // Submit answer (student)
     socket.on('quizwave:answer', async (data) => {
       try {
+        // Rate limiting
+        if (!checkRateLimit(socket.id)) {
+          socket.emit('quizwave:error', { message: 'Too many requests. Please wait a moment.' });
+          return;
+        }
+
         const { sessionId, questionIndex, selectedOptions, timeTaken } = data;
+
+        // Validate sessionId is a valid ObjectId
+        if (!sessionId || !mongoose.Types.ObjectId.isValid(sessionId)) {
+          socket.emit('quizwave:error', { message: 'Invalid session ID format' });
+          return;
+        }
+
+        // Validate questionIndex is a number
+        if (typeof questionIndex !== 'number' || !Number.isInteger(questionIndex) || questionIndex < 0) {
+          socket.emit('quizwave:error', { message: 'Invalid question index' });
+          return;
+        }
+
+        // Validate selectedOptions is an array
+        if (!Array.isArray(selectedOptions)) {
+          socket.emit('quizwave:error', { message: 'Selected options must be an array' });
+          return;
+        }
+
+        // Validate timeTaken is a positive number
+        if (typeof timeTaken !== 'number' || timeTaken < 0 || !isFinite(timeTaken)) {
+          socket.emit('quizwave:error', { message: 'Invalid time taken value' });
+          return;
+        }
 
         if (!socket.gamePin) {
           socket.emit('quizwave:error', { message: 'Not in a session' });
@@ -217,6 +350,18 @@ const initializeQuizWaveSocket = (io) => {
         const session = await QuizSession.findById(sessionId).populate('quiz');
         if (!session) {
           socket.emit('quizwave:error', { message: 'Session not found' });
+          return;
+        }
+
+        // Validate quiz exists
+        if (!session.quiz) {
+          socket.emit('quizwave:error', { message: 'Quiz not found' });
+          return;
+        }
+
+        // Validate quiz has questions
+        if (!session.quiz.questions || session.quiz.questions.length === 0) {
+          socket.emit('quizwave:error', { message: 'Quiz has no questions' });
           return;
         }
 
@@ -240,12 +385,28 @@ const initializeQuizWaveSocket = (io) => {
           return;
         }
 
-        // Get question
+        // Validate questionIndex is within bounds
+        if (questionIndex >= session.quiz.questions.length) {
+          socket.emit('quizwave:error', { message: `Question index ${questionIndex} is out of bounds` });
+          return;
+        }
+
+        // Validate selectedOptions indices are within question bounds
         const question = session.quiz.questions[questionIndex];
         if (!question) {
           console.error('Question not found:', { questionIndex, totalQuestions: session.quiz.questions.length, sessionId });
           socket.emit('quizwave:error', { message: `Question not found at index ${questionIndex}` });
           return;
+        }
+
+        // Validate selectedOptions are valid integers within option bounds
+        if (question.options && question.options.length > 0) {
+          for (const optionIndex of selectedOptions) {
+            if (!Number.isInteger(optionIndex) || optionIndex < 0 || optionIndex >= question.options.length) {
+              socket.emit('quizwave:error', { message: `Invalid option index: ${optionIndex}` });
+              return;
+            }
+          }
         }
 
         // Check if correct
@@ -274,16 +435,24 @@ const initializeQuizWaveSocket = (io) => {
         let points = 0;
         if (isCorrect) {
           const maxTime = question.timeLimit * 1000; // Convert to milliseconds
-          // points = 500 * (1 - (time_taken / max_time))
-          points = 500 * (1 - (timeTaken / maxTime));
-          // Ensure points is not negative
-          if (points < 0) {
-            points = 0;
+          // Validate maxTime is positive to prevent division by zero
+          if (maxTime > 0) {
+            // points = 500 * (1 - (time_taken / max_time))
+            points = 500 * (1 - (timeTaken / maxTime));
+            // Ensure points is not negative
+            if (points < 0) {
+              points = 0;
+            }
           }
           // Add streak bonus
           points += (streak * 50);
         } else {
           // Incorrect answer = 0 points
+          points = 0;
+        }
+
+        // Validate points is finite
+        if (!isFinite(points) || isNaN(points)) {
           points = 0;
         }
 
@@ -326,11 +495,35 @@ const initializeQuizWaveSocket = (io) => {
     // Next question (teacher)
     socket.on('quizwave:next-question', async (data) => {
       try {
+        // Rate limiting
+        if (!checkRateLimit(socket.id)) {
+          socket.emit('quizwave:error', { message: 'Too many requests. Please wait a moment.' });
+          return;
+        }
+
         const { sessionId } = data;
+
+        // Validate sessionId is a valid ObjectId
+        if (!sessionId || !mongoose.Types.ObjectId.isValid(sessionId)) {
+          socket.emit('quizwave:error', { message: 'Invalid session ID format' });
+          return;
+        }
 
         const session = await QuizSession.findById(sessionId).populate('quiz');
         if (!session) {
           socket.emit('quizwave:error', { message: 'Session not found' });
+          return;
+        }
+
+        // Validate quiz exists
+        if (!session.quiz) {
+          socket.emit('quizwave:error', { message: 'Quiz not found' });
+          return;
+        }
+
+        // Validate quiz has questions
+        if (!session.quiz.questions || session.quiz.questions.length === 0) {
+          socket.emit('quizwave:error', { message: 'Quiz has no questions' });
           return;
         }
 
@@ -373,13 +566,24 @@ const initializeQuizWaveSocket = (io) => {
         session.currentQuestionIndex = nextIndex;
         await session.save();
 
+        // Validate nextIndex is within bounds
+        if (nextIndex >= quiz.questions.length) {
+          socket.emit('quizwave:error', { message: 'Next question index is out of bounds' });
+          return;
+        }
+
         const nextQuestion = quiz.questions[nextIndex];
+        if (!nextQuestion) {
+          socket.emit('quizwave:error', { message: 'Next question not found' });
+          return;
+        }
+
         const questionData = {
           questionIndex: nextIndex,
           questionText: nextQuestion.questionText,
           questionType: nextQuestion.questionType,
-          options: nextQuestion.options.map(opt => ({ text: opt.text })),
-          timeLimit: nextQuestion.timeLimit
+          options: nextQuestion.options ? nextQuestion.options.map(opt => ({ text: opt.text })) : [],
+          timeLimit: nextQuestion.timeLimit || 30
         };
 
         // Update active sessions
@@ -415,7 +619,19 @@ const initializeQuizWaveSocket = (io) => {
     // End session (teacher)
     socket.on('quizwave:end', async (data) => {
       try {
+        // Rate limiting
+        if (!checkRateLimit(socket.id)) {
+          socket.emit('quizwave:error', { message: 'Too many requests. Please wait a moment.' });
+          return;
+        }
+
         const { sessionId } = data;
+
+        // Validate sessionId is a valid ObjectId
+        if (!sessionId || !mongoose.Types.ObjectId.isValid(sessionId)) {
+          socket.emit('quizwave:error', { message: 'Invalid session ID format' });
+          return;
+        }
 
         const session = await QuizSession.findById(sessionId);
         if (!session) {
@@ -463,7 +679,19 @@ const initializeQuizWaveSocket = (io) => {
     // Teacher joins session room
     socket.on('quizwave:teacher-join', async (data) => {
       try {
+        // Rate limiting
+        if (!checkRateLimit(socket.id)) {
+          socket.emit('quizwave:error', { message: 'Too many requests. Please wait a moment.' });
+          return;
+        }
+
         const { gamePin } = data;
+
+        // Validate gamePin format
+        if (!gamePin || typeof gamePin !== 'string' || !/^\d{6}$/.test(gamePin)) {
+          socket.emit('quizwave:error', { message: 'Invalid game PIN format. Must be 6 digits.' });
+          return;
+        }
 
         const session = await QuizSession.findOne({ gamePin });
         if (!session) {
@@ -504,7 +732,19 @@ const initializeQuizWaveSocket = (io) => {
     // Get leaderboard (teacher)
     socket.on('quizwave:get-leaderboard', async (data) => {
       try {
+        // Rate limiting
+        if (!checkRateLimit(socket.id)) {
+          socket.emit('quizwave:error', { message: 'Too many requests. Please wait a moment.' });
+          return;
+        }
+
         const { sessionId } = data;
+
+        // Validate sessionId is a valid ObjectId
+        if (!sessionId || !mongoose.Types.ObjectId.isValid(sessionId)) {
+          socket.emit('quizwave:error', { message: 'Invalid session ID format' });
+          return;
+        }
 
         const session = await QuizSession.findById(sessionId);
         if (!session) {
@@ -537,6 +777,8 @@ const initializeQuizWaveSocket = (io) => {
     // Disconnect
     socket.on('disconnect', () => {
       console.log(`❌ QuizWave: User disconnected - ${socket.userId}`);
+      // Cleanup rate limiting data
+      rateLimitMap.delete(socket.id);
       // Cleanup handled by session management
     });
   });

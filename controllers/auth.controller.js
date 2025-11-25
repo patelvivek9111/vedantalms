@@ -149,7 +149,8 @@ exports.login = async (req, res) => {
 // @access  Private
 exports.getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
+    // Use _id for consistency with MongoDB (req.user is a Mongoose document)
+    const user = await User.findById(req.user._id || req.user.id);
     res.json({
       success: true,
       user: {
@@ -183,7 +184,7 @@ exports.getLoginActivity = async (req, res) => {
     startDate.setDate(startDate.getDate() - days);
 
     const query = { 
-      userId: req.user.id,
+      userId: req.user._id || req.user.id,
       timestamp: { $gte: startDate }
     };
 

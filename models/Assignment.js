@@ -126,4 +126,14 @@ const assignmentSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Add validation to ensure dueDate is after availableFrom
+assignmentSchema.pre('validate', function(next) {
+  if (this.availableFrom && this.dueDate) {
+    if (new Date(this.dueDate) <= new Date(this.availableFrom)) {
+      this.invalidate('dueDate', 'Due date must be after available from date');
+    }
+  }
+  next();
+});
+
 module.exports = mongoose.model('Assignment', assignmentSchema); 

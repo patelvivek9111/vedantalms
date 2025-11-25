@@ -20,6 +20,7 @@ import CourseDetail from './components/CourseDetail';
 import CourseForm from './components/CourseForm';
 import PageView from './components/PageView';
 import PageViewWrapper from './components/PageViewWrapper';
+import PageEditWrapper from './components/PageEditWrapper';
 import AssignmentList from './components/assignments/AssignmentList';
 import AssignmentDetails from './components/assignments/AssignmentDetails';
 import CreateAssignmentForm from './components/assignments/CreateAssignmentForm';
@@ -270,6 +271,16 @@ function AppContent() {
               <PrivateRoute>
                 <ModuleProvider>
                   <ModuleEditPage />
+                </ModuleProvider>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/courses/:courseId/pages/:pageId/edit"
+            element={
+              <PrivateRoute>
+                <ModuleProvider>
+                  <PageEditWrapper />
                 </ModuleProvider>
               </PrivateRoute>
             }

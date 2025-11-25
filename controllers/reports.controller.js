@@ -10,7 +10,14 @@ const Group = require('../models/Group');
 // Get all unique semesters that the student has courses in
 exports.getAvailableSemesters = async (req, res) => {
   try {
-    const studentId = req.user._id;
+    const studentId = req.user._id || req.user.id;
+    
+    if (!studentId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Student ID is required'
+      });
+    }
 
     // Find all courses the student is enrolled in
     // Include courses with or without semester info, we'll handle defaults later
@@ -75,13 +82,39 @@ exports.getAvailableSemesters = async (req, res) => {
 // Get student transcript for a specific semester
 exports.getStudentTranscript = async (req, res) => {
   try {
-    const studentId = req.user._id;
+    const studentId = req.user._id || req.user.id;
+    
+    if (!studentId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Student ID is required'
+      });
+    }
+    
     const { term, year } = req.query;
 
     if (!term || !year) {
       return res.status(400).json({
         success: false,
         message: 'Term and year are required'
+      });
+    }
+    
+    // Validate term
+    const validTerms = ['Fall', 'Spring', 'Summer', 'Winter'];
+    if (!validTerms.includes(term)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid term. Must be one of: ${validTerms.join(', ')}`
+      });
+    }
+    
+    // Validate year
+    const yearNum = parseInt(year);
+    if (isNaN(yearNum) || yearNum < 2000 || yearNum > 2100) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid year. Must be a number between 2000 and 2100'
       });
     }
 
@@ -117,8 +150,9 @@ exports.getStudentTranscript = async (req, res) => {
 
     // Filter courses by semester (including those with default semester)
     const courses = allCourses.filter(course => {
+      if (!course) return false;
       const courseSemester = getSemesterWithDefaults(course);
-      return courseSemester.term === term && courseSemester.year === parseInt(year);
+      return courseSemester.term === term && courseSemester.year === yearNum;
     });
 
     const courseGrades = [];
@@ -260,7 +294,16 @@ exports.getStudentTranscript = async (req, res) => {
       // Calculate final grade
       const gradeScale = course.gradeScale || [];
       const totalPercent = getWeightedGradeForStudent(studentId, course, allAssignments, grades, submissionMap);
-      const letterGrade = getLetterGrade(totalPercent, gradeScale);
+      
+      // Validate totalPercent is a finite number
+      if (!isFinite(totalPercent) || isNaN(totalPercent)) {
+        console.error(`Invalid grade calculation for course ${course._id}, student ${studentId}`);
+        // Continue with null grade instead of crashing
+      }
+      
+      const letterGrade = isFinite(totalPercent) && !isNaN(totalPercent) 
+        ? getLetterGrade(totalPercent, gradeScale) 
+        : 'N/A';
 
       // Extract course code from catalog or title
       const courseCode = course.catalog?.subject || course.title.split(' ')[0] || 'N/A';
@@ -269,12 +312,12 @@ exports.getStudentTranscript = async (req, res) => {
 
       courseGrades.push({
         courseId: course._id.toString(),
-        courseTitle: course.title,
+        courseTitle: course.title || 'Untitled Course',
         courseCode: courseCode,
         creditHours: creditHours,
-        finalGrade: totalPercent,
+        finalGrade: isFinite(totalPercent) && !isNaN(totalPercent) ? totalPercent : null,
         letterGrade: letterGrade,
-        semester: course.semester || { term, year: parseInt(year) }
+        semester: course.semester || { term, year: yearNum }
       });
     }
 

@@ -433,12 +433,39 @@ VITE_API_URL=https://vedantaed.com/api
 - `npm run dev` - Start development server with nodemon
 - `npm run build` - Build frontend
 - `npm run build:frontend` - Build frontend only
+- `npm test` - Run backend tests
+- `npm test:watch` - Run tests in watch mode
+- `npm test:coverage` - Run tests with coverage report
 
 **Frontend directory:**
 - `npm run dev` - Start Vite dev server
 - `npm run build` - Build for production
 - `npm run preview` - Preview production build
 - `npm run lint` - Run ESLint
+- `npm test` - Run frontend tests
+- `npm test:ui` - Run tests with UI
+- `npm test:coverage` - Run tests with coverage
+
+### Testing
+
+The application includes comprehensive testing setup:
+
+- **Automated Tests**: Jest (backend) and Vitest (frontend)
+- **Manual Testing Checklist**: See `MANUAL_TESTING_CHECKLIST.md`
+- **Testing Guide**: See `TESTING_GUIDE.md`
+- **Quick Start**: See `QUICK_TEST_START.md`
+
+**Quick Test Commands:**
+```bash
+# Backend tests
+npm test
+
+# Frontend tests
+cd frontend && npm test
+
+# Manual testing
+# Follow MANUAL_TESTING_CHECKLIST.md
+```
 
 ---
 

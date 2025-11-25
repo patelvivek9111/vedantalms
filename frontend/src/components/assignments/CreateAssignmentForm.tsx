@@ -424,6 +424,16 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
       setError('Total points is required for offline assignments');
       return;
     }
+    // For file-upload-only assignments (no questions), totalPoints is required
+    if (formData.allowStudentUploads && formData.questions.length === 0 && (!formData.totalPoints || formData.totalPoints <= 0)) {
+      setError('Total points is required for file upload assignments');
+      return;
+    }
+    // If not file-upload-only and not offline, require at least one question
+    if (!formData.allowStudentUploads && !formData.isOfflineAssignment && formData.questions.length === 0) {
+      setError('Please add at least one question or enable file uploads');
+      return;
+    }
 
     try {
       const formDataToSend = new FormData();
@@ -659,7 +669,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
               </div>
             </div>
 
-            {/* Graded Quiz Checkbox */}
+            {/* Assignment Options */}
             <div className="space-y-4">
               <div className="flex items-center">
                 <input
@@ -686,6 +696,25 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                 <label htmlFor="isOfflineAssignment" className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
                   Offline Assignment (Paper Based - manual grade entry)
                 </label>
+              </div>
+
+              {/* Allow Student Uploads Checkbox */}
+              <div className="flex items-start">
+                <input
+                  type="checkbox"
+                  id="allowStudentUploadsStep1"
+                  checked={formData.allowStudentUploads}
+                  onChange={(e) => setFormData({ ...formData, allowStudentUploads: e.target.checked })}
+                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600 rounded mt-0.5"
+                />
+                <div className="ml-2">
+                  <label htmlFor="allowStudentUploadsStep1" className="block text-sm font-medium text-gray-900 dark:text-gray-100 dark:text-gray-100">
+                    Allow students to upload files only
+                  </label>
+                  <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                    Students can submit assignments by uploading files (no questions required)
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -831,11 +860,11 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                 />
               </div>
             </div>
-            <div className="flex justify-end">
+            <div className="flex justify-end pt-4 pb-4 sm:pb-0">
               <button
                 type="button"
                 onClick={nextStep}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600"
+                className="inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600"
               >
                 Save & Continue
               </button>
@@ -871,66 +900,74 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                     Allow students to upload files
                   </label>
                 </div>
+                {formData.allowStudentUploads && (
+                  <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                    Students can submit assignments by uploading files only (no questions required)
+                  </p>
+                )}
                 {editMode && (
                   <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 dark:text-gray-400">
                     Debug: allowStudentUploads = {String(formData.allowStudentUploads)}
                   </div>
                 )}
               </div>
-              <div className="mt-3">
-                <label htmlFor="displayModeSingle" className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Assignment Display Mode</label>
-                <div className="mt-2 space-y-4">
-                  <div className="flex items-center">
-                    <input
-                      type="radio"
-                      id="displayModeSingle"
-                      name="displayMode"
-                      value="single"
-                      checked={formData.displayMode === 'single'}
-                      onChange={(e) => setFormData({ ...formData, displayMode: e.target.value as 'single' | 'scrollable' })}
-                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600 rounded"
-                    />
-                    <label htmlFor="displayModeSingle" className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
-                      Single Question View (one question at a time)
-                    </label>
-                  </div>
-                  <div className="flex items-center">
-                    <input
-                      type="radio"
-                      id="displayModeScrollable"
-                      name="displayMode"
-                      value="scrollable"
-                      checked={formData.displayMode === 'scrollable'}
-                      onChange={(e) => setFormData({ ...formData, displayMode: e.target.value as 'single' | 'scrollable' })}
-                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600 rounded"
-                    />
-                    <label htmlFor="displayModeScrollable" className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
-                      Scrollable View (all questions at once)
-                    </label>
+              {/* Only show display mode if not file-upload-only assignment */}
+              {(!formData.allowStudentUploads || formData.questions.length > 0) && (
+                <div className="mt-3">
+                  <label htmlFor="displayModeSingle" className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Assignment Display Mode</label>
+                  <div className="mt-2 space-y-4">
+                    <div className="flex items-center">
+                      <input
+                        type="radio"
+                        id="displayModeSingle"
+                        name="displayMode"
+                        value="single"
+                        checked={formData.displayMode === 'single'}
+                        onChange={(e) => setFormData({ ...formData, displayMode: e.target.value as 'single' | 'scrollable' })}
+                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600 rounded"
+                      />
+                      <label htmlFor="displayModeSingle" className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
+                        Single Question View (one question at a time)
+                      </label>
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        type="radio"
+                        id="displayModeScrollable"
+                        name="displayMode"
+                        value="scrollable"
+                        checked={formData.displayMode === 'scrollable'}
+                        onChange={(e) => setFormData({ ...formData, displayMode: e.target.value as 'single' | 'scrollable' })}
+                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600 rounded"
+                      />
+                      <label htmlFor="displayModeScrollable" className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
+                        Scrollable View (all questions at once)
+                      </label>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
-            <div className="flex justify-between">
+            <div className="flex flex-col sm:flex-row justify-between gap-3 sm:gap-0 pt-4 pb-4 sm:pb-0">
               <button
                 type="button"
                 onClick={prevStep}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-700 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:bg-gray-700 dark:hover:bg-gray-700"
+                className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
               >
                 Back
               </button>
-              <div className="space-x-2">
+              <div className="flex flex-col sm:flex-row gap-2 sm:space-x-2">
                 <button
                   type="button"
                   onClick={() => setPreview(!preview)}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-700 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:bg-gray-700 dark:hover:bg-gray-700"
+                  className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
                 >
                   {preview ? 'Edit' : 'Preview'}
                 </button>
                 <button
                   type="button"
                   onClick={nextStep}
-                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+                  className="inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600"
                 >
                   Continue
                 </button>
@@ -941,8 +978,89 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
         {/* Step 3: Questions & Files */}
         {currentStep === 3 && (
           <div className="space-y-6">
-            {/* For offline assignments, show simplified interface */}
-            {formData.isOfflineAssignment ? (
+            {/* For file-upload-only assignments (no questions) */}
+            {formData.allowStudentUploads && formData.questions.length === 0 && !formData.isOfflineAssignment ? (
+              <div className="space-y-6">
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <div className="flex items-start">
+                    <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <div>
+                      <h4 className="text-sm font-medium text-blue-900 dark:text-blue-200">File Upload Assignment</h4>
+                      <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">
+                        This assignment allows students to upload files only. No questions are required. Students will submit their work by uploading files.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Total Points Input for File Upload Assignments */}
+                <div>
+                  <label htmlFor="totalPoints" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Total Points <span className="text-red-500">*</span>
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      type="number"
+                      id="totalPoints"
+                      name="totalPoints"
+                      min="0"
+                      step="0.01"
+                      value={totalPointsInput}
+                      onChange={(e) => {
+                        const inputValue = e.target.value;
+                        setTotalPointsInput(inputValue);
+                        if (inputValue === '' || inputValue === null) {
+                          setFormData({ ...formData, totalPoints: 0 });
+                        } else {
+                          const value = parseFloat(inputValue);
+                          if (!isNaN(value) && value >= 0) {
+                            setFormData({ ...formData, totalPoints: value });
+                          }
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const value = parseFloat(e.target.value);
+                        if (isNaN(value) || value <= 0) {
+                          setTotalPointsInput('');
+                          setFormData({ ...formData, totalPoints: 0 });
+                        } else {
+                          setTotalPointsInput(value.toString());
+                          setFormData({ ...formData, totalPoints: value });
+                        }
+                      }}
+                      className="block w-full rounded-md border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2"
+                      placeholder="Enter total points (e.g., 100)"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Option to add questions if needed */}
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                  <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
+                    Want to add questions to this assignment? Click the button below to add questions.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newQuestion: Question = {
+                        id: Math.random().toString(36).substr(2, 9),
+                        type: 'text',
+                        text: '',
+                        points: 0
+                      };
+                      setFormData({ ...formData, questions: [...formData.questions, newQuestion] });
+                    }}
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Questions (Optional)
+                  </button>
+                </div>
+              </div>
+            ) : formData.isOfflineAssignment ? (
               <div className="space-y-6">
                 <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                   <div className="flex items-start">
@@ -1334,32 +1452,32 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
             )}
             
             {/* Navigation buttons for both offline and regular assignments */}
-            <div className="flex justify-between">
+            <div className="flex flex-col sm:flex-row justify-between gap-3 sm:gap-0 pt-4 pb-4 sm:pb-0">
               <button
                 type="button"
                 onClick={prevStep}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white hover:bg-gray-50 dark:bg-gray-700"
+                className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
               >
                 Back
               </button>
-              <div className="space-x-2">
+              <div className="flex flex-col sm:flex-row gap-2 sm:space-x-2">
                 <button
                   type="button"
                   onClick={() => setPreview(!preview)}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white hover:bg-gray-50 dark:bg-gray-700"
+                  className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
                 >
                   {preview ? 'Edit' : 'Preview'}
                 </button>
                 <button
                   type="button"
                   onClick={() => navigate(`/modules/${formData.moduleId}/assignments`)}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white hover:bg-gray-50 dark:bg-gray-700"
+                  className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+                  className="inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600"
                 >
                   {editMode 
                     ? (formData.isGradedQuiz ? 'Update Quiz' : 'Update Assignment')
@@ -1380,8 +1498,8 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
           </div>
           <div className="mt-4 space-y-2 text-sm text-gray-500 dark:text-gray-400">
             <p>Total Points: {formData.totalPoints}</p>
-            <p>Available From: {new Date(formData.availableFrom).toLocaleString()}</p>
-            <p>Due: {new Date(formData.dueDate).toLocaleString()}</p>
+            <p>Available From: {format(new Date(formData.availableFrom), 'MMM d, yyyy, h:mm a')}</p>
+            <p>Due: {format(new Date(formData.dueDate), 'MMM d, yyyy, h:mm a')}</p>
             {formData.allowStudentUploads && (
               <p className="text-blue-600 font-medium">✓ Students can upload files</p>
             )}

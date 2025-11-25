@@ -78,7 +78,10 @@ const submissionSchema = new mongoose.Schema({
     type: String
   },
   files: [{
-    type: String
+    type: mongoose.Schema.Types.Mixed // Can be String (URL) or Object {url, name, originalname}
+  }],
+  teacherFeedbackFiles: [{
+    type: mongoose.Schema.Types.Mixed // Can be String (URL) or Object {url, name, originalname}
   }],
   memberGrades: [{
     student: {
@@ -125,9 +128,9 @@ const submissionSchema = new mongoose.Schema({
 });
 
 // Compound index to ensure one submission per student per assignment for individual assignments
-// and one submission per group per assignment for group assignments
+// Note: For individual submissions, group should be null/undefined
 submissionSchema.index(
-  { assignment: 1, student: 1, group: 1 },
+  { assignment: 1, student: 1 },
   { 
     unique: true,
     partialFilterExpression: {
@@ -135,18 +138,21 @@ submissionSchema.index(
         { group: { $exists: false } },
         { group: null }
       ]
-    }
+    },
+    name: 'assignment_student_unique_individual'
   }
 );
 
 // Add a compound index for group submissions
+// Note: For group submissions, group must exist and not be null
 submissionSchema.index(
   { assignment: 1, group: 1 },
   { 
     unique: true,
     partialFilterExpression: {
       group: { $exists: true, $ne: null }
-    }
+    },
+    name: 'assignment_group_unique'
   }
 );
 

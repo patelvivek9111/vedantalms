@@ -11,11 +11,12 @@ const roleCheck = (roles) => {
         return res.status(401).json({ message: 'No authentication token, access denied' });
       }
 
-      // Verify token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      // Verify token (use fallback for safety)
+      const jwtSecret = process.env.JWT_SECRET || 'your-super-secret-jwt-key-123';
+      const decoded = jwt.verify(token, jwtSecret);
       
-      // Get user from database
-      const user = await User.findById(decoded.userId);
+      // Get user from database (JWT payload uses 'id' not 'userId')
+      const user = await User.findById(decoded.id || decoded.userId);
       
       if (!user) {
         return res.status(401).json({ message: 'User not found' });

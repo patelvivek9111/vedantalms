@@ -121,7 +121,11 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
         createdBy: a.createdBy,
         type: ((a as any).type === 'discussion' || (a as any).group === 'Discussions') ? 'discussion' : 'assignment',
         group: (a as any).group || 'Assignments',
-        totalPoints: (a as any).totalPoints || (a as any).points || 0,
+        totalPoints: (a as any).totalPoints !== undefined && (a as any).totalPoints !== null 
+          ? Number((a as any).totalPoints) 
+          : ((a as any).points !== undefined && (a as any).points !== null 
+            ? Number((a as any).points) 
+            : 0),
         published: (a as any).published !== undefined ? (a as any).published : true,
         replies: (a as any).replies || [],
         studentGrades: (a as any).studentGrades || [],
@@ -134,7 +138,7 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
         createdBy: d.author || { firstName: '', lastName: '' },
         type: 'discussion',
         group: d.group || 'Discussions',
-        totalPoints: d.totalPoints || 0,
+        totalPoints: (d.totalPoints !== undefined && d.totalPoints !== null) ? Number(d.totalPoints) : 0,
         published: d.published !== undefined ? d.published : true,
         replies: d.replies || [],
         studentGrades: d.studentGrades || [],
@@ -315,7 +319,11 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
       createdBy: item.createdBy || (item as any).author || { firstName: '', lastName: '' },
       type: ((item as any).type === 'discussion' || (item as any).group === 'Discussions') ? 'discussion' : 'assignment',
       group: (item as any).group || 'Assignments',
-      totalPoints: (item as any).totalPoints || (item as any).points || 0,
+      totalPoints: ((item as any).totalPoints !== undefined && (item as any).totalPoints !== null) 
+        ? Number((item as any).totalPoints) 
+        : (((item as any).points !== undefined && (item as any).points !== null) 
+          ? Number((item as any).points) 
+          : 0),
       published: (item as any).published !== undefined ? (item as any).published : true,
       replies: (item as any).replies || [],
       studentGrades: (item as any).studentGrades || [],
@@ -403,7 +411,7 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
                         </span>
                       )}
                       {dueDate && (
-                        <span>{format(dueDate, 'PPp')}</span>
+                        <span>{format(dueDate, 'MMM d, yyyy, h:mm a')}</span>
                       )}
                     </div>
                   </div>
@@ -515,7 +523,7 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
                           </div>
                         )}
                         <div className="md:hidden mt-1 text-xs text-gray-500 dark:text-gray-400">
-                          {dueDate ? format(dueDate, 'PPp') : '-'}
+                          {dueDate ? format(dueDate, 'MMM d, yyyy, h:mm a') : '-'}
                         </div>
                       </td>
                       {!isQuizzesView && (
@@ -558,7 +566,7 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
                           </div>
                         )}
                         <div className="md:hidden mt-1 text-xs text-gray-500 dark:text-gray-400">
-                          {dueDate ? format(dueDate, 'PPp') : '-'}
+                          {dueDate ? format(dueDate, 'MMM d, yyyy, h:mm a') : '-'}
                         </div>
                         <div className="lg:hidden mt-1">
                           {item.published ? (

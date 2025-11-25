@@ -93,7 +93,8 @@ exports.getSystemStats = async (req, res) => {
 
     // Determine system health based on various factors
     let systemHealth = 'good';
-    const storagePercentage = (storageUsedGB / storageTotalGB) * 100;
+    // Prevent division by zero
+    const storagePercentage = storageTotalGB > 0 ? (storageUsedGB / storageTotalGB) * 100 : 0;
     
     if (storagePercentage > 90) {
       systemHealth = 'critical';
@@ -134,7 +135,14 @@ exports.getSystemStats = async (req, res) => {
 // Get recent activity
 exports.getRecentActivity = async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 10;
+    let limit = parseInt(req.query.limit) || 10;
+    // Validate limit is a positive integer
+    if (isNaN(limit) || limit < 1) {
+      limit = 10;
+    }
+    if (limit > 100) {
+      limit = 100; // Cap at 100 for performance
+    }
     const activities = [];
 
     // Get recent user registrations
@@ -237,11 +245,15 @@ exports.getAnalytics = async (req, res) => {
   try {
     const { timeRange = '30d' } = req.query;
     
+    // Validate timeRange
+    const validTimeRanges = ['7d', '30d', '90d', '1y'];
+    const validatedTimeRange = validTimeRanges.includes(timeRange) ? timeRange : '30d';
+    
     // Calculate date range
     const now = new Date();
     let startDate = new Date();
     
-    switch (timeRange) {
+    switch (validatedTimeRange) {
       case '7d':
         startDate.setDate(now.getDate() - 7);
         break;
@@ -394,14 +406,21 @@ exports.getAllUsers = async (req, res) => {
     const { role, status, search } = req.query;
     
     const query = {};
-    if (role && role !== 'all') {
+    
+    // Validate role
+    const validRoles = ['student', 'teacher', 'admin'];
+    if (role && role !== 'all' && validRoles.includes(role)) {
       query.role = role;
     }
-    if (search) {
+    
+    // Sanitize search input to prevent ReDoS
+    if (search && typeof search === 'string' && search.trim().length > 0) {
+      // Limit search length and escape special regex characters
+      const sanitizedSearch = search.trim().substring(0, 100).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       query.$or = [
-        { firstName: { $regex: search, $options: 'i' } },
-        { lastName: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } }
+        { firstName: { $regex: sanitizedSearch, $options: 'i' } },
+        { lastName: { $regex: sanitizedSearch, $options: 'i' } },
+        { email: { $regex: sanitizedSearch, $options: 'i' } }
       ];
     }
     
@@ -479,7 +498,8 @@ exports.getAllUsers = async (req, res) => {
     
     // Filter by status if provided
     let filteredUsers = usersWithStatus;
-    if (status && status !== 'all') {
+    const validStatuses = ['active', 'inactive'];
+    if (status && status !== 'all' && validStatuses.includes(status)) {
       filteredUsers = usersWithStatus.filter(u => u.status === status);
     }
 
@@ -503,14 +523,24 @@ exports.getAllCourses = async (req, res) => {
     const { status, published, search } = req.query;
     
     const query = {};
+    
+    // Validate published parameter
     if (published && published !== 'all') {
-      query.published = published === 'published';
+      if (published === 'published' || published === 'true') {
+        query.published = true;
+      } else if (published === 'unpublished' || published === 'false') {
+        query.published = false;
+      }
     }
-    if (search) {
+    
+    // Sanitize search input to prevent ReDoS
+    if (search && typeof search === 'string' && search.trim().length > 0) {
+      // Limit search length and escape special regex characters
+      const sanitizedSearch = search.trim().substring(0, 100).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       query.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { 'catalog.courseCode': { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } }
+        { title: { $regex: sanitizedSearch, $options: 'i' } },
+        { 'catalog.courseCode': { $regex: sanitizedSearch, $options: 'i' } },
+        { description: { $regex: sanitizedSearch, $options: 'i' } }
       ];
     }
     
@@ -554,7 +584,8 @@ exports.getAllCourses = async (req, res) => {
     
     // Filter by status if provided
     let filteredCourses = coursesWithStats;
-    if (status && status !== 'all') {
+    const validStatuses = ['active', 'draft'];
+    if (status && status !== 'all' && validStatuses.includes(status)) {
       filteredCourses = coursesWithStats.filter(c => c.status === status);
     }
 
@@ -622,6 +653,7 @@ exports.getSecurityStats = async (req, res) => {
     if (failedLogins > 0) {
       // Deduct up to 30 points based on failed login ratio
       const totalAttempts = await LoginActivity.countDocuments({ timestamp: { $gte: thirtyDaysAgo } });
+      // Prevent division by zero
       if (totalAttempts > 0) {
         const failureRate = (failedLogins / totalAttempts) * 100;
         securityScore -= Math.min(30, failureRate / 10);
@@ -658,7 +690,14 @@ exports.getSecurityStats = async (req, res) => {
 // @access  Private (Admin)
 exports.getSecurityEvents = async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 50;
+    let limit = parseInt(req.query.limit) || 50;
+    // Validate limit is a positive integer
+    if (isNaN(limit) || limit < 1) {
+      limit = 50;
+    }
+    if (limit > 500) {
+      limit = 500; // Cap at 500 for performance
+    }
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     
@@ -672,20 +711,24 @@ exports.getSecurityEvents = async (req, res) => {
     
     // Convert to security events format
     const events = activities.map((activity) => {
+      if (!activity) return null;
+      
       let type = 'login_attempt';
       let severity = 'low';
       let description = '';
       
       if (activity.success) {
-        if (activity.userId) {
+        if (activity.userId && activity.userId.firstName && activity.userId.lastName && activity.userId.email) {
           description = `Successful login: ${activity.userId.firstName} ${activity.userId.lastName} (${activity.userId.email})`;
+        } else if (activity.userId && activity.userId.email) {
+          description = `Successful login: ${activity.userId.email}`;
         } else {
           description = 'Successful login';
         }
       } else {
         type = 'failed_login';
         severity = 'medium';
-        if (activity.userId) {
+        if (activity.userId && activity.userId.email) {
           description = `Failed login attempt: ${activity.userId.email} - ${activity.failureReason || 'Invalid credentials'}`;
         } else {
           description = `Failed login attempt: ${activity.failureReason || 'User not found'}`;
@@ -693,15 +736,15 @@ exports.getSecurityEvents = async (req, res) => {
       }
       
       return {
-        id: activity._id.toString(),
+        id: activity._id ? activity._id.toString() : '',
         type,
         description,
-        timestamp: activity.timestamp.toISOString(),
+        timestamp: activity.timestamp ? activity.timestamp.toISOString() : new Date().toISOString(),
         severity,
-        ipAddress: activity.ipAddress,
-        userAgent: activity.userAgent
+        ipAddress: activity.ipAddress || 'Unknown',
+        userAgent: activity.userAgent || 'Unknown'
       };
-    });
+    }).filter(event => event !== null);
     
     res.json({
       success: true,

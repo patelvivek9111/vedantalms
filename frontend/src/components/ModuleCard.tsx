@@ -121,7 +121,12 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
 
   const handlePageClick = (e: React.MouseEvent, pageId: string) => {
     e.stopPropagation();
-    navigate(`/pages/${pageId}`);
+    // Navigate to page view with courseId to show sidebar
+    if (module.course) {
+      navigate(`/courses/${module.course}/pages/${pageId}`);
+    } else {
+      navigate(`/pages/${pageId}`);
+    }
   };
 
   const handleAddPageClick = (e: React.MouseEvent) => {
@@ -289,7 +294,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
                       <button
                         onClick={e => {
                           e.stopPropagation();
-                          navigate(`/pages/${page._id}/edit`);
+                          navigate(`/courses/${module.course}/pages/${page._id}/edit`);
                         }}
                         className="p-1.5 sm:p-1 hover:bg-yellow-100 dark:hover:bg-yellow-900/50 active:bg-yellow-200 dark:active:bg-yellow-900/70 rounded text-yellow-600 dark:text-yellow-400 touch-manipulation"
                         title="Edit Page"
@@ -369,9 +374,25 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
                           <div className="min-w-0 flex-1">
                             <span className="block group-hover:text-green-600 dark:group-hover:text-green-400 text-gray-900 dark:text-gray-100 text-xs sm:text-sm md:text-base truncate">{a.title}</span>
                             <span className="text-xs text-gray-500 dark:text-gray-400">
-                              ({a.isOfflineAssignment && a.totalPoints 
-                                ? a.totalPoints 
-                                : (a.questions ? a.questions.reduce((sum: number, q: any) => sum + (q.points || 0), 0) : (a.totalPoints || 0))} pts)
+                              {(() => {
+                                const hasQuestions = a.questions && Array.isArray(a.questions) && a.questions.length > 0;
+                                let points = 0;
+                                
+                                if (a.isOfflineAssignment && a.totalPoints !== undefined && a.totalPoints !== null) {
+                                  points = Number(a.totalPoints);
+                                } else if (a.allowStudentUploads && !hasQuestions && a.totalPoints !== undefined && a.totalPoints !== null) {
+                                  // File-upload-only assignment
+                                  points = Number(a.totalPoints);
+                                } else if (hasQuestions) {
+                                  // Calculate from questions
+                                  points = a.questions.reduce((sum: number, q: any) => sum + (q.points || 0), 0);
+                                } else if (a.totalPoints !== undefined && a.totalPoints !== null) {
+                                  // Fallback to stored totalPoints
+                                  points = Number(a.totalPoints);
+                                }
+                                
+                                return `(${points} pts)`;
+                              })()}
                             </span>
                           </div>
                         </div>

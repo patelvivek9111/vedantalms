@@ -10,8 +10,42 @@ exports.createAssignment = async (req, res) => {
   try {
     const { title, description, moduleId, availableFrom, dueDate, questions, group } = req.body;
     
+    // Validate required fields
+    if (!title || !title.trim()) {
+      return res.status(400).json({ message: 'Title is required' });
+    }
+    if (!description || !description.trim()) {
+      return res.status(400).json({ message: 'Description is required' });
+    }
+    if (!availableFrom) {
+      return res.status(400).json({ message: 'Available from date is required' });
+    }
+    if (!dueDate) {
+      return res.status(400).json({ message: 'Due date is required' });
+    }
+    
+    // Validate that due date is after available from date
+    const availableFromDate = new Date(availableFrom);
+    const dueDateDate = new Date(dueDate);
+    if (dueDateDate <= availableFromDate) {
+      return res.status(400).json({ message: 'Due date must be after available from date' });
+    }
+    
     // Get file URLs from uploaded files
     const attachments = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
+    
+    // Parse questions safely
+    let parsedQuestions = [];
+    if (questions) {
+      try {
+        parsedQuestions = JSON.parse(questions);
+        if (!Array.isArray(parsedQuestions)) {
+          return res.status(400).json({ message: 'Questions must be an array' });
+        }
+      } catch (parseError) {
+        return res.status(400).json({ message: 'Invalid questions format. Must be valid JSON array.' });
+      }
+    }
     
     // Build assignment data object
     const assignmentData = {
@@ -21,7 +55,7 @@ exports.createAssignment = async (req, res) => {
       dueDate,
       attachments,
       createdBy: req.user._id,
-      questions: questions ? JSON.parse(questions) : [],
+      questions: parsedQuestions,
       isGroupAssignment: req.body.isGroupAssignment === 'true' || req.body.isGroupAssignment === true,
       groupSet: req.body.groupSet || null,
       group,
@@ -136,6 +170,29 @@ exports.updateAssignment = async (req, res) => {
           console.error('Error deleting file:', err);
         }
       }));
+    }
+    
+    // Validate dates if both are being updated
+    if (availableFrom && dueDate) {
+      const availableFromDate = new Date(availableFrom);
+      const dueDateDate = new Date(dueDate);
+      if (dueDateDate <= availableFromDate) {
+        return res.status(400).json({ message: 'Due date must be after available from date' });
+      }
+    } else if (availableFrom && assignment.dueDate) {
+      // Only availableFrom is being updated
+      const availableFromDate = new Date(availableFrom);
+      const dueDateDate = new Date(assignment.dueDate);
+      if (dueDateDate <= availableFromDate) {
+        return res.status(400).json({ message: 'Due date must be after available from date' });
+      }
+    } else if (dueDate && assignment.availableFrom) {
+      // Only dueDate is being updated
+      const availableFromDate = new Date(assignment.availableFrom);
+      const dueDateDate = new Date(dueDate);
+      if (dueDateDate <= availableFromDate) {
+        return res.status(400).json({ message: 'Due date must be after available from date' });
+      }
     }
     
     // Update the assignment
@@ -393,10 +450,19 @@ exports.getStudentAssignmentsDueThisWeek = async (req, res) => {
     const weekStart = startOfWeek(now, { weekStartsOn: 1 });
     const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
     
-
+    // First, get all courses the student is enrolled in
+    const Course = require('../models/course.model');
+    const courses = await Course.find({ students: userId, published: true }).select('_id');
+    const courseIds = courses.map(c => c._id);
     
-    // Find assignments where dueDate is this week and user is enrolled
+    // Get all modules for these courses
+    const Module = require('../models/module.model');
+    const modules = await Module.find({ course: { $in: courseIds } }).select('_id');
+    const moduleIds = modules.map(m => m._id);
+    
+    // Find assignments where dueDate is this week, user is enrolled, and assignment is published
     const assignments = await Assignment.find({
+      module: { $in: moduleIds },
       dueDate: { $gte: weekStart, $lte: weekEnd },
       published: true,
     })
@@ -409,8 +475,6 @@ exports.getStudentAssignmentsDueThisWeek = async (req, res) => {
       })
       .sort({ dueDate: 1 })
       .lean();
-    
-    
     
     // Filter out assignments already submitted by this student
     const Submission = require('../models/Submission');
@@ -457,8 +521,19 @@ exports.getAllItemsDueThisWeek = async (req, res) => {
     const weekStart = startOfWeek(now, { weekStartsOn: 1 });
     const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
     
-    // Find assignments where dueDate is this week and user is enrolled
+    // First, get all courses the student is enrolled in
+    const Course = require('../models/course.model');
+    const courses = await Course.find({ students: userId, published: true }).select('_id');
+    const courseIds = courses.map(c => c._id);
+    
+    // Get all modules for these courses
+    const Module = require('../models/module.model');
+    const modules = await Module.find({ course: { $in: courseIds } }).select('_id');
+    const moduleIds = modules.map(m => m._id);
+    
+    // Find assignments where dueDate is this week, user is enrolled, and assignment is published
     const assignments = await Assignment.find({
+      module: { $in: moduleIds },
       dueDate: { $gte: weekStart, $lte: weekEnd },
       published: true,
     })
@@ -475,6 +550,7 @@ exports.getAllItemsDueThisWeek = async (req, res) => {
     // Find discussions where dueDate is this week and user is enrolled
     const Thread = require('../models/thread.model');
     const discussions = await Thread.find({
+      module: { $in: moduleIds },
       dueDate: { $gte: weekStart, $lte: weekEnd },
       published: true,
     })

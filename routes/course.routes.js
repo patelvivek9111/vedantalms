@@ -121,9 +121,10 @@ router.get('/:courseId/enrollment-requests', protect, async (req, res) => {
     
 
     // Check if user has access to the course (instructor or admin)
+    const userId = req.user._id || req.user.id;
     if (req.user.role === 'student' && 
-        !course.students.some(student => student._id.toString() === req.user.id) &&
-        course.instructor.toString() !== req.user.id) {
+        !course.students.some(student => student._id.toString() === userId.toString()) &&
+        course.instructor.toString() !== userId.toString()) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to access this course'
@@ -169,9 +170,10 @@ router.get('/:courseId/waitlist', protect, async (req, res) => {
     }
     
     // Check if user has access to the course (instructor or admin)
+    const userId = req.user._id || req.user.id;
     if (req.user.role === 'student' && 
-        !course.students.some(student => student._id.toString() === req.user.id) &&
-        course.instructor.toString() !== req.user.id) {
+        !course.students.some(student => student._id.toString() === userId.toString()) &&
+        course.instructor.toString() !== userId.toString()) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to access this course'
@@ -248,7 +250,7 @@ router.get('/:courseId/students', protect, async (req, res) => {
 router.get('/:courseId/enrollment-status', protect, async (req, res) => {
   try {
     const { courseId } = req.params;
-    const userId = req.user.id;
+    const userId = req.user._id || req.user.id;
     
     // Validate courseId
     if (!mongoose.Types.ObjectId.isValid(courseId)) {
@@ -325,7 +327,7 @@ router.post('/:id/enroll-teacher', protect, authorize('teacher', 'admin'), enrol
 router.post('/:courseId/unenroll-self', protect, async (req, res) => {
   try {
     const { courseId } = req.params;
-    const studentId = req.user.id;
+    const studentId = req.user._id || req.user.id;
     
     // Validate courseId
     if (!mongoose.Types.ObjectId.isValid(courseId)) {
@@ -429,13 +431,14 @@ router.post('/:id/enroll', protect, async (req, res) => {
     
     
     // Check if already enrolled
-    if (course.students.includes(req.user.id)) {
+    const userId = req.user._id || req.user.id;
+    if (course.students.some(id => id.toString() === userId.toString())) {
       return res.status(400).json({ success: false, message: 'Already enrolled in this course' });
     }
     
     // Check if there's already a pending enrollment request
     const existingRequest = course.enrollmentRequests.find(
-      request => request.student.toString() === req.user.id && request.status === 'pending'
+      request => request.student.toString() === userId.toString() && request.status === 'pending'
     );
     
     if (existingRequest) {
@@ -448,7 +451,7 @@ router.post('/:id/enroll', protect, async (req, res) => {
       // Course is full - check if user is a teacher who can override capacity
       if (req.user.role === 'teacher') {
         // Teacher can override capacity - enroll directly
-        course.students.push(req.user.id);
+        course.students.push(userId);
         await course.save();
         
         // Create or update consolidated enrollment notification for instructor
@@ -464,14 +467,14 @@ router.post('/:id/enroll', protect, async (req, res) => {
         // Regular student - add to waitlist
         const waitlistPosition = course.waitlist.length + 1;
         course.waitlist.push({
-          student: req.user.id,
+          student: userId,
           position: waitlistPosition,
           addedDate: new Date()
         });
         
         // Add to enrollmentRequests with waitlisted status for teacher to see
         course.enrollmentRequests.push({
-          student: req.user.id,
+          student: userId,
           status: 'waitlisted',
           requestDate: new Date()
         });
@@ -494,7 +497,7 @@ router.post('/:id/enroll', protect, async (req, res) => {
     }
     
     // Course has space - enroll student directly
-    course.students.push(req.user.id);
+    course.students.push(userId);
     
     await course.save();
     

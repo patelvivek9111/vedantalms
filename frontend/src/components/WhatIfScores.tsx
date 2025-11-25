@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { calculateFinalGradeWithWeightedGroups, getLetterGrade } from '../utils/gradeUtils';
+import { calculateFinalGradeWithWeightedGroups } from '../utils/gradeUtils';
 
 interface WhatIfScoresProps {
   course: any;

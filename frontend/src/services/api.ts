@@ -20,7 +20,8 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
-    if (token) {
+    // Only add token if it exists and is not null/empty
+    if (token && token.trim() !== '') {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -81,35 +82,57 @@ export const updateOverviewConfig = async (courseId: string, config: {
   showLatestAnnouncements?: boolean;
   numberOfAnnouncements?: number;
 }) => {
-  const token = localStorage.getItem('token');
-  const response = await api.put(`/courses/${courseId}/overview-config`, config, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+  // Validate courseId
+  if (!courseId || typeof courseId !== 'string' || courseId.trim() === '') {
+    throw new Error('Invalid course ID');
+  }
+
+  // Validate numberOfAnnouncements if provided
+  if (config.numberOfAnnouncements !== undefined) {
+    if (!Number.isInteger(config.numberOfAnnouncements) || 
+        config.numberOfAnnouncements < 1 || 
+        config.numberOfAnnouncements > 10) {
+      throw new Error('Number of announcements must be between 1 and 10');
+    }
+  }
+
+  // Use api instance which already has token interceptor
+  const response = await api.put(`/courses/${courseId}/overview-config`, config);
   return response.data;
 };
 
 // Utility function to get full image URL for uploaded files
 export const getImageUrl = (filename: string): string => {
-  if (!filename) return '';
-  if (filename.startsWith('http')) return filename;
+  // Validate input
+  if (!filename || typeof filename !== 'string') {
+    return '';
+  }
+
+  // Sanitize filename to prevent path traversal
+  const sanitizedFilename = filename.replace(/\.\./g, '').replace(/[^a-zA-Z0-9._/-]/g, '');
+
+  // If already a full URL, return as-is
+  if (sanitizedFilename.startsWith('http://') || sanitizedFilename.startsWith('https://')) {
+    return sanitizedFilename;
+  }
   
   // If API_URL is empty (relative URL), use relative path
   if (!API_URL || API_URL === '') {
     // If the path already includes /uploads/, use as-is
-    if (filename.startsWith('/uploads/')) {
-      return filename;
+    if (sanitizedFilename.startsWith('/uploads/')) {
+      return sanitizedFilename;
     }
     // Otherwise, prepend /uploads/
-    return `/uploads/${filename}`;
+    return `/uploads/${sanitizedFilename}`;
   }
   
   // If API_URL is set, construct full URL
   // If the path already includes /uploads/, just prepend the base URL
-  if (filename.startsWith('/uploads/')) {
-    return `${API_URL}${filename}`;
+  if (sanitizedFilename.startsWith('/uploads/')) {
+    return `${API_URL}${sanitizedFilename}`;
   }
   // Otherwise, assume it's just a filename and prepend /uploads/
-  return `${API_URL}/uploads/${filename}`;
+  return `${API_URL}/uploads/${sanitizedFilename}`;
 };
 
 export default api; 

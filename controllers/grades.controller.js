@@ -10,7 +10,11 @@ const { calculateFinalGradeWithWeightedGroups, getWeightedGradeForStudent, getLe
 exports.getStudentCourseGrade = async (req, res) => {
   try {
     const courseId = req.params.courseId;
-    const studentId = req.user._id;
+    const studentId = req.user._id || req.user.id;
+    
+    if (!studentId) {
+      return res.status(400).json({ message: 'Student ID is required' });
+    }
 
     // Fetch course with groups and gradeScale
     const course = await Course.findById(courseId);
@@ -168,7 +172,11 @@ exports.getStudentCourseGrade = async (req, res) => {
 exports.getStudentCourseGradeLegacy = async (req, res) => {
   try {
     const courseId = req.params.courseId;
-    const studentId = req.user._id;
+    const studentId = req.user._id || req.user.id;
+    
+    if (!studentId) {
+      return res.status(400).json({ message: 'Student ID is required' });
+    }
 
     // Fetch course with groups and gradeScale
     const course = await Course.findById(courseId);
@@ -487,8 +495,8 @@ exports.getCourseClassAverage = async (req, res) => {
         // Calculate weighted grade
         const totalPercent = getWeightedGradeForStudent(studentId.toString(), course, allAssignments, grades, submissionMap);
         
-        // Only include if grade is valid (not NaN)
-        if (!isNaN(totalPercent) && isFinite(totalPercent)) {
+        // Only include if grade is valid (not NaN, not Infinity, and is a number)
+        if (typeof totalPercent === 'number' && !isNaN(totalPercent) && isFinite(totalPercent) && totalPercent >= 0) {
           studentGrades.push(totalPercent);
         }
       } catch (error) {
@@ -502,8 +510,20 @@ exports.getCourseClassAverage = async (req, res) => {
       return res.json({ average: null, studentCount: students.length, gradedCount: 0 });
     }
 
-    const sum = studentGrades.reduce((acc, grade) => acc + grade, 0);
+    const sum = studentGrades.reduce((acc, grade) => {
+      // Validate each grade is a valid number
+      if (typeof grade === 'number' && isFinite(grade)) {
+        return acc + grade;
+      }
+      return acc;
+    }, 0);
+    
     const average = sum / studentGrades.length;
+    
+    // Validate average is a valid number
+    if (!isFinite(average) || isNaN(average)) {
+      return res.json({ average: null, studentCount: students.length, gradedCount: studentGrades.length });
+    }
 
     res.json({ 
       average: Math.round(average * 100) / 100, // Round to 2 decimal places

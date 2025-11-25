@@ -86,8 +86,14 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const getCourse = async (id: string): Promise<Course> => {
-    if (!id || id === 'undefined' || id === 'null') {
+    // Validate ID
+    if (!id || typeof id !== 'string' || id.trim() === '' || id === 'undefined' || id === 'null') {
       throw new Error('Invalid course ID');
+    }
+
+    // Validate ObjectId format (24 hex characters)
+    if (!/^[a-fA-F0-9]{24}$/.test(id.trim())) {
+      throw new Error('Invalid course ID format');
     }
     
     try {
@@ -109,12 +115,26 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const createCourse = async (title: string, description: string, catalogData?: any, semesterData?: any) => {
+    // Validate inputs
+    if (!title || typeof title !== 'string' || title.trim().length === 0) {
+      throw new Error('Course title is required');
+    }
+
+    if (!description || typeof description !== 'string' || description.trim().length === 0) {
+      throw new Error('Course description is required');
+    }
+
+    // Validate title length
+    if (title.trim().length > 200) {
+      throw new Error('Course title must be 200 characters or less');
+    }
+
     try {
       setLoading(true);
       setError(null);
       const response = await api.post('/courses', { 
-        title, 
-        description,
+        title: title.trim(), 
+        description: description.trim(),
         catalog: catalogData,
         semester: semesterData
       });
@@ -133,12 +153,39 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const updateCourse = async (id: string, title?: string, description?: string, catalogData?: any, semesterData?: any, defaultColor?: string) => {
+    // Validate ID
+    if (!id || typeof id !== 'string' || id.trim() === '' || id === 'undefined' || id === 'null') {
+      throw new Error('Invalid course ID');
+    }
+
+    // Validate ObjectId format
+    if (!/^[a-fA-F0-9]{24}$/.test(id.trim())) {
+      throw new Error('Invalid course ID format');
+    }
+
+    // Validate title if provided
+    if (title !== undefined) {
+      if (!title || typeof title !== 'string' || title.trim().length === 0) {
+        throw new Error('Course title cannot be empty');
+      }
+      if (title.trim().length > 200) {
+        throw new Error('Course title must be 200 characters or less');
+      }
+    }
+
+    // Validate description if provided
+    if (description !== undefined && description !== null) {
+      if (typeof description !== 'string') {
+        throw new Error('Course description must be a string');
+      }
+    }
+
     try {
       setLoading(true);
       setError(null);
       const updateData: any = {};
-      if (title !== undefined) updateData.title = title;
-      if (description !== undefined) updateData.description = description;
+      if (title !== undefined) updateData.title = title.trim();
+      if (description !== undefined) updateData.description = description ? description.trim() : description;
       if (catalogData !== undefined) updateData.catalog = catalogData;
       if (semesterData !== undefined) updateData.semester = semesterData;
       if (defaultColor !== undefined) updateData.defaultColor = defaultColor;
@@ -161,10 +208,20 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const deleteCourse = async (id: string) => {
+    // Validate ID
+    if (!id || typeof id !== 'string' || id.trim() === '' || id === 'undefined' || id === 'null') {
+      throw new Error('Invalid course ID');
+    }
+
+    // Validate ObjectId format
+    if (!/^[a-fA-F0-9]{24}$/.test(id.trim())) {
+      throw new Error('Invalid course ID format');
+    }
+
     try {
       setLoading(true);
       setError(null);
-      const response = await api.delete(`/courses/${id}`);
+      const response = await api.delete(`/courses/${id.trim()}`);
       if (response.data.success) {
         setCourses(courses.filter(course => course._id !== id));
       } else {
@@ -180,10 +237,28 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const enrollStudent = async (courseId: string, studentId: string) => {
+    // Validate IDs
+    if (!courseId || typeof courseId !== 'string' || courseId.trim() === '' || courseId === 'undefined' || courseId === 'null') {
+      throw new Error('Invalid course ID');
+    }
+
+    if (!studentId || typeof studentId !== 'string' || studentId.trim() === '' || studentId === 'undefined' || studentId === 'null') {
+      throw new Error('Invalid student ID');
+    }
+
+    // Validate ObjectId format
+    if (!/^[a-fA-F0-9]{24}$/.test(courseId.trim())) {
+      throw new Error('Invalid course ID format');
+    }
+
+    if (!/^[a-fA-F0-9]{24}$/.test(studentId.trim())) {
+      throw new Error('Invalid student ID format');
+    }
+
     try {
       setLoading(true);
       setError(null);
-      const response = await api.post(`/courses/${courseId}/enroll-teacher`, { studentId });
+      const response = await api.post(`/courses/${courseId.trim()}/enroll-teacher`, { studentId: studentId.trim() });
       if (response.data.success) {
         setCourses(courses.map(course => 
           course._id === courseId ? response.data.data : course
@@ -201,8 +276,26 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const unenrollStudent = async (courseId: string, studentId: string) => {
+    // Validate IDs
+    if (!courseId || typeof courseId !== 'string' || courseId.trim() === '' || courseId === 'undefined' || courseId === 'null') {
+      throw new Error('Invalid course ID');
+    }
+
+    if (!studentId || typeof studentId !== 'string' || studentId.trim() === '' || studentId === 'undefined' || studentId === 'null') {
+      throw new Error('Invalid student ID');
+    }
+
+    // Validate ObjectId format
+    if (!/^[a-fA-F0-9]{24}$/.test(courseId.trim())) {
+      throw new Error('Invalid course ID format');
+    }
+
+    if (!/^[a-fA-F0-9]{24}$/.test(studentId.trim())) {
+      throw new Error('Invalid student ID format');
+    }
+
     try {
-      const response = await api.post(`/courses/${courseId}/unenroll`, { studentId });
+      const response = await api.post(`/courses/${courseId.trim()}/unenroll`, { studentId: studentId.trim() });
       if (response.data.success) {
         // Refresh the course data
         await getCourse(courseId);

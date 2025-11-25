@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const { QuizWave, QuizSession, QuizResponse } = require('../models/quizwave.model');
 const Course = require('../models/course.model');
 
@@ -14,6 +15,14 @@ const createQuiz = async (req, res) => {
       });
     }
 
+    // Validate ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid course ID format'
+      });
+    }
+
     const { title, description, questions, settings } = req.body;
 
     // Validate course exists and user is instructor
@@ -26,11 +35,38 @@ const createQuiz = async (req, res) => {
     }
 
     // Check if user is the instructor or admin
-    if (course.instructor.toString() !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({
+    const userId = req.user._id || req.user.id;
+    if (!userId) {
+      return res.status(400).json({
         success: false,
-        message: 'Only course instructors can create quizzes'
+        message: 'User ID is required'
       });
+    }
+    
+    // Validate title
+    if (!title || typeof title !== 'string' || title.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Quiz title is required'
+      });
+    }
+
+    // Validate title length
+    if (title.trim().length > 200) {
+      return res.status(400).json({
+        success: false,
+        message: 'Quiz title must be 200 characters or less'
+      });
+    }
+
+    // Check if user is the instructor or admin
+    if (!course.instructor || course.instructor.toString() !== userId.toString()) {
+      if (req.user.role !== 'admin') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only course instructors can create quizzes'
+        });
+      }
     }
 
     // Validate questions
@@ -111,12 +147,26 @@ const createQuiz = async (req, res) => {
           isCorrect: opt.isCorrect === true || opt.isCorrect === 'true'
         }));
 
+      // Validate timeLimit
+      let timeLimit = 30; // default
+      if (q.timeLimit !== undefined) {
+        const parsedTimeLimit = parseInt(q.timeLimit);
+        if (!isNaN(parsedTimeLimit) && parsedTimeLimit > 0 && parsedTimeLimit <= 300) {
+          timeLimit = parsedTimeLimit;
+        } else {
+          return res.status(400).json({
+            success: false,
+            message: `Question ${index + 1} time limit must be between 1 and 300 seconds`
+          });
+        }
+      }
+
       return {
         questionText: q.questionText.trim(),
         questionType: q.questionType,
         options: cleanedOptions,
-        timeLimit: q.timeLimit && !isNaN(q.timeLimit) ? parseInt(q.timeLimit) : 30,
-        order: q.order !== undefined ? q.order : index
+        timeLimit: timeLimit,
+        order: q.order !== undefined && !isNaN(q.order) ? parseInt(q.order) : index
       };
     });
 
@@ -126,7 +176,7 @@ const createQuiz = async (req, res) => {
       description: description && description.trim() ? description.trim() : undefined,
       questions: cleanedQuestions,
       settings: settings || {},
-      createdBy: req.user.id
+      createdBy: userId
     });
 
     await quiz.save();
@@ -186,6 +236,14 @@ const getQuizzesByCourse = async (req, res) => {
       });
     }
 
+    // Validate ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid course ID format'
+      });
+    }
+
     const { user } = req;
 
     // Validate course exists
@@ -198,9 +256,18 @@ const getQuizzesByCourse = async (req, res) => {
     }
 
     // Check access
-    const isInstructor = course.instructor.toString() === user.id;
+    const userId = user._id || user.id;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+    
+    const isInstructor = course.instructor && course.instructor.toString() === userId.toString();
     const isAdmin = user.role === 'admin';
-    const isStudent = course.students.some(s => s.toString() === user.id);
+    const isStudent = course.students && Array.isArray(course.students) && 
+      course.students.some(s => s && s.toString() === userId.toString());
 
     if (!isInstructor && !isAdmin && !isStudent) {
       return res.status(403).json({
@@ -239,6 +306,14 @@ const getQuiz = async (req, res) => {
         message: 'Quiz ID is required'
       });
     }
+    
+    // Validate ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(quizId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid quiz ID format'
+      });
+    }
 
     const { user } = req;
 
@@ -251,10 +326,26 @@ const getQuiz = async (req, res) => {
     }
 
     // Check access
+    const userId = user._id || user.id;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+    
     const course = quiz.course;
-    const isInstructor = course.instructor.toString() === user.id;
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: 'Course not found for this quiz'
+      });
+    }
+    
+    const isInstructor = course.instructor && course.instructor.toString() === userId.toString();
     const isAdmin = user.role === 'admin';
-    const isStudent = course.students.some(s => s.toString() === user.id);
+    const isStudent = course.students && Array.isArray(course.students) && 
+      course.students.some(s => s && s.toString() === userId.toString());
 
     if (!isInstructor && !isAdmin && !isStudent) {
       return res.status(403).json({
@@ -282,6 +373,14 @@ const updateQuiz = async (req, res) => {
   try {
     const { quizId } = req.params;
     const { title, description, questions, settings } = req.body;
+    
+    // Validate quizId
+    if (!quizId || !mongoose.Types.ObjectId.isValid(quizId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid quiz ID format'
+      });
+    }
 
     const quiz = await QuizWave.findById(quizId).populate('course');
     if (!quiz) {
@@ -292,12 +391,29 @@ const updateQuiz = async (req, res) => {
     }
 
     // Check if user is the instructor or admin
-    const course = quiz.course;
-    if (course.instructor.toString() !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({
+    const userId = req.user._id || req.user.id;
+    if (!userId) {
+      return res.status(400).json({
         success: false,
-        message: 'Only course instructors can update quizzes'
+        message: 'User ID is required'
       });
+    }
+    
+    const course = quiz.course;
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: 'Course not found for this quiz'
+      });
+    }
+    
+    if (!course.instructor || course.instructor.toString() !== userId.toString()) {
+      if (req.user.role !== 'admin') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only course instructors can update quizzes'
+        });
+      }
     }
 
     // Check if quiz has active sessions
@@ -314,23 +430,90 @@ const updateQuiz = async (req, res) => {
     }
 
     // Update quiz
-    if (title !== undefined) quiz.title = title;
-    if (description !== undefined) quiz.description = description;
+    if (title !== undefined) {
+      if (!title || !title.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Title cannot be empty'
+        });
+      }
+      quiz.title = title.trim();
+    }
+    if (description !== undefined) {
+      quiz.description = description ? description.trim() : description;
+    }
     if (questions !== undefined) {
-      // Validate questions
+      // Validate questions array
+      if (!Array.isArray(questions) || questions.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'At least one question is required'
+        });
+      }
+
+      // Validate each question
       for (let i = 0; i < questions.length; i++) {
         const q = questions[i];
-        if (!q.questionText || q.questionText.trim() === '') {
+        if (!q || typeof q !== 'object') {
+          return res.status(400).json({
+            success: false,
+            message: `Question ${i + 1} is invalid`
+          });
+        }
+
+        if (!q.questionText || typeof q.questionText !== 'string' || q.questionText.trim() === '') {
           return res.status(400).json({
             success: false,
             message: `Question ${i + 1} text is required`
           });
         }
-        if (q.questionType === 'multiple-choice' && q.options.filter(opt => opt.isCorrect).length !== 1) {
+
+        // Validate question type
+        if (!q.questionType || !['multiple-choice', 'true-false'].includes(q.questionType)) {
           return res.status(400).json({
             success: false,
-            message: `Question ${i + 1} must have exactly one correct answer`
+            message: `Question ${i + 1} must have a valid question type (multiple-choice or true-false)`
           });
+        }
+
+        // Validate options
+        if (!q.options || !Array.isArray(q.options)) {
+          return res.status(400).json({
+            success: false,
+            message: `Question ${i + 1} must have an options array`
+          });
+        }
+
+        const validOptions = q.options.filter(opt => opt && opt.text && opt.text.trim() !== '');
+        
+        if (q.questionType === 'multiple-choice') {
+          if (validOptions.length < 2) {
+            return res.status(400).json({
+              success: false,
+              message: `Question ${i + 1} must have at least 2 valid options`
+            });
+          }
+          const correctCount = validOptions.filter(opt => opt.isCorrect === true).length;
+          if (correctCount !== 1) {
+            return res.status(400).json({
+              success: false,
+              message: `Question ${i + 1} must have exactly one correct answer`
+            });
+          }
+        } else if (q.questionType === 'true-false') {
+          if (validOptions.length !== 2) {
+            return res.status(400).json({
+              success: false,
+              message: `True/False question ${i + 1} must have exactly 2 valid options`
+            });
+          }
+          const correctCount = validOptions.filter(opt => opt.isCorrect === true).length;
+          if (correctCount !== 1) {
+            return res.status(400).json({
+              success: false,
+              message: `True/False question ${i + 1} must have exactly one correct answer`
+            });
+          }
         }
       }
       quiz.questions = questions;
@@ -368,12 +551,37 @@ const deleteQuiz = async (req, res) => {
     }
 
     // Check if user is the instructor or admin
-    const course = quiz.course;
-    if (course.instructor.toString() !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({
+    const userId = req.user._id || req.user.id;
+    if (!userId) {
+      return res.status(400).json({
         success: false,
-        message: 'Only course instructors can delete quizzes'
+        message: 'User ID is required'
       });
+    }
+    
+    const course = quiz.course;
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: 'Course not found for this quiz'
+      });
+    }
+    
+    // Validate quizId
+    if (!quizId || !mongoose.Types.ObjectId.isValid(quizId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid quiz ID format'
+      });
+    }
+
+    if (!course.instructor || course.instructor.toString() !== userId.toString()) {
+      if (req.user.role !== 'admin') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only course instructors can delete quizzes'
+        });
+      }
     }
 
     // Check if quiz has active sessions
@@ -421,11 +629,20 @@ const createSession = async (req, res) => {
         message: 'Quiz ID is required'
       });
     }
+    
+    // Validate ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(quizId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid quiz ID format'
+      });
+    }
 
     const { user } = req;
     
     // Ensure user is authenticated
-    if (!user || !user.id) {
+    const userId = user._id || user.id;
+    if (!user || !userId) {
       return res.status(401).json({
         success: false,
         message: 'Authentication required'
@@ -449,25 +666,26 @@ const createSession = async (req, res) => {
       });
     }
     
-    // Handle both populated and unpopulated course
-    let instructorId;
-    if (course.instructor) {
-      if (typeof course.instructor === 'object' && course.instructor._id) {
-        instructorId = course.instructor._id.toString();
-      } else if (typeof course.instructor === 'object' && course.instructor.toString) {
-        instructorId = course.instructor.toString();
-      } else {
-        instructorId = String(course.instructor);
-      }
-    } else {
+    // Validate course has instructor
+    if (!course.instructor) {
       return res.status(400).json({
         success: false,
         message: 'Course instructor not found'
       });
     }
     
-    const userId = String(user.id);
-    if (instructorId !== userId && user.role !== 'admin') {
+    // Handle both populated and unpopulated course
+    let instructorId;
+    if (typeof course.instructor === 'object' && course.instructor._id) {
+      instructorId = course.instructor._id.toString();
+    } else if (typeof course.instructor === 'object' && course.instructor.toString) {
+      instructorId = course.instructor.toString();
+    } else {
+      instructorId = String(course.instructor);
+    }
+    
+    const userIdStr = String(userId);
+    if (instructorId !== userIdStr && user.role !== 'admin') {
       return res.status(403).json({
         success: false,
         message: 'Only course instructors can create sessions'
@@ -486,7 +704,7 @@ const createSession = async (req, res) => {
     const existingSession = await QuizSession.findOne({
       quiz: quizId,
       status: { $in: ['waiting', 'active', 'paused'] },
-      createdBy: user.id
+      createdBy: userId
     });
 
     if (existingSession) {
@@ -562,7 +780,7 @@ const createSession = async (req, res) => {
           quiz: quizId,
           course: courseId,
           gamePin,
-          createdBy: user.id
+          createdBy: userId
         });
 
         // Validate before saving
@@ -715,7 +933,7 @@ const createSession = async (req, res) => {
             quiz: quizId,
             course: emergencyCourseId,
             gamePin: emergencyPin,
-            createdBy: user.id
+            createdBy: userId
           });
           await emergencySession.save();
           return res.status(201).json({
@@ -763,6 +981,15 @@ const getSessionByPin = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Game PIN is required'
+      });
+    }
+    
+    // Validate pin format (should be 6-digit numeric)
+    const pinRegex = /^\d{6}$/;
+    if (!pinRegex.test(pin.trim())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid PIN format. PIN must be 6 digits'
       });
     }
 
@@ -819,6 +1046,14 @@ const getSessionByPin = async (req, res) => {
 const getSession = async (req, res) => {
   try {
     const { sessionId } = req.params;
+    
+    // Validate sessionId
+    if (!sessionId || !mongoose.Types.ObjectId.isValid(sessionId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid session ID format'
+      });
+    }
 
     const session = await QuizSession.findById(sessionId)
       .populate('quiz')
@@ -834,11 +1069,26 @@ const getSession = async (req, res) => {
     }
 
     // Check access
+    const userId = req.user._id || req.user.id;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+    
     const course = session.course;
-    const isInstructor = course.instructor.toString() === req.user.id;
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: 'Course not found for this session'
+      });
+    }
+    
+    const isInstructor = course.instructor && course.instructor.toString() === userId.toString();
     const isAdmin = req.user.role === 'admin';
 
-    if (!isInstructor && !isAdmin && session.createdBy.toString() !== req.user.id) {
+    if (!isInstructor && !isAdmin && session.createdBy.toString() !== userId.toString()) {
       return res.status(403).json({
         success: false,
         message: 'You do not have access to this session'
@@ -873,8 +1123,31 @@ const getSessionsByQuiz = async (req, res) => {
     }
 
     // Check access
+    const userId = req.user._id || req.user.id;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+    
+    // Validate quizId
+    if (!quizId || !mongoose.Types.ObjectId.isValid(quizId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid quiz ID format'
+      });
+    }
+
     const course = quiz.course;
-    const isInstructor = course.instructor.toString() === req.user.id;
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: 'Course not found for this quiz'
+      });
+    }
+    
+    const isInstructor = course.instructor && course.instructor.toString() === userId.toString();
     const isAdmin = req.user.role === 'admin';
 
     if (!isInstructor && !isAdmin) {
@@ -906,17 +1179,50 @@ const getSessionsByQuiz = async (req, res) => {
 // Cleanup old sessions (2-day retention)
 const cleanupOldSessions = async (req, res) => {
   try {
+    // Check authorization - only admin can trigger cleanup
+    if (req.user && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only administrators can trigger cleanup'
+      });
+    }
+
+    // Validate date calculation
     const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+    if (isNaN(twoDaysAgo.getTime())) {
+      return res.status(500).json({
+        success: false,
+        message: 'Invalid date calculation'
+      });
+    }
     
     const oldSessions = await QuizSession.find({
       status: 'ended',
       createdAt: { $lt: twoDaysAgo }
     });
 
-    const sessionIds = oldSessions.map(s => s._id);
+    // Validate sessions array
+    if (!Array.isArray(oldSessions)) {
+      return res.status(500).json({
+        success: false,
+        message: 'Invalid sessions array returned'
+      });
+    }
+
+    const sessionIds = oldSessions
+      .map(s => s && s._id ? s._id : null)
+      .filter(id => id !== null);
 
     // Delete related responses
-    await QuizResponse.deleteMany({ session: { $in: sessionIds } });
+    let responseResult = { deletedCount: 0 };
+    try {
+      if (sessionIds.length > 0) {
+        responseResult = await QuizResponse.deleteMany({ session: { $in: sessionIds } });
+      }
+    } catch (responseError) {
+      console.error('Error deleting responses:', responseError);
+      // Continue with session deletion even if response deletion fails
+    }
 
     // Delete old sessions
     const result = await QuizSession.deleteMany({
@@ -924,10 +1230,13 @@ const cleanupOldSessions = async (req, res) => {
       createdAt: { $lt: twoDaysAgo }
     });
 
+    const deletedCount = result && typeof result.deletedCount === 'number' ? result.deletedCount : 0;
+
     res.json({
       success: true,
-      message: `Cleaned up ${result.deletedCount} old sessions`,
-      deletedCount: result.deletedCount
+      message: `Cleaned up ${deletedCount} old sessions and ${responseResult.deletedCount || 0} responses`,
+      deletedCount: deletedCount,
+      deletedResponses: responseResult.deletedCount || 0
     });
   } catch (error) {
     console.error('Cleanup error:', error);

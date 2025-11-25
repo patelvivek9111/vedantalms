@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
 import { format } from 'date-fns';
-import { Lock, Unlock } from 'lucide-react';
+import { Lock, Unlock, Download } from 'lucide-react';
 import { API_URL } from '../../config';
 
 const AssignmentDetails = () => {
@@ -16,16 +16,30 @@ const AssignmentDetails = () => {
   const [userRole, setUserRole] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [answers, setAnswers] = useState({});
 
   useEffect(() => {
-    const user = JSON.parse(localStorage.getItem('user'));
+    let user = null;
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        user = JSON.parse(userStr);
+      }
+    } catch (e) {
+      console.error('Error parsing user from localStorage:', e);
+    }
     const currentUserRole = user?.role || '';
     setUserRole(currentUserRole);
 
     const fetchData = async () => {
       try {
         const token = localStorage.getItem('token');
+        if (!token) {
+          setError('Authentication token not found. Please log in again.');
+          setLoading(false);
+          return;
+        }
         
         const assignmentRes = await axios.get(`${API_URL}/api/assignments/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
@@ -68,6 +82,10 @@ const AssignmentDetails = () => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Authentication token not found. Please log in again.');
+        return;
+      }
       const response = await axios.post(`${API_URL}/api/submissions`, {
         assignment: id,
         answers,
@@ -142,10 +160,10 @@ const AssignmentDetails = () => {
           <div className="flex-1 min-w-0">
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 break-words">{assignment.title}</h1>
             <p className="mt-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-              <span className="block sm:inline">Due: {format(new Date(assignment.dueDate), 'PPp')}</span>
+              <span className="block sm:inline">Due: {format(new Date(assignment.dueDate), 'MMM d, yyyy, h:mm a')}</span>
               {userRole === 'student' && assignment.submission && (
                 <span className="block sm:inline sm:ml-4 mt-1 sm:mt-0 text-green-600 dark:text-green-400">
-                  Submitted: {format(new Date(assignment.submission.submittedAt), 'PPp')}
+                  Submitted: {format(new Date(assignment.submission.submittedAt), 'MMM d, yyyy, h:mm a')}
                 </span>
               )}
             </p>
@@ -293,7 +311,42 @@ const AssignmentDetails = () => {
 
             {(userRole === 'teacher' || userRole === 'admin') && (
               <div className="mt-8">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Submissions</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Submissions</h3>
+                  {submission && submission.length > 0 && (
+                    <button
+                      onClick={async () => {
+                        setIsDownloading(true);
+                        setError('');
+                        try {
+                          const token = localStorage.getItem('token');
+                          const response = await axios.get(`${API_URL}/api/submissions/assignment/${id}/download`, {
+                            headers: { Authorization: `Bearer ${token}` },
+                            responseType: 'blob'
+                          });
+                          const url = window.URL.createObjectURL(new Blob([response.data]));
+                          const link = document.createElement('a');
+                          link.href = url;
+                          link.setAttribute('download', `${assignment?.title?.replace(/[^a-z0-9]/gi, '_') || 'submissions'}_submissions.zip`);
+                          document.body.appendChild(link);
+                          link.click();
+                          link.remove();
+                          window.URL.revokeObjectURL(url);
+                        } catch (err) {
+                          console.error('Download error:', err);
+                          setError(err.response?.data?.message || 'Error downloading submissions');
+                        } finally {
+                          setIsDownloading(false);
+                        }
+                      }}
+                      disabled={isDownloading}
+                      className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      {isDownloading ? 'Downloading...' : 'Download All'}
+                    </button>
+                  )}
+                </div>
                 {submission && submission.length === 0 ? (
                   <p className="mt-2 text-gray-500 dark:text-gray-400">No submissions yet</p>
                 ) : (
@@ -301,18 +354,67 @@ const AssignmentDetails = () => {
                     {submission && submission.map((sub) => (
                       <li key={sub._id} className="py-4">
                         <div className="flex items-center justify-between">
-                          <div>
+                          <div className="flex-1">
                             <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
                               {sub.student?.firstName} {sub.student?.lastName}
                             </p>
                             <p className="text-sm text-gray-500 dark:text-gray-400">
-                              Submitted at: {format(new Date(sub.submittedAt), 'PPp')}
+                              Submitted at: {format(new Date(sub.submittedAt), 'MMM d, yyyy, h:mm a')}
                             </p>
                           </div>
-                          <div className="text-right">
-                            <p className={`text-sm font-medium ${sub.grade ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
-                              {sub.grade !== null && sub.grade !== undefined ? `Grade: ${sub.grade}` : 'Not Graded'}
-                            </p>
+                          <div className="flex items-center gap-3">
+                            <div className="text-right">
+                              <p className={`text-sm font-medium ${sub.grade ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
+                                {sub.grade !== null && sub.grade !== undefined ? `Grade: ${sub.grade}` : 'Not Graded'}
+                              </p>
+                            </div>
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const token = localStorage.getItem('token');
+                                  const response = await axios.get(`${API_URL}/api/submissions/${sub._id}/download`, {
+                                    headers: { Authorization: `Bearer ${token}` },
+                                    responseType: 'blob'
+                                  });
+                                  
+                                  // Get filename from Content-Disposition header or use default
+                                  const contentDisposition = response.headers['content-disposition'];
+                                  let filename = 'submission';
+                                  
+                                  if (contentDisposition) {
+                                    const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
+                                    if (filenameMatch) {
+                                      filename = filenameMatch[1];
+                                    }
+                                  } else {
+                                    // Fallback: if single file, use file name; if multiple, use zip
+                                    if (sub.files && sub.files.length === 1) {
+                                      filename = sub.files[0].split('/').pop() || 'submission';
+                                    } else {
+                                      const studentName = `${sub.student?.firstName || 'Student'}_${sub.student?.lastName || ''}`.replace(/[^a-z0-9]/gi, '_');
+                                      filename = `${assignment?.title?.replace(/[^a-z0-9]/gi, '_') || 'submission'}_${studentName}.zip`;
+                                    }
+                                  }
+                                  
+                                  const url = window.URL.createObjectURL(new Blob([response.data]));
+                                  const link = document.createElement('a');
+                                  link.href = url;
+                                  link.setAttribute('download', filename);
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  link.remove();
+                                  window.URL.revokeObjectURL(url);
+                                } catch (err) {
+                                  console.error('Download error:', err);
+                                  setError(err.response?.data?.message || 'Error downloading submission');
+                                }
+                              }}
+                              className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600 transition-colors"
+                              title="Download this submission"
+                            >
+                              <Download className="h-3.5 w-3.5 mr-1.5" />
+                              Download
+                            </button>
                           </div>
                         </div>
                       </li>

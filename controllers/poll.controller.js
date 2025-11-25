@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Poll = require('../models/poll.model');
 const Course = require('../models/course.model');
 
@@ -6,6 +7,22 @@ const createPoll = async (req, res) => {
   try {
     const { courseId } = req.params;
     const { title, options, endDate, allowMultipleVotes, resultsVisible } = req.body;
+    const userId = req.user._id || req.user.id;
+
+    // Validate courseId
+    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid course ID format'
+      });
+    }
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
 
     // Validate course exists and user is instructor
     const course = await Course.findById(courseId);
@@ -17,7 +34,7 @@ const createPoll = async (req, res) => {
     }
 
     // Check if user is the instructor or admin
-    if (course.instructor.toString() !== req.user.id && req.user.role !== 'admin') {
+    if (course.instructor.toString() !== userId.toString() && req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
         message: 'Only course instructors can create polls'
@@ -33,7 +50,21 @@ const createPoll = async (req, res) => {
     }
 
     // Validate end date
+    if (!endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'End date is required'
+      });
+    }
+    
     const endDateObj = new Date(endDate);
+    if (isNaN(endDateObj.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid end date format'
+      });
+    }
+    
     if (endDateObj <= new Date()) {
       return res.status(400).json({
         success: false,
@@ -41,11 +72,19 @@ const createPoll = async (req, res) => {
       });
     }
 
+    // Validate title
+    if (!title || !title.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Title is required'
+      });
+    }
+
     const poll = new Poll({
       course: courseId,
-      title,
-      options: options.map(option => ({ text: option, votes: 0 })),
-      createdBy: req.user.id,
+      title: title.trim(),
+      options: options.map(option => ({ text: typeof option === 'string' ? option.trim() : String(option).trim(), votes: 0 })),
+      createdBy: userId,
       endDate: endDateObj,
       allowMultipleVotes: allowMultipleVotes || false,
       resultsVisible: resultsVisible || false
@@ -73,6 +112,22 @@ const getPollsByCourse = async (req, res) => {
   try {
     const { courseId } = req.params;
     const { user } = req;
+    const userId = user._id || user.id;
+
+    // Validate courseId
+    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid course ID format'
+      });
+    }
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
 
     // Validate course exists
     const course = await Course.findById(courseId);
@@ -84,8 +139,8 @@ const getPollsByCourse = async (req, res) => {
     }
 
     // Check if user has access to the course
-    const isInstructor = course.instructor.toString() === user.id;
-    const isStudent = course.students.some(student => student.toString() === user.id);
+    const isInstructor = course.instructor.toString() === userId.toString();
+    const isStudent = course.students.some(student => student.toString() === userId.toString());
     const isAdmin = user.role === 'admin';
 
     if (!isInstructor && !isStudent && !isAdmin) {
@@ -115,7 +170,7 @@ const getPollsByCourse = async (req, res) => {
       if (user.role === 'student') {
         // Check if student has voted
         const studentVote = poll.studentVotes.find(vote => 
-          vote.student.toString() === user.id
+          vote.student.toString() === userId.toString()
         );
         pollObj.hasVoted = !!studentVote;
         pollObj.studentVote = studentVote;
@@ -160,6 +215,22 @@ const voteOnPoll = async (req, res) => {
     const { pollId } = req.params;
     const { selectedOptions } = req.body;
     const { user } = req;
+    const userId = user._id || user.id;
+
+    // Validate IDs
+    if (!mongoose.Types.ObjectId.isValid(pollId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid poll ID format'
+      });
+    }
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
 
     // Validate poll exists
     const poll = await Poll.findById(pollId).populate('course');
@@ -180,7 +251,14 @@ const voteOnPoll = async (req, res) => {
 
     // Check if user is a student in the course
     const course = poll.course;
-    const isStudent = course.students.some(student => student.toString() === user.id);
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: 'Course not found for this poll'
+      });
+    }
+    
+    const isStudent = course.students.some(student => student.toString() === userId.toString());
     if (!isStudent) {
       return res.status(403).json({
         success: false,
@@ -188,11 +266,11 @@ const voteOnPoll = async (req, res) => {
       });
     }
 
-    // Check if student has already voted
+    // Check if student has already voted (unless multiple votes allowed)
     const existingVote = poll.studentVotes.find(vote => 
-      vote.student.toString() === user.id
+      vote.student.toString() === userId.toString()
     );
-    if (existingVote) {
+    if (existingVote && !poll.allowMultipleVotes) {
       return res.status(400).json({
         success: false,
         message: 'You have already voted on this poll'
@@ -217,7 +295,7 @@ const voteOnPoll = async (req, res) => {
 
     // Validate option indices
     const validIndices = selectedOptions.every(index => 
-      index >= 0 && index < poll.options.length
+      typeof index === 'number' && index >= 0 && index < poll.options.length && Number.isInteger(index)
     );
     if (!validIndices) {
       return res.status(400).json({
@@ -226,9 +304,20 @@ const voteOnPoll = async (req, res) => {
       });
     }
 
+    // Check for duplicate options if multiple votes not allowed
+    if (!poll.allowMultipleVotes && selectedOptions.length > 1) {
+      const uniqueOptions = new Set(selectedOptions);
+      if (uniqueOptions.size !== selectedOptions.length) {
+        return res.status(400).json({
+          success: false,
+          message: 'Duplicate options are not allowed'
+        });
+      }
+    }
+
     // Add vote
     poll.studentVotes.push({
-      student: user.id,
+      student: userId,
       selectedOptions,
       votedAt: new Date()
     });
@@ -260,6 +349,22 @@ const getPollResults = async (req, res) => {
   try {
     const { pollId } = req.params;
     const { user } = req;
+    const userId = user._id || user.id;
+
+    // Validate pollId
+    if (!mongoose.Types.ObjectId.isValid(pollId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid poll ID format'
+      });
+    }
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
 
     const poll = await Poll.findById(pollId)
       .populate('course')
@@ -274,7 +379,14 @@ const getPollResults = async (req, res) => {
 
     // Check if user is instructor or admin
     const course = poll.course;
-    const isInstructor = course.instructor.toString() === user.id;
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: 'Course not found for this poll'
+      });
+    }
+    
+    const isInstructor = course.instructor.toString() === userId.toString();
     const isAdmin = user.role === 'admin';
 
     if (!isInstructor && !isAdmin) {
@@ -311,6 +423,22 @@ const updatePoll = async (req, res) => {
     const { pollId } = req.params;
     const { title, endDate, isActive, resultsVisible } = req.body;
     const { user } = req;
+    const userId = user._id || user.id;
+
+    // Validate pollId
+    if (!mongoose.Types.ObjectId.isValid(pollId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid poll ID format'
+      });
+    }
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
 
     const poll = await Poll.findById(pollId).populate('course');
     if (!poll) {
@@ -322,7 +450,14 @@ const updatePoll = async (req, res) => {
 
     // Check if user is the instructor
     const course = poll.course;
-    if (course.instructor.toString() !== user.id && user.role !== 'admin') {
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: 'Course not found for this poll'
+      });
+    }
+    
+    if (course.instructor.toString() !== userId.toString() && user.role !== 'admin') {
       return res.status(403).json({
         success: false,
         message: 'Only course instructors can update polls'
@@ -330,8 +465,33 @@ const updatePoll = async (req, res) => {
     }
 
     // Update fields
-    if (title) poll.title = title;
-    if (endDate) poll.endDate = new Date(endDate);
+    if (title !== undefined) {
+      if (!title || !title.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Title cannot be empty'
+        });
+      }
+      poll.title = title.trim();
+    }
+    
+    if (endDate) {
+      const endDateObj = new Date(endDate);
+      if (isNaN(endDateObj.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid end date format'
+        });
+      }
+      if (endDateObj <= new Date()) {
+        return res.status(400).json({
+          success: false,
+          message: 'End date must be in the future'
+        });
+      }
+      poll.endDate = endDateObj;
+    }
+    
     if (typeof isActive === 'boolean') poll.isActive = isActive;
     if (typeof resultsVisible === 'boolean') poll.resultsVisible = resultsVisible;
 
@@ -357,6 +517,22 @@ const deletePoll = async (req, res) => {
   try {
     const { pollId } = req.params;
     const { user } = req;
+    const userId = user._id || user.id;
+
+    // Validate pollId
+    if (!mongoose.Types.ObjectId.isValid(pollId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid poll ID format'
+      });
+    }
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
 
     const poll = await Poll.findById(pollId).populate('course');
     if (!poll) {
@@ -368,7 +544,14 @@ const deletePoll = async (req, res) => {
 
     // Check if user is the instructor
     const course = poll.course;
-    if (course.instructor.toString() !== user.id && user.role !== 'admin') {
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: 'Course not found for this poll'
+      });
+    }
+    
+    if (course.instructor.toString() !== userId.toString() && user.role !== 'admin') {
       return res.status(403).json({
         success: false,
         message: 'Only course instructors can delete polls'

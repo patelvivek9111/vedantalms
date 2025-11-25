@@ -2,118 +2,11 @@ const Submission = require('../models/Submission');
 const Assignment = require('../models/Assignment');
 const Group = require('../models/Group');
 const fs = require('fs').promises;
+const fsSync = require('fs');
 const path = require('path');
 const Module = require('../models/module.model');
-const { deleteFromCloudinary, extractPublicId, isCloudinaryConfigured } = require('../utils/cloudinary');
-
-// Submit an assignment
-exports.submitAssignment = async (req, res) => {
-  try {
-    const { submissionText, groupId } = req.body;
-    const assignmentId = req.params.assignmentId;
-    
-    // Check if assignment exists
-    const assignment = await Assignment.findById(assignmentId);
-    if (!assignment) {
-      return res.status(404).json({ message: 'Assignment not found' });
-    }
-    
-    // Check if due date has passed
-    if (new Date() > assignment.dueDate) {
-      return res.status(400).json({ message: 'Assignment due date has passed' });
-    }
-
-    let group = null;
-    if (assignment.isGroupAssignment) {
-      if (!groupId) {
-        return res.status(400).json({ message: 'Group ID is required for group assignments' });
-      }
-
-      // Verify the group exists and user is a member
-      group = await Group.findById(groupId);
-      if (!group) {
-        return res.status(404).json({ message: 'Group not found' });
-      }
-
-      if (!group.members.includes(req.user._id)) {
-        return res.status(403).json({ message: 'You are not a member of this group' });
-      }
-
-      // Check if group belongs to the correct group set
-      if (group.groupSet.toString() !== assignment.groupSet.toString()) {
-        return res.status(400).json({ message: 'Group does not belong to the required group set' });
-      }
-    }
-    
-    // Check if submission already exists
-    const query = assignment.isGroupAssignment
-      ? { assignment: assignmentId, group: groupId }
-      : { assignment: assignmentId, student: req.user._id };
-    
-    const existingSubmission = await Submission.findOne(query);
-    
-    if (existingSubmission) {
-      // If there's an existing submission, delete its files
-      if (existingSubmission.files.length > 0) {
-        await Promise.all(existingSubmission.files.map(async (file) => {
-          // Check if file is from Cloudinary or local
-          if (typeof file === 'string' && file.includes('cloudinary.com') && isCloudinaryConfigured()) {
-            // Delete from Cloudinary
-            const publicId = extractPublicId(file);
-            if (publicId) {
-              try {
-                await deleteFromCloudinary(publicId, 'auto');
-              } catch (err) {
-                console.error('Error deleting file from Cloudinary:', err);
-              }
-            }
-          } else {
-            // Delete local file
-          const filePath = path.join(__dirname, '..', file);
-          try {
-            await fs.unlink(filePath);
-          } catch (err) {
-              console.error('Error deleting local file:', err);
-            }
-          }
-        }));
-      }
-      
-      // Update existing submission
-      existingSubmission.submissionText = submissionText;
-      // Files are already uploaded via /api/upload endpoint, so we get URLs from req.body
-      existingSubmission.files = req.body.uploadedFiles || (req.files ? req.files.map(file => `/uploads/${file.filename}`) : []);
-      existingSubmission.submittedAt = new Date();
-      existingSubmission.submittedBy = req.user._id;
-      
-      await existingSubmission.save();
-      return res.json(existingSubmission);
-    }
-    
-    // Get file URLs from uploaded files (already uploaded via /api/upload)
-    const files = req.body.uploadedFiles || (req.files ? req.files.map(file => `/uploads/${file.filename}`) : []);
-    
-    const submission = new Submission({
-      assignment: assignmentId,
-      student: req.user._id,
-      group: group ? group._id : undefined,
-      submittedBy: req.user._id,
-      submissionText,
-      files
-    });
-    
-    await submission.save();
-    res.status(201).json(submission);
-  } catch (error) {
-    // If there's an error, delete any uploaded files
-    if (req.files) {
-      await Promise.all(req.files.map(file => 
-        fs.unlink(file.path).catch(err => console.error('Error deleting file:', err))
-      ));
-    }
-    res.status(500).json({ message: error.message });
-  }
-};
+const archiver = require('archiver');
+const { deleteFromCloudinary, extractPublicId, isCloudinaryConfigured, uploadToCloudinary } = require('../utils/cloudinary');
 
 // Create a new submission (student only)
 exports.createSubmission = async (req, res) => {
@@ -134,27 +27,39 @@ exports.createSubmission = async (req, res) => {
       return res.status(404).json({ message: 'Assignment not found' });
     }
 
-    if (new Date() > new Date(assignmentDoc.dueDate)) {
-      
+    // Check if assignment is available yet
+    const now = new Date();
+    if (assignmentDoc.availableFrom && new Date(assignmentDoc.availableFrom) > now) {
+      return res.status(400).json({ message: 'Assignment is not available yet' });
+    }
+
+    // Check if assignment is past due (with a small buffer for timezone issues)
+    if (assignmentDoc.dueDate && new Date(assignmentDoc.dueDate) < now) {
       return res.status(400).json({ message: 'Assignment is past due' });
     }
 
     // Check if there are any answers provided
     const hasAnswers = answers && Object.keys(answers).length > 0;
     
+    // Check if files are provided
+    const hasFiles = req.body.uploadedFiles && (
+      (Array.isArray(req.body.uploadedFiles) && req.body.uploadedFiles.length > 0) ||
+      (typeof req.body.uploadedFiles === 'string' && req.body.uploadedFiles.trim() !== '')
+    );
     
     // For assignments with questions, require at least some answers
+    // For file-upload-only assignments (allowStudentUploads with no questions), require files
     if (assignmentDoc.questions && assignmentDoc.questions.length > 0) {
       const hasAnyAnswers = hasAnswers && Object.values(answers).some(answer => 
         answer && answer.toString().trim() !== ''
       );
       
-      
-      
       if (!hasAnyAnswers) {
-        
         return res.status(400).json({ message: 'Please provide answers for the assignment questions' });
       }
+    } else if (assignmentDoc.allowStudentUploads && (!hasFiles || (Array.isArray(req.body.uploadedFiles) && req.body.uploadedFiles.length === 0))) {
+      // File-upload-only assignment requires at least one file
+      return res.status(400).json({ message: 'Please upload at least one file for this assignment' });
     }
 
     let group = null;
@@ -188,10 +93,31 @@ exports.createSubmission = async (req, res) => {
     
     if (existingSubmission) {
       // Update existing submission
+      // Store files as objects with url and originalname, or as strings for backward compatibility
+      let filesArray = [];
+      if (req.body.uploadedFiles) {
+        if (Array.isArray(req.body.uploadedFiles)) {
+          filesArray = req.body.uploadedFiles.map(file => {
+            // If it's an object with url and name, store the object
+            if (typeof file === 'object' && file.url) {
+              return {
+                url: file.url,
+                name: file.name || file.originalname || file.url.split('/').pop(),
+                originalname: file.name || file.originalname || file.url.split('/').pop()
+              };
+            }
+            // If it's already a string, keep it as string for backward compatibility
+            return typeof file === 'string' ? file : String(file);
+          });
+        } else if (typeof req.body.uploadedFiles === 'string') {
+          filesArray = [req.body.uploadedFiles];
+        }
+      }
+      
       existingSubmission.answers = answers;
       existingSubmission.submittedAt = new Date();
       existingSubmission.submittedBy = req.user._id;
-      existingSubmission.files = req.body.uploadedFiles || [];
+      existingSubmission.files = filesArray;
       
       await existingSubmission.save();
       
@@ -220,6 +146,24 @@ exports.createSubmission = async (req, res) => {
     }
 
     // Create new submission
+    // Ensure files is an array of strings (file paths/URLs)
+    let filesArray = [];
+    if (req.body.uploadedFiles) {
+      if (Array.isArray(req.body.uploadedFiles)) {
+        filesArray = req.body.uploadedFiles.map(file => {
+          // If it's an object with url property, extract the URL
+          if (typeof file === 'object' && file.url) {
+            return file.url;
+          }
+          // If it's already a string, use it directly
+          return typeof file === 'string' ? file : String(file);
+        });
+      } else if (typeof req.body.uploadedFiles === 'string') {
+        filesArray = [req.body.uploadedFiles];
+      }
+    }
+    
+    
     const submission = new Submission({
       assignment,
       student: req.user._id,
@@ -227,7 +171,7 @@ exports.createSubmission = async (req, res) => {
       submittedBy: req.user._id,
       answers,
       submittedAt: new Date(),
-      files: req.body.uploadedFiles || []
+      files: filesArray
     });
 
     
@@ -440,7 +384,38 @@ exports.getStudentSubmissionsForCourse = async (req, res) => {
 // Grade a submission
 exports.gradeSubmission = async (req, res) => {
   try {
-    const { grade, feedback, questionGrades, useIndividualGrades, memberGrades, approveGrade, showCorrectAnswers, showStudentAnswers, studentId } = req.body;
+    let { grade, feedback, questionGrades, useIndividualGrades, memberGrades, approveGrade, showCorrectAnswers, showStudentAnswers, studentId } = req.body;
+    
+    // Parse questionGrades if it's a JSON string (from FormData)
+    if (typeof questionGrades === 'string' && questionGrades.trim().startsWith('{')) {
+      try {
+        questionGrades = JSON.parse(questionGrades);
+      } catch (e) {
+        console.error('Error parsing questionGrades JSON:', e);
+        questionGrades = {};
+      }
+    }
+    
+    // Parse approveGrade if it's a string (from FormData)
+    if (typeof approveGrade === 'string') {
+      approveGrade = approveGrade === 'true';
+    }
+    
+    // Parse grade if it's a string (from FormData)
+    // FormData always sends values as strings, so we need to parse them
+    if (typeof grade === 'string') {
+      if (grade.trim() === '' || grade === 'null' || grade === 'undefined') {
+        grade = undefined;
+      } else {
+        const parsedGrade = parseFloat(grade);
+        if (!isNaN(parsedGrade) && isFinite(parsedGrade)) {
+          grade = parsedGrade;
+        } else {
+          grade = undefined;
+        }
+      }
+    }
+    
     let submission = await Submission.findById(req.params.id).populate('group');
 
     // If submission doesn't exist, check if this is for an offline assignment
@@ -727,23 +702,28 @@ exports.gradeSubmission = async (req, res) => {
       } else {
         submission.useIndividualGrades = false;
         // Only validate grade if it's provided and not approving auto-grade
-        if (grade !== undefined && !approveGrade) {
-          const parsedGrade = parseFloat(grade);
+        if (grade !== undefined && grade !== null && !approveGrade) {
+          // Grade should already be parsed as a number from FormData handling above
+          const parsedGrade = typeof grade === 'number' ? grade : parseFloat(grade);
           if (isNaN(parsedGrade)) {
             return res.status(400).json({ message: 'Invalid grade format' });
           }
           submission.grade = parsedGrade;
+          submission.finalGrade = parsedGrade; // Set finalGrade for upload-only assignments
+          submission.teacherApproved = true;
+          submission.gradedBy = req.user._id;
+          submission.gradedAt = new Date();
         }
       }
       
-      if (questionGrades) {
+      if (questionGrades && Object.keys(questionGrades).length > 0) {
         submission.questionGrades = new Map(
           Object.entries(questionGrades).map(([key, value]) => [key, parseFloat(value) || 0])
         );
         
         // Recalculate final grade based on manual grades
         const assignment = await Assignment.findById(submission.assignment);
-        if (assignment && assignment.questions) {
+        if (assignment && assignment.questions && assignment.questions.length > 0) {
           let earnedPoints = 0;
           
           for (let i = 0; i < assignment.questions.length; i++) {
@@ -763,6 +743,48 @@ exports.gradeSubmission = async (req, res) => {
     }
 
     submission.feedback = feedback;
+    
+    // Handle teacher feedback file uploads
+    if (req.files && req.files.length > 0) {
+      try {
+        const feedbackFiles = [];
+        
+        // Process each uploaded file
+        for (const file of req.files) {
+          if (isCloudinaryConfigured()) {
+            // Upload to Cloudinary
+            const uploadResult = await uploadToCloudinary(file, {
+              folder: 'lms/teacher-feedback',
+              resource_type: 'auto' // Auto-detect file type
+            });
+            
+            feedbackFiles.push({
+              url: uploadResult.url,
+              name: file.originalname,
+              originalname: file.originalname
+            });
+          } else {
+            // Store local file path
+            const fileUrl = file.path.replace(/\\/g, '/'); // Normalize path separators
+            feedbackFiles.push({
+              url: fileUrl,
+              name: file.originalname,
+              originalname: file.originalname
+            });
+          }
+        }
+        
+        // Add new files to existing teacher feedback files
+        if (!submission.teacherFeedbackFiles) {
+          submission.teacherFeedbackFiles = [];
+        }
+        submission.teacherFeedbackFiles = [...submission.teacherFeedbackFiles, ...feedbackFiles];
+      } catch (error) {
+        console.error('Error uploading teacher feedback files:', error);
+        // Don't fail the entire request if file upload fails
+        // Just log the error and continue
+      }
+    }
     
     // Update quiz feedback options if provided
     if (showCorrectAnswers !== undefined) {
@@ -968,12 +990,42 @@ exports.deleteSubmission = async (req, res) => {
     // Delete any uploaded files
     if (submission.files && submission.files.length > 0) {
       await Promise.all(submission.files.map(async (file) => {
-        const filePath = path.join(__dirname, '..', file);
-        try {
-          await fs.unlink(filePath);
-
-        } catch (err) {
-          console.error('[DeleteSubmission] Error deleting file:', err);
+        // Extract file URL from object or string
+        let fileUrl;
+        if (typeof file === 'object' && file.url) {
+          fileUrl = file.url;
+        } else if (typeof file === 'string') {
+          fileUrl = file;
+        } else {
+          fileUrl = String(file);
+        }
+        
+        // Check if it's a Cloudinary URL
+        if (fileUrl.includes('cloudinary.com') && isCloudinaryConfigured()) {
+          const publicId = extractPublicId(fileUrl);
+          if (publicId) {
+            try {
+              let resourceType = 'auto';
+              if (fileUrl.includes('/raw/upload/')) {
+                resourceType = 'raw';
+              } else if (fileUrl.includes('/video/upload/')) {
+                resourceType = 'video';
+              } else if (fileUrl.includes('/image/upload/')) {
+                resourceType = 'image';
+              }
+              await deleteFromCloudinary(publicId, resourceType);
+            } catch (err) {
+              console.error('[DeleteSubmission] Error deleting from Cloudinary:', err);
+            }
+          }
+        } else {
+          // Delete local file
+          const filePath = path.join(__dirname, '..', fileUrl);
+          try {
+            await fs.unlink(filePath);
+          } catch (err) {
+            console.error('[DeleteSubmission] Error deleting file:', err);
+          }
         }
       }));
     }
@@ -990,5 +1042,568 @@ exports.deleteSubmission = async (req, res) => {
   } catch (error) {
     console.error('[DeleteSubmission] Error:', error);
     res.status(500).json({ message: error.message });
+  }
+};
+
+// Download all submissions for an assignment as a zip file
+exports.downloadSubmissions = async (req, res) => {
+  try {
+    const { assignmentId } = req.params;
+    
+    // Get assignment details
+    const assignment = await Assignment.findById(assignmentId);
+    if (!assignment) {
+      return res.status(404).json({ message: 'Assignment not found' });
+    }
+
+    // Get all submissions for this assignment
+    const submissions = await Submission.find({ assignment: assignmentId })
+      .populate('student', 'firstName lastName email');
+
+    if (submissions.length === 0) {
+      return res.status(404).json({ message: 'No submissions found for this assignment' });
+    }
+
+    // Create a zip archive
+    const archive = archiver('zip', {
+      zlib: { level: 9 } // Maximum compression
+    });
+
+    // Set response headers
+    res.attachment(`${assignment.title.replace(/[^a-z0-9]/gi, '_')}_submissions.zip`);
+    archive.pipe(res);
+
+    // Add files from each submission
+    for (const submission of submissions) {
+      const studentName = `${submission.student?.firstName || 'Unknown'}_${submission.student?.lastName || 'Student'}`.replace(/[^a-z0-9]/gi, '_');
+      const studentFolder = `${studentName}_${submission.student?._id || submission._id}`;
+
+      if (submission.files && submission.files.length > 0) {
+        for (let i = 0; i < submission.files.length; i++) {
+          const fileData = submission.files[i];
+          
+          // Extract file URL and original filename
+          let fileUrl;
+          let fileName;
+          
+          if (typeof fileData === 'object' && fileData.url) {
+            // New format: object with url and originalname
+            fileUrl = fileData.url;
+            fileName = fileData.originalname || fileData.name || fileUrl.split('/').pop() || `file_${i + 1}`;
+          } else if (typeof fileData === 'string') {
+            // Legacy format: just a URL string
+            fileUrl = fileData;
+            fileName = fileUrl.split('/').pop() || `file_${i + 1}`;
+          } else {
+            fileUrl = String(fileData);
+            fileName = fileUrl.split('/').pop() || `file_${i + 1}`;
+          }
+          
+          // Ensure fileName has an extension
+          if (!fileName.includes('.')) {
+            const urlExt = fileUrl.split('.').pop()?.split('?')[0] || '';
+            if (urlExt && urlExt.length <= 5) {
+              fileName = `${fileName}.${urlExt}`;
+            }
+          }
+          
+          // Create unique filename if multiple files from same student
+          const fileExtension = path.extname(fileName);
+          const baseName = path.basename(fileName, fileExtension);
+          const uniqueFileName = submission.files.length > 1 
+            ? `${baseName}_${i + 1}${fileExtension}`
+            : fileName;
+          
+          // Check if it's a Cloudinary URL
+          if (fileUrl.includes('cloudinary.com')) {
+            // Fetch from Cloudinary
+            try {
+              const https = require('https');
+              const http = require('http');
+              let fetchUrl = fileUrl;
+              if (fileUrl.includes('/image/upload/') && (fileUrl.includes('.pdf') || fileUrl.includes('.doc') || fileUrl.includes('.docx'))) {
+                fetchUrl = fileUrl.replace('/image/upload/', '/raw/upload/');
+              }
+              const protocol = fetchUrl.startsWith('https') ? https : http;
+              
+              await new Promise((resolve, reject) => {
+                protocol.get(fetchUrl, (response) => {
+                  if (response.statusCode === 200) {
+                    archive.append(response, { name: `${studentFolder}/${uniqueFileName}` });
+                    resolve();
+                  } else if (response.statusCode === 301 || response.statusCode === 302) {
+                    // Handle redirects
+                    const redirectUrl = response.headers.location;
+                    const redirectProtocol = redirectUrl.startsWith('https') ? https : http;
+                    redirectProtocol.get(redirectUrl, (redirectResponse) => {
+                      if (redirectResponse.statusCode === 200) {
+                        archive.append(redirectResponse, { name: `${studentFolder}/${uniqueFileName}` });
+                        resolve();
+                      } else {
+                        reject(new Error(`Failed to fetch file: ${redirectResponse.statusCode}`));
+                      }
+                    }).on('error', reject);
+                  } else {
+                    reject(new Error(`Failed to fetch file: ${response.statusCode}`));
+                  }
+                }).on('error', reject);
+              });
+            } catch (err) {
+              console.error('[DownloadSubmissions] Error fetching Cloudinary file:', err);
+            }
+          } else {
+            // For local files
+            const fullPath = path.join(__dirname, '..', fileUrl);
+            
+            if (fsSync.existsSync(fullPath)) {
+              archive.file(fullPath, { name: `${studentFolder}/${uniqueFileName}` });
+            }
+          }
+        }
+      }
+
+      // Also add submission text if available
+      if (submission.submissionText) {
+        const textFileName = `submission_text_${submission._id}.txt`;
+        archive.append(submission.submissionText, { name: `${studentFolder}/${textFileName}` });
+      }
+    }
+
+    // Finalize the archive
+    archive.finalize();
+
+  } catch (error) {
+    console.error('[DownloadSubmissions] Error:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ message: error.message });
+    }
+  }
+};
+
+// Download a single submission (files directly, not zipped)
+exports.downloadSingleSubmission = async (req, res) => {
+  try {
+    const { submissionId } = req.params;
+    
+    // Get submission details
+    const submission = await Submission.findById(submissionId)
+      .populate('student', 'firstName lastName email')
+      .populate('assignment', 'title');
+
+    if (!submission) {
+      return res.status(404).json({ message: 'Submission not found' });
+    }
+
+    // Check authorization - teacher/admin or the student themselves
+    const isTeacher = req.user.role === 'teacher' || req.user.role === 'admin';
+    const isOwnSubmission = submission.student && submission.student._id.toString() === req.user._id.toString();
+    
+    if (!isTeacher && !isOwnSubmission) {
+      return res.status(403).json({ message: 'Not authorized to download this submission' });
+    }
+
+    // Only download if there are uploaded files
+    if (!submission.files || submission.files.length === 0) {
+      return res.status(404).json({ message: 'No files uploaded for this submission' });
+    }
+
+    // If only one file, download it directly
+    if (submission.files.length === 1) {
+      const fileData = submission.files[0];
+      
+      // Extract file URL and original filename
+      let fileUrl;
+      let fileName;
+      
+      if (typeof fileData === 'object' && fileData.url) {
+        // New format: object with url and originalname
+        fileUrl = fileData.url;
+        // Prefer originalname, then name, then extract from URL
+        fileName = fileData.originalname || fileData.name || '';
+        
+        // If we don't have a filename with extension, try to extract from URL
+        if (!fileName || !fileName.includes('.')) {
+          const urlFileName = fileUrl.split('/').pop() || '';
+          // Remove query parameters and fragments from URL filename
+          const cleanUrlFileName = urlFileName.split('?')[0].split('#')[0];
+          
+          // If URL filename has extension, use it
+          if (cleanUrlFileName.includes('.')) {
+            fileName = fileName ? `${fileName}.${cleanUrlFileName.split('.').pop()}` : cleanUrlFileName;
+          } else if (fileName) {
+            // We have a filename but no extension, try to get from URL path
+            const urlWithoutQuery = fileUrl.split('?')[0];
+            const urlParts = urlWithoutQuery.split('.');
+            if (urlParts.length > 1) {
+              const urlExt = urlParts[urlParts.length - 1].toLowerCase();
+              if (urlExt && urlExt.length >= 2 && urlExt.length <= 5 && /^[a-z0-9]+$/.test(urlExt)) {
+                fileName = `${fileName}.${urlExt}`;
+              }
+            }
+          } else {
+            fileName = cleanUrlFileName || 'download';
+          }
+        }
+      } else if (typeof fileData === 'string') {
+        // Legacy format: just a URL string
+        fileUrl = fileData;
+        const urlParts = fileUrl.split('/');
+        fileName = urlParts[urlParts.length - 1] || 'download';
+        // Remove query parameters
+        fileName = fileName.split('?')[0].split('#')[0];
+      } else {
+        fileUrl = String(fileData);
+        fileName = fileUrl.split('/').pop() || 'download';
+        fileName = fileName.split('?')[0].split('#')[0];
+      }
+      
+      // Ensure fileName has an extension - extract from URL if still missing
+      if (!fileName.includes('.')) {
+        // Try to extract extension from URL (before query parameters)
+        const urlWithoutQuery = fileUrl.split('?')[0];
+        const urlParts = urlWithoutQuery.split('.');
+        if (urlParts.length > 1) {
+          const urlExt = urlParts[urlParts.length - 1].toLowerCase();
+          // Only use extension if it's a valid file extension (2-5 chars, alphanumeric)
+          if (urlExt && urlExt.length >= 2 && urlExt.length <= 5 && /^[a-z0-9]+$/.test(urlExt)) {
+            fileName = `${fileName}.${urlExt}`;
+          } else {
+            // Try to get extension from Cloudinary format parameter
+            const formatMatch = fileUrl.match(/[?&]f=([a-z0-9]+)/i);
+            if (formatMatch) {
+              fileName = `${fileName}.${formatMatch[1]}`;
+            } else {
+              fileName = `${fileName}.pdf`; // Default fallback
+            }
+          }
+        } else {
+          fileName = `${fileName}.pdf`; // Default fallback
+        }
+      }
+      
+      // Final cleanup - ensure no query parameters or fragments in filename
+      fileName = fileName.split('?')[0].split('#')[0];
+      
+      // Extract file extension
+      const fileExtension = fileName.includes('.') ? fileName.split('.').pop() : 'pdf';
+      
+      // Format filename as: AssignmentName_FirstName_LastName.extension
+      const assignmentName = submission.assignment?.title 
+        ? submission.assignment.title.replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, '_')
+        : 'Assignment';
+      const firstName = submission.student?.firstName 
+        ? submission.student.firstName.replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, '_')
+        : 'Student';
+      const lastName = submission.student?.lastName 
+        ? submission.student.lastName.replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, '_')
+        : '';
+      
+      // Create formatted filename
+      const formattedFileName = lastName 
+        ? `${assignmentName}_${firstName}_${lastName}.${fileExtension}`
+        : `${assignmentName}_${firstName}.${fileExtension}`;
+      
+      fileName = formattedFileName;
+      
+      // Helper function to get MIME type from extension
+      const getMimeType = (filename) => {
+        const ext = filename.split('.').pop()?.toLowerCase() || '';
+        const mimeTypes = {
+          'pdf': 'application/pdf',
+          'doc': 'application/msword',
+          'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'xls': 'application/vnd.ms-excel',
+          'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'ppt': 'application/vnd.ms-powerpoint',
+          'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          'txt': 'text/plain',
+          'rtf': 'application/rtf',
+          'odt': 'application/vnd.oasis.opendocument.text',
+          'ods': 'application/vnd.oasis.opendocument.spreadsheet',
+          'odp': 'application/vnd.oasis.opendocument.presentation',
+          'jpg': 'image/jpeg',
+          'jpeg': 'image/jpeg',
+          'png': 'image/png',
+          'gif': 'image/gif',
+          'zip': 'application/zip',
+          'rar': 'application/x-rar-compressed'
+        };
+        return mimeTypes[ext] || 'application/octet-stream';
+      };
+      
+      // Check if it's a Cloudinary URL
+      if (fileUrl.includes('cloudinary.com')) {
+        // For Cloudinary URLs, fetch the file and serve it through our server
+        try {
+          const https = require('https');
+          const http = require('http');
+          
+          // Fetch file from Cloudinary
+          const protocol = fileUrl.startsWith('https') ? https : http;
+          
+          // Add a small delay to ensure Cloudinary has processed the file
+          const fetchFile = () => {
+            protocol.get(fileUrl, (cloudinaryResponse) => {
+              if (cloudinaryResponse.statusCode === 200) {
+                // Set headers for file download
+                // Use MIME type from extension as primary, fallback to Cloudinary's content-type
+                const contentTypeFromExt = getMimeType(fileName);
+                const contentType = contentTypeFromExt !== 'application/octet-stream' 
+                  ? contentTypeFromExt 
+                  : (cloudinaryResponse.headers['content-type'] || 'application/octet-stream');
+                
+                // Properly encode filename for Content-Disposition header
+                const encodedFileName = encodeURIComponent(fileName);
+                
+                res.setHeader('Content-Type', contentType);
+                res.setHeader('Content-Disposition', `attachment; filename="${fileName}"; filename*=UTF-8''${encodedFileName}`);
+                if (cloudinaryResponse.headers['content-length']) {
+                  res.setHeader('Content-Length', cloudinaryResponse.headers['content-length']);
+                }
+                
+                // Pipe the response to the client
+                cloudinaryResponse.pipe(res);
+              } else if (cloudinaryResponse.statusCode === 301 || cloudinaryResponse.statusCode === 302) {
+                // Handle redirects
+                const redirectUrl = cloudinaryResponse.headers.location;
+                
+                // Follow the redirect
+                const redirectProtocol = redirectUrl.startsWith('https') ? https : http;
+                redirectProtocol.get(redirectUrl, (redirectResponse) => {
+                  if (redirectResponse.statusCode === 200) {
+                    // Use MIME type from extension as primary, fallback to redirect response's content-type
+                    const contentTypeFromExt = getMimeType(fileName);
+                    const contentType = contentTypeFromExt !== 'application/octet-stream' 
+                      ? contentTypeFromExt 
+                      : (redirectResponse.headers['content-type'] || 'application/octet-stream');
+                    
+                    // Properly encode filename for Content-Disposition header
+                    const encodedFileName = encodeURIComponent(fileName);
+                    
+                    res.setHeader('Content-Type', contentType);
+                    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"; filename*=UTF-8''${encodedFileName}`);
+                    if (redirectResponse.headers['content-length']) {
+                      res.setHeader('Content-Length', redirectResponse.headers['content-length']);
+                    }
+                    redirectResponse.pipe(res);
+                  } else {
+                    res.status(redirectResponse.statusCode).json({ message: 'Failed to fetch file from Cloudinary' });
+                  }
+                }).on('error', (err) => {
+                  console.error('[DownloadSingleSubmission] Error fetching from redirect:', err);
+                  res.status(500).json({ message: 'Error fetching file from Cloudinary' });
+                });
+              } else {
+                res.status(cloudinaryResponse.statusCode).json({ 
+                  message: 'Failed to fetch file from Cloudinary',
+                  statusCode: cloudinaryResponse.statusCode
+                });
+              }
+            }).on('error', (err) => {
+              console.error('[DownloadSingleSubmission] Error fetching from Cloudinary:', err);
+              res.status(500).json({ message: 'Error fetching file from Cloudinary: ' + err.message });
+            });
+          };
+          
+          // Small delay to ensure file is ready (Cloudinary sometimes needs a moment)
+          setTimeout(fetchFile, 100);
+          
+          return;
+        } catch (err) {
+          console.error('[DownloadSingleSubmission] Error processing Cloudinary URL:', err);
+          res.status(500).json({ message: 'Error processing file URL: ' + err.message });
+          return;
+        }
+      }
+      
+      // For local files
+      const fullPath = path.join(__dirname, '..', fileUrl);
+      
+      if (fsSync.existsSync(fullPath)) {
+        // Set proper Content-Type for local files
+        const contentTypeFromExt = getMimeType(fileName);
+        if (contentTypeFromExt !== 'application/octet-stream') {
+          res.setHeader('Content-Type', contentTypeFromExt);
+        }
+        res.download(fullPath, fileName);
+        return;
+      } else {
+        // If it's a valid URL, redirect to it
+        if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
+          res.redirect(fileUrl);
+          return;
+        }
+        return res.status(404).json({ message: 'File not found on server' });
+      }
+    }
+
+    // If multiple files, create a zip
+    if (submission.files.length > 1) {
+      const archive = archiver('zip', {
+        zlib: { level: 9 }
+      });
+
+      // Format names consistently
+      const assignmentName = submission.assignment?.title 
+        ? submission.assignment.title.replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, '_')
+        : 'Assignment';
+      const firstName = submission.student?.firstName 
+        ? submission.student.firstName.replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, '_')
+        : 'Student';
+      const lastName = submission.student?.lastName 
+        ? submission.student.lastName.replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, '_')
+        : '';
+      
+      const studentName = lastName ? `${firstName}_${lastName}` : firstName;
+      const zipFileName = lastName 
+        ? `${assignmentName}_${firstName}_${lastName}.zip`
+        : `${assignmentName}_${firstName}.zip`;
+
+      res.attachment(zipFileName);
+      archive.pipe(res);
+
+      let filesAdded = 0;
+      // Add files
+      for (let i = 0; i < submission.files.length; i++) {
+        const fileData = submission.files[i];
+        
+        // Extract file URL and original filename
+        let fileUrl;
+        let fileName;
+        
+        if (typeof fileData === 'object' && fileData.url) {
+          // New format: object with url and originalname
+          fileUrl = fileData.url;
+          fileName = fileData.originalname || fileData.name || fileUrl.split('/').pop() || `file_${i + 1}`;
+        } else if (typeof fileData === 'string') {
+          // Legacy format: just a URL string
+          fileUrl = fileData;
+          fileName = fileUrl.split('/').pop() || `file_${i + 1}`;
+        } else {
+          fileUrl = String(fileData);
+          fileName = fileUrl.split('/').pop() || `file_${i + 1}`;
+        }
+        
+        // Ensure fileName has an extension
+        if (!fileName.includes('.')) {
+          const urlExt = fileUrl.split('.').pop()?.split('?')[0] || '';
+          if (urlExt && urlExt.length <= 5) {
+            fileName = `${fileName}.${urlExt}`;
+          }
+        }
+        
+        // Format filename for zip: AssignmentName_FirstName_LastName_FileNumber.extension
+        const fileExtension = path.extname(fileName);
+        const formattedFileName = lastName 
+          ? `${assignmentName}_${firstName}_${lastName}_${i + 1}${fileExtension}`
+          : `${assignmentName}_${firstName}_${i + 1}${fileExtension}`;
+        
+        fileName = formattedFileName;
+        
+        // Check if it's a Cloudinary URL
+        if (fileUrl.includes('cloudinary.com')) {
+          // For Cloudinary URLs, we need to fetch the file and add it to the zip
+          try {
+            const https = require('https');
+            const http = require('http');
+            
+            // Get the raw file URL (replace /image/upload/ with /raw/upload/ if needed)
+            let fetchUrl = fileUrl;
+            if (fileUrl.includes('/image/upload/') && (fileUrl.includes('.pdf') || fileUrl.includes('.doc') || fileUrl.includes('.docx'))) {
+              fetchUrl = fileUrl.replace('/image/upload/', '/raw/upload/');
+            }
+            
+            const parsedUrl = new URL(fetchUrl);
+            const client = parsedUrl.protocol === 'https:' ? https : http;
+            
+            // Fetch file from Cloudinary and add to archive
+            await new Promise((resolve, reject) => {
+              client.get(fetchUrl, (response) => {
+                if (response.statusCode === 200) {
+                  archive.append(response, { name: fileName });
+                  filesAdded++;
+                  resolve();
+                } else if (response.statusCode === 301 || response.statusCode === 302) {
+                  // Handle redirects
+                  const redirectUrl = response.headers.location;
+                  const redirectProtocol = redirectUrl.startsWith('https') ? https : http;
+                  redirectProtocol.get(redirectUrl, (redirectResponse) => {
+                    if (redirectResponse.statusCode === 200) {
+                      archive.append(redirectResponse, { name: fileName });
+                      filesAdded++;
+                      resolve();
+                    } else {
+                      reject(new Error(`Failed to fetch file: ${redirectResponse.statusCode}`));
+                    }
+                  }).on('error', reject);
+                } else {
+                  reject(new Error(`Failed to fetch file: ${response.statusCode}`));
+                }
+              }).on('error', (err) => {
+                reject(err);
+              });
+            });
+          } catch (err) {
+            // Error already handled in promise rejection
+          }
+        } else {
+          // For local files
+          const fullPath = path.join(__dirname, '..', fileUrl);
+
+          if (fsSync.existsSync(fullPath)) {
+            archive.file(fullPath, { name: fileName });
+            filesAdded++;
+          } else {
+            // Try to download from URL if it's a valid URL
+            if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
+              try {
+                const https = require('https');
+                const http = require('http');
+                const protocol = fileUrl.startsWith('https') ? https : http;
+                await new Promise((resolve, reject) => {
+                  protocol.get(fileUrl, (response) => {
+                    if (response.statusCode === 200) {
+                      archive.append(response, { name: fileName });
+                      filesAdded++;
+                      resolve();
+                    } else if (response.statusCode === 301 || response.statusCode === 302) {
+                      const redirectUrl = response.headers.location;
+                      const redirectProtocol = redirectUrl.startsWith('https') ? https : http;
+                      redirectProtocol.get(redirectUrl, (redirectResponse) => {
+                        if (redirectResponse.statusCode === 200) {
+                          archive.append(redirectResponse, { name: fileName });
+                          filesAdded++;
+                          resolve();
+                        } else {
+                          reject(new Error(`Failed to fetch file: ${redirectResponse.statusCode}`));
+                        }
+                      }).on('error', reject);
+                    } else {
+                      reject(new Error(`Failed to fetch file: ${response.statusCode}`));
+                    }
+                  }).on('error', reject);
+                });
+              } catch (err) {
+                // Error already handled in promise rejection
+              }
+            }
+          }
+        }
+      }
+
+      if (filesAdded === 0) {
+        archive.abort();
+        return res.status(404).json({ message: 'No files found on server' });
+      }
+
+      archive.finalize();
+      return;
+    }
+
+  } catch (error) {
+    console.error('[DownloadSingleSubmission] Error:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ message: error.message });
+    }
   }
 }; 

@@ -9,6 +9,7 @@ import api from '../services/api';
 import { API_URL } from '../config';
 import { getImageUrl } from '../services/api';
 import axios from 'axios';
+import ReactMarkdown from 'react-markdown';
 import { 
   Lock, 
   Unlock, 
@@ -37,6 +38,17 @@ import {
   User as UserIcon,
   LogOut
 } from 'lucide-react';
+
+// Helper function to sanitize HTML content
+function sanitizeHtml(html: string): string {
+  if (!html) return '';
+  // Basic sanitization: remove script/style tags and event handlers
+  let sanitized = html.replace(/<\/(script|style)>/gi, '</removed>');
+  sanitized = sanitized.replace(/<(script|style)[^>]*>[\s\S]*?<\/(script|style)>/gi, '');
+  sanitized = sanitized.replace(/ on\w+="[^"]*"/gi, '');
+  sanitized = sanitized.replace(/ on\w+='[^']*'/gi, '');
+  return sanitized;
+}
 import WhatIfScores from './WhatIfScores';
 import StudentGradeSidebar from './StudentGradeSidebar';
 import CourseDiscussions from './CourseDiscussions';
@@ -2263,8 +2275,20 @@ const CourseDetail: React.FC = () => {
               {/* Display Syllabus Content */}
               {course.catalog?.syllabusContent && (
                 <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
-                  <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Syllabus Content</h3>
-                  <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: course.catalog.syllabusContent }} />
+                  <div className="prose prose-lg dark:prose-invert max-w-none 
+                    prose-headings:text-gray-900 dark:prose-headings:text-gray-100
+                    prose-p:text-gray-700 dark:prose-p:text-gray-300
+                    prose-strong:text-gray-900 dark:prose-strong:text-gray-100
+                    prose-ul:text-gray-700 dark:prose-ul:text-gray-300
+                    prose-ol:text-gray-700 dark:prose-ol:text-gray-300
+                    prose-li:text-gray-700 dark:prose-li:text-gray-300
+                    prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg
+                    prose-h1:font-bold prose-h2:font-semibold prose-h3:font-semibold
+                    prose-h1:mt-8 prose-h2:mt-6 prose-h3:mt-4
+                    prose-p:mb-4 prose-ul:mb-4 prose-ol:mb-4
+                    prose-li:mb-2"
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(course.catalog.syllabusContent) }}
+                  />
                 </div>
               )}
 
@@ -4083,7 +4107,7 @@ const CourseDetail: React.FC = () => {
                 <Announcements courseId={course._id} />
                 {(isInstructor || isAdmin) && (
                   <button
-                    className="fixed bottom-4 right-4 sm:bottom-8 sm:right-8 z-50 bg-blue-600 text-white px-4 py-2.5 sm:px-6 sm:py-3 rounded-full shadow-lg hover:bg-blue-700 text-sm sm:text-lg font-bold flex items-center gap-1.5 sm:gap-2"
+                    className="fixed bottom-20 right-4 sm:bottom-8 sm:right-8 z-[110] bg-blue-600 text-white px-4 py-2.5 sm:px-6 sm:py-3 rounded-full shadow-lg hover:bg-blue-700 text-sm sm:text-lg font-bold flex items-center gap-1.5 sm:gap-2"
                     onClick={() => setShowAnnouncementModal(true)}
                   >
                     <span className="text-lg sm:text-xl">+</span>

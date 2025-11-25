@@ -24,7 +24,8 @@ async function checkStatus() {
     
     // Total sessions
     const totalSessions = await QuizSession.countDocuments({});
-    console.log(`Total sessions: ${totalSessions}`);
+    const totalSessionsCount = typeof totalSessions === 'number' ? totalSessions : 0;
+    console.log(`Total sessions: ${totalSessionsCount}`);
     
     // Sessions by status
     const waiting = await QuizSession.countDocuments({ status: 'waiting' });
@@ -32,24 +33,35 @@ async function checkStatus() {
     const paused = await QuizSession.countDocuments({ status: 'paused' });
     const ended = await QuizSession.countDocuments({ status: 'ended' });
     
-    console.log(`  - Waiting: ${waiting}`);
-    console.log(`  - Active: ${active}`);
-    console.log(`  - Paused: ${paused}`);
-    console.log(`  - Ended: ${ended}`);
+    console.log(`  - Waiting: ${typeof waiting === 'number' ? waiting : 0}`);
+    console.log(`  - Active: ${typeof active === 'number' ? active : 0}`);
+    console.log(`  - Paused: ${typeof paused === 'number' ? paused : 0}`);
+    console.log(`  - Ended: ${typeof ended === 'number' ? ended : 0}`);
     
     // Old ended sessions (2+ days)
     const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+    if (isNaN(twoDaysAgo.getTime())) {
+      throw new Error('Invalid date calculation');
+    }
+
     const oldEnded = await QuizSession.countDocuments({
       status: 'ended',
       createdAt: { $lt: twoDaysAgo }
     });
-    console.log(`\nOld ended sessions (2+ days): ${oldEnded}`);
+    const oldEndedCount = typeof oldEnded === 'number' ? oldEnded : 0;
+    console.log(`\nOld ended sessions (2+ days): ${oldEndedCount}`);
     
     // Check for duplicate PINs
     const sessions = await QuizSession.find({}).select('gamePin').lean();
+    if (!Array.isArray(sessions)) {
+      throw new Error('Invalid sessions array returned from database');
+    }
+
     const pinCounts = {};
     sessions.forEach(s => {
-      pinCounts[s.gamePin] = (pinCounts[s.gamePin] || 0) + 1;
+      if (s && s.gamePin && typeof s.gamePin === 'string') {
+        pinCounts[s.gamePin] = (pinCounts[s.gamePin] || 0) + 1;
+      }
     });
     const duplicates = Object.entries(pinCounts).filter(([pin, count]) => count > 1);
     
@@ -64,16 +76,24 @@ async function checkStatus() {
     
     // PIN collision probability
     const possiblePins = 900000; // 100000-999999
-    const collisionProb = ((totalSessions / possiblePins) * 100).toFixed(2);
-    console.log(`\nPIN collision probability: ${collisionProb}%`);
+    if (possiblePins > 0 && totalSessionsCount > 0) {
+      const collisionProb = ((totalSessionsCount / possiblePins) * 100).toFixed(2);
+      if (isFinite(parseFloat(collisionProb))) {
+        console.log(`\nPIN collision probability: ${collisionProb}%`);
+      } else {
+        console.log('\nPIN collision probability: Unable to calculate');
+      }
+    } else {
+      console.log('\nPIN collision probability: 0%');
+    }
     
-    if (totalSessions > 800000) {
+    if (totalSessionsCount > 800000) {
       console.log('⚠️  WARNING: Very high collision probability! Consider cleaning up old sessions.');
     }
     
     // Offer to clean up
-    if (oldEnded > 0) {
-      console.log(`\n🧹 Would you like to clean up ${oldEnded} old ended sessions? (This will free up PINs)`);
+    if (oldEndedCount > 0) {
+      console.log(`\n🧹 Would you like to clean up ${oldEndedCount} old ended sessions? (This will free up PINs)`);
       console.log('Run: node scripts/cleanupOldSessions.js');
     }
     
@@ -81,7 +101,9 @@ async function checkStatus() {
     process.exit(0);
   } catch (error) {
     console.error('❌ Error checking status:', error);
-    mongoose.connection.close();
+    if (mongoose.connection.readyState === 1) {
+      mongoose.connection.close();
+    }
     process.exit(1);
   }
 }

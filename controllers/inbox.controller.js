@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 const ConversationParticipant = require('../models/ConversationParticipant');
@@ -5,10 +6,19 @@ const ConversationParticipant = require('../models/ConversationParticipant');
 // List all conversations for the current user
 exports.getConversations = async (req, res) => {
   try {
-    const userId = req.user._id;
+    const userId = req.user._id || req.user.id;
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+    
     // Find all conversations where user is a participant
     const participants = await ConversationParticipant.find({ userId });
     const conversationIds = participants.map(p => p.conversationId);
+    
+    if (conversationIds.length === 0) {
+      return res.json([]);
+    }
+    
     // Get conversations and populate last message and participants
     const conversations = await Conversation.find({ _id: { $in: conversationIds } })
       .sort({ updatedAt: -1 });
@@ -18,7 +28,7 @@ exports.getConversations = async (req, res) => {
       const participant = participants.find(p => String(p.conversationId) === String(conv._id));
       const unreadCount = await Message.countDocuments({
         conversationId: conv._id,
-        createdAt: { $gt: participant.lastReadAt || new Date(0) },
+        createdAt: { $gt: participant?.lastReadAt || new Date(0) },
         senderId: { $ne: userId }
       });
       // New: check if user has sent any message in this conversation
@@ -30,11 +40,11 @@ exports.getConversations = async (req, res) => {
         createdBy: conv.createdBy,
         updatedAt: conv.updatedAt,
         participants: convParticipants.map(p => ({
-          _id: p.userId._id,
-          firstName: p.userId.firstName,
-          lastName: p.userId.lastName,
-          email: p.userId.email,
-          profilePicture: p.userId.profilePicture,
+          _id: p.userId?._id,
+          firstName: p.userId?.firstName,
+          lastName: p.userId?.lastName,
+          email: p.userId?.email,
+          profilePicture: p.userId?.profilePicture,
           folder: p.folder,
           starred: p.starred,
           lastReadAt: p.lastReadAt,
@@ -54,7 +64,41 @@ exports.getConversations = async (req, res) => {
 exports.createConversation = async (req, res) => {
   try {
     const { subject, participantIds, body, sendIndividually, course } = req.body;
-    const userId = req.user._id;
+    const userId = req.user._id || req.user.id;
+    
+    // Validate inputs
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+    
+    if (!subject || !subject.trim()) {
+      return res.status(400).json({ error: 'Subject is required' });
+    }
+    
+    if (!body || !body.trim()) {
+      return res.status(400).json({ error: 'Message body is required' });
+    }
+    
+    if (!participantIds || !Array.isArray(participantIds) || participantIds.length === 0) {
+      return res.status(400).json({ error: 'At least one participant is required' });
+    }
+    
+    // Validate all participant IDs
+    for (const pid of participantIds) {
+      if (!mongoose.Types.ObjectId.isValid(pid)) {
+        return res.status(400).json({ error: `Invalid participant ID: ${pid}` });
+      }
+      // Don't allow sending to self
+      if (pid.toString() === userId.toString()) {
+        return res.status(400).json({ error: 'Cannot send message to yourself' });
+      }
+    }
+    
+    // Validate course ID if provided
+    if (course && !mongoose.Types.ObjectId.isValid(course)) {
+      return res.status(400).json({ error: 'Invalid course ID format' });
+    }
+    
     if (sendIndividually) {
       // Create a separate conversation for each recipient
       const results = await Promise.all(participantIds.map(async (recipientId) => {
@@ -116,9 +160,20 @@ exports.createConversation = async (req, res) => {
 exports.getMessages = async (req, res) => {
   try {
     const { conversationId } = req.params;
+    const userId = req.user._id || req.user.id;
+    
+    // Validate IDs
+    if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+      return res.status(400).json({ error: 'Invalid conversation ID format' });
+    }
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+    
     // Check if user is a participant
-    const participant = await ConversationParticipant.findOne({ conversationId, userId: req.user._id });
+    const participant = await ConversationParticipant.findOne({ conversationId, userId });
     if (!participant) return res.status(403).json({ error: 'Not a participant' });
+    
     const messages = await Message.find({ conversationId }).sort({ createdAt: 1 }).populate('senderId', 'firstName lastName email profilePicture');
     res.json(messages);
   } catch (err) {
@@ -131,10 +186,30 @@ exports.sendMessage = async (req, res) => {
   try {
     const { conversationId } = req.params;
     const { body, attachments } = req.body;
-    const userId = req.user._id;
+    const userId = req.user._id || req.user.id;
+    
+    // Validate IDs
+    if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+      return res.status(400).json({ error: 'Invalid conversation ID format' });
+    }
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+    
+    // Validate body
+    if (!body || !body.trim()) {
+      return res.status(400).json({ error: 'Message body is required' });
+    }
+    
     // Check if user is a participant
     const participant = await ConversationParticipant.findOne({ conversationId, userId });
     if (!participant) return res.status(403).json({ error: 'Not a participant' });
+    
+    // Validate attachments if provided
+    if (attachments && !Array.isArray(attachments)) {
+      return res.status(400).json({ error: 'Attachments must be an array' });
+    }
+    
     // Create message
     const message = await Message.create({
       conversationId,
@@ -142,12 +217,16 @@ exports.sendMessage = async (req, res) => {
       body,
       attachments: attachments || []
     });
+    
     // Update conversation updatedAt
     await Conversation.findByIdAndUpdate(conversationId, { updatedAt: new Date() });
+    
     // Update sender's lastReadAt
     await ConversationParticipant.updateOne({ conversationId, userId }, { lastReadAt: new Date(), folder: 'sent' });
+    
     // Mark as unread for other participants (do not update their lastReadAt)
     await ConversationParticipant.updateMany({ conversationId, userId: { $ne: userId }, folder: { $ne: 'archived' } }, { folder: 'inbox' });
+    
     res.status(201).json(message);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -158,9 +237,19 @@ exports.sendMessage = async (req, res) => {
 exports.markAsRead = async (req, res) => {
   try {
     const { conversationId } = req.params;
-    const userId = req.user._id;
+    const userId = req.user._id || req.user.id;
+    
+    // Validate IDs
+    if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+      return res.status(400).json({ error: 'Invalid conversation ID format' });
+    }
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+    
     const participant = await ConversationParticipant.findOne({ conversationId, userId });
     if (!participant) return res.status(403).json({ error: 'Not a participant' });
+    
     participant.lastReadAt = new Date();
     await participant.save();
     res.json({ success: true });
@@ -174,9 +263,25 @@ exports.moveConversation = async (req, res) => {
   try {
     const { conversationId } = req.params;
     const { folder } = req.body; // inbox, sent, archived
-    const userId = req.user._id;
+    const userId = req.user._id || req.user.id;
+    
+    // Validate IDs
+    if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+      return res.status(400).json({ error: 'Invalid conversation ID format' });
+    }
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+    
+    // Validate folder
+    const validFolders = ['inbox', 'sent', 'archived'];
+    if (!folder || !validFolders.includes(folder)) {
+      return res.status(400).json({ error: `Folder must be one of: ${validFolders.join(', ')}` });
+    }
+    
     const participant = await ConversationParticipant.findOne({ conversationId, userId });
     if (!participant) return res.status(403).json({ error: 'Not a participant' });
+    
     participant.folder = folder;
     await participant.save();
     res.json({ success: true });
@@ -189,9 +294,19 @@ exports.moveConversation = async (req, res) => {
 exports.toggleStar = async (req, res) => {
   try {
     const { conversationId } = req.params;
-    const userId = req.user._id;
+    const userId = req.user._id || req.user.id;
+    
+    // Validate IDs
+    if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+      return res.status(400).json({ error: 'Invalid conversation ID format' });
+    }
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+    
     const participant = await ConversationParticipant.findOne({ conversationId, userId });
     if (!participant) return res.status(403).json({ error: 'Not a participant' });
+    
     participant.starred = !participant.starred;
     await participant.save();
     res.json({ starred: participant.starred });
@@ -204,15 +319,26 @@ exports.toggleStar = async (req, res) => {
 exports.deleteForever = async (req, res) => {
   try {
     const { conversationId } = req.params;
-    const userId = req.user._id;
+    const userId = req.user._id || req.user.id;
+    
+    // Validate IDs
+    if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+      return res.status(400).json({ error: 'Invalid conversation ID format' });
+    }
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+    
     // Remove the participant record for this user
     await ConversationParticipant.deleteOne({ conversationId, userId });
+    
     // Optionally, clean up the conversation/messages if no participants remain
     const remaining = await ConversationParticipant.countDocuments({ conversationId });
     if (remaining === 0) {
       await Message.deleteMany({ conversationId });
       await Conversation.deleteOne({ _id: conversationId });
     }
+    
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -74,6 +74,21 @@ pollSchema.virtual('totalVotes').get(function() {
   return this.options.reduce((sum, option) => sum + option.votes, 0);
 });
 
+// Add validation to ensure endDate is in the future when creating
+pollSchema.pre('validate', function(next) {
+  if (this.isNew && this.endDate) {
+    if (new Date(this.endDate) <= new Date()) {
+      this.invalidate('endDate', 'End date must be in the future');
+    }
+  }
+  
+  // Validate at least 2 options
+  if (this.options && this.options.length < 2) {
+    this.invalidate('options', 'Poll must have at least 2 options');
+  }
+  next();
+});
+
 // Method to check if poll is expired
 pollSchema.methods.isExpired = function() {
   return new Date() > this.endDate;

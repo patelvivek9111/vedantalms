@@ -20,7 +20,9 @@ exports.protect = async (req, res, next) => {
   
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // Use fallback JWT_SECRET if not set (shouldn't happen as server.js sets it, but safety check)
+    const jwtSecret = process.env.JWT_SECRET || 'your-super-secret-jwt-key-123';
+    const decoded = jwt.verify(token, jwtSecret);
 
     
     const user = await User.findById(decoded.id);

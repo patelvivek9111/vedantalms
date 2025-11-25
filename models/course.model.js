@@ -106,7 +106,7 @@ const courseSchema = new mongoose.Schema({
   },
   semester: {
     term: { type: String, enum: ['Fall', 'Spring', 'Summer', 'Winter'], default: 'Fall' },
-    year: { type: Number, default: new Date().getFullYear() }
+    year: { type: Number, default: new Date().getFullYear(), min: 2000, max: 2100 }
   },
   enrollmentRequests: [{
     student: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -240,6 +240,40 @@ const courseSchema = new mongoose.Schema({
   }
 }, {
   timestamps: true // This will add createdAt and updatedAt fields
+});
+
+// Add validation to ensure endDate is after startDate and enrollmentDeadline is before startDate
+courseSchema.pre('validate', function(next) {
+  if (this.catalog) {
+    // Validate endDate is after startDate
+    if (this.catalog.startDate && this.catalog.endDate) {
+      if (new Date(this.catalog.endDate) <= new Date(this.catalog.startDate)) {
+        this.invalidate('catalog.endDate', 'End date must be after start date');
+      }
+    }
+    
+    // Validate enrollmentDeadline is before startDate (if both exist)
+    if (this.catalog.enrollmentDeadline && this.catalog.startDate) {
+      if (new Date(this.catalog.enrollmentDeadline) >= new Date(this.catalog.startDate)) {
+        this.invalidate('catalog.enrollmentDeadline', 'Enrollment deadline must be before start date');
+      }
+    }
+    
+    // Validate maxStudents is positive if provided
+    if (this.catalog.maxStudents !== undefined && this.catalog.maxStudents !== null) {
+      if (this.catalog.maxStudents < 1) {
+        this.invalidate('catalog.maxStudents', 'Maximum students must be at least 1');
+      }
+    }
+    
+    // Validate creditHours is positive
+    if (this.catalog.creditHours !== undefined && this.catalog.creditHours !== null) {
+      if (this.catalog.creditHours < 0) {
+        this.invalidate('catalog.creditHours', 'Credit hours must be non-negative');
+      }
+    }
+  }
+  next();
 });
 
 module.exports = mongoose.model('Course', courseSchema); 

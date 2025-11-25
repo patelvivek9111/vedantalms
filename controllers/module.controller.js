@@ -19,14 +19,51 @@ exports.createModule = async (req, res) => {
       });
     }
     const { title, course, description } = req.body;
+    const userId = req.user._id || req.user.id;
+    
+    // Validate course ID
+    if (!course || !mongoose.Types.ObjectId.isValid(course)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid course ID format' 
+      });
+    }
+    
+    // Validate title
+    if (!title || !title.trim()) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Title is required and cannot be empty' 
+      });
+    }
+    
     // Only allow teachers/admins to create modules for their courses
     if (req.user.role !== 'admin') {
+      if (!userId) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'User ID is required' 
+        });
+      }
       const foundCourse = await Course.findById(course);
-      if (!foundCourse || foundCourse.instructor.toString() !== req.user.id) {
-        return res.status(403).json({ success: false, message: 'Not authorized to add module to this course' });
+      if (!foundCourse) {
+        return res.status(404).json({ 
+          success: false, 
+          message: 'Course not found' 
+        });
+      }
+      if (foundCourse.instructor.toString() !== userId.toString()) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Not authorized to add module to this course' 
+        });
       }
     }
-    const module = await Module.create({ title, course, description });
+    const module = await Module.create({ 
+      title: title.trim(), 
+      course, 
+      description: description ? description.trim() : description 
+    });
     res.status(201).json({ success: true, data: module });
   } catch (err) {
     console.error('Create module error:', err);
@@ -116,10 +153,48 @@ exports.getModuleById = async (req, res) => {
 // @access  Private (Teacher/Admin)
 exports.deleteModule = async (req, res) => {
   try {
-    const module = await Module.findById(req.params.id);
-    if (!module) {
-      return res.status(404).json({ success: false, message: 'Module not found' });
+    const { id } = req.params;
+    const userId = req.user._id || req.user.id;
+    
+    // Validate module ID
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid module ID format' 
+      });
     }
+    
+    if (!userId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'User ID is required' 
+      });
+    }
+    
+    const module = await Module.findById(id);
+    if (!module) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Module not found' 
+      });
+    }
+    
+    // Check authorization
+    const course = await Course.findById(module.course);
+    if (!course) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Course not found' 
+      });
+    }
+    
+    if (req.user.role !== 'admin' && course.instructor.toString() !== userId.toString()) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Not authorized to delete this module' 
+      });
+    }
+    
     await module.deleteOne();
     res.json({ success: true, message: 'Module deleted' });
   } catch (err) {
@@ -133,10 +208,48 @@ exports.deleteModule = async (req, res) => {
 // @access  Private (Teacher/Admin)
 exports.toggleModulePublish = async (req, res) => {
   try {
-    const module = await Module.findById(req.params.id);
-    if (!module) {
-      return res.status(404).json({ success: false, message: 'Module not found' });
+    const { id } = req.params;
+    const userId = req.user._id || req.user.id;
+    
+    // Validate module ID
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid module ID format' 
+      });
     }
+    
+    if (!userId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'User ID is required' 
+      });
+    }
+    
+    const module = await Module.findById(id);
+    if (!module) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Module not found' 
+      });
+    }
+    
+    // Check authorization
+    const course = await Course.findById(module.course);
+    if (!course) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Course not found' 
+      });
+    }
+    
+    if (req.user.role !== 'admin' && course.instructor.toString() !== userId.toString()) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Not authorized to toggle publish status of this module' 
+      });
+    }
+    
     module.published = !module.published;
     await module.save();
     res.json({ success: true, published: module.published });
@@ -170,17 +283,45 @@ exports.updateModule = async (req, res) => {
     }
 
     // Check if user is authorized to update
+    const userId = req.user._id || req.user.id;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+    
     const course = await Course.findById(module.course);
-    if (req.user.role !== 'admin' && course.instructor.toString() !== req.user.id) {
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: 'Course not found'
+      });
+    }
+    
+    if (req.user.role !== 'admin' && course.instructor.toString() !== userId.toString()) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to update this module'
       });
     }
 
-    // Update the module
-    module.title = title;
-    module.description = description;
+    // Validate title if provided
+    if (title !== undefined) {
+      if (!title || !title.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Title cannot be empty'
+        });
+      }
+      module.title = title.trim();
+    }
+    
+    // Update description if provided
+    if (description !== undefined) {
+      module.description = description ? description.trim() : description;
+    }
+    
     await module.save();
 
     res.json({

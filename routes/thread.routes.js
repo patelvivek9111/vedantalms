@@ -1,16 +1,28 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const Thread = require('../models/thread.model');
 const { protect, authorize } = require('../middleware/auth');
 
 // Helper function to check if user is authorized to modify content
 const isAuthorized = (user, contentAuthor, isTeacher) => {
+  if (!user || !user._id || !contentAuthor) {
+    return false;
+  }
   return user._id.toString() === contentAuthor.toString() || isTeacher;
 };
 
 // Get all threads for a course
 router.get('/course/:courseId', protect, async (req, res) => {
   try {
+    // Validate courseId
+    if (!mongoose.Types.ObjectId.isValid(req.params.courseId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid course ID format'
+      });
+    }
+    
     const threads = await Thread.find({ course: req.params.courseId })
       .populate('author', 'firstName lastName role profilePicture')
       .populate('studentGrades.student', 'firstName lastName')
@@ -41,6 +53,14 @@ router.get('/course/:courseId', protect, async (req, res) => {
 // Get threads for a specific groupset
 router.get('/groupset/:groupSetId', protect, async (req, res) => {
   try {
+    // Validate groupSetId
+    if (!mongoose.Types.ObjectId.isValid(req.params.groupSetId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid group set ID format'
+      });
+    }
+    
     const threads = await Thread.find({ groupSet: req.params.groupSetId })
       .populate('author', 'firstName lastName role profilePicture')
       .populate('studentGrades.student', 'firstName lastName')
@@ -71,6 +91,15 @@ router.get('/groupset/:groupSetId', protect, async (req, res) => {
 // Create a new thread
 router.post('/', protect, authorize(['teacher', 'admin']), async (req, res) => {
   try {
+    // Validate user ID
+    const userId = req.user._id || req.user.id;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+
     const { 
       title, 
       content, 
@@ -84,15 +113,71 @@ router.post('/', protect, authorize(['teacher', 'admin']), async (req, res) => {
       settings 
     } = req.body;
     
+    // Validate required fields
+    if (!title || typeof title !== 'string' || title.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Thread title is required'
+      });
+    }
+
+    if (!content || typeof content !== 'string' || content.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Thread content is required'
+      });
+    }
+
+    // Validate courseId
+    if (!courseId || !mongoose.Types.ObjectId.isValid(courseId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid course ID is required'
+      });
+    }
+
+    // Validate totalPoints if isGraded
+    if (isGraded) {
+      if (totalPoints === undefined || totalPoints === null) {
+        return res.status(400).json({
+          success: false,
+          message: 'Total points is required for graded discussions'
+        });
+      }
+      const points = parseFloat(totalPoints);
+      if (isNaN(points) || points <= 0 || points > 1000) {
+        return res.status(400).json({
+          success: false,
+          message: 'Total points must be a number between 1 and 1000'
+        });
+      }
+    }
+
+    // Validate module if provided
+    if (module !== undefined && module !== null && !mongoose.Types.ObjectId.isValid(module)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid module ID format'
+      });
+    }
+
+    // Validate groupSet if provided
+    if (groupSet !== undefined && groupSet !== null && !mongoose.Types.ObjectId.isValid(groupSet)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid group set ID format'
+      });
+    }
+    
     const thread = new Thread({
-      title,
-      content,
+      title: title.trim(),
+      content: content.trim(),
       course: courseId,
-      author: req.user._id,
+      author: userId,
       module: module || undefined,
       groupSet: groupSet || undefined,
       isGraded: isGraded || false,
-      totalPoints: isGraded ? totalPoints : null,
+      totalPoints: isGraded ? parseFloat(totalPoints) : null,
       group: group || 'Discussions',
       dueDate: dueDate || null,
       settings: {
@@ -126,6 +211,14 @@ router.post('/', protect, authorize(['teacher', 'admin']), async (req, res) => {
 // Get a single thread with replies
 router.get('/:threadId', protect, async (req, res) => {
   try {
+    // Validate threadId
+    if (!mongoose.Types.ObjectId.isValid(req.params.threadId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid thread ID format'
+      });
+    }
+    
     const thread = await Thread.findById(req.params.threadId)
       .populate('author', 'firstName lastName role profilePicture')
       .populate('studentGrades.student', 'firstName lastName')
@@ -168,7 +261,41 @@ router.get('/:threadId', protect, async (req, res) => {
 // Add a reply to a thread or to another reply
 router.post('/:threadId/replies', protect, async (req, res) => {
   try {
+    // Validate threadId
+    if (!mongoose.Types.ObjectId.isValid(req.params.threadId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid thread ID format'
+      });
+    }
+
+    // Validate user ID
+    const userId = req.user._id || req.user.id;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+
     const { content, parentReply } = req.body;
+
+    // Validate content
+    if (!content || typeof content !== 'string' || content.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reply content is required'
+      });
+    }
+
+    // Validate parentReply if provided
+    if (parentReply !== undefined && parentReply !== null && !mongoose.Types.ObjectId.isValid(parentReply)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid parent reply ID format'
+      });
+    }
+
     const thread = await Thread.findById(req.params.threadId);
 
     if (!thread) {
@@ -191,8 +318,8 @@ router.post('/:threadId/replies', protect, async (req, res) => {
 
     // Add the reply
     thread.replies.push({
-      content,
-      author: req.user._id,
+      content: content.trim(),
+      author: userId,
       parentReply: parentReply || null
     });
 
@@ -251,6 +378,23 @@ router.post('/:threadId/replies', protect, async (req, res) => {
 // Update a thread
 router.put('/:threadId', protect, async (req, res) => {
   try {
+    // Validate threadId
+    if (!mongoose.Types.ObjectId.isValid(req.params.threadId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid thread ID format'
+      });
+    }
+
+    // Validate user ID
+    const userId = req.user._id || req.user.id;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+
     const thread = await Thread.findById(req.params.threadId);
     
     if (!thread) {
@@ -261,7 +405,7 @@ router.put('/:threadId', protect, async (req, res) => {
     }
 
     // Check if user is authorized to edit
-    if (!isAuthorized(req.user, thread.author, req.user.role === 'teacher')) {
+    if (!thread.author || !isAuthorized(req.user, thread.author, req.user.role === 'teacher')) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to edit this thread'
@@ -269,10 +413,50 @@ router.put('/:threadId', protect, async (req, res) => {
     }
 
     const { title, content, isGraded, totalPoints, group, dueDate, module, groupSet, settings } = req.body;
-    thread.title = title || thread.title;
-    thread.content = content || thread.content;
+    
+    // Validate title if provided
+    if (title !== undefined) {
+      if (!title || typeof title !== 'string' || title.trim().length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Title cannot be empty'
+        });
+      }
+      thread.title = title.trim();
+    }
+    
+    // Validate content if provided
+    if (content !== undefined) {
+      if (!content || typeof content !== 'string' || content.trim().length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Content cannot be empty'
+        });
+      }
+      thread.content = content.trim();
+    }
+    
     thread.isGraded = isGraded !== undefined ? isGraded : thread.isGraded;
-    thread.totalPoints = isGraded ? totalPoints : null;
+    
+    // Validate totalPoints if isGraded
+    if (isGraded) {
+      if (totalPoints === undefined || totalPoints === null) {
+        return res.status(400).json({
+          success: false,
+          message: 'Total points is required for graded discussions'
+        });
+      }
+      const points = parseFloat(totalPoints);
+      if (isNaN(points) || points <= 0 || points > 1000) {
+        return res.status(400).json({
+          success: false,
+          message: 'Total points must be a number between 1 and 1000'
+        });
+      }
+      thread.totalPoints = points;
+    } else {
+      thread.totalPoints = null;
+    }
     thread.group = group || thread.group;
     thread.dueDate = dueDate || thread.dueDate;
     if (module !== undefined) thread.module = module;
@@ -324,6 +508,14 @@ router.put('/:threadId', protect, async (req, res) => {
 // Delete a thread
 router.delete('/:threadId', protect, async (req, res) => {
   try {
+    // Validate threadId
+    if (!mongoose.Types.ObjectId.isValid(req.params.threadId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid thread ID format'
+      });
+    }
+
     const thread = await Thread.findById(req.params.threadId);
     
     if (!thread) {
@@ -334,7 +526,7 @@ router.delete('/:threadId', protect, async (req, res) => {
     }
 
     // Check if user is authorized to delete
-    if (!isAuthorized(req.user, thread.author, req.user.role === 'teacher')) {
+    if (!thread.author || !isAuthorized(req.user, thread.author, req.user.role === 'teacher')) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to delete this thread'
@@ -359,7 +551,49 @@ router.delete('/:threadId', protect, async (req, res) => {
 // Grade a student's participation in a thread
 router.post('/:threadId/grade', protect, authorize(['teacher', 'admin']), async (req, res) => {
   try {
+    // Validate threadId
+    if (!mongoose.Types.ObjectId.isValid(req.params.threadId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid thread ID format'
+      });
+    }
+
+    // Validate user ID
+    const userId = req.user._id || req.user.id;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+
     const { studentId, grade, feedback } = req.body;
+
+    // Validate studentId
+    if (!studentId || !mongoose.Types.ObjectId.isValid(studentId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid student ID is required'
+      });
+    }
+
+    // Validate grade
+    if (grade === undefined || grade === null) {
+      return res.status(400).json({
+        success: false,
+        message: 'Grade is required'
+      });
+    }
+
+    const gradeNum = parseFloat(grade);
+    if (isNaN(gradeNum)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Grade must be a number'
+      });
+    }
+
     const thread = await Thread.findById(req.params.threadId);
 
     if (!thread) {
@@ -376,8 +610,16 @@ router.post('/:threadId/grade', protect, authorize(['teacher', 'admin']), async 
       });
     }
 
-    // Validate grade
-    if (grade < 0 || grade > thread.totalPoints) {
+    // Validate totalPoints exists
+    if (!thread.totalPoints || thread.totalPoints <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Thread total points is not set or invalid'
+      });
+    }
+
+    // Validate grade range
+    if (gradeNum < 0 || gradeNum > thread.totalPoints) {
       return res.status(400).json({
         success: false,
         message: `Grade must be between 0 and ${thread.totalPoints}`
@@ -393,19 +635,19 @@ router.post('/:threadId/grade', protect, authorize(['teacher', 'admin']), async 
       // Update existing grade
       thread.studentGrades[gradeIndex] = {
         student: studentId,
-        grade,
-        feedback,
+        grade: gradeNum,
+        feedback: feedback || null,
         gradedAt: new Date(),
-        gradedBy: req.user._id
+        gradedBy: userId
       };
     } else {
       // Add new grade
       thread.studentGrades.push({
         student: studentId,
-        grade,
-        feedback,
+        grade: gradeNum,
+        feedback: feedback || null,
         gradedAt: new Date(),
-        gradedBy: req.user._id
+        gradedBy: userId
       });
     }
 
@@ -445,6 +687,22 @@ router.post('/:threadId/grade', protect, authorize(['teacher', 'admin']), async 
 // Get a student's grade for a thread
 router.get('/:threadId/grade/:studentId', protect, async (req, res) => {
   try {
+    // Validate threadId
+    if (!mongoose.Types.ObjectId.isValid(req.params.threadId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid thread ID format'
+      });
+    }
+
+    // Validate studentId
+    if (!mongoose.Types.ObjectId.isValid(req.params.studentId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid student ID format'
+      });
+    }
+
     const thread = await Thread.findById(req.params.threadId)
       .populate('studentGrades.student', 'firstName lastName')
       .populate('studentGrades.gradedBy', 'firstName lastName');
@@ -457,7 +715,7 @@ router.get('/:threadId/grade/:studentId', protect, async (req, res) => {
     }
 
     const grade = thread.studentGrades.find(
-      g => g.student._id.toString() === req.params.studentId
+      g => g.student && g.student._id && g.student._id.toString() === req.params.studentId
     );
 
     if (!grade) {
@@ -483,6 +741,14 @@ router.get('/:threadId/grade/:studentId', protect, async (req, res) => {
 // Pin/Unpin a thread (teachers only)
 router.patch('/:threadId/pin', protect, authorize(['teacher', 'admin']), async (req, res) => {
   try {
+    // Validate threadId
+    if (!mongoose.Types.ObjectId.isValid(req.params.threadId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid thread ID format'
+      });
+    }
+
     const thread = await Thread.findById(req.params.threadId);
     if (!thread) {
       return res.status(404).json({
@@ -528,6 +794,14 @@ router.patch('/:threadId/pin', protect, authorize(['teacher', 'admin']), async (
 // Get all threads for a module (both graded and non-graded)
 router.get('/module/:moduleId', protect, async (req, res) => {
   try {
+    // Validate moduleId
+    if (!mongoose.Types.ObjectId.isValid(req.params.moduleId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid module ID format'
+      });
+    }
+
     const threads = await Thread.find({ module: req.params.moduleId })
       .populate('author', 'firstName lastName role profilePicture')
       .populate('studentGrades.student', 'firstName lastName')
@@ -563,6 +837,14 @@ router.get('/module/:moduleId', protect, async (req, res) => {
 // Add publish/unpublish endpoint for threads (discussions)
 router.patch('/threads/:id/publish', protect, authorize(['teacher', 'admin']), async (req, res) => {
   try {
+    // Validate threadId
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid thread ID format' 
+      });
+    }
+
     const thread = await Thread.findById(req.params.id);
     if (!thread) {
       return res.status(404).json({ success: false, message: 'Thread not found' });
@@ -581,6 +863,31 @@ router.patch('/threads/:id/publish', protect, authorize(['teacher', 'admin']), a
 // Like/Unlike a reply
 router.post('/:threadId/replies/:replyId/like', protect, async (req, res) => {
   try {
+    // Validate threadId
+    if (!mongoose.Types.ObjectId.isValid(req.params.threadId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid thread ID format'
+      });
+    }
+
+    // Validate replyId
+    if (!mongoose.Types.ObjectId.isValid(req.params.replyId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid reply ID format'
+      });
+    }
+
+    // Validate user ID
+    const userId = req.user._id || req.user.id;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+
     const thread = await Thread.findById(req.params.threadId);
     
     if (!thread) {
@@ -591,7 +898,7 @@ router.post('/:threadId/replies/:replyId/like', protect, async (req, res) => {
     }
 
     // Check if likes are allowed
-    if (!thread.settings.allowLikes) {
+    if (!thread.settings || !thread.settings.allowLikes) {
       return res.status(400).json({
         success: false,
         message: 'Likes are not allowed for this discussion'
@@ -608,7 +915,7 @@ router.post('/:threadId/replies/:replyId/like', protect, async (req, res) => {
     }
 
     const existingLikeIndex = reply.likes.findIndex(
-      like => like.user.toString() === req.user._id.toString()
+      like => like.user && like.user.toString() === userId.toString()
     );
 
     if (existingLikeIndex > -1) {
@@ -617,7 +924,7 @@ router.post('/:threadId/replies/:replyId/like', protect, async (req, res) => {
     } else {
       // Like - add the like
       reply.likes.push({
-        user: req.user._id,
+        user: userId,
         likedAt: new Date()
       });
     }
@@ -658,6 +965,31 @@ router.post('/:threadId/replies/:replyId/like', protect, async (req, res) => {
 // Get thread with filtered replies based on user participation
 router.get('/:threadId/participant/:userId', protect, async (req, res) => {
   try {
+    // Validate threadId
+    if (!mongoose.Types.ObjectId.isValid(req.params.threadId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid thread ID format'
+      });
+    }
+
+    // Validate userId
+    if (!mongoose.Types.ObjectId.isValid(req.params.userId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid user ID format'
+      });
+    }
+
+    // Validate current user ID
+    const currentUserId = req.user._id || req.user.id;
+    if (!currentUserId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+
     const thread = await Thread.findById(req.params.threadId)
       .populate('author', 'firstName lastName role profilePicture')
       .populate('studentGrades.student', 'firstName lastName')
@@ -685,15 +1017,17 @@ router.get('/:threadId/participant/:userId', protect, async (req, res) => {
     }
 
     // If "require post before see" is enabled and user is a student
-    if (thread.settings.requirePostBeforeSee && req.user.role === 'student') {
+    if (thread.settings && thread.settings.requirePostBeforeSee && req.user.role === 'student') {
       // Check if the user has posted in this thread
-      const userHasPosted = thread.replies.some(reply => 
-        reply.author._id.toString() === req.user._id.toString()
-      );
+      const userHasPosted = thread.replies && Array.isArray(thread.replies) && 
+        thread.replies.some(reply => 
+          reply.author && reply.author._id && reply.author._id.toString() === currentUserId.toString()
+        );
 
-      if (!userHasPosted) {
+      if (!userHasPosted && thread.author && thread.author._id) {
         // Filter out all replies except the original post
         thread.replies = thread.replies.filter(reply => 
+          reply.author && reply.author._id && 
           reply.author._id.toString() === thread.author._id.toString()
         );
       }

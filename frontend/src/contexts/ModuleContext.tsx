@@ -45,7 +45,17 @@ export const ModuleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const { token } = useAuth();
 
   const getModules = useCallback(async (courseId: string) => {
-    if (!courseId) return;
+    // Validate courseId
+    if (!courseId || typeof courseId !== 'string' || courseId.trim() === '' || courseId === 'undefined' || courseId === 'null') {
+      console.warn('Invalid courseId in getModules');
+      return;
+    }
+
+    // Validate ObjectId format
+    if (!/^[a-fA-F0-9]{24}$/.test(courseId.trim())) {
+      console.warn('Invalid courseId format in getModules');
+      return;
+    }
     
     setLoading(true); 
     setError(null);
@@ -71,13 +81,35 @@ export const ModuleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [getModules]);
 
   const createModule = async (courseId: string, data: { title: string; description: string }) => {
+    // Validate courseId
+    if (!courseId || typeof courseId !== 'string' || courseId.trim() === '' || courseId === 'undefined' || courseId === 'null') {
+      throw new Error('Invalid course ID');
+    }
+
+    if (!/^[a-fA-F0-9]{24}$/.test(courseId.trim())) {
+      throw new Error('Invalid course ID format');
+    }
+
+    // Validate data
+    if (!data || typeof data !== 'object') {
+      throw new Error('Invalid module data');
+    }
+
+    if (!data.title || typeof data.title !== 'string' || data.title.trim().length === 0) {
+      throw new Error('Module title is required');
+    }
+
+    if (data.title.trim().length > 200) {
+      throw new Error('Module title must be 200 characters or less');
+    }
+
     setLoading(true); 
     setError(null);
     try {
       const res = await api.post('/modules', { 
-        title: data.title, 
-        course: courseId, 
-        description: data.description 
+        title: data.title.trim(), 
+        course: courseId.trim(), 
+        description: data.description ? data.description.trim() : data.description
       });
       if (res.data.success) {
         await getModulesRef.current(courseId);
@@ -93,10 +125,44 @@ export const ModuleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const updateModule = async (moduleId: string, data: { title: string; description: string }, courseId: string) => {
+    // Validate IDs
+    if (!moduleId || typeof moduleId !== 'string' || moduleId.trim() === '' || moduleId === 'undefined' || moduleId === 'null') {
+      throw new Error('Invalid module ID');
+    }
+
+    if (!courseId || typeof courseId !== 'string' || courseId.trim() === '' || courseId === 'undefined' || courseId === 'null') {
+      throw new Error('Invalid course ID');
+    }
+
+    if (!/^[a-fA-F0-9]{24}$/.test(moduleId.trim())) {
+      throw new Error('Invalid module ID format');
+    }
+
+    if (!/^[a-fA-F0-9]{24}$/.test(courseId.trim())) {
+      throw new Error('Invalid course ID format');
+    }
+
+    // Validate data
+    if (!data || typeof data !== 'object') {
+      throw new Error('Invalid module data');
+    }
+
+    if (data.title !== undefined) {
+      if (!data.title || typeof data.title !== 'string' || data.title.trim().length === 0) {
+        throw new Error('Module title cannot be empty');
+      }
+      if (data.title.trim().length > 200) {
+        throw new Error('Module title must be 200 characters or less');
+      }
+    }
+
     setLoading(true);
     setError(null);
     try {
-      await api.put(`/modules/${moduleId}`, data);
+      const updateData: any = {};
+      if (data.title !== undefined) updateData.title = data.title.trim();
+      if (data.description !== undefined) updateData.description = data.description ? data.description.trim() : data.description;
+      await api.put(`/modules/${moduleId.trim()}`, updateData);
       await getModulesRef.current(courseId);
     } catch (err: any) {
       console.error('Error updating module:', err);
@@ -107,22 +173,64 @@ export const ModuleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const createPage = async (data: { title: string; content: string; module?: string; groupSet?: string }, attachments?: File[]) => {
+    // Validate data
+    if (!data || typeof data !== 'object') {
+      throw new Error('Invalid page data');
+    }
+
+    if (!data.title || typeof data.title !== 'string' || data.title.trim().length === 0) {
+      throw new Error('Page title is required');
+    }
+
+    if (!data.content || typeof data.content !== 'string' || data.content.trim().length === 0) {
+      throw new Error('Page content is required');
+    }
+
+    if (data.title.trim().length > 200) {
+      throw new Error('Page title must be 200 characters or less');
+    }
+
+    // Validate module if provided
+    if (data.module !== undefined && data.module !== null) {
+      if (typeof data.module !== 'string' || data.module.trim() === '' || !/^[a-fA-F0-9]{24}$/.test(data.module.trim())) {
+        throw new Error('Invalid module ID format');
+      }
+    }
+
+    // Validate groupSet if provided
+    if (data.groupSet !== undefined && data.groupSet !== null) {
+      if (typeof data.groupSet !== 'string' || data.groupSet.trim() === '' || !/^[a-fA-F0-9]{24}$/.test(data.groupSet.trim())) {
+        throw new Error('Invalid group set ID format');
+      }
+    }
+
+    // Validate attachments if provided
+    if (attachments !== undefined && attachments !== null) {
+      if (!Array.isArray(attachments)) {
+        throw new Error('Attachments must be an array');
+      }
+      // Limit number of attachments
+      if (attachments.length > 10) {
+        throw new Error('Maximum 10 attachments allowed');
+      }
+    }
+
     setLoading(true);
     setError(null);
     try {
       let res;
       if (attachments && attachments.length > 0) {
         const form = new FormData();
-        form.append('title', data.title);
-        form.append('content', data.content);
-        if (data.module) form.append('module', data.module);
-        if (data.groupSet) form.append('groupSet', data.groupSet);
+        form.append('title', data.title.trim());
+        form.append('content', data.content.trim());
+        if (data.module) form.append('module', data.module.trim());
+        if (data.groupSet) form.append('groupSet', data.groupSet.trim());
         attachments.forEach(file => form.append('attachments', file));
         res = await api.post('/pages', form, { headers: { 'Content-Type': 'multipart/form-data' } });
       } else {
-        const payload: any = { title: data.title, content: data.content };
-        if (data.module) payload.module = data.module;
-        if (data.groupSet) payload.groupSet = data.groupSet;
+        const payload: any = { title: data.title.trim(), content: data.content.trim() };
+        if (data.module) payload.module = data.module.trim();
+        if (data.groupSet) payload.groupSet = data.groupSet.trim();
         res = await api.post('/pages', payload);
       }
       if (res.data.success && data.module) {
@@ -143,7 +251,16 @@ export const ModuleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const getPages = useCallback(async (moduleId: string): Promise<Page[]> => {
-    if (!moduleId) return [];
+    // Validate moduleId
+    if (!moduleId || typeof moduleId !== 'string' || moduleId.trim() === '' || moduleId === 'undefined' || moduleId === 'null') {
+      console.warn('Invalid moduleId in getPages');
+      return [];
+    }
+
+    if (!/^[a-fA-F0-9]{24}$/.test(moduleId.trim())) {
+      console.warn('Invalid moduleId format in getPages');
+      return [];
+    }
     
     try {
       const res = await api.get(`/pages/${moduleId}`);
@@ -166,8 +283,17 @@ export const ModuleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [getPages]);
 
   const getPage = async (pageId: string): Promise<Page> => {
+    // Validate pageId
+    if (!pageId || typeof pageId !== 'string' || pageId.trim() === '' || pageId === 'undefined' || pageId === 'null') {
+      throw new Error('Invalid page ID');
+    }
+
+    if (!/^[a-fA-F0-9]{24}$/.test(pageId.trim())) {
+      throw new Error('Invalid page ID format');
+    }
+
     try {
-      const res = await api.get(`/pages/view/${pageId}`);
+      const res = await api.get(`/pages/view/${pageId.trim()}`);
       if (res.data.success) {
         return res.data.data;
       } else {
@@ -180,10 +306,27 @@ export const ModuleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const deleteModule = async (moduleId: string, courseId: string) => {
+    // Validate IDs
+    if (!moduleId || typeof moduleId !== 'string' || moduleId.trim() === '' || moduleId === 'undefined' || moduleId === 'null') {
+      throw new Error('Invalid module ID');
+    }
+
+    if (!courseId || typeof courseId !== 'string' || courseId.trim() === '' || courseId === 'undefined' || courseId === 'null') {
+      throw new Error('Invalid course ID');
+    }
+
+    if (!/^[a-fA-F0-9]{24}$/.test(moduleId.trim())) {
+      throw new Error('Invalid module ID format');
+    }
+
+    if (!/^[a-fA-F0-9]{24}$/.test(courseId.trim())) {
+      throw new Error('Invalid course ID format');
+    }
+
     setLoading(true);
     setError(null);
     try {
-      await api.delete(`/modules/${moduleId}`);
+      await api.delete(`/modules/${moduleId.trim()}`);
       await getModulesRef.current(courseId);
     } catch (err: any) {
       console.error('Error deleting module:', err);
@@ -194,8 +337,17 @@ export const ModuleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const toggleModulePublish = async (moduleId: string) => {
+    // Validate moduleId
+    if (!moduleId || typeof moduleId !== 'string' || moduleId.trim() === '' || moduleId === 'undefined' || moduleId === 'null') {
+      throw new Error('Invalid module ID');
+    }
+
+    if (!/^[a-fA-F0-9]{24}$/.test(moduleId.trim())) {
+      throw new Error('Invalid module ID format');
+    }
+
     try {
-      const res = await api.patch(`/modules/${moduleId}/publish`);
+      const res = await api.patch(`/modules/${moduleId.trim()}/publish`);
       if (res.data.success) {
         setModules(prevModules =>
           prevModules.map(m =>

@@ -38,15 +38,30 @@ router.put('/:id', protect, authorize('teacher', 'admin'), upload.array('attachm
 // Get all pages for a course
 router.get('/course/:courseId', protect, async (req, res) => {
   try {
+    const mongoose = require('mongoose');
+    const { courseId } = req.params;
+    
+    // Validate courseId
+    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid course ID format' 
+      });
+    }
+    
     // Find all modules for the course
-    const modules = await Module.find({ course: req.params.courseId }).select('_id');
+    const modules = await Module.find({ course: courseId }).select('_id');
+    if (!modules || modules.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+    
     const moduleIds = modules.map(m => m._id);
     // Find all pages for those modules
     const pages = await Page.find({ module: { $in: moduleIds } });
     res.json({ success: true, data: pages });
   } catch (err) {
     console.error('Error fetching pages for course:', err);
-    res.status(500).json({ success: false, message: 'Error fetching pages for course' });
+    res.status(500).json({ success: false, message: 'Error fetching pages for course', error: err.message });
   }
 });
 

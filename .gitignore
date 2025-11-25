@@ -23,7 +23,6 @@ logs
 *.log
 npm-debug.log*
 yarn-debug.log*
-yarn-error.log*
 lerna-debug.log*
 
 # Runtime data
@@ -111,9 +110,9 @@ Thumbs.db
 uploads/
 !uploads/.gitkeep
 
-# Test files
-test-*.js
-*test*.js
-check-*.js
-create-*.js
-recreate-*.js
+# Test files (keep test files, but ignore test output)
+# test-*.js
+# *test*.js
+# check-*.js
+# create-*.js
+# recreate-*.js

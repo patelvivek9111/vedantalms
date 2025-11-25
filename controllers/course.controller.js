@@ -77,10 +77,38 @@ exports.createCourse = async (req, res) => {
       defaultSemester = { term, year };
     }
     
+    // Validate semester term if provided
+    if (defaultSemester.term) {
+      const validTerms = ['Fall', 'Spring', 'Summer', 'Winter'];
+      if (!validTerms.includes(defaultSemester.term)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid semester term. Must be one of: Fall, Spring, Summer, Winter'
+        });
+      }
+    }
+    
+    // Validate semester year if provided
+    if (defaultSemester.year && (defaultSemester.year < 2000 || defaultSemester.year > 2100)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid semester year. Must be between 2000 and 2100'
+      });
+    }
+    
+    // Validate user ID
+    const userId = req.user._id || req.user.id;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+
     const course = await Course.create({
       title,
       description,
-      instructor: req.user.id,
+      instructor: userId,
       defaultColor: courseDefaultColor,
       semester: defaultSemester,
       ...(gradeScale ? { gradeScale } : {}),
@@ -106,6 +134,15 @@ exports.createCourse = async (req, res) => {
 // @access  Private
 exports.getCourses = async (req, res) => {
   try {
+    // Validate user ID
+    const userId = req.user._id || req.user.id;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+
     let courses;
     if (req.user.role === 'admin') {
       // Admin can see all courses
@@ -115,13 +152,13 @@ exports.getCourses = async (req, res) => {
         .populate('enrollmentRequests.student', 'firstName lastName email');
     } else if (req.user.role === 'teacher') {
       // Teachers can see their own courses
-      courses = await Course.find({ instructor: req.user.id })
+      courses = await Course.find({ instructor: userId })
         .populate('instructor', 'firstName lastName email')
         .populate('students', 'firstName lastName email')
         .populate('enrollmentRequests.student', 'firstName lastName email');
     } else {
       // Students can see courses they're enrolled in
-      courses = await Course.find({ students: req.user.id, published: true })
+      courses = await Course.find({ students: userId, published: true })
         .populate('instructor', 'firstName lastName email')
         .populate('students', 'firstName lastName email')
         .populate('enrollmentRequests.student', 'firstName lastName email');
@@ -242,8 +279,17 @@ exports.updateCourse = async (req, res) => {
       });
     }
 
+    // Validate user ID
+    const userId = req.user._id || req.user.id;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+
     // Check if user is authorized to update
-    if (req.user.role !== 'admin' && course.instructor.toString() !== req.user.id) {
+    if (req.user.role !== 'admin' && (!course.instructor || course.instructor.toString() !== userId.toString())) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to update this course'
@@ -314,6 +360,15 @@ exports.assignInstructor = async (req, res) => {
       });
     }
 
+    // Validate user ID
+    const userId = req.user._id || req.user.id;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+
     // Assign current user as instructor if they are a teacher
     if (req.user.role !== 'teacher' && req.user.role !== 'admin') {
       return res.status(403).json({ 
@@ -322,7 +377,7 @@ exports.assignInstructor = async (req, res) => {
       });
     }
 
-    course.instructor = req.user.id;
+    course.instructor = userId;
     await course.save();
 
     const updatedCourse = await Course.findById(req.params.id)
@@ -359,7 +414,16 @@ exports.publishCourse = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Course not found' });
     }
 
-    if (course.instructor.toString() !== req.user.id && req.user.role !== 'admin') {
+    // Validate user ID
+    const userId = req.user._id || req.user.id;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+
+    if ((!course.instructor || course.instructor.toString() !== userId.toString()) && req.user.role !== 'admin') {
       return res.status(403).json({ success: false, message: 'Not authorized to publish this course' });
     }
 
@@ -602,8 +666,28 @@ exports.enrollStudent = async (req, res) => {
       });
     }
 
-    // Check if student is already enrolled
-    if (course.students.includes(studentId)) {
+    // Validate user ID for authorization
+    const userId = req.user._id || req.user.id;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+
+    // Check authorization - only admin, teacher (instructor), or the student themselves can enroll
+    if (req.user.role !== 'admin' && 
+        (!course.instructor || course.instructor.toString() !== userId.toString()) &&
+        studentId.toString() !== userId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to enroll students in this course'
+      });
+    }
+
+    // Check if student is already enrolled (use proper ObjectId comparison)
+    const isEnrolled = course.students.some(student => student.toString() === studentId.toString());
+    if (isEnrolled) {
       return res.status(400).json({
         success: false,
         message: 'Student is already enrolled in this course'
@@ -637,14 +721,55 @@ exports.enrollStudent = async (req, res) => {
 // @route   DELETE /api/courses/:courseId/unenroll
 // @access  Private (Admin/Teacher)
 exports.unenrollStudent = async (req, res) => {
-  
-  const { courseId } = req.params;
-  const { studentId } = req.body;
   try {
+    // Validate courseId
+    const { courseId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid course ID format'
+      });
+    }
+
+    // Validate studentId
+    const { studentId } = req.body;
+    if (!studentId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Student ID is required'
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(studentId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid student ID format'
+      });
+    }
+
+    // Validate user ID for authorization
+    const userId = req.user._id || req.user.id;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+
     const course = await Course.findById(courseId);
     
     if (!course) {
       return res.status(404).json({ success: false, message: 'Course not found' });
+    }
+
+    // Check authorization - only admin, teacher (instructor), or the student themselves can unenroll
+    if (req.user.role !== 'admin' && 
+        (!course.instructor || course.instructor.toString() !== userId.toString()) &&
+        studentId.toString() !== userId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to unenroll students from this course'
+      });
     }
     
     // Remove student from course
@@ -669,11 +794,11 @@ exports.unenrollStudent = async (req, res) => {
         
         const promotedUser = await User.findById(promotedStudent.student).select('firstName lastName');
         
-        if (promotedUser) {
+        if (promotedUser && course.instructor) {
           await Todo.create({
             title: `Student ${promotedUser.firstName} ${promotedUser.lastName} has been promoted from waitlist to "${course.title}"`,
             dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000), // 1 day from now
-            user: course.instructor._id,
+            user: course.instructor._id || course.instructor,
             type: 'waitlist_promotion',
             courseId: course._id,
             studentId: promotedStudent.student,
@@ -749,10 +874,19 @@ exports.getCourseModules = async (req, res) => {
       });
     }
 
+    // Validate user ID
+    const userId = req.user._id || req.user.id;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+
     // Check if user has access to the course
     if (req.user.role === 'student' && 
-        !course.students.some(student => student.toString() === req.user.id) &&
-        course.instructor.toString() !== req.user.id) {
+        !course.students.some(student => student.toString() === userId.toString()) &&
+        (!course.instructor || course.instructor.toString() !== userId.toString())) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to access this course'
@@ -796,8 +930,17 @@ exports.updateOverviewConfig = async (req, res) => {
       });
     }
 
+    // Validate user ID
+    const userId = req.user._id || req.user.id;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+
     // Check if user is authorized to update
-    if (req.user.role !== 'admin' && course.instructor.toString() !== req.user.id) {
+    if (req.user.role !== 'admin' && (!course.instructor || course.instructor.toString() !== userId.toString())) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to update this course'
@@ -868,8 +1011,17 @@ exports.updateSidebarConfig = async (req, res) => {
       });
     }
 
+    // Validate user ID
+    const userId = req.user._id || req.user.id;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+
     // Check if user is authorized to update
-    if (req.user.role !== 'admin' && course.instructor.toString() !== req.user.id) {
+    if (req.user.role !== 'admin' && (!course.instructor || course.instructor.toString() !== userId.toString())) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to update this course'

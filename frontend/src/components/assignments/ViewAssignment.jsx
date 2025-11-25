@@ -3,8 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
 import { format } from 'date-fns';
-import { Lock, Unlock, HelpCircle, CheckCircle, Circle, Bookmark, BarChart3, Edit, Eye, ArrowLeft } from 'lucide-react';
+import { Lock, Unlock, HelpCircle, CheckCircle, Circle, Bookmark, BarChart3, Edit, Eye, ArrowLeft, X, Download } from 'lucide-react';
 import { API_URL } from '../../config';
+import FilePreview from './FilePreview';
 
 // Fisher-Yates shuffle algorithm for proper randomization
 const shuffleArray = (array) => {
@@ -42,6 +43,7 @@ const ViewAssignment = () => {
   const [showTimer, setShowTimer] = useState(true);
   const [showUploadSection, setShowUploadSection] = useState(false);
   const [shuffledOptions, setShuffledOptions] = useState({});
+  const [previewFile, setPreviewFile] = useState(null);
 
   // Teacher analytics state
   const [submissionStats, setSubmissionStats] = useState({
@@ -65,7 +67,15 @@ const ViewAssignment = () => {
   const isInstructor = user?.role === 'teacher' || user?.role === 'admin';
 
   useEffect(() => {
-    const storedUser = JSON.parse(localStorage.getItem('user'));
+    let storedUser = null;
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        storedUser = JSON.parse(userStr);
+      }
+    } catch (e) {
+      console.error('Error parsing user from localStorage:', e);
+    }
     setUser(storedUser);
     // Add a timeout fallback in case user is not set
     const timeout = setTimeout(() => {
@@ -359,6 +369,11 @@ const ViewAssignment = () => {
       });
 
       const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Authentication token not found. Please log in again.');
+        setIsUploading(false);
+        return;
+      }
       const response = await axios.post('/api/upload', formData, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -520,11 +535,38 @@ const ViewAssignment = () => {
       });
 
       const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Authentication token not found. Please log in again.');
+        setIsSubmitting(false);
+        return;
+      }
+      
+      // Extract file objects with URL and original name
+      const fileObjects = uploadedFiles.map(file => {
+        // If file is an object with url and name, use it; otherwise create object from string URL
+        if (typeof file === 'object' && file.url) {
+          return {
+            url: file.url,
+            name: file.name || file.originalname || file.url.split('/').pop(),
+            originalname: file.name || file.originalname || file.url.split('/').pop()
+          };
+        } else if (typeof file === 'string') {
+          // Legacy: if it's just a string URL, extract filename from URL
+          const fileName = file.split('/').pop() || 'file';
+          return {
+            url: file,
+            name: fileName,
+            originalname: fileName
+          };
+        }
+        return file;
+      });
+      
       const payload = {
         assignment: id,
         answers: submissionAnswers,
         submittedAt: new Date(),
-        uploadedFiles: uploadedFiles
+        uploadedFiles: fileObjects
       };
       if (assignment?.isGroupAssignment) {
         payload.groupId = studentGroupId;
@@ -637,22 +679,78 @@ const ViewAssignment = () => {
         </div>
       </nav>
 
-      <div className="w-full px-2 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8 pt-16 lg:pt-4">
-        <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 shadow rounded-lg p-4 sm:p-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
-            <div className="flex-1 min-w-0">
+      <div className="w-full px-2 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8 pt-16 lg:pt-4 max-w-full overflow-x-hidden">
+        <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 shadow rounded-lg p-2 sm:p-4 lg:p-6 max-w-full overflow-hidden">
+          <div className="flex flex-col sm:flex-row justify-between items-start gap-4 max-w-full">
+            <div className="flex-1 min-w-0 w-full max-w-full">
               <h1 className="hidden lg:block text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 dark:text-gray-100 break-words">{assignment.title}</h1>
             <p className="mt-1 text-xs sm:text-sm text-gray-500 dark:text-gray-400 dark:text-gray-400">
-              <span className="block sm:inline">Due: {format(new Date(assignment.dueDate), 'PPp')}</span>
+              <span className="block sm:inline">Due: {format(new Date(assignment.dueDate), 'MMM d, yyyy, h:mm a')}</span>
               {submission && (
-                <span className="block sm:inline sm:ml-4 mt-1 sm:mt-0 text-green-600 dark:text-green-400 dark:text-green-400">Submitted: {format(new Date(submission.submittedAt), 'PPp')}</span>
+                <span className="block sm:inline sm:ml-4 mt-1 sm:mt-0 text-green-600 dark:text-green-400 dark:text-green-400">Submitted: {format(new Date(submission.submittedAt), 'MMM d, yyyy, h:mm a')}</span>
               )}
             </p>
             {/* Show feedback if student and feedback exists */}
             {isStudent && submission && typeof submission.feedback === 'string' && submission.feedback.trim() !== '' && (
-              <div className="mt-4 bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 dark:border-yellow-600 p-4 rounded">
-                <div className="text-yellow-800 dark:text-yellow-200 font-semibold mb-1">Instructor Feedback</div>
-                <div className="text-yellow-900 dark:text-yellow-100 whitespace-pre-line">{submission.feedback}</div>
+              <div className="mt-4 bg-gradient-to-r from-yellow-50 to-yellow-50/50 dark:from-yellow-900/30 dark:to-yellow-900/10 border-l-4 border-yellow-400 dark:border-yellow-500 shadow-sm sm:shadow-md rounded-lg p-3 sm:p-4 overflow-hidden max-w-full transition-all duration-200">
+                <div className="flex items-center space-x-2 mb-2">
+                  <div className="w-1 h-5 bg-yellow-400 dark:bg-yellow-500 rounded-full"></div>
+                  <div className="text-yellow-800 dark:text-yellow-200 font-semibold text-sm sm:text-base break-words">Instructor Feedback</div>
+                </div>
+                <div className="text-yellow-900 dark:text-yellow-100 whitespace-pre-line break-words overflow-wrap-anywhere text-sm sm:text-base leading-relaxed pl-3">{submission.feedback}</div>
+              </div>
+            )}
+
+            {/* Show teacher feedback files if student and files exist */}
+            {isStudent && submission && submission.teacherFeedbackFiles && submission.teacherFeedbackFiles.length > 0 && (
+              <div className="mt-4 bg-gradient-to-r from-indigo-50 to-indigo-50/50 dark:from-indigo-900/30 dark:to-indigo-900/10 border-l-4 border-indigo-400 dark:border-indigo-500 shadow-sm sm:shadow-md rounded-lg p-3 sm:p-4 overflow-hidden max-w-full transition-all duration-200">
+                <div className="flex items-center space-x-2 mb-2">
+                  <div className="w-1 h-5 bg-indigo-400 dark:bg-indigo-500 rounded-full"></div>
+                  <div className="text-indigo-800 dark:text-indigo-200 font-semibold text-sm sm:text-base break-words">Instructor Feedback Files</div>
+                </div>
+                <p className="text-xs sm:text-sm text-indigo-700 dark:text-indigo-300 mb-3 break-words pl-3">
+                  Your instructor has uploaded annotated files with feedback:
+                </p>
+                <div className="space-y-2.5 max-w-full">
+                  {submission.teacherFeedbackFiles.map((file, index) => {
+                    const fileUrl = typeof file === 'string' ? file : (file.url || file.path || '');
+                    const fileName = typeof file === 'string' 
+                      ? file.split('/').pop() || `Feedback File ${index + 1}`
+                      : (file.name || file.originalname || `Feedback File ${index + 1}`);
+                    return (
+                      <div key={index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 p-3 sm:p-3 bg-white dark:bg-gray-900 rounded-lg border border-indigo-200/50 dark:border-indigo-700/50 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden max-w-full">
+                        <div className="flex items-start sm:items-center space-x-3 flex-1 min-w-0 w-full sm:w-auto">
+                          <div className="flex-shrink-0 w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center">
+                            <svg className="w-5 h-5 sm:w-4 sm:h-4 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                          </div>
+                          <span className="text-sm sm:text-sm text-gray-900 dark:text-gray-100 break-all overflow-wrap-anywhere word-break break-word flex-1 min-w-0 font-medium">{fileName}</span>
+                        </div>
+                        <div className="flex items-center space-x-3 sm:ml-2 flex-shrink-0 self-start sm:self-center pl-11 sm:pl-0">
+                          <button
+                            onClick={() => setPreviewFile({ url: fileUrl, name: fileName })}
+                            className="flex items-center space-x-1.5 px-3 py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors duration-200 flex-shrink-0 active:scale-95"
+                            title="Preview file"
+                          >
+                            <Eye className="w-4 h-4" />
+                            <span className="text-xs font-medium sm:hidden">Preview</span>
+                          </button>
+                          <a
+                            href={fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center space-x-1.5 px-3 py-2 bg-indigo-600 dark:bg-indigo-500 text-white rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-600 transition-colors duration-200 flex-shrink-0 active:scale-95 shadow-sm"
+                            title="Download file"
+                          >
+                            <Download className="w-4 h-4" />
+                            <span className="text-xs font-medium">Download</span>
+                          </a>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
             
@@ -685,6 +783,72 @@ const ViewAssignment = () => {
                     </>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* Show submitted files for students */}
+            {isStudent && submission && submission.files && submission.files.length > 0 && (
+              <div className="mt-4 bg-gradient-to-r from-gray-50 to-gray-50/50 dark:from-gray-800 dark:to-gray-800/50 border border-gray-200 dark:border-gray-700 shadow-sm sm:shadow-md rounded-lg p-3 sm:p-4 overflow-hidden max-w-full transition-all duration-200">
+                <div className="flex items-center space-x-2 mb-3">
+                  <div className="w-1 h-5 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
+                  <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-100">Your Submitted Files:</h3>
+                </div>
+                <div className="space-y-2.5 max-w-full">
+                  {submission.files.map((file, index) => {
+                    const fileUrl = typeof file === 'string' ? file : (file.url || file.path || '');
+                    const fileName = typeof file === 'string' 
+                      ? file.split('/').pop() || `File ${index + 1}`
+                      : (file.name || file.originalname || `File ${index + 1}`);
+                    return (
+                      <div key={index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 p-3 bg-white dark:bg-gray-900 border border-gray-200/50 dark:border-gray-600/50 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden max-w-full">
+                        <div className="flex items-start sm:items-center space-x-3 flex-1 min-w-0 w-full sm:w-auto">
+                          <div className="flex-shrink-0 w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                            <svg className="w-5 h-5 sm:w-4 sm:h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 break-all overflow-wrap-anywhere word-break break-word">{fileName}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3 sm:ml-2 flex-shrink-0 self-start sm:self-center pl-11 sm:pl-0">
+                          <button
+                            onClick={() => setPreviewFile({ url: fileUrl, name: fileName })}
+                            className="flex items-center space-x-1.5 px-3 py-2 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 flex-shrink-0 active:scale-95"
+                            title="Preview file"
+                          >
+                            <Eye className="w-4 h-4" />
+                            <span className="text-xs font-medium sm:hidden">Preview</span>
+                          </button>
+                          <a
+                            href={fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center space-x-1.5 px-3 py-2 bg-indigo-600 dark:bg-indigo-500 text-white rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-600 transition-colors duration-200 flex-shrink-0 active:scale-95 shadow-sm"
+                            title="Open in new tab"
+                          >
+                            <Download className="w-4 h-4" />
+                            <span className="text-xs font-medium">Open</span>
+                          </a>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                {/* File Preview Modal for submitted files */}
+                {previewFile && previewFile.url && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-sm" onClick={() => setPreviewFile(null)}>
+                    <div className="relative max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-auto rounded-lg shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                      <FilePreview
+                        fileUrl={previewFile.url || ''}
+                        fileName={previewFile.name || ''}
+                        onClose={() => setPreviewFile(null)}
+                        showCloseButton={true}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -751,6 +915,107 @@ const ViewAssignment = () => {
                 </li>
               ))}
             </ul>
+          </div>
+        )}
+
+        {/* File Upload Section - Always available for students */}
+        {isStudent && !submission && !isPastDue && (
+          <div className="mt-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">File Upload</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Upload a file, or choose a file you've already uploaded.
+            </p>
+            <div className="space-y-4">
+              {/* Upload Button */}
+              <div>
+                <div className="flex items-center space-x-4">
+                  <input
+                    type="file"
+                    multiple
+                    onChange={handleFileUpload}
+                    disabled={isUploading}
+                    className="hidden"
+                    id="file-upload-main"
+                  />
+                  <label
+                    htmlFor="file-upload-main"
+                    className={`inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600 cursor-pointer ${
+                      isUploading ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    {isUploading ? 'Uploading...' : 'Upload File'}
+                  </label>
+                  {uploadedFiles.length > 0 && (
+                    <button
+                      onClick={() => document.getElementById('file-upload-main').click()}
+                      className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                      Add Another File
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Uploaded Files List */}
+              {uploadedFiles.length > 0 && (
+                <div className="mt-4">
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Uploaded Files:</h4>
+                  <div className="space-y-2">
+                    {uploadedFiles.map((file, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md">
+                        <div className="flex items-center space-x-3 flex-1 min-w-0">
+                          <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{file.name}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              {file.size ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : 'Size unknown'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2 ml-2">
+                          <button
+                            onClick={() => setPreviewFile({ url: file.url, name: file.name })}
+                            className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 p-1"
+                            title="Preview file"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => removeFile(index)}
+                            className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 p-1"
+                            title="Remove file"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* File Preview Modal */}
+                  {previewFile && previewFile.url && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-sm" onClick={() => setPreviewFile(null)}>
+                      <div className="relative max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-auto rounded-lg shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                        <FilePreview
+                          fileUrl={previewFile.url || ''}
+                          fileName={previewFile.name || ''}
+                          onClose={() => setPreviewFile(null)}
+                          showCloseButton={true}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -1277,26 +1542,48 @@ const ViewAssignment = () => {
                                 <div className="space-y-2">
                                   {uploadedFiles.map((file, index) => (
                                   <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md">
-                                      <div className="flex items-center space-x-3">
-                                      <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <div className="flex items-center space-x-3 flex-1 min-w-0">
+                                      <svg className="w-5 h-5 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                         </svg>
-                                        <div>
-                                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{file.name}</p>
+                                        <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{file.name}</p>
                                         <p className="text-xs text-gray-500 dark:text-gray-400">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
                                         </div>
                                       </div>
-                                      <button
-                                        onClick={() => removeFile(index)}
-                                      className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
-                                      >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                        </svg>
-                                      </button>
+                                      <div className="flex items-center space-x-2 ml-2">
+                                        <button
+                                          onClick={() => setPreviewFile({ url: file.url, name: file.name })}
+                                          className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 p-1"
+                                          title="Preview file"
+                                        >
+                                          <Eye className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                          onClick={() => removeFile(index)}
+                                          className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 p-1"
+                                          title="Remove file"
+                                        >
+                                          <X className="w-4 h-4" />
+                                        </button>
+                                      </div>
                                     </div>
                                   ))}
                                 </div>
+                                
+                                {/* File Preview Modal */}
+                                {previewFile && previewFile.url && (
+                                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setPreviewFile(null)}>
+                                    <div className="relative max-w-4xl w-full max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+                                      <FilePreview
+                                        fileUrl={previewFile.url || ''}
+                                        fileName={previewFile.name || ''}
+                                        onClose={() => setPreviewFile(null)}
+                                        showCloseButton={true}
+                                      />
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
@@ -1833,7 +2120,7 @@ const ViewAssignment = () => {
                     </div>
                     
                     {/* File Upload Section for Students - at the bottom of scrollable mode */}
-                    {assignment.allowStudentUploads && isStudent && !submission && !isPastDue && (
+                    {isStudent && !submission && !isPastDue && (
                       <div className="mt-6 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Upload Files</h3>
                         <div className="space-y-4">
@@ -1881,26 +2168,48 @@ const ViewAssignment = () => {
                               <div className="space-y-2">
                                 {uploadedFiles.map((file, index) => (
                                   <div key={index} className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md">
-                                    <div className="flex items-center space-x-3">
-                                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <div className="flex items-center space-x-3 flex-1 min-w-0">
+                                      <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                       </svg>
-                                      <div>
-                                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{file.name}</p>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{file.name}</p>
                                         <p className="text-xs text-gray-500 dark:text-gray-400">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
                                       </div>
                                     </div>
-                                    <button
-                                      onClick={() => removeFile(index)}
-                                      className="text-red-600 hover:text-red-800"
-                                    >
-                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                      </svg>
-                                    </button>
+                                    <div className="flex items-center space-x-2 ml-2">
+                                      <button
+                                        onClick={() => setPreviewFile({ url: file.url, name: file.name })}
+                                        className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 p-1"
+                                        title="Preview file"
+                                      >
+                                        <Eye className="w-4 h-4" />
+                                      </button>
+                                      <button
+                                        onClick={() => removeFile(index)}
+                                        className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 p-1"
+                                        title="Remove file"
+                                      >
+                                        <X className="w-4 h-4" />
+                                      </button>
+                                    </div>
                                   </div>
                                 ))}
                               </div>
+                              
+                              {/* File Preview Modal */}
+                              {previewFile && previewFile.url && (
+                                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setPreviewFile(null)}>
+                                  <div className="relative max-w-4xl w-full max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+                                    <FilePreview
+                                      fileUrl={previewFile.url || ''}
+                                      fileName={previewFile.name || ''}
+                                      onClose={() => setPreviewFile(null)}
+                                      showCloseButton={true}
+                                    />
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>

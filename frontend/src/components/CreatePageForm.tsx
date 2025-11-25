@@ -74,8 +74,8 @@ const CreatePageForm: React.FC<CreatePageFormProps> = ({ modules, courseId, onSu
   };
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center lg:justify-end bg-black/30 p-2 sm:p-4 lg:pl-72">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-3xl lg:max-w-2xl h-[calc(100vh-8rem)] sm:max-h-[80vh] sm:h-auto p-4 sm:p-6 relative overflow-hidden flex flex-col border dark:border-gray-700">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/30 p-2 sm:p-4 lg:left-[336px] lg:right-0">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full h-full lg:h-[calc(100vh-2rem)] lg:max-w-none lg:rounded-none lg:shadow-none p-4 sm:p-6 lg:p-8 relative overflow-hidden flex flex-col border dark:border-gray-700 lg:border-l lg:border-r-0 lg:border-t-0 lg:border-b-0">
         <button
           type="button"
           onClick={handleCancel}

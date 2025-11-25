@@ -15,6 +15,11 @@
  * @returns {number} The calculated final grade percentage
  */
 function calculateFinalGradeWithWeightedGroups(studentId, course, assignments, grades, submissions = {}) {
+  // Validate inputs
+  if (!studentId || !course || !assignments || !Array.isArray(assignments)) {
+    return 0;
+  }
+  
   const courseGroups = course.groups || [];
   const now = new Date();
 
@@ -72,13 +77,18 @@ function calculateFinalGradeWithWeightedGroups(studentId, course, assignments, g
 
     if (hasGradedAssignments && possible > 0) {
       const percent = (earned / possible) * 100;
-      groupsWithGrades.push({
-        ...group,
-        originalWeight: group.weight,
-        earned,
-        possible,
-        percent
-      });
+      // Validate percent is a valid number
+      if (isFinite(percent)) {
+        groupsWithGrades.push({
+          ...group,
+          originalWeight: group.weight,
+          earned,
+          possible,
+          percent
+        });
+      } else {
+        groupsWithoutGrades.push(group);
+      }
     } else {
       groupsWithoutGrades.push(group);
     }
@@ -139,25 +149,38 @@ function calculateFinalGradeWithWeightedGroups(studentId, course, assignments, g
   if (groupsWithGrades.length > 0) {
     const totalWeightWithGrades = groupsWithGrades.reduce((sum, g) => sum + g.originalWeight, 0);
     
-    groupsWithGrades.forEach((group) => {
-      // Calculate proportional redistribution
-      const redistributionRatio = group.originalWeight / totalWeightWithGrades;
-      const redistributedWeight = weightToRedistribute * redistributionRatio;
-      const adjustedWeight = group.originalWeight + redistributedWeight;
-      
-      weightedSum += group.percent * adjustedWeight;
-      totalAdjustedWeight += adjustedWeight;
-    });
+    // Prevent division by zero if all groups have weight 0
+    if (totalWeightWithGrades > 0) {
+      groupsWithGrades.forEach((group) => {
+        // Calculate proportional redistribution
+        const redistributionRatio = group.originalWeight / totalWeightWithGrades;
+        const redistributedWeight = weightToRedistribute * redistributionRatio;
+        const adjustedWeight = group.originalWeight + redistributedWeight;
+        
+        weightedSum += group.percent * adjustedWeight;
+        totalAdjustedWeight += adjustedWeight;
+      });
+    } else {
+      // If all groups have weight 0, use equal distribution
+      const equalWeight = 100 / groupsWithGrades.length;
+      groupsWithGrades.forEach((group) => {
+        weightedSum += group.percent * equalWeight;
+        totalAdjustedWeight += equalWeight;
+      });
+    }
   }
 
   // Handle the "Other" group if it has grades
   if (otherGroupHasGrades && otherPossible > 0) {
     const otherPercent = (otherEarned / otherPossible) * 100;
-    const otherWeight = 100 - totalAdjustedWeight; // Remaining weight goes to ungrouped assignments
-    
-    if (otherWeight > 0) {
-      weightedSum += otherPercent * otherWeight;
-      totalAdjustedWeight += otherWeight;
+    // Validate percent is a valid number
+    if (isFinite(otherPercent)) {
+      const otherWeight = 100 - totalAdjustedWeight; // Remaining weight goes to ungrouped assignments
+      
+      if (otherWeight > 0) {
+        weightedSum += otherPercent * otherWeight;
+        totalAdjustedWeight += otherWeight;
+      }
     }
   }
 
@@ -166,8 +189,13 @@ function calculateFinalGradeWithWeightedGroups(studentId, course, assignments, g
     return 0;
   }
 
-  // Return the final weighted percentage
-  return weightedSum / totalAdjustedWeight;
+  // Return the final weighted percentage (with safety check)
+  if (totalAdjustedWeight === 0 || !isFinite(totalAdjustedWeight)) {
+    return 0;
+  }
+  const result = weightedSum / totalAdjustedWeight;
+  // Ensure result is a valid number
+  return isFinite(result) ? result : 0;
 }
 
 /**
@@ -175,6 +203,11 @@ function calculateFinalGradeWithWeightedGroups(studentId, course, assignments, g
  * This function maintains backward compatibility with existing code.
  */
 function getWeightedGradeForStudent(studentId, course, assignments, grades, submissions = {}) {
+  // Validate inputs
+  if (!studentId || !course || !assignments || !Array.isArray(assignments)) {
+    return 0;
+  }
+  
   let weightedSum = 0;
   let totalWeight = 0;
   const courseGroups = course.groups || [];
@@ -235,8 +268,11 @@ function getWeightedGradeForStudent(studentId, course, assignments, grades, subm
     });
     if (possible > 0) {
       const percent = (earned / possible) * 100;
-      weightedSum += percent * group.weight;
-      totalWeight += group.weight;
+      // Validate percent is a valid number before using it
+      if (isFinite(percent)) {
+        weightedSum += percent * group.weight;
+        totalWeight += group.weight;
+      }
     }
   });
 
@@ -277,19 +313,32 @@ function getWeightedGradeForStudent(studentId, course, assignments, grades, subm
       // Assign remaining weight to ungrouped assignments
       const remainingWeight = 100 - totalWeight;
       const percent = (earned / possible) * 100;
-      weightedSum += percent * remainingWeight;
-      totalWeight += remainingWeight;
+      // Validate percent is a valid number before using it
+      if (isFinite(percent)) {
+        weightedSum += percent * remainingWeight;
+        totalWeight += remainingWeight;
+      }
     }
   }
-  if (totalWeight === 0) return 0;
+  if (totalWeight === 0 || !isFinite(totalWeight)) return 0;
   // Normalize to 100% scale
-  return weightedSum / totalWeight;
+  const result = weightedSum / totalWeight;
+  // Ensure result is a valid number
+  return isFinite(result) ? result : 0;
 }
 
 /**
  * Get letter grade from percentage
  */
 function getLetterGrade(percent, gradeScale) {
+  // Validate percent is a valid number
+  if (!isFinite(percent) || isNaN(percent)) {
+    return 'F';
+  }
+  
+  // Clamp percent to 0-100 range
+  percent = Math.max(0, Math.min(100, percent));
+  
   // Standard US scale as fallback
   const scale = gradeScale && gradeScale.length > 0 ? gradeScale : [
     { letter: 'A', min: 90, max: 100 },

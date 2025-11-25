@@ -31,10 +31,14 @@ const corsOptions = {
       ]
       : ['http://localhost:3000', 'http://localhost:5173'];
     
-    // Check if origin is in allowed list or matches patterns
-    const isAllowed = allowedOrigins.includes(origin) ||
-      origin.endsWith('.onrender.com') ||
-      origin.endsWith('.vercel.app');
+    // Check if origin is in allowed list
+    // Note: Wildcard patterns like .onrender.com are security risks - only allow specific origins
+    const isAllowed = allowedOrigins.includes(origin);
+    
+    // In development, allow localhost with any port
+    if (process.env.NODE_ENV !== 'production' && origin.startsWith('http://localhost:')) {
+      return callback(null, true);
+    }
     
     if (isAllowed) {
       callback(null, true);
@@ -45,6 +49,41 @@ const corsOptions = {
   credentials: true,
   optionsSuccessStatus: 200
 };
+
+// Security headers middleware
+app.use((req, res, next) => {
+  // Set security headers
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  
+  // Content Security Policy (basic)
+  if (process.env.NODE_ENV === 'production') {
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:;");
+  }
+  
+  // Remove X-Powered-By header
+  res.removeHeader('X-Powered-By');
+  
+  next();
+});
+
+// Enforce HTTPS in production
+if (process.env.NODE_ENV === 'production') {
+  app.use((req, res, next) => {
+    // Check if request is secure (HTTPS)
+    if (req.header('x-forwarded-proto') !== 'https' && !req.secure) {
+      // Allow health check endpoint without HTTPS
+      if (req.path === '/health') {
+        return next();
+      }
+      // Redirect to HTTPS
+      return res.redirect(`https://${req.header('host')}${req.url}`);
+    }
+    next();
+  });
+}
 
 // Middleware
 app.use(cors(corsOptions));
@@ -203,7 +242,130 @@ app.use('/api/quizwave', require('./routes/quizwave.routes'));
 // Upload route for file uploads
 const upload = require('./middleware/upload');
 const { protect } = require('./middleware/auth');
-const { uploadMultipleToCloudinary, isCloudinaryConfigured } = require('./utils/cloudinary');
+const { uploadMultipleToCloudinary, uploadToCloudinary, isCloudinaryConfigured } = require('./utils/cloudinary');
+
+// Proxy endpoint for Cloudinary files (to avoid CORS and 401 issues)
+app.get('/api/files/proxy', async (req, res) => {
+  try {
+    const fileUrl = req.query.url;
+    if (!fileUrl) {
+      return res.status(400).json({ message: 'File URL is required' });
+    }
+
+    // Only allow Cloudinary URLs for security (prevent SSRF attacks)
+    if (!fileUrl.includes('cloudinary.com') && !fileUrl.startsWith('/uploads/')) {
+      return res.status(400).json({ message: 'Invalid file URL' });
+    }
+    
+    // Additional SSRF protection: validate Cloudinary URL format
+    if (fileUrl.includes('cloudinary.com')) {
+      // Ensure it's a valid Cloudinary URL (res.cloudinary.com)
+      if (!fileUrl.includes('res.cloudinary.com') && !fileUrl.includes('api.cloudinary.com')) {
+        return res.status(400).json({ message: 'Invalid Cloudinary URL format' });
+      }
+      // Prevent accessing internal/private IPs through Cloudinary
+      if (fileUrl.match(/localhost|127\.0\.0\.1|0\.0\.0\.0|192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\./)) {
+        return res.status(400).json({ message: 'Invalid file URL' });
+      }
+    }
+
+    const https = require('https');
+    const http = require('http');
+    const url = require('url');
+
+    // Handle relative URLs (e.g., /uploads/file.pdf)
+    let parsedUrl;
+    try {
+      // If it's a relative URL, construct absolute URL
+      if (fileUrl.startsWith('/uploads/')) {
+        // For local files, serve directly without proxy
+        const filePath = path.join(__dirname, fileUrl);
+        if (fs.existsSync(filePath)) {
+          return res.sendFile(filePath);
+        } else {
+          return res.status(404).json({ message: 'File not found' });
+        }
+      }
+      parsedUrl = new URL(fileUrl);
+    } catch (err) {
+      return res.status(400).json({ message: 'Invalid file URL format' });
+    }
+    const client = parsedUrl.protocol === 'https:' ? https : http;
+
+    client.get(fileUrl, (response) => {
+      if (response.statusCode === 200) {
+        // Set appropriate headers
+        const contentType = response.headers['content-type'] || 'application/octet-stream';
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', response.headers['content-disposition'] || 'inline');
+        res.setHeader('Cache-Control', 'public, max-age=31536000');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        
+        // Pipe the response
+        response.pipe(res);
+      } else if (response.statusCode === 301 || response.statusCode === 302) {
+        // Handle redirects
+        const redirectUrl = response.headers.location;
+        if (!redirectUrl) {
+          return res.status(500).json({ message: 'Redirect location not provided' });
+        }
+        
+        // Handle relative redirects by resolving against the original URL
+        let absoluteRedirectUrl;
+        try {
+          if (redirectUrl.startsWith('http://') || redirectUrl.startsWith('https://')) {
+            absoluteRedirectUrl = redirectUrl;
+          } else {
+            // Relative redirect - resolve against original URL
+            absoluteRedirectUrl = new URL(redirectUrl, fileUrl).href;
+          }
+          const redirectParsed = new URL(absoluteRedirectUrl);
+          const redirectClient = redirectParsed.protocol === 'https:' ? https : http;
+        
+        redirectClient.get(absoluteRedirectUrl, (redirectResponse) => {
+          if (redirectResponse.statusCode === 200) {
+            const contentType = redirectResponse.headers['content-type'] || 'application/octet-stream';
+            res.setHeader('Content-Type', contentType);
+            res.setHeader('Content-Disposition', redirectResponse.headers['content-disposition'] || 'inline');
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            redirectResponse.pipe(res);
+          } else {
+            res.status(redirectResponse.statusCode).json({ 
+              message: 'Failed to fetch file',
+              statusCode: redirectResponse.statusCode,
+              hint: redirectResponse.statusCode === 401 ? 'File is not publicly accessible. Run: node scripts/fixCloudinaryAccess.js' : undefined
+            });
+          }
+        }).on('error', (err) => {
+          console.error('Proxy error:', err);
+          res.status(500).json({ message: 'Error fetching file' });
+        });
+        } catch (redirectErr) {
+          console.error('Proxy error: Invalid redirect URL:', redirectErr);
+          res.status(500).json({ message: 'Error processing redirect URL' });
+        }
+      } else if (response.statusCode === 401) {
+        // File is not publicly accessible
+        console.error('[Proxy] 401 Unauthorized for file:', fileUrl);
+        res.status(401).json({ 
+          message: 'File is not publicly accessible',
+          hint: 'The file needs to be made public in Cloudinary. Run: node scripts/fixCloudinaryAccess.js'
+        });
+      } else {
+        res.status(response.statusCode).json({ 
+          message: 'Failed to fetch file',
+          statusCode: response.statusCode
+        });
+      }
+    }).on('error', (err) => {
+      console.error('Proxy error:', err);
+      res.status(500).json({ message: 'Error fetching file' });
+    });
+  } catch (error) {
+    console.error('Proxy error:', error);
+    res.status(500).json({ message: 'Error processing request' });
+  }
+});
 
 app.post('/api/upload', protect, upload.array('files', 10), async (req, res) => {
   try {
@@ -216,19 +378,124 @@ app.post('/api/upload', protect, upload.array('files', 10), async (req, res) => 
     // Use Cloudinary if configured, otherwise use local storage
     if (isCloudinaryConfigured()) {
       try {
-        const cloudinaryResults = await uploadMultipleToCloudinary(req.files, {
-          folder: 'lms/uploads'
+        console.log('[Upload] Starting Cloudinary upload for', req.files.length, 'file(s)');
+        
+        // Upload files with appropriate resource_type
+        const uploadPromises = req.files.map(async (file, index) => {
+          // Determine resource_type based on file MIME type
+          let resourceType = 'auto';
+          if (file.mimetype.startsWith('image/')) {
+            resourceType = 'image';
+          } else if (file.mimetype.startsWith('video/')) {
+            resourceType = 'video';
+          } else {
+            // For PDFs, documents, etc., use 'raw'
+            resourceType = 'raw';
+          }
+          
+          console.log(`[Upload] File ${index + 1}:`, {
+            originalname: file.originalname,
+            mimetype: file.mimetype,
+            size: file.size,
+            resourceType: resourceType,
+            path: file.path
+          });
+          
+          try {
+            const result = await uploadToCloudinary(file, {
+              folder: 'lms/uploads',
+              resource_type: resourceType
+            });
+            
+            console.log(`[Upload] File ${index + 1} uploaded successfully:`, {
+              url: result.url,
+              public_id: result.public_id,
+              resource_type: result.resource_type,
+              bytes: result.bytes
+            });
+            
+            return { success: true, result, index };
+          } catch (uploadError) {
+            console.error(`[Upload] Error uploading file ${index + 1}:`, uploadError);
+            // Return error info instead of throwing, so other files can still upload
+            return { success: false, error: uploadError.message, file: file.originalname, index };
+          }
         });
         
-        files = cloudinaryResults.map((result, index) => ({
-          originalname: req.files[index].originalname,
-          filename: result.public_id.split('/').pop(),
-          path: result.url, // Cloudinary URL
-          size: result.bytes,
-          cloudinary: true
-        }));
+        const uploadResults = await Promise.all(uploadPromises);
+        
+        // Separate successful and failed uploads
+        const cloudinaryResults = uploadResults.filter(r => r.success).map(r => r.result);
+        const failedUploads = uploadResults.filter(r => !r.success);
+        
+        // Log failed uploads
+        if (failedUploads.length > 0) {
+          console.error('[Upload] Some files failed to upload:', failedUploads);
+          // If all files failed, throw error
+          if (cloudinaryResults.length === 0) {
+            throw new Error(`All files failed to upload: ${failedUploads.map(f => f.error).join('; ')}`);
+          }
+        }
+        
+        // Clean up local files after successful Cloudinary uploads
+        // Note: uploadToCloudinary already deletes files, but we'll ensure cleanup for any edge cases
+        const fsPromises = require('fs').promises;
+        for (const result of uploadResults) {
+          if (result.success && result.index !== undefined) {
+            const file = req.files[result.index];
+            if (file && file.path) {
+              try {
+                await fsPromises.unlink(file.path);
+                console.log('[Upload] Cleaned up local file after Cloudinary upload:', file.path);
+              } catch (err) {
+                // File might already be deleted by uploadToCloudinary, ignore error
+                console.log('[Upload] Local file already cleaned up or not found:', file.path);
+              }
+            }
+          }
+        }
+        
+        console.log('[Upload] All files uploaded successfully:', cloudinaryResults.length);
+        
+        // Map results preserving original file order
+        files = uploadResults
+          .filter(r => r.success)
+          .map(r => {
+            const originalFile = req.files[r.index];
+            const result = r.result;
+            const fileData = {
+              originalname: originalFile.originalname,
+              filename: result.public_id.split('/').pop(),
+              path: result.url, // Cloudinary URL
+              size: result.bytes,
+              cloudinary: true,
+              resource_type: result.resource_type,
+              public_id: result.public_id
+            };
+            
+            // Log file data for debugging
+            console.log(`[Upload] File ${r.index + 1} data:`, {
+              originalname: fileData.originalname,
+              url: fileData.path,
+              resource_type: fileData.resource_type,
+              public_id: fileData.public_id,
+              size: fileData.size
+            });
+            
+            return fileData;
+          });
+        
+        console.log('[Upload] Returning file data:', files.map(f => ({ 
+          name: f.originalname, 
+          url: f.path, 
+          resource_type: f.resource_type 
+        })));
       } catch (cloudinaryError) {
-        console.error('Cloudinary upload failed, falling back to local storage:', cloudinaryError);
+        console.error('[Upload] Cloudinary upload failed, falling back to local storage:', cloudinaryError);
+        console.error('[Upload] Error details:', {
+          message: cloudinaryError.message,
+          stack: cloudinaryError.stack
+        });
         // Fallback to local storage
         files = req.files.map(file => ({
           originalname: file.originalname,
@@ -259,9 +526,50 @@ app.post('/api/upload', protect, upload.array('files', 10), async (req, res) => 
   }
 });
 
-// Error handling middleware
+// Error handling middleware (must be after all routes)
 app.use((err, req, res, next) => {
-  console.error('❌ Error:', err.stack);
+  // Log error details (but don't expose to client in production)
+  console.error('❌ Error:', err.message);
+  if (process.env.NODE_ENV !== 'production') {
+    console.error('Stack:', err.stack);
+  }
+  
+  // Handle Multer errors specifically
+  if (err.name === 'MulterError') {
+    let message = 'File upload error';
+    let status = 400;
+    
+    switch (err.code) {
+      case 'LIMIT_FILE_SIZE':
+        message = 'File too large. Maximum file size is 10MB.';
+        break;
+      case 'LIMIT_FILE_COUNT':
+        message = 'Too many files. Maximum file count exceeded.';
+        break;
+      case 'LIMIT_UNEXPECTED_FILE':
+        message = 'Unexpected file field.';
+        break;
+      case 'LIMIT_PART_COUNT':
+        message = 'Too many parts in the request.';
+        break;
+      default:
+        message = `File upload error: ${err.message}`;
+    }
+    
+    return res.status(status).json({ 
+      success: false,
+      message,
+      error: err.code
+    });
+  }
+  
+  // Handle file filter errors
+  if (err.message && err.message.includes('Invalid file type')) {
+    return res.status(400).json({ 
+      success: false,
+      message: err.message
+    });
+  }
   
   // Don't expose internal errors in production
   const message = process.env.NODE_ENV === 'production' 
@@ -269,6 +577,7 @@ app.use((err, req, res, next) => {
     : err.message;
     
   res.status(err.status || 500).json({ 
+    success: false,
     message,
     ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
   });
@@ -315,32 +624,45 @@ console.log('✅ Socket.io initialized for QuizWave');
 const { startCleanupScheduler } = require('./utils/quizwaveCleanup');
 startCleanupScheduler();
 
-// Start server
+// Start server (only if not in test environment)
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📱 Health check: http://localhost:${PORT}/health`);
-  console.log(`🔗 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🎮 QuizWave Socket.io ready`);
-});
+if (process.env.NODE_ENV !== 'test') {
+  server.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`📱 Health check: http://localhost:${PORT}/health`);
+    console.log(`🔗 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🎮 QuizWave Socket.io ready`);
+  });
+} else {
+  // In test environment, server is not started
+  // Export app for Supertest (which requires Express app, not HTTP server)
+}
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('🛑 SIGTERM received, shutting down gracefully');
-  io.close(() => {
-    mongoose.connection.close(() => {
-      console.log('✅ MongoDB connection closed');
-      process.exit(0);
+// Graceful shutdown (only register if server is started)
+if (process.env.NODE_ENV !== 'test') {
+  process.on('SIGTERM', () => {
+    console.log('🛑 SIGTERM received, shutting down gracefully');
+    io.close(() => {
+      mongoose.connection.close(() => {
+        console.log('✅ MongoDB connection closed');
+        process.exit(0);
+      });
     });
   });
-});
 
-process.on('SIGINT', () => {
-  console.log('🛑 SIGINT received, shutting down gracefully');
-  io.close(() => {
-    mongoose.connection.close(() => {
-      console.log('✅ MongoDB connection closed');
-      process.exit(0);
+  process.on('SIGINT', () => {
+    console.log('🛑 SIGINT received, shutting down gracefully');
+    io.close(() => {
+      mongoose.connection.close(() => {
+        console.log('✅ MongoDB connection closed');
+        process.exit(0);
+      });
     });
   });
-}); 
+}
+
+// Export Express app for testing with Supertest
+// Supertest requires the Express app instance, not the HTTP server
+// In test environment: app is exported, server is not started
+// In production: app is exported, server is started and listening
+module.exports = app;

@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
 import { format } from 'date-fns';
+import { Eye } from 'lucide-react';
+import FilePreview from './FilePreview';
 
 const GradeSubmissions = () => {
   const { id } = useParams();
@@ -17,6 +19,7 @@ const GradeSubmissions = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [previewFile, setPreviewFile] = useState(null);
 
   useEffect(() => {
     const fetchSubmission = async () => {
@@ -99,7 +102,7 @@ const GradeSubmissions = () => {
             {submission.student.firstName} {submission.student.lastName}
           </p>
           <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-            Submitted: {format(new Date(submission.submittedAt), 'PPp')}
+            Submitted: {format(new Date(submission.submittedAt), 'MMM d, yyyy, h:mm a')}
           </p>
         </div>
 
@@ -110,21 +113,59 @@ const GradeSubmissions = () => {
           </div>
           {submission.files?.length > 0 && (
             <div className="mt-3 sm:mt-4">
-              <h3 className="text-xs sm:text-sm font-medium text-gray-900 dark:text-gray-100">Files:</h3>
-              <ul className="mt-2 space-y-2">
-                {submission.files.map((file, index) => (
-                  <li key={index}>
-                    <a
-                      href={file}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 text-sm sm:text-base break-all"
-                    >
-                      {file.split('/').pop()}
-                    </a>
-                  </li>
-                ))}
-              </ul>
+              <h3 className="text-xs sm:text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Files:</h3>
+              <div className="space-y-2">
+                {submission.files.map((file, index) => {
+                  const fileUrl = typeof file === 'string' ? file : (file.url || file.path || '');
+                  const fileName = typeof file === 'string' 
+                    ? file.split('/').pop() || `File ${index + 1}`
+                    : (file.name || file.originalname || `File ${index + 1}`);
+                  return (
+                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md">
+                      <div className="flex items-center space-x-3 flex-1 min-w-0">
+                        <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{fileName}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2 ml-2">
+                        <button
+                          onClick={() => setPreviewFile({ url: fileUrl, name: fileName })}
+                          className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 p-1"
+                          title="Preview file"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <a
+                          href={fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 text-sm sm:text-base"
+                          title="Open in new tab"
+                        >
+                          Open
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              
+              {/* File Preview Modal */}
+              {previewFile && previewFile.url && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setPreviewFile(null)}>
+                  <div className="relative max-w-4xl w-full max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+                    <FilePreview
+                      fileUrl={previewFile.url || ''}
+                      fileName={previewFile.name || ''}
+                      onClose={() => setPreviewFile(null)}
+                      showCloseButton={true}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

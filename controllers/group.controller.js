@@ -6,6 +6,11 @@ const Course = require('../models/course.model');
 // Get all members of a group
 exports.getGroupMembers = async (req, res) => {
   try {
+    // Validate groupId
+    if (!require('mongoose').Types.ObjectId.isValid(req.params.groupId)) {
+      return res.status(400).json({ message: 'Invalid group ID format' });
+    }
+    
     const group = await Group.findById(req.params.groupId).populate('members', 'firstName lastName email profilePicture');
     if (!group) return res.status(404).json({ message: 'Group not found' });
     res.json(group.members);
@@ -17,10 +22,22 @@ exports.getGroupMembers = async (req, res) => {
 // Remove a member from a group
 exports.removeGroupMember = async (req, res) => {
   try {
+    // Validate IDs
+    const mongoose = require('mongoose');
+    if (!mongoose.Types.ObjectId.isValid(req.params.groupId)) {
+      return res.status(400).json({ message: 'Invalid group ID format' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(req.params.userId)) {
+      return res.status(400).json({ message: 'Invalid user ID format' });
+    }
+    
     const group = await Group.findById(req.params.groupId);
     if (!group) return res.status(404).json({ message: 'Group not found' });
+    
+    // Use proper ObjectId comparison
+    const userId = new mongoose.Types.ObjectId(req.params.userId);
     group.members = group.members.filter(
-      memberId => memberId.toString() !== req.params.userId
+      memberId => memberId.toString() !== userId.toString()
     );
     await group.save();
     res.json({ message: 'Member removed' });
@@ -33,26 +50,51 @@ exports.removeGroupMember = async (req, res) => {
 exports.getAvailableStudentsForGroupSet = async (req, res) => {
   try {
     const { groupSetId } = req.params;
+    const mongoose = require('mongoose');
+    
+    // Validate groupSetId
+    if (!mongoose.Types.ObjectId.isValid(groupSetId)) {
+      return res.status(400).json({ message: 'Invalid group set ID format' });
+    }
+    
     const search = req.query.search || '';
     // Find the group set and its course
     const groupSet = await GroupSet.findById(groupSetId).populate('course');
     if (!groupSet) return res.status(404).json({ message: 'Group set not found' });
-    const course = await Course.findById(groupSet.course._id || groupSet.course);
+    
+    const courseId = groupSet.course._id || groupSet.course;
+    if (!courseId) return res.status(404).json({ message: 'Course not found in group set' });
+    
+    const course = await Course.findById(courseId);
     if (!course) return res.status(404).json({ message: 'Course not found' });
+    
     // Find all groups in this group set
     const groups = await Group.find({ groupSet: groupSetId });
     const membersInGroups = new Set();
-    groups.forEach(g => g.members.forEach(m => membersInGroups.add(m.toString())));
+    groups.forEach(g => {
+      if (g.members && Array.isArray(g.members)) {
+        g.members.forEach(m => membersInGroups.add(m.toString()));
+      }
+    });
+    
     // Filter course students not in any group in this set
-    let availableStudents = await User.find({
-      _id: { $in: course.students.filter(sid => !membersInGroups.has(sid.toString())) },
-      role: 'student',
+    const availableStudentIds = course.students.filter(sid => !membersInGroups.has(sid.toString()));
+    
+    // Build search query
+    const searchQuery = search.trim() ? {
       $or: [
         { firstName: { $regex: search, $options: 'i' } },
         { lastName: { $regex: search, $options: 'i' } },
         { email: { $regex: search, $options: 'i' } }
       ]
+    } : {};
+    
+    let availableStudents = await User.find({
+      _id: { $in: availableStudentIds },
+      role: 'student',
+      ...searchQuery
     }).select('firstName lastName email profilePicture');
+    
     res.json(availableStudents);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -64,12 +106,38 @@ exports.addGroupMember = async (req, res) => {
   try {
     const { groupId } = req.params;
     const { userId } = req.body;
+    const mongoose = require('mongoose');
+    
+    // Validate IDs
+    if (!mongoose.Types.ObjectId.isValid(groupId)) {
+      return res.status(400).json({ message: 'Invalid group ID format' });
+    }
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID format' });
+    }
+    
     const group = await Group.findById(groupId);
     if (!group) return res.status(404).json({ message: 'Group not found' });
-    if (group.members.includes(userId)) {
+    
+    // Use proper ObjectId comparison
+    const userIdObj = new mongoose.Types.ObjectId(userId);
+    const isAlreadyMember = group.members.some(m => m.toString() === userIdObj.toString());
+    if (isAlreadyMember) {
       return res.status(400).json({ message: 'User already in group' });
     }
-    group.members.push(userId);
+    
+    // Verify user is enrolled in the course
+    const course = await Course.findById(group.course);
+    if (!course) {
+      return res.status(404).json({ message: 'Course not found' });
+    }
+    
+    const isEnrolled = course.students.some(s => s.toString() === userIdObj.toString());
+    if (!isEnrolled) {
+      return res.status(400).json({ message: 'User is not enrolled in this course' });
+    }
+    
+    group.members.push(userIdObj);
     await group.save();
     res.json({ message: 'Member added' });
   } catch (err) {

@@ -47,7 +47,28 @@ export function calculateFinalGradeWithWeightedGroups(
   grades: Grades,
   submissions: { [assignmentId: string]: any } = {}
 ): number {
-  const courseGroups = course.groups || [];
+  // Validate inputs
+  if (!studentId || typeof studentId !== 'string' || studentId.trim() === '') {
+    console.warn('Invalid studentId in calculateFinalGradeWithWeightedGroups');
+    return 0;
+  }
+
+  if (!course || typeof course !== 'object') {
+    console.warn('Invalid course in calculateFinalGradeWithWeightedGroups');
+    return 0;
+  }
+
+  if (!Array.isArray(assignments)) {
+    console.warn('Invalid assignments array in calculateFinalGradeWithWeightedGroups');
+    return 0;
+  }
+
+  if (!grades || typeof grades !== 'object') {
+    console.warn('Invalid grades object in calculateFinalGradeWithWeightedGroups');
+    return 0;
+  }
+
+  const courseGroups = Array.isArray(course.groups) ? course.groups : [];
   const now = new Date();
 
   // Track assignments that are not in any group
@@ -100,15 +121,17 @@ export function calculateFinalGradeWithWeightedGroups(
       // Note: We exclude "Not Graded" submissions (hasSubmission but no grade) from calculation entirely
     });
 
-    if (hasGradedAssignments && possible > 0) {
+    if (hasGradedAssignments && possible > 0 && isFinite(possible)) {
       const percent = (earned / possible) * 100;
-      groupsWithGrades.push({
-        ...group,
-        originalWeight: group.weight,
-        earned,
-        possible,
-        percent
-      });
+      if (isFinite(percent)) {
+        groupsWithGrades.push({
+          ...group,
+          originalWeight: Number(group.weight) || 0,
+          earned,
+          possible,
+          percent
+        });
+      }
     } else {
       groupsWithoutGrades.push(group);
     }
@@ -179,23 +202,26 @@ export function calculateFinalGradeWithWeightedGroups(
   }
 
   // Handle the "Other" group if it has grades
-  if (otherGroupHasGrades && otherPossible > 0) {
+  if (otherGroupHasGrades && otherPossible > 0 && isFinite(otherPossible)) {
     const otherPercent = (otherEarned / otherPossible) * 100;
-    const otherWeight = 100 - totalAdjustedWeight; // Remaining weight goes to ungrouped assignments
-    
-    if (otherWeight > 0) {
-      weightedSum += otherPercent * otherWeight;
-      totalAdjustedWeight += otherWeight;
+    if (isFinite(otherPercent)) {
+      const otherWeight = 100 - totalAdjustedWeight; // Remaining weight goes to ungrouped assignments
+      
+      if (otherWeight > 0 && isFinite(otherWeight)) {
+        weightedSum += otherPercent * otherWeight;
+        totalAdjustedWeight += otherWeight;
+      }
     }
   }
 
   // If no groups have grades, return 0
-  if (totalAdjustedWeight === 0) {
+  if (totalAdjustedWeight === 0 || !isFinite(totalAdjustedWeight)) {
     return 0;
   }
 
   // Return the final weighted percentage
-  return weightedSum / totalAdjustedWeight;
+  const finalGrade = weightedSum / totalAdjustedWeight;
+  return isFinite(finalGrade) ? finalGrade : 0;
 }
 
 /**
@@ -209,9 +235,30 @@ export function getWeightedGradeForStudent(
   grades: Grades,
   submissions: { [assignmentId: string]: any } = {}
 ): number {
+  // Validate inputs
+  if (!studentId || typeof studentId !== 'string' || studentId.trim() === '') {
+    console.warn('Invalid studentId in getWeightedGradeForStudent');
+    return 0;
+  }
+
+  if (!course || typeof course !== 'object') {
+    console.warn('Invalid course in getWeightedGradeForStudent');
+    return 0;
+  }
+
+  if (!Array.isArray(assignments)) {
+    console.warn('Invalid assignments array in getWeightedGradeForStudent');
+    return 0;
+  }
+
+  if (!grades || typeof grades !== 'object') {
+    console.warn('Invalid grades object in getWeightedGradeForStudent');
+    return 0;
+  }
+
   let weightedSum = 0;
   let totalWeight = 0;
-  const courseGroups = course.groups || [];
+  const courseGroups = Array.isArray(course.groups) ? course.groups : [];
   const now = new Date();
 
   // Track assignments that are not in any group
@@ -263,10 +310,13 @@ export function getWeightedGradeForStudent(
       }
       // Note: We exclude "Not Graded" submissions (hasSubmission but no grade) from calculation entirely
     });
-    if (possible > 0) {
+    if (possible > 0 && isFinite(possible)) {
       const percent = (earned / possible) * 100;
-      weightedSum += percent * group.weight;
-      totalWeight += group.weight;
+      if (isFinite(percent)) {
+        const weight = Number(group.weight) || 0;
+        weightedSum += percent * weight;
+        totalWeight += weight;
+      }
     }
   });
 
@@ -299,31 +349,59 @@ export function getWeightedGradeForStudent(
       }
       // Note: We exclude "Not Graded" submissions (hasSubmission but no grade) from calculation entirely
     });
-    if (possible > 0) {
+    if (possible > 0 && isFinite(possible)) {
       // Assign remaining weight to ungrouped assignments
       const remainingWeight = 100 - totalWeight;
       const percent = (earned / possible) * 100;
-      weightedSum += percent * remainingWeight;
-      totalWeight += remainingWeight;
+      if (isFinite(percent) && remainingWeight > 0 && isFinite(remainingWeight)) {
+        weightedSum += percent * remainingWeight;
+        totalWeight += remainingWeight;
+      }
     }
   }
-  if (totalWeight === 0) return 0;
+  if (totalWeight === 0 || !isFinite(totalWeight)) return 0;
   // Normalize to 100% scale
-  return weightedSum / totalWeight;
+  const finalGrade = weightedSum / totalWeight;
+  return isFinite(finalGrade) ? finalGrade : 0;
 }
 
 export function getLetterGrade(
   percent: number,
   gradeScale?: { letter: string; min: number; max: number }[]
 ): string {
+  // Validate percent
+  if (typeof percent !== 'number' || !isFinite(percent) || percent < 0 || percent > 100) {
+    console.warn('Invalid percent in getLetterGrade:', percent);
+    return 'F';
+  }
+
   // Standard US scale as fallback
-  const scale = gradeScale && gradeScale.length > 0 ? gradeScale : [
+  const defaultScale = [
     { letter: 'A', min: 90, max: 100 },
     { letter: 'B', min: 80, max: 89 },
     { letter: 'C', min: 70, max: 79 },
     { letter: 'D', min: 60, max: 69 },
     { letter: 'F', min: 0, max: 59 }
   ];
+
+  // Validate gradeScale if provided
+  let scale = defaultScale;
+  if (gradeScale && Array.isArray(gradeScale) && gradeScale.length > 0) {
+    // Validate each entry in gradeScale
+    const validScale = gradeScale.filter(s => 
+      s && 
+      typeof s.letter === 'string' && 
+      typeof s.min === 'number' && isFinite(s.min) &&
+      typeof s.max === 'number' && isFinite(s.max) &&
+      s.min >= 0 && s.min <= 100 &&
+      s.max >= 0 && s.max <= 100 &&
+      s.min <= s.max
+    );
+    if (validScale.length > 0) {
+      scale = validScale;
+    }
+  }
+
   // Sort by min descending
   const sorted = [...scale].sort((a, b) => b.min - a.min);
   // Use inclusive lower bound: percent >= min

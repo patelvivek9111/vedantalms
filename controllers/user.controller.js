@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const User = require('../models/user.model');
 
 // @desc    Search users by email or name
@@ -19,22 +20,37 @@ exports.searchUsers = async (req, res) => {
     // Build $or conditions for name and email search
     const orConditions = [];
     
+    // Sanitize search input to prevent ReDoS
+    const sanitizeRegex = (input) => {
+      if (!input || typeof input !== 'string') return '';
+      // Limit length and escape special regex characters
+      return input.trim().substring(0, 100).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    };
+    
     // If both name and email are provided with the same value, treat it as a general search
     if (email && name && email === name) {
-      const searchTerm = email; // or name, they're the same
-      orConditions.push(
-        { email: { $regex: searchTerm, $options: 'i' } },
-        { firstName: { $regex: searchTerm, $options: 'i' } },
-        { lastName: { $regex: searchTerm, $options: 'i' } }
-      );
+      const searchTerm = sanitizeRegex(email); // or name, they're the same
+      if (searchTerm) {
+        orConditions.push(
+          { email: { $regex: searchTerm, $options: 'i' } },
+          { firstName: { $regex: searchTerm, $options: 'i' } },
+          { lastName: { $regex: searchTerm, $options: 'i' } }
+        );
+      }
     } else {
       // Handle individual parameters
       if (email) {
-        orConditions.push({ email: { $regex: email, $options: 'i' } });
+        const sanitizedEmail = sanitizeRegex(email);
+        if (sanitizedEmail) {
+          orConditions.push({ email: { $regex: sanitizedEmail, $options: 'i' } });
+        }
       }
       if (name) {
-        orConditions.push({ firstName: { $regex: name, $options: 'i' } });
-        orConditions.push({ lastName: { $regex: name, $options: 'i' } });
+        const sanitizedName = sanitizeRegex(name);
+        if (sanitizedName) {
+          orConditions.push({ firstName: { $regex: sanitizedName, $options: 'i' } });
+          orConditions.push({ lastName: { $regex: sanitizedName, $options: 'i' } });
+        }
       }
     }
 
@@ -42,7 +58,11 @@ exports.searchUsers = async (req, res) => {
     
     // Add role filter if specified
     if (role) {
-      searchQuery.role = { $in: role.split(',') };
+      const validRoles = ['student', 'teacher', 'admin'];
+      const roleArray = role.split(',').map(r => r.trim()).filter(r => validRoles.includes(r));
+      if (roleArray.length > 0) {
+        searchQuery.role = { $in: roleArray };
+      }
     }
     
     // Add search conditions
@@ -52,6 +72,13 @@ exports.searchUsers = async (req, res) => {
     
     // Add course filter if specified
     if (courseId) {
+      // Validate courseId is a valid ObjectId
+      if (!mongoose.Types.ObjectId.isValid(courseId)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid course ID format'
+        });
+      }
       searchQuery.courses = courseId;
     }
 
@@ -79,12 +106,35 @@ exports.searchUsers = async (req, res) => {
 // @access  Private
 exports.updateMe = async (req, res) => {
   try {
-    const userId = req.user._id;
+    const userId = req.user._id || req.user.id;
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+    
     const { firstName, lastName, bio, profilePicture } = req.body;
+    
+    // Validate firstName and lastName if provided
+    if (firstName !== undefined && (!firstName || !firstName.trim())) {
+      return res.status(400).json({
+        success: false,
+        message: 'First name cannot be empty'
+      });
+    }
+    
+    if (lastName !== undefined && (!lastName || !lastName.trim())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Last name cannot be empty'
+      });
+    }
     const updateFields = {};
-    if (firstName !== undefined) updateFields.firstName = firstName;
-    if (lastName !== undefined) updateFields.lastName = lastName;
-    if (bio !== undefined) updateFields.bio = bio;
+    if (firstName !== undefined) updateFields.firstName = firstName.trim();
+    if (lastName !== undefined) updateFields.lastName = lastName.trim();
+    if (bio !== undefined) updateFields.bio = bio ? bio.trim() : bio;
     if (profilePicture !== undefined) updateFields.profilePicture = profilePicture;
     const updatedUser = await User.findByIdAndUpdate(userId, updateFields, { new: true, runValidators: true }).select('-password');
     res.json({ success: true, user: updatedUser });
@@ -105,7 +155,15 @@ exports.uploadProfilePicture = async (req, res) => {
     
     const { uploadToCloudinary, isCloudinaryConfigured, deleteFromCloudinary, extractPublicId } = require('../utils/cloudinary');
     
-    const userId = req.user._id;
+    const userId = req.user._id || req.user.id;
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+    
     let profilePictureUrl;
     
     // Get current user to delete old profile picture if exists
@@ -159,7 +217,15 @@ exports.uploadProfilePicture = async (req, res) => {
 // @access  Private
 exports.getPreferences = async (req, res) => {
   try {
-    const userId = req.user._id;
+    const userId = req.user._id || req.user.id;
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+    
     const user = await User.findById(userId).select('preferences');
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
@@ -188,7 +254,15 @@ exports.getPreferences = async (req, res) => {
 // @access  Private
 exports.updatePreferences = async (req, res) => {
   try {
-    const userId = req.user._id;
+    const userId = req.user._id || req.user.id;
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+    
     const { language, timeZone, theme, courseColors } = req.body;
     const updateFields = {};
     if (language !== undefined) updateFields['preferences.language'] = language;

@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Attendance = require('../models/attendance.model');
 const Course = require('../models/course.model');
 const User = require('../models/user.model');
@@ -8,8 +9,19 @@ exports.getAttendance = async (req, res) => {
     const { courseId } = req.params;
     const { date } = req.query;
 
+    // Validate courseId
+    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      return res.status(400).json({ message: 'Invalid course ID format' });
+    }
+
     if (!date) {
       return res.status(400).json({ message: 'Date parameter is required' });
+    }
+
+    // Validate date format
+    const attendanceDate = new Date(date);
+    if (isNaN(attendanceDate.getTime())) {
+      return res.status(400).json({ message: 'Invalid date format' });
     }
 
     // Get all students enrolled in the course
@@ -18,8 +30,7 @@ exports.getAttendance = async (req, res) => {
       return res.status(404).json({ message: 'Course not found' });
     }
 
-    // Parse the date properly
-    const attendanceDate = new Date(date);
+    // Parse the date properly (already validated above)
     attendanceDate.setHours(0, 0, 0, 0);
     const nextDate = new Date(attendanceDate);
     nextDate.setDate(nextDate.getDate() + 1);
@@ -41,18 +52,19 @@ exports.getAttendance = async (req, res) => {
 
     // Create attendance data for all enrolled students
     const attendanceData = course.students.map(student => {
+      if (!student || !student._id) return null;
       const existingRecord = attendanceMap[student._id.toString()];
       return {
         studentId: student._id,
-        studentName: `${student.firstName} ${student.lastName}`,
-        email: student.email,
+        studentName: `${student.firstName || ''} ${student.lastName || ''}`.trim(),
+        email: student.email || '',
         status: existingRecord ? existingRecord.status : 'unmarked',
         date: date,
         timestamp: existingRecord ? existingRecord.timestamp : null,
         reason: existingRecord ? existingRecord.reason : '',
         notes: existingRecord ? existingRecord.notes : ''
       };
-    });
+    }).filter(item => item !== null);
 
     res.json(attendanceData);
   } catch (error) {
@@ -66,9 +78,25 @@ exports.saveAttendance = async (req, res) => {
   try {
     const { courseId } = req.params;
     const { date, attendanceData } = req.body;
+    const userId = req.user._id || req.user.id;
+
+    // Validate courseId
+    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      return res.status(400).json({ message: 'Invalid course ID format' });
+    }
+
+    if (!userId) {
+      return res.status(400).json({ message: 'User ID is required' });
+    }
 
     if (!date || !attendanceData || !Array.isArray(attendanceData)) {
       return res.status(400).json({ message: 'Date and attendance data are required' });
+    }
+
+    // Validate date format
+    const attendanceDate = new Date(date);
+    if (isNaN(attendanceDate.getTime())) {
+      return res.status(400).json({ message: 'Invalid date format' });
     }
 
     // Verify the course exists and user is instructor
@@ -77,14 +105,32 @@ exports.saveAttendance = async (req, res) => {
       return res.status(404).json({ message: 'Course not found' });
     }
 
-    if (course.instructor.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+    if (course.instructor.toString() !== userId.toString() && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Only instructors can mark attendance' });
+    }
+
+    // Validate attendance data
+    const validStatuses = ['present', 'absent', 'late', 'excused', 'unmarked'];
+    for (const record of attendanceData) {
+      if (!record.studentId) {
+        return res.status(400).json({ message: 'Student ID is required for each attendance record' });
+      }
+      if (!mongoose.Types.ObjectId.isValid(record.studentId)) {
+        return res.status(400).json({ message: `Invalid student ID format: ${record.studentId}` });
+      }
+      if (record.status && !validStatuses.includes(record.status)) {
+        return res.status(400).json({ message: `Invalid status: ${record.status}. Must be one of: ${validStatuses.join(', ')}` });
+      }
+      // Verify student is enrolled in course
+      const isEnrolled = course.students.some(s => s.toString() === record.studentId.toString());
+      if (!isEnrolled) {
+        return res.status(400).json({ message: `Student ${record.studentId} is not enrolled in this course` });
+      }
     }
 
     const results = [];
 
-    // First, let's check what's currently in the database for this date
-    const attendanceDate = new Date(date);
+    // Parse the date properly (already validated above)
     attendanceDate.setHours(0, 0, 0, 0);
     const nextDate = new Date(attendanceDate);
     nextDate.setDate(nextDate.getDate() + 1);
@@ -98,10 +144,6 @@ exports.saveAttendance = async (req, res) => {
     });
     
     for (const record of attendanceData) {
-      // Parse the date properly
-      const attendanceDate = new Date(date);
-      attendanceDate.setHours(0, 0, 0, 0);
-      
       if (record.status === 'unmarked') {
         // Remove attendance record if status is unmarked
         const deleteResult = await Attendance.findOneAndDelete({
@@ -122,7 +164,7 @@ exports.saveAttendance = async (req, res) => {
             {
               status: record.status,
               timestamp: new Date(),
-              markedBy: req.user._id,
+              markedBy: userId,
               reason: record.reason || '',
               notes: record.notes || ''
             },
@@ -159,11 +201,27 @@ exports.getAttendanceStats = async (req, res) => {
     const { courseId } = req.params;
     const { startDate, endDate } = req.query;
 
+    // Validate courseId
+    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      return res.status(400).json({ message: 'Invalid course ID format' });
+    }
+
     const query = { course: courseId };
     if (startDate && endDate) {
+      const start = new Date(startDate + 'T00:00:00.000Z');
+      const end = new Date(endDate + 'T23:59:59.999Z');
+      
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return res.status(400).json({ message: 'Invalid date format' });
+      }
+      
+      if (end < start) {
+        return res.status(400).json({ message: 'End date must be after start date' });
+      }
+      
       query.date = {
-        $gte: new Date(startDate + 'T00:00:00.000Z'),
-        $lte: new Date(endDate + 'T23:59:59.999Z')
+        $gte: start,
+        $lte: end
       };
     }
 
@@ -181,12 +239,24 @@ exports.getAttendanceStats = async (req, res) => {
     };
 
     attendanceRecords.forEach(record => {
-      stats[record.status]++;
+      if (!record || !record.status) return;
+      
+      // Validate status is valid
+      const validStatuses = ['present', 'absent', 'late', 'excused', 'unmarked'];
+      if (!validStatuses.includes(record.status)) {
+        return; // Skip invalid statuses
+      }
+      
+      if (stats[record.status] !== undefined) {
+        stats[record.status]++;
+      }
+      
+      if (!record.student || !record.student._id) return;
       
       const studentId = record.student._id.toString();
       if (!stats.byStudent[studentId]) {
         stats.byStudent[studentId] = {
-          name: `${record.student.firstName} ${record.student.lastName}`,
+          name: `${record.student.firstName || ''} ${record.student.lastName || ''}`.trim(),
           present: 0,
           absent: 0,
           late: 0,
@@ -194,7 +264,9 @@ exports.getAttendanceStats = async (req, res) => {
           total: 0
         };
       }
-      stats.byStudent[studentId][record.status]++;
+      if (stats.byStudent[studentId][record.status] !== undefined) {
+        stats.byStudent[studentId][record.status]++;
+      }
       stats.byStudent[studentId].total++;
     });
 
@@ -209,12 +281,26 @@ exports.getAttendanceStats = async (req, res) => {
 exports.getStudentAttendance = async (req, res) => {
   try {
     const { courseId } = req.params;
-    const studentId = req.user._id;
+    const studentId = req.user._id || req.user.id;
+
+    // Validate IDs
+    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      return res.status(400).json({ message: 'Invalid course ID format' });
+    }
+
+    if (!studentId) {
+      return res.status(400).json({ message: 'User ID is required' });
+    }
 
     // Verify student is enrolled in the course
     const course = await Course.findById(courseId);
-    if (!course || !course.students.includes(studentId)) {
-      return res.status(404).json({ message: 'Course not found or student not enrolled' });
+    if (!course) {
+      return res.status(404).json({ message: 'Course not found' });
+    }
+    
+    const isEnrolled = course.students.some(s => s.toString() === studentId.toString());
+    if (!isEnrolled) {
+      return res.status(403).json({ message: 'Student not enrolled in this course' });
     }
 
     const attendanceRecords = await Attendance.find({
@@ -243,6 +329,11 @@ exports.getAttendancePercentages = async (req, res) => {
     const { courseId } = req.params;
     const { startDate, endDate } = req.query;
 
+    // Validate courseId
+    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      return res.status(400).json({ message: 'Invalid course ID format' });
+    }
+
     // Verify the course exists
     const course = await Course.findById(courseId);
     if (!course) {
@@ -252,9 +343,20 @@ exports.getAttendancePercentages = async (req, res) => {
     // Build date range query
     const dateQuery = {};
     if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return res.status(400).json({ message: 'Invalid date format' });
+      }
+      
+      if (end < start) {
+        return res.status(400).json({ message: 'End date must be after start date' });
+      }
+      
       dateQuery.date = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate)
+        $gte: start,
+        $lte: end
       };
     }
 
@@ -281,23 +383,29 @@ exports.getAttendancePercentages = async (req, res) => {
 
     // Count attendance by student
     attendanceRecords.forEach(record => {
+      if (!record || !record.student) return;
+      
       const studentId = record.student.toString();
       if (studentAttendance[studentId]) {
         studentAttendance[studentId].totalDays++;
         
-        switch (record.status) {
-          case 'present':
-            studentAttendance[studentId].presentDays++;
-            break;
-          case 'late':
-            studentAttendance[studentId].lateDays++;
-            break;
-          case 'excused':
-            studentAttendance[studentId].excusedDays++;
-            break;
-          case 'absent':
-            studentAttendance[studentId].absentDays++;
-            break;
+        // Validate status before counting
+        const validStatuses = ['present', 'absent', 'late', 'excused'];
+        if (validStatuses.includes(record.status)) {
+          switch (record.status) {
+            case 'present':
+              studentAttendance[studentId].presentDays++;
+              break;
+            case 'late':
+              studentAttendance[studentId].lateDays++;
+              break;
+            case 'excused':
+              studentAttendance[studentId].excusedDays++;
+              break;
+            case 'absent':
+              studentAttendance[studentId].absentDays++;
+              break;
+          }
         }
       }
     });
@@ -306,7 +414,13 @@ exports.getAttendancePercentages = async (req, res) => {
     Object.keys(studentAttendance).forEach(studentId => {
       const student = studentAttendance[studentId];
       const attendedDays = student.presentDays + student.lateDays + student.excusedDays;
-      student.percentage = student.totalDays > 0 ? Math.round((attendedDays / student.totalDays) * 100) : 0;
+      // Prevent division by zero and validate result
+      if (student.totalDays > 0) {
+        const percentage = (attendedDays / student.totalDays) * 100;
+        student.percentage = isFinite(percentage) ? Math.round(percentage) : 0;
+      } else {
+        student.percentage = 0;
+      }
     });
 
     res.json(studentAttendance);
@@ -459,9 +573,35 @@ exports.testSaveAttendance = async (req, res) => {
   try {
     const { courseId } = req.params;
     const { studentId, status, date } = req.body;
+    const userId = req.user._id || req.user.id;
     
-    // Parse the date properly
+    // Validate IDs
+    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      return res.status(400).json({ message: 'Invalid course ID format' });
+    }
+    if (!studentId || !mongoose.Types.ObjectId.isValid(studentId)) {
+      return res.status(400).json({ message: 'Invalid student ID format' });
+    }
+    if (!userId) {
+      return res.status(400).json({ message: 'User ID is required' });
+    }
+    
+    if (!date) {
+      return res.status(400).json({ message: 'Date is required' });
+    }
+    
+    // Validate date format
     const attendanceDate = new Date(date);
+    if (isNaN(attendanceDate.getTime())) {
+      return res.status(400).json({ message: 'Invalid date format' });
+    }
+    
+    // Validate status
+    const validStatuses = ['present', 'absent', 'late', 'excused', 'unmarked'];
+    if (status && !validStatuses.includes(status)) {
+      return res.status(400).json({ message: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
+    }
+    
     attendanceDate.setHours(0, 0, 0, 0);
     
     // Try to save a single attendance record
@@ -472,9 +612,9 @@ exports.testSaveAttendance = async (req, res) => {
         date: attendanceDate
       },
       {
-        status: status,
+        status: status || 'present',
         timestamp: new Date(),
-        markedBy: req.user._id,
+        markedBy: userId,
         reason: '',
         notes: ''
       },

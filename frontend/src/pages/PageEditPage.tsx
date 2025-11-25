@@ -3,8 +3,19 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useModule } from '../contexts/ModuleContext';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
-import ReactMarkdown from 'react-markdown';
+import RichTextEditor from '../components/RichTextEditor';
 import { ArrowLeft, Menu } from 'lucide-react';
+
+// Helper function to sanitize HTML content
+function sanitizeHtml(html: string): string {
+  if (!html) return '';
+  // Basic sanitization: remove script/style tags and event handlers
+  let sanitized = html.replace(/<\/(script|style)>/gi, '</removed>');
+  sanitized = sanitized.replace(/<(script|style)[^>]*>[\s\S]*?<\/(script|style)>/gi, '');
+  sanitized = sanitized.replace(/ on\w+="[^"]*"/gi, '');
+  sanitized = sanitized.replace(/ on\w+='[^']*'/gi, '');
+  return sanitized;
+}
 
 const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000';
 
@@ -130,24 +141,30 @@ const PageEditPage: React.FC = () => {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Top Navigation Bar (Mobile Only) */}
-      <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
-        <div className="relative flex items-center justify-between px-4 py-3">
-          <button
-            onClick={() => navigate(-1)}
-            className="text-gray-700 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
-            aria-label="Go back"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Edit Page</h1>
-          <div className="w-10"></div> {/* Spacer for centering */}
-        </div>
-      </nav>
+  // Check if we're in a wrapper (has courseId in URL)
+  const { courseId } = useParams<{ courseId?: string; pageId: string }>();
+  const isWrapped = !!courseId;
 
-      <div className="max-w-4xl mx-auto p-3 sm:p-4 lg:p-6 pt-16 lg:pt-6">
+  return (
+    <div className={isWrapped ? "" : "min-h-screen bg-gray-50 dark:bg-gray-900"}>
+      {/* Top Navigation Bar (Mobile Only) - Only show if not wrapped */}
+      {!isWrapped && (
+        <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+          <div className="relative flex items-center justify-between px-4 py-3">
+            <button
+              onClick={() => navigate(-1)}
+              className="text-gray-700 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
+              aria-label="Go back"
+            >
+              <ArrowLeft className="w-6 h-6" />
+            </button>
+            <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Edit Page</h1>
+            <div className="w-10"></div> {/* Spacer for centering */}
+          </div>
+        </nav>
+      )}
+
+      <div className={`max-w-4xl mx-auto p-3 sm:p-4 lg:p-6 ${isWrapped ? "" : "pt-16 lg:pt-6"}`}>
       <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-4 sm:p-6 border dark:border-gray-700">
           <div className="hidden lg:flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-4 sm:mb-6">
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Edit Page</h1>
@@ -163,7 +180,7 @@ const PageEditPage: React.FC = () => {
         {preview ? (
           <div className="prose max-w-none prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-p:text-gray-700 dark:prose-p:text-gray-300">
             <h1>{formData.title}</h1>
-            <ReactMarkdown>{formData.content}</ReactMarkdown>
+            <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(formData.content) }} />
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
@@ -183,15 +200,15 @@ const PageEditPage: React.FC = () => {
 
             <div>
               <label htmlFor="content" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Content (Markdown supported)
+                Content
               </label>
-              <textarea
-                id="content"
-                value={formData.content}
-                onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                rows={15}
-                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 font-mono"
-              />
+              <div className="mt-1 border border-gray-300 dark:border-gray-700 rounded-md">
+                <RichTextEditor
+                  content={formData.content}
+                  onChange={(value) => setFormData({ ...formData, content: value })}
+                  height={400}
+                />
+              </div>
             </div>
 
             <div className="flex flex-col sm:flex-row justify-end gap-2 sm:space-x-3">

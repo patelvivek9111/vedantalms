@@ -27,6 +27,15 @@ exports.getAnnouncementsByCourse = async (req, res) => {
 
     let query = { course: courseId };
     const groupsetId = req.query.groupset;
+    
+    // Validate groupsetId if provided
+    if (groupsetId && !mongoose.Types.ObjectId.isValid(groupsetId)) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid groupset ID format' 
+      });
+    }
+    
     // Only filter for students
     if (req.user && req.user.role === 'student') {
       const now = new Date();
@@ -88,24 +97,98 @@ exports.createAnnouncement = async (req, res) => {
     }
 
     const course = await Course.findById(courseId);
-    if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+    if (!course) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Course not found' 
+      });
+    }
+    
+    // Validate user is instructor or admin
+    const userId = req.user._id || req.user.id;
+    if (!userId) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'User ID is required' 
+      });
+    }
+    
+    const isInstructor = course.instructor.toString() === userId.toString();
+    const isAdmin = req.user.role === 'admin';
+    
+    if (!isInstructor && !isAdmin) {
+      return res.status(403).json({ 
+        success: false,
+        message: 'Only course instructors can create announcements' 
+      });
+    }
+    
+    // Validate required fields
+    if (!title || !title.trim()) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Title is required' 
+      });
+    }
+    
+    if (!body || !body.trim()) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Body is required' 
+      });
+    }
+    
     const attachments = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
     let groupsetId = undefined;
     let postToValue = 'all';
+    
     if (postTo && postTo !== 'all') {
+      // Validate groupsetId if provided
+      if (!mongoose.Types.ObjectId.isValid(postTo)) {
+        return res.status(400).json({ 
+          success: false,
+          message: 'Invalid groupset ID format' 
+        });
+      }
       groupsetId = postTo;
       postToValue = 'groupset';
     }
+    
+    // Parse options safely
+    let parsedOptions = {};
+    if (options) {
+      try {
+        parsedOptions = typeof options === 'string' ? JSON.parse(options) : options;
+      } catch (parseError) {
+        return res.status(400).json({ 
+          success: false,
+          message: 'Invalid options JSON format' 
+        });
+      }
+    }
+    
+    // Validate delayedUntil if provided
+    let delayedUntilDate = undefined;
+    if (req.body.delayedUntil) {
+      delayedUntilDate = new Date(req.body.delayedUntil);
+      if (isNaN(delayedUntilDate.getTime())) {
+        return res.status(400).json({ 
+          success: false,
+          message: 'Invalid delayedUntil date format' 
+        });
+      }
+    }
+    
     const announcement = await Announcement.create({
-      title,
-      body,
+      title: title.trim(),
+      body: body.trim(),
       course: courseId,
-      author: req.user._id,
+      author: userId,
       attachments,
       postTo: postToValue,
       groupset: groupsetId,
-      options: options ? JSON.parse(options) : {},
-      delayedUntil: req.body.delayedUntil || undefined,
+      options: parsedOptions,
+      delayedUntil: delayedUntilDate,
     });
     res.status(201).json({ success: true, data: announcement });
   } catch (err) {
@@ -116,7 +199,17 @@ exports.createAnnouncement = async (req, res) => {
 // Get all comments for an announcement (threaded)
 exports.getAnnouncementComments = async (req, res) => {
   try {
-    const announcement = await Announcement.findById(req.params.id)
+    const { id } = req.params;
+    
+    // Validate announcement ID
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid announcement ID format' 
+      });
+    }
+    
+    const announcement = await Announcement.findById(id)
       .populate({
         path: 'comments.author',
         select: 'firstName lastName',
@@ -141,13 +234,43 @@ exports.getAnnouncementComments = async (req, res) => {
 // Add a top-level comment to an announcement
 exports.addAnnouncementComment = async (req, res) => {
   try {
+    const { id } = req.params;
     const { text } = req.body;
-    if (!text) return res.status(400).json({ success: false, message: 'Text is required' });
-    const announcement = await Announcement.findById(req.params.id);
-    if (!announcement) return res.status(404).json({ success: false, message: 'Announcement not found' });
+    const userId = req.user._id || req.user.id;
+    
+    // Validate announcement ID
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid announcement ID format' 
+      });
+    }
+    
+    if (!userId) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'User ID is required' 
+      });
+    }
+    
+    if (!text || !text.trim()) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Text is required and cannot be empty' 
+      });
+    }
+    
+    const announcement = await Announcement.findById(id);
+    if (!announcement) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Announcement not found' 
+      });
+    }
+    
     const comment = {
-      author: req.user._id,
-      text,
+      author: userId,
+      text: text.trim(),
       createdAt: new Date(),
       replies: []
     };
@@ -162,10 +285,46 @@ exports.addAnnouncementComment = async (req, res) => {
 // Add a reply to a comment (threaded)
 exports.replyToAnnouncementComment = async (req, res) => {
   try {
+    const { id, commentId } = req.params;
     const { text } = req.body;
-    if (!text) return res.status(400).json({ success: false, message: 'Text is required' });
-    const announcement = await Announcement.findById(req.params.id);
-    if (!announcement) return res.status(404).json({ success: false, message: 'Announcement not found' });
+    const userId = req.user._id || req.user.id;
+    
+    // Validate IDs
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid announcement ID format' 
+      });
+    }
+    
+    if (!commentId || !mongoose.Types.ObjectId.isValid(commentId)) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid comment ID format' 
+      });
+    }
+    
+    if (!userId) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'User ID is required' 
+      });
+    }
+    
+    if (!text || !text.trim()) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Text is required and cannot be empty' 
+      });
+    }
+    
+    const announcement = await Announcement.findById(id);
+    if (!announcement) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Announcement not found' 
+      });
+    }
     // Recursive function to find and add reply as a Mongoose subdocument
     function addReply(comments, commentId, replyData) {
       for (let comment of comments) {
@@ -181,12 +340,12 @@ exports.replyToAnnouncementComment = async (req, res) => {
       return false;
     }
     const replyData = {
-      author: req.user._id,
-      text,
+      author: userId,
+      text: text.trim(),
       createdAt: new Date(),
       replies: []
     };
-    const added = addReply(announcement.comments, req.params.commentId, replyData);
+    const added = addReply(announcement.comments, commentId, replyData);
     if (!added) return res.status(404).json({ success: false, message: 'Comment not found' });
     announcement.markModified('comments');
     await announcement.save();
@@ -199,14 +358,48 @@ exports.replyToAnnouncementComment = async (req, res) => {
 // Like a comment or reply (threaded)
 exports.likeAnnouncementComment = async (req, res) => {
   try {
-    const announcement = await Announcement.findById(req.params.id);
-    if (!announcement) return res.status(404).json({ success: false, message: 'Announcement not found' });
-    const userId = req.user._id.toString();
+    const { id, commentId } = req.params;
+    const userId = req.user._id || req.user.id;
+    
+    // Validate IDs
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid announcement ID format' 
+      });
+    }
+    
+    if (!commentId || !mongoose.Types.ObjectId.isValid(commentId)) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid comment ID format' 
+      });
+    }
+    
+    if (!userId) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'User ID is required' 
+      });
+    }
+    
+    const announcement = await Announcement.findById(id);
+    if (!announcement) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Announcement not found' 
+      });
+    }
+    
+    const userIdStr = userId.toString();
     // Recursive function to find and like comment
     function likeComment(comments, commentId) {
       for (let comment of comments) {
         if (comment._id.toString() === commentId) {
-          if (!comment.likes.map(id => id.toString()).includes(userId)) {
+          if (!comment.likes) {
+            comment.likes = [];
+          }
+          if (!comment.likes.map(id => id.toString()).includes(userIdStr)) {
             comment.likes.push(userId);
           }
           return true;
@@ -217,7 +410,7 @@ exports.likeAnnouncementComment = async (req, res) => {
       }
       return false;
     }
-    const liked = likeComment(announcement.comments, req.params.commentId);
+    const liked = likeComment(announcement.comments, commentId);
     if (!liked) return res.status(404).json({ success: false, message: 'Comment not found' });
     announcement.markModified('comments');
     await announcement.save();
@@ -230,14 +423,47 @@ exports.likeAnnouncementComment = async (req, res) => {
 // Unlike a comment or reply (threaded)
 exports.unlikeAnnouncementComment = async (req, res) => {
   try {
-    const announcement = await Announcement.findById(req.params.id);
-    if (!announcement) return res.status(404).json({ success: false, message: 'Announcement not found' });
-    const userId = req.user._id.toString();
+    const { id, commentId } = req.params;
+    const userId = req.user._id || req.user.id;
+    
+    // Validate IDs
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid announcement ID format' 
+      });
+    }
+    
+    if (!commentId || !mongoose.Types.ObjectId.isValid(commentId)) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid comment ID format' 
+      });
+    }
+    
+    if (!userId) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'User ID is required' 
+      });
+    }
+    
+    const announcement = await Announcement.findById(id);
+    if (!announcement) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Announcement not found' 
+      });
+    }
+    
+    const userIdStr = userId.toString();
     // Recursive function to find and unlike comment
     function unlikeComment(comments, commentId) {
       for (let comment of comments) {
         if (comment._id.toString() === commentId) {
-          comment.likes = comment.likes.filter(id => id.toString() !== userId);
+          if (comment.likes && Array.isArray(comment.likes)) {
+            comment.likes = comment.likes.filter(id => id.toString() !== userIdStr);
+          }
           return true;
         }
         if (comment.replies && unlikeComment(comment.replies, commentId)) {
@@ -246,7 +472,7 @@ exports.unlikeAnnouncementComment = async (req, res) => {
       }
       return false;
     }
-    const unliked = unlikeComment(announcement.comments, req.params.commentId);
+    const unliked = unlikeComment(announcement.comments, commentId);
     if (!unliked) return res.status(404).json({ success: false, message: 'Comment not found' });
     announcement.markModified('comments');
     await announcement.save();
@@ -259,21 +485,75 @@ exports.unlikeAnnouncementComment = async (req, res) => {
 // Update an announcement
 exports.updateAnnouncement = async (req, res) => {
   try {
-    const announcement = await Announcement.findById(req.params.id);
-    if (!announcement) return res.status(404).json({ success: false, message: 'Announcement not found' });
+    const { id } = req.params;
+    const userId = req.user._id || req.user.id;
+    
+    // Validate announcement ID
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid announcement ID format' 
+      });
+    }
+    
+    if (!userId) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'User ID is required' 
+      });
+    }
+    
+    const announcement = await Announcement.findById(id);
+    if (!announcement) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Announcement not found' 
+      });
+    }
+    
     // Only allow author, teacher, or admin
     if (
       req.user.role !== 'admin' &&
       req.user.role !== 'teacher' &&
-      announcement.author.toString() !== req.user._id.toString()
+      announcement.author.toString() !== userId.toString()
     ) {
-      return res.status(403).json({ success: false, message: 'Not authorized' });
+      return res.status(403).json({ 
+        success: false,
+        message: 'Not authorized' 
+      });
     }
+    
     const { title, body, options, delayedUntil } = req.body;
-    if (title) announcement.title = title;
-    if (body) announcement.body = body;
-    if (options) announcement.options = JSON.parse(options);
-    if (delayedUntil) announcement.delayedUntil = delayedUntil;
+    if (title !== undefined) {
+      if (!title || !title.trim()) {
+        return res.status(400).json({ 
+          success: false,
+          message: 'Title cannot be empty' 
+        });
+      }
+      announcement.title = title.trim();
+    }
+    if (body !== undefined) announcement.body = body;
+    if (options) {
+      try {
+        announcement.options = typeof options === 'string' ? JSON.parse(options) : options;
+      } catch (parseError) {
+        return res.status(400).json({ 
+          success: false,
+          message: 'Invalid options JSON format' 
+        });
+      }
+    }
+    if (delayedUntil) {
+      const delayedDate = new Date(delayedUntil);
+      if (isNaN(delayedDate.getTime())) {
+        return res.status(400).json({ 
+          success: false,
+          message: 'Invalid delayedUntil date format' 
+        });
+      }
+      announcement.delayedUntil = delayedDate;
+    }
     if (req.files && req.files.length > 0) {
       announcement.attachments = req.files.map(file => `/uploads/${file.filename}`);
     }
@@ -287,15 +567,42 @@ exports.updateAnnouncement = async (req, res) => {
 // Delete an announcement
 exports.deleteAnnouncement = async (req, res) => {
   try {
-    const announcement = await Announcement.findById(req.params.id);
-    if (!announcement) return res.status(404).json({ success: false, message: 'Announcement not found' });
+    const { id } = req.params;
+    const userId = req.user._id || req.user.id;
+    
+    // Validate announcement ID
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid announcement ID format' 
+      });
+    }
+    
+    if (!userId) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'User ID is required' 
+      });
+    }
+    
+    const announcement = await Announcement.findById(id);
+    if (!announcement) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Announcement not found' 
+      });
+    }
+    
     // Only allow author, teacher, or admin
     if (
       req.user.role !== 'admin' &&
       req.user.role !== 'teacher' &&
-      announcement.author.toString() !== req.user._id.toString()
+      announcement.author.toString() !== userId.toString()
     ) {
-      return res.status(403).json({ success: false, message: 'Not authorized' });
+      return res.status(403).json({ 
+        success: false,
+        message: 'Not authorized' 
+      });
     }
     await announcement.deleteOne();
     res.json({ success: true, message: 'Announcement deleted' });

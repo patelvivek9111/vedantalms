@@ -66,26 +66,12 @@ const CoursePages: React.FC<CoursePagesProps> = ({ courseId, modules, isInstruct
             <p className="text-sm sm:text-base text-gray-500 dark:text-gray-300 mt-1">All pages for this course</p>
           </div>
           {(isInstructor || isAdmin) && modules.length > 0 && (
-            <div className="relative w-full sm:w-auto">
-              <button
-                onClick={handleCreateClick}
-                className="w-full sm:w-auto px-4 sm:px-5 py-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow transition-colors text-sm sm:text-base"
-              >
-                + Page
-              </button>
-              {showCreate && (
-                <div className="absolute right-0 mt-2 w-full sm:w-96 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded shadow-lg z-10 p-3 sm:p-4">
-                  <ModuleProvider>
-                    <CreatePageForm
-                      modules={modules}
-                      courseId={courseId}
-                      onSuccess={handleCreateSuccess}
-                      onCancel={() => setShowCreate(false)}
-                    />
-                  </ModuleProvider>
-                </div>
-              )}
-            </div>
+            <button
+              onClick={handleCreateClick}
+              className="w-full sm:w-auto px-4 sm:px-5 py-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow transition-colors text-sm sm:text-base"
+            >
+              + Page
+            </button>
           )}
         </div>
         {loading ? (
@@ -118,6 +104,16 @@ const CoursePages: React.FC<CoursePagesProps> = ({ courseId, modules, isInstruct
           </ul>
         )}
       </div>
+      {showCreate && (isInstructor || isAdmin) && modules.length > 0 && (
+        <ModuleProvider>
+          <CreatePageForm
+            modules={modules}
+            courseId={courseId}
+            onSuccess={handleCreateSuccess}
+            onCancel={() => setShowCreate(false)}
+          />
+        </ModuleProvider>
+      )}
     </div>
   );
 };
