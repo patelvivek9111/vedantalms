@@ -1,21 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import AnnouncementList, { Announcement } from '../announcements/AnnouncementList';
-import { getGroupSetAnnouncements, getAnnouncementComments, postAnnouncementComment, postAnnouncementReply, likeAnnouncementComment, unlikeAnnouncementComment } from '../../services/announcementService';
+import { getGroupSetAnnouncements, getAnnouncementComments, postAnnouncementComment, postAnnouncementReply, likeAnnouncementComment, unlikeAnnouncementComment, AnnouncementComment } from '../../services/announcementService';
 import { useAuth } from '../../context/AuthContext';
 import { ThumbsUp } from 'lucide-react';
+import logger from '../../utils/logger';
 
 interface GroupAnnouncementsProps {
   courseId: string;
   groupSetId: string;
-}
-
-interface Comment {
-  _id: string;
-  author: { _id: string; firstName: string; lastName: string };
-  text: string;
-  createdAt: string;
-  replies: Comment[];
-  likes?: string[];
 }
 
 const GroupAnnouncements: React.FC<GroupAnnouncementsProps> = ({ courseId, groupSetId }) => {
@@ -24,7 +16,7 @@ const GroupAnnouncements: React.FC<GroupAnnouncementsProps> = ({ courseId, group
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
-  const [comments, setComments] = useState<Comment[]>([]);
+  const [comments, setComments] = useState<AnnouncementComment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
@@ -61,7 +53,7 @@ const GroupAnnouncements: React.FC<GroupAnnouncementsProps> = ({ courseId, group
       const data = await getAnnouncementComments(announcementId);
       setComments(data);
       if (user && selectedAnnouncement?.options?.requirePostBeforeSeeingReplies) {
-        const hasPosted = data.some((comment: Comment) => comment.author._id === user._id);
+        const hasPosted = data.some((comment: AnnouncementComment) => comment.author._id === user._id);
         setUserHasPosted(hasPosted);
       } else {
         setUserHasPosted(true);
@@ -104,7 +96,7 @@ const GroupAnnouncements: React.FC<GroupAnnouncementsProps> = ({ courseId, group
       setReplyingTo(null);
       await fetchComments(selectedAnnouncement._id);
     } catch (err) {
-      console.error('Failed to post reply:', err);
+      logger.error('Failed to post reply', err);
     }
     setPosting(false);
   };
@@ -129,7 +121,7 @@ const GroupAnnouncements: React.FC<GroupAnnouncementsProps> = ({ courseId, group
     setLiking(prev => ({ ...prev, [commentId]: false }));
   };
 
-  const renderComments = (comments: Comment[], level = 0, parentKey = '') => {
+  const renderComments = (comments: AnnouncementComment[], level = 0, parentKey = '') => {
     let visibleComments = comments;
     const shouldHideOthers =
       level === 0 &&
@@ -145,12 +137,12 @@ const GroupAnnouncements: React.FC<GroupAnnouncementsProps> = ({ courseId, group
         {visibleComments
           .filter(comment => comment._id)
           .map((comment) => {
-            const isLiked = user && comment.likes && comment.likes.includes(user._id);
+            const isLiked = user && comment.likes && comment.likes.some(like => like.user === user._id || like._id === user._id);
             const isOwnComment = user && comment.author._id === user._id;
             const shouldShowReplies = userHasPosted || 
               !selectedAnnouncement?.options?.requirePostBeforeSeeingReplies ||
               user?.role !== 'student';
-            const visibleReplies = shouldShowReplies ? comment.replies : [];
+            const visibleReplies = shouldShowReplies ? (comment.replies || []) : [];
             return (
               <li key={parentKey + comment._id} className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 sm:p-4 border border-gray-100 dark:border-gray-700">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-2">

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useModule } from '../contexts/ModuleContext';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
+import logger from '../utils/logger';
 import RichTextEditor from '../components/RichTextEditor';
 import { ArrowLeft, Menu } from 'lucide-react';
 
@@ -52,7 +53,7 @@ const PageEditPage: React.FC = () => {
           setError('Failed to load page data');
         }
       } catch (err: any) {
-        console.error('Error fetching page:', err);
+        logger.error('Error fetching page', err);
         setError(err.response?.data?.message || 'Error loading page');
       } finally {
         setLoading(false);
@@ -92,7 +93,7 @@ const PageEditPage: React.FC = () => {
         throw new Error(response.data.message || 'Failed to update page');
       }
     } catch (err: any) {
-      console.error('Error updating page:', err);
+      logger.error('Error updating page', err);
       setError(err.response?.data?.message || 'Error updating page');
     } finally {
       setIsSubmitting(false);
@@ -191,6 +192,7 @@ const PageEditPage: React.FC = () => {
               <input
                 type="text"
                 id="title"
+                name="title"
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 required
@@ -204,6 +206,8 @@ const PageEditPage: React.FC = () => {
               </label>
               <div className="mt-1 border border-gray-300 dark:border-gray-700 rounded-md">
                 <RichTextEditor
+                  id="page-edit-content"
+                  name="content"
                   content={formData.content}
                   onChange={(value) => setFormData({ ...formData, content: value })}
                   height={400}

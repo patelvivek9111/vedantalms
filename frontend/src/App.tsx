@@ -4,7 +4,6 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { CourseProvider } from './contexts/CourseContext';
 import { ModuleProvider } from './contexts/ModuleContext';
 import { PrivateRoute } from './components/PrivateRoute';
-import Navigation from './components/Navigation';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
 import { Dashboard } from './pages/Dashboard';
@@ -21,6 +20,7 @@ import CourseForm from './components/CourseForm';
 import PageView from './components/PageView';
 import PageViewWrapper from './components/PageViewWrapper';
 import PageEditWrapper from './components/PageEditWrapper';
+import AssignmentEditWrapper from './components/assignments/AssignmentEditWrapper';
 import AssignmentList from './components/assignments/AssignmentList';
 import AssignmentDetails from './components/assignments/AssignmentDetails';
 import CreateAssignmentForm from './components/assignments/CreateAssignmentForm';
@@ -28,6 +28,7 @@ import CreateAssignmentWrapper from './components/assignments/CreateAssignmentWr
 import GradeSubmissions from './components/assignments/GradeSubmissions';
 import ViewAssignment from './components/assignments/ViewAssignment';
 import ModuleEditPage from './pages/ModuleEditPage';
+import ModuleEditWrapper from './components/ModuleEditWrapper';
 import PageEditPage from './pages/PageEditPage';
 import AssignmentEditPage from './pages/AssignmentEditPage';
 import AssignmentGrading from './components/assignments/AssignmentGrading';
@@ -39,8 +40,6 @@ import 'react-toastify/dist/ReactToastify.css';
 import ThreadView from './components/ThreadView';
 import ThreadViewWrapper from './components/ThreadViewWrapper';
 import Transcript from './pages/Transcript';
-import { Provider } from 'react-redux';
-import { store } from './store/store';
 import GroupDashboard from './components/groups/GroupDashboard';
 import GroupDiscussion from './components/groups/GroupDiscussion';
 import GroupPeopleWrapper from './components/groups/GroupPeopleWrapper';
@@ -250,6 +249,14 @@ function AppContent() {
             }
           />
           <Route
+            path="/courses/:courseId/assignments/:id/edit"
+            element={
+              <PrivateRoute>
+                <AssignmentEditWrapper />
+              </PrivateRoute>
+            }
+          />
+          <Route
             path="/assignments/:id/edit"
             element={
               <PrivateRoute>
@@ -270,7 +277,7 @@ function AppContent() {
             element={
               <PrivateRoute>
                 <ModuleProvider>
-                  <ModuleEditPage />
+                  <ModuleEditWrapper />
                 </ModuleProvider>
               </PrivateRoute>
             }
@@ -479,17 +486,15 @@ function AppContent() {
 
 function App() {
   return (
-    <Provider store={store}>
-      <ThemeProvider>
-        <AuthProvider>
-          <CourseProvider>
-            <ErrorBoundary>
-              <AppContent />
-            </ErrorBoundary>
-          </CourseProvider>
-        </AuthProvider>
-      </ThemeProvider>
-    </Provider>
+    <ThemeProvider>
+      <AuthProvider>
+        <CourseProvider>
+          <ErrorBoundary>
+            <AppContent />
+          </ErrorBoundary>
+        </CourseProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

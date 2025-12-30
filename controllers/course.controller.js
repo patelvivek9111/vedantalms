@@ -3,6 +3,8 @@ const { validationResult } = require('express-validator');
 const mongoose = require('mongoose');
 const Module = require('../models/module.model');
 const Page = require('../models/page.model');
+const logger = require('../utils/logger');
+const { ValidationError, NotFoundError, sendErrorResponse, asyncHandler } = require('../utils/errorHandler');
 
 // Earthy tone color palette for course cards
 const earthyColors = [
@@ -27,17 +29,15 @@ const getRandomColor = () => {
 // @desc    Create a course
 // @route   POST /api/courses
 // @access  Private (Teacher/Admin)
-exports.createCourse = async (req, res) => {
+exports.createCourse = async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ 
-        success: false,
-        errors: errors.array().map(err => ({
-          field: err.param,
-          message: err.msg
-        }))
-      });
+      const validationErrors = errors.array().map(err => ({
+        field: err.param,
+        message: err.msg
+      }));
+      return sendErrorResponse(res, new ValidationError('Validation error', validationErrors), { action: 'createCourse' });
     }
 
     const { title, description, gradeScale, catalog, defaultColor, semester } = req.body;
@@ -120,20 +120,15 @@ exports.createCourse = async (req, res) => {
       data: course
     });
   } catch (err) {
-    console.error('Create course error:', err);
-    res.status(500).json({ 
-      success: false,
-      message: 'Server error during course creation',
-      error: err.message 
-    });
+    // Let the global error handler deal with it
+    next(err);
   }
 };
 
 // @desc    Get all courses
 // @route   GET /api/courses
 // @access  Private
-exports.getCourses = async (req, res) => {
-  try {
+exports.getCourses = asyncHandler(async (req, res, next) => {
     // Validate user ID
     const userId = req.user._id || req.user.id;
     if (!userId) {
@@ -187,22 +182,12 @@ exports.getCourses = async (req, res) => {
       count: courses.length,
       data: courses
     });
-  } catch (err) {
-    console.error('Get courses error:', err);
-    res.status(500).json({ 
-      success: false,
-      message: 'Server error while fetching courses',
-      error: err.message 
-    });
-  }
-};
+});
 
 // @desc    Get single course
 // @route   GET /api/courses/:id
 // @access  Private
-exports.getCourse = async (req, res) => {
-  try {
-    
+exports.getCourse = asyncHandler(async (req, res, next) => {
     // Validate if the ID is a valid MongoDB ObjectId
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({
@@ -247,15 +232,7 @@ exports.getCourse = async (req, res) => {
       success: true,
       data: course
     });
-  } catch (err) {
-    console.error('Get course error:', err);
-    res.status(500).json({ 
-      success: false,
-      message: 'Server error while fetching course',
-      error: err.message 
-    });
-  }
-};
+});
 
 // @desc    Update course
 // @route   PUT /api/courses/:id
@@ -306,7 +283,7 @@ exports.updateCourse = async (req, res) => {
         }
         updateFields.gradeScale = req.body.gradeScale;
       } catch (err) {
-        console.error('Grade scale validation error:', err);
+        logger.warn('Grade scale validation error', { error: err.message, courseId: req.params.id });
         return res.status(400).json({ success: false, message: 'Invalid grade scale format.' });
       }
     }
@@ -319,7 +296,7 @@ exports.updateCourse = async (req, res) => {
       ).populate('instructor', 'firstName lastName email')
        .populate('students', 'firstName lastName email');
     } catch (err) {
-      console.error('Course update error:', err);
+      logger.logError(err, { action: 'updateCourse', courseId: req.params.id });
       return res.status(400).json({ success: false, message: 'Failed to update course. Check your data.' });
     }
 
@@ -328,7 +305,7 @@ exports.updateCourse = async (req, res) => {
       data: course
     });
   } catch (err) {
-    console.error('Update course error:', err);
+    logger.logError(err, { action: 'updateCourse', courseId: req.params.id });
     res.status(500).json({ 
       success: false,
       message: 'Server error while updating course',
@@ -390,7 +367,7 @@ exports.assignInstructor = async (req, res) => {
       data: updatedCourse
     });
   } catch (err) {
-    console.error('Assign instructor error:', err);
+    logger.logError(err, { action: 'assignInstructor', courseId: req.params.id });
     res.status(500).json({ 
       success: false,
       message: 'Server error while assigning instructor',
@@ -404,11 +381,13 @@ exports.assignInstructor = async (req, res) => {
 // @access  Private (Teacher/Admin)
 exports.publishCourse = async (req, res) => {
   try {
+    logger.info('publishCourse called', { courseId: req.params.id, userId: req.user?._id || req.user?.id });
+    
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ success: false, message: 'Invalid course ID' });
     }
 
-    const course = await Course.findById(req.params.id);
+    let course = await Course.findById(req.params.id);
 
     if (!course) {
       return res.status(404).json({ success: false, message: 'Course not found' });
@@ -429,6 +408,12 @@ exports.publishCourse = async (req, res) => {
 
     const wasPublished = course.published;
     const willBePublished = !wasPublished;
+    
+    logger.info('publishCourse state', { 
+      courseId: req.params.id, 
+      wasPublished, 
+      willBePublished 
+    });
 
     // If unpublishing: save current published states and unpublish everything
     if (wasPublished && !willBePublished) {
@@ -436,43 +421,121 @@ exports.publishCourse = async (req, res) => {
       const modules = await Module.find({ course: course._id });
       const moduleIds = modules.map(m => m._id);
       
-      // Get all pages for these modules
-      const pages = await Page.find({ module: { $in: moduleIds } });
+      // Get all pages for these modules (only if there are modules)
+      const pages = moduleIds.length > 0 
+        ? await Page.find({ module: { $in: moduleIds } })
+        : [];
       
-      // Get all assignments for these modules
+      // Get all assignments for these modules AND group assignments for this course
       const Assignment = require('../models/Assignment');
-      const assignments = await Assignment.find({ module: { $in: moduleIds } });
+      const GroupSet = require('../models/GroupSet');
+      
+      // Get assignments that belong to modules in this course (only if there are modules)
+      const moduleAssignments = moduleIds.length > 0
+        ? await Assignment.find({ module: { $in: moduleIds } })
+        : [];
+      
+      // Get group assignments that belong to this course (via groupSet)
+      let groupSets = [];
+      let groupSetIds = [];
+      let groupAssignments = [];
+      
+      try {
+        groupSets = await GroupSet.find({ course: course._id });
+        groupSetIds = groupSets.map(gs => gs._id);
+        
+        if (groupSetIds.length > 0) {
+          groupAssignments = await Assignment.find({ 
+            isGroupAssignment: true, 
+            groupSet: { $in: groupSetIds } 
+          });
+        }
+      } catch (groupError) {
+        logger.warn('Error finding group sets or assignments', { 
+          courseId: course._id, 
+          error: groupError.message,
+          stack: groupError.stack 
+        });
+        // Continue without group assignments - don't fail the whole operation
+        groupSets = [];
+        groupSetIds = [];
+        groupAssignments = [];
+      }
+      // Combine all assignments
+      const assignments = [...moduleAssignments, ...groupAssignments];
       
       // Get all threads for this course
       const Thread = require('../models/thread.model');
       const threads = await Thread.find({ course: course._id });
       
       // Save the current published states BEFORE unpublishing
+      // Helper function to safely convert to ObjectId
+      const toObjectId = (id) => {
+        if (!id) return null;
+        if (id instanceof mongoose.Types.ObjectId) return id;
+        if (mongoose.Types.ObjectId.isValid(id)) {
+          return typeof id === 'string' ? new mongoose.Types.ObjectId(id) : id;
+        }
+        return null;
+      };
+      
       const snapshot = {
         modules: modules.map(m => ({
-          moduleId: m._id,
+          moduleId: toObjectId(m._id),
           published: m.published || false
-        })),
+        })).filter(m => m.moduleId !== null),
         pages: pages.map(p => ({
-          pageId: p._id,
+          pageId: toObjectId(p._id),
           published: p.published || false
-        })),
+        })).filter(p => p.pageId !== null),
         assignments: assignments.map(a => ({
-          assignmentId: a._id,
+          assignmentId: toObjectId(a._id),
           published: a.published || false
-        })),
+        })).filter(a => a.assignmentId !== null),
         threads: threads.map(t => ({
-          threadId: t._id,
+          threadId: toObjectId(t._id),
           published: t.published !== undefined ? t.published : true
-        }))
+        })).filter(t => t.threadId !== null)
       };
       
       // Save snapshot to course FIRST (before unpublishing)
-      course.publishedStateSnapshot = snapshot;
-      await course.save();
+      // Skip validation since we're only updating published state, not catalog data
+      try {
+        // Ensure course._id is a proper ObjectId
+        const courseObjectId = course._id instanceof mongoose.Types.ObjectId 
+          ? course._id 
+          : new mongoose.Types.ObjectId(course._id);
+        
+        // Use MongoDB collection directly to bypass Mongoose hooks
+        const snapshotResult = await Course.collection.updateOne(
+          { _id: courseObjectId },
+          { $set: { publishedStateSnapshot: snapshot } }
+        );
+        
+        logger.info('Snapshot saved', { 
+          courseId: req.params.id,
+          matchedCount: snapshotResult.matchedCount,
+          modifiedCount: snapshotResult.modifiedCount
+        });
+        
+        // Reload course to get updated snapshot
+        course = await Course.findById(course._id);
+        
+        if (!course) {
+          throw new Error('Course not found after saving snapshot');
+        }
+      } catch (saveError) {
+        logger.logError(saveError, { 
+          action: 'publishCourse - save snapshot', 
+          courseId: req.params.id,
+          errorMessage: saveError.message,
+          errorStack: saveError.stack
+        });
+        throw saveError;
+      }
       
       // Now unpublish everything
-      course.published = false;
+      // Don't modify course.published directly - we'll update via findByIdAndUpdate
       
       // Unpublish all modules
       await Module.updateMany(
@@ -480,17 +543,29 @@ exports.publishCourse = async (req, res) => {
         { published: false }
       );
       
-      // Unpublish all pages
-      await Page.updateMany(
-        { module: { $in: moduleIds } },
-        { published: false }
-      );
+      // Unpublish all pages (only if there are modules)
+      if (moduleIds.length > 0) {
+        await Page.updateMany(
+          { module: { $in: moduleIds } },
+          { published: false }
+        );
+      }
       
-      // Unpublish all assignments
-      await Assignment.updateMany(
-        { module: { $in: moduleIds } },
-        { published: false }
-      );
+      // Unpublish all assignments (both module-based and group assignments)
+      // Unpublish module-based assignments (only if there are modules)
+      if (moduleIds.length > 0) {
+        await Assignment.updateMany(
+          { module: { $in: moduleIds } },
+          { published: false }
+        );
+      }
+      // Unpublish group assignments for this course
+      if (groupSetIds.length > 0) {
+        await Assignment.updateMany(
+          { isGroupAssignment: true, groupSet: { $in: groupSetIds } },
+          { published: false }
+        );
+      }
       
       // Unpublish all threads
       await Thread.updateMany(
@@ -500,27 +575,57 @@ exports.publishCourse = async (req, res) => {
       
     } else if (!wasPublished && willBePublished) {
       // If republishing: restore saved published states
-      course.published = true;
+      logger.info('Publishing course - restoring snapshot', { courseId: req.params.id });
+      
+      let Assignment, Thread;
+      try {
+        Assignment = require('../models/Assignment');
+        Thread = require('../models/thread.model');
+      } catch (modelError) {
+        logger.logError(modelError, { action: 'publishCourse - require models', courseId: req.params.id });
+        throw new Error(`Failed to load required models: ${modelError.message}`);
+      }
+      
+      // Helper function to safely convert to ObjectId for queries
+      const toObjectIdForQuery = (id) => {
+        if (!id) return null;
+        if (id instanceof mongoose.Types.ObjectId) return id;
+        if (mongoose.Types.ObjectId.isValid(id)) {
+          return typeof id === 'string' ? new mongoose.Types.ObjectId(id) : id;
+        }
+        return null;
+      };
       
       if (course.publishedStateSnapshot) {
+        logger.info('Found snapshot, restoring states', { 
+          courseId: req.params.id,
+          modulesCount: course.publishedStateSnapshot.modules?.length || 0,
+          pagesCount: course.publishedStateSnapshot.pages?.length || 0,
+          assignmentsCount: course.publishedStateSnapshot.assignments?.length || 0,
+          threadsCount: course.publishedStateSnapshot.threads?.length || 0
+        });
+        // Restore from saved snapshot
         const snapshot = course.publishedStateSnapshot;
-        const Assignment = require('../models/Assignment');
-        const Thread = require('../models/thread.model');
         
         // Restore module published states
         if (snapshot.modules && snapshot.modules.length > 0) {
           for (const moduleState of snapshot.modules) {
             try {
-              const moduleExists = await Module.findById(moduleState.moduleId);
+              const moduleId = toObjectIdForQuery(moduleState.moduleId);
+              if (!moduleId) {
+                logger.warn('Invalid module ID in snapshot', { moduleId: moduleState.moduleId, courseId: req.params.id });
+                continue;
+              }
+              const moduleExists = await Module.findById(moduleId);
               if (moduleExists) {
                 await Module.findByIdAndUpdate(
-                  moduleState.moduleId,
+                  moduleId,
                   { published: moduleState.published !== undefined ? moduleState.published : false },
                   { runValidators: false }
                 );
               }
             } catch (err) {
-              console.error(`Error restoring module ${moduleState.moduleId}:`, err);
+              logger.warn('Error restoring module', { moduleId: moduleState.moduleId, courseId: req.params.id, error: err.message });
             }
           }
         }
@@ -529,16 +634,21 @@ exports.publishCourse = async (req, res) => {
         if (snapshot.pages && snapshot.pages.length > 0) {
           for (const pageState of snapshot.pages) {
             try {
-              const pageExists = await Page.findById(pageState.pageId);
+              const pageId = toObjectIdForQuery(pageState.pageId);
+              if (!pageId) {
+                logger.warn('Invalid page ID in snapshot', { pageId: pageState.pageId, courseId: req.params.id });
+                continue;
+              }
+              const pageExists = await Page.findById(pageId);
               if (pageExists) {
                 await Page.findByIdAndUpdate(
-                  pageState.pageId,
+                  pageId,
                   { published: pageState.published !== undefined ? pageState.published : false },
                   { runValidators: false }
                 );
               }
             } catch (err) {
-              console.error(`Error restoring page ${pageState.pageId}:`, err);
+              logger.warn('Error restoring page', { pageId: pageState.pageId, courseId: req.params.id, error: err.message });
             }
           }
         }
@@ -547,16 +657,21 @@ exports.publishCourse = async (req, res) => {
         if (snapshot.assignments && snapshot.assignments.length > 0) {
           for (const assignmentState of snapshot.assignments) {
             try {
-              const assignmentExists = await Assignment.findById(assignmentState.assignmentId);
+              const assignmentId = toObjectIdForQuery(assignmentState.assignmentId);
+              if (!assignmentId) {
+                logger.warn('Invalid assignment ID in snapshot', { assignmentId: assignmentState.assignmentId, courseId: req.params.id });
+                continue;
+              }
+              const assignmentExists = await Assignment.findById(assignmentId);
               if (assignmentExists) {
                 await Assignment.findByIdAndUpdate(
-                  assignmentState.assignmentId,
+                  assignmentId,
                   { published: assignmentState.published !== undefined ? assignmentState.published : false },
                   { runValidators: false }
                 );
               }
             } catch (err) {
-              console.error(`Error restoring assignment ${assignmentState.assignmentId}:`, err);
+              logger.warn('Error restoring assignment', { assignmentId: assignmentState.assignmentId, courseId: req.params.id, error: err.message });
             }
           }
         }
@@ -565,34 +680,153 @@ exports.publishCourse = async (req, res) => {
         if (snapshot.threads && snapshot.threads.length > 0) {
           for (const threadState of snapshot.threads) {
             try {
-              const threadExists = await Thread.findById(threadState.threadId);
+              const threadId = toObjectIdForQuery(threadState.threadId);
+              if (!threadId) {
+                logger.warn('Invalid thread ID in snapshot', { threadId: threadState.threadId, courseId: req.params.id });
+                continue;
+              }
+              const threadExists = await Thread.findById(threadId);
               if (threadExists) {
                 await Thread.findByIdAndUpdate(
-                  threadState.threadId,
+                  threadId,
                   { published: threadState.published !== undefined ? threadState.published : true },
                   { runValidators: false }
                 );
               }
             } catch (err) {
-              console.error(`Error restoring thread ${threadState.threadId}:`, err);
+              logger.warn('Error restoring thread', { threadId: threadState.threadId, courseId: req.params.id, error: err.message });
             }
           }
         }
+      } else {
+        // No snapshot exists - this is a first-time publish
+        // By default, don't auto-publish modules/pages/assignments/threads
+        // They need to be published individually
+        logger.info('Publishing course without snapshot (first time)', { courseId: req.params.id });
       }
       // Clear the snapshot after restoring (optional - you can keep it if you want)
       // course.publishedStateSnapshot = null;
     }
 
-    await course.save();
-    const updatedCourse = await Course.findById(req.params.id);
+    try {
+      logger.info('Saving course published state', { courseId: req.params.id, willBePublished });
+      
+      // Save without validating catalog fields (publishing doesn't change catalog data)
+      // Use updateOne with runValidators: false to completely skip all validation hooks
+      // Reload course to get latest snapshot if it was updated during unpublish
+      const currentCourse = await Course.findById(course._id);
+      
+      if (!currentCourse) {
+        throw new Error('Course not found after processing');
+      }
+      
+      const updateData = {
+        published: willBePublished
+      };
+      // Include snapshot if it exists (set during unpublish, or keep existing during publish)
+      if (currentCourse.publishedStateSnapshot !== undefined) {
+        updateData.publishedStateSnapshot = currentCourse.publishedStateSnapshot;
+      }
+      
+      logger.info('Updating course in database', { courseId: req.params.id, updateData });
+      
+      // Ensure course._id is a proper ObjectId
+      const courseObjectId = course._id instanceof mongoose.Types.ObjectId 
+        ? course._id 
+        : new mongoose.Types.ObjectId(course._id);
+      
+      let updateResult;
+      try {
+        // Use MongoDB collection directly to completely bypass Mongoose hooks and validation
+        updateResult = await Course.collection.updateOne(
+          { _id: courseObjectId },
+          { $set: updateData }
+        );
+        
+        logger.info('Course update result', { 
+          courseId: req.params.id, 
+          matchedCount: updateResult.matchedCount,
+          modifiedCount: updateResult.modifiedCount 
+        });
+      } catch (updateError) {
+        logger.logError(updateError, { 
+          action: 'publishCourse - collection updateOne failed', 
+          courseId: req.params.id,
+          tryingFallback: true
+        });
+        
+        // Fallback: Use Mongoose findByIdAndUpdate with runValidators: false
+        logger.info('Trying fallback update method', { courseId: req.params.id });
+        const fallbackUpdate = await Course.findByIdAndUpdate(
+          courseObjectId,
+          { $set: updateData },
+          { new: true, runValidators: false }
+        );
+        
+        if (!fallbackUpdate) {
+          throw new Error('Course update failed with both methods');
+        }
+        
+        logger.info('Fallback update successful', { courseId: req.params.id });
+        const updatedCourse = await Course.findById(req.params.id);
+        
+        if (!updatedCourse) {
+          throw new Error('Course not found after fallback update');
+        }
+        
+        logger.info('Course published successfully (fallback)', { courseId: req.params.id, published: updatedCourse.published });
 
-    res.json({
-      success: true,
-      published: updatedCourse.published
-    });
+        return res.json({
+          success: true,
+          published: updatedCourse.published
+        });
+      }
+      
+      const updatedCourse = await Course.findById(req.params.id);
+      
+      if (!updatedCourse) {
+        throw new Error('Course not found after update');
+      }
+
+      logger.info('Course published successfully', { courseId: req.params.id, published: updatedCourse.published });
+
+      res.json({
+        success: true,
+        published: updatedCourse.published
+      });
+    } catch (saveError) {
+      logger.logError(saveError, { 
+        action: 'publishCourse - final save', 
+        courseId: req.params.id,
+        errorMessage: saveError.message,
+        errorStack: saveError.stack,
+        errorName: saveError.name
+      });
+      throw saveError;
+    }
   } catch (err) {
-    console.error('Publish course error:', err);
-    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+    logger.logError(err, { 
+      action: 'publishCourse', 
+      courseId: req.params.id, 
+      stack: err.stack,
+      errorMessage: err.message,
+      errorName: err.name,
+      errorCode: err.code
+    });
+    
+    const errorMessage = process.env.NODE_ENV === 'development' 
+      ? err.message 
+      : 'Internal server error';
+    
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error while publishing/unpublishing course', 
+      error: errorMessage,
+      ...(process.env.NODE_ENV === 'development' && { 
+        stack: err.stack,
+        name: err.name 
+      })
+    });
   }
 };
 
@@ -625,7 +859,7 @@ exports.deleteCourse = async (req, res) => {
       data: {}
     });
   } catch (err) {
-    console.error('Delete course error:', err);
+    logger.logError(err, { action: 'deleteCourse', courseId: req.params.id });
     res.status(500).json({ 
       success: false,
       message: 'Server error while deleting course',
@@ -694,21 +928,29 @@ exports.enrollStudent = async (req, res) => {
       });
     }
 
-    // Add student to course
-    course.students.push(studentId);
-    await course.save();
-
-    // Populate the updated course data
-    const updatedCourse = await Course.findById(course._id)
+    // Add student to course using findByIdAndUpdate to bypass catalog validation
+    // We're only updating the students array, so we don't need to validate catalog fields
+    const updatedCourse = await Course.findByIdAndUpdate(
+      req.params.id,
+      { $push: { students: studentId } },
+      { new: true, runValidators: false }
+    )
       .populate('instructor', 'firstName lastName email')
       .populate('students', 'firstName lastName email');
+
+    if (!updatedCourse) {
+      return res.status(404).json({
+        success: false,
+        message: 'Course not found after update'
+      });
+    }
 
     res.json({
       success: true,
       data: updatedCourse
     });
   } catch (err) {
-    console.error('Enroll student error:', err);
+    logger.logError(err, { action: 'enrollStudent', courseId: req.params.id });
     res.status(500).json({ 
       success: false,
       message: 'Server error while enrolling student',
@@ -772,27 +1014,33 @@ exports.unenrollStudent = async (req, res) => {
       });
     }
     
-    // Remove student from course
-    course.students = course.students.filter(id => id.toString() !== studentId);
+    // Remove student from course and handle waitlist promotion
+    const updatedStudents = course.students.filter(id => id.toString() !== studentId);
+    let updatedWaitlist = course.waitlist || [];
+    let waitlistPromoted = false;
+    let promotedStudentId = null;
     
     // Check if there are students on the waitlist and promote the first one
-    if (course.waitlist && course.waitlist.length > 0) {
+    if (updatedWaitlist.length > 0) {
       try {
-        const promotedStudent = course.waitlist.shift(); // Remove first student from waitlist
+        const promotedStudent = updatedWaitlist.shift(); // Remove first student from waitlist
+        promotedStudentId = promotedStudent.student;
         
         // Add them to the course
-        course.students.push(promotedStudent.student);
+        updatedStudents.push(promotedStudentId);
+        waitlistPromoted = true;
         
         // Update positions for remaining waitlist students
-        course.waitlist.forEach((waitlistEntry, index) => {
-          waitlistEntry.position = index + 1;
-        });
+        updatedWaitlist = updatedWaitlist.map((waitlistEntry, index) => ({
+          ...waitlistEntry.toObject ? waitlistEntry.toObject() : waitlistEntry,
+          position: index + 1
+        }));
         
         // Create todo notification for teacher about the promotion
         const Todo = require('../models/todo.model');
         const User = require('../models/user.model');
         
-        const promotedUser = await User.findById(promotedStudent.student).select('firstName lastName');
+        const promotedUser = await User.findById(promotedStudentId).select('firstName lastName');
         
         if (promotedUser && course.instructor) {
           await Todo.create({
@@ -801,28 +1049,43 @@ exports.unenrollStudent = async (req, res) => {
             user: course.instructor._id || course.instructor,
             type: 'waitlist_promotion',
             courseId: course._id,
-            studentId: promotedStudent.student,
+            studentId: promotedStudentId,
             action: 'completed'
           });
         }
       } catch (waitlistError) {
-        console.error('Error during waitlist promotion:', waitlistError);
+        logger.warn('Error during waitlist promotion', { courseId: courseId, error: waitlistError.message });
         // Continue with unenrollment even if waitlist promotion fails
       }
     }
     
-    await course.save();
-    
-    // Populate the updated course data
-    const updatedCourse = await Course.findById(course._id)
+    // Update course using findByIdAndUpdate to bypass catalog validation
+    // We're only updating students and waitlist arrays, so we don't need to validate catalog fields
+    const updatedCourse = await Course.findByIdAndUpdate(
+      courseId,
+      { 
+        $set: { 
+          students: updatedStudents,
+          waitlist: updatedWaitlist
+        } 
+      },
+      { new: true, runValidators: false }
+    )
       .populate('instructor', 'firstName lastName email')
       .populate('students', 'firstName lastName email')
       .populate('waitlist.student', 'firstName lastName email');
     
+    if (!updatedCourse) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Course not found after update' 
+      });
+    }
+    
     res.json({ 
       success: true, 
       data: updatedCourse,
-      message: 'Student unenrolled successfully' + (course.waitlist && course.waitlist.length > 0 ? '. A student has been promoted from the waitlist.' : '')
+      message: 'Student unenrolled successfully' + (waitlistPromoted ? '. A student has been promoted from the waitlist.' : '')
     });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error', error: err.message });
@@ -899,7 +1162,7 @@ exports.getCourseModules = async (req, res) => {
       data: modules
     });
   } catch (err) {
-    console.error('Get course modules error:', err);
+    logger.logError(err, { action: 'getCourseModules', courseId: req.params.id });
     res.status(500).json({ 
       success: false,
       message: 'Server error while fetching course modules',
@@ -980,7 +1243,7 @@ exports.updateOverviewConfig = async (req, res) => {
       data: updatedCourse
     });
   } catch (err) {
-    console.error('Update overview config error:', err);
+    logger.logError(err, { action: 'updateOverviewConfig', courseId: req.params.id });
     res.status(500).json({ 
       success: false,
       message: 'Server error while updating overview configuration',
@@ -1062,7 +1325,7 @@ exports.updateSidebarConfig = async (req, res) => {
     // Validate studentVisibility if provided
     if (studentVisibility) {
       const validKeys = [
-        'overview', 'modules', 'pages', 'assignments', 'quizzes', 'discussions',
+        'overview', 'syllabus', 'modules', 'pages', 'assignments', 'quizzes', 'discussions',
         'announcements', 'polls', 'groups', 'attendance', 'grades',
         'gradebook', 'students'
       ];
@@ -1104,7 +1367,7 @@ exports.updateSidebarConfig = async (req, res) => {
       data: updatedCourse
     });
   } catch (err) {
-    console.error('Update sidebar config error:', err);
+    logger.logError(err, { action: 'updateSidebarConfig', courseId: req.params.id });
     res.status(500).json({ 
       success: false,
       message: 'Server error while updating sidebar configuration',

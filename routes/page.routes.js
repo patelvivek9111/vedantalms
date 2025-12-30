@@ -1,71 +1,47 @@
 const express = require('express');
 const router = express.Router();
 const { check } = require('express-validator');
-const multer = require('multer');
 const { protect, authorize } = require('../middleware/auth');
-const { createPage, getPagesByModule, getPageById, updatePage, getPagesByGroupSet } = require('../controllers/page.controller');
-const Page = require('../models/page.model');
-const Module = require('../models/module.model');
-
-// Multer setup for file uploads
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/');
-  },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + '-' + file.originalname);
-  }
-});
-const upload = multer({ storage });
+const {
+  createPage,
+  getPagesByModule,
+  getPageById,
+  updatePage,
+  getPagesByGroupSet,
+  getPagesByCourse,
+  deletePage
+} = require('../controllers/page.controller');
+const upload = require('../middleware/upload');
 
 // Validation middleware
 const pageValidation = [
   check('title').trim().notEmpty().withMessage('Title is required'),
-  check('content').notEmpty().withMessage('Content is required'),
-  check(['module', 'groupSet']).custom((value, { req }) => {
-    if (!req.body.module && !req.body.groupSet) {
-      throw new Error('Either module or groupSet is required');
-    }
-    return true;
-  })
+  check('module').optional().isMongoId().withMessage('Invalid module ID'),
+  check('groupSet').optional().isMongoId().withMessage('Invalid groupSet ID')
 ];
 
-router.post('/', protect, authorize('teacher', 'admin'), upload.array('attachments'), pageValidation, createPage);
-router.get('/view/:id', protect, getPageById);
-router.get('/:moduleId', protect, getPagesByModule);
-router.put('/:id', protect, authorize('teacher', 'admin'), upload.array('attachments'), pageValidation, updatePage);
+// Create a page
+router.post('/', protect, authorize('teacher', 'admin'), upload.array('attachments', 10), pageValidation, createPage);
 
-// Get all pages for a course
-router.get('/course/:courseId', protect, async (req, res) => {
-  try {
-    const mongoose = require('mongoose');
-    const { courseId } = req.params;
-    
-    // Validate courseId
-    if (!mongoose.Types.ObjectId.isValid(courseId)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid course ID format' 
-      });
-    }
-    
-    // Find all modules for the course
-    const modules = await Module.find({ course: courseId }).select('_id');
-    if (!modules || modules.length === 0) {
-      return res.json({ success: true, data: [] });
-    }
-    
-    const moduleIds = modules.map(m => m._id);
-    // Find all pages for those modules
-    const pages = await Page.find({ module: { $in: moduleIds } });
-    res.json({ success: true, data: pages });
-  } catch (err) {
-    console.error('Error fetching pages for course:', err);
-    res.status(500).json({ success: false, message: 'Error fetching pages for course', error: err.message });
-  }
-});
-
+// Specific routes must come before generic /:moduleId route
 // Get all pages for a group set
 router.get('/groupset/:groupSetId', protect, getPagesByGroupSet);
 
-module.exports = router; 
+// Get all pages for a course
+router.get('/course/:courseId', protect, getPagesByCourse);
+
+// Get a single page by ID
+router.get('/view/:id', protect, getPageById);
+
+// Get all pages for a module (also handles /:moduleId for backward compatibility)
+router.get('/module/:moduleId', protect, getPagesByModule);
+router.get('/:moduleId', protect, getPagesByModule);
+
+// Update a page
+router.put('/:id', protect, authorize('teacher', 'admin'), upload.array('attachments', 10), updatePage);
+
+// Delete a page
+router.delete('/:id', protect, authorize('teacher', 'admin'), deletePage);
+
+module.exports = router;
+

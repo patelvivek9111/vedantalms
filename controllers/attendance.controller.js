@@ -2,32 +2,33 @@ const mongoose = require('mongoose');
 const Attendance = require('../models/attendance.model');
 const Course = require('../models/course.model');
 const User = require('../models/user.model');
+const logger = require('../utils/logger');
+const { ValidationError, NotFoundError, ForbiddenError, sendErrorResponse, asyncHandler } = require('../utils/errorHandler');
 
 // Get attendance for a specific course and date
-exports.getAttendance = async (req, res) => {
-  try {
+exports.getAttendance = asyncHandler(async (req, res, next) => {
     const { courseId } = req.params;
     const { date } = req.query;
 
     // Validate courseId
     if (!mongoose.Types.ObjectId.isValid(courseId)) {
-      return res.status(400).json({ message: 'Invalid course ID format' });
+      return sendErrorResponse(res, new ValidationError('Invalid course ID format'), { action: 'getAttendance', courseId });
     }
 
     if (!date) {
-      return res.status(400).json({ message: 'Date parameter is required' });
+      return sendErrorResponse(res, new ValidationError('Date parameter is required'), { action: 'getAttendance' });
     }
 
     // Validate date format
     const attendanceDate = new Date(date);
     if (isNaN(attendanceDate.getTime())) {
-      return res.status(400).json({ message: 'Invalid date format' });
+      return sendErrorResponse(res, new ValidationError('Invalid date format'), { action: 'getAttendance', date });
     }
 
     // Get all students enrolled in the course
     const course = await Course.findById(courseId).populate('students');
     if (!course) {
-      return res.status(404).json({ message: 'Course not found' });
+      return sendErrorResponse(res, new NotFoundError('Course not found'), { action: 'getAttendance', courseId });
     }
 
     // Parse the date properly (already validated above)
@@ -67,64 +68,59 @@ exports.getAttendance = async (req, res) => {
     }).filter(item => item !== null);
 
     res.json(attendanceData);
-  } catch (error) {
-    console.error('Error getting attendance:', error);
-    res.status(500).json({ message: 'Error fetching attendance data' });
-  }
-};
+});
 
 // Save attendance for a course
-exports.saveAttendance = async (req, res) => {
-  try {
+exports.saveAttendance = asyncHandler(async (req, res, next) => {
     const { courseId } = req.params;
     const { date, attendanceData } = req.body;
     const userId = req.user._id || req.user.id;
 
     // Validate courseId
     if (!mongoose.Types.ObjectId.isValid(courseId)) {
-      return res.status(400).json({ message: 'Invalid course ID format' });
+      return sendErrorResponse(res, new ValidationError('Invalid course ID format'), { action: 'saveAttendance', courseId });
     }
 
     if (!userId) {
-      return res.status(400).json({ message: 'User ID is required' });
+      return sendErrorResponse(res, new ValidationError('User ID is required'), { action: 'saveAttendance' });
     }
 
     if (!date || !attendanceData || !Array.isArray(attendanceData)) {
-      return res.status(400).json({ message: 'Date and attendance data are required' });
+      return sendErrorResponse(res, new ValidationError('Date and attendance data are required'), { action: 'saveAttendance' });
     }
 
     // Validate date format
     const attendanceDate = new Date(date);
     if (isNaN(attendanceDate.getTime())) {
-      return res.status(400).json({ message: 'Invalid date format' });
+      return sendErrorResponse(res, new ValidationError('Invalid date format'), { action: 'saveAttendance', date });
     }
 
     // Verify the course exists and user is instructor
     const course = await Course.findById(courseId);
     if (!course) {
-      return res.status(404).json({ message: 'Course not found' });
+      return sendErrorResponse(res, new NotFoundError('Course not found'), { action: 'saveAttendance', courseId });
     }
 
     if (course.instructor.toString() !== userId.toString() && req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Only instructors can mark attendance' });
+      return sendErrorResponse(res, new ForbiddenError('Only instructors can mark attendance'), { action: 'saveAttendance', courseId });
     }
 
     // Validate attendance data
     const validStatuses = ['present', 'absent', 'late', 'excused', 'unmarked'];
     for (const record of attendanceData) {
       if (!record.studentId) {
-        return res.status(400).json({ message: 'Student ID is required for each attendance record' });
+        return sendErrorResponse(res, new ValidationError('Student ID is required for each attendance record'), { action: 'saveAttendance' });
       }
       if (!mongoose.Types.ObjectId.isValid(record.studentId)) {
-        return res.status(400).json({ message: `Invalid student ID format: ${record.studentId}` });
+        return sendErrorResponse(res, new ValidationError(`Invalid student ID format: ${record.studentId}`), { action: 'saveAttendance', studentId: record.studentId });
       }
       if (record.status && !validStatuses.includes(record.status)) {
-        return res.status(400).json({ message: `Invalid status: ${record.status}. Must be one of: ${validStatuses.join(', ')}` });
+        return sendErrorResponse(res, new ValidationError(`Invalid status: ${record.status}. Must be one of: ${validStatuses.join(', ')}`), { action: 'saveAttendance', status: record.status });
       }
       // Verify student is enrolled in course
       const isEnrolled = course.students.some(s => s.toString() === record.studentId.toString());
       if (!isEnrolled) {
-        return res.status(400).json({ message: `Student ${record.studentId} is not enrolled in this course` });
+        return sendErrorResponse(res, new ValidationError(`Student ${record.studentId} is not enrolled in this course`), { action: 'saveAttendance', studentId: record.studentId });
       }
     }
 
@@ -175,7 +171,7 @@ exports.saveAttendance = async (req, res) => {
           );
           results.push({ studentId: record.studentId, status: attendanceRecord.status });
         } catch (upsertError) {
-          console.error('Error upserting attendance record:', upsertError);
+          logger.warn('Error upserting attendance record', { error: upsertError.message, courseId: req.params.courseId });
           throw upsertError;
         }
       }
@@ -185,15 +181,7 @@ exports.saveAttendance = async (req, res) => {
       message: 'Attendance saved successfully',
       results 
     });
-  } catch (error) {
-    console.error('Error saving attendance:', error);
-    console.error('Error stack:', error.stack);
-    res.status(500).json({ 
-      message: 'Error saving attendance data',
-      error: error.message 
-    });
-  }
-};
+});
 
 // Get attendance statistics for a course
 exports.getAttendanceStats = async (req, res) => {
@@ -272,7 +260,7 @@ exports.getAttendanceStats = async (req, res) => {
 
     res.json(stats);
   } catch (error) {
-    console.error('Error getting attendance stats:', error);
+    logger.logError(error, { action: 'getAttendanceStats', courseId: req.params.courseId });
     res.status(500).json({ message: 'Error fetching attendance statistics' });
   }
 };
@@ -318,7 +306,7 @@ exports.getStudentAttendance = async (req, res) => {
 
     res.json(attendanceData);
   } catch (error) {
-    console.error('Error getting student attendance:', error);
+    logger.logError(error, { action: 'getStudentAttendance', courseId: req.params.courseId, studentId: req.params.studentId });
     res.status(500).json({ message: 'Error fetching student attendance' });
   }
 };
@@ -425,7 +413,7 @@ exports.getAttendancePercentages = async (req, res) => {
 
     res.json(studentAttendance);
   } catch (error) {
-    console.error('Error getting attendance percentages:', error);
+    logger.logError(error, { action: 'getAttendancePercentages', courseId: req.params.courseId });
     res.status(500).json({ message: 'Error calculating attendance percentages' });
   }
 };
@@ -498,7 +486,7 @@ exports.cleanupAttendance = async (req, res) => {
       newIndexes: newIndexes.length
     });
   } catch (error) {
-    console.error('Error in cleanup:', error);
+    logger.logError(error, { action: 'cleanupAttendance' });
     res.status(500).json({ message: 'Error during cleanup', error: error.message });
   }
 };
@@ -563,7 +551,7 @@ exports.fixDatabase = async (req, res) => {
       collectionRecreated: true
     });
   } catch (error) {
-    console.error('Error in direct database fix:', error);
+    logger.logError(error, { action: 'directDatabaseFix' });
     res.status(500).json({ message: 'Error fixing database', error: error.message });
   }
 };
@@ -629,7 +617,7 @@ exports.testSaveAttendance = async (req, res) => {
       record: attendanceRecord
     });
   } catch (error) {
-    console.error('Error in test save:', error);
+    logger.logError(error, { action: 'testSave' });
     res.status(500).json({ message: 'Error testing save', error: error.message });
   }
 };
@@ -676,7 +664,7 @@ exports.inspectDatabase = async (req, res) => {
       indexes: indexes
     });
   } catch (error) {
-    console.error('Error in database inspection:', error);
+    logger.logError(error, { action: 'databaseInspection' });
     res.status(500).json({ message: 'Error inspecting database', error: error.message });
   }
 };
@@ -721,7 +709,7 @@ exports.testAttendance = async (req, res) => {
       problematicRecords: problematicRecords.length
     });
   } catch (error) {
-    console.error('Error in test attendance:', error);
+    logger.logError(error, { action: 'testAttendance' });
     res.status(500).json({ message: 'Error testing attendance', error: error.message });
   }
 }; 

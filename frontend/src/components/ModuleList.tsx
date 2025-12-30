@@ -3,6 +3,7 @@ import { useModule } from '../contexts/ModuleContext';
 import { useAuth } from '../context/AuthContext';
 import ModuleCard from './ModuleCard';
 import CreateModuleForm from './CreateModuleForm';
+import logger from '../utils/logger';
 
 interface ModuleListProps {
   courseId: string;
@@ -22,7 +23,7 @@ const ModuleList: React.FC<ModuleListProps> = ({ courseId }) => {
   useEffect(() => {
     if (courseId) {
       getModulesRef.current(courseId).catch(err => {
-        console.error('Error in ModuleList useEffect:', err);
+        logger.error('Error in ModuleList useEffect', err);
       });
     }
   }, [courseId]);

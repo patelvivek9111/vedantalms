@@ -1,10 +1,11 @@
 const mongoose = require('mongoose');
 const { QuizWave, QuizSession, QuizResponse } = require('../models/quizwave.model');
 const Course = require('../models/course.model');
+const logger = require('../utils/logger');
+const { ValidationError, NotFoundError, ForbiddenError, ConflictError, sendErrorResponse, asyncHandler } = require('../utils/errorHandler');
 
 // Create a new quiz
-const createQuiz = async (req, res) => {
-  try {
+const createQuiz = asyncHandler(async (req, res, next) => {
     const { courseId } = req.params;
     
     // Validate courseId
@@ -28,79 +29,52 @@ const createQuiz = async (req, res) => {
     // Validate course exists and user is instructor
     const course = await Course.findById(courseId);
     if (!course) {
-      return res.status(404).json({
-        success: false,
-        message: 'Course not found'
-      });
+      return sendErrorResponse(res, new NotFoundError('Course not found'), { action: 'createQuiz', courseId });
     }
 
     // Check if user is the instructor or admin
     const userId = req.user._id || req.user.id;
     if (!userId) {
-      return res.status(400).json({
-        success: false,
-        message: 'User ID is required'
-      });
+      return sendErrorResponse(res, new ValidationError('User ID is required'), { action: 'createQuiz' });
     }
     
     // Validate title
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Quiz title is required'
-      });
+      return sendErrorResponse(res, new ValidationError('Quiz title is required'), { action: 'createQuiz' });
     }
 
     // Validate title length
     if (title.trim().length > 200) {
-      return res.status(400).json({
-        success: false,
-        message: 'Quiz title must be 200 characters or less'
-      });
+      return sendErrorResponse(res, new ValidationError('Quiz title must be 200 characters or less'), { action: 'createQuiz' });
     }
 
     // Check if user is the instructor or admin
     if (!course.instructor || course.instructor.toString() !== userId.toString()) {
       if (req.user.role !== 'admin') {
-        return res.status(403).json({
-          success: false,
-          message: 'Only course instructors can create quizzes'
-        });
+        return sendErrorResponse(res, new ForbiddenError('Only course instructors can create quizzes'), { action: 'createQuiz', courseId });
       }
     }
 
     // Validate questions
     if (!questions || questions.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'At least one question is required'
-      });
+      return sendErrorResponse(res, new ValidationError('At least one question is required'), { action: 'createQuiz' });
     }
 
     // Validate each question
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
       if (!q.questionText || q.questionText.trim() === '') {
-        return res.status(400).json({
-          success: false,
-          message: `Question ${i + 1} text is required`
-        });
+        return sendErrorResponse(res, new ValidationError(`Question ${i + 1} text is required`), { action: 'createQuiz', questionIndex: i + 1 });
       }
 
       // Validate question type
       if (!q.questionType || !['multiple-choice', 'true-false'].includes(q.questionType)) {
-        return res.status(400).json({
-          success: false,
-          message: `Question ${i + 1} must have a valid question type (multiple-choice or true-false)`
-        });
+        return sendErrorResponse(res, new ValidationError(`Question ${i + 1} must have a valid question type (multiple-choice or true-false)`), { action: 'createQuiz', questionIndex: i + 1 });
       }
 
       // Validate options exist
       if (!q.options || !Array.isArray(q.options)) {
-        return res.status(400).json({
-          success: false,
-          message: `Question ${i + 1} must have an options array`
-        });
+        return sendErrorResponse(res, new ValidationError(`Question ${i + 1} must have an options array`), { action: 'createQuiz', questionIndex: i + 1 });
       }
 
       // Validate and clean options
@@ -108,37 +82,27 @@ const createQuiz = async (req, res) => {
       
       if (q.questionType === 'multiple-choice') {
         if (validOptions.length < 2) {
-          return res.status(400).json({
-            success: false,
-            message: `Question ${i + 1} must have at least 2 valid options with text`
-          });
+          return sendErrorResponse(res, new ValidationError(`Question ${i + 1} must have at least 2 valid options with text`), { action: 'createQuiz', questionIndex: i + 1 });
         }
         const correctCount = validOptions.filter(opt => opt.isCorrect === true).length;
         if (correctCount !== 1) {
-          return res.status(400).json({
-            success: false,
-            message: `Question ${i + 1} must have exactly one correct answer`
-          });
+          return sendErrorResponse(res, new ValidationError(`Question ${i + 1} must have exactly one correct answer`), { action: 'createQuiz', questionIndex: i + 1 });
         }
       } else if (q.questionType === 'true-false') {
         if (validOptions.length !== 2) {
-          return res.status(400).json({
-            success: false,
-            message: `True/False question ${i + 1} must have exactly 2 valid options`
-          });
+          return sendErrorResponse(res, new ValidationError(`True/False question ${i + 1} must have exactly 2 valid options`), { action: 'createQuiz', questionIndex: i + 1 });
         }
         const correctCount = validOptions.filter(opt => opt.isCorrect === true).length;
         if (correctCount !== 1) {
-          return res.status(400).json({
-            success: false,
-            message: `True/False question ${i + 1} must have exactly one correct answer`
-          });
+          return sendErrorResponse(res, new ValidationError(`True/False question ${i + 1} must have exactly one correct answer`), { action: 'createQuiz', questionIndex: i + 1 });
         }
       }
     }
 
     // Clean and prepare questions data
-    const cleanedQuestions = questions.map((q, index) => {
+    const cleanedQuestions = [];
+    for (let index = 0; index < questions.length; index++) {
+      const q = questions[index];
       // Filter out empty options and ensure proper structure
       const cleanedOptions = (q.options || [])
         .filter(opt => opt && opt.text && opt.text.trim() !== '')
@@ -154,21 +118,18 @@ const createQuiz = async (req, res) => {
         if (!isNaN(parsedTimeLimit) && parsedTimeLimit > 0 && parsedTimeLimit <= 300) {
           timeLimit = parsedTimeLimit;
         } else {
-          return res.status(400).json({
-            success: false,
-            message: `Question ${index + 1} time limit must be between 1 and 300 seconds`
-          });
+          return sendErrorResponse(res, new ValidationError(`Question ${index + 1} time limit must be between 1 and 300 seconds`), { action: 'createQuiz', questionIndex: index + 1 });
         }
       }
 
-      return {
+      cleanedQuestions.push({
         questionText: q.questionText.trim(),
         questionType: q.questionType,
         options: cleanedOptions,
         timeLimit: timeLimit,
         order: q.order !== undefined && !isNaN(q.order) ? parseInt(q.order) : index
-      };
-    });
+      });
+    }
 
     const quiz = new QuizWave({
       course: courseId,
@@ -186,42 +147,7 @@ const createQuiz = async (req, res) => {
       message: 'Quiz created successfully',
       data: quiz
     });
-  } catch (error) {
-    console.error('Create quiz error:', error);
-    console.error('Error details:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack
-    });
-    
-    // Handle Mongoose validation errors
-    if (error.name === 'ValidationError') {
-      const errors = Object.values(error.errors).map((err) => err.message);
-      console.error('Validation errors:', errors);
-      return res.status(400).json({
-        success: false,
-        message: 'Validation error',
-        errors: errors
-      });
-    }
-    
-    // Handle CastError (invalid ObjectId, etc.)
-    if (error.name === 'CastError') {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid data format',
-        error: error.message
-      });
-    }
-    
-    res.status(500).json({
-      success: false,
-      message: 'Error creating quiz',
-      error: process.env.NODE_ENV === 'production' ? 'An error occurred' : error.message,
-      ...(process.env.NODE_ENV !== 'production' && { stack: error.stack })
-    });
-  }
-};
+});
 
 // Get all quizzes for a course
 const getQuizzesByCourse = async (req, res) => {
@@ -285,7 +211,7 @@ const getQuizzesByCourse = async (req, res) => {
       data: quizzes
     });
   } catch (error) {
-    console.error('Get quizzes error:', error);
+    logger.logError(error, { action: 'getQuizzesByCourse', courseId: req.params.courseId });
     res.status(500).json({
       success: false,
       message: 'Error fetching quizzes',
@@ -359,7 +285,7 @@ const getQuiz = async (req, res) => {
       data: quiz
     });
   } catch (error) {
-    console.error('Get quiz error:', error);
+    logger.logError(error, { action: 'getQuizById', quizId: req.params.quizId });
     res.status(500).json({
       success: false,
       message: 'Error fetching quiz',
@@ -528,7 +454,7 @@ const updateQuiz = async (req, res) => {
       data: quiz
     });
   } catch (error) {
-    console.error('Update quiz error:', error);
+    logger.logError(error, { action: 'updateQuiz', quizId: req.params.quizId });
     res.status(500).json({
       success: false,
       message: 'Error updating quiz',
@@ -608,7 +534,7 @@ const deleteQuiz = async (req, res) => {
       message: 'Quiz deleted successfully'
     });
   } catch (error) {
-    console.error('Delete quiz error:', error);
+    logger.logError(error, { action: 'deleteQuiz', quizId: req.params.quizId });
     res.status(500).json({
       success: false,
       message: 'Error deleting quiz',
@@ -618,8 +544,7 @@ const deleteQuiz = async (req, res) => {
 };
 
 // Create a new quiz session
-const createSession = async (req, res) => {
-  try {
+const createSession = asyncHandler(async (req, res, next) => {
     const { quizId } = req.params;
     
     // Validate quizId
@@ -694,10 +619,7 @@ const createSession = async (req, res) => {
 
     // Check if quiz has questions
     if (!quiz.questions || quiz.questions.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Quiz must have at least one question'
-      });
+      return sendErrorResponse(res, new ValidationError('Quiz must have at least one question'), { action: 'createSession', quizId });
     }
 
     // Check if there's already an active session for this quiz
@@ -729,16 +651,12 @@ const createSession = async (req, res) => {
     
     // Ensure courseId is a valid ObjectId
     if (!courseId) {
-      console.error('[createSession] ❌ courseId is null or undefined!');
-      return res.status(400).json({
-        success: false,
-        message: 'Course ID is missing',
-        error: 'Unable to determine course ID for session'
-      });
+      logger.error('[createSession] courseId is null or undefined', { quizId: req.params.quizId });
+      return sendErrorResponse(res, new ValidationError('Course ID is missing'), { action: 'createSession', quizId });
     }
     
     // Convert to string for logging, but keep as ObjectId for MongoDB
-    console.log(`[createSession] Course ID resolved: ${courseId.toString() || courseId}`);
+    logger.debug('[createSession] Course ID resolved', { courseId: courseId.toString() || courseId });
 
     // Retry logic for handling race conditions with PIN generation
     let session;
@@ -751,25 +669,15 @@ const createSession = async (req, res) => {
         // Generate unique game PIN
         let gamePin;
         try {
-          console.log(`[${new Date().toISOString()}] Attempting to generate PIN for quiz ${quizId}...`);
+          logger.debug('Attempting to generate PIN for quiz', { quizId });
           gamePin = await QuizSession.generateGamePin();
-          console.log(`[${new Date().toISOString()}] Successfully generated PIN: ${gamePin}`);
+          logger.debug('Successfully generated PIN', { quizId, gamePin });
         } catch (pinError) {
-          console.error('❌ Error generating game PIN:', pinError);
-          console.error('Error stack:', pinError.stack);
-          console.error('Error details:', {
-            name: pinError.name,
-            message: pinError.message,
-            code: pinError.code
-          });
-          return res.status(500).json({
-            success: false,
-            message: 'Error generating game PIN',
-            error: process.env.NODE_ENV === 'production' ? 'An error occurred' : pinError.message
-          });
+          logger.logError(pinError, { action: 'generateGamePin', quizId });
+          throw pinError; // Let global error handler deal with it
         }
 
-        console.log(`[createSession] Creating session object with:`, {
+        logger.debug('[createSession] Creating session object', {
           quiz: quizId,
           course: courseId,
           gamePin,
@@ -785,32 +693,22 @@ const createSession = async (req, res) => {
 
         // Validate before saving
         try {
-          console.log('[createSession] Validating session...');
+          logger.debug('[createSession] Validating session');
           await session.validate();
-          console.log('[createSession] ✅ Validation passed');
+          logger.debug('[createSession] Validation passed');
         } catch (validationError) {
-          console.error('[createSession] ❌ Session validation error:', validationError);
-          console.error('Validation error details:', {
-            name: validationError.name,
-            message: validationError.message,
-            errors: validationError.errors
-          });
-          return res.status(400).json({
-            success: false,
-            message: 'Session validation failed',
-            error: process.env.NODE_ENV === 'production' ? 'Invalid session data' : validationError.message,
-            ...(process.env.NODE_ENV !== 'production' && { details: validationError.errors })
-          });
+          logger.logError(validationError, { action: 'validateSession', quizId: req.params.quizId });
+          throw validationError; // Let global error handler deal with it
         }
 
         // Try to save - this might fail with duplicate key error in race conditions
-        console.log('[createSession] Attempting to save session...');
+        logger.debug('[createSession] Attempting to save session');
         try {
           await session.save();
-          console.log('[createSession] ✅ Session saved successfully!');
+          logger.debug('[createSession] Session saved successfully');
           saved = true;
         } catch (saveErr) {
-          console.error('[createSession] ❌ Save failed:', {
+          logger.warn('[createSession] Save failed', {
             code: saveErr.code,
             name: saveErr.name,
             message: saveErr.message,
@@ -821,7 +719,7 @@ const createSession = async (req, res) => {
         }
       } catch (saveError) {
         // Log the error for debugging
-        console.log('Save error caught:', {
+        logger.debug('Save error caught', {
           code: saveError.code,
           name: saveError.name,
           message: saveError.message,
@@ -839,19 +737,14 @@ const createSession = async (req, res) => {
 
         if (isDuplicatePinError) {
           retries++;
-          console.warn(`Duplicate PIN detected (attempt ${retries}/${maxRetries}), retrying with new PIN...`);
-          console.warn('Duplicate PIN details:', {
+          logger.warn(`Duplicate PIN detected (attempt ${retries}/${maxRetries}), retrying`, {
             attemptedPin: session?.gamePin,
             keyValue: saveError.keyValue
           });
           
           if (retries >= maxRetries) {
-            console.error('Failed to create session after maximum retries due to duplicate PINs');
-            return res.status(500).json({
-              success: false,
-              message: 'Unable to generate unique game PIN after multiple attempts',
-              error: 'Please try again in a moment'
-            });
+            logger.error('Failed to create session after maximum retries due to duplicate PINs', { quizId: req.params.quizId, maxRetries });
+            throw new ConflictError('Unable to generate unique game PIN after multiple attempts. Please try again in a moment');
           }
           // Wait a small random amount before retrying to reduce collision chance
           await new Promise(resolve => setTimeout(resolve, Math.random() * 100));
@@ -867,109 +760,7 @@ const createSession = async (req, res) => {
       message: 'Session created successfully',
       data: session
     });
-  } catch (error) {
-    console.error('\n❌❌❌ CREATE SESSION ERROR ❌❌❌');
-    console.error('Error type:', error.name);
-    console.error('Error message:', error.message);
-    console.error('Error code:', error.code);
-    console.error('Full error object:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack,
-      code: error.code,
-      keyPattern: error.keyPattern,
-      keyValue: error.keyValue,
-      errors: error.errors
-    });
-    console.error('❌❌❌ END ERROR ❌❌❌\n');
-    
-    // Handle specific error types
-    if (error.name === 'ValidationError') {
-      const errors = Object.values(error.errors).map((err) => err.message);
-      console.error('Validation errors:', errors);
-      return res.status(400).json({
-        success: false,
-        message: 'Validation error',
-        errors: errors,
-        error: errors.join(', ')
-      });
-    }
-    
-    if (error.name === 'CastError') {
-      console.error('Cast error:', error.message);
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid data format',
-        error: error.message
-      });
-    }
-    
-    // Handle duplicate key errors (e.g., duplicate gamePin)
-    // Note: This should rarely be hit now due to retry logic above,
-    // but kept as a fallback for edge cases
-    if (error.code === 11000) {
-      const field = Object.keys(error.keyPattern || {})[0] || 'key';
-      console.error('Duplicate key error (fallback handler - should not reach here):', {
-        field,
-        keyValue: error.keyValue,
-        keyPattern: error.keyPattern,
-        fullError: error
-      });
-      console.error('This should have been caught by retry logic - investigating...');
-      
-      // If it's a gamePin error, try one more time with retry logic
-      if (field === 'gamePin' || (error.message && error.message.includes('gamePin'))) {
-        console.log('Attempting emergency retry for gamePin duplicate...');
-        // This is a fallback - the retry should have caught it, but if we're here, try once more
-        try {
-          // Re-fetch courseId if needed (should be in scope, but just in case)
-          let emergencyCourseId = courseId;
-          if (!emergencyCourseId && quiz && quiz.course) {
-            emergencyCourseId = quiz.course._id || quiz.course;
-          }
-          
-          const emergencyPin = await QuizSession.generateGamePin();
-          const emergencySession = new QuizSession({
-            quiz: quizId,
-            course: emergencyCourseId,
-            gamePin: emergencyPin,
-            createdBy: userId
-          });
-          await emergencySession.save();
-          return res.status(201).json({
-            success: true,
-            message: 'Session created successfully (after retry)',
-            data: emergencySession
-          });
-        } catch (retryError) {
-          console.error('Emergency retry also failed:', retryError);
-        }
-      }
-      
-      return res.status(409).json({
-        success: false,
-        message: `Duplicate ${field} detected`,
-        error: `A session with this ${field} already exists. Please try again.`
-      });
-    }
-    
-    // Return detailed error in development, generic in production
-    const errorMessage = process.env.NODE_ENV === 'production' 
-      ? 'An error occurred while creating the session' 
-      : error.message;
-    
-    res.status(500).json({
-      success: false,
-      message: 'Error creating session',
-      error: errorMessage,
-      ...(process.env.NODE_ENV !== 'production' && { 
-        stack: error.stack,
-        name: error.name,
-        code: error.code
-      })
-    });
-  }
-};
+});
 
 // Get session by PIN (for students to join)
 const getSessionByPin = async (req, res) => {
@@ -1033,7 +824,7 @@ const getSessionByPin = async (req, res) => {
       data: sessionData
     });
   } catch (error) {
-    console.error('Get session by PIN error:', error);
+    logger.logError(error, { action: 'getSessionByPin', pin: req.params.pin });
     res.status(500).json({
       success: false,
       message: 'Error fetching session',
@@ -1100,7 +891,7 @@ const getSession = async (req, res) => {
       data: session
     });
   } catch (error) {
-    console.error('Get session error:', error);
+    logger.logError(error, { action: 'getSession', sessionId: req.params.sessionId });
     res.status(500).json({
       success: false,
       message: 'Error fetching session',
@@ -1167,7 +958,7 @@ const getSessionsByQuiz = async (req, res) => {
       data: sessions
     });
   } catch (error) {
-    console.error('Get sessions error:', error);
+    logger.logError(error, { action: 'getSessions', quizId: req.params.quizId });
     res.status(500).json({
       success: false,
       message: 'Error fetching sessions',
@@ -1220,7 +1011,7 @@ const cleanupOldSessions = async (req, res) => {
         responseResult = await QuizResponse.deleteMany({ session: { $in: sessionIds } });
       }
     } catch (responseError) {
-      console.error('Error deleting responses:', responseError);
+      logger.warn('Error deleting responses', { error: responseError.message, sessionId: req.params.sessionId });
       // Continue with session deletion even if response deletion fails
     }
 
@@ -1239,7 +1030,7 @@ const cleanupOldSessions = async (req, res) => {
       deletedResponses: responseResult.deletedCount || 0
     });
   } catch (error) {
-    console.error('Cleanup error:', error);
+    logger.logError(error, { action: 'cleanupOldSessions' });
     res.status(500).json({
       success: false,
       message: 'Error cleaning up sessions',

@@ -5,6 +5,7 @@ import { API_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { getImageUrl } from '../services/api';
 import { ChangeUserModal } from '../components/ChangeUserModal';
+import logger from '../utils/logger';
 import { 
   BookOpen, 
   Search, 
@@ -21,7 +22,8 @@ import {
   Settings,
   HelpCircle,
   User as UserIcon,
-  LogOut
+  LogOut,
+  ArrowLeft
 } from 'lucide-react';
 
 interface Course {
@@ -60,6 +62,9 @@ export function TeacherCourseOversight() {
   const [saving, setSaving] = useState(false);
   const [showBurgerMenu, setShowBurgerMenu] = useState(false);
   const [showChangeUserModal, setShowChangeUserModal] = useState(false);
+  
+  // Get previous course ID from localStorage
+  const previousCourseId = localStorage.getItem('previousCourseId');
 
   useEffect(() => {
     const fetchCourses = async () => {
@@ -88,7 +93,7 @@ export function TeacherCourseOversight() {
                 }
               } catch (error) {
                 // Skip if we can't get average (course might have no grades yet)
-                console.warn(`Could not fetch class average for course ${course._id}:`, error);
+                logger.warn('Could not fetch class average for course', { courseId: course._id, error });
               }
               
               // Determine status
@@ -112,7 +117,7 @@ export function TeacherCourseOversight() {
                 status: status
               };
             } catch (error) {
-              console.error(`Error processing course ${course._id}:`, error);
+              logger.error('Error processing course', error, { courseId: course._id });
               return {
                 ...course,
                 enrollmentCount: course.students?.length || 0,
@@ -126,7 +131,7 @@ export function TeacherCourseOversight() {
           setFilteredCourses(coursesWithStats);
         }
       } catch (error) {
-        console.error('Error fetching courses:', error);
+        logger.error('Error fetching courses', error);
       } finally {
         setLoading(false);
       }
@@ -244,7 +249,7 @@ export function TeacherCourseOversight() {
       setShowCourseModal(false);
       setSelectedCourse(null);
     } catch (error: any) {
-      console.error('Error updating course:', error);
+      logger.error('Error updating course', error);
       alert(error.response?.data?.message || 'Failed to update course');
     } finally {
       setSaving(false);
@@ -262,7 +267,7 @@ export function TeacherCourseOversight() {
       setCourses(courses.filter(c => c._id !== courseId));
       setFilteredCourses(filteredCourses.filter(c => c._id !== courseId));
     } catch (error: any) {
-      console.error('Error deleting course:', error);
+      logger.error('Error deleting course', error);
       alert(error.response?.data?.message || 'Failed to delete course');
     }
   };
@@ -280,13 +285,26 @@ export function TeacherCourseOversight() {
       {/* Top Navigation Bar (Mobile Only) */}
       <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
         <div className="relative flex items-center justify-between px-4 py-3">
-          <button
-            onClick={() => setShowBurgerMenu(!showBurgerMenu)}
-            className="text-gray-700 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
-            aria-label="Open menu"
-          >
-            <Menu className="w-6 h-6" />
-          </button>
+          {previousCourseId ? (
+            <button
+              onClick={() => {
+                localStorage.removeItem('previousCourseId');
+                navigate(`/courses/${previousCourseId}`);
+              }}
+              className="text-gray-700 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
+              aria-label="Back to course"
+            >
+              <ArrowLeft className="w-6 h-6" />
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowBurgerMenu(!showBurgerMenu)}
+              className="text-gray-700 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
+              aria-label="Open menu"
+            >
+              <Menu className="w-6 h-6" />
+            </button>
+          )}
           <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">My Course</h1>
           <div className="w-10"></div> {/* Spacer for centering */}
           

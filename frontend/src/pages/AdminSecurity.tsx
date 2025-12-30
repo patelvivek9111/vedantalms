@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { API_URL } from '../config';
+import logger from '../utils/logger';
 import { 
   Shield, 
   AlertTriangle, 
@@ -64,7 +65,7 @@ export function AdminSecurity() {
           setSecurityEvents(eventsResponse.data.data);
         }
       } catch (error) {
-        console.error('Error fetching security data:', error);
+        logger.error('Error fetching security data', error);
         // Keep default values on error
         setSecurityStats({
           totalLogins: 0,

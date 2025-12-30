@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import api from '../services/api';
+import logger from '../utils/logger';
 
 export interface User {
   _id: string;
@@ -71,8 +72,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [token]);
 
   const login = async (email: string, password: string) => {
-    const response = await api.post('/auth/login', { email, password });
-    const { token, user: userData } = response.data;
+    try {
+      const response = await api.post('/auth/login', { email, password });
+      
+      // Check if response has success field and it's false
+      if (response.data && response.data.success === false) {
+        throw new Error(response.data.message || 'Login failed');
+      }
+      
+      // Check if response has required data
+      if (!response.data || !response.data.token || !response.data.user) {
+        logger.error('Invalid login response format', { data: response.data });
+        throw new Error('Invalid response from server');
+      }
+      
+      const { token, user: userData } = response.data;
     // Map the user data to match our User interface
     const user = {
       _id: userData.id || userData._id, // Handle both 'id' and '_id'
@@ -116,11 +130,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       localStorage.setItem(storedUsersKey, JSON.stringify(users));
     } catch (error) {
-      console.error('Error saving user to stored users:', error);
+      logger.error('Error saving user to stored users', error instanceof Error ? error : new Error(String(error)));
     }
     
-    setToken(token);
-    setUser(user);
+      setToken(token);
+      setUser(user);
+    } catch (error: any) {
+      // Log the error for debugging
+      logger.error('Login error', error instanceof Error ? error : new Error(String(error)), {
+        email,
+        status: error?.response?.status,
+        responseData: error?.response?.data,
+      });
+      
+      // Re-throw with a user-friendly message
+      const errorMessage = error?.response?.data?.message || 
+                          error?.message || 
+                          'Failed to login. Please check your credentials.';
+      throw new Error(errorMessage);
+    }
   };
 
   const signup = async (firstName: string, lastName: string, email: string, password: string, role: string) => {
@@ -170,13 +198,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         localStorage.setItem(storedUsersKey, JSON.stringify(users));
       } catch (error) {
-        console.error('Error saving user to stored users:', error);
+        logger.error('Error saving user to stored users', error instanceof Error ? error : new Error(String(error)));
       }
       
       setToken(token);
       setUser(user);
     } catch (error: any) {
-      console.error('Signup error:', error.response?.data || error);
+      logger.error('Signup error', error.response?.data || error);
       throw error;
     }
   };

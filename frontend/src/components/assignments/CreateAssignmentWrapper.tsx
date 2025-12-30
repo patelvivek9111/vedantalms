@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
 import { API_URL } from '../../config';
 import CreateAssignmentForm from './CreateAssignmentForm';
+import logger from '../../utils/logger';
 import { 
   ClipboardList, 
   BookOpen, 
@@ -78,7 +79,7 @@ const CreateAssignmentWrapper: React.FC = () => {
           }
         }
       } catch (err) {
-        console.error('Error fetching course data:', err);
+        logger.error('Error fetching course data', err instanceof Error ? err : new Error(String(err)));
       } finally {
         setLoading(false);
       }

@@ -4,7 +4,20 @@ import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
 import { format } from 'date-fns';
 import { API_URL } from '../../config';
-import { Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
+import logger from '../../utils/logger';
+import { Plus, Trash2, ArrowUp, ArrowDown, X } from 'lucide-react';
+import RichTextEditor from '../RichTextEditor';
+
+// Helper function to sanitize HTML content
+function sanitizeHtml(html: string): string {
+  if (!html) return '';
+  // Basic sanitization: remove script/style tags and event handlers
+  let sanitized = html.replace(/<\/(script|style)>/gi, '</removed>');
+  sanitized = sanitized.replace(/<(script|style)[^>]*>[\s\S]*?<\/(script|style)>/gi, '');
+  sanitized = sanitized.replace(/ on\w+="[^"]*"/gi, '');
+  sanitized = sanitized.replace(/ on\w+='[^']*'/gi, '');
+  return sanitized;
+}
 
 interface CreateAssignmentFormProps {
   moduleId: string;
@@ -49,7 +62,8 @@ interface FormData {
   questions: Question[];
   isGroupAssignment: boolean;
   groupSetId: string | null;
-  allowStudentUploads: boolean;
+  allowStudentUploads: boolean; // Step 2: Allow file uploads (but still allow questions)
+  allowStudentUploadsOnly: boolean; // Step 1: File uploads ONLY (no questions)
   displayMode: 'single' | 'scrollable';
   isGradedQuiz: boolean;
   isTimedQuiz: boolean;
@@ -83,6 +97,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
     isGroupAssignment: false,
     groupSetId: null,
     allowStudentUploads: false,
+    allowStudentUploadsOnly: false,
     displayMode: 'single',
     isGradedQuiz: false,
     isTimedQuiz: false,
@@ -156,7 +171,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
           setError('Error fetching current module');
         }
       } catch (err: any) {
-        console.error('Error fetching modules:', err);
+        logger.error('Error fetching modules', err);
         if (err.response?.status === 404) {
           setError('Module not found. Please make sure you are accessing a valid module.');
           // Redirect to course page after 3 seconds
@@ -188,7 +203,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
         });
         setGroupSets(response.data);
       } catch (err: any) {
-        console.error('Error fetching group sets:', err);
+        logger.error('Error fetching group sets', err);
       }
     };
     fetchGroupSets();
@@ -208,7 +223,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
           setSubmissionCount(response.data.length);
           setHasSubmissions(response.data.length > 0);
         } catch (err) {
-          console.error('Error fetching submission count:', err);
+          logger.error('Error fetching submission count', err instanceof Error ? err : new Error(String(err)));
           setSubmissionCount(0);
           setHasSubmissions(false);
         }
@@ -227,6 +242,8 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
       
       // Ensure boolean values are properly converted
       const allowStudentUploads = Boolean(assignmentData.allowStudentUploads);
+      // Check if it's file-upload-only: allowStudentUploads is true AND no questions
+      const allowStudentUploadsOnly = Boolean(assignmentData.allowStudentUploads && (!assignmentData.questions || assignmentData.questions.length === 0));
       
       const formDataToSet = {
         title: assignmentData.title || '',
@@ -239,7 +256,8 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
         questions: assignmentData.questions || [],
         isGroupAssignment: Boolean(assignmentData.isGroupAssignment),
         groupSetId: assignmentData.groupSet || null,
-        allowStudentUploads: allowStudentUploads,
+        allowStudentUploads: allowStudentUploads && !allowStudentUploadsOnly, // Only true if not file-upload-only
+        allowStudentUploadsOnly: allowStudentUploadsOnly,
         displayMode: assignmentData.displayMode || 'single',
         isGradedQuiz: Boolean(assignmentData.isGradedQuiz || assignmentData.isTimedQuiz || assignmentData.showCorrectAnswers || assignmentData.showStudentAnswers),
         isTimedQuiz: Boolean(assignmentData.isTimedQuiz),
@@ -255,12 +273,10 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
         setGroup(assignmentData.group || '');
       }
       setExistingAttachments(assignmentData.attachments || []);
-      // Set totalPointsInput for offline assignments in edit mode
-      if (assignmentData.isOfflineAssignment) {
-        const calculatedTotalPoints = assignmentData.questions?.reduce((sum: number, q: any) => sum + (q.points || 0), 0) || assignmentData.totalPoints || 0;
-        if (calculatedTotalPoints > 0) {
-          setTotalPointsInput(calculatedTotalPoints.toString());
-        }
+      // Set totalPointsInput from formData for all assignment types in edit mode
+      const calculatedTotalPoints = assignmentData.questions?.reduce((sum: number, q: any) => sum + (q.points || 0), 0) || assignmentData.totalPoints || 0;
+      if (calculatedTotalPoints > 0) {
+        setTotalPointsInput(calculatedTotalPoints.toString());
       }
     }
   }, [editMode, assignmentData]);
@@ -425,13 +441,13 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
       return;
     }
     // For file-upload-only assignments (no questions), totalPoints is required
-    if (formData.allowStudentUploads && formData.questions.length === 0 && (!formData.totalPoints || formData.totalPoints <= 0)) {
+    if (formData.allowStudentUploadsOnly && (!formData.totalPoints || formData.totalPoints <= 0)) {
       setError('Total points is required for file upload assignments');
       return;
     }
     // If not file-upload-only and not offline, require at least one question
-    if (!formData.allowStudentUploads && !formData.isOfflineAssignment && formData.questions.length === 0) {
-      setError('Please add at least one question or enable file uploads');
+    if (!formData.allowStudentUploadsOnly && !formData.isOfflineAssignment && formData.questions.length === 0) {
+      setError('Please add at least one question or enable file uploads only');
       return;
     }
 
@@ -446,12 +462,14 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
       formDataToSend.append('questions', JSON.stringify(formData.questions));
       formDataToSend.append('isGroupAssignment', formData.isGroupAssignment.toString());
       formDataToSend.append('allowStudentUploads', formData.allowStudentUploads.toString());
+      formDataToSend.append('allowStudentUploadsOnly', formData.allowStudentUploadsOnly.toString());
       formDataToSend.append('displayMode', formData.displayMode);
       formDataToSend.append('isGradedQuiz', formData.isGradedQuiz.toString());
       formDataToSend.append('isTimedQuiz', formData.isTimedQuiz.toString());
       formDataToSend.append('quizTimeLimit', formData.quizTimeLimit.toString());
-      formDataToSend.append('showCorrectAnswers', formData.showCorrectAnswers.toString());
-      formDataToSend.append('showStudentAnswers', formData.showStudentAnswers.toString());
+      // Always send feedback options explicitly (important for updates, especially when submissions exist)
+      formDataToSend.append('showCorrectAnswers', String(formData.showCorrectAnswers));
+      formDataToSend.append('showStudentAnswers', String(formData.showStudentAnswers));
       formDataToSend.append('isOfflineAssignment', formData.isOfflineAssignment.toString());
       if (formData.isGroupAssignment && formData.groupSetId) {
         formDataToSend.append('groupSet', formData.groupSetId);
@@ -516,7 +534,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
         }
       }
     } catch (err: any) {
-      console.error(editMode ? 'Error updating assignment:' : 'Error creating assignment:', err);
+      logger.error(editMode ? 'Error updating assignment' : 'Error creating assignment', err);
       if (err.response?.status === 403) {
         setError(`You are not authorized to ${editMode ? 'update' : 'create'} assignments. Please contact your administrator.`);
       } else if (err.response?.status === 400 && err.response?.data?.submissionCount) {
@@ -698,17 +716,33 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                 </label>
               </div>
 
-              {/* Allow Student Uploads Checkbox */}
+              {/* Allow Student Uploads Only Checkbox (Step 1) */}
               <div className="flex items-start">
                 <input
                   type="checkbox"
-                  id="allowStudentUploadsStep1"
-                  checked={formData.allowStudentUploads}
-                  onChange={(e) => setFormData({ ...formData, allowStudentUploads: e.target.checked })}
+                  id="allowStudentUploadsOnly"
+                  checked={formData.allowStudentUploadsOnly}
+                  onChange={(e) => {
+                    const isChecked = e.target.checked;
+                    // If enabling file uploads only, clear all questions and disable regular file uploads
+                    if (isChecked) {
+                      setFormData({ 
+                        ...formData, 
+                        allowStudentUploadsOnly: true,
+                        allowStudentUploads: false, // Disable regular file uploads when "only" is checked
+                        questions: [] // Clear questions when file-upload-only is enabled
+                      });
+                    } else {
+                      setFormData({ 
+                        ...formData, 
+                        allowStudentUploadsOnly: false
+                      });
+                    }
+                  }}
                   className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600 rounded mt-0.5"
                 />
                 <div className="ml-2">
-                  <label htmlFor="allowStudentUploadsStep1" className="block text-sm font-medium text-gray-900 dark:text-gray-100 dark:text-gray-100">
+                  <label htmlFor="allowStudentUploadsOnly" className="block text-sm font-medium text-gray-900 dark:text-gray-100 dark:text-gray-100">
                     Allow students to upload files only
                   </label>
                   <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
@@ -722,7 +756,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
             {formData.isGradedQuiz && (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Quiz Timer</label>
+                  <span className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Quiz Timer</span>
                   <div className="mt-2 space-y-4">
                     <div className="flex items-center">
                       <input
@@ -757,7 +791,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
 
                 {formData.isTimedQuiz && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Time Limit (minutes)</label>
+                    <label htmlFor="quiz-time-limit" className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Time Limit (minutes)</label>
                     <input
                       type="number"
                       id="quiz-time-limit"
@@ -776,30 +810,32 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                 {/* Quiz Feedback Options */}
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Quiz Feedback Options</label>
+                    <span className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Quiz Feedback Options</span>
                     <div className="mt-2 space-y-3">
                       <div className="flex items-center">
                         <input
-                          type="checkbox"
+                          type="radio"
                           id="showCorrectAnswers"
-                          checked={formData.showCorrectAnswers}
-                          onChange={(e) => setFormData({ ...formData, showCorrectAnswers: e.target.checked })}
-                          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600 rounded"
+                          name="feedbackOption"
+                          checked={formData.showCorrectAnswers && !formData.showStudentAnswers}
+                          onChange={() => setFormData({ ...formData, showCorrectAnswers: true, showStudentAnswers: false })}
+                          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600"
                         />
                         <label htmlFor="showCorrectAnswers" className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
-                          Show students which questions they got correct after submission
+                          Show student answers with correctness and reveal correct answers
                         </label>
                       </div>
                       <div className="flex items-center">
                         <input
-                          type="checkbox"
+                          type="radio"
                           id="showStudentAnswers"
-                          checked={formData.showStudentAnswers}
-                          onChange={(e) => setFormData({ ...formData, showStudentAnswers: e.target.checked })}
-                          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600 rounded"
+                          name="feedbackOption"
+                          checked={formData.showStudentAnswers && !formData.showCorrectAnswers}
+                          onChange={() => setFormData({ ...formData, showStudentAnswers: true, showCorrectAnswers: false })}
+                          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600"
                         />
                         <label htmlFor="showStudentAnswers" className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
-                          Show students their submitted answers after submission
+                          Show student answers with correctness only (no correct answers revealed)
                         </label>
                       </div>
                     </div>
@@ -875,34 +911,40 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
         {currentStep === 2 && (
           <div className="space-y-6">
             <div>
-              <label htmlFor="assignment-description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Description</label>
-              <div className="mt-1">
-                <textarea
+              <label htmlFor="assignment-description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300 mb-1">Description</label>
+              <div className="mt-1 border border-gray-300 dark:border-gray-700 rounded-md">
+                <RichTextEditor
                   id="assignment-description"
                   name="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows={6}
-                  className="block w-full rounded-md border-gray-300 dark:border-gray-700 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400"
+                  content={formData.description}
+                  onChange={(value) => setFormData({ ...formData, description: value })}
                   placeholder="Enter a detailed description of the assignment..."
+                  height={700}
                 />
               </div>
               <div className="mt-3">
                 <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="allowStudentUploads"
-                    checked={formData.allowStudentUploads}
-                    onChange={(e) => setFormData({ ...formData, allowStudentUploads: e.target.checked })}
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600 rounded"
-                  />
+                <input
+                  type="checkbox"
+                  id="allowStudentUploads"
+                  checked={formData.allowStudentUploads}
+                  disabled={formData.allowStudentUploadsOnly}
+                  onChange={(e) => {
+                    // Step 2: Allow file uploads but still allow questions
+                    setFormData({ 
+                      ...formData, 
+                      allowStudentUploads: e.target.checked
+                    });
+                  }}
+                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                />
                   <label htmlFor="allowStudentUploads" className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
                     Allow students to upload files
                   </label>
                 </div>
-                {formData.allowStudentUploads && (
+                {formData.allowStudentUploads && !formData.allowStudentUploadsOnly && (
                   <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                    Students can submit assignments by uploading files only (no questions required)
+                    Students can submit assignments by uploading files in addition to answering questions
                   </p>
                 )}
                 {editMode && (
@@ -911,8 +953,8 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                   </div>
                 )}
               </div>
-              {/* Only show display mode if not file-upload-only assignment */}
-              {(!formData.allowStudentUploads || formData.questions.length > 0) && (
+              {/* Show display mode if NOT file-upload-only (Step 1 checkbox) OR if allowStudentUploads (Step 2) is checked */}
+              {(!formData.allowStudentUploadsOnly || formData.allowStudentUploads) && (
                 <div className="mt-3">
                   <label htmlFor="displayModeSingle" className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Assignment Display Mode</label>
                   <div className="mt-2 space-y-4">
@@ -979,7 +1021,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
         {currentStep === 3 && (
           <div className="space-y-6">
             {/* For file-upload-only assignments (no questions) */}
-            {formData.allowStudentUploads && formData.questions.length === 0 && !formData.isOfflineAssignment ? (
+            {formData.allowStudentUploadsOnly && !formData.isOfflineAssignment ? (
               <div className="space-y-6">
                 <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                   <div className="flex items-start">
@@ -1037,27 +1079,51 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                   </div>
                 </div>
 
-                {/* Option to add questions if needed */}
-                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-                  <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
-                    Want to add questions to this assignment? Click the button below to add questions.
+                {/* Attachments Section for File Upload Assignments */}
+                <div>
+                  <label htmlFor="assignment-attachments-fileupload" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Attachments (Optional)
+                  </label>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                    Upload assignment instructions, rubric, or any related documents for students to download.
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newQuestion: Question = {
-                        id: Math.random().toString(36).substr(2, 9),
-                        type: 'text',
-                        text: '',
-                        points: 0
-                      };
-                      setFormData({ ...formData, questions: [...formData.questions, newQuestion] });
+                  <input
+                    type="file"
+                    id="assignment-attachments-fileupload"
+                    name="attachments"
+                    multiple
+                    onChange={(e) => {
+                      if (e.target.files) {
+                        setFormData({ ...formData, attachments: [...formData.attachments, ...Array.from(e.target.files)] });
+                      }
                     }}
-                    className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Questions (Optional)
-                  </button>
+                    className="block w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 dark:file:bg-indigo-900/50 file:text-indigo-700 dark:file:text-indigo-300 hover:file:bg-indigo-100 dark:hover:file:bg-indigo-900/70"
+                  />
+                  {formData.attachments.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {formData.attachments.map((file, index) => (
+                        <div key={index} className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded p-2">
+                          <span className="flex items-center">
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            {file.name}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newAttachments = [...formData.attachments];
+                              newAttachments.splice(index, 1);
+                              setFormData({ ...formData, attachments: newAttachments });
+                            }}
+                            className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             ) : formData.isOfflineAssignment ? (
@@ -1125,7 +1191,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
 
                 {/* Attachments Section - Still available for offline assignments */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Attachments (Optional)</label>
+                  <label htmlFor="attachments" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Attachments (Optional)</label>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
                     You can attach the question paper or any related documents here.
                   </p>
@@ -1166,11 +1232,13 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
               <>
                 {/* Total Points Display for regular assignments */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Total Points</label>
+              <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">Total Points</span>
               <div className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 shadow-sm p-2">
                 {Number.isFinite(formData.totalPoints) ? formData.totalPoints : 0}
               </div>
             </div>
+            {/* Only show questions section if NOT file-upload-only */}
+            {!formData.allowStudentUploadsOnly && (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Questions</h3>
@@ -1234,7 +1302,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                         value={question.text}
                         onChange={(e) => updateQuestion(index, 'text', e.target.value)}
                         placeholder="Enter question text"
-                        className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 px-3 py-2"
                       />
                     </div>
                     <div className="flex items-center space-x-2 ml-4">
@@ -1250,7 +1318,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                           }
                         }}
                         min="0"
-                        className="w-20 rounded-md border-gray-300 dark:border-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        className="w-20 rounded-md border-gray-300 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 px-3 py-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                       <span className="text-sm text-gray-500 dark:text-gray-400">points</span>
                       <button
@@ -1302,8 +1370,11 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                             }}
                             className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700"
                           />
+                          <label htmlFor={`question-${index}-option-${optionIndex}`} className="sr-only">Option {optionIndex + 1} text</label>
                           <input
                             type="text"
+                            id={`question-${index}-option-${optionIndex}`}
+                            name={`question-${index}-option-${optionIndex}`}
                             value={option.text}
                             onChange={(e) => {
                               const newQuestions = [...formData.questions];
@@ -1312,7 +1383,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                                 setFormData({ ...formData, questions: newQuestions });
                               }
                             }}
-                            className="flex-grow rounded-md border-gray-300 dark:border-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            className="flex-grow rounded-md border-gray-300 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 px-3 py-2"
                           />
                           <button
                             type="button"
@@ -1331,7 +1402,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                           value={newOption.text}
                           onChange={(e) => setNewOption({ ...newOption, text: e.target.value })}
                           placeholder="Add new option"
-                          className="flex-grow rounded-md border-gray-300 dark:border-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                          className="flex-grow rounded-md border-gray-300 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 px-3 py-2"
                         />
                         <button
                           type="button"
@@ -1348,9 +1419,12 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                       <div className="font-semibold mb-2">Matching Pairs</div>
                       {question.leftItems && question.leftItems.map((left, idx) => (
                         <div key={left.id} className="flex items-center mb-2 gap-2">
+                          <label htmlFor={`question-${index}-left-${idx}`} className="sr-only">Left item {idx + 1}</label>
                           <input
                             type="text"
-                            className="border p-1 rounded w-40"
+                            id={`question-${index}-left-${idx}`}
+                            name={`question-${index}-left-${idx}`}
+                            className="border border-gray-300 dark:border-gray-700 p-1 rounded w-40 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400"
                             value={left.text}
                             onChange={e => {
                               const updated = [...(question.leftItems || [])];
@@ -1360,9 +1434,12 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                             placeholder="Prompt (e.g., Red)"
                           />
                           <span className="mx-2">→</span>
+                          <label htmlFor={`question-${index}-right-${idx}`} className="sr-only">Right item {idx + 1}</label>
                           <input
                             type="text"
-                            className="border p-1 rounded w-40"
+                            id={`question-${index}-right-${idx}`}
+                            name={`question-${index}-right-${idx}`}
+                            className="border border-gray-300 dark:border-gray-700 p-1 rounded w-40 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400"
                             value={question.rightItems && question.rightItems[idx] ? question.rightItems[idx].text : ''}
                             onChange={e => {
                               const updated = [...(question.rightItems || [])];
@@ -1381,20 +1458,24 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                           }}>Remove</button>
                         </div>
                       ))}
-                      <button type="button" className="mt-2 px-2 py-1 bg-blue-100 rounded" onClick={() => {
+                      <button type="button" className="mt-2 px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600" onClick={() => {
                         const newId = Math.random().toString(36).substr(2, 9);
                         updateQuestion(index, 'leftItems', [...(question.leftItems || []), { id: newId, text: '' }]);
                         updateQuestion(index, 'rightItems', [...(question.rightItems || []), { id: newId, text: '' }]);
                       }}>Add Pair</button>
                       <div className="font-semibold mt-4 mb-2">Distractor Options (Right Side Only)</div>
-                      {(question.rightItems || []).slice((question.leftItems || []).length).map((right, idx) => (
+                      {(question.rightItems || []).slice((question.leftItems || []).length).map((right, idx) => {
+                        const base = question.leftItems ? question.leftItems.length : 0;
+                        return (
                         <div key={right.id || idx} className="flex items-center mb-2 gap-2">
+                          <label htmlFor={`question-${index}-distractor-${idx}`} className="sr-only">Distractor {idx + 1}</label>
                           <input
                             type="text"
-                            className="border p-1 rounded w-40"
+                            id={`question-${index}-distractor-${idx}`}
+                            name={`question-${index}-distractor-${idx}`}
+                            className="border border-gray-300 dark:border-gray-700 p-1 rounded w-40 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400"
                             value={right.text}
                             onChange={e => {
-                              const base = question.leftItems ? question.leftItems.length : 0;
                               const updated = [...(question.rightItems || [])];
                               updated[base + idx].text = e.target.value;
                               updateQuestion(index, 'rightItems', updated);
@@ -1402,14 +1483,14 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                             placeholder="Distractor (e.g., Aqua)"
                           />
                           <button type="button" className="ml-2 text-red-600 dark:text-red-400" onClick={() => {
-                            const base = question.leftItems ? question.leftItems.length : 0;
                             const updated = [...(question.rightItems || [])];
                             updated.splice(base + idx, 1);
                             updateQuestion(index, 'rightItems', updated);
                           }}>Remove</button>
                         </div>
-                      ))}
-                      <button type="button" className="mt-2 px-2 py-1 bg-blue-100 rounded" onClick={() => {
+                      );
+                      })}
+                      <button type="button" className="mt-2 px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600" onClick={() => {
                         const base = question.leftItems ? question.leftItems.length : 0;
                         updateQuestion(index, 'rightItems', [...(question.rightItems || []), { id: Math.random().toString(36).substr(2, 9), text: '' }]);
                       }}>Add Distractor</button>
@@ -1419,7 +1500,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                         {(question.leftItems || []).map((left, idx) => (
                           <div key={left.id} className="flex items-center mb-2 gap-2">
                             <span className="w-40">{left.text || <em>Prompt</em>}</span>
-                            <select className="border p-1 rounded w-40" disabled>
+                            <select className="border border-gray-300 dark:border-gray-700 p-1 rounded w-40 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100" disabled>
                               <option>[ Choose ]</option>
                               {shuffleArray((question.rightItems || []).map(r => r.text)).map((opt, i) => (
                                 <option key={i}>{opt}</option>
@@ -1433,8 +1514,16 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                 </div>
               ))}
             </div>
+            )}
+            {/* Attachments Section - Show for regular assignments (not file-upload-only) */}
+            {!formData.allowStudentUploadsOnly && (
             <div>
-              <label htmlFor="assignment-attachments" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Attachments</label>
+              <label htmlFor="assignment-attachments" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Attachments (Optional)
+              </label>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                Upload assignment instructions, rubric, or any related documents for students to download.
+              </p>
               <input
                 type="file"
                 id="assignment-attachments"
@@ -1445,9 +1534,35 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                     setFormData({ ...formData, attachments: [...formData.attachments, ...Array.from(e.target.files)] });
                   }
                 }}
-                className="mt-1 block w-full"
+                className="block w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 dark:file:bg-indigo-900/50 file:text-indigo-700 dark:file:text-indigo-300 hover:file:bg-indigo-100 dark:hover:file:bg-indigo-900/70"
               />
+              {formData.attachments.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {formData.attachments.map((file, index) => (
+                    <div key={index} className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded p-2">
+                      <span className="flex items-center">
+                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        {file.name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newAttachments = [...formData.attachments];
+                          newAttachments.splice(index, 1);
+                          setFormData({ ...formData, attachments: newAttachments });
+                        }}
+                        className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
+            )}
               </>
             )}
             
@@ -1494,13 +1609,16 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
         <div className="mt-8 p-6 border rounded-lg bg-gray-50 dark:bg-gray-700">
           <h3 className="text-xl font-semibold mb-4">{formData.title}</h3>
           <div className="prose max-w-none">
-            <ReactMarkdown>{formData.description}</ReactMarkdown>
+            <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(formData.description || '') }} />
           </div>
           <div className="mt-4 space-y-2 text-sm text-gray-500 dark:text-gray-400">
             <p>Total Points: {formData.totalPoints}</p>
             <p>Available From: {format(new Date(formData.availableFrom), 'MMM d, yyyy, h:mm a')}</p>
             <p>Due: {format(new Date(formData.dueDate), 'MMM d, yyyy, h:mm a')}</p>
-            {formData.allowStudentUploads && (
+            {formData.allowStudentUploadsOnly && (
+              <p className="text-blue-600 font-medium">✓ File upload only (no questions)</p>
+            )}
+            {formData.allowStudentUploads && !formData.allowStudentUploadsOnly && (
               <p className="text-blue-600 font-medium">✓ Students can upload files</p>
             )}
             <p>Display Mode: {formData.displayMode === 'single' ? 'Single Question View' : 'Scrollable View'}</p>
@@ -1537,7 +1655,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                 {question.type === 'text' && (
                   <div className="mt-4">
                     <textarea
-                      className="w-full h-32 p-2 border rounded-md bg-gray-50 dark:bg-gray-700"
+                      className="w-full h-32 p-2 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
                       placeholder="Student's answer will appear here"
                       readOnly
                     />
@@ -1550,7 +1668,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                       <div key={left.id} className="flex items-center space-x-2">
                         <span className="w-32">{left.text || <em>Prompt</em>}</span>
                         <span className="mx-2">→</span>
-                        <select className="border p-1 rounded w-32" disabled>
+                        <select className="border border-gray-300 dark:border-gray-700 p-1 rounded w-32 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100" disabled>
                           <option>[ Choose ]</option>
                           {shuffleArray((question.rightItems || []).map(r => r.text)).map((opt, i) => (
                             <option key={i}>{opt}</option>

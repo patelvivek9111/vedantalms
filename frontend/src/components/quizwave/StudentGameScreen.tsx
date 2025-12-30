@@ -4,6 +4,7 @@ import { getQuizWaveSocket } from '../../utils/quizwaveSocket';
 import { quizwaveService } from '../../services/quizwaveService';
 import { useAuth } from '../../context/AuthContext';
 import { Trophy, Clock, CheckCircle, XCircle } from 'lucide-react';
+import logger from '../../utils/logger';
 
 const StudentGameScreen: React.FC = () => {
   const { pin } = useParams<{ pin: string }>();
@@ -79,7 +80,7 @@ const StudentGameScreen: React.FC = () => {
                 const question = sessionData.quiz.questions[data.currentQuestionIndex];
                 if (question) {
                   setCurrentQuestion(question);
-                  setTimeRemaining(question.timeLimit);
+                  setTimeRemaining(question.timeLimit || 30); // Default to 30 seconds if not provided
                 }
               }
             });
@@ -113,15 +114,15 @@ const StudentGameScreen: React.FC = () => {
         });
 
         sock.on('quizwave:error', (data) => {
-          console.error('QuizWave error:', data);
+          logger.error('QuizWave error', new Error(data.message || 'Unknown error'), { data });
           const errorMessage = data.message || 'An error occurred';
           
           // Don't show alert for "Question not found" - it might be a timing issue
           // Instead, try to reload the session
           if (errorMessage.includes('Question not found')) {
-            console.warn('Question not found, attempting to reload session...');
+            logger.warn('Question not found, attempting to reload session', { questionIndex: data.questionIndex });
             loadSession().catch(err => {
-              console.error('Failed to reload session:', err);
+              logger.error('Failed to reload session', err);
               alert('Error loading question. Please refresh the page.');
             });
             return;
@@ -137,7 +138,7 @@ const StudentGameScreen: React.FC = () => {
         // Join session via socket
         sock.emit('quizwave:join', { gamePin: pin, nickname });
       } catch (error) {
-        console.error('Error initializing game:', error);
+        logger.error('Error initializing game', error);
         navigate('/quizwave/join');
       }
     };

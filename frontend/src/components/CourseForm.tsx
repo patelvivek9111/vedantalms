@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useCourse } from '../contexts/CourseContext';
+import logger from '../utils/logger';
 
 interface CourseFormProps {
   mode: 'create' | 'edit';
@@ -57,7 +58,7 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
                   const course = await getCourseRef.current(id);
         setFormData({
           title: course.title,
-          description: course.description,
+          description: course.description || '',
           courseCode: course.catalog?.courseCode || '',
           subject: course.catalog?.subject || '',
           catalogDescription: course.catalog?.description || '',
@@ -73,7 +74,7 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
           semesterYear: course.semester?.year?.toString() || new Date().getFullYear().toString()
         });
         } catch (err) {
-          console.error('Error fetching course:', err);
+          logger.error('Error fetching course', err);
         }
       };
       fetchCourse();
@@ -151,7 +152,7 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
        }
        navigate('/dashboard');
     } catch (err) {
-      console.error('Error submitting form:', err);
+      logger.error('Error submitting form', err);
     }
   };
 
@@ -183,7 +184,11 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form 
+          onSubmit={handleSubmit} 
+          className="space-y-6"
+          aria-label={mode === 'create' ? 'Create course form' : 'Edit course form'}
+        >
           <div>
             <label
               htmlFor="title"
@@ -201,9 +206,14 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
                 formErrors.title ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-700'
               }`}
               placeholder="Enter course title"
+              aria-required="true"
+              aria-invalid={formErrors.title ? 'true' : 'false'}
+              aria-describedby={formErrors.title ? 'title-error' : undefined}
             />
             {formErrors.title && (
-              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.title}</p>
+              <p id="title-error" className="mt-1 text-sm text-red-600 dark:text-red-400" role="alert">
+                {formErrors.title}
+              </p>
             )}
           </div>
 

@@ -223,18 +223,37 @@ const SidebarConfigModal: React.FC<SidebarConfigModalProps> = ({
 
     try {
       // Clean the items array to remove any MongoDB _id fields
-      const cleanItems = items.map(item => ({
-        id: item.id,
-        label: item.label,
-        visible: item.visible,
-        order: item.order,
-        fixed: item.fixed
-      }));
+      const cleanItems = items.map(item => {
+        const cleanedItem: any = {
+          id: item.id,
+          label: item.label,
+          visible: item.visible,
+          order: item.order
+        };
+        // Only include fixed if it's defined
+        if (item.fixed !== undefined) {
+          cleanedItem.fixed = item.fixed;
+        }
+        return cleanedItem;
+      });
 
+      // Clean studentVisibility to only include valid keys and boolean values
+      const cleanedStudentVisibility: any = {};
+      const validKeys = [
+        'overview', 'syllabus', 'modules', 'pages', 'assignments', 'quizzes', 'discussions',
+        'announcements', 'polls', 'groups', 'attendance', 'grades',
+        'gradebook', 'students'
+      ];
+      
+      for (const key of validKeys) {
+        if (studentVisibility[key as keyof StudentVisibility] !== undefined) {
+          cleanedStudentVisibility[key] = studentVisibility[key as keyof StudentVisibility];
+        }
+      }
       
       const response = await api.put(`/courses/${courseId}/sidebar-config`, {
         items: cleanItems,
-        studentVisibility
+        studentVisibility: cleanedStudentVisibility
       });
 
       if (response.data.success) {
@@ -253,74 +272,76 @@ const SidebarConfigModal: React.FC<SidebarConfigModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden border dark:border-gray-700 flex flex-col">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-0 sm:p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-none sm:rounded-lg shadow-xl max-w-4xl w-full h-full sm:h-auto sm:max-h-[90vh] overflow-hidden border-0 sm:border dark:border-gray-700 flex flex-col pt-14 sm:pt-0 pb-16 sm:pb-0">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
-          <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100">Customize Course Sidebar</h2>
+        <div className="flex items-center justify-between p-3 sm:p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+          <h2 className="text-lg sm:text-2xl font-semibold text-gray-900 dark:text-gray-100">Customize Course Sidebar</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-1"
+            className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-2 touch-manipulation"
+            aria-label="Close"
           >
-            <X className="w-5 h-5 sm:w-6 sm:h-6" />
+            <X className="w-6 h-6" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-4 sm:p-6 overflow-y-auto flex-1">
+        <div className="p-3 sm:p-6 overflow-y-auto flex-1 pb-28 sm:pb-6">
           {error && (
-            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm sm:text-base text-red-700 dark:text-red-400">
+            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-400">
               {error}
             </div>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
             {/* Item Ordering and Visibility */}
             <div>
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Sidebar Items</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              <h3 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2 sm:mb-4">Sidebar Items</h3>
+              <p className="text-xs sm:text-base text-gray-600 dark:text-gray-400 mb-3 sm:mb-6">
                 Drag items to reorder them. Use the eye icons to control visibility for all users.
               </p>
               
-              <div className="space-y-2">
+              <div className="space-y-2 sm:space-y-3">
                 {items.map((item, index) => {
                   const Icon = iconMap[item.id];
                   return (
-                                         <div
-                       key={item.id}
-                       draggable={!item.fixed}
-                       onDragStart={(e) => handleDragStart(e, index)}
-                       onDragOver={handleDragOver}
-                       onDrop={(e) => handleDrop(e, index)}
-                       className={`flex items-center gap-3 p-3 border rounded-lg transition-colors ${
-                         item.fixed 
-                           ? 'cursor-default bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700' 
-                           : 'cursor-move'
-                       } ${
-                         item.visible 
-                           ? 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600' 
-                           : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700'
-                       }`}
-                     >
-                       {item.fixed ? (
-                         <div className="w-4 h-4 flex-shrink-0 flex items-center justify-center">
-                           <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
-                         </div>
-                       ) : (
-                         <GripVertical className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
-                       )}
+                    <div
+                      key={item.id}
+                      draggable={!item.fixed}
+                      onDragStart={(e) => handleDragStart(e, index)}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDrop(e, index)}
+                      className={`flex items-center gap-2.5 sm:gap-4 p-2.5 sm:p-3.5 border rounded-lg sm:rounded-xl transition-all touch-manipulation ${
+                        item.fixed 
+                          ? 'cursor-default bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700' 
+                          : 'cursor-move active:scale-[0.98]'
+                      } ${
+                        item.visible 
+                          ? 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-md' 
+                          : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700'
+                      }`}
+                    >
+                      {item.fixed ? (
+                        <div className="w-5 h-5 sm:w-5 sm:h-5 flex-shrink-0 flex items-center justify-center">
+                          <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
+                        </div>
+                      ) : (
+                        <GripVertical className="w-5 h-5 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                      )}
                       {Icon && <Icon className="w-5 h-5 text-gray-600 dark:text-gray-400 flex-shrink-0" />}
-                      <span className={`flex-1 ${item.visible ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>
+                      <span className={`flex-1 text-sm font-medium ${item.visible ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>
                         {item.label}
                       </span>
                       <button
                         onClick={() => toggleItemVisibility(item.id)}
-                        className={`p-1 rounded transition-colors ${
+                        className={`p-1.5 sm:p-1.5 rounded-lg transition-colors touch-manipulation active:scale-95 ${
                           item.visible 
-                            ? 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200' 
-                            : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
+                            ? 'text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20' 
+                            : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                         }`}
                         title={item.visible ? 'Hide item' : 'Show item'}
+                        aria-label={item.visible ? 'Hide item' : 'Show item'}
                       >
                         {item.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                       </button>
@@ -332,12 +353,12 @@ const SidebarConfigModal: React.FC<SidebarConfigModalProps> = ({
 
             {/* Student Visibility Controls */}
             <div>
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Student Visibility</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              <h3 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2 sm:mb-4">Student Visibility</h3>
+              <p className="text-xs sm:text-base text-gray-600 dark:text-gray-400 mb-3 sm:mb-6">
                 Control which items are visible to students. Teachers and admins can always see all items.
               </p>
               
-              <div className="space-y-2">
+              <div className="space-y-2 sm:space-y-3">
                 {items.map((item) => {
                   const Icon = iconMap[item.id];
                   const isVisibleToStudents = studentVisibility[item.id as keyof StudentVisibility];
@@ -345,24 +366,25 @@ const SidebarConfigModal: React.FC<SidebarConfigModalProps> = ({
                   return (
                     <div
                       key={item.id}
-                      className={`flex items-center gap-3 p-3 border rounded-lg transition-colors ${
+                      className={`flex items-center gap-2.5 sm:gap-4 p-2.5 sm:p-3.5 border rounded-lg sm:rounded-xl transition-all touch-manipulation ${
                         isVisibleToStudents 
-                          ? 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700' 
+                          ? 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-md' 
                           : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700'
                       }`}
                     >
                       {Icon && <Icon className="w-5 h-5 text-gray-600 dark:text-gray-400 flex-shrink-0" />}
-                      <span className={`flex-1 ${isVisibleToStudents ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>
+                      <span className={`flex-1 text-sm font-medium ${isVisibleToStudents ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>
                         {item.label}
                       </span>
                       <button
                         onClick={() => toggleStudentVisibility(item.id)}
-                        className={`p-1 rounded transition-colors ${
+                        className={`p-1.5 sm:p-1.5 rounded-lg transition-colors touch-manipulation active:scale-95 ${
                           isVisibleToStudents 
-                            ? 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200' 
-                            : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
+                            ? 'text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20' 
+                            : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                         }`}
                         title={isVisibleToStudents ? 'Hide from students' : 'Show to students'}
+                        aria-label={isVisibleToStudents ? 'Hide from students' : 'Show to students'}
                       >
                         {isVisibleToStudents ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                       </button>
@@ -375,27 +397,26 @@ const SidebarConfigModal: React.FC<SidebarConfigModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-4 sm:p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex-shrink-0">
+        <div className="fixed bottom-16 left-0 right-0 sm:relative sm:bottom-0 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3 p-3 sm:p-6 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 sm:bg-gray-50 sm:dark:bg-gray-900 flex-shrink-0 shadow-lg sm:shadow-none">
           <button
             onClick={resetToDefault}
-            className="flex items-center justify-center gap-2 px-4 py-2 text-sm sm:text-base text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+            className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 py-2 sm:py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors touch-manipulation active:scale-95"
           >
             <RotateCcw className="w-4 h-4" />
-            <span className="hidden sm:inline">Reset to Default</span>
-            <span className="sm:hidden">Reset</span>
+            <span>Reset to Default</span>
           </button>
           
           <div className="flex gap-2 sm:gap-3">
             <button
               onClick={onClose}
-              className="flex-1 sm:flex-none px-4 py-2 text-sm sm:text-base text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+              className="flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors touch-manipulation active:scale-95"
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
               disabled={saving}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm sm:text-base bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-6 py-2 sm:py-2 text-sm font-medium bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-manipulation active:scale-95"
             >
               <Save className="w-4 h-4" />
               {saving ? 'Saving...' : 'Save'}

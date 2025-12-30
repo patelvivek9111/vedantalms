@@ -22,77 +22,65 @@ exports.createPage = async (req, res) => {
       });
     }
     const { title, module, groupSet, content } = req.body;
-    const userId = req.user._id || req.user.id;
     
-    // Validate user ID
-    if (!userId) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'User ID is required' 
-      });
-    }
-    
-    // Validate title
+    // Validate required fields
     if (!title || !title.trim()) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Title is required and cannot be empty' 
+      return res.status(400).json({
+        success: false,
+        message: 'Title is required'
       });
     }
-    
-    // Validate content
     if (!content || !content.trim()) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Content is required and cannot be empty' 
+      return res.status(400).json({
+        success: false,
+        message: 'Content is required'
       });
     }
-    
-    // Validate module or groupSet
     if (!module && !groupSet) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Either module or groupSet is required' 
+      return res.status(400).json({
+        success: false,
+        message: 'Either module or groupSet is required'
       });
     }
     
-    // Validate ObjectIds if provided
+    // Validate module/groupSet IDs if provided
     if (module && !mongoose.Types.ObjectId.isValid(module)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid module ID format' 
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid module ID format'
       });
     }
-    
     if (groupSet && !mongoose.Types.ObjectId.isValid(groupSet)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid groupSet ID format' 
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid groupSet ID format'
       });
     }
     
     // Check authorization if module is provided
     if (module) {
-      const foundModule = await Module.findById(module);
-      if (!foundModule) {
-        return res.status(404).json({ 
-          success: false, 
-          message: 'Module not found' 
+      const moduleDoc = await Module.findById(module);
+      if (!moduleDoc) {
+        return res.status(404).json({
+          success: false,
+          message: 'Module not found'
         });
       }
       
-      const course = await Course.findById(foundModule.course);
+      const course = await Course.findById(moduleDoc.course);
       if (!course) {
-        return res.status(404).json({ 
-          success: false, 
-          message: 'Course not found' 
+        return res.status(404).json({
+          success: false,
+          message: 'Course not found'
         });
       }
       
-      if (req.user.role !== 'admin' && course.instructor.toString() !== userId.toString()) {
-        return res.status(403).json({ 
-          success: false, 
-          message: 'Not authorized to add page to this module' 
+      // Check if user is authorized (must be admin or course instructor)
+      const userId = req.user._id || req.user.id;
+      if (req.user.role !== 'admin' && (!course.instructor || course.instructor.toString() !== userId.toString())) {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to create pages in this module'
         });
       }
     }
@@ -101,11 +89,7 @@ exports.createPage = async (req, res) => {
     if (req.files && req.files.length > 0) {
       attachments = req.files.map(file => `/uploads/${file.filename}`);
     }
-    const pageData = { 
-      title: title.trim(), 
-      content: content.trim(), 
-      attachments 
-    };
+    const pageData = { title: title.trim(), content: content.trim(), attachments };
     if (module) pageData.module = module;
     if (groupSet) pageData.groupSet = groupSet;
     const page = await Page.create(pageData);
@@ -115,6 +99,18 @@ exports.createPage = async (req, res) => {
     }
     res.status(201).json({ success: true, data: page });
   } catch (err) {
+    // Handle Mongoose validation errors
+    if (err.name === 'ValidationError') {
+      const errors = Object.values(err.errors).map(e => ({
+        field: e.path,
+        message: e.message
+      }));
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error',
+        errors
+      });
+    }
     console.error('Create page error:', err);
     res.status(500).json({ success: false, message: 'Server error during page creation', error: err.message });
   }
@@ -150,7 +146,10 @@ exports.getPagesByModule = async (req, res) => {
     const isStudent = req.user.role === 'student';
     let pages;
     if (isStudent) {
-      if (!module.published) {
+      // Check if module and course are published
+      const Course = require('../models/course.model');
+      const course = await Course.findById(module.course);
+      if (!module.published || !course || !course.published) {
         pages = [];
       } else {
         // Return all pages, ignore page.published for students if module is published
@@ -181,22 +180,17 @@ exports.getPagesByModule = async (req, res) => {
 // @access  Private
 exports.getPageById = async (req, res) => {
   try {
-    const { id } = req.params;
-    
     // Validate page ID
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid page ID format' 
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid page ID format'
       });
     }
     
-    const page = await Page.findById(id);
+    const page = await Page.findById(req.params.id);
     if (!page) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Page not found' 
-      });
+      return res.status(404).json({ success: false, message: 'Page not found' });
     }
     res.json({ success: true, data: page });
   } catch (err) {
@@ -228,30 +222,6 @@ exports.updatePage = async (req, res) => {
       });
     }
 
-    const userId = req.user._id || req.user.id;
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        message: 'User ID is required'
-      });
-    }
-    
-    // Validate title if provided
-    if (title !== undefined && (!title || !title.trim())) {
-      return res.status(400).json({
-        success: false,
-        message: 'Title cannot be empty'
-      });
-    }
-    
-    // Validate content if provided
-    if (content !== undefined && (!content || !content.trim())) {
-      return res.status(400).json({
-        success: false,
-        message: 'Content cannot be empty'
-      });
-    }
-    
     // Get the module to check authorization
     const module = await Module.findById(page.module);
     if (!module) {
@@ -271,7 +241,7 @@ exports.updatePage = async (req, res) => {
     }
 
     // Check if user is authorized to update
-    if (req.user.role !== 'admin' && course.instructor.toString() !== userId.toString()) {
+    if (req.user.role !== 'admin' && course.instructor.toString() !== req.user.id) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to update this page'
@@ -279,34 +249,42 @@ exports.updatePage = async (req, res) => {
     }
 
     // Handle file attachments if any
-    let attachments = page.attachments || [];
+    let attachments = page.attachments;
     if (req.files && req.files.length > 0) {
       // Delete old attachments
-      if (page.attachments && Array.isArray(page.attachments)) {
-        for (const attachment of page.attachments) {
-          if (attachment && typeof attachment === 'string') {
-            const filePath = path.join(__dirname, '..', attachment);
-            try {
-              await fs.promises.unlink(filePath);
-            } catch (err) {
-              // File might not exist, ignore error
-              console.error('Error deleting old attachment:', err);
-            }
-          }
+      for (const attachment of page.attachments) {
+        const filePath = path.join(__dirname, '..', attachment);
+        try {
+          await fs.unlink(filePath);
+        } catch (err) {
+          console.error('Error deleting old attachment:', err);
         }
       }
       // Add new attachments
       attachments = req.files.map(file => `/uploads/${file.filename}`);
     }
 
-    // Update the page
+    // Validate update fields
     if (title !== undefined) {
+      if (!title || !title.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Title cannot be empty'
+        });
+      }
       page.title = title.trim();
     }
     if (content !== undefined) {
+      if (!content || !content.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Content cannot be empty'
+        });
+      }
       page.content = content.trim();
     }
     page.attachments = attachments;
+    
     await page.save();
 
     res.json({
@@ -314,6 +292,18 @@ exports.updatePage = async (req, res) => {
       data: page
     });
   } catch (err) {
+    // Handle Mongoose validation errors
+    if (err.name === 'ValidationError') {
+      const errors = Object.values(err.errors).map(e => ({
+        field: e.path,
+        message: e.message
+      }));
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error',
+        errors
+      });
+    }
     console.error('Update page error:', err);
     res.status(500).json({
       success: false,
@@ -342,6 +332,113 @@ exports.getPagesByGroupSet = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Server error while fetching pages by groupSet',
+      error: err.message
+    });
+  }
+};
+
+// @desc    Get all pages for a course
+// @route   GET /api/pages/course/:courseId
+// @access  Private
+exports.getPagesByCourse = async (req, res) => {
+  try {
+    const courseId = req.params.courseId;
+    
+    // Validate course ID
+    if (!courseId || !mongoose.Types.ObjectId.isValid(courseId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid course ID format'
+      });
+    }
+
+    // Check if course exists
+    const course = await Course.findById(courseId);
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: 'Course not found'
+      });
+    }
+
+    // Get all modules for this course
+    const modules = await Module.find({ course: courseId });
+    const moduleIds = modules.map(m => m._id);
+
+    // Get all pages for these modules
+    const pages = await Page.find({ module: { $in: moduleIds } });
+
+    res.json({
+      success: true,
+      data: pages
+    });
+  } catch (err) {
+    console.error('Get pages by course error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching pages by course',
+      error: err.message
+    });
+  }
+};
+
+// @desc    Delete a page
+// @route   DELETE /api/pages/:id
+// @access  Private (Teacher/Admin)
+exports.deletePage = async (req, res) => {
+  try {
+    const pageId = req.params.id;
+    
+    // Validate page ID
+    if (!mongoose.Types.ObjectId.isValid(pageId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid page ID format'
+      });
+    }
+
+    const page = await Page.findById(pageId);
+    if (!page) {
+      return res.status(404).json({
+        success: false,
+        message: 'Page not found'
+      });
+    }
+
+    // Get the module to check authorization
+    if (page.module) {
+      const module = await Module.findById(page.module);
+      if (module) {
+        const course = await Course.findById(module.course);
+        if (course) {
+          // Check if user is authorized to delete
+          if (req.user.role !== 'admin' && course.instructor.toString() !== req.user.id) {
+            return res.status(403).json({
+              success: false,
+              message: 'Not authorized to delete this page'
+            });
+          }
+        }
+      }
+    }
+
+    // Remove page from module if it exists
+    if (page.module) {
+      await Module.findByIdAndUpdate(page.module, { $pull: { pages: pageId } });
+    }
+
+    // Delete the page
+    await page.deleteOne();
+
+    res.json({
+      success: true,
+      message: 'Page deleted successfully'
+    });
+  } catch (err) {
+    console.error('Delete page error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while deleting page',
       error: err.message
     });
   }

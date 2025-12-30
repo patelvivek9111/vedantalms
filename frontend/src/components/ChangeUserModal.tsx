@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { getImageUrl } from '../services/api';
 import api from '../services/api';
 import { useNavigate } from 'react-router-dom';
+import logger from '../utils/logger';
 
 interface StoredUser {
   _id: string;
@@ -88,7 +89,7 @@ export const ChangeUserModal: React.FC<ChangeUserModalProps> = ({
       const sortedUsers = users.sort((a, b) => b.lastUsed - a.lastUsed);
       setStoredUsers(sortedUsers);
     } catch (error) {
-      console.error('Error loading stored users:', error);
+      logger.error('Error loading stored users', error);
       setStoredUsers([]);
     }
     };
@@ -117,7 +118,7 @@ export const ChangeUserModal: React.FC<ChangeUserModalProps> = ({
       localStorage.setItem(STORAGE_KEY, JSON.stringify(users));
       setStoredUsers(users.sort((a, b) => b.lastUsed - a.lastUsed));
     } catch (error) {
-      console.error('Error saving stored user:', error);
+      logger.error('Error saving stored user', error);
     }
   };
 
@@ -184,7 +185,7 @@ export const ChangeUserModal: React.FC<ChangeUserModalProps> = ({
       }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to login. Please check your credentials.');
-      console.error('Login error:', err);
+      logger.error('Login error', err);
     } finally {
       setLoading(false);
     }
@@ -200,7 +201,7 @@ export const ChangeUserModal: React.FC<ChangeUserModalProps> = ({
         setStoredUsers(users);
       }
     } catch (error) {
-      console.error('Error removing user:', error);
+      logger.error('Error removing user', error);
     }
   };
 

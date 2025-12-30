@@ -46,8 +46,10 @@ export function Login() {
       await login(email, password);
       // Always redirect to dashboard after login, not the previous page
       navigate('/dashboard', { replace: true });
-    } catch (err) {
-      setError('Failed to login. Please check your credentials.');
+    } catch (err: any) {
+      // Use the error message from the login function if available
+      const errorMessage = err?.message || 'Failed to login. Please check your credentials.';
+      setError(errorMessage);
       setIsLoading(false);
     }
   };
@@ -56,16 +58,28 @@ export function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-6 sm:space-y-8">
         <div className="text-center">
-          <div className="flex justify-center">
-            <img 
-              src={logoPath} 
-              alt="Vedanta Logo" 
-              className="h-32 w-48 sm:h-42 sm:w-60"
-            />
+          <div className="flex justify-center mb-4">
+            <div className="relative group">
+              {/* Glow effect container */}
+              <div className="absolute inset-0 bg-gradient-to-r from-amber-400/20 via-yellow-400/20 to-amber-400/20 dark:from-amber-500/30 dark:via-yellow-500/30 dark:to-amber-500/30 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10"></div>
+              
+              {/* Logo container with subtle shadow and border */}
+              <div className="relative p-4 sm:p-6 rounded-2xl bg-gradient-to-br from-white/50 to-gray-50/50 dark:from-gray-800/50 dark:to-gray-900/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 shadow-lg dark:shadow-2xl transition-all duration-300 group-hover:shadow-xl dark:group-hover:shadow-amber-900/20 group-hover:scale-105">
+                <img 
+                  src={logoPath} 
+                  alt="Vedanta Logo" 
+                  className="h-24 w-auto sm:h-32 sm:w-auto md:h-36 md:w-auto transition-transform duration-300 group-hover:scale-105 drop-shadow-lg"
+                  onError={(e) => {
+                    // Fallback handling
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
+            </div>
           </div>
           
           {/* Interactive Eyes */}
-          <div className="mt-1">
+          <div className="mt-2">
             <InteractiveEyes
               isPasswordFocused={isPasswordFocused}
               isUsernameFocused={isEmailFocused}

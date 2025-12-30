@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getAnnouncementComments, postAnnouncementComment, postAnnouncementReply, likeAnnouncementComment, unlikeAnnouncementComment } from '../services/announcementService';
 import { useAuth } from '../context/AuthContext';
 import { X, User, Clock, MessageSquare, ThumbsUp, Reply, Send, Lightbulb } from 'lucide-react';
+import logger from '../utils/logger';
 
 interface AnnouncementDetailModalProps {
   isOpen: boolean;
@@ -85,7 +86,7 @@ const AnnouncementDetailModal: React.FC<AnnouncementDetailModalProps> = ({
       setUserHasPosted(true);
       await fetchComments(announcement._id);
     } catch (err) {
-      console.error('Failed to post comment:', err);
+      logger.error('Failed to post comment', err instanceof Error ? err : new Error(String(err)));
     }
     setPosting(false);
   };
@@ -99,7 +100,7 @@ const AnnouncementDetailModal: React.FC<AnnouncementDetailModalProps> = ({
       setReplyingTo(null);
       await fetchComments(announcement._id);
     } catch (err) {
-      console.error('Failed to post reply:', err);
+      logger.error('Failed to post reply', err instanceof Error ? err : new Error(String(err)));
     }
     setPosting(false);
   };
@@ -111,7 +112,7 @@ const AnnouncementDetailModal: React.FC<AnnouncementDetailModalProps> = ({
       await likeAnnouncementComment(announcement._id, commentId);
       await fetchComments(announcement._id);
     } catch (err) {
-      console.error('Failed to like comment:', err);
+      logger.error('Failed to like comment', err instanceof Error ? err : new Error(String(err)));
     }
     setLiking(prev => ({ ...prev, [commentId]: false }));
   };
@@ -123,7 +124,7 @@ const AnnouncementDetailModal: React.FC<AnnouncementDetailModalProps> = ({
       await unlikeAnnouncementComment(announcement._id, commentId);
       await fetchComments(announcement._id);
     } catch (err) {
-      console.error('Failed to unlike comment:', err);
+      logger.error('Failed to unlike comment', err instanceof Error ? err : new Error(String(err)));
     }
     setLiking(prev => ({ ...prev, [commentId]: false }));
   };

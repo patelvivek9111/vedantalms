@@ -1,0 +1,75 @@
+{
+  "common": {
+    "loading": "Cargando...",
+    "error": "Error",
+    "success": "Éxito",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "view": "Ver",
+    "close": "Cerrar",
+    "submit": "Enviar",
+    "back": "Atrás",
+    "next": "Siguiente",
+    "previous": "Anterior"
+  },
+  "auth": {
+    "login": "Iniciar sesión",
+    "logout": "Cerrar sesión",
+    "register": "Registrarse",
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "firstName": "Nombre",
+    "lastName": "Apellido",
+    "forgotPassword": "¿Olvidaste tu contraseña?"
+  },
+  "course": {
+    "title": "Cursos",
+    "create": "Crear Curso",
+    "enroll": "Inscribirse",
+    "unenroll": "Desinscribirse",
+    "students": "Estudiantes",
+    "assignments": "Tareas",
+    "discussions": "Discusiones",
+    "grades": "Calificaciones"
+  },
+  "assignment": {
+    "title": "Tareas",
+    "create": "Crear Tarea",
+    "dueDate": "Fecha de vencimiento",
+    "points": "Puntos",
+    "submitted": "Enviado",
+    "grade": "Calificar",
+    "view": "Ver Tarea"
+  },
+  "dashboard": {
+    "title": "Panel de control",
+    "welcome": "Bienvenido",
+    "recentCourses": "Cursos Recientes",
+    "upcomingAssignments": "Tareas Próximas",
+    "notifications": "Notificaciones"
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

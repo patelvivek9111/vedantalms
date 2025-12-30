@@ -1,33 +1,108 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import ReactMarkdown from 'react-markdown';
 import { format } from 'date-fns';
 import { Lock, Unlock, Download } from 'lucide-react';
 import { API_URL } from '../../config';
+import logger from '../../utils/logger';
 
-const AssignmentDetails = () => {
-  const { id } = useParams();
+// Helper function to sanitize HTML content
+function sanitizeHtml(html: string): string {
+  if (!html) return '';
+  // Basic sanitization: remove script/style tags and event handlers
+  let sanitized = html.replace(/<\/(script|style)>/gi, '</removed>');
+  sanitized = sanitized.replace(/<(script|style)[^>]*>[\s\S]*?<\/(script|style)>/gi, '');
+  sanitized = sanitized.replace(/ on\w+="[^"]*"/gi, '');
+  sanitized = sanitized.replace(/ on\w+='[^']*'/gi, '');
+  return sanitized;
+}
+
+interface AssignmentDetailsProps {
+  courseId?: string;
+}
+
+interface Question {
+  _id?: string;
+  id?: string;
+  type: 'text' | 'multiple-choice' | 'matching';
+  text: string;
+  points: number;
+  options?: {
+    text: string;
+    isCorrect?: boolean;
+  }[];
+  leftItems?: {
+    id: string;
+    text: string;
+  }[];
+  rightItems?: {
+    id: string;
+    text: string;
+  }[];
+}
+
+interface Student {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email?: string;
+}
+
+interface Submission {
+  _id: string;
+  assignment: string;
+  student: Student;
+  submittedAt: string;
+  answers?: Record<number, string>;
+  grade?: number | null;
+  files?: string[];
+}
+
+interface Assignment {
+  _id: string;
+  title: string;
+  description: string;
+  content?: string;
+  dueDate: string;
+  availableFrom?: string;
+  questions?: Question[];
+  attachments?: string[];
+  published?: boolean;
+  module?: string | { _id: string };
+}
+
+interface User {
+  _id: string;
+  role: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+}
+
+const AssignmentDetails: React.FC<AssignmentDetailsProps> = ({ courseId: propCourseId }) => {
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [assignment, setAssignment] = useState(null);
-  const [submission, setSubmission] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [userRole, setUserRole] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isPublishing, setIsPublishing] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [answers, setAnswers] = useState({});
+  const [courseId, setCourseId] = useState<string | undefined>(propCourseId);
+  const [assignment, setAssignment] = useState<Assignment | null>(null);
+  const [submission, setSubmission] = useState<Submission | Submission[] | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string>('');
+  const [userRole, setUserRole] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [isPublishing, setIsPublishing] = useState<boolean>(false);
+  const [isDownloading, setIsDownloading] = useState<boolean>(false);
+  const [answers, setAnswers] = useState<Record<number, string>>({});
 
   useEffect(() => {
-    let user = null;
+    let user: User | null = null;
     try {
       const userStr = localStorage.getItem('user');
       if (userStr) {
         user = JSON.parse(userStr);
       }
     } catch (e) {
-      console.error('Error parsing user from localStorage:', e);
+      logger.error('Error parsing user from localStorage', e instanceof Error ? e : new Error(String(e)));
     }
     const currentUserRole = user?.role || '';
     setUserRole(currentUserRole);
@@ -41,14 +116,34 @@ const AssignmentDetails = () => {
           return;
         }
         
-        const assignmentRes = await axios.get(`${API_URL}/api/assignments/${id}`, {
+        const assignmentRes = await axios.get<Assignment>(`${API_URL}/api/assignments/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         setAssignment(assignmentRes.data);
+        
+        // Fetch courseId if not provided
+        if (!courseId && assignmentRes.data?.module) {
+          const moduleId = typeof assignmentRes.data.module === 'string' 
+            ? assignmentRes.data.module 
+            : assignmentRes.data.module._id;
+          try {
+            const moduleRes = await axios.get<{ success: boolean; data: { course: { _id: string } | string } }>(`${API_URL}/api/modules/view/${moduleId}`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (moduleRes.data.success) {
+              const fetchedCourseId = typeof moduleRes.data.data.course === 'string' 
+                ? moduleRes.data.data.course 
+                : moduleRes.data.data.course._id;
+              setCourseId(fetchedCourseId);
+            }
+          } catch (err) {
+            logger.error('Error fetching module for courseId', err instanceof Error ? err : new Error(String(err)));
+          }
+        }
 
         if (currentUserRole === 'student') {
           try {
-            const submissionRes = await axios.get(`${API_URL}/api/submissions/student/${id}`, {
+            const submissionRes = await axios.get<Submission>(`${API_URL}/api/submissions/student/${id}`, {
               headers: { 'Authorization': `Bearer ${token}` }
             });
             if (submissionRes.data) {
@@ -56,7 +151,8 @@ const AssignmentDetails = () => {
               setAnswers(submissionRes.data.answers || {});
             }
           } catch (err) {
-            if (err.response && err.response.status === 404) {
+            const axiosError = err as AxiosError;
+            if (axiosError.response && axiosError.response.status === 404) {
               setSubmission(null);
             } else {
               throw err;
@@ -65,20 +161,22 @@ const AssignmentDetails = () => {
         }
         setLoading(false);
       } catch (err) {
-        console.error('Error fetching assignment details:', err);
+        logger.error('Error fetching assignment details', err instanceof Error ? err : new Error(String(err)));
         setError('Error fetching assignment details');
         setLoading(false);
       }
     };
 
-    fetchData();
-  }, [id]);
+    if (id) {
+      fetchData();
+    }
+  }, [id, courseId]);
 
-  const handleAnswerChange = (questionIndex, value) => {
+  const handleAnswerChange = (questionIndex: number, value: string): void => {
     setAnswers(prev => ({ ...prev, [questionIndex]: value }));
   };
 
-  const handleSubmission = async (e) => {
+  const handleSubmission = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
@@ -86,7 +184,7 @@ const AssignmentDetails = () => {
         setError('Authentication token not found. Please log in again.');
         return;
       }
-      const response = await axios.post(`${API_URL}/api/submissions`, {
+      const response = await axios.post<Submission>(`${API_URL}/api/submissions`, {
         assignment: id,
         answers,
       }, { headers: { 'Authorization': `Bearer ${token}` } });
@@ -96,11 +194,12 @@ const AssignmentDetails = () => {
       // Dispatch event to refresh ToDo panel
       window.dispatchEvent(new Event('assignmentSubmitted'));
     } catch (err) {
+      logger.error('Error submitting assignment', err instanceof Error ? err : new Error(String(err)));
       setError('Error submitting assignment');
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = async (): Promise<void> => {
     if (window.confirm('Are you sure you want to delete this assignment?')) {
       try {
         const token = localStorage.getItem('token');
@@ -111,23 +210,24 @@ const AssignmentDetails = () => {
         });
         navigate(-1);
       } catch (err) {
+        logger.error('Error deleting assignment', err instanceof Error ? err : new Error(String(err)));
         setError('Error deleting assignment');
       }
     }
   };
 
-  const handleTogglePublish = async () => {
+  const handleTogglePublish = async (): Promise<void> => {
     setIsPublishing(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.patch(
+      const res = await axios.patch<{ published: boolean }>(
         `${API_URL}/api/assignments/${id}/publish`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setAssignment(prev => ({ ...prev, published: res.data.published }));
+      setAssignment(prev => prev ? { ...prev, published: res.data.published } : null);
     } catch (err) {
-      console.error('Error toggling assignment publish:', err);
+      logger.error('Error toggling assignment publish', err instanceof Error ? err : new Error(String(err)));
     } finally {
       setIsPublishing(false);
     }
@@ -153,6 +253,8 @@ const AssignmentDetails = () => {
     return <div className="text-gray-900 dark:text-gray-100">Assignment not found</div>;
   }
 
+  const submissions = Array.isArray(submission) ? submission : (submission ? [submission] : []);
+
   return (
     <div className="w-full px-2 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
       <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-4 sm:p-6">
@@ -161,9 +263,9 @@ const AssignmentDetails = () => {
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 break-words">{assignment.title}</h1>
             <p className="mt-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
               <span className="block sm:inline">Due: {format(new Date(assignment.dueDate), 'MMM d, yyyy, h:mm a')}</span>
-              {userRole === 'student' && assignment.submission && (
+              {userRole === 'student' && submission && !Array.isArray(submission) && (
                 <span className="block sm:inline sm:ml-4 mt-1 sm:mt-0 text-green-600 dark:text-green-400">
-                  Submitted: {format(new Date(assignment.submission.submittedAt), 'MMM d, yyyy, h:mm a')}
+                  Submitted: {format(new Date(submission.submittedAt), 'MMM d, yyyy, h:mm a')}
                 </span>
               )}
             </p>
@@ -193,7 +295,13 @@ const AssignmentDetails = () => {
                   )}
                 </button>
                 <button
-                  onClick={() => navigate(`/assignments/${id}/edit`)}
+                  onClick={() => {
+                    if (courseId) {
+                      navigate(`/courses/${courseId}/assignments/${id}/edit`);
+                    } else {
+                      navigate(`/assignments/${id}/edit`);
+                    }
+                  }}
                   className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-indigo-400"
                 >
                   Edit Assignment
@@ -218,12 +326,12 @@ const AssignmentDetails = () => {
         </div>
 
         <div className="mt-6 prose max-w-none prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-p:text-gray-700 dark:prose-p:text-gray-300">
-          <ReactMarkdown>{assignment.description}</ReactMarkdown>
+          <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(assignment.description || '') }} />
         </div>
 
         {assignment.content && (
           <div className="mt-6 prose max-w-none prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-p:text-gray-700 dark:prose-p:text-gray-300">
-            <ReactMarkdown>{assignment.content}</ReactMarkdown>
+            <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(assignment.content || '') }} />
           </div>
         )}
 
@@ -234,7 +342,7 @@ const AssignmentDetails = () => {
               {assignment.questions.map((q, index) => (
                 <div key={index}>
                   <p className="font-semibold text-gray-900 dark:text-gray-100">{index + 1}. {q.text} ({q.points} pts)</p>
-                  {q.type === 'multiple-choice' && (
+                  {q.type === 'multiple-choice' && q.options && (
                     <ul className="list-disc ml-8 mt-2 space-y-1 text-gray-700 dark:text-gray-300">
                       {q.options.map((opt, optIndex) => (
                         <li key={optIndex}>{opt.text}</li>
@@ -250,10 +358,10 @@ const AssignmentDetails = () => {
         {isSubmitting ? (
           <form onSubmit={handleSubmission} className="mt-8">
             <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Your Submission</h3>
-            {assignment.questions.map((q, index) => (
+            {assignment.questions && assignment.questions.map((q, index) => (
               <div key={index} className="mb-6">
                 <p className="font-semibold text-gray-900 dark:text-gray-100">{index + 1}. {q.text} ({q.points} pts)</p>
-                {q.type === 'multiple-choice' && q.options.map((opt, optIndex) => (
+                {q.type === 'multiple-choice' && q.options && q.options.map((opt, optIndex) => (
                   <div key={optIndex} className="ml-4">
                     <label className="flex items-center space-x-2 text-gray-900 dark:text-gray-100">
                       <input
@@ -270,10 +378,12 @@ const AssignmentDetails = () => {
                 ))}
                 {q.type === 'text' && (
                   <textarea
+                    id={`question-${index}-answer`}
+                    name={`question-${index}-answer`}
                     value={answers[index] || ''}
                     onChange={(e) => handleAnswerChange(index, e.target.value)}
                     className="mt-2 block w-full rounded-md border-gray-300 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 sm:text-sm"
-                    rows="4"
+                    rows={4}
                   />
                 )}
               </div>
@@ -289,7 +399,7 @@ const AssignmentDetails = () => {
           </form>
         ) : (
           <>
-            {assignment.attachments?.length > 0 && (
+            {assignment.attachments && assignment.attachments.length > 0 && (
               <div className="mt-6">
                 <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Attachments</h3>
                 <ul className="mt-2 divide-y divide-gray-200 dark:divide-gray-700">
@@ -313,7 +423,7 @@ const AssignmentDetails = () => {
               <div className="mt-8">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Submissions</h3>
-                  {submission && submission.length > 0 && (
+                  {submissions.length > 0 && (
                     <button
                       onClick={async () => {
                         setIsDownloading(true);
@@ -333,8 +443,11 @@ const AssignmentDetails = () => {
                           link.remove();
                           window.URL.revokeObjectURL(url);
                         } catch (err) {
-                          console.error('Download error:', err);
-                          setError(err.response?.data?.message || 'Error downloading submissions');
+                          const axiosError = err as AxiosError;
+                          logger.error('Download error', err instanceof Error ? err : new Error(String(err)));
+                          const errorData = axiosError.response?.data as { message?: string } | undefined;
+                          const errorMessage = errorData?.message;
+                          setError(errorMessage || 'Error downloading submissions');
                         } finally {
                           setIsDownloading(false);
                         }
@@ -347,11 +460,11 @@ const AssignmentDetails = () => {
                     </button>
                   )}
                 </div>
-                {submission && submission.length === 0 ? (
+                {submissions.length === 0 ? (
                   <p className="mt-2 text-gray-500 dark:text-gray-400">No submissions yet</p>
                 ) : (
                   <ul className="mt-2 divide-y divide-gray-200 dark:divide-gray-700">
-                    {submission && submission.map((sub) => (
+                    {submissions.map((sub) => (
                       <li key={sub._id} className="py-4">
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
@@ -405,8 +518,11 @@ const AssignmentDetails = () => {
                                   link.remove();
                                   window.URL.revokeObjectURL(url);
                                 } catch (err) {
-                                  console.error('Download error:', err);
-                                  setError(err.response?.data?.message || 'Error downloading submission');
+                                  const axiosError = err as AxiosError;
+                                  logger.error('Download error', err instanceof Error ? err : new Error(String(err)));
+                                  const errorData = axiosError.response?.data as { message?: string } | undefined;
+                                  const errorMessage = errorData?.message;
+                                  setError(errorMessage || 'Error downloading submission');
                                 }
                               }}
                               className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600 transition-colors"
@@ -430,4 +546,9 @@ const AssignmentDetails = () => {
   );
 };
 
-export default AssignmentDetails; 
+export default AssignmentDetails;
+
+
+
+
+

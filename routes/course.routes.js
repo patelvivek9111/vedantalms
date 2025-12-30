@@ -451,11 +451,19 @@ router.post('/:id/enroll', protect, async (req, res) => {
       // Course is full - check if user is a teacher who can override capacity
       if (req.user.role === 'teacher') {
         // Teacher can override capacity - enroll directly
-        course.students.push(userId);
-        await course.save();
+        // Use findByIdAndUpdate to bypass catalog validation
+        const updatedCourse = await Course.findByIdAndUpdate(
+          req.params.id,
+          { $push: { students: userId } },
+          { new: true, runValidators: false }
+        );
+        
+        if (!updatedCourse) {
+          return res.status(404).json({ success: false, message: 'Course not found after update' });
+        }
         
         // Create or update consolidated enrollment notification for instructor
-        await createOrUpdateEnrollmentNotification(course, Todo);
+        await createOrUpdateEnrollmentNotification(updatedCourse, Todo);
         
         
         return res.json({ 
@@ -465,27 +473,40 @@ router.post('/:id/enroll', protect, async (req, res) => {
         });
       } else {
         // Regular student - add to waitlist
-        const waitlistPosition = course.waitlist.length + 1;
-        course.waitlist.push({
+        const waitlistPosition = (course.waitlist?.length || 0) + 1;
+        const waitlistEntry = {
           student: userId,
           position: waitlistPosition,
           addedDate: new Date()
-        });
+        };
         
-        // Add to enrollmentRequests with waitlisted status for teacher to see
-        course.enrollmentRequests.push({
+        const enrollmentRequest = {
           student: userId,
           status: 'waitlisted',
           requestDate: new Date()
-        });
+        };
         
-        await course.save();
+        // Use findByIdAndUpdate to bypass catalog validation
+        const updatedCourse = await Course.findByIdAndUpdate(
+          req.params.id,
+          { 
+            $push: { 
+              waitlist: waitlistEntry,
+              enrollmentRequests: enrollmentRequest
+            } 
+          },
+          { new: true, runValidators: false }
+        );
+        
+        if (!updatedCourse) {
+          return res.status(404).json({ success: false, message: 'Course not found after update' });
+        }
         
         // Create or update consolidated enrollment notification for instructor
-        await createOrUpdateEnrollmentNotification(course, Todo);
+        await createOrUpdateEnrollmentNotification(updatedCourse, Todo);
         
         // Create or update consolidated waitlist notification for instructor
-        await createOrUpdateWaitlistNotification(course, Todo);
+        await createOrUpdateWaitlistNotification(updatedCourse, Todo);
         
         return res.json({ 
           success: true, 
@@ -497,12 +518,19 @@ router.post('/:id/enroll', protect, async (req, res) => {
     }
     
     // Course has space - enroll student directly
-    course.students.push(userId);
+    // Use findByIdAndUpdate to bypass catalog validation
+    const updatedCourse = await Course.findByIdAndUpdate(
+      req.params.id,
+      { $push: { students: userId } },
+      { new: true, runValidators: false }
+    );
     
-    await course.save();
+    if (!updatedCourse) {
+      return res.status(404).json({ success: false, message: 'Course not found after update' });
+    }
     
     // Create or update consolidated enrollment notification for instructor
-    await createOrUpdateEnrollmentNotification(course, Todo);
+    await createOrUpdateEnrollmentNotification(updatedCourse, Todo);
     
     
     res.json({ 

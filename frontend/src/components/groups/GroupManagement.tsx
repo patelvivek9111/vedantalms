@@ -5,6 +5,7 @@ import { Plus, Users, Trash2, Edit2, UserPlus, Shuffle, MessageSquare, Activity,
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
+import logger from '../../utils/logger';
 
 interface GroupSet {
   _id: string;
@@ -77,8 +78,8 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
   const [messageContent, setMessageContent] = useState('');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [groupStructure, setGroupStructure] = useState('manual');
-  const [groupCount, setGroupCount] = useState(2);
-  const [studentsPerGroup, setStudentsPerGroup] = useState(2);
+  const [groupCount, setGroupCount] = useState<number | ''>('');
+  const [studentsPerGroup, setStudentsPerGroup] = useState<number | ''>('');
 
   const navigate = useNavigate();
 
@@ -133,8 +134,8 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
       } else {
         payload.groupStructure = 'manual';
       }
-      if (groupStructure === 'byGroupCount') payload.groupCount = groupCount;
-      if (groupStructure === 'byStudentsPerGroup') payload.studentsPerGroup = studentsPerGroup;
+      if (groupStructure === 'byGroupCount' && groupCount !== '') payload.groupCount = Number(groupCount);
+      if (groupStructure === 'byStudentsPerGroup' && studentsPerGroup !== '') payload.studentsPerGroup = Number(studentsPerGroup);
       const response = await api.post(
         `${API_URL}/api/groups/sets`,
         payload,
@@ -155,8 +156,8 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
       setNewSetName('');
       setAllowSelfSignup(false);
       setGroupStructure('manual');
-      setGroupCount(2);
-      setStudentsPerGroup(2);
+      setGroupCount('');
+      setStudentsPerGroup('');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error creating group set');
     }
@@ -190,9 +191,13 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
       setNewGroupName('');
       setSelectedStudents([]);
       // Redirect to the new group's page
+      // Store courseId before navigating to group
+      if (courseId) {
+        localStorage.setItem('previousCourseId', courseId);
+      }
       navigate(`/groups/${response.data._id}`);
     } catch (err: any) {
-      console.error("Error creating group:", err.response?.data || err.message);
+      logger.error("Error creating group", err, { responseData: err.response?.data });
       setError(err.response?.data?.message || err.response?.data?.error || 'Error creating group');
     }
   };
@@ -398,7 +403,7 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
         <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Group Management</h2>
         <button
           onClick={() => setShowCreateSetModal(true)}
-          className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+          className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2.5 border border-transparent rounded-lg shadow-sm text-sm font-semibold text-white bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600 transition-all duration-200 hover:shadow-md"
         >
           <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
           Create Group Set
@@ -413,29 +418,41 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
 
       {/* Group Sets List */}
       <div className="mb-6 sm:mb-8">
-        <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 mb-3 sm:mb-4">Group Sets</h3>
-        <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {groupSets.map(set => (
-            <div
-              key={set._id}
-              className={`p-3 sm:p-4 border rounded-lg cursor-pointer ${
-                selectedSet?._id === set._id
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                  : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600'
-              }`}
-              onClick={() => setSelectedSet(set)}
-            >
-              <div className="flex justify-between items-start">
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-medium text-sm sm:text-base text-gray-900 dark:text-gray-100 break-words">{set.name}</h4>
-                  <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                    {set.allowSelfSignup ? 'Self-signup enabled' : 'Self-signup disabled'}
-                  </p>
+        <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Group Sets</h3>
+        {groupSets.length === 0 ? (
+          <div className="text-center py-12 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg">
+            <p className="text-gray-500 dark:text-gray-400">No group sets created yet. Create your first group set to get started.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {groupSets.map(set => (
+              <div
+                key={set._id}
+                className={`p-4 border-2 rounded-xl cursor-pointer transition-all duration-200 ${
+                  selectedSet?._id === set._id
+                    ? 'border-blue-500 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/30 shadow-md'
+                    : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-md'
+                }`}
+                onClick={() => setSelectedSet(set)}
+              >
+                <div className="flex justify-between items-start">
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-semibold text-base text-gray-900 dark:text-gray-100 break-words mb-1">{set.name}</h4>
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                        set.allowSelfSignup
+                          ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300'
+                      }`}>
+                        {set.allowSelfSignup ? 'Self-signup enabled' : 'Self-signup disabled'}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Groups List */}
@@ -444,29 +461,42 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
           <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
             {/* Sidebar: Student List (only for manual group sets) */}
             {selectedSet.groupStructure === 'manual' && (
-              <div className="w-full lg:w-64 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 sm:p-4 h-fit">
-                <h4 className="font-medium text-gray-900 mb-2">Students</h4>
+              <div className="w-full lg:w-64 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-5 h-fit">
+                <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-4 text-base">Students</h4>
                 <Droppable droppableId="students-list">
-                  {(provided) => (
-                    <ul ref={provided.innerRef} {...provided.droppableProps} className="space-y-2 min-h-[40px]">
-                      {students.filter(s => !groups.some(g => g.members.some(m => m._id === s._id))).map((student, idx) => (
-                        <Draggable key={student._id} draggableId={student._id} index={idx}>
-                          {(provided) => (
-                            <li
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              {...provided.dragHandleProps}
-                              className="p-2 bg-white border rounded flex items-center gap-2 shadow-sm cursor-move"
-                            >
-                              <Users className="h-4 w-4 text-gray-400" />
-                              {student.firstName} {student.lastName}
-                            </li>
-                          )}
-                        </Draggable>
-                      ))}
-                      {provided.placeholder}
-                    </ul>
-                  )}
+                  {(provided) => {
+                    const unassignedStudents = students.filter(s => !groups.some(g => g.members.some(m => m._id === s._id)));
+                    return (
+                      <ul ref={provided.innerRef} {...provided.droppableProps} className="space-y-2 min-h-[40px]">
+                        {unassignedStudents.length > 0 ? (
+                          unassignedStudents.map((student, idx) => (
+                            <Draggable key={student._id} draggableId={student._id} index={idx}>
+                              {(provided) => (
+                                <li
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  {...provided.dragHandleProps}
+                                  className="p-3.5 bg-gradient-to-r from-gray-50 to-white dark:from-gray-700/80 dark:to-gray-600/80 border-2 border-gray-200 dark:border-gray-600 rounded-xl flex items-center gap-3 shadow-md cursor-move hover:shadow-lg hover:scale-[1.02] hover:border-blue-300 dark:hover:border-blue-500 transition-all duration-200"
+                                >
+                                  <div className="flex-shrink-0 w-9 h-9 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900/50 dark:to-blue-800/50 flex items-center justify-center shadow-sm">
+                                    <Users className="h-4.5 w-4.5 text-blue-600 dark:text-blue-400" />
+                                  </div>
+                                  <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate flex-1">
+                                    {student.firstName} {student.lastName}
+                                  </span>
+                                </li>
+                              )}
+                            </Draggable>
+                          ))
+                        ) : (
+                          <li className="p-3 text-sm text-gray-500 dark:text-gray-400 text-center">
+                            {students.length === 0 ? 'No students enrolled' : 'All students assigned to groups'}
+                          </li>
+                        )}
+                        {provided.placeholder}
+                      </ul>
+                    );
+                  }}
                 </Droppable>
               </div>
             )}
@@ -474,90 +504,113 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
             {/* Main: Groups List */}
             <div className="flex-1">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-gray-900">Groups in {selectedSet.name}</h3>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Groups in {selectedSet.name}</h3>
                 {selectedSet.groupStructure === 'manual' && (
                   <button
                     onClick={() => setShowCreateGroupModal(true)}
-                    className="inline-flex items-center px-3 py-1 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-semibold text-white bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600 transition-all duration-200 hover:shadow-md"
                   >
-                    <Plus className="h-4 w-4 mr-1" />
+                    <Plus className="h-4 w-4 mr-1.5" />
                     Group
                   </button>
                 )}
               </div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {groups.map(group => (
-                  <Droppable key={group._id} droppableId={`group-${group._id}`}>
-                    {(provided) => (
-                      <div
-                        key={group._id}
-                        className="p-4 border border-gray-200 rounded-lg min-h-[80px] cursor-pointer"
-                        onClick={e => {
-                          // Prevent navigation if clicking the expand/collapse button
-                          if ((e.target as HTMLElement).closest('button')) return;
-                          navigate(`/groups/${group._id}`);
-                        }}
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                      >
-                        <div className="flex justify-between items-start mb-2">
-                          <div className="flex items-center space-x-2">
-                            <button
-                              onClick={() => toggleGroupExpand(group._id)}
-                              className="text-gray-400 hover:text-gray-500"
-                            >
-                              {expandedGroups.has(group._id) ? (
-                                <ChevronUp className="h-5 w-5" />
-                              ) : (
-                                <ChevronDown className="h-5 w-5" />
-                              )}
-                            </button>
-                            <h4 className="font-medium text-gray-900">{group.name}</h4>
+              {groups.length === 0 ? (
+                <div className="text-center py-8 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+                  <p className="text-gray-500 dark:text-gray-400">No groups created yet. Create your first group to get started.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4">
+                  {groups.map(group => (
+                    <Droppable key={group._id} droppableId={`group-${group._id}`}>
+                      {(provided) => (
+                        <div
+                          key={group._id}
+                          className="w-full p-6 border-2 border-gray-200 dark:border-gray-700 rounded-xl min-h-[120px] cursor-pointer bg-white dark:bg-gray-800 hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-xl transition-all duration-200 shadow-md"
+                          onClick={e => {
+                            // Prevent navigation if clicking the expand/collapse button
+                            if ((e.target as HTMLElement).closest('button')) return;
+                            // Store courseId before navigating to group
+                            if (courseId) {
+                              localStorage.setItem('previousCourseId', courseId);
+                            }
+                            navigate(`/groups/${group._id}`);
+                          }}
+                          ref={provided.innerRef}
+                          {...provided.droppableProps}
+                        >
+                          <div className="flex justify-between items-center mb-4">
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <button
+                                onClick={() => toggleGroupExpand(group._id)}
+                                className="flex-shrink-0 text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+                              >
+                                {expandedGroups.has(group._id) ? (
+                                  <ChevronUp className="h-5 w-5" />
+                                ) : (
+                                  <ChevronDown className="h-5 w-5" />
+                                )}
+                              </button>
+                              <h4 className="font-bold text-gray-900 dark:text-gray-100 text-xl truncate flex-1">{group.name}</h4>
+                              <span className="flex-shrink-0 inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold bg-gradient-to-r from-blue-100 to-blue-50 dark:from-blue-900/40 dark:to-blue-800/30 text-blue-700 dark:text-blue-300 border-2 border-blue-200 dark:border-blue-700 shadow-sm">
+                                {group.members.length} {group.members.length === 1 ? 'member' : 'members'}
+                              </span>
+                            </div>
                           </div>
+                          {expandedGroups.has(group._id) && (
+                            <div className="mt-4 pt-4 border-t-2 border-gray-200 dark:border-gray-700">
+                              <p className="text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-3">Members</p>
+                              <ul className="space-y-2.5">
+                                {group.members.length > 0 ? (
+                                  group.members.map((member, idx) => (
+                                    <Draggable key={member._id} draggableId={member._id} index={idx}>
+                                      {(provided) => (
+                                        <li
+                                          ref={provided.innerRef}
+                                          {...provided.draggableProps}
+                                          className="flex items-center p-3 bg-gradient-to-r from-gray-50 to-white dark:from-gray-700/80 dark:to-gray-600/80 border-2 border-gray-200 dark:border-gray-600 rounded-xl gap-3 shadow-md hover:shadow-lg hover:scale-[1.02] hover:border-blue-300 dark:hover:border-blue-500 transition-all duration-200"
+                                        >
+                                          {/* 6-dot drag handle */}
+                                          <span
+                                            {...provided.dragHandleProps}
+                                            className="flex-shrink-0 cursor-grab active:cursor-grabbing p-1.5 text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 rounded hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                                            aria-label="Drag handle"
+                                          >
+                                            {/* SVG for 6 dots */}
+                                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                              <circle cx="4" cy="4" r="1.2" fill="currentColor"/>
+                                              <circle cx="4" cy="8" r="1.2" fill="currentColor"/>
+                                              <circle cx="4" cy="12" r="1.2" fill="currentColor"/>
+                                              <circle cx="8" cy="4" r="1.2" fill="currentColor"/>
+                                              <circle cx="8" cy="8" r="1.2" fill="currentColor"/>
+                                              <circle cx="8" cy="12" r="1.2" fill="currentColor"/>
+                                            </svg>
+                                          </span>
+                                          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900/50 dark:to-blue-800/50 flex items-center justify-center shadow-sm">
+                                            <Users className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                          </div>
+                                          <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate flex-1">
+                                            {member.firstName} {member.lastName}
+                                          </span>
+                                        </li>
+                                      )}
+                                    </Draggable>
+                                  ))
+                                ) : (
+                                  <li className="text-xs text-gray-500 dark:text-gray-400 italic py-3 text-center bg-gray-50 dark:bg-gray-700/30 rounded-lg">
+                                    No members yet
+                                  </li>
+                                )}
+                                {provided.placeholder}
+                              </ul>
+                            </div>
+                          )}
                         </div>
-                        {expandedGroups.has(group._id) && (
-                          <div className="space-y-2 mt-2">
-                            <p className="text-sm font-medium text-gray-700">Members:</p>
-                            <ul className="text-sm text-gray-600">
-                              {group.members.map((member, idx) => (
-                                <Draggable key={member._id} draggableId={member._id} index={idx}>
-                                  {(provided) => (
-                                    <li
-                                      ref={provided.innerRef}
-                                      {...provided.draggableProps}
-                                      className="flex items-center p-2 bg-white border rounded mb-1 gap-2 shadow-sm"
-                                    >
-                                      {/* 6-dot drag handle */}
-                                      <span
-                                        {...provided.dragHandleProps}
-                                        className="cursor-grab px-1 text-gray-400 flex items-center"
-                                        aria-label="Drag handle"
-                                      >
-                                        {/* SVG for 6 dots */}
-                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                          <circle cx="4" cy="4" r="1" fill="currentColor"/>
-                                          <circle cx="4" cy="8" r="1" fill="currentColor"/>
-                                          <circle cx="4" cy="12" r="1" fill="currentColor"/>
-                                          <circle cx="8" cy="4" r="1" fill="currentColor"/>
-                                          <circle cx="8" cy="8" r="1" fill="currentColor"/>
-                                          <circle cx="8" cy="12" r="1" fill="currentColor"/>
-                                        </svg>
-                                      </span>
-                                      <Users className="h-4 w-4 text-gray-400" />
-                                      {member.firstName} {member.lastName}
-                                    </li>
-                                  )}
-                                </Draggable>
-                              ))}
-                              {provided.placeholder}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </Droppable>
-                ))}
-              </div>
+                      )}
+                    </Droppable>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </DragDropContext>
@@ -565,19 +618,19 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
 
       {/* Create Group Set Modal */}
       {showCreateSetModal && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 p-2 sm:p-4">
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 dark:bg-gray-900 dark:bg-opacity-75 flex items-center justify-center z-50 p-2 sm:p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 max-w-md w-full max-h-[95vh] overflow-y-auto">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Create Group Set</h3>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Create Group Set</h3>
             <form onSubmit={handleCreateSet}>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700">Name</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Name</label>
                 <input
                   type="text"
                   id="new-set-name"
                   name="newSetName"
                   value={newSetName}
                   onChange={(e) => setNewSetName(e.target.value)}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                   required
                 />
               </div>
@@ -589,19 +642,19 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
                     name="allowSelfSignup"
                     checked={allowSelfSignup}
                     onChange={(e) => setAllowSelfSignup(e.target.checked)}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="rounded border-gray-300 dark:border-gray-700 text-blue-600 dark:text-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-900"
                   />
-                  <span className="ml-2 text-sm text-gray-700">Allow self-signup</span>
+                  <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Allow self-signup</span>
                 </label>
               </div>
               <div className="mb-4">
-                <label htmlFor="groupStructure" className="block text-sm font-medium text-gray-700">Group Structure</label>
+                <label htmlFor="groupStructure" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Group Structure</label>
                 <select
                   id="groupStructure"
                   name="groupStructure"
                   value={groupStructure}
                   onChange={e => setGroupStructure(e.target.value)}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                 >
                   <option value="manual">Create groups later</option>
                   <option value="byGroupCount">Split students by number of groups</option>
@@ -610,22 +663,23 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
               </div>
               {groupStructure === 'byGroupCount' && (
                 <div className="mb-4">
-                  <label htmlFor="groupCount" className="block text-sm font-medium text-gray-700">Number of Groups</label>
+                  <label htmlFor="groupCount" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Number of Groups</label>
                   <input
                     id="groupCount"
                     name="groupCount"
                     type="number"
                     min={2}
                     value={groupCount}
-                    onChange={e => setGroupCount(Number(e.target.value))}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    onChange={e => setGroupCount(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                     required
+                    placeholder="Enter number of groups"
                   />
                 </div>
               )}
               {groupStructure === 'byStudentsPerGroup' && (
                 <div className="mb-4">
-                  <label htmlFor="studentsPerGroup" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="studentsPerGroup" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                     Number of Students per Group
                   </label>
                   <input
@@ -633,12 +687,13 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
                     name="studentsPerGroup"
                     type="number"
                     min={2}
-                    value={studentsPerGroup}
-                    onChange={e => setStudentsPerGroup(Number(e.target.value))}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    value={studentsPerGroup === '' ? '' : studentsPerGroup}
+                    onChange={e => setStudentsPerGroup(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                     required
+                    placeholder="Enter number of students per group"
                   />
-                  <p className="mt-1 text-xs text-gray-500">
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     Enter the number of students you want in each group. Minimum is 2.
                   </p>
                 </div>
@@ -647,13 +702,13 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
                 <button
                   type="button"
                   onClick={() => setShowCreateSetModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 border border-transparent rounded-md hover:bg-blue-700 dark:hover:bg-blue-600"
                 >
                   Create
                 </button>
@@ -665,26 +720,27 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
 
       {/* Create Group Modal */}
       {showCreateGroupModal && selectedSet && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 max-w-md w-full max-h-[95vh] overflow-y-auto">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Create Group</h3>
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 dark:bg-gray-900 dark:bg-opacity-75 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 sm:p-8 max-w-md w-full max-h-[95vh] overflow-y-auto shadow-2xl">
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-6">Create Group</h3>
             <form onSubmit={handleCreateGroup}>
-              <div className="mb-4">
-                <label htmlFor="groupName" className="block text-sm font-medium text-gray-700">Group Name</label>
+              <div className="mb-5">
+                <label htmlFor="groupName" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Group Name</label>
                 <input
                   id="groupName"
                   name="groupName"
                   type="text"
                   value={newGroupName}
                   onChange={(e) => setNewGroupName(e.target.value)}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2.5"
+                  placeholder="Enter group name"
                   required
                 />
               </div>
               {/* Only show member selection for non-manual group sets */}
               {selectedSet.groupStructure !== 'manual' && (
-                <div className="mb-4">
-                  <label htmlFor="groupMembers" className="block text-sm font-medium text-gray-700">Select Members</label>
+                <div className="mb-5">
+                  <label htmlFor="groupMembers" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Select Members</label>
                   <select
                     id="groupMembers"
                     name="groupMembers"
@@ -693,7 +749,7 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
                     onChange={(e) => setSelectedStudents(
                       Array.from(e.target.selectedOptions, option => option.value)
                     )}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    className="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-700 shadow-sm focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                     size={5}
                   >
                     {students.map(student => (
@@ -702,22 +758,22 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
                       </option>
                     ))}
                   </select>
-                  <p className="mt-1 text-sm text-gray-500">
+                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                     Hold Ctrl/Cmd to select multiple students
                   </p>
                 </div>
               )}
-              <div className="flex justify-end space-x-3">
+              <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <button
                   type="button"
                   onClick={() => setShowCreateGroupModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                  className="px-5 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
+                  className="px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 dark:bg-blue-500 border border-transparent rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors shadow-sm hover:shadow-md"
                 >
                   Create
                 </button>

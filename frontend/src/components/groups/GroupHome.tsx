@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Home, Users, MessageSquare, FileText, ClipboardList, Megaphone, Calendar, TrendingUp, Star, Award, Target, Zap, BookOpen, Clock, CheckCircle, AlertCircle, Plus, Settings, UserPlus, BarChart3 } from 'lucide-react';
+import { Home, Users, MessageSquare, FileText, ClipboardList, Megaphone, Calendar, TrendingUp, Star, Award, Target, Zap, BookOpen, Clock, CheckCircle, AlertCircle, Plus, Settings, UserPlus, BarChart3, ArrowLeft } from 'lucide-react';
 import axios from 'axios';
 import { API_URL } from '../../config';
 import { useAuth } from '../../context/AuthContext';
@@ -265,9 +265,11 @@ const GroupHome: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-900 p-4 sm:p-6">
-      {/* 1. Welcome Section - For Both Teachers and Students */}
-      <div className="mb-6 sm:mb-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-900">
+      {/* Navigation is handled by GroupDashboard parent component */}
+      <div className="p-4 sm:p-6 pt-16 lg:pt-4">
+        {/* 1. Welcome Section - For Both Teachers and Students */}
+        <div className="mb-6 sm:mb-8">
         <div className="bg-white dark:bg-gray-800 dark:!bg-gray-800 rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8 border border-gray-100 dark:border-gray-700 dark:!border-gray-700 hover:shadow-xl transition-all duration-300">
           <div className="flex items-center justify-center">
             <div className="text-center">
@@ -482,6 +484,7 @@ const GroupHome: React.FC = () => {
             )}
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

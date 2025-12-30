@@ -8,6 +8,7 @@ import CreateThreadModal from '../CreateThreadModal';
 import axios from 'axios';
 import CreatePageForm from '../CreatePageForm';
 import { ModuleProvider } from '../../contexts/ModuleContext';
+import logger from '../../utils/logger';
 
 interface Thread {
   _id: string;
@@ -80,7 +81,7 @@ const GroupDiscussion: React.FC = () => {
           setCourseId(typeof course === 'string' ? course : course?._id || '');
         }
       } catch (err) {
-        console.error('Error fetching group info:', err);
+        logger.error('Error fetching group info', err);
         setError('Failed to load group information');
       }
     };
@@ -103,7 +104,7 @@ const GroupDiscussion: React.FC = () => {
           setCourseGroups(response.data.data.groups || []);
         }
       } catch (err) {
-        console.error('Error fetching course groups:', err);
+        logger.error('Error fetching course groups', err);
       }
     };
 
@@ -157,7 +158,7 @@ const GroupDiscussion: React.FC = () => {
           setError('Failed to fetch discussion threads');
         }
       } catch (err) {
-        console.error('Error fetching threads:', err);
+        logger.error('Error fetching threads', err);
         setError('Failed to load discussion threads');
       } finally {
         setLoading(false);
@@ -179,7 +180,7 @@ const GroupDiscussion: React.FC = () => {
     if (groupId) {
       navigate(`/groups/${groupId}/discussion/${threadId}`);
     } else {
-      console.error('Group ID not found. Cannot navigate to thread.');
+      logger.error('Group ID not found. Cannot navigate to thread.', new Error('Group ID not found'));
       alert('Group ID not found. Please contact your administrator.');
     }
   };

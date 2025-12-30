@@ -1,5 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/user.model');
+const logger = require('../utils/logger');
+const { UnauthorizedError, ForbiddenError, sendErrorResponse } = require('../utils/errorHandler');
 
 // Protect routes
 exports.protect = async (req, res, next) => {
@@ -10,41 +12,38 @@ exports.protect = async (req, res, next) => {
   }
 
   if (!token) {
-    console.error('Authentication failed: No token provided');
-    return res.status(401).json({
-      success: false,
-      error: 'Not authorized to access this route'
-    });
+    logger.warn('Authentication failed: No token provided', { path: req.path, method: req.method });
+    return sendErrorResponse(res, new UnauthorizedError(), { action: 'auth_protect', reason: 'no_token' });
   }
 
   
 
   try {
-    // Use fallback JWT_SECRET if not set (shouldn't happen as server.js sets it, but safety check)
-    const jwtSecret = process.env.JWT_SECRET || 'your-super-secret-jwt-key-123';
-    const decoded = jwt.verify(token, jwtSecret);
+    // JWT_SECRET must be set in environment variables
+    if (!process.env.JWT_SECRET) {
+      logger.error('JWT_SECRET is not configured in environment variables', { path: req.path });
+      return sendErrorResponse(res, new UnauthorizedError('Authentication configuration error'), { action: 'auth_protect', reason: 'jwt_secret_missing' });
+    }
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     
     const user = await User.findById(decoded.id);
 
     if (!user) {
-      console.error('Authentication failed: User not found for token');
-      return res.status(401).json({
-        success: false,
-        error: 'Not authorized to access this route'
-      });
+      logger.warn('Authentication failed: User not found for token', { userId: decoded.id, path: req.path });
+      return sendErrorResponse(res, new UnauthorizedError(), { action: 'auth_protect', reason: 'user_not_found' });
     }
 
 
     req.user = user;
     next();
   } catch (err) {
-    console.error('Authentication failed:', err.message);
-    console.error('JWT verification error details:', err);
-    return res.status(401).json({
-      success: false,
-      error: 'Not authorized to access this route'
+    logger.warn('Authentication failed: JWT verification error', { 
+      error: err.message, 
+      name: err.name,
+      path: req.path 
     });
+    return sendErrorResponse(res, new UnauthorizedError(), { action: 'auth_protect', reason: 'jwt_verification_failed' });
   }
 };
 
@@ -55,18 +54,21 @@ exports.authorize = (...roles) => {
     const allowedRoles = roles.flat();
     
     if (!req.user || !req.user.role) {
-      console.error('Authorization failed: No user or role found in request');
-      return res.status(403).json({
-        success: false,
-        error: 'Not authorized to access this route'
-      });
+      logger.warn('Authorization failed: No user or role found in request', { path: req.path });
+      return sendErrorResponse(res, new ForbiddenError('User role not found'), { action: 'auth_authorize', reason: 'no_role' });
     }
 
     if (!allowedRoles.includes(req.user.role)) {
-      console.error(`Authorization failed: User role ${req.user.role} not authorized for roles: ${allowedRoles.join(', ')}`);
-      return res.status(403).json({
-        success: false,
-        error: `User role ${req.user.role} is not authorized to access this route`
+      logger.warn('Authorization failed: Insufficient permissions', { 
+        userRole: req.user.role, 
+        allowedRoles, 
+        path: req.path 
+      });
+      return sendErrorResponse(res, new ForbiddenError(`User role ${req.user.role} is not authorized to access this route`), { 
+        action: 'auth_authorize', 
+        reason: 'insufficient_permissions',
+        userRole: req.user.role,
+        allowedRoles 
       });
     }
 

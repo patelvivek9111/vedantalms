@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
 const User = require('../models/user.model');
+const logger = require('../utils/logger');
+const { ValidationError, NotFoundError, sendErrorResponse, asyncHandler } = require('../utils/errorHandler');
 
 // @desc    Search users by email or name
 // @route   GET /api/users/search
@@ -11,10 +13,7 @@ exports.searchUsers = async (req, res) => {
 
     // If no search parameters provided, return error
     if (!email && !name && !role) {
-      return res.status(400).json({
-        success: false,
-        message: 'At least one of email, name, or role query parameter is required'
-      });
+      return sendErrorResponse(res, new ValidationError('At least one of email, name, or role query parameter is required'), { action: 'searchUsers' });
     }
 
     // Build $or conditions for name and email search
@@ -92,7 +91,7 @@ exports.searchUsers = async (req, res) => {
       data: users
     });
   } catch (err) {
-    console.error('Search users error:', err);
+    logger.logError(err, { action: 'searchUsers', query: req.query });
     res.status(500).json({
       success: false,
       message: 'Server error while searching users',
@@ -139,7 +138,7 @@ exports.updateMe = async (req, res) => {
     const updatedUser = await User.findByIdAndUpdate(userId, updateFields, { new: true, runValidators: true }).select('-password');
     res.json({ success: true, user: updatedUser });
   } catch (err) {
-    console.error('Update profile error:', err);
+    logger.logError(err, { action: 'updateProfile', userId: req.user?._id });
     res.status(500).json({ success: false, message: 'Server error while updating profile', error: err.message });
   }
 };
@@ -188,12 +187,12 @@ exports.uploadProfilePicture = async (req, res) => {
             try {
               await deleteFromCloudinary(oldPublicId, 'image');
             } catch (deleteErr) {
-              console.error('Error deleting old profile picture from Cloudinary:', deleteErr);
+              logger.warn('Error deleting old profile picture from Cloudinary', { error: deleteErr.message, userId: req.user?._id });
             }
           }
         }
       } catch (cloudinaryError) {
-        console.error('Cloudinary upload failed, falling back to local storage:', cloudinaryError);
+        logger.warn('Cloudinary upload failed, falling back to local storage', { error: cloudinaryError.message, userId: req.user?._id });
         profilePictureUrl = `/uploads/${req.file.filename}`;
       }
     } else {
@@ -207,7 +206,7 @@ exports.uploadProfilePicture = async (req, res) => {
     ).select('-password');
     res.json({ success: true, user: updatedUser });
   } catch (err) {
-    console.error('Profile picture upload error:', err);
+    logger.logError(err, { action: 'uploadProfilePicture', userId: req.user?._id });
     res.status(500).json({ success: false, message: 'Server error while uploading profile picture', error: err.message });
   }
 };
@@ -242,9 +241,35 @@ exports.getPreferences = async (req, res) => {
       preferences.courseColors = Object.fromEntries(preferences.courseColors);
     }
     
+    // Ensure courseQuickLinks is properly formatted
+    if (!preferences.courseQuickLinks) {
+      preferences.courseQuickLinks = {};
+    }
+    
+    // If it's a Map, convert to object
+    if (preferences.courseQuickLinks instanceof Map) {
+      preferences.courseQuickLinks = Object.fromEntries(preferences.courseQuickLinks);
+    }
+    
+    // Ensure all values are arrays (convert old single values if needed)
+    const quickLinks = {};
+    Object.keys(preferences.courseQuickLinks).forEach(courseId => {
+      const value = preferences.courseQuickLinks[courseId];
+      if (Array.isArray(value)) {
+        quickLinks[courseId] = value;
+      } else if (value) {
+        // Old format: single value, convert to array
+        quickLinks[courseId] = [value];
+      } else {
+        // Empty or null, set as empty array
+        quickLinks[courseId] = [];
+      }
+    });
+    preferences.courseQuickLinks = quickLinks;
+    
     res.json({ success: true, preferences });
   } catch (err) {
-    console.error('Get preferences error:', err);
+    logger.logError(err, { action: 'getPreferences', userId: req.user?._id });
     res.status(500).json({ success: false, message: 'Server error while getting preferences', error: err.message });
   }
 };
@@ -263,11 +288,12 @@ exports.updatePreferences = async (req, res) => {
       });
     }
     
-    const { language, timeZone, theme, courseColors } = req.body;
+    const { language, timeZone, theme, showOnlineStatus, courseColors, courseQuickLinks } = req.body;
     const updateFields = {};
     if (language !== undefined) updateFields['preferences.language'] = language;
     if (timeZone !== undefined) updateFields['preferences.timeZone'] = timeZone;
     if (theme !== undefined) updateFields['preferences.theme'] = theme;
+    if (showOnlineStatus !== undefined) updateFields['preferences.showOnlineStatus'] = showOnlineStatus;
     
     // Handle courseColors - update specific course color(s)
     if (courseColors !== undefined) {
@@ -291,6 +317,37 @@ exports.updatePreferences = async (req, res) => {
       updateFields['preferences.courseColors'] = mergedColors;
     }
     
+    // Handle courseQuickLinks - update specific course quick link(s)
+    if (courseQuickLinks !== undefined) {
+      const user = await User.findById(userId).select('preferences');
+      if (!user) {
+        return res.status(404).json({ success: false, message: 'User not found' });
+      }
+      
+      // Get current courseQuickLinks, handling both Map and object formats
+      let currentQuickLinks = {};
+      if (user.preferences && user.preferences.courseQuickLinks) {
+        if (user.preferences.courseQuickLinks instanceof Map) {
+          currentQuickLinks = Object.fromEntries(user.preferences.courseQuickLinks);
+        } else {
+          currentQuickLinks = user.preferences.courseQuickLinks || {};
+        }
+      }
+      
+      // Merge new quick links with existing ones
+      const mergedQuickLinks = { ...currentQuickLinks };
+      Object.keys(courseQuickLinks).forEach(courseId => {
+        const value = courseQuickLinks[courseId];
+        if (value === null || (Array.isArray(value) && value.length === 0)) {
+          // Keep empty arrays in preferences (don't delete) so we know the user has interacted with this
+          mergedQuickLinks[courseId] = [];
+        } else {
+          mergedQuickLinks[courseId] = value;
+        }
+      });
+      updateFields['preferences.courseQuickLinks'] = mergedQuickLinks;
+    }
+    
     const updatedUser = await User.findByIdAndUpdate(userId, updateFields, { new: true, runValidators: true }).select('preferences');
     
     // Ensure preferences object exists and courseColors is properly formatted
@@ -304,9 +361,89 @@ exports.updatePreferences = async (req, res) => {
       preferences.courseColors = Object.fromEntries(preferences.courseColors);
     }
     
+    // Ensure courseQuickLinks is properly formatted
+    if (!preferences.courseQuickLinks) {
+      preferences.courseQuickLinks = {};
+    }
+    
+    // If it's a Map, convert to object
+    if (preferences.courseQuickLinks instanceof Map) {
+      preferences.courseQuickLinks = Object.fromEntries(preferences.courseQuickLinks);
+    }
+    
+    // Ensure all courseQuickLinks values are arrays (convert old single values if needed)
+    const quickLinks = {};
+    Object.keys(preferences.courseQuickLinks).forEach(courseId => {
+      const value = preferences.courseQuickLinks[courseId];
+      if (Array.isArray(value)) {
+        quickLinks[courseId] = value;
+      } else if (value && !Array.isArray(value)) {
+        // Old format: single value, convert to array
+        quickLinks[courseId] = [value];
+      } else {
+        // Empty or null, set as empty array
+        quickLinks[courseId] = [];
+      }
+    });
+    preferences.courseQuickLinks = quickLinks;
+    
     res.json({ success: true, preferences });
   } catch (err) {
-    console.error('Update preferences error:', err);
+    logger.logError(err, { action: 'updatePreferences', userId: req.user?._id });
     res.status(500).json({ success: false, message: 'Server error while updating preferences', error: err.message });
   }
-}; 
+};
+
+// @desc    Update current user's password
+// @route   PUT /api/users/me/password
+// @access  Private
+exports.updatePassword = asyncHandler(async (req, res) => {
+  const userId = req.user._id || req.user.id;
+  
+  if (!userId) {
+    throw new ValidationError('User ID is required');
+  }
+  
+  const { currentPassword, newPassword, confirmPassword } = req.body;
+  
+  // Validate all fields are provided
+  if (!currentPassword || !newPassword || !confirmPassword) {
+    throw new ValidationError('All password fields are required');
+  }
+  
+  // Validate new password matches confirm password
+  if (newPassword !== confirmPassword) {
+    throw new ValidationError('New password and confirm password do not match');
+  }
+  
+  // Validate new password length (minimum 6 characters as per schema)
+  if (newPassword.length < 6) {
+    throw new ValidationError('New password must be at least 6 characters long');
+  }
+  
+  // Validate new password is different from current password
+  if (currentPassword === newPassword) {
+    throw new ValidationError('New password must be different from current password');
+  }
+  
+  // Get user with password field selected
+  const user = await User.findById(userId).select('+password');
+  if (!user) {
+    throw new NotFoundError('User not found');
+  }
+  
+  // Verify current password
+  const isPasswordMatch = await user.matchPassword(currentPassword);
+  if (!isPasswordMatch) {
+    throw new ValidationError('Current password is incorrect');
+  }
+  
+  // Update password (will be hashed by pre-save hook)
+  user.password = newPassword;
+  await user.save();
+  
+  res.json({ 
+    success: true, 
+    message: 'Password updated successfully' 
+  });
+}); 

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_URL } from '../config';
+import logger from '../utils/logger';
 
 // Ensure baseURL is properly formatted
 const getBaseURL = () => {
@@ -24,18 +25,74 @@ api.interceptors.request.use(
     if (token && token.trim() !== '') {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    logger.logApiRequest(config.method?.toUpperCase() || 'GET', config.url || '', config.data);
     return config;
   },
   (error) => {
+    logger.error('API request interceptor error', error);
     return Promise.reject(error);
   }
 );
 
 // Add a response interceptor to handle token expiration
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    logger.logApiResponse(
+      response.config.method?.toUpperCase() || 'GET',
+      response.config.url || '',
+      response.status,
+      response.data
+    );
+    return response;
+  },
   (error) => {
+    // Don't log canceled requests (intentional cancellations via AbortController)
+    const isCanceled = error.code === 'ERR_CANCELED' || error.name === 'CanceledError' || error.message === 'canceled';
+    
+    if (isCanceled) {
+      // Silently ignore canceled requests - they're intentional
+      return Promise.reject(error);
+    }
+    
+    // Don't log rate limit errors as errors - they're expected when rate limited
+    const isRateLimit = error.response?.status === 429;
+    
+    if (isRateLimit) {
+      // Extract retry-after information from headers or response body
+      const retryAfterHeader = error.response?.headers?.['retry-after'] || 
+                               error.response?.headers?.['Retry-After'];
+      const retryAfterBody = error.response?.data?.retryAfter || 
+                            error.response?.data?.retryAfterSeconds;
+      
+      // Use header first, then body, then default to 60 seconds
+      const retryAfter = retryAfterHeader 
+        ? parseInt(retryAfterHeader, 10) 
+        : (retryAfterBody ? parseInt(retryAfterBody, 10) : 60);
+      
+      // Add retry-after to error object for components to use
+      error.retryAfter = retryAfter;
+      error.retryAfterSeconds = retryAfter;
+      
+      // Only log as warning, not error
+      logger.warn(`Rate limited: ${error.config?.method?.toUpperCase() || 'GET'} ${error.config?.url || ''}`, {
+        retryAfter,
+        retryAfterSeconds: retryAfter
+      });
+      return Promise.reject(error);
+    }
+    
+    if (error.response) {
+      logger.logApiError(
+        error.config?.method?.toUpperCase() || 'GET',
+        error.config?.url || '',
+        error
+      );
+    } else {
+      logger.error('API request failed (no response)', error);
+    }
+    
     if (error.response?.status === 401) {
+      logger.warn('Unauthorized - redirecting to login');
       localStorage.removeItem('token');
       window.location.href = '/login';
     }
@@ -68,9 +125,19 @@ export const updateUserPreferences = async (prefs: {
   language?: string;
   timeZone?: string;
   theme?: string;
+  showOnlineStatus?: boolean;
   courseColors?: { [courseId: string]: string };
+  courseQuickLinks?: { [courseId: string]: ('announcements' | 'pages' | 'discussions' | 'modules')[] | null };
 }) => {
   return api.put('/users/me/preferences', prefs);
+};
+
+export const updatePassword = async (passwords: {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}) => {
+  return api.put('/users/me/password', passwords);
 };
 
 export const getLoginActivity = async (page = 1, limit = 20, days = 150) => {

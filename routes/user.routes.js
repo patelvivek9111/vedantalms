@@ -1,7 +1,7 @@
 const express = require('express');
 const { protect, authorize } = require('../middleware/auth');
 const { searchUsers } = require('../controllers/user.controller');
-const { updateMe, uploadProfilePicture, getPreferences, updatePreferences } = require('../controllers/user.controller');
+const { updateMe, uploadProfilePicture, getPreferences, updatePreferences, updatePassword } = require('../controllers/user.controller');
 const upload = require('../middleware/upload');
 
 const router = express.Router();
@@ -16,5 +16,7 @@ router.post('/me/profile-picture', protect, upload.single('profilePicture'), upl
 router.get('/me/preferences', protect, getPreferences);
 // Update current user's preferences
 router.put('/me/preferences', protect, updatePreferences);
+// Update current user's password
+router.put('/me/password', protect, updatePassword);
 
 module.exports = router; 

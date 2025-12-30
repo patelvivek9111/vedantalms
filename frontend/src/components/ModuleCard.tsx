@@ -7,6 +7,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import CreatePageForm from './CreatePageForm';
 import axios from 'axios';
 import { API_URL } from '../config';
+import logger from '../utils/logger';
 
 // Vite env type for TypeScript
 interface ImportMeta {
@@ -59,7 +60,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
           const fetchedPages = await getPages(module._id);
           setPages(fetchedPages);
         } catch (err) {
-          console.error('Error fetching pages:', err);
+          logger.error('Error fetching pages', err);
           setError('Failed to load pages');
         } finally {
           setIsLoadingPages(false);
@@ -82,7 +83,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
           });
           setAssignments(res.data);
         } catch (err) {
-          console.error('Assignments fetch error:', err);
+          logger.error('Assignments fetch error', err);
           setAssignmentsError('Failed to load assignments');
         } finally {
           setIsLoadingAssignments(false);
@@ -105,7 +106,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
           const discussions = res.data.data || res.data || [];
           setDiscussions(discussions);
         } catch (err) {
-          console.error('Discussions fetch error:', err);
+          logger.error('Discussions fetch error', err);
           setDiscussionsError('Failed to load discussions');
         } finally {
           setIsLoadingDiscussions(false);
@@ -149,7 +150,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
     try {
       await toggleModulePublish(module._id);
     } catch (err) {
-      console.error('Error toggling publish:', err);
+      logger.error('Error toggling publish', err);
     } finally {
       setIsPublishing(false);
     }
@@ -166,7 +167,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
       );
       setAssignmentPublished(prev => ({ ...prev, [assignment._id]: res.data.published }));
     } catch (err) {
-      console.error('Error toggling assignment publish:', err);
+      logger.error('Error toggling assignment publish', err);
     } finally {
       setAssignmentPublishing(null);
     }
@@ -422,7 +423,12 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
                             <button
                               onClick={e => {
                                 e.stopPropagation();
-                                navigate(`/assignments/${a._id}/edit`);
+                                // Navigate to edit with courseId to show sidebar
+                                if (module.course) {
+                                  navigate(`/courses/${module.course}/assignments/${a._id}/edit`);
+                                } else {
+                                  navigate(`/assignments/${a._id}/edit`);
+                                }
                               }}
                               className="p-1.5 sm:p-1 hover:bg-yellow-100 dark:hover:bg-yellow-900/50 active:bg-yellow-200 dark:active:bg-yellow-900/70 rounded text-yellow-600 dark:text-yellow-400 touch-manipulation"
                               title="Edit Assignment"

@@ -92,9 +92,10 @@ const AnnouncementForm: React.FC<AnnouncementFormProps> = ({ onSubmit, loading, 
         onChange={e => setTitle(e.target.value)}
         required
       />
-      <RichTextEditor content={body} onChange={setBody} />
+      <label htmlFor="announcement-body" className="sr-only">Announcement body</label>
+      <RichTextEditor id="announcement-body" name="body" content={body} onChange={setBody} />
       <div>
-        <label className="block mb-1 font-medium text-gray-700 dark:text-gray-300">Post to</label>
+        <label htmlFor="announcement-post-to" className="block mb-1 font-medium text-gray-700 dark:text-gray-300">Post to</label>
         <select
           id="announcement-post-to"
           name="postTo"

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import logger from '../utils/logger';
 import { 
   Users, 
   BookOpen, 
@@ -80,7 +81,7 @@ export function AdminDashboard() {
           setRecentActivity(activityResponse.data.data || []);
         }
       } catch (error) {
-        console.error('Error fetching admin dashboard data:', error);
+        logger.error('Error fetching admin dashboard data', error);
         // Keep default values on error
       } finally {
         setLoading(false);

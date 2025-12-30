@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import api, { getImageUrl } from '../services/api';
 import { API_URL } from '../config';
 import RichTextEditor from './RichTextEditor';
+import logger from '../utils/logger';
 import { 
   MessageSquare, 
   Pin, 
@@ -170,7 +171,7 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
       await onEdit(reply._id, editContent);
       setIsEditing(false);
     } catch (error) {
-      console.error('Error editing reply:', error);
+      logger.error('Error editing reply', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -181,7 +182,7 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
       try {
         await onDelete(reply._id);
       } catch (error) {
-        console.error('Error deleting reply:', error);
+        logger.error('Error deleting reply', error);
       }
     }
   };
@@ -268,7 +269,10 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
           {/* Content */}
           {isEditing ? (
             <form onSubmit={handleEdit} className="space-y-4">
+              <label htmlFor="edit-reply-content" className="sr-only">Edit reply content</label>
               <RichTextEditor
+                id="edit-reply-content"
+                name="editContent"
                 content={editContent}
                 onChange={setEditContent}
                 placeholder="Edit your reply..."
@@ -343,7 +347,10 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
               <span>Reply to {reply.author.firstName}</span>
             </h4>
             <form onSubmit={e => onSubmitReply(e, reply._id)}>
+              <label htmlFor="reply-content" className="sr-only">Reply content</label>
               <RichTextEditor
+                id="reply-content"
+                name="replyContent"
                 content={replyContent}
                 onChange={setReplyContent}
                 placeholder="Write your reply..."
@@ -403,7 +410,7 @@ const ThreadView: React.FC = () => {
         try {
           setReplyContent(savedDraft);
         } catch (e) {
-          console.error('Error loading draft:', e);
+          logger.error('Error loading draft', e);
         }
       }
     }
@@ -471,7 +478,7 @@ const ThreadView: React.FC = () => {
             setLoading(false);
           }
         } catch (err) {
-          console.error('Error fetching group:', err);
+          logger.error('Error fetching group', err);
           setError('Failed to load group information');
           setLoading(false);
         }
@@ -547,7 +554,7 @@ const ThreadView: React.FC = () => {
             setModules(modulesRes.data.data || []);
           }
       } catch (err) {
-        console.error('Error fetching thread or students:', err);
+        logger.error('Error fetching thread or students', err);
         setError('Failed to load thread or students');
       } finally {
         setLoading(false);
@@ -599,7 +606,7 @@ const ThreadView: React.FC = () => {
         setShowReplyEditor(false);
       }
     } catch (error) {
-      console.error('Error posting reply:', error);
+      logger.error('Error posting reply', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -622,7 +629,7 @@ const ThreadView: React.FC = () => {
         setThread(response.data.data);
       }
     } catch (error) {
-      console.error('Error liking reply:', error);
+      logger.error('Error liking reply', error);
     }
   };
 
@@ -649,7 +656,7 @@ const ThreadView: React.FC = () => {
         setIsEditing(false);
       }
     } catch (error) {
-      console.error('Error updating thread:', error);
+      logger.error('Error updating thread', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -671,7 +678,7 @@ const ThreadView: React.FC = () => {
         navigate(-1);
       }
     } catch (error) {
-      console.error('Error deleting thread:', error);
+      logger.error('Error deleting thread', error);
     }
   };
 
@@ -692,7 +699,7 @@ const ThreadView: React.FC = () => {
         setThread(response.data.data);
       }
     } catch (error) {
-      console.error('Error toggling pin status:', error);
+      logger.error('Error toggling pin status', error);
     }
   };
 
@@ -713,7 +720,7 @@ const ThreadView: React.FC = () => {
         setThread(response.data.data);
       }
     } catch (error) {
-      console.error('Error updating reply:', error);
+      logger.error('Error updating reply', error);
       throw error;
     }
   };
@@ -740,7 +747,7 @@ const ThreadView: React.FC = () => {
         }
       }
     } catch (error) {
-      console.error('Error deleting reply:', error);
+      logger.error('Error deleting reply', error);
       throw error;
     }
   };
@@ -782,7 +789,7 @@ const ThreadView: React.FC = () => {
         setGradingError('Failed to submit grade');
       }
     } catch (err) {
-      console.error('Error submitting grade:', err);
+      logger.error('Error submitting grade', err);
       setGradingError('Failed to submit grade. Please try again.');
     } finally {
       setIsGrading(false);
@@ -825,7 +832,7 @@ const ThreadView: React.FC = () => {
         setShowEditModal(false);
       }
     } catch (err) {
-      console.error('Error updating thread settings:', err);
+      logger.error('Error updating thread settings', err);
       setError('Failed to update thread settings');
     }
   };
@@ -929,14 +936,20 @@ const ThreadView: React.FC = () => {
               
               {isEditing ? (
                 <form onSubmit={handleEditThread} className="space-y-3 sm:space-y-4">
+                  <label htmlFor="edit-thread-title" className="sr-only">Thread Title</label>
                   <input
                     type="text"
+                    id="edit-thread-title"
+                    name="editTitle"
                     value={editTitle}
                     onChange={(e) => setEditTitle(e.target.value)}
                     className="w-full text-lg sm:text-2xl font-bold text-gray-900 dark:text-gray-100 p-2 sm:p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                     placeholder="Thread title"
                   />
+                  <label htmlFor="edit-thread-content" className="sr-only">Edit thread content</label>
                   <RichTextEditor
+                    id="edit-thread-content"
+                    name="editContent"
                     content={editContent}
                     onChange={setEditContent}
                     placeholder="Edit your thread content..."
@@ -1099,7 +1112,10 @@ const ThreadView: React.FC = () => {
                   </h3>
                   <form onSubmit={e => handleSubmitReply(e, null)}>
                     <div onClick={(e) => e.stopPropagation()}>
+                      <label htmlFor="thread-reply-content" className="sr-only">Thread reply content</label>
                       <RichTextEditor
+                        id="thread-reply-content"
+                        name="replyContent"
                         content={replyContent}
                         onChange={setReplyContent}
                         placeholder="Share your thoughts..."

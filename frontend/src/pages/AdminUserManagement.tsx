@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import logger from '../utils/logger';
 import { 
   Users, 
   Search, 
@@ -68,7 +69,7 @@ export function AdminUserManagement() {
           setUsers(response.data.data);
         }
       } catch (error) {
-        console.error('Error fetching users:', error);
+        logger.error('Error fetching users', error);
       } finally {
         setLoading(false);
       }
@@ -198,7 +199,7 @@ export function AdminUserManagement() {
         }
       }
     } catch (error: any) {
-      console.error('Error creating user:', error);
+      logger.error('Error creating user', error);
       setCreateUserError(
         error.response?.data?.message || 
         error.response?.data?.errors?.map((e: any) => e.message).join(', ') ||

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useModule } from '../contexts/ModuleContext';
 import api from '../services/api';
 import RichTextEditor from './RichTextEditor';
+import logger from '../utils/logger';
 
 interface Module {
   _id: string;
@@ -59,7 +60,7 @@ const CreatePageForm: React.FC<CreatePageFormProps> = ({ modules, courseId, onSu
       setAttachments([]);
       onSuccess();
     } catch (error) {
-      console.error('Error creating page:', error);
+      logger.error('Error creating page', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -93,6 +94,7 @@ const CreatePageForm: React.FC<CreatePageFormProps> = ({ modules, courseId, onSu
             <input
               type="text"
               id="title"
+              name="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
@@ -100,13 +102,15 @@ const CreatePageForm: React.FC<CreatePageFormProps> = ({ modules, courseId, onSu
             />
           </div>
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Content</label>
-            <RichTextEditor content={content} onChange={setContent} height={400} />
+            <label htmlFor="page-content" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Content</label>
+            <RichTextEditor id="page-content" name="content" content={content} onChange={setContent} height={400} />
           </div>
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Attachments (optional)</label>
+            <label htmlFor="attachments" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Attachments (optional)</label>
             <input
               type="file"
+              id="attachments"
+              name="attachments"
               multiple
               onChange={(e) => setAttachments(Array.from(e.target.files || []))}
               className="block w-full text-sm text-gray-700 dark:text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 dark:file:bg-blue-900/50 file:text-blue-700 dark:file:text-blue-300 hover:file:bg-blue-100 dark:hover:file:bg-blue-900/70"
@@ -114,7 +118,7 @@ const CreatePageForm: React.FC<CreatePageFormProps> = ({ modules, courseId, onSu
           </div>
           <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Module</label>
+              <label htmlFor="page-module" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Module</label>
               <select
                 id="page-module"
                 name="module"
@@ -133,7 +137,7 @@ const CreatePageForm: React.FC<CreatePageFormProps> = ({ modules, courseId, onSu
               </select>
             </div>
             <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Group Set</label>
+              <label htmlFor="page-group-set" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Group Set</label>
               <select
                 id="page-group-set"
                 name="groupSet"

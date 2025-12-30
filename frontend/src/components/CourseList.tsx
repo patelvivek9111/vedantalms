@@ -1,26 +1,35 @@
 import React, { useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useCourse } from '../contexts/CourseContext';
 import { useAuth } from '../context/AuthContext';
+import logger from '../utils/logger';
 
 const CourseList: React.FC = () => {
-  const { courses, loading, error, deleteCourse } = useCourse();
+  const { courses, loading, error, deleteCourse, getCourses } = useCourse();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Fetch courses when component mounts
+  useEffect(() => {
+    getCourses();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only fetch once on mount
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this course?')) {
       try {
         await deleteCourse(id);
       } catch (err) {
-        console.error('Error deleting course:', err);
+        logger.error('Error deleting course', err);
       }
     }
   };
 
-  // Auto-redirect to first course if available
+  // Auto-redirect to first course if available (only when on /courses route)
   useEffect(() => {
-    if (!loading && courses && courses.length > 0) {
+    // Only auto-redirect when we're on the /courses route, not when embedded elsewhere
+    if (location.pathname === '/courses' && !loading && courses && courses.length > 0) {
       // Filter published courses for students, all courses for teachers/admins
       const isTeacherOrAdmin = user?.role === 'teacher' || user?.role === 'admin';
       const availableCourses = isTeacherOrAdmin 
@@ -32,7 +41,7 @@ const CourseList: React.FC = () => {
         navigate(`/courses/${availableCourses[0]._id}`);
       }
     }
-  }, [courses, loading, user, navigate]);
+  }, [courses, loading, user, navigate, location.pathname]);
 
   if (loading) {
     return (

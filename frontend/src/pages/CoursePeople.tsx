@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { getImageUrl } from '../services/api';
+import logger from '../utils/logger';
 
 interface Student {
   _id: string;
@@ -63,7 +64,7 @@ const CoursePeople: React.FC = () => {
         }
       } catch (err: any) {
         setError('Failed to load course people');
-        console.error('Error fetching course people:', err);
+        logger.error('Error fetching course people', err);
       } finally {
         setLoading(false);
       }
@@ -85,7 +86,7 @@ const CoursePeople: React.FC = () => {
       
       alert('Enrollment approved successfully!');
     } catch (err: any) {
-      console.error('Error approving enrollment:', err);
+      logger.error('Error approving enrollment', err);
       alert('Failed to approve enrollment');
     }
   };
@@ -99,7 +100,7 @@ const CoursePeople: React.FC = () => {
       
       alert('Enrollment denied successfully!');
     } catch (err: any) {
-      console.error('Error denying enrollment:', err);
+      logger.error('Error denying enrollment', err);
       alert('Failed to deny enrollment');
     }
   };
@@ -113,7 +114,7 @@ const CoursePeople: React.FC = () => {
       await api.post(`/courses/${courseId}/unenroll`, { studentId });
       setStudents(prev => prev.filter(student => student._id !== studentId));
     } catch (err: any) {
-      console.error('Error removing student:', err);
+      logger.error('Error removing student', err);
       alert('Failed to remove student');
     }
   };

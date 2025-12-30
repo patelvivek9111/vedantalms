@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { API_URL } from '../config';
 import ThreadView from './ThreadView';
+import logger from '../utils/logger';
 import { 
   ClipboardList, 
   BookOpen, 
@@ -51,7 +52,7 @@ const ThreadViewWrapper: React.FC = () => {
   useEffect(() => {
     const fetchCourse = async () => {
       if (!courseId || courseId === 'undefined' || courseId === 'null') {
-        console.error('Invalid course ID:', courseId);
+        logger.error('Invalid course ID', new Error('Invalid course ID'), { courseId });
         return;
       }
       
@@ -72,9 +73,9 @@ const ThreadViewWrapper: React.FC = () => {
           throw new Error(response.data.message || 'Failed to fetch course');
         }
       } catch (err: any) {
-        console.error('Error fetching course:', err);
+        logger.error('Error fetching course', err);
         if (err.response?.status === 400) {
-          console.error('Invalid course ID format');
+          logger.error('Invalid course ID format', new Error('Invalid course ID format'));
         }
       } finally {
         setLoading(false);

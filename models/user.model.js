@@ -52,7 +52,12 @@ const userSchema = new mongoose.Schema({
     language: { type: String, default: 'en' },
     timeZone: { type: String, default: 'UTC' },
     theme: { type: String, enum: ['light', 'dark'], default: 'light' },
+    showOnlineStatus: { type: Boolean, default: true },
     courseColors: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {}
+    },
+    courseQuickLinks: {
       type: mongoose.Schema.Types.Mixed,
       default: {}
     }

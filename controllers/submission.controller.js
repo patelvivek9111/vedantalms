@@ -7,35 +7,34 @@ const path = require('path');
 const Module = require('../models/module.model');
 const archiver = require('archiver');
 const { deleteFromCloudinary, extractPublicId, isCloudinaryConfigured, uploadToCloudinary } = require('../utils/cloudinary');
+const logger = require('../utils/logger');
+const { ValidationError, NotFoundError, ForbiddenError, sendErrorResponse, asyncHandler } = require('../utils/errorHandler');
 
 // Create a new submission (student only)
-exports.createSubmission = async (req, res) => {
-  try {
+exports.createSubmission = asyncHandler(async (req, res, next) => {
 
     const { assignment, answers, groupId } = req.body;
     
     // Check if user is a student
     if (req.user.role !== 'student') {
-
-      return res.status(403).json({ message: 'Only students can submit assignments' });
+      return sendErrorResponse(res, new ForbiddenError('Only students can submit assignments'), { action: 'createSubmission' });
     }
 
     // Check if assignment exists and is not past due
     const assignmentDoc = await Assignment.findById(assignment);
     if (!assignmentDoc) {
-      
-      return res.status(404).json({ message: 'Assignment not found' });
+      return sendErrorResponse(res, new NotFoundError('Assignment not found'), { action: 'createSubmission', assignmentId: assignment });
     }
 
     // Check if assignment is available yet
     const now = new Date();
     if (assignmentDoc.availableFrom && new Date(assignmentDoc.availableFrom) > now) {
-      return res.status(400).json({ message: 'Assignment is not available yet' });
+      return sendErrorResponse(res, new ValidationError('Assignment is not available yet'), { action: 'createSubmission', assignmentId: assignment });
     }
 
     // Check if assignment is past due (with a small buffer for timezone issues)
     if (assignmentDoc.dueDate && new Date(assignmentDoc.dueDate) < now) {
-      return res.status(400).json({ message: 'Assignment is past due' });
+      return sendErrorResponse(res, new ValidationError('Assignment is past due'), { action: 'createSubmission', assignmentId: assignment });
     }
 
     // Check if there are any answers provided
@@ -202,10 +201,7 @@ exports.createSubmission = async (req, res) => {
     }
 
     res.status(201).json(submission);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+});
 
 // Auto-grade submission function
 const autoGradeSubmission = async (submission, assignment) => {
@@ -391,7 +387,7 @@ exports.gradeSubmission = async (req, res) => {
       try {
         questionGrades = JSON.parse(questionGrades);
       } catch (e) {
-        console.error('Error parsing questionGrades JSON:', e);
+        logger.warn('Error parsing questionGrades JSON', { error: e.message, submissionId: req.params.id });
         questionGrades = {};
       }
     }
@@ -780,7 +776,7 @@ exports.gradeSubmission = async (req, res) => {
         }
         submission.teacherFeedbackFiles = [...submission.teacherFeedbackFiles, ...feedbackFiles];
       } catch (error) {
-        console.error('Error uploading teacher feedback files:', error);
+        logger.warn('Error uploading teacher feedback files', { error: error.message, submissionId: req.params.id });
         // Don't fail the entire request if file upload fails
         // Just log the error and continue
       }
@@ -810,7 +806,7 @@ exports.gradeSubmission = async (req, res) => {
 
     res.json(populatedSubmission);
   } catch (error) {
-    console.error('Error grading submission:', error);
+    logger.logError(error, { action: 'gradeSubmission', submissionId: req.params.id });
     res.status(500).json({ message: error.message });
   }
 };
@@ -957,7 +953,7 @@ exports.createOrUpdateManualGrade = async (req, res) => {
     
     res.json(populatedSubmission);
   } catch (error) {
-    console.error('Error creating/updating manual grade:', error);
+    logger.logError(error, { action: 'createOrUpdateManualGrade', submissionId: req.params.id });
     res.status(500).json({ message: error.message });
   }
 }; 
@@ -1015,7 +1011,7 @@ exports.deleteSubmission = async (req, res) => {
               }
               await deleteFromCloudinary(publicId, resourceType);
             } catch (err) {
-              console.error('[DeleteSubmission] Error deleting from Cloudinary:', err);
+              logger.warn('[DeleteSubmission] Error deleting from Cloudinary', { error: err.message, publicId });
             }
           }
         } else {
@@ -1024,7 +1020,7 @@ exports.deleteSubmission = async (req, res) => {
           try {
             await fs.unlink(filePath);
           } catch (err) {
-            console.error('[DeleteSubmission] Error deleting file:', err);
+            logger.warn('[DeleteSubmission] Error deleting file', { error: err.message, filePath });
           }
         }
       }));
@@ -1040,7 +1036,7 @@ exports.deleteSubmission = async (req, res) => {
       res.status(404).json({ message: 'Submission not found' });
     }
   } catch (error) {
-    console.error('[DeleteSubmission] Error:', error);
+    logger.logError(error, { action: 'deleteSubmission', submissionId: req.params.id });
     res.status(500).json({ message: error.message });
   }
 };
@@ -1149,7 +1145,7 @@ exports.downloadSubmissions = async (req, res) => {
                 }).on('error', reject);
               });
             } catch (err) {
-              console.error('[DownloadSubmissions] Error fetching Cloudinary file:', err);
+              logger.warn('[DownloadSubmissions] Error fetching Cloudinary file', { error: err.message, fileUrl });
             }
           } else {
             // For local files
@@ -1173,7 +1169,7 @@ exports.downloadSubmissions = async (req, res) => {
     archive.finalize();
 
   } catch (error) {
-    console.error('[DownloadSubmissions] Error:', error);
+    logger.logError(error, { action: 'downloadSubmissions', assignmentId: req.params.assignmentId });
     if (!res.headersSent) {
       res.status(500).json({ message: error.message });
     }
@@ -1390,7 +1386,7 @@ exports.downloadSingleSubmission = async (req, res) => {
                     res.status(redirectResponse.statusCode).json({ message: 'Failed to fetch file from Cloudinary' });
                   }
                 }).on('error', (err) => {
-                  console.error('[DownloadSingleSubmission] Error fetching from redirect:', err);
+                  logger.warn('[DownloadSingleSubmission] Error fetching from redirect', { error: err.message, redirectUrl });
                   res.status(500).json({ message: 'Error fetching file from Cloudinary' });
                 });
               } else {
@@ -1400,7 +1396,7 @@ exports.downloadSingleSubmission = async (req, res) => {
                 });
               }
             }).on('error', (err) => {
-              console.error('[DownloadSingleSubmission] Error fetching from Cloudinary:', err);
+              logger.warn('[DownloadSingleSubmission] Error fetching from Cloudinary', { error: err.message, fileUrl });
               res.status(500).json({ message: 'Error fetching file from Cloudinary: ' + err.message });
             });
           };
@@ -1410,7 +1406,7 @@ exports.downloadSingleSubmission = async (req, res) => {
           
           return;
         } catch (err) {
-          console.error('[DownloadSingleSubmission] Error processing Cloudinary URL:', err);
+          logger.warn('[DownloadSingleSubmission] Error processing Cloudinary URL', { error: err.message, fileUrl });
           res.status(500).json({ message: 'Error processing file URL: ' + err.message });
           return;
         }
@@ -1601,7 +1597,7 @@ exports.downloadSingleSubmission = async (req, res) => {
     }
 
   } catch (error) {
-    console.error('[DownloadSingleSubmission] Error:', error);
+    logger.logError(error, { action: 'downloadSingleSubmission', submissionId: req.params.submissionId });
     if (!res.headersSent) {
       res.status(500).json({ message: error.message });
     }

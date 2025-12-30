@@ -1,84 +1,164 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import { format } from 'date-fns';
 import { CheckCircle, XCircle, AlertCircle, Download, Eye, Upload, X } from 'lucide-react';
 import FilePreview from './FilePreview';
+import logger from '../../utils/logger';
 
-const AssignmentGrading = () => {
-  const { id } = useParams();
-  const [assignment, setAssignment] = useState(null);
-  const [submissions, setSubmissions] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [selectedSubmission, setSelectedSubmission] = useState(null);
-  const [questionGrades, setQuestionGrades] = useState({});
-  const [feedback, setFeedback] = useState('');
-  const [grade, setGrade] = useState('');
-  const [isGrading, setIsGrading] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [previewFile, setPreviewFile] = useState(null);
-  const [teacherFeedbackFiles, setTeacherFeedbackFiles] = useState([]);
-  const [selectedFeedbackFiles, setSelectedFeedbackFiles] = useState([]);
+interface Question {
+  _id?: string;
+  id?: string;
+  type: 'text' | 'multiple-choice' | 'matching';
+  text: string;
+  points: number;
+  options?: {
+    text: string;
+    isCorrect?: boolean;
+  }[];
+  leftItems?: {
+    id: string;
+    text: string;
+  }[];
+  rightItems?: {
+    id: string;
+    text: string;
+  }[];
+}
+
+interface Student {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email?: string;
+}
+
+interface Assignment {
+  _id: string;
+  title: string;
+  description?: string;
+  content?: string;
+  dueDate?: string;
+  availableFrom?: string;
+  questions?: Question[];
+  attachments?: string[];
+  published?: boolean;
+  totalPoints?: number;
+  module?: string | { _id: string };
+}
+
+type QuestionGrades = Map<string, number> | Record<string, number> | Record<number, number>;
+type Answers = Map<string, any> | Record<string, any>;
+
+interface Submission {
+  _id: string;
+  assignment: string | Assignment;
+  student: Student;
+  submittedAt: string;
+  answers?: Answers;
+  grade?: number | null;
+  finalGrade?: number | null;
+  feedback?: string;
+  files?: Array<string | { url?: string; path?: string; name?: string; originalname?: string }>;
+  autoGraded?: boolean;
+  autoGrade?: number;
+  teacherApproved?: boolean;
+  questionGrades?: QuestionGrades;
+  autoQuestionGrades?: QuestionGrades;
+  teacherFeedbackFiles?: Array<string | { url?: string; path?: string; name?: string; originalname?: string }>;
+}
+
+interface PreviewFile {
+  url: string;
+  name: string;
+}
+
+const AssignmentGrading: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const [assignment, setAssignment] = useState<Assignment | null>(null);
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string>('');
+  const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
+  const [questionGrades, setQuestionGrades] = useState<Record<number, number>>({});
+  const [feedback, setFeedback] = useState<string>('');
+  const [grade, setGrade] = useState<string>('');
+  const [isGrading, setIsGrading] = useState<boolean>(false);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [isDownloading, setIsDownloading] = useState<boolean>(false);
+  const [previewFile, setPreviewFile] = useState<PreviewFile | null>(null);
+  const [teacherFeedbackFiles, setTeacherFeedbackFiles] = useState<Array<string | { url?: string; path?: string; name?: string; originalname?: string }>>([]);
+  const [selectedFeedbackFiles, setSelectedFeedbackFiles] = useState<File[]>([]);
+
+  // Helper function to extract grade from QuestionGrades (Map or object)
+  const getGradeFromQuestionGrades = (questionGrades: QuestionGrades | undefined, index: number): number | null => {
+    if (!questionGrades) return null;
+    
+    if (questionGrades instanceof Map) {
+      return questionGrades.get(index.toString()) ?? null;
+    } else if (typeof questionGrades === 'object') {
+      // Type guard to safely access the object
+      const grades = questionGrades as Record<string | number, number>;
+      // Try number index first, then string
+      if (typeof index === 'number' && index in grades) {
+        return grades[index];
+      }
+      const stringIndex = index.toString();
+      if (stringIndex in grades) {
+        return grades[stringIndex];
+      }
+      return null;
+    }
+    
+    return null;
+  };
 
   // Initialize question grades when submission is selected
   useEffect(() => {
     if (selectedSubmission && assignment) {
-      const initialGrades = {};
+      const initialGrades: Record<number, number> = {};
       
-      assignment.questions.forEach((question, index) => {
-        // Load existing grades from questionGrades if available
-        // This includes all grades that were previously set (both auto and manual)
-        let existingGrade = null;
-        
-        if (selectedSubmission.questionGrades) {
-          if (selectedSubmission.questionGrades instanceof Map) {
-            existingGrade = selectedSubmission.questionGrades.get(index.toString());
-          } else if (typeof selectedSubmission.questionGrades === 'object') {
-            existingGrade = selectedSubmission.questionGrades[index] !== undefined 
-              ? selectedSubmission.questionGrades[index] 
-              : selectedSubmission.questionGrades[index.toString()];
-          }
-        }
-        
-        // Get auto-grade for comparison
-        const autoGrade = selectedSubmission.autoQuestionGrades instanceof Map
-          ? selectedSubmission.autoQuestionGrades.get(index.toString())
-          : selectedSubmission.autoQuestionGrades?.[index.toString()];
-        
-        if (question.type !== 'multiple-choice' && question.type !== 'matching') {
-          // Text questions - use existing grade if available, otherwise use auto-grade or 0
-          if (existingGrade !== null && existingGrade !== undefined) {
-            initialGrades[index] = existingGrade;
-          } else if (autoGrade !== null && autoGrade !== undefined) {
-            initialGrades[index] = autoGrade;
-          } else {
-            initialGrades[index] = 0;
-          }
-        } else {
-          // Auto-graded questions - only include if teacher manually changed it
-          // IMPORTANT: Don't include if stored value is 0 and auto-grade is non-zero
-          // This filters out incorrect stored data
-          if (existingGrade !== null && existingGrade !== undefined && 
-              autoGrade !== null && autoGrade !== undefined) {
-            const difference = Math.abs(existingGrade - autoGrade);
-            // Only include if significantly different AND it's a legitimate change
-            // (not just incorrect 0 stored when auto-grade is correct)
-            if (difference > 0.01 && !(existingGrade === 0 && autoGrade > 0)) {
-              // Teacher manually changed this auto-graded question
+      if (assignment.questions) {
+        assignment.questions.forEach((question, index) => {
+          // Load existing grades from questionGrades if available
+          const existingGrade = getGradeFromQuestionGrades(selectedSubmission.questionGrades, index);
+          
+          // Get auto-grade for comparison
+          const autoGrade = getGradeFromQuestionGrades(selectedSubmission.autoQuestionGrades, index);
+          
+          if (question.type !== 'multiple-choice' && question.type !== 'matching') {
+            // Text questions - use existing grade if available, otherwise use auto-grade or 0
+            if (existingGrade !== null && existingGrade !== undefined) {
               initialGrades[index] = existingGrade;
+            } else if (autoGrade !== null && autoGrade !== undefined) {
+              initialGrades[index] = autoGrade;
+            } else {
+              initialGrades[index] = 0;
             }
+          } else {
+            // Auto-graded questions - only include if teacher manually changed it
+            // IMPORTANT: Don't include if stored value is 0 and auto-grade is non-zero
+            // This filters out incorrect stored data
+            if (existingGrade !== null && existingGrade !== undefined && 
+                autoGrade !== null && autoGrade !== undefined) {
+              const difference = Math.abs(existingGrade - autoGrade);
+              // Only include if significantly different AND it's a legitimate change
+              // (not just incorrect 0 stored when auto-grade is correct)
+              if (difference > 0.01 && !(existingGrade === 0 && autoGrade > 0)) {
+                // Teacher manually changed this auto-graded question
+                initialGrades[index] = existingGrade;
+              }
+            }
+            // Otherwise don't include it - backend will use auto-grade
           }
-          // Otherwise don't include it - backend will use auto-grade
-        }
-      });
+        });
+      }
       
       setQuestionGrades(initialGrades);
       setFeedback(selectedSubmission.feedback || '');
       // Set grade for upload-only assignments (no questions)
       if (!assignment.questions || assignment.questions.length === 0) {
-        setGrade(selectedSubmission.grade || selectedSubmission.finalGrade || '');
+        setGrade(selectedSubmission.grade?.toString() || selectedSubmission.finalGrade?.toString() || '');
       } else {
         setGrade('');
       }
@@ -99,34 +179,47 @@ const AssignmentGrading = () => {
         const token = localStorage.getItem('token');
         
         // Fetch assignment details
-        const assignmentRes = await axios.get(`/api/assignments/${id}`, {
+        const assignmentRes = await axios.get<Assignment>(`/api/assignments/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         setAssignment(assignmentRes.data);
 
         // Fetch submissions
-        const submissionsRes = await axios.get(`/api/submissions/assignment/${id}`, {
+        const submissionsRes = await axios.get<Submission[]>(`/api/submissions/assignment/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         setSubmissions(submissionsRes.data);
         
         setLoading(false);
       } catch (err) {
+        logger.error('Error fetching assignment data', err instanceof Error ? err : new Error(String(err)));
         setError('Error fetching assignment data');
         setLoading(false);
       }
     };
 
-    fetchData();
+    if (id) {
+      fetchData();
+    }
   }, [id]);
 
-  const handleGradeSubmission = async (approveGrade = false) => {
-    if (!selectedSubmission) return;
+  const getAutoGradeForQuestion = (questionIndex: number): number | null => {
+    if (!selectedSubmission?.autoQuestionGrades) return null;
+    return getGradeFromQuestionGrades(selectedSubmission.autoQuestionGrades, questionIndex);
+  };
+
+  const handleGradeSubmission = async (approveGrade: boolean = false): Promise<void> => {
+    if (!selectedSubmission || !assignment) return;
     
     setIsGrading(true);
     try {
       const token = localStorage.getItem('token');
-      const payload = {
+      const payload: {
+        feedback: string;
+        approveGrade: boolean;
+        grade?: number;
+        questionGrades?: Record<string, number>;
+      } = {
         feedback,
         approveGrade
       };
@@ -142,53 +235,39 @@ const AssignmentGrading = () => {
       // Always send existing grades when re-grading to ensure backend recalculates correctly
       if (!approveGrade) {
         // Build complete grades object: include all question grades from state
-        // The state should already have all existing grades loaded from the submission
-        const gradesToSend = {};
+        const gradesToSend: Record<string, number> = {};
         
         // Send grades from state, but filter out auto-graded questions unless manually changed
-        // This ensures we don't send incorrect stored values for auto-graded questions
         Object.keys(questionGrades).forEach(index => {
-          const gradeValue = questionGrades[index];
+          const gradeValue = questionGrades[parseInt(index)];
           if (gradeValue !== undefined && gradeValue !== null) {
             const questionIdx = parseInt(index);
-            const question = assignment?.questions?.[questionIdx];
+            const question = assignment.questions?.[questionIdx];
             
             // For auto-graded questions, only send if teacher manually changed it
             if (question && (question.type === 'multiple-choice' || question.type === 'matching')) {
               const autoGrade = getAutoGradeForQuestion(questionIdx);
               // Only send if it's different from auto-grade AND not incorrect stored data
-              // Filter out cases where stored value is 0 but auto-grade is correct (non-zero)
               if (autoGrade !== null && autoGrade !== undefined) {
                 const difference = Math.abs(gradeValue - autoGrade);
                 if (difference > 0.01 && !(gradeValue === 0 && autoGrade > 0)) {
                   // Teacher manually changed this auto-graded question
-                  gradesToSend[index.toString()] = gradeValue;
+                  gradesToSend[index] = gradeValue;
                 }
               }
               // Otherwise don't send - backend will use auto-grade
             } else {
               // Text questions - always send
-              gradesToSend[index.toString()] = gradeValue;
+              gradesToSend[index] = gradeValue;
             }
           }
         });
         
         // If questionGrades is empty but submission has existing grades, load them
         if (Object.keys(gradesToSend).length === 0 && selectedSubmission.questionGrades) {
-          if (assignment && assignment.questions) {
+          if (assignment.questions) {
             assignment.questions.forEach((question, index) => {
-              let existingGrade = null;
-              
-              // Get existing grade from submission
-              if (selectedSubmission.questionGrades instanceof Map) {
-                existingGrade = selectedSubmission.questionGrades.get(index.toString());
-              } else if (typeof selectedSubmission.questionGrades === 'object') {
-                existingGrade = selectedSubmission.questionGrades[index] !== undefined 
-                  ? selectedSubmission.questionGrades[index] 
-                  : selectedSubmission.questionGrades[index.toString()];
-              }
-              
-              // Get auto-grade for comparison
+              const existingGrade = getGradeFromQuestionGrades(selectedSubmission.questionGrades, index);
               const autoGrade = getAutoGradeForQuestion(index);
               
               if (question.type !== 'multiple-choice' && question.type !== 'matching') {
@@ -219,7 +298,7 @@ const AssignmentGrading = () => {
         
         // Add all form fields to FormData
         formData.append('feedback', feedback || '');
-        formData.append('approveGrade', approveGrade);
+        formData.append('approveGrade', approveGrade.toString());
         
         if (!assignment.questions || assignment.questions.length === 0) {
           if (grade !== '' && grade !== null && grade !== undefined) {
@@ -239,7 +318,7 @@ const AssignmentGrading = () => {
           formData.append('teacherFeedbackFiles', file);
         });
         
-        response = await axios.put(`/api/submissions/${selectedSubmission._id}`, formData, {
+        response = await axios.put<Submission>(`/api/submissions/${selectedSubmission._id}`, formData, {
           headers: { 
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'multipart/form-data'
@@ -247,7 +326,7 @@ const AssignmentGrading = () => {
         });
       } else {
         // No files, use regular JSON payload
-        response = await axios.put(`/api/submissions/${selectedSubmission._id}`, payload, {
+        response = await axios.put<Submission>(`/api/submissions/${selectedSubmission._id}`, payload, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
       }
@@ -269,16 +348,25 @@ const AssignmentGrading = () => {
       setSelectedFeedbackFiles([]);
       
       // Reset questionGrades to reflect the updated submission
-      const updatedGrades = {};
-      if (assignment && assignment.questions) {
+      const updatedGrades: Record<number, number> = {};
+      if (assignment.questions) {
         assignment.questions.forEach((question, index) => {
           // For text questions, use the grade from the response if available
-          if (response.data.questionGrades && response.data.questionGrades[index] !== undefined) {
-            updatedGrades[index] = response.data.questionGrades[index];
+          if (response.data.questionGrades) {
+            const responseGrade = getGradeFromQuestionGrades(response.data.questionGrades, index);
+            if (responseGrade !== null && responseGrade !== undefined) {
+              updatedGrades[index] = responseGrade;
+            } else {
+              // Fallback to auto-grade for multiple-choice or 0 for text questions
+              const autoGrade = question.type === 'multiple-choice' ? 
+                (question.options?.find(opt => opt.isCorrect) ? question.points : 0) : 
+                0;
+              updatedGrades[index] = autoGrade;
+            }
           } else {
             // Fallback to auto-grade for multiple-choice or 0 for text questions
             const autoGrade = question.type === 'multiple-choice' ? 
-              (question.options.find(opt => opt.isCorrect) ? question.points : 0) : 
+              (question.options?.find(opt => opt.isCorrect) ? question.points : 0) : 
               0;
             updatedGrades[index] = autoGrade;
           }
@@ -288,13 +376,15 @@ const AssignmentGrading = () => {
       
       setError('');
     } catch (err) {
-      setError(err.response?.data?.message || 'Error grading submission');
+      const axiosError = err as AxiosError<{ message?: string }>;
+      logger.error('Error grading submission', err instanceof Error ? err : new Error(String(err)));
+      setError(axiosError.response?.data?.message || 'Error grading submission');
     } finally {
       setIsGrading(false);
     }
   };
 
-  const handleDeleteSubmission = async () => {
+  const handleDeleteSubmission = async (): Promise<void> => {
     if (!selectedSubmission) return;
     
     if (!window.confirm('Are you sure you want to delete this submission? This action cannot be undone.')) {
@@ -305,7 +395,7 @@ const AssignmentGrading = () => {
     try {
       const token = localStorage.getItem('token');
       
-      const response = await axios.delete(`/api/submissions/${selectedSubmission._id}`, {
+      await axios.delete(`/api/submissions/${selectedSubmission._id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -314,14 +404,15 @@ const AssignmentGrading = () => {
       setSelectedSubmission(null);
       setError('');
     } catch (err) {
-      console.error('Delete error:', err.response?.data || err.message);
-      setError(err.response?.data?.message || 'Error deleting submission');
+      const axiosError = err as AxiosError<{ message?: string }>;
+      logger.error('Delete error', err instanceof Error ? err : new Error(String(err)));
+      setError(axiosError.response?.data?.message || 'Error deleting submission');
     } finally {
       setIsDeleting(false);
     }
   };
 
-  const handleDownloadSubmissions = async () => {
+  const handleDownloadSubmissions = async (): Promise<void> => {
     if (!assignment || submissions.length === 0) return;
     
     setIsDownloading(true);
@@ -345,43 +436,31 @@ const AssignmentGrading = () => {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      console.error('Download error:', err);
-      setError(err.response?.data?.message || 'Error downloading submissions');
+      const axiosError = err as AxiosError<{ message?: string }>;
+      logger.error('Download error', err instanceof Error ? err : new Error(String(err)));
+      setError(axiosError.response?.data?.message || 'Error downloading submissions');
     } finally {
       setIsDownloading(false);
     }
   };
 
-  const getQuestionType = (questionIndex) => {
+  const getQuestionType = (questionIndex: number): 'text' | 'multiple-choice' | 'matching' | 'unknown' => {
     if (!assignment?.questions) return 'unknown';
     const question = assignment.questions[questionIndex];
     return question?.type || 'unknown';
   };
 
-  const getAutoGradeForQuestion = (questionIndex) => {
-    if (!selectedSubmission?.autoQuestionGrades) return null;
-    
-    // Handle both Map and object formats
-    if (selectedSubmission.autoQuestionGrades instanceof Map) {
-      return selectedSubmission.autoQuestionGrades.get(questionIndex.toString());
-    } else if (typeof selectedSubmission.autoQuestionGrades === 'object') {
-      return selectedSubmission.autoQuestionGrades[questionIndex.toString()];
-    }
-    
-    return null;
-  };
-
-  const getMaxPointsForQuestion = (questionIndex) => {
+  const getMaxPointsForQuestion = (questionIndex: number): number => {
     if (!assignment?.questions) return 0;
     const question = assignment.questions[questionIndex];
     return question?.points || 0;
   };
 
-  const getStudentAnswer = (questionIndex) => {
+  const getStudentAnswer = (questionIndex: number): string | Record<string, any> => {
     if (!selectedSubmission?.answers) return '';
     
     // Handle both Map and object formats
-    let answer = '';
+    let answer: any = '';
     if (selectedSubmission.answers instanceof Map) {
       answer = selectedSubmission.answers.get(questionIndex.toString()) || '';
     } else if (typeof selectedSubmission.answers === 'object') {
@@ -508,7 +587,7 @@ const AssignmentGrading = () => {
 
                   {/* Download button */}
                   <button
-                    onClick={async (e) => {
+                    onClick={async (e: React.MouseEvent) => {
                       e.stopPropagation();
                       try {
                         const token = localStorage.getItem('token');
@@ -529,7 +608,8 @@ const AssignmentGrading = () => {
                         } else {
                           // Fallback: if single file, use file name; if multiple, use zip
                           if (submission.files && submission.files.length === 1) {
-                            filename = submission.files[0].split('/').pop() || 'submission';
+                            const file = submission.files[0];
+                            filename = typeof file === 'string' ? file.split('/').pop() || 'submission' : (file.name || file.originalname || 'submission');
                           } else {
                             const studentName = `${submission.student?.firstName || 'Student'}_${submission.student?.lastName || ''}`.replace(/[^a-z0-9]/gi, '_');
                             filename = `${assignment?.title?.replace(/[^a-z0-9]/gi, '_') || 'submission'}_${studentName}.zip`;
@@ -545,8 +625,9 @@ const AssignmentGrading = () => {
                         link.remove();
                         window.URL.revokeObjectURL(url);
                       } catch (err) {
-                        console.error('Download error:', err);
-                        setError(err.response?.data?.message || 'Error downloading submission');
+                        const axiosError = err as AxiosError<{ message?: string }>;
+                        logger.error('Download error', err instanceof Error ? err : new Error(String(err)));
+                        setError(axiosError.response?.data?.message || 'Error downloading submission');
                       }
                     }}
                     className="w-full inline-flex items-center justify-center px-3 py-2 border border-transparent text-xs font-medium rounded-md text-white bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600 active:bg-indigo-800 dark:active:bg-indigo-700 transition-colors shadow-sm"
@@ -639,8 +720,8 @@ const AssignmentGrading = () => {
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setPreviewFile(null)}>
                           <div className="relative max-w-4xl w-full max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
                             <FilePreview
-                              fileUrl={previewFile.url || ''}
-                              fileName={previewFile.name || ''}
+                              fileUrl={previewFile.url}
+                              fileName={previewFile.name}
                               onClose={() => setPreviewFile(null)}
                               showCloseButton={true}
                             />
@@ -680,16 +761,16 @@ const AssignmentGrading = () => {
                             <div className="mb-3">
                               <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Student Answer:</div>
                               {questionType === 'multiple-choice' ? (
-                                <div className="text-sm text-gray-900 dark:text-gray-100">{studentAnswer || 'No answer'}</div>
+                                <div className="text-sm text-gray-900 dark:text-gray-100">{String(studentAnswer) || 'No answer'}</div>
                               ) : questionType === 'matching' ? (
                                 <div className="space-y-2">
                                   {question.leftItems && question.leftItems.map((leftItem, leftIndex) => {
-                                    const studentMatch = typeof studentAnswer === 'object' ? 
-                                      studentAnswer[leftIndex] : '';
+                                    const studentMatch = typeof studentAnswer === 'object' && !Array.isArray(studentAnswer) ? 
+                                      (studentAnswer as Record<string, any>)[leftIndex] : '';
                                     const correctMatch = question.rightItems && question.rightItems.find(rightItem => 
                                       rightItem.id === leftItem.id
                                     );
-                                    const isCorrect = studentMatch === (correctMatch?.text || '');
+                                    const isCorrect = String(studentMatch) === (correctMatch?.text || '');
                                     
                                     return (
                                       <div key={leftItem.id} className={`p-2 rounded border ${
@@ -702,7 +783,7 @@ const AssignmentGrading = () => {
                                             <span className={`text-sm ${
                                               isCorrect ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'
                                             }`}>
-                                              {studentMatch || 'No answer'}
+                                              {String(studentMatch) || 'No answer'}
                                             </span>
                                             {isCorrect ? (
                                               <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
@@ -722,7 +803,7 @@ const AssignmentGrading = () => {
                                 </div>
                               ) : (
                                 <textarea
-                                  value={studentAnswer}
+                                  value={String(studentAnswer)}
                                   readOnly
                                   className="w-full h-24 p-2 border border-gray-300 dark:border-gray-700 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                                   placeholder="No answer provided"
@@ -735,39 +816,6 @@ const AssignmentGrading = () => {
                               <div>
                                 {/* Auto-graded questions - no manual input needed */}
                               </div>
-                            ) : questionType === 'matching' ? (
-                              <div>
-                                <label htmlFor={`grade-${index}`} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                  Grade (0-{maxPoints}):
-                                </label>
-                                <div className="flex items-center space-x-3">
-                                  <input
-                                    key={`grade-${index}-${questionGrades[index] || 0}`}
-                                    id={`grade-${index}`}
-                                    name={`grade-${index}`}
-                                    type="number"
-                                    min="0"
-                                    max={maxPoints}
-                                    value={questionGrades[index] !== undefined ? questionGrades[index] : (autoGrade !== null ? autoGrade : 0)}
-                                    onChange={(e) => setQuestionGrades(prev => ({
-                                      ...prev,
-                                      [index]: parseFloat(e.target.value) || 0
-                                    }))}
-                                    onFocus={(e) => {
-                                      // Clear the input when focused to allow easy editing
-                                      if (e.target.value === '0' || e.target.value === '') {
-                                        e.target.select();
-                                      }
-                                    }}
-                                    className="w-20 p-2 border border-gray-300 dark:border-gray-700 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                  />
-                                  {autoGrade !== null && (
-                                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                                      Auto: {autoGrade}/{maxPoints}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
                             ) : (
                               <div>
                                 <label htmlFor={`grade-${index}`} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -775,26 +823,38 @@ const AssignmentGrading = () => {
                                 </label>
                                 <div className="flex items-center space-x-3">
                                   <input
-                                    key={`grade-${index}-${questionGrades[index] || 0}`}
                                     id={`grade-${index}`}
                                     name={`grade-${index}`}
                                     type="number"
                                     min="0"
                                     max={maxPoints}
-                                    value={questionGrades[index] !== undefined ? questionGrades[index] : (autoGrade !== null ? autoGrade : 0)}
-                                    onChange={(e) => setQuestionGrades(prev => ({
-                                      ...prev,
-                                      [index]: parseFloat(e.target.value) || 0
-                                    }))}
-                                    onFocus={(e) => {
-                                      // Clear the input when focused to allow easy editing
-                                      if (e.target.value === '0' || e.target.value === '') {
-                                        e.target.select();
+                                    step="0.01"
+                                    value={questionGrades[index] !== undefined ? questionGrades[index] : (autoGrade !== null ? autoGrade : '')}
+                                    onChange={(e) => {
+                                      const value = e.target.value;
+                                      // Allow empty string for clearing, or parse the number
+                                      if (value === '') {
+                                        setQuestionGrades(prev => ({
+                                          ...prev,
+                                          [index]: 0
+                                        }));
+                                      } else {
+                                        const numValue = parseFloat(value);
+                                        if (!isNaN(numValue)) {
+                                          setQuestionGrades(prev => ({
+                                            ...prev,
+                                            [index]: numValue
+                                          }));
+                                        }
                                       }
+                                    }}
+                                    onFocus={(e) => {
+                                      // Select all text when focused for easy editing
+                                      e.target.select();
                                     }}
                                     className="w-20 p-2 border border-gray-300 dark:border-gray-700 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                   />
-                                  {questionType === 'multiple-choice' && autoGrade !== null && (
+                                  {autoGrade !== null && (
                                     <div className="text-sm text-gray-600 dark:text-gray-400">
                                       Auto: {autoGrade}/{maxPoints}
                                     </div>
@@ -881,7 +941,7 @@ const AssignmentGrading = () => {
                           multiple
                           accept=".pdf,.doc,.docx,.txt,.rtf"
                           onChange={(e) => {
-                            const files = Array.from(e.target.files);
+                            const files = Array.from(e.target.files || []);
                             setSelectedFeedbackFiles(prev => [...prev, ...files]);
                           }}
                         />
@@ -1016,3 +1076,8 @@ const AssignmentGrading = () => {
 };
 
 export default AssignmentGrading;
+
+
+
+
+

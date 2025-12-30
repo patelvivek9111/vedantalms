@@ -1,10 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import api from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCourse } from '../contexts/CourseContext';
 import { getUserPreferences, getImageUrl } from '../services/api';
 import { ChangeUserModal } from '../components/ChangeUserModal';
+import logger from '../utils/logger';
+import { requestCache, CACHE_KEYS } from '../utils/requestCache';
 import { 
   Users, 
   Plus, 
@@ -64,12 +66,19 @@ const Groups: React.FC = () => {
   const { courses } = useCourse();
   const [showBurgerMenu, setShowBurgerMenu] = useState(false);
   const [showChangeUserModal, setShowChangeUserModal] = useState(false);
+  const fetchingRef = useRef(false);
+  const preferencesFetchingRef = useRef(false);
 
   useEffect(() => {
     // Don't fetch if still loading auth or if user is not authenticated
-    if (authLoading || !user) {
+    if (authLoading || !user || fetchingRef.current) {
       return;
     }
+
+    // AbortController for request cancellation
+    const abortController = new AbortController();
+    let isMounted = true;
+    fetchingRef.current = true;
 
     const fetchData = async () => {
       setLoading(true);
@@ -77,75 +86,155 @@ const Groups: React.FC = () => {
       try {
         if (user.role === 'teacher' || user.role === 'admin') {
           // For teachers, fetch groupsets and their group/member counts
-          const res = await api.get('/groups/sets/my');
+          const res = await api.get('/groups/sets/my', {
+            signal: abortController.signal
+          });
           const groupSetsData = res.data.data || [];
           
-            // Fetch group and member counts for each group set
-        const groupSetsWithCounts = await Promise.all(
-          groupSetsData.map(async (groupSet: GroupSet) => {
-            try {
-              const groupsRes = await api.get(`/groups/sets/${groupSet._id}/groups`);
-              const groups = groupsRes.data || [];
+          if (!isMounted) return;
+          
+          // Fetch group and member counts for each group set with delay to avoid rate limiting
+          // Process in batches to avoid overwhelming the server
+          const batchSize = 3;
+          const groupSetsWithCounts: GroupSet[] = [];
+          
+          for (let i = 0; i < groupSetsData.length; i += batchSize) {
+            const batch = groupSetsData.slice(i, i + batchSize);
+            const batchResults = await Promise.all(
+              batch.map(async (groupSet: GroupSet) => {
               
-              // Store groups data for this group set
-              setAllGroupsData(prev => ({
-                ...prev,
-                [groupSet._id]: groups
-              }));
-              
-                      // Count unique members across all groups in this set
-        const uniqueMembers = new Set();
-        
-        groups.forEach((group: any, groupIndex: number) => {
-          if (group.members && Array.isArray(group.members)) {
-            group.members.forEach((member: any, memberIndex: number) => {
-              // Use member ID to ensure uniqueness - check for _id first, then email as fallback
-              const memberId = member._id || member.id || member.email;
-              
-              if (memberId) {
-                uniqueMembers.add(memberId);
+              if (abortController.signal.aborted || !isMounted) {
+                return {
+                  ...groupSet,
+                  totalGroups: 0,
+                  totalMembers: 0
+                };
               }
-            });
-          }
-        });
               
-              return {
-                ...groupSet,
-                totalGroups: groups.length,
-                totalMembers: uniqueMembers.size
-              };
-            } catch (err) {
-              console.error(`Error fetching groups for set ${groupSet._id}:`, err);
-              return {
-                ...groupSet,
-                totalGroups: 0,
-                totalMembers: 0
-              };
+              try {
+                const groupsRes = await api.get(`/groups/sets/${groupSet._id}/groups`, {
+                  signal: abortController.signal
+                });
+                const groups = groupsRes.data || [];
+                
+                if (!isMounted) return {
+                  ...groupSet,
+                  totalGroups: 0,
+                  totalMembers: 0
+                };
+                
+                // Store groups data for this group set
+                setAllGroupsData(prev => ({
+                  ...prev,
+                  [groupSet._id]: groups
+                }));
+                
+                // Count unique members across all groups in this set
+                const uniqueMembers = new Set();
+                
+                groups.forEach((group: any) => {
+                  if (group.members && Array.isArray(group.members)) {
+                    group.members.forEach((member: any) => {
+                      // Use member ID to ensure uniqueness - check for _id first, then email as fallback
+                      const memberId = member._id || member.id || member.email;
+                      
+                      if (memberId) {
+                        uniqueMembers.add(memberId);
+                      }
+                    });
+                  }
+                });
+                
+                return {
+                  ...groupSet,
+                  totalGroups: groups.length,
+                  totalMembers: uniqueMembers.size
+                };
+              } catch (err: any) {
+                // Don't handle canceled requests - they're intentional
+                const isCanceled = err.code === 'ERR_CANCELED' || err.name === 'CanceledError' || err.message === 'canceled';
+                if (isCanceled || abortController.signal.aborted) {
+                  return {
+                    ...groupSet,
+                    totalGroups: 0,
+                    totalMembers: 0
+                  };
+                }
+                
+                // Don't log rate limit errors as errors, just skip this group set
+                if (err.response?.status === 429) {
+                  logger.warn(`Rate limited while fetching groups for set ${groupSet._id}`);
+                  return {
+                    ...groupSet,
+                    totalGroups: 0,
+                    totalMembers: 0
+                  };
+                }
+                logger.error(`Error fetching groups for set ${groupSet._id}`, err);
+                return {
+                  ...groupSet,
+                  totalGroups: 0,
+                  totalMembers: 0
+                };
+              }
+              })
+            );
+            
+            groupSetsWithCounts.push(...batchResults);
+            
+            // Add delay between batches to avoid rate limiting
+            if (i + batchSize < groupSetsData.length && isMounted) {
+              await new Promise(resolve => setTimeout(resolve, 300));
             }
-          })
-        );
-        
-        setGroupSets(groupSetsWithCounts);
+          }
+          
+          if (isMounted) {
+            setGroupSets(groupSetsWithCounts);
+          }
         } else {
           // For students, fetch groups
-          const res = await api.get('/groups/my');
-          setGroups(res.data.data || []);
+          const res = await api.get('/groups/my', {
+            signal: abortController.signal
+          });
+          if (isMounted) {
+            setGroups(res.data.data || []);
+          }
         }
       } catch (err: any) {
-        console.error('Error fetching data:', err);
+        // Don't handle canceled requests - they're intentional
+        const isCanceled = err.code === 'ERR_CANCELED' || err.name === 'CanceledError' || err.message === 'canceled';
+        
+        if (isCanceled || abortController.signal.aborted || !isMounted) {
+          return;
+        }
+        
+        logger.error('Error fetching data', err);
         if (err.response?.status === 401) {
           setError('Please log in to view groups');
+        } else if (err.response?.status === 429) {
+          setError('Too many requests. Please wait a moment and refresh the page.');
         } else if (err.response?.status === 500) {
           setError('Server error. Please try again later.');
         } else {
           setError('Failed to load groups');
         }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+          fetchingRef.current = false;
+        }
       }
     };
+    
     fetchData();
-  }, [user, authLoading]);
+
+    // Cleanup function
+    return () => {
+      isMounted = false;
+      fetchingRef.current = false;
+      abortController.abort();
+    };
+  }, [user?.role, user?._id]); // Only depend on role and _id, not the entire user object
 
   // Show loading while checking authentication
   if (authLoading) {
@@ -181,38 +270,71 @@ const Groups: React.FC = () => {
     ? 'View all group sets from all your courses in one place' 
     : 'View all groups from all your courses in one place';
 
-  // Load user preferences on mount
+  // Load user preferences on mount (only once, with request cancellation)
   useEffect(() => {
+    if (!user?._id || preferencesFetchingRef.current) return;
+    
+    const abortController = new AbortController();
+    let isMounted = true;
+    preferencesFetchingRef.current = true;
+
     const loadUserPreferences = async () => {
-      if (!user) return;
-      
       try {
-        const response = await getUserPreferences();
-        if (response.data.success && response.data.preferences?.courseColors) {
+        // Use request cache to prevent duplicate requests
+        const response = await requestCache.get(
+          `${CACHE_KEYS.USER_PREFERENCES}:${user._id}`,
+          () => api.get('/users/me/preferences', {
+            signal: abortController.signal
+          }),
+          60000 // Cache for 60 seconds
+        );
+        if (isMounted && response.data.success && response.data.preferences?.courseColors) {
           setUserCourseColors(response.data.preferences.courseColors || {});
         }
-      } catch (err) {
-        console.error('Error loading user preferences:', err);
+      } catch (err: any) {
+        // Don't log canceled requests or rate limit errors
+        const isCanceled = err.code === 'ERR_CANCELED' || err.name === 'CanceledError' || err.message === 'canceled';
+        if (!isCanceled && err.response?.status !== 429 && !abortController.signal.aborted) {
+          logger.error('Error loading user preferences', err);
+        }
+      } finally {
+        if (isMounted) {
+          preferencesFetchingRef.current = false;
+        }
       }
     };
 
-    loadUserPreferences();
-  }, [user]);
+    // Add a delay to avoid immediate rate limiting on page load
+    const timeoutId = setTimeout(() => {
+      loadUserPreferences();
+    }, 1000);
+
+    return () => {
+      isMounted = false;
+      preferencesFetchingRef.current = false;
+      clearTimeout(timeoutId);
+      abortController.abort();
+    };
+  }, [user?._id]); // Only depend on user ID, not entire user object
 
   // Helper to get course color (same logic as Dashboard)
+  // Priority: user's personal color preference > course defaultColor > fallback
+  // Both teachers and students can have personal preferences
   const getCourseColor = (courseId: string) => {
     const course = courses.find(c => c._id === courseId);
     
-    if (isTeacher) {
-      // Teachers see the course's defaultColor
-      return course?.defaultColor || '#556B2F';
-    } else {
-      // Students: priority is user's personal color > course defaultColor > fallback
-      if (userCourseColors[courseId]) {
-        return userCourseColors[courseId];
-      }
-      return course?.defaultColor || '#556B2F';
+    // Check if user has a personal color preference (for both teachers and students)
+    if (userCourseColors[courseId]) {
+      return userCourseColors[courseId];
     }
+    
+    // Use course's default color (set by teacher when creating/publishing)
+    if (course?.defaultColor) {
+      return course.defaultColor;
+    }
+    
+    // Fallback
+    return '#556B2F';
   };
 
   // Get unique courses for filter
@@ -361,7 +483,7 @@ const Groups: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Top Navigation Bar (Mobile Only) */}
-      <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+      <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm backdrop-blur-sm">
         <div className="relative flex items-center justify-between px-4 py-3">
           <button
             onClick={() => setShowBurgerMenu(!showBurgerMenu)}
@@ -599,11 +721,13 @@ const Groups: React.FC = () => {
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
           <div className="space-y-2">
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Search Groups</label>
+            <label htmlFor="search-groups" className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Search Groups</label>
             <div className="relative">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4" />
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4" aria-hidden="true" />
               <input
                 type="text"
+                id="search-groups"
+                name="searchGroups"
                 placeholder="Search by name or course..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -613,8 +737,10 @@ const Groups: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Filter by Course</label>
+            <label htmlFor="filter-course" className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Filter by Course</label>
             <select
+              id="filter-course"
+              name="courseFilter"
               value={courseFilter}
               onChange={(e) => setCourseFilter(e.target.value)}
               className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 transition-all duration-200 hover:bg-white dark:hover:bg-gray-800 appearance-none cursor-pointer"

@@ -5,19 +5,18 @@ const Assignment = require('../models/Assignment');
 const Submission = require('../models/Submission');
 const Thread = require('../models/thread.model');
 const Group = require('../models/Group');
+const logger = require('../utils/logger');
+const { asyncHandler } = require('../utils/errorHandler');
+const { ValidationError } = require('../utils/errorHandler');
 
 // GET /api/reports/semesters
 // Get all unique semesters that the student has courses in
-exports.getAvailableSemesters = async (req, res) => {
-  try {
-    const studentId = req.user._id || req.user.id;
-    
-    if (!studentId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Student ID is required'
-      });
-    }
+exports.getAvailableSemesters = asyncHandler(async (req, res) => {
+  const studentId = req.user._id || req.user.id;
+  
+  if (!studentId) {
+    throw new ValidationError('Student ID is required');
+  }
 
     // Find all courses the student is enrolled in
     // Include courses with or without semester info, we'll handle defaults later
@@ -68,55 +67,34 @@ exports.getAvailableSemesters = async (req, res) => {
       success: true,
       data: semesters
     });
-  } catch (error) {
-    console.error('Error fetching semesters:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch semesters',
-      error: error.message
-    });
-  }
-};
+});
 
 // GET /api/reports/transcript
 // Get student transcript for a specific semester
-exports.getStudentTranscript = async (req, res) => {
-  try {
-    const studentId = req.user._id || req.user.id;
-    
-    if (!studentId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Student ID is required'
-      });
-    }
-    
-    const { term, year } = req.query;
+exports.getStudentTranscript = asyncHandler(async (req, res) => {
+  const studentId = req.user._id || req.user.id;
+  
+  if (!studentId) {
+    throw new ValidationError('Student ID is required');
+  }
+  
+  const { term, year } = req.query;
 
-    if (!term || !year) {
-      return res.status(400).json({
-        success: false,
-        message: 'Term and year are required'
-      });
-    }
-    
-    // Validate term
-    const validTerms = ['Fall', 'Spring', 'Summer', 'Winter'];
-    if (!validTerms.includes(term)) {
-      return res.status(400).json({
-        success: false,
-        message: `Invalid term. Must be one of: ${validTerms.join(', ')}`
-      });
-    }
-    
-    // Validate year
-    const yearNum = parseInt(year);
-    if (isNaN(yearNum) || yearNum < 2000 || yearNum > 2100) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid year. Must be a number between 2000 and 2100'
-      });
-    }
+  if (!term || !year) {
+    throw new ValidationError('Term and year are required');
+  }
+  
+  // Validate term
+  const validTerms = ['Fall', 'Spring', 'Summer', 'Winter'];
+  if (!validTerms.includes(term)) {
+    throw new ValidationError(`Invalid term. Must be one of: ${validTerms.join(', ')}`);
+  }
+  
+  // Validate year
+  const yearNum = parseInt(year);
+  if (isNaN(yearNum) || yearNum < 2000 || yearNum > 2100) {
+    throw new ValidationError('Invalid year. Must be a number between 2000 and 2100');
+  }
 
     // Helper function to get semester with defaults
     const getSemesterWithDefaults = (course) => {
@@ -297,7 +275,7 @@ exports.getStudentTranscript = async (req, res) => {
       
       // Validate totalPercent is a finite number
       if (!isFinite(totalPercent) || isNaN(totalPercent)) {
-        console.error(`Invalid grade calculation for course ${course._id}, student ${studentId}`);
+        logger.warn('Invalid grade calculation', { courseId: course._id, studentId });
         // Continue with null grade instead of crashing
       }
       
@@ -328,12 +306,4 @@ exports.getStudentTranscript = async (req, res) => {
         totalCredits: courseGrades.reduce((sum, course) => sum + (course.creditHours || 0), 0)
       }
     });
-  } catch (error) {
-    console.error('Error fetching transcript:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch transcript',
-      error: error.message
-    });
-  }
-};
+});

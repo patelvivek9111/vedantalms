@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import logger from '../utils/logger';
 import { 
   BarChart3, 
   TrendingUp, 
@@ -62,7 +63,7 @@ export function AdminAnalytics() {
           });
         }
       } catch (error) {
-        console.error('Error fetching analytics:', error);
+        logger.error('Error fetching analytics', error);
       } finally {
         setLoading(false);
       }

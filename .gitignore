@@ -106,8 +106,18 @@ temp/
 ehthumbs.db
 Thumbs.db
 
-# Uploads
-uploads/
+# Uploads (ignore uploaded files, but keep directory structure)
+uploads/*.jpg
+uploads/*.jpeg
+uploads/*.png
+uploads/*.gif
+uploads/*.pdf
+uploads/*.doc
+uploads/*.docx
+uploads/*.xls
+uploads/*.xlsx
+uploads/*.zip
+uploads/*.rar
 !uploads/.gitkeep
 
 # Test files (keep test files, but ignore test output)

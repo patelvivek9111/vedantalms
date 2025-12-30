@@ -4,6 +4,7 @@ import api from '../services/api';
 import { API_URL } from '../config';
 import RichTextEditor from './RichTextEditor';
 import axios from 'axios';
+import logger from '../utils/logger';
 
 interface CreateThreadModalProps {
   isOpen: boolean;
@@ -73,7 +74,7 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
         });
         setGroupSets(response.data);
       } catch (err: any) {
-        console.error('Error fetching group sets:', err);
+        logger.error('Error fetching group sets', err);
       }
     };
     fetchGroupSets();
@@ -137,7 +138,7 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
         setError('Failed to create thread');
       }
     } catch (err) {
-      console.error('Error creating thread:', err);
+      logger.error('Error creating thread', err);
       setError('Failed to create thread. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -147,59 +148,74 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-[200] flex items-center justify-center p-2 sm:p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl h-[calc(100vh-8rem)] sm:max-h-[85vh] sm:h-auto flex flex-col">
-        <div className="flex justify-between items-center p-4 sm:p-6 border-b dark:border-gray-700 flex-shrink-0">
-          <h2 className="hidden lg:block text-lg sm:text-2xl font-semibold text-gray-800 dark:text-gray-100 pr-2">Create New Discussion Thread</h2>
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/30 p-2 sm:p-4 lg:left-[336px] lg:right-0">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full h-full lg:h-[calc(100vh-2rem)] lg:max-w-none lg:rounded-none lg:shadow-none p-4 sm:p-6 lg:p-8 relative overflow-hidden flex flex-col border dark:border-gray-700 lg:border-l lg:border-r-0 lg:border-t-0 lg:border-b-0">
+        <div className="flex justify-between items-center mb-4 sm:mb-6 flex-shrink-0">
+          <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 dark:text-gray-100">Create New Discussion Thread</h2>
           <button
             onClick={onClose}
-            className="hidden lg:flex text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none flex-shrink-0"
+            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none flex-shrink-0"
+            aria-label="Close"
           >
-            <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          <form id="create-thread-form" onSubmit={handleSubmit} className="p-4 sm:p-6 pb-4">
-          {error && (
-            <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/20 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 rounded">
-              {error}
-            </div>
-          )}
+          <form 
+            id="create-thread-form" 
+            onSubmit={handleSubmit} 
+            className="space-y-4 sm:space-y-6"
+            aria-label="Create discussion thread form"
+          >
+            {error && (
+              <div 
+                className="p-3 bg-red-100 dark:bg-red-900/20 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 rounded"
+                role="alert"
+                aria-live="polite"
+              >
+                {error}
+              </div>
+            )}
 
-          <div className="mb-4">
+            <div>
             <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Title
             </label>
             <input
               type="text"
               id="title"
+              name="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
               placeholder="Enter thread title"
               required
+              aria-required="true"
+              aria-label="Thread title"
             />
           </div>
 
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Content
-            </label>
-            <div className="border border-gray-300 dark:border-gray-700 rounded-md">
-              <RichTextEditor
-                content={content}
-                onChange={setContent}
-                placeholder="Write your thread content..."
-                className="h-64"
-              />
+            <div>
+              <label htmlFor="content" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Content
+              </label>
+              <div className="border border-gray-300 dark:border-gray-700 rounded-md">
+                <RichTextEditor
+                  id="thread-content"
+                  name="content"
+                  content={content}
+                  onChange={setContent}
+                  placeholder="Write your thread content..."
+                  height={700}
+                />
+              </div>
             </div>
-          </div>
 
-          {/* Group Discussion Options */}
-          <div className="mb-4 space-y-4">
+            {/* Group Discussion Options */}
+            <div className="space-y-4">
             <div className="flex items-center">
               <input
                 type="checkbox"
@@ -220,6 +236,7 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
                 </label>
                 <select
                   id="groupSet"
+                  name="groupSet"
                   value={selectedGroupSet}
                   onChange={(e) => setSelectedGroupSet(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
@@ -241,8 +258,8 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
             )}
           </div>
 
-          {/* Grading Options */}
-          <div className="mb-4 space-y-4">
+            {/* Grading Options */}
+            <div className="space-y-4">
             <div className="flex items-center">
               <input
                 type="checkbox"
@@ -266,6 +283,7 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
                     <input
                       type="number"
                       id="totalPoints"
+                      name="totalPoints"
                       value={totalPoints}
                       onChange={(e) => setTotalPoints(Math.max(0, parseInt(e.target.value) || 0))}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
@@ -280,6 +298,7 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
                     <input
                       type="datetime-local"
                       id="dueDate"
+                      name="dueDate"
                       value={dueDate}
                       onChange={(e) => setDueDate(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
@@ -293,6 +312,7 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
                   </label>
                   <select
                     id="group"
+                    name="group"
                     value={selectedGroup}
                     onChange={(e) => setSelectedGroup(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
@@ -310,8 +330,8 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
             )}
           </div>
 
-          {/* Discussion Settings */}
-          <div className="mb-4 space-y-4">
+            {/* Discussion Settings */}
+            <div className="space-y-4">
             <h3 className="text-lg font-medium text-gray-800 dark:text-gray-100">Discussion Settings</h3>
             
             <div className="space-y-3">
@@ -356,25 +376,26 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
             </div>
           </div>
 
-          <div className="mb-4">
-            <label htmlFor="module" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Module (optional)
-            </label>
-            <select
-              id="module"
-              value={selectedModule}
-              onChange={e => setSelectedModule(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-            >
-              <option value="">No module</option>
-              {modules && modules.map((mod: any) => (
-                <option key={mod._id} value={mod._id}>{mod.title}</option>
-              ))}
-            </select>
-        </div>
+            <div>
+              <label htmlFor="module" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Module (optional)
+              </label>
+              <select
+                id="module"
+                name="module"
+                value={selectedModule}
+                onChange={e => setSelectedModule(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+              >
+                <option value="">No module</option>
+                {modules && modules.map((mod: any) => (
+                  <option key={mod._id} value={mod._id}>{mod.title}</option>
+                ))}
+              </select>
+            </div>
 
-          {/* Action Buttons */}
-          <div className="flex justify-end space-x-3 mt-6 pt-4 border-t dark:border-gray-700">
+            {/* Action Buttons */}
+            <div className="flex justify-end space-x-3 pt-4 border-t dark:border-gray-700 mt-6">
           <button
             type="button"
             onClick={onClose}
@@ -389,7 +410,7 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
           >
             {isSubmitting ? 'Creating...' : 'Create Thread'}
           </button>
-          </div>
+            </div>
           </form>
         </div>
       </div>

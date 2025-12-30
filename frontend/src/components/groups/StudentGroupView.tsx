@@ -3,6 +3,7 @@ import axios from 'axios';
 import { API_URL } from '../../config';
 import { Users, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import logger from '../../utils/logger';
 
 interface GroupSet {
   _id: string;
@@ -71,7 +72,7 @@ const StudentGroupView: React.FC<StudentGroupViewProps> = ({ courseId, userId })
               enrolledGroupsData.push({ groupSet, group });
             });
           } catch (err) {
-            console.error(`Error fetching groups for set ${groupSet._id}:`, err);
+            logger.error('Error fetching groups for set', err, { groupSetId: groupSet._id });
           }
         }
         

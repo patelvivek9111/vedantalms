@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { API_URL } from '../config';
 import { format } from 'date-fns';
+import logger from '../utils/logger';
 
 interface CourseGrade {
   courseId: string;
@@ -52,7 +53,7 @@ const Transcript: React.FC = () => {
           setAvailableSemesters(semesters);
         }
       } catch (err: any) {
-        console.error('Error fetching semesters:', err);
+        logger.error('Error fetching semesters', err);
         setError(err.response?.data?.message || 'Failed to load semesters');
       }
     };
@@ -77,7 +78,7 @@ const Transcript: React.FC = () => {
         setTranscriptData(response.data.data);
       }
     } catch (err: any) {
-      console.error('Error fetching transcript:', err);
+      logger.error('Error fetching transcript', err);
       setError(err.response?.data?.message || 'Failed to load transcript');
     } finally {
       setLoading(false);
@@ -114,7 +115,7 @@ const Transcript: React.FC = () => {
             allCourses.push(...response.data.data.courses);
           }
         } catch (err) {
-          console.error(`Error fetching courses for ${semester.term} ${semester.year}:`, err);
+          logger.error('Error fetching courses for semester', err, { term: semester.term, year: semester.year });
         }
       }
       
@@ -123,7 +124,7 @@ const Transcript: React.FC = () => {
         totalCredits: allCourses.reduce((sum, course) => sum + (course.creditHours || 0), 0)
       });
     } catch (err: any) {
-      console.error('Error fetching all courses:', err);
+      logger.error('Error fetching all courses', err);
     } finally {
       setLoadingAllCourses(false);
     }
@@ -263,10 +264,12 @@ const Transcript: React.FC = () => {
 
           {/* Semester Selector */}
           <div className="mb-4 sm:mb-6">
-            <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label htmlFor="semester-select" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Select Semester
             </label>
             <select
+              id="semester-select"
+              name="semester"
               value={selectedSemester ? `${selectedSemester.term}-${selectedSemester.year}` : ''}
               onChange={(e) => {
                 const [term, year] = e.target.value.split('-');

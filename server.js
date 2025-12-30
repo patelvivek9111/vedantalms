@@ -52,19 +52,31 @@ const corsOptions = {
 
 // Security headers middleware
 app.use((req, res, next) => {
-  // Set security headers
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('X-XSS-Protection', '1; mode=block');
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  // Skip security headers for file requests to prevent CORB issues
+  // File requests will set their own headers
+  const isFileRequest = req.path.startsWith('/uploads/') || req.path.startsWith('/api/files/');
   
-  // Content Security Policy (basic)
-  if (process.env.NODE_ENV === 'production') {
-    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:;");
+  if (!isFileRequest) {
+    // Set security headers for non-file requests
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    
+    // Content Security Policy (basic)
+    if (process.env.NODE_ENV === 'production') {
+      res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:;");
+    }
   }
   
   // Remove X-Powered-By header
   res.removeHeader('X-Powered-By');
+  
+  // CORS headers for file requests
+  if (isFileRequest) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+  }
   
   next();
 });
@@ -90,16 +102,24 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Add request logging in development
+// Add request logging
+const logger = require('./utils/logger');
 if (process.env.NODE_ENV !== 'production') {
   app.use((req, res, next) => {
-    console.log(`${req.method} ${req.path}`);
+    logger.http(`${req.method} ${req.path}`);
     next();
   });
 }
 
-// Set default JWT secret if not in environment
-process.env.JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-123';
+// Validate required environment variables
+if (!process.env.JWT_SECRET) {
+  console.error('❌ ERROR: JWT_SECRET is not set in environment variables!');
+  console.error('   Please set JWT_SECRET in your .env file or environment.');
+  console.error('   For security, never use default/fallback secrets in production.');
+  process.exit(1);
+}
+
+// Set JWT_EXPIRE with a safe default (30 days)
 process.env.JWT_EXPIRE = process.env.JWT_EXPIRE || '30d';
 
 // Create uploads directory if it doesn't exist
@@ -181,7 +201,10 @@ mongoose.connect(MONGODB_URI, mongoOptions)
   .catch((err) => {
     console.error('❌ MongoDB connection error:', err.message);
     console.error('Please check your MONGODB_URI environment variable in Render dashboard.');
-    process.exit(1); // Exit if cannot connect to database
+    // Don't exit in test environment - let tests handle connection
+    if (process.env.NODE_ENV !== 'test') {
+      process.exit(1); // Exit if cannot connect to database
+    }
   });
 
 // Health check endpoint
@@ -193,15 +216,69 @@ app.get('/health', (req, res) => {
   });
 });
 
+// MIME type mapping for proper Content-Type headers (prevents CORB issues)
+const getMimeType = (filePath) => {
+  const ext = path.extname(filePath).toLowerCase();
+  const mimeTypes = {
+    // Images
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+    '.svg': 'image/svg+xml',
+    '.bmp': 'image/bmp',
+    '.ico': 'image/x-icon',
+    // Documents
+    '.pdf': 'application/pdf',
+    '.doc': 'application/msword',
+    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    '.xls': 'application/vnd.ms-excel',
+    '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    '.ppt': 'application/vnd.ms-powerpoint',
+    '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    '.txt': 'text/plain',
+    '.rtf': 'application/rtf',
+    '.csv': 'text/csv',
+    // Archives
+    '.zip': 'application/zip',
+    '.rar': 'application/x-rar-compressed',
+    '.7z': 'application/x-7z-compressed',
+    '.tar': 'application/x-tar',
+    '.gz': 'application/gzip',
+    // Video
+    '.mp4': 'video/mp4',
+    '.webm': 'video/webm',
+    '.mov': 'video/quicktime',
+    '.avi': 'video/x-msvideo',
+    // Audio
+    '.mp3': 'audio/mpeg',
+    '.wav': 'audio/wav',
+    '.ogg': 'audio/ogg',
+  };
+  return mimeTypes[ext] || 'application/octet-stream';
+};
+
 // Serve uploads directory for profile pictures and other files
 // IMPORTANT: This must be BEFORE frontend static files and catch-all route
 const uploadsStatic = express.static(path.join(__dirname, 'uploads'), {
   setHeaders: (res, filePath) => {
-    // Set proper headers for images
-    if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg') || filePath.endsWith('.png') || filePath.endsWith('.gif')) {
-      res.setHeader('Content-Type', filePath.endsWith('.png') ? 'image/png' : 'image/jpeg');
+    // Set proper Content-Type header for all file types (prevents CORB)
+    const contentType = getMimeType(filePath);
+    res.setHeader('Content-Type', contentType);
+    
+    // Set Cache-Control for static assets
+    if (contentType.startsWith('image/') || contentType.startsWith('video/') || contentType.startsWith('audio/')) {
       res.setHeader('Cache-Control', 'public, max-age=31536000');
+    } else {
+      // For documents, shorter cache or no-cache
+      res.setHeader('Cache-Control', 'public, max-age=3600');
     }
+    
+    // CORS headers to prevent CORB issues
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
   }
 });
 
@@ -211,9 +288,36 @@ app.use('/uploads', (req, res, next) => {
   if (fs.existsSync(filePath)) {
     uploadsStatic(req, res, next);
   } else {
-    // File doesn't exist - return 404 (browser will handle fallback)
-    res.status(404).json({ message: 'File not found' });
+    // File doesn't exist - return 404 with proper Content-Type to prevent CORB
+    // Check if request expects a file (based on Accept header or file extension)
+    const expectsFile = req.path.match(/\.(jpg|jpeg|png|gif|pdf|doc|docx|xls|xlsx|zip|rar|mp4|mov|avi|mp3|wav)$/i);
+    if (expectsFile) {
+      // Return 404 with appropriate Content-Type for the expected file type
+      const contentType = getMimeType(req.path);
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.status(404).send('File not found');
+    } else {
+      // Return JSON for API-like requests
+      res.status(404).json({ message: 'File not found' });
+    }
   }
+});
+
+// Rate limiting middleware (apply after CORS but before routes)
+const { smartLimiter } = require('./middleware/rateLimiter');
+
+// Apply smart rate limiting to all API routes except auth (auth has its own limiters)
+// Smart limiter automatically uses:
+// - 500 requests/15min for authenticated users
+// - 300 requests/15min for unauthenticated users
+// This provides better UX for legitimate users while maintaining security
+app.use('/api/', (req, res, next) => {
+  // Skip rate limiting for auth routes (they have their own limiters)
+  if (req.path.startsWith('/auth')) {
+    return next();
+  }
+  smartLimiter(req, res, next);
 });
 
 // Routes
@@ -245,6 +349,14 @@ const { protect } = require('./middleware/auth');
 const { uploadMultipleToCloudinary, uploadToCloudinary, isCloudinaryConfigured } = require('./utils/cloudinary');
 
 // Proxy endpoint for Cloudinary files (to avoid CORS and 401 issues)
+// Handle OPTIONS preflight requests
+app.options('/api/files/proxy', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.status(204).end();
+});
+
 app.get('/api/files/proxy', async (req, res) => {
   try {
     const fileUrl = req.query.url;
@@ -281,9 +393,19 @@ app.get('/api/files/proxy', async (req, res) => {
         // For local files, serve directly without proxy
         const filePath = path.join(__dirname, fileUrl);
         if (fs.existsSync(filePath)) {
+          // Set proper headers before sending file (prevents CORB)
+          const contentType = getMimeType(filePath);
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+          res.setHeader('X-Content-Type-Options', 'nosniff');
           return res.sendFile(filePath);
         } else {
-          return res.status(404).json({ message: 'File not found' });
+          // Return 404 with proper Content-Type
+          const contentType = getMimeType(fileUrl);
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          return res.status(404).send('File not found');
         }
       }
       parsedUrl = new URL(fileUrl);
@@ -294,12 +416,32 @@ app.get('/api/files/proxy', async (req, res) => {
 
     client.get(fileUrl, (response) => {
       if (response.statusCode === 200) {
-        // Set appropriate headers
-        const contentType = response.headers['content-type'] || 'application/octet-stream';
+        // Determine Content-Type - use file extension if available, otherwise use response header
+        let contentType = response.headers['content-type'] || 'application/octet-stream';
+        
+        // If Content-Type is generic or missing, try to determine from URL
+        if (contentType === 'application/octet-stream' || !contentType.includes('/')) {
+          const urlPath = new URL(fileUrl).pathname;
+          const detectedType = getMimeType(urlPath);
+          if (detectedType !== 'application/octet-stream') {
+            contentType = detectedType;
+          }
+        }
+        
+        // Ensure Content-Type is valid (prevents CORB)
+        if (!contentType || contentType === 'text/html' || contentType === 'application/json') {
+          // Fallback to detecting from URL
+          const urlPath = new URL(fileUrl).pathname;
+          contentType = getMimeType(urlPath);
+        }
+        
+        // Set appropriate headers (prevents CORB)
         res.setHeader('Content-Type', contentType);
         res.setHeader('Content-Disposition', response.headers['content-disposition'] || 'inline');
         res.setHeader('Cache-Control', 'public, max-age=31536000');
         res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
         
         // Pipe the response
         response.pipe(res);
@@ -324,10 +466,30 @@ app.get('/api/files/proxy', async (req, res) => {
         
         redirectClient.get(absoluteRedirectUrl, (redirectResponse) => {
           if (redirectResponse.statusCode === 200) {
-            const contentType = redirectResponse.headers['content-type'] || 'application/octet-stream';
+            // Determine Content-Type from redirect response or URL
+            let contentType = redirectResponse.headers['content-type'] || 'application/octet-stream';
+            
+            // If Content-Type is generic, try to determine from URL
+            if (contentType === 'application/octet-stream' || !contentType.includes('/')) {
+              const urlPath = new URL(absoluteRedirectUrl).pathname;
+              const detectedType = getMimeType(urlPath);
+              if (detectedType !== 'application/octet-stream') {
+                contentType = detectedType;
+              }
+            }
+            
+            // Ensure Content-Type is valid (prevents CORB)
+            if (!contentType || contentType === 'text/html' || contentType === 'application/json') {
+              const urlPath = new URL(absoluteRedirectUrl).pathname;
+              contentType = getMimeType(urlPath);
+            }
+            
+            // Set appropriate headers (prevents CORB)
             res.setHeader('Content-Type', contentType);
             res.setHeader('Content-Disposition', redirectResponse.headers['content-disposition'] || 'inline');
             res.setHeader('Access-Control-Allow-Origin', '*');
+            res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+            res.setHeader('X-Content-Type-Options', 'nosniff');
             redirectResponse.pipe(res);
           } else {
             res.status(redirectResponse.statusCode).json({ 
@@ -393,12 +555,12 @@ app.post('/api/upload', protect, upload.array('files', 10), async (req, res) => 
             resourceType = 'raw';
           }
           
-          console.log(`[Upload] File ${index + 1}:`, {
+          logger.debug('Uploading file to Cloudinary', {
+            index: index + 1,
             originalname: file.originalname,
             mimetype: file.mimetype,
             size: file.size,
-            resourceType: resourceType,
-            path: file.path
+            resourceType: resourceType
           });
           
           try {
@@ -527,65 +689,13 @@ app.post('/api/upload', protect, upload.array('files', 10), async (req, res) => 
 });
 
 // Error handling middleware (must be after all routes)
-app.use((err, req, res, next) => {
-  // Log error details (but don't expose to client in production)
-  console.error('❌ Error:', err.message);
-  if (process.env.NODE_ENV !== 'production') {
-    console.error('Stack:', err.stack);
-  }
-  
-  // Handle Multer errors specifically
-  if (err.name === 'MulterError') {
-    let message = 'File upload error';
-    let status = 400;
-    
-    switch (err.code) {
-      case 'LIMIT_FILE_SIZE':
-        message = 'File too large. Maximum file size is 10MB.';
-        break;
-      case 'LIMIT_FILE_COUNT':
-        message = 'Too many files. Maximum file count exceeded.';
-        break;
-      case 'LIMIT_UNEXPECTED_FILE':
-        message = 'Unexpected file field.';
-        break;
-      case 'LIMIT_PART_COUNT':
-        message = 'Too many parts in the request.';
-        break;
-      default:
-        message = `File upload error: ${err.message}`;
-    }
-    
-    return res.status(status).json({ 
-      success: false,
-      message,
-      error: err.code
-    });
-  }
-  
-  // Handle file filter errors
-  if (err.message && err.message.includes('Invalid file type')) {
-    return res.status(400).json({ 
-      success: false,
-      message: err.message
-    });
-  }
-  
-  // Don't expose internal errors in production
-  const message = process.env.NODE_ENV === 'production' 
-    ? 'Something went wrong!' 
-    : err.message;
-    
-  res.status(err.status || 500).json({ 
-    success: false,
-    message,
-    ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
-  });
-});
+const { globalErrorHandler } = require('./utils/errorHandler');
+app.use(globalErrorHandler);
 
 // API route not found handler (must be after all API routes but before static files)
+const { NotFoundError, sendErrorResponse } = require('./utils/errorHandler');
 app.use('/api/*', (req, res) => {
-  res.status(404).json({ message: 'API route not found', path: req.path });
+  sendErrorResponse(res, new NotFoundError('API route'), { action: 'route_not_found', path: req.path });
 });
 
 // Serve frontend static files in production
@@ -632,6 +742,20 @@ if (process.env.NODE_ENV !== 'test') {
     console.log(`📱 Health check: http://localhost:${PORT}/health`);
     console.log(`🔗 Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`🎮 QuizWave Socket.io ready`);
+  }).on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`❌ Port ${PORT} is already in use.`);
+      console.error(`   Another process is using port ${PORT}.`);
+      console.error(`   Please either:`);
+      console.error(`   1. Stop the other process using port ${PORT}`);
+      console.error(`   2. Use a different port by setting PORT environment variable`);
+      console.error(`   3. On Windows, run: netstat -ano | findstr :${PORT} to find the process`);
+      console.error(`   4. Then kill it with: taskkill /PID <PID> /F`);
+      process.exit(1);
+    } else {
+      console.error(`❌ Server error:`, err);
+      process.exit(1);
+    }
   });
 } else {
   // In test environment, server is not started

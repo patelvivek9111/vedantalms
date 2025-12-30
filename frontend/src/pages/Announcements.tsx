@@ -1,22 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import AnnouncementList, { Announcement } from '../components/announcements/AnnouncementList';
 import AnnouncementForm from '../components/announcements/AnnouncementForm';
-import { getAnnouncements, createAnnouncement, getAnnouncementComments, postAnnouncementComment, postAnnouncementReply, likeAnnouncementComment, unlikeAnnouncementComment, updateAnnouncement, deleteAnnouncement } from '../services/announcementService';
+import { getAnnouncements, createAnnouncement, getAnnouncementComments, postAnnouncementComment, postAnnouncementReply, likeAnnouncementComment, unlikeAnnouncementComment, updateAnnouncement, deleteAnnouncement, AnnouncementComment } from '../services/announcementService';
 import { useAuth } from '../context/AuthContext';
 import { useState as useReactState } from 'react';
 import { ThumbsUp, Info, Lightbulb } from 'lucide-react';
+import logger from '../utils/logger';
 
 interface AnnouncementsProps {
   courseId: string;
-}
-
-interface Comment {
-  _id: string;
-  author: { _id: string; firstName: string; lastName: string };
-  text: string;
-  createdAt: string;
-  replies: Comment[];
-  likes?: string[];
 }
 
 const Announcements: React.FC<AnnouncementsProps> = ({ courseId }) => {
@@ -26,7 +18,7 @@ const Announcements: React.FC<AnnouncementsProps> = ({ courseId }) => {
   const [formLoading, setFormLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
-  const [comments, setComments] = useState<Comment[]>([]);
+  const [comments, setComments] = useState<AnnouncementComment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
@@ -57,7 +49,7 @@ const Announcements: React.FC<AnnouncementsProps> = ({ courseId }) => {
       const data = await getAnnouncementComments(announcementId);
       setComments(data);
       if (user && selectedAnnouncement?.options?.requirePostBeforeSeeingReplies) {
-        const hasPosted = data.some((comment: Comment) => comment.author._id === user._id);
+        const hasPosted = data.some((comment: AnnouncementComment) => comment.author._id === user._id);
         setUserHasPosted(hasPosted);
       } else {
         setUserHasPosted(true);
@@ -114,7 +106,7 @@ const Announcements: React.FC<AnnouncementsProps> = ({ courseId }) => {
       setReplyingTo(null);
       await fetchComments(selectedAnnouncement._id);
     } catch (err) {
-      console.error('Failed to post reply:', err);
+      logger.error('Failed to post reply', err);
     }
     setPosting(false);
   };
@@ -177,7 +169,7 @@ const Announcements: React.FC<AnnouncementsProps> = ({ courseId }) => {
     }
   };
 
-  const renderComments = (comments: Comment[], level = 0, parentKey = '') => {
+  const renderComments = (comments: AnnouncementComment[], level = 0, parentKey = '') => {
     // If top-level and hiding is required, filter to only show user's own comments
     let visibleComments = comments;
     const shouldHideOthers =
@@ -194,7 +186,12 @@ const Announcements: React.FC<AnnouncementsProps> = ({ courseId }) => {
         {visibleComments
           .filter(comment => comment._id)
           .map((comment) => {
-            const isLiked = user && comment.likes && comment.likes.includes(user._id);
+            const isLiked = user && comment.likes && comment.likes.some(like => {
+              if (typeof like === 'string') {
+                return like === user._id;
+              }
+              return like.user === user._id || like._id === user._id;
+            });
             const shouldShowReplies = userHasPosted || 
               !selectedAnnouncement?.options?.requirePostBeforeSeeingReplies ||
               user?.role !== 'student';

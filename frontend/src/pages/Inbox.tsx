@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { fetchConversations, fetchMessages, sendMessage, createConversation, searchUsers, toggleStar, moveConversation, bulkMoveConversations, bulkDeleteForever } from '../services/inboxService';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import api from '../services/api';
-import { getImageUrl } from '../services/api';
+import { getImageUrl, getUserPreferences } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { Edit, Reply, Archive, Trash2, Search, ChevronLeft, CheckSquare, Paperclip, CheckSquare2, Menu, Folder, Settings, HelpCircle, User as UserIcon, LogOut } from 'lucide-react';
+import { Plus, Reply, Archive, Trash2, Search, ChevronLeft, CheckSquare, Paperclip, CheckSquare2, Menu, Folder, Settings, HelpCircle, User as UserIcon, LogOut, Mail, Star, Inbox as InboxIcon, Send, FolderArchive, Heart, Filter } from 'lucide-react';
 import RichTextEditor from '../components/RichTextEditor';
 import { ChangeUserModal } from '../components/ChangeUserModal';
 
@@ -35,12 +35,54 @@ const getAvatarColor = (id: string) => {
   return colors[Math.abs(hash) % colors.length];
 };
 
+/**
+ * Determine if a user is online based on their lastLogin timestamp
+ * Considered online if they logged in within the last 1 minute
+ * Only shows online status if user has showOnlineStatus enabled
+ * For current user, checks their own showOnlineStatus preference
+ */
+const isUserOnline = (user: any, currentUserId?: string, currentUserShowOnlineStatus?: boolean): boolean => {
+  if (!user) return false;
+  
+  const isCurrentUser = currentUserId && user._id && user._id.toString() === currentUserId.toString();
+  
+  // For current user, check their own preference
+  if (isCurrentUser) {
+    // If current user has disabled showing online status, don't show it
+    if (currentUserShowOnlineStatus === false) {
+      return false;
+    }
+    // If enabled, current user is always considered online (they're actively using the app)
+    return true;
+  }
+  
+  // For other users, check if they have enabled showing their online status
+  if (user.showOnlineStatus === false) {
+    return false;
+  }
+  
+  // If no lastLogin, assume offline
+  if (!user.lastLogin) return false;
+  
+  try {
+    const lastLogin = new Date(user.lastLogin);
+    const now = new Date();
+    const minutesSinceLogin = (now.getTime() - lastLogin.getTime()) / (1000 * 60);
+    
+    // Consider online if logged in within last 1 minute
+    return minutesSinceLogin <= 1;
+  } catch (error) {
+    return false;
+  }
+};
+
 const Inbox: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [conversations, setConversations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentUserShowOnlineStatus, setCurrentUserShowOnlineStatus] = useState<boolean>(true);
   const [selectedConversation, setSelectedConversation] = useState<any | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
@@ -180,6 +222,28 @@ const Inbox: React.FC = () => {
       setBulkActionLoading(false);
     }
   };
+
+  // Load current user's preferences
+  useEffect(() => {
+    const loadUserPreferences = async () => {
+      try {
+        const response = await getUserPreferences();
+        if (response.data && response.data.preferences) {
+          setCurrentUserShowOnlineStatus(
+            response.data.preferences.showOnlineStatus !== undefined 
+              ? response.data.preferences.showOnlineStatus 
+              : true
+          );
+        }
+      } catch (err) {
+        // Default to true if fetch fails
+        setCurrentUserShowOnlineStatus(true);
+      }
+    };
+    if (user?._id) {
+      loadUserPreferences();
+    }
+  }, [user?._id]);
 
   useEffect(() => {
     const loadConversations = async () => {
@@ -486,7 +550,7 @@ const Inbox: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full min-h-[80vh] bg-gray-100 dark:bg-gray-900">
+    <div className="flex flex-col h-full min-h-[80vh] bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
       {/* Top Navigation Bar (Mobile Only) */}
       <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
         <div className="relative flex items-center justify-between px-4 py-3">
@@ -625,7 +689,7 @@ const Inbox: React.FC = () => {
       />
       
       {/* Top Bar */}
-      <div className="flex flex-col gap-2 px-3 sm:px-4 lg:px-6 py-2 sm:py-3 border-b bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-sm sticky top-0 lg:sticky z-20 pt-20 lg:pt-2">
+      <div className="flex flex-col gap-3 px-3 sm:px-4 lg:px-6 py-3 sm:py-4 border-b bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-gray-200/50 dark:border-gray-700/50 shadow-sm sticky top-0 lg:sticky z-20 pt-20 lg:pt-3">
         {/* First Row: Dropdowns */}
         <div className="flex items-center gap-2 flex-wrap">
           {/* Course Dropdown - Hide for admins */}
@@ -671,38 +735,38 @@ const Inbox: React.FC = () => {
           <div className="flex items-center gap-1 sm:gap-2">
             {/* Compose (modern icon) */}
             <button
-              className="p-1.5 sm:p-2 rounded hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400 touch-manipulation"
+              className="p-2 sm:p-2.5 rounded-lg bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-md hover:shadow-lg transition-all duration-200 touch-manipulation flex items-center justify-center"
               title="Compose"
               onClick={() => setShowCompose(true)}
             >
-              <Edit size={18} className="sm:w-[22px] sm:h-[22px]" />
+              <Plus size={20} className="sm:w-[22px] sm:h-[22px]" strokeWidth={2.5} />
             </button>
             {/* Reply */}
             <button 
-              className={`p-1.5 sm:p-2 rounded touch-manipulation ${selectedConversations.length > 0 ? 'hover:bg-blue-200 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500'}`} 
+              className={`p-2 sm:p-2.5 rounded-lg transition-all duration-200 touch-manipulation ${selectedConversations.length > 0 ? 'hover:bg-blue-50 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 shadow-sm' : 'hover:bg-gray-100 dark:hover:bg-gray-700/50 text-gray-400 dark:text-gray-500 cursor-not-allowed'}`} 
               title="Reply" 
               onClick={handleReply}
               disabled={selectedConversations.length === 0 || bulkActionLoading}
             >
-              <Reply size={18} className="sm:w-[22px] sm:h-[22px]" />
+              <Reply size={18} className="sm:w-[20px] sm:h-[20px]" strokeWidth={2} />
             </button>
             {/* Archive */}
             <button 
-              className={`p-1.5 sm:p-2 rounded touch-manipulation ${selectedConversations.length > 0 ? 'hover:bg-yellow-200 dark:hover:bg-yellow-900/50 text-yellow-600 dark:text-yellow-400' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500'}`} 
+              className={`p-2 sm:p-2.5 rounded-lg transition-all duration-200 touch-manipulation ${selectedConversations.length > 0 ? 'hover:bg-amber-50 dark:hover:bg-amber-900/30 text-amber-600 dark:text-amber-400 shadow-sm' : 'hover:bg-gray-100 dark:hover:bg-gray-700/50 text-gray-400 dark:text-gray-500 cursor-not-allowed'}`} 
               title="Archive" 
               onClick={handleArchive}
               disabled={selectedConversations.length === 0 || bulkActionLoading}
             >
-              <Archive size={18} className="sm:w-[22px] sm:h-[22px]" />
+              <Archive size={18} className="sm:w-[20px] sm:h-[20px]" strokeWidth={2} />
             </button>
             {/* Delete */}
             <button 
-              className={`p-1.5 sm:p-2 rounded touch-manipulation ${selectedConversations.length > 0 ? 'hover:bg-red-200 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500'}`} 
+              className={`p-2 sm:p-2.5 rounded-lg transition-all duration-200 touch-manipulation ${selectedConversations.length > 0 ? 'hover:bg-red-50 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 shadow-sm' : 'hover:bg-gray-100 dark:hover:bg-gray-700/50 text-gray-400 dark:text-gray-500 cursor-not-allowed'}`} 
               title="Delete" 
               onClick={handleDelete}
               disabled={selectedConversations.length === 0 || bulkActionLoading}
             >
-              <Trash2 size={18} className="sm:w-[22px] sm:h-[22px]" />
+              <Trash2 size={18} className="sm:w-[20px] sm:h-[20px]" strokeWidth={2} />
             </button>
           </div>
           {/* Search Bar */}
@@ -712,7 +776,7 @@ const Inbox: React.FC = () => {
               id="inbox-search"
               name="search"
               ref={searchInputRef}
-              className="border border-gray-200 dark:border-gray-700 rounded-full pl-8 sm:pl-10 pr-3 sm:pr-4 py-1.5 sm:py-2 text-xs sm:text-sm bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 w-full shadow-sm"
+              className="border border-gray-200 dark:border-gray-700 rounded-full pl-10 sm:pl-12 pr-4 sm:pr-5 py-2 sm:py-2.5 text-xs sm:text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 dark:focus:border-blue-400 w-full shadow-sm transition-all duration-200"
               type="text"
               placeholder="Search..."
               value={search}
@@ -728,10 +792,17 @@ const Inbox: React.FC = () => {
       <div className="flex flex-col lg:flex-row flex-1 gap-4 lg:gap-6 px-2 sm:px-4 lg:px-6 py-4 lg:py-6">
         {/* Compose Modal */}
         {showCompose && (
-          <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-[100] p-2 sm:p-4">
-            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-0 w-full max-w-xl relative border border-gray-200 dark:border-gray-700 max-h-[95vh] overflow-y-auto">
-              <button className="absolute top-2 right-2 sm:top-3 sm:right-3 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 text-xl sm:text-2xl p-1 touch-manipulation" onClick={() => setShowCompose(false)}>&times;</button>
-              <div className="border-b border-gray-200 dark:border-gray-700 px-3 sm:px-4 lg:px-6 py-2.5 sm:py-3 lg:py-4 text-base sm:text-lg lg:text-xl font-semibold text-gray-900 dark:text-gray-100">Compose Message</div>
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[100] p-2 sm:p-4 animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl p-0 w-full max-w-2xl relative border border-gray-200/50 dark:border-gray-700/50 max-h-[95vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+              <button className="absolute top-3 right-3 sm:top-4 sm:right-4 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 text-xl sm:text-2xl p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors touch-manipulation z-10" onClick={() => setShowCompose(false)}>&times;</button>
+              <div className="border-b border-gray-200 dark:border-gray-700 px-4 sm:px-6 lg:px-8 py-4 sm:py-5 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center shadow-md">
+                    <Plus className="w-5 h-5 text-white" strokeWidth={2.5} />
+                  </div>
+                  <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 dark:text-gray-100">Compose Message</h2>
+                </div>
+              </div>
               <form onSubmit={handleCompose} className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
                 {/* Course Dropdown - Hide for admins */}
                 {user?.role !== 'admin' && (
@@ -745,7 +816,9 @@ const Inbox: React.FC = () => {
                       onChange={e => { setComposeCourse(e.target.value); setComposeToGroup(''); setComposeGroupUsers([]); }}
                     >
                       {composeCourseOptions.map((c: any) => (
-                        <option key={c._id} value={c._id}>{c.title}</option>
+                        <option key={c._id} value={c._id}>
+                          {c.catalog?.courseCode || c.title}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -759,7 +832,7 @@ const Inbox: React.FC = () => {
                         {composeToGroup === 'sections' && user?.role !== 'admin' ? (
                           composeCourse ? (
                             <span className="bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs flex items-center">
-                              All Students in {composeCourseOptions.find(c => c._id === composeCourse)?.title || 'Course'}
+                              All Students in {composeCourseOptions.find(c => c._id === composeCourse)?.catalog?.courseCode || composeCourseOptions.find(c => c._id === composeCourse)?.title || 'Course'}
                               <button type="button" className="ml-1 text-[10px] sm:text-xs text-red-500 dark:text-red-400 touch-manipulation" onClick={e => { e.stopPropagation(); setComposeToGroup(''); setComposeCourse(''); }}>&times;</button>
                             </span>
                           ) : (
@@ -950,7 +1023,7 @@ const Inbox: React.FC = () => {
                         </div>
                         {composeCourseOptions.map((c: any) => (
                           <div key={c._id} className="px-4 py-2 hover:bg-blue-100 dark:hover:bg-blue-900/50 cursor-pointer text-gray-900 dark:text-gray-100" onClick={() => setComposeCourse(c._id)}>
-                            {c.title}
+                            {c.catalog?.courseCode || c.title}
                           </div>
                         ))}
                       </div>
@@ -1004,8 +1077,19 @@ const Inbox: React.FC = () => {
                     <Paperclip size={18} className="sm:w-[22px] sm:h-[22px]" />
                   </button>
                   <div className="flex gap-2">
-                    <button type="button" className="px-3 sm:px-4 py-1.5 sm:py-2 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 text-xs sm:text-sm touch-manipulation" onClick={() => setShowCompose(false)} disabled={composeLoading}>Cancel</button>
-                    <button type="submit" className="px-3 sm:px-4 py-1.5 sm:py-2 rounded bg-red-600 dark:bg-red-500 text-white hover:bg-red-700 dark:hover:bg-red-600 text-xs sm:text-sm touch-manipulation" disabled={composeLoading || (!composeRecipients.length && (composeToGroup !== 'sections' || !composeCourse)) || !composeSubject.trim() || !composeBody.trim()}>{composeLoading ? 'Sending...' : 'Send'}</button>
+                    <button type="button" className="px-4 sm:px-6 py-2 sm:py-2.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 text-sm font-medium transition-colors duration-200 touch-manipulation" onClick={() => setShowCompose(false)} disabled={composeLoading}>Cancel</button>
+                    <button type="submit" className="px-4 sm:px-6 py-2 sm:py-2.5 rounded-lg bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-md hover:shadow-lg text-sm font-medium transition-all duration-200 touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none" disabled={composeLoading || (!composeRecipients.length && (composeToGroup !== 'sections' || !composeCourse)) || !composeSubject.trim() || !composeBody.trim()}>
+                      {composeLoading ? (
+                        <span className="flex items-center gap-2">
+                          <span className="animate-spin">⏳</span> Sending...
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          <Send className="w-4 h-4" strokeWidth={2} />
+                          Send
+                        </span>
+                      )}
+                    </button>
                   </div>
                 </div>
                 {composeError && <div className="text-red-500 dark:text-red-400 mt-2">{composeError}</div>}
@@ -1014,10 +1098,10 @@ const Inbox: React.FC = () => {
           </div>
         )}
         {/* Conversation List */}
-        <div className={`w-full lg:w-80 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800 p-0 overflow-y-auto flex flex-col ${selectedConversation ? 'hidden lg:flex' : 'flex'}`}>
+        <div className={`w-full lg:w-96 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200/50 dark:border-gray-700/50 p-0 overflow-hidden flex flex-col backdrop-blur-sm ${selectedConversation ? 'hidden lg:flex' : 'flex'}`}>
           {/* Header with select all */}
           {!loading && !error && conversations.length > 0 && (
-            <div className="px-3 sm:px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex items-center">
+            <div className="px-4 sm:px-5 py-3 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 flex items-center shadow-sm">
               <input
                 type="checkbox"
                 id="select-all-conversations"
@@ -1030,15 +1114,17 @@ const Inbox: React.FC = () => {
                     setSelectedConversations([]);
                   }
                 }}
-                className="mr-2 sm:mr-3 accent-blue-600 w-4 h-4 touch-manipulation"
+                className="mr-3 accent-blue-600 w-4 h-4 touch-manipulation cursor-pointer"
               />
-              <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 {bulkActionLoading ? (
-                  <span className="text-blue-600 dark:text-blue-400">Processing...</span>
+                  <span className="text-blue-600 dark:text-blue-400 flex items-center gap-2">
+                    <span className="animate-spin">⏳</span> Processing...
+                  </span>
                 ) : (
                   selectedConversations.length > 0 
-                    ? `${selectedConversations.length} selected` 
-                    : `${filteredConversations.length} conversations`
+                    ? <span className="text-blue-600 dark:text-blue-400">{selectedConversations.length} selected</span>
+                    : <span>{filteredConversations.length} {filteredConversations.length === 1 ? 'conversation' : 'conversations'}</span>
                 )}
               </span>
             </div>
@@ -1046,12 +1132,18 @@ const Inbox: React.FC = () => {
           {loading && <div className="p-4 text-gray-600 dark:text-gray-400">Loading...</div>}
           {error && <div className="p-4 text-red-500 dark:text-red-400">{error}</div>}
           {!loading && !error && conversations.length === 0 && (
-            <div className="p-4 text-gray-400 dark:text-gray-500">No conversations yet.</div>
+            <div className="flex flex-col items-center justify-center p-8 text-center">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 flex items-center justify-center mb-4">
+                <Mail className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+              </div>
+              <p className="text-gray-500 dark:text-gray-400 font-medium">No conversations yet</p>
+              <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">Start a new conversation to get started</p>
+            </div>
           )}
           <div className="flex-1 overflow-y-auto">
             {dateKeys.map(dateKey => (
               <div key={dateKey}>
-                <div className="px-3 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs text-gray-500 dark:text-gray-300 font-semibold bg-gray-50 dark:bg-gray-900 sticky top-0 z-10 rounded-t-2xl">{formatDateHeader(dateKey)}</div>
+                <div className="px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm text-gray-600 dark:text-gray-400 font-semibold bg-gradient-to-r from-gray-50 to-gray-100/50 dark:from-gray-900 dark:to-gray-800/50 sticky top-0 z-10 border-b border-gray-200 dark:border-gray-700">{formatDateHeader(dateKey)}</div>
                 {grouped[dateKey].map((conv: any) => {
                   const unread = conv.unreadCount > 0;
                   const participant = conv.participants.find((p: any) => p._id?.toString() === currentUserId?.toString()) || conv.participants[0];
@@ -1065,7 +1157,7 @@ const Inbox: React.FC = () => {
                   return (
                     <div
                       key={conv._id}
-                      className={`flex flex-col px-3 sm:px-4 py-2.5 sm:py-3 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 cursor-pointer transition-all duration-150 active:bg-blue-50 dark:active:bg-blue-900 hover:bg-blue-50 dark:hover:bg-blue-900 ${selectedConversation && selectedConversation._id === conv._id ? 'bg-blue-100 dark:bg-blue-900 border-l-4 border-l-blue-500' : ''}`}
+                      className={`flex flex-col px-4 sm:px-5 py-3 sm:py-4 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 cursor-pointer transition-all duration-200 hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-transparent dark:hover:from-blue-900/20 dark:hover:to-transparent ${selectedConversation && selectedConversation._id === conv._id ? 'bg-gradient-to-r from-blue-50 to-blue-100/50 dark:from-blue-900/30 dark:to-blue-800/20 border-l-4 border-l-blue-500 shadow-sm' : ''}`}
                       onClick={e => {
                         if ((e.target as HTMLElement).tagName === 'INPUT') return;
                         handleSelectConversation(conv);
@@ -1088,18 +1180,24 @@ const Inbox: React.FC = () => {
                           onClick={e => e.stopPropagation()}
                         />
                         {/* Avatar */}
-                        <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white font-bold text-xs sm:text-sm mr-1.5 sm:mr-2 overflow-hidden flex-shrink-0 ${getAvatarColor(conv._id)}`}>
-                          {otherParticipants[0]?.profilePicture ? (
-                            <img
-                              src={otherParticipants[0].profilePicture.startsWith('http')
-                                ? otherParticipants[0].profilePicture
-                                : getImageUrl(otherParticipants[0].profilePicture)}
-                              alt={participantNames}
-                              className="w-8 h-8 sm:w-10 sm:h-10 object-cover rounded-full"
-                            />
-                          ) : (
-                            getInitials(otherParticipants[0])
-                          )}
+                        <div className="relative flex-shrink-0 mr-2 sm:mr-3">
+                          <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-white font-bold text-sm sm:text-base shadow-md ${isUserOnline(otherParticipants[0], currentUserId, currentUserShowOnlineStatus) ? 'ring-2 ring-green-500 dark:ring-green-400 animate-pulse' : 'ring-2 ring-white dark:ring-gray-800'} ${getAvatarColor(conv._id)}`}>
+                            <div className="w-full h-full rounded-full overflow-hidden">
+                              {otherParticipants[0]?.profilePicture ? (
+                                <img
+                                  src={otherParticipants[0].profilePicture.startsWith('http')
+                                    ? otherParticipants[0].profilePicture
+                                    : getImageUrl(otherParticipants[0].profilePicture)}
+                                  alt={participantNames}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  {getInitials(otherParticipants[0])}
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 sm:gap-2">
@@ -1112,32 +1210,17 @@ const Inbox: React.FC = () => {
                         </div>
                       </div>
                       <div className="flex items-center min-h-[22px] mt-1 gap-1.5 sm:gap-2">
-                        <span
-                          className="cursor-pointer flex items-center justify-center transition-colors touch-manipulation flex-shrink-0"
+                        <button
+                          className="cursor-pointer flex items-center justify-center transition-all duration-200 touch-manipulation flex-shrink-0 p-1 rounded hover:bg-amber-50 dark:hover:bg-amber-900/20"
                           title={starred ? 'Unstar' : 'Star'}
                           onClick={e => { e.stopPropagation(); handleToggleStar(conv); }}
-                          style={{ width: 16, height: 16 }}
                         >
-                          <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill={starred ? '#2563eb' : 'none'}
-                            stroke={starred ? '#2563eb' : '#9ca3af'}
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            style={{ display: 'block' }}
-                            className="dark:stroke-blue-400"
-                          >
-                            <polygon
-                              points="12 17.27 18.18 21 16.54 13.97 22 9.24 14.81 8.63 12 2 9.19 8.63 2 9.24 7.46 13.97 5.82 21 12 17.27"
-                              fill={starred ? '#2563eb' : 'none'}
-                              stroke={starred ? '#2563eb' : '#9ca3af'}
-                              className="dark:fill-blue-400 dark:stroke-blue-400"
-                            />
-                          </svg>
-                        </span>
+                          <Star 
+                            size={16} 
+                            className={`transition-all duration-200 ${starred ? 'fill-amber-500 text-amber-500 dark:fill-amber-400 dark:text-amber-400' : 'text-gray-400 dark:text-gray-500 hover:text-amber-500 dark:hover:text-amber-400'}`}
+                            strokeWidth={starred ? 0 : 2}
+                          />
+                        </button>
                         <span className={`truncate flex-1 text-xs sm:text-sm ${unread ? 'font-bold text-blue-900 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'}`}>{conv.subject}</span>
                         {unread && (
                           <span className="ml-1 sm:ml-2 bg-blue-500 dark:bg-blue-400 text-white text-[10px] sm:text-xs rounded-full px-1.5 sm:px-2 py-0.5 flex-shrink-0">{conv.unreadCount}</span>
@@ -1158,28 +1241,31 @@ const Inbox: React.FC = () => {
           </div>
         </div>
         {/* Message View */}
-        <div className={`flex-1 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800 p-0 flex flex-col min-h-[400px] lg:min-h-[600px] ${!selectedConversation ? 'hidden lg:flex' : 'flex'}`}>
+        <div className={`flex-1 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200/50 dark:border-gray-700/50 p-0 flex flex-col min-h-[400px] lg:min-h-[600px] backdrop-blur-sm ${!selectedConversation ? 'hidden lg:flex' : 'flex'}`}>
           {!selectedConversation && (
-            <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500">
-              <svg width="96" height="96" fill="none" viewBox="0 0 24 24"><path d="M2 6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6Zm2 0 8 7 8-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              <div className="mt-4 text-lg text-gray-600 dark:text-gray-400">No Conversations Selected</div>
+            <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500 p-8">
+              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 flex items-center justify-center mb-6 shadow-lg">
+                <InboxIcon className="w-12 h-12 text-blue-600 dark:text-blue-400" strokeWidth={1.5} />
+              </div>
+              <div className="mt-4 text-xl font-semibold text-gray-600 dark:text-gray-400">No Conversations Selected</div>
+              <div className="mt-2 text-sm text-gray-500 dark:text-gray-500">Select a conversation from the list to view messages</div>
             </div>
           )}
           {selectedConversation && (
             <div className="flex flex-col h-full">
               {/* Sticky Subject Header */}
-              <div className="mb-3 sm:mb-4 border-b border-gray-200 dark:border-gray-700 pb-2 flex items-center justify-between sticky top-0 z-10 bg-white dark:bg-gray-800 rounded-t-2xl shadow-sm px-3 sm:px-4 lg:px-6 pt-3 sm:pt-4 lg:pt-6">
-                <div className="flex items-center gap-2 flex-1 min-w-0">
+              <div className="mb-0 border-b border-gray-200 dark:border-gray-700 pb-4 flex items-center justify-between sticky top-0 z-10 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-t-xl shadow-sm px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 lg:pt-8">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
                   <button
                     onClick={() => setSelectedConversation(null)}
-                    className="lg:hidden text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 mr-1 sm:mr-2 p-1 touch-manipulation"
+                    className="lg:hidden text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 mr-1 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
                   >
                     <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
                   </button>
-                  <div className="font-bold text-base sm:text-lg lg:text-2xl text-gray-900 dark:text-gray-100 truncate">{selectedConversation.subject}</div>
+                  <div className="font-bold text-lg sm:text-xl lg:text-2xl text-gray-900 dark:text-gray-100 truncate">{selectedConversation.subject}</div>
                 </div>
               </div>
-              <div className="flex-1 overflow-y-auto px-3 sm:px-4 lg:px-6 pb-4 sm:pb-6">
+              <div className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 pb-6 sm:pb-8">
                 {messagesLoading && <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 py-4">Loading messages...</div>}
                 {messagesError && <div className="text-xs sm:text-sm text-red-500 dark:text-red-400 py-4">{messagesError}</div>}
                 {!messagesLoading && !messagesError && messages.length === 0 && (
@@ -1194,23 +1280,29 @@ const Inbox: React.FC = () => {
                     const isLast = idx === messages.length - 1;
                     const isMe = msg.senderId?._id === currentUserId;
                     return (
-                      <div key={msg._id} className="border-b border-gray-200 dark:border-gray-700 pb-4 sm:pb-6 last:border-b-0">
+                      <div key={msg._id} className="border-b border-gray-200 dark:border-gray-700 pb-6 sm:pb-8 last:border-b-0 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors duration-200 rounded-lg px-2 py-2 -mx-2">
                         {/* Email Header */}
                         <div className="flex items-start justify-between mb-3 sm:mb-4 gap-2">
                           <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
                             {/* Avatar */}
-                            <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white font-bold text-sm sm:text-lg overflow-hidden flex-shrink-0 ${getAvatarColor(msg.senderId?._id)}`}>
-                              {msg.senderId?.profilePicture ? (
-                                <img
-                                  src={msg.senderId.profilePicture.startsWith('http')
-                                    ? msg.senderId.profilePicture
-                                    : getImageUrl(msg.senderId.profilePicture)}
-                                  alt={senderName}
-                                  className="w-8 h-8 sm:w-10 sm:h-10 object-cover rounded-full"
-                                />
-                              ) : (
-                                getInitials(msg.senderId)
-                              )}
+                            <div className="relative flex-shrink-0">
+                              <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-white font-bold text-base sm:text-lg shadow-md ${isUserOnline(msg.senderId, currentUserId, currentUserShowOnlineStatus) ? 'ring-2 ring-green-500 dark:ring-green-400 animate-pulse' : 'ring-2 ring-white dark:ring-gray-800'} ${getAvatarColor(msg.senderId?._id)}`}>
+                                <div className="w-full h-full rounded-full overflow-hidden">
+                                  {msg.senderId?.profilePicture ? (
+                                    <img
+                                      src={msg.senderId.profilePicture.startsWith('http')
+                                        ? msg.senderId.profilePicture
+                                        : getImageUrl(msg.senderId.profilePicture)}
+                                      alt={senderName}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center">
+                                      {getInitials(msg.senderId)}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
                             </div>
                             <div className="min-w-0 flex-1">
                               <div className="font-semibold text-sm sm:text-base text-gray-900 dark:text-gray-100 truncate">
@@ -1245,6 +1337,8 @@ const Inbox: React.FC = () => {
                 <form className="flex flex-col gap-2 mt-2 px-3 sm:px-4 lg:px-6 pb-3 sm:pb-4 lg:pb-6" onSubmit={handleSendReply}>
                   <label htmlFor="reply-message" className="sr-only">Reply</label>
                   <RichTextEditor
+                    id="reply-message"
+                    name="reply"
                     content={reply}
                     onChange={setReply}
                     placeholder="Type your reply..."
@@ -1261,10 +1355,19 @@ const Inbox: React.FC = () => {
                     </button>
                     <button
                       type="submit"
-                      className="bg-blue-600 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded disabled:opacity-50 shadow text-xs sm:text-sm touch-manipulation"
+                      className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white px-4 sm:px-6 py-2 sm:py-2.5 rounded-lg disabled:opacity-50 shadow-md hover:shadow-lg text-sm font-medium transition-all duration-200 touch-manipulation disabled:cursor-not-allowed flex items-center gap-2"
                       disabled={sending || !reply.trim()}
                     >
-                      {sending ? 'Sending...' : 'Send'}
+                      {sending ? (
+                        <span className="flex items-center gap-2">
+                          <span className="animate-spin">⏳</span> Sending...
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          <Send className="w-4 h-4" strokeWidth={2} />
+                          Send
+                        </span>
+                      )}
                     </button>
                   </div>
                 </form>
@@ -1273,9 +1376,9 @@ const Inbox: React.FC = () => {
                 <div className="px-3 sm:px-4 lg:px-6 pb-3 sm:pb-4 lg:pb-6 flex justify-end">
                   <button
                     onClick={() => setShowReplyBox(true)}
-                    className="inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-xs sm:text-sm leading-4 font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400 touch-manipulation"
+                    className="inline-flex items-center px-4 sm:px-5 py-2 sm:py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-md hover:shadow-lg text-sm font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400 touch-manipulation"
                   >
-                    <Reply className="w-3 h-3 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                    <Reply className="w-4 h-4 mr-2" strokeWidth={2} />
                     Reply
                   </button>
                 </div>

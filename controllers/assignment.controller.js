@@ -4,6 +4,8 @@ const fs = require('fs').promises;
 const path = require('path');
 const mongoose = require('mongoose');
 const { startOfWeek, endOfWeek } = require('date-fns');
+const logger = require('../utils/logger');
+const { ValidationError, sendErrorResponse } = require('../utils/errorHandler');
 
 // Create a new assignment
 exports.createAssignment = async (req, res) => {
@@ -12,23 +14,23 @@ exports.createAssignment = async (req, res) => {
     
     // Validate required fields
     if (!title || !title.trim()) {
-      return res.status(400).json({ message: 'Title is required' });
+      return sendErrorResponse(res, new ValidationError('Title is required'), { action: 'createAssignment' });
     }
     if (!description || !description.trim()) {
-      return res.status(400).json({ message: 'Description is required' });
+      return sendErrorResponse(res, new ValidationError('Description is required'), { action: 'createAssignment' });
     }
     if (!availableFrom) {
-      return res.status(400).json({ message: 'Available from date is required' });
+      return sendErrorResponse(res, new ValidationError('Available from date is required'), { action: 'createAssignment' });
     }
     if (!dueDate) {
-      return res.status(400).json({ message: 'Due date is required' });
+      return sendErrorResponse(res, new ValidationError('Due date is required'), { action: 'createAssignment' });
     }
     
     // Validate that due date is after available from date
     const availableFromDate = new Date(availableFrom);
     const dueDateDate = new Date(dueDate);
     if (dueDateDate <= availableFromDate) {
-      return res.status(400).json({ message: 'Due date must be after available from date' });
+      return sendErrorResponse(res, new ValidationError('Due date must be after available from date'), { action: 'createAssignment' });
     }
     
     // Get file URLs from uploaded files
@@ -40,10 +42,10 @@ exports.createAssignment = async (req, res) => {
       try {
         parsedQuestions = JSON.parse(questions);
         if (!Array.isArray(parsedQuestions)) {
-          return res.status(400).json({ message: 'Questions must be an array' });
+          return sendErrorResponse(res, new ValidationError('Questions must be an array'), { action: 'createAssignment' });
         }
       } catch (parseError) {
-        return res.status(400).json({ message: 'Invalid questions format. Must be valid JSON array.' });
+        return sendErrorResponse(res, new ValidationError('Invalid questions format. Must be valid JSON array.'), { action: 'createAssignment' });
       }
     }
     
@@ -82,9 +84,11 @@ exports.createAssignment = async (req, res) => {
     // If there's an error, delete any uploaded files
     if (req.files) {
       await Promise.all(req.files.map(file => 
-        fs.unlink(file.path).catch(err => console.error('Error deleting file:', err))
+        fs.unlink(file.path).catch(err => logger.warn('Error deleting file', { error: err.message, path: file.path }))
       ));
     }
+    // Let the global error handler deal with it
+    next(error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -93,6 +97,21 @@ exports.createAssignment = async (req, res) => {
 exports.getModuleAssignments = async (req, res) => {
   try {
     const isStudent = req.user.role === 'student';
+    const Module = require('../models/module.model');
+    const Course = require('../models/course.model');
+    
+    // For students, check if module and course are published
+    if (isStudent) {
+      const module = await Module.findById(req.params.moduleId).populate('course', 'published');
+      if (!module || !module.published) {
+        return res.json([]);
+      }
+      const course = module.course;
+      if (!course || !course.published) {
+        return res.json([]);
+      }
+    }
+    
     const assignments = await Assignment.find({
       module: req.params.moduleId,
       ...(isStudent ? { published: true } : {})
@@ -124,13 +143,37 @@ exports.getModuleAssignments = async (req, res) => {
 // Get a single assignment
 exports.getAssignment = async (req, res) => {
   try {
+    const isStudent = req.user.role === 'student';
     const assignment = await Assignment.findById(req.params.id)
       .populate('createdBy', 'firstName lastName profilePicture')
-      .populate('module', 'title');
+      .populate({
+        path: 'module',
+        select: 'title published course',
+        populate: {
+          path: 'course',
+          select: 'published'
+        }
+      });
       
     if (!assignment) {
       return res.status(404).json({ message: 'Assignment not found' });
     }
+    
+    // For students, check if assignment, module, and course are published
+    if (isStudent) {
+      if (!assignment.published) {
+        return res.status(404).json({ message: 'Assignment not found' });
+      }
+      if (assignment.module) {
+        if (!assignment.module.published) {
+          return res.status(404).json({ message: 'Assignment not found' });
+        }
+        if (assignment.module.course && !assignment.module.course.published) {
+          return res.status(404).json({ message: 'Assignment not found' });
+        }
+      }
+    }
+    
     // Always return just the assignment object, never attach a submission
     res.json(assignment);
   } catch (error) {
@@ -157,6 +200,9 @@ exports.updateAssignment = async (req, res) => {
     const submissionCount = await Submission.countDocuments({ assignment: req.params.id });
     const hasSubmissions = submissionCount > 0;
     
+    // Note: Feedback options (showCorrectAnswers, showStudentAnswers) can always be updated,
+    // even after students have submitted. Only question structure changes are restricted.
+    
     // Get new file URLs from uploaded files
     const newAttachments = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
     
@@ -167,7 +213,7 @@ exports.updateAssignment = async (req, res) => {
         try {
           await fs.unlink(filePath);
         } catch (err) {
-          console.error('Error deleting file:', err);
+          logger.warn('Error deleting file', { error: err.message, path: file.path });
         }
       }));
     }
@@ -207,8 +253,16 @@ exports.updateAssignment = async (req, res) => {
     if (req.body.quizTimeLimit !== undefined) assignment.quizTimeLimit = req.body.quizTimeLimit ? parseInt(req.body.quizTimeLimit) : null;
     if (req.body.allowStudentUploads !== undefined) assignment.allowStudentUploads = req.body.allowStudentUploads === 'true' || req.body.allowStudentUploads === true;
     if (req.body.displayMode !== undefined) assignment.displayMode = req.body.displayMode;
-    if (req.body.showCorrectAnswers !== undefined) assignment.showCorrectAnswers = req.body.showCorrectAnswers === 'true' || req.body.showCorrectAnswers === true;
-    if (req.body.showStudentAnswers !== undefined) assignment.showStudentAnswers = req.body.showStudentAnswers === 'true' || req.body.showStudentAnswers === true;
+    // Always update feedback options if they're provided, even if false (important for assignments with submissions)
+    // These can be changed even after students have submitted
+    if ('showCorrectAnswers' in req.body) {
+      const value = req.body.showCorrectAnswers;
+      assignment.showCorrectAnswers = value === 'true' || value === true || value === 'True';
+    }
+    if ('showStudentAnswers' in req.body) {
+      const value = req.body.showStudentAnswers;
+      assignment.showStudentAnswers = value === 'true' || value === true || value === 'True';
+    }
     if (req.body.isOfflineAssignment !== undefined) assignment.isOfflineAssignment = req.body.isOfflineAssignment === 'true' || req.body.isOfflineAssignment === true;
     if (req.body.totalPoints !== undefined) assignment.totalPoints = req.body.totalPoints ? parseFloat(req.body.totalPoints) : 0;
     
@@ -263,7 +317,7 @@ exports.updateAssignment = async (req, res) => {
           }));
         }
       } catch (err) {
-        console.error('Error parsing questions:', err);
+        logger.warn('Error parsing questions', { error: err.message });
         return res.status(400).json({ message: 'Invalid questions format' });
       }
     }
@@ -279,7 +333,7 @@ exports.updateAssignment = async (req, res) => {
     // If there's an error, delete any uploaded files
     if (req.files) {
       await Promise.all(req.files.map(file => 
-        fs.unlink(file.path).catch(err => console.error('Error deleting file:', err))
+        fs.unlink(file.path).catch(err => logger.warn('Error deleting file', { error: err.message, path: file.path }))
       ));
     }
     res.status(500).json({ message: error.message });
@@ -292,16 +346,16 @@ exports.deleteAssignment = async (req, res) => {
 
     const assignment = await Assignment.findById(req.params.id);
     if (!assignment) {
-      console.error('[DeleteAssignment] Assignment not found:', req.params.id);
+      logger.warn('[DeleteAssignment] Assignment not found', { assignmentId: req.params.id });
       return res.status(404).json({ message: 'Assignment not found' });
     }
     if (!assignment.createdBy) {
-      console.error('[DeleteAssignment] Assignment has no creator:', assignment);
+      logger.error('[DeleteAssignment] Assignment has no creator', { assignmentId: req.params.id });
       return res.status(500).json({ message: 'Assignment has no creator. Cannot verify permissions.' });
     }
     // Check if user is the creator
     if (assignment.createdBy.toString() !== req.user._id.toString()) {
-      console.error('[DeleteAssignment] Not authorized. Assignment creator:', assignment.createdBy, 'User:', req.user._id);
+      logger.warn('[DeleteAssignment] Not authorized', { assignmentId: req.params.id, creator: assignment.createdBy, userId: req.user._id });
       return res.status(403).json({ message: 'Not authorized to delete this assignment' });
     }
     // Delete all files
@@ -312,7 +366,7 @@ exports.deleteAssignment = async (req, res) => {
           await fs.unlink(filePath);
 
         } catch (err) {
-          console.error('[DeleteAssignment] Error deleting file:', filePath, err.message);
+          logger.warn('[DeleteAssignment] Error deleting file', { filePath, error: err.message });
         }
       }));
     } else {
@@ -323,18 +377,18 @@ exports.deleteAssignment = async (req, res) => {
       const result = await Submission.deleteMany({ assignment: req.params.id });
 
     } catch (err) {
-      console.error('[DeleteAssignment] Error deleting submissions:', err.message);
+      logger.warn('[DeleteAssignment] Error deleting submissions', { assignmentId: req.params.id, error: err.message });
     }
     try {
       await assignment.deleteOne();
 
       res.json({ message: 'Assignment deleted successfully' });
     } catch (removeError) {
-      console.error('[DeleteAssignment] Error removing assignment:', removeError);
+      logger.logError(removeError, { action: 'deleteAssignment', assignmentId: req.params.id });
       res.status(500).json({ message: 'Error removing assignment', error: removeError.message });
     }
   } catch (error) {
-    console.error('[DeleteAssignment] Unexpected error:', error);
+    logger.logError(error, { action: 'deleteAssignment', assignmentId: req.params.id });
     res.status(500).json({ message: 'Server error during assignment deletion', error: error.message });
   }
 };
@@ -350,7 +404,7 @@ exports.toggleAssignmentPublish = async (req, res) => {
     await assignment.save();
     res.json({ success: true, published: assignment.published });
   } catch (err) {
-    console.error('Toggle assignment publish error:', err);
+    logger.logError(err, { action: 'toggleAssignmentPublish', assignmentId: req.params.id });
     res.status(500).json({ success: false, message: 'Server error during publish toggle', error: err.message });
   }
 };
@@ -376,6 +430,16 @@ exports.getCourseGroupAssignments = async (req, res) => {
   try {
     const courseId = req.params.courseId;
     const isStudent = req.user.role === 'student';
+    
+    // For students, check if course is published
+    if (isStudent) {
+      const Course = require('../models/course.model');
+      const course = await Course.findById(courseId);
+      if (!course || !course.published) {
+        return res.json([]);
+      }
+    }
+    
     // Find all group assignments for the course by finding assignments with groupSet
     // that belongs to the course
     const assignments = await Assignment.find({
@@ -398,7 +462,7 @@ exports.getCourseGroupAssignments = async (req, res) => {
       : courseGroupAssignments;
     res.json(filteredAssignments);
   } catch (error) {
-    console.error('Error in getCourseGroupAssignments:', error);
+    logger.logError(error, { action: 'getCourseGroupAssignments', courseId: req.params.courseId });
     res.status(500).json({ message: error.message });
   }
 };
@@ -437,7 +501,7 @@ exports.getUngradedAssignmentsTodo = async (req, res) => {
     }
     res.json(results);
   } catch (err) {
-    console.error('Error in getUngradedAssignmentsTodo:', err);
+    logger.logError(err, { action: 'getUngradedAssignmentsTodo', userId: req.user?._id });
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 };
@@ -508,7 +572,7 @@ exports.getStudentAssignmentsDueThisWeek = async (req, res) => {
     
     res.json(filtered);
   } catch (err) {
-    console.error('Error in getStudentAssignmentsDueThisWeek:', err);
+    logger.logError(err, { action: 'getStudentAssignmentsDueThisWeek', userId: req.user?._id });
     res.status(500).json({ error: err.message });
   }
 };
@@ -616,7 +680,7 @@ exports.getAllItemsDueThisWeek = async (req, res) => {
     
     res.json(allItems);
   } catch (err) {
-    console.error('Error in getAllItemsDueThisWeek:', err);
+    logger.logError(err, { action: 'getAllItemsDueThisWeek', userId: req.user?._id });
     res.status(500).json({ error: err.message });
   }
 }; 
@@ -727,7 +791,7 @@ exports.getAssignmentStats = async (req, res) => {
 
     res.json({ success: true, stats });
   } catch (error) {
-    console.error('Error getting assignment stats:', error);
+    logger.logError(error, { action: 'getAssignmentStats', assignmentId: req.params.id });
     res.status(500).json({ message: 'Error fetching assignment statistics' });
   }
 }; 

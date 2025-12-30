@@ -16,7 +16,7 @@ const sizeClasses = {
   xl: 'w-20 h-20 text-3xl'
 };
 
-const ProfileImage: React.FC<ProfileImageProps> = ({ 
+const ProfileImage: React.FC<ProfileImageProps> = React.memo(({ 
   firstName, 
   lastName, 
   profilePicture, 
@@ -48,7 +48,9 @@ const ProfileImage: React.FC<ProfileImageProps> = ({
       )}
     </div>
   );
-};
+});
+
+ProfileImage.displayName = 'ProfileImage';
 
 export default ProfileImage;
 

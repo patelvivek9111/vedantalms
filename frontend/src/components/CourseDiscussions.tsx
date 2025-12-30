@@ -6,6 +6,7 @@ import { API_URL } from '../config';
 import { formatDistanceToNow } from 'date-fns';
 import CreateThreadModal from './CreateThreadModal';
 import axios from 'axios';
+import logger from '../utils/logger';
 
 interface Thread {
   _id: string;
@@ -72,7 +73,7 @@ const CourseDiscussions: React.FC<CourseDiscussionsProps> = ({ courseId, courseG
           setError('Failed to fetch discussion threads');
         }
       } catch (err) {
-        console.error('Error fetching threads:', err);
+        logger.error('Error fetching threads', err);
         setError('Failed to load discussion threads');
       } finally {
         setLoading(false);

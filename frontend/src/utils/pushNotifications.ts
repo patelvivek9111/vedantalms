@@ -1,128 +1,76 @@
-// Browser Push Notification Utilities
+/**
+ * Push notifications utility
+ * Handles browser push notifications for the LMS
+ */
 
-export async function requestNotificationPermission(): Promise<NotificationPermission> {
-  if (!('Notification' in window)) {
-    console.warn('This browser does not support notifications');
-    return 'denied';
-  }
+class PushNotificationService {
+  private permission: NotificationPermission = 'default';
 
-  if (Notification.permission === 'granted') {
-    return 'granted';
-  }
-
-  if (Notification.permission !== 'denied') {
-    const permission = await Notification.requestPermission();
-    return permission;
-  }
-
-  return Notification.permission;
-}
-
-export async function subscribeToPushNotifications(): Promise<PushSubscription | null> {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    console.warn('Push messaging is not supported');
-    return null;
-  }
-
-  try {
-    // Request notification permission first
-    const permission = await requestNotificationPermission();
-    if (permission !== 'granted') {
-      console.warn('Notification permission not granted');
-      return null;
+  async requestPermission(): Promise<NotificationPermission> {
+    if (!('Notification' in window)) {
+      console.warn('This browser does not support notifications');
+      return 'denied';
     }
 
-    // Register service worker
-    const registration = await navigator.serviceWorker.register('/sw.js');
-    
-    // Wait for service worker to be ready
-    await navigator.serviceWorker.ready;
-
-    // Validate VAPID key
-    const vapidKey = process.env.VITE_VAPID_PUBLIC_KEY;
-    if (!vapidKey || vapidKey.trim() === '') {
-      console.warn('VAPID public key is not configured');
-      return null;
+    if (this.permission === 'granted') {
+      return 'granted';
     }
 
-    // Subscribe to push notifications
-    let applicationServerKey: Uint8Array;
+    if (this.permission === 'denied') {
+      return 'denied';
+    }
+
     try {
-      applicationServerKey = urlBase64ToUint8Array(vapidKey);
+      const permission = await Notification.requestPermission();
+      this.permission = permission;
+      return permission;
     } catch (error) {
-      console.error('Error converting VAPID key:', error);
+      console.error('Error requesting notification permission:', error);
+      return 'denied';
+    }
+  }
+
+  async showNotification(title: string, options?: NotificationOptions): Promise<Notification | null> {
+    if (!('Notification' in window)) {
       return null;
     }
 
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: applicationServerKey
-    });
-
-    return subscription;
-  } catch (error) {
-    console.error('Error subscribing to push notifications:', error);
-    return null;
-  }
-}
-
-export async function unsubscribeFromPushNotifications(): Promise<boolean> {
-  try {
-    const registration = await navigator.serviceWorker.ready;
-    const subscription = await registration.pushManager.getSubscription();
-    
-    if (subscription) {
-      await subscription.unsubscribe();
-      return true;
+    if (this.permission !== 'granted') {
+      const permission = await this.requestPermission();
+      if (permission !== 'granted') {
+        return null;
+      }
     }
-    return false;
-  } catch (error) {
-    console.error('Error unsubscribing from push notifications:', error);
-    return false;
-  }
-}
 
-export async function getPushSubscription(): Promise<PushSubscription | null> {
-  try {
-    if (!('serviceWorker' in navigator)) {
+    try {
+      const notification = new Notification(title, {
+        icon: '/favicon.ico',
+        badge: '/favicon.ico',
+        ...options
+      });
+
+      // Auto-close after 5 seconds
+      setTimeout(() => {
+        notification.close();
+      }, 5000);
+
+      return notification;
+    } catch (error) {
+      console.error('Error showing notification:', error);
       return null;
     }
-    
-    const registration = await navigator.serviceWorker.ready;
-    return await registration.pushManager.getSubscription();
-  } catch (error) {
-    console.error('Error getting push subscription:', error);
-    return null;
-  }
-}
-
-// Helper function to convert VAPID key
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
-  // Validate input
-  if (!base64String || typeof base64String !== 'string' || base64String.trim() === '') {
-    throw new Error('Invalid VAPID key: must be a non-empty string');
   }
 
-  // Limit length to prevent DoS
-  if (base64String.length > 200) {
-    throw new Error('Invalid VAPID key: key is too long');
-  }
-
-  try {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding)
-      .replace(/\-/g, '+')
-      .replace(/_/g, '/');
-
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-
-    for (let i = 0; i < rawData.length; ++i) {
-      outputArray[i] = rawData.charCodeAt(i);
+  getPermission(): NotificationPermission {
+    if (!('Notification' in window)) {
+      return 'denied';
     }
-    return outputArray;
-  } catch (error) {
-    throw new Error('Invalid VAPID key format: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    return Notification.permission;
   }
 }
+
+export const pushNotificationService = new PushNotificationService();
+export default pushNotificationService;
+
+
 

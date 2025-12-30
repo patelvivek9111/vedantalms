@@ -1,14 +1,138 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import ReactMarkdown from 'react-markdown';
 import { format } from 'date-fns';
 import { Lock, Unlock, HelpCircle, CheckCircle, Circle, Bookmark, BarChart3, Edit, Eye, ArrowLeft, X, Download } from 'lucide-react';
 import { API_URL } from '../../config';
 import FilePreview from './FilePreview';
+import logger from '../../utils/logger';
+
+interface ViewAssignmentProps {
+  courseId?: string;
+}
+
+interface Question {
+  _id?: string;
+  id?: string;
+  type: 'text' | 'multiple-choice' | 'matching';
+  text: string;
+  points: number;
+  options?: {
+    text: string;
+    isCorrect?: boolean;
+  }[];
+  leftItems?: {
+    id: string;
+    text: string;
+  }[];
+  rightItems?: {
+    id: string;
+    text: string;
+  }[];
+}
+
+interface User {
+  _id: string;
+  role: 'student' | 'teacher' | 'admin';
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+}
+
+interface Assignment {
+  _id: string;
+  title: string;
+  description?: string;
+  content?: string;
+  dueDate: string;
+  availableFrom?: string;
+  questions?: Question[];
+  attachments?: string[];
+  published?: boolean;
+  totalPoints?: number;
+  module?: string | { _id: string };
+  isGradedQuiz?: boolean;
+  isTimedQuiz?: boolean;
+  quizTimeLimit?: number;
+  isGroupAssignment?: boolean;
+  groupSet?: string;
+  group?: string;
+  isOfflineAssignment?: boolean;
+  displayMode?: 'single' | 'scrollable';
+  showCorrectAnswers?: boolean;
+  showStudentAnswers?: boolean;
+  createdBy?: {
+    _id: string;
+  };
+}
+
+interface Submission {
+  _id: string;
+  assignment: string | Assignment;
+  student: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email?: string;
+  };
+  submittedAt: string;
+  answers?: Record<string, string | Record<number, string>>;
+  grade?: number | null;
+  finalGrade?: number | null;
+  feedback?: string;
+  files?: Array<string | { url?: string; path?: string; name?: string; originalname?: string }>;
+  autoGraded?: boolean;
+  autoGrade?: number;
+  teacherApproved?: boolean;
+  questionGrades?: Record<string, number> | Map<string, number>;
+  autoQuestionGrades?: Record<string, number> | Map<string, number>;
+  teacherFeedbackFiles?: Array<string | { url?: string; path?: string; name?: string; originalname?: string }>;
+  showCorrectAnswers?: boolean;
+  showStudentAnswers?: boolean;
+  timeSpent?: number;
+}
+
+interface UploadedFile {
+  name: string;
+  url: string;
+  size?: number;
+}
+
+interface PreviewFile {
+  url: string;
+  name: string;
+}
+
+interface QuestionStat {
+  questionIndex: number;
+  correctCount: number;
+  incorrectCount: number;
+  averagePoints: number;
+}
+
+interface EngagementStats {
+  averageTimeSpent: number;
+  averageAttemptsPerStudent: number;
+  peakHour: number;
+  peakDay: string;
+  lateSubmissions: number;
+  totalSubmissions: number;
+}
+
+interface SubmissionStats {
+  totalStudents: number;
+  submittedCount: number;
+  averageGrade: number;
+  averageTime: number;
+  questionStats: QuestionStat[];
+  engagementStats: EngagementStats;
+}
+
+type Answers = Record<number, string | Record<number, string>>;
 
 // Fisher-Yates shuffle algorithm for proper randomization
-const shuffleArray = (array) => {
+const shuffleArray = <T,>(array: T[]): T[] => {
   if (!Array.isArray(array) || array.length === 0) {
     return [];
   }
@@ -20,33 +144,43 @@ const shuffleArray = (array) => {
   return shuffled;
 };
 
-const ViewAssignment = () => {
-  const { id } = useParams();
+const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId }) => {
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [assignment, setAssignment] = useState(null);
-  const [submission, setSubmission] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [user, setUser] = useState(null);
-  const [answers, setAnswers] = useState({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [studentGroupId, setStudentGroupId] = useState(null);
-  const [isPublishing, setIsPublishing] = useState(false);
-  const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [answeredQuestions, setAnsweredQuestions] = useState(new Set());
-  const [markedQuestions, setMarkedQuestions] = useState(new Set());
-  const [timeLeft, setTimeLeft] = useState(null);
-  const [quizStarted, setQuizStarted] = useState(false);
-  const [quizStartTime, setQuizStartTime] = useState(null);
-  const [uploadedFiles, setUploadedFiles] = useState([]);
-  const [isUploading, setIsUploading] = useState(false);
-  const [showTimer, setShowTimer] = useState(true);
-  const [showUploadSection, setShowUploadSection] = useState(false);
-  const [shuffledOptions, setShuffledOptions] = useState({});
-  const [previewFile, setPreviewFile] = useState(null);
+  const [courseId, setCourseId] = useState<string | undefined>(propCourseId);
+  
+  // Debug: Log when courseId changes
+  useEffect(() => {
+    console.log('[CourseId] courseId changed:', courseId, 'propCourseId:', propCourseId);
+  }, [courseId, propCourseId]);
+  const [assignment, setAssignment] = useState<Assignment | null>(null);
+  const [submission, setSubmission] = useState<Submission | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string>('');
+  const [user, setUser] = useState<User | null>(null);
+  const [answers, setAnswers] = useState<Answers>({});
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [studentGroupId, setStudentGroupId] = useState<string | null>(null);
+  const [isPublishing, setIsPublishing] = useState<boolean>(false);
+  const [currentQuestion, setCurrentQuestion] = useState<number>(0);
+  const [answeredQuestions, setAnsweredQuestions] = useState<Set<number>>(new Set());
+  const [markedQuestions, setMarkedQuestions] = useState<Set<number>>(new Set());
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [quizStarted, setQuizStarted] = useState<boolean>(false);
+  const [quizStartTime, setQuizStartTime] = useState<Date | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [showTimer, setShowTimer] = useState<boolean>(true);
+  const [showUploadSection, setShowUploadSection] = useState<boolean>(false);
+  const [shuffledOptions, setShuffledOptions] = useState<Record<number, Question['rightItems']>>({});
+  const [previewFile, setPreviewFile] = useState<PreviewFile | null>(null);
+  
+  // Course-level grade data
+  const [courseAverage, setCourseAverage] = useState<number | null>(null); // For teachers
+  const [studentCourseGrade, setStudentCourseGrade] = useState<number | null>(null); // For students
 
   // Teacher analytics state
-  const [submissionStats, setSubmissionStats] = useState({
+  const [submissionStats, setSubmissionStats] = useState<SubmissionStats>({
     totalStudents: 0,
     submittedCount: 0,
     averageGrade: 0,
@@ -63,8 +197,9 @@ const ViewAssignment = () => {
   });
   const [loadingStats, setLoadingStats] = useState(false);
 
-  // Define instructor check early
+  // Define instructor and student checks early
   const isInstructor = user?.role === 'teacher' || user?.role === 'admin';
+  const isStudent = user?.role === 'student';
 
   useEffect(() => {
     let storedUser = null;
@@ -74,7 +209,7 @@ const ViewAssignment = () => {
         storedUser = JSON.parse(userStr);
       }
     } catch (e) {
-      console.error('Error parsing user from localStorage:', e);
+      logger.error('Error parsing user from localStorage', e);
     }
     setUser(storedUser);
     // Add a timeout fallback in case user is not set
@@ -106,41 +241,60 @@ const ViewAssignment = () => {
         setSubmissionStats(response.data.stats);
       }
     } catch (error) {
-      console.error('Error fetching submission stats:', error);
+      logger.error('Error fetching submission stats', error instanceof Error ? error : new Error(String(error)));
       // Fallback: calculate basic stats from submissions
       try {
+        const token = localStorage.getItem('token');
         const submissionsResponse = await axios.get(`/api/submissions/assignment/${assignment._id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         
         const submissions = submissionsResponse.data || [];
-        const stats = {
+        const questionStats = assignment.questions?.map((q: Question, index: number) => ({
+          questionIndex: index,
+          correctCount: 0,
+          incorrectCount: 0,
+          averagePoints: 0
+        })) || [];
+        
+        const stats: SubmissionStats = {
           totalStudents: submissions.length,
-          submittedCount: submissions.filter(s => s.submittedAt).length,
+          submittedCount: submissions.filter((s: any) => s.submittedAt).length,
           averageGrade: submissions.length > 0 
-            ? submissions.reduce((sum, s) => sum + (s.grade || 0), 0) / submissions.length 
+            ? submissions.reduce((sum: number, s: any) => sum + (s.grade || 0), 0) / submissions.length 
             : 0,
           averageTime: assignment.isTimedQuiz && submissions.length > 0
-            ? submissions.reduce((sum, s) => sum + (s.timeSpent || 0), 0) / submissions.length
+            ? submissions.reduce((sum: number, s: any) => sum + (s.timeSpent || 0), 0) / submissions.length
             : 0,
-          questionStats: assignment.questions?.map((q, index) => ({
-            questionIndex: index,
-            correctCount: 0,
-            incorrectCount: 0,
-            averagePoints: 0
-          })) || []
+          questionStats: questionStats,
+          engagementStats: {
+            averageTimeSpent: 0,
+            averageAttemptsPerStudent: 0,
+            peakHour: 0,
+            peakDay: 'Monday',
+            lateSubmissions: 0,
+            totalSubmissions: 0
+          }
         };
         
         setSubmissionStats(stats);
       } catch (err) {
-        console.error('Error calculating basic stats:', err);
+        logger.error('Error calculating basic stats', err instanceof Error ? err : new Error(String(err)));
         // Set default stats if all else fails
         setSubmissionStats({
           totalStudents: 0,
           submittedCount: 0,
           averageGrade: 0,
           averageTime: 0,
-          questionStats: []
+          questionStats: [],
+          engagementStats: {
+            averageTimeSpent: 0,
+            averageAttemptsPerStudent: 0,
+            peakHour: 0,
+            peakDay: 'Monday',
+            lateSubmissions: 0,
+            totalSubmissions: 0
+          }
         });
       }
     } finally {
@@ -157,11 +311,30 @@ const ViewAssignment = () => {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         setAssignment(assignmentRes.data);
+        
+        // Fetch courseId if not provided
+        if (!courseId && assignmentRes.data?.module) {
+          const moduleId = typeof assignmentRes.data.module === 'string' 
+            ? assignmentRes.data.module 
+            : assignmentRes.data.module._id;
+          try {
+            const moduleRes = await axios.get(`${API_URL}/api/modules/view/${moduleId}`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (moduleRes.data.success) {
+              const fetchedCourseId = moduleRes.data.data.course._id || moduleRes.data.data.course;
+              console.log('[CourseId] Setting courseId from module:', fetchedCourseId);
+              setCourseId(fetchedCourseId);
+            }
+          } catch (err) {
+            logger.error('Error fetching module for courseId', err);
+          }
+        }
 
         // Initialize shuffled options for matching questions
         if (assignmentRes.data.questions) {
-          const shuffled = {};
-          assignmentRes.data.questions.forEach((question, index) => {
+          const shuffled: Record<number, Question['rightItems']> = {};
+          assignmentRes.data.questions.forEach((question: Question, index: number) => {
             if (question.type === 'matching' && Array.isArray(question.rightItems) && question.rightItems.length > 0) {
               // Shuffle the rightItems to randomize the order using Fisher-Yates algorithm
               shuffled[index] = shuffleArray([...question.rightItems]);
@@ -172,8 +345,8 @@ const ViewAssignment = () => {
 
         // Initialize answers object for student submission
         if (assignmentRes.data.questions) {
-          const initialAnswers = {};
-          assignmentRes.data.questions.forEach((q, index) => {
+          const initialAnswers: Answers = {};
+          assignmentRes.data.questions.forEach((q: Question, index: number) => {
             if (q.type === 'matching') {
               initialAnswers[index] = {}; // Object for matching questions
             } else {
@@ -189,8 +362,8 @@ const ViewAssignment = () => {
           const groupsRes = await axios.get(`/api/groups/sets/${assignmentRes.data.groupSet}/groups`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
-          const userGroup = groupsRes.data.find(group =>
-            group.members.some(member => String(member._id) === String(userId))
+          const userGroup = groupsRes.data.find((group: any) =>
+            group.members.some((member: any) => String(member._id) === String(userId))
           );
           setStudentGroupId(userGroup ? userGroup._id : null);
         }
@@ -208,7 +381,7 @@ const ViewAssignment = () => {
               setSubmission(submissionRes.data);
               if (submissionRes.data?.answers) {
                 // Parse answers back to proper format
-                const parsedAnswers = {};
+                const parsedAnswers: Record<string, string | Record<number, string>> = {};
                 Object.keys(submissionRes.data.answers).forEach(questionIndex => {
                   const answer = submissionRes.data.answers[questionIndex];
                   try {
@@ -236,21 +409,22 @@ const ViewAssignment = () => {
                 const draft = JSON.parse(savedDraft);
                 if (draft.answers) {
                   // Merge saved answers with initial structure
-                  const initialAnswers = {};
-                  assignmentRes.data.questions.forEach((q, index) => {
+                  const initialAnswers: Record<string, string | Record<number, string>> = {};
+                  assignmentRes.data.questions.forEach((q: Question, index: number) => {
                     if (q.type === 'matching') {
-                      initialAnswers[index] = {}; // Object for matching questions
+                      initialAnswers[index.toString()] = {}; // Object for matching questions
                     } else {
-                      initialAnswers[index] = ''; // String for other question types
+                      initialAnswers[index.toString()] = ''; // String for other question types
                     }
                   });
-                  const mergedAnswers = { ...initialAnswers };
-                  Object.keys(draft.answers).forEach(key => {
+                  const mergedAnswers: Record<string, string | Record<number, string>> = { ...initialAnswers };
+                  Object.keys(draft.answers).forEach((key: string) => {
                     try {
                       // Try to parse matching question answers
-                      mergedAnswers[key] = typeof draft.answers[key] === 'string' && draft.answers[key].startsWith('{') 
-                        ? JSON.parse(draft.answers[key]) 
-                        : draft.answers[key];
+                      const answerValue = draft.answers[key];
+                      mergedAnswers[key] = typeof answerValue === 'string' && answerValue.startsWith('{') 
+                        ? JSON.parse(answerValue) 
+                        : answerValue;
                     } catch {
                       mergedAnswers[key] = draft.answers[key];
                     }
@@ -261,7 +435,7 @@ const ViewAssignment = () => {
                   setUploadedFiles(draft.uploadedFiles);
                 }
               } catch (e) {
-                console.error('Error loading draft:', e);
+                logger.error('Error loading draft', e);
               }
             }
           }
@@ -278,6 +452,7 @@ const ViewAssignment = () => {
 
         setLoading(false);
       } catch (err) {
+        logger.error('Error fetching assignment details', err instanceof Error ? err : new Error(String(err)));
         setError('Error fetching assignment details');
         setLoading(false);
       }
@@ -295,6 +470,101 @@ const ViewAssignment = () => {
     }
   }, [assignment, isInstructor]);
 
+  // Fetch course-level grade data
+  useEffect(() => {
+    const fetchCourseGradeData = async () => {
+      console.log('[Course Grade Fetch] Starting fetch', {
+        courseId,
+        userId: user?._id,
+        userRole: user?.role,
+        isInstructor,
+        isStudent,
+        hasToken: !!localStorage.getItem('token')
+      });
+      
+      if (!courseId) {
+        console.log('[Course Grade Fetch] No courseId, cannot fetch');
+        return;
+      }
+      
+      if (!user) {
+        console.log('[Course Grade Fetch] No user, cannot fetch');
+        return;
+      }
+      
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          console.log('[Course Grade Fetch] No token, cannot fetch');
+          return;
+        }
+
+        if (isInstructor) {
+          // Fetch course class average for teachers
+          console.log('[Course Grade Fetch] Fetching teacher course average for courseId:', courseId);
+          try {
+            const response = await axios.get(`${API_URL}/api/grades/course/${courseId}/average`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            console.log('[Course Grade Fetch] Teacher API response:', response.data);
+            if (response.data && response.data.average !== null && response.data.average !== undefined) {
+              setCourseAverage(response.data.average);
+              console.log('[Course Grade] Teacher course average set:', response.data.average);
+            } else {
+              console.log('[Course Grade] Teacher response has no average:', response.data);
+            }
+          } catch (err: any) {
+            console.log('[Course Grade] Error fetching course average:', err.response?.data || err.message);
+          }
+        } else if (isStudent) {
+          // Fetch student's overall course grade
+          console.log('[Course Grade Fetch] Fetching student course grade for courseId:', courseId);
+          try {
+            const response = await axios.get(`${API_URL}/api/grades/student/course/${courseId}`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            console.log('[Course Grade Fetch] Student API response:', response.data);
+            if (response.data && response.data.totalPercent !== null && response.data.totalPercent !== undefined) {
+              setStudentCourseGrade(response.data.totalPercent);
+              console.log('[Course Grade] Student course grade set:', response.data.totalPercent);
+            } else {
+              console.log('[Course Grade] Student response has no totalPercent:', response.data);
+            }
+          } catch (err: any) {
+            console.log('[Course Grade] Error fetching student course grade:', err.response?.data || err.message);
+          }
+        } else {
+          console.log('[Course Grade Fetch] User is neither instructor nor student');
+        }
+      } catch (err) {
+        logger.error('Error fetching course grade data', err instanceof Error ? err : new Error(String(err)));
+        console.log('[Course Grade Fetch] General error:', err);
+      }
+    };
+
+    fetchCourseGradeData();
+  }, [courseId, user, isInstructor, isStudent]);
+
+  // Update answeredQuestions when answers are loaded or changed
+  useEffect(() => {
+    if (assignment?.questions) {
+      const answered = new Set<number>();
+      assignment.questions.forEach((_, index) => {
+        const answer = answers[index];
+        const isAnswered = typeof answer === 'object' && answer !== null ? 
+          Object.keys(answer).length > 0 && Object.values(answer).some(v => {
+            if (v === null || v === undefined) return false;
+            return typeof v === 'string' ? v.trim() !== '' : String(v).trim() !== '';
+          }) :
+          answer !== null && answer !== undefined && (typeof answer === 'string' ? answer.trim() !== '' : String(answer).trim() !== '');
+        if (isAnswered) {
+          answered.add(index);
+        }
+      });
+      setAnsweredQuestions(answered);
+    }
+  }, [answers, assignment?.questions]);
+
   // Timer logic for timed quizzes
   useEffect(() => {
     if (assignment?.isTimedQuiz && assignment?.quizTimeLimit && user?.role === 'student' && !submission) {
@@ -306,8 +576,8 @@ const ViewAssignment = () => {
         // Only restore quiz state if there's no submission and user hasn't completed the quiz
         const startTime = new Date(storedStartTime);
         const now = new Date();
-        const elapsed = Math.floor((now - startTime) / 1000);
-        const totalSeconds = assignment.quizTimeLimit * 60;
+        const elapsed = Math.floor((now.getTime() - startTime.getTime()) / 1000);
+        const totalSeconds = (assignment.quizTimeLimit || 0) * 60;
         
         // Only restore if quiz hasn't expired and no submission exists
         if (elapsed < totalSeconds) {
@@ -326,8 +596,8 @@ const ViewAssignment = () => {
     if (quizStarted && quizStartTime && assignment?.isTimedQuiz && assignment?.quizTimeLimit && !submission && user?.role === 'student') {
       const timer = setInterval(() => {
         const now = new Date();
-        const elapsed = Math.floor((now - quizStartTime) / 1000); // seconds
-        const totalSeconds = assignment.quizTimeLimit * 60; // convert minutes to seconds
+        const elapsed = Math.floor((now.getTime() - (quizStartTime?.getTime() || 0)) / 1000); // seconds
+        const totalSeconds = (assignment.quizTimeLimit || 0) * 60; // convert minutes to seconds
         const remaining = totalSeconds - elapsed;
         
         if (remaining <= 0) {
@@ -346,7 +616,7 @@ const ViewAssignment = () => {
   }, [quizStarted, quizStartTime, assignment, id, submission, user]);
 
   const startQuiz = () => {
-    if (assignment?.isTimedQuiz && assignment?.quizTimeLimit) {
+    if (assignment?.isTimedQuiz && assignment?.quizTimeLimit && user?._id) {
       const startTime = new Date();
       setQuizStartTime(startTime);
       setQuizStarted(true);
@@ -357,8 +627,8 @@ const ViewAssignment = () => {
     }
   };
 
-  const handleFileUpload = async (event) => {
-    const files = Array.from(event.target.files);
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
     if (files.length === 0) return;
 
     setIsUploading(true);
@@ -381,7 +651,7 @@ const ViewAssignment = () => {
         }
       });
 
-      const newFiles = response.data.files.map(file => ({
+      const newFiles = response.data.files.map((file: any) => ({
         name: file.originalname,
         url: file.path,
         size: file.size
@@ -400,21 +670,21 @@ const ViewAssignment = () => {
             draft.uploadedFiles = updated;
             localStorage.setItem(draftKey, JSON.stringify(draft));
           } catch (e) {
-            console.error('Error saving draft:', e);
+            logger.error('Error saving draft', e);
           }
         }
         
         return updated;
       });
     } catch (error) {
-      console.error('Error uploading files:', error);
+      logger.error('Error uploading files', error instanceof Error ? error : new Error(String(error)));
       setError('Error uploading files. Please try again.');
     } finally {
       setIsUploading(false);
     }
   };
 
-  const removeFile = (index) => {
+  const removeFile = (index: number) => {
     setUploadedFiles(prev => {
       const updated = prev.filter((_, i) => i !== index);
       
@@ -428,7 +698,7 @@ const ViewAssignment = () => {
           draft.uploadedFiles = updated;
           localStorage.setItem(draftKey, JSON.stringify(draft));
         } catch (e) {
-          console.error('Error saving draft:', e);
+          logger.error('Error saving draft', e);
         }
       }
       
@@ -436,7 +706,7 @@ const ViewAssignment = () => {
     });
   };
 
-  const formatTime = (seconds) => {
+  const formatTime = (seconds: number): string => {
     if (!seconds || seconds <= 0) return '0 Hours, 0 Minutes, 0 Seconds';
     
     const hours = Math.floor(seconds / 3600);
@@ -446,7 +716,7 @@ const ViewAssignment = () => {
     return `${hours} Hour${hours !== 1 ? 's' : ''}, ${minutes} Minute${minutes !== 1 ? 's' : ''}, ${secs} Second${secs !== 1 ? 's' : ''}`;
   };
 
-  const handleAnswerChange = (questionIndex, value) => {
+  const handleAnswerChange = (questionIndex: number, value: string | Record<number, string>) => {
     setAnswers(prev => {
       const newAnswers = {
         ...prev,
@@ -463,7 +733,7 @@ const ViewAssignment = () => {
           draft.uploadedFiles = uploadedFiles;
           localStorage.setItem(draftKey, JSON.stringify(draft));
         } catch (e) {
-          console.error('Error saving draft:', e);
+          logger.error('Error saving draft', e);
         }
       }
       
@@ -471,9 +741,12 @@ const ViewAssignment = () => {
     });
     
     // Update answered questions tracking
-    const isAnswered = typeof value === 'object' ? 
-      Object.keys(value).length > 0 && Object.values(value).some(v => v && v.trim() !== '') :
-      value && value.trim() !== '';
+    const isAnswered = typeof value === 'object' && value !== null ? 
+      Object.keys(value).length > 0 && Object.values(value).some(v => {
+        if (v === null || v === undefined) return false;
+        return typeof v === 'string' ? v.trim() !== '' : String(v).trim() !== '';
+      }) :
+      value !== null && value !== undefined && (typeof value === 'string' ? value.trim() !== '' : String(value).trim() !== '');
     
     if (isAnswered) {
       setAnsweredQuestions(prev => new Set([...prev, questionIndex]));
@@ -486,7 +759,7 @@ const ViewAssignment = () => {
     }
   };
 
-  const navigateToQuestion = (questionIndex) => {
+  const navigateToQuestion = (questionIndex: number) => {
     setCurrentQuestion(questionIndex);
   };
 
@@ -502,7 +775,7 @@ const ViewAssignment = () => {
     }
   };
 
-  const toggleMarkQuestion = (questionIndex) => {
+  const toggleMarkQuestion = (questionIndex: number) => {
     setMarkedQuestions(prev => {
       const newSet = new Set(prev);
       if (newSet.has(questionIndex)) {
@@ -523,14 +796,14 @@ const ViewAssignment = () => {
     setIsSubmitting(true);
     try {
       // Prepare answers for submission
-      const submissionAnswers = {};
+      const submissionAnswers: Record<string, string> = {};
       Object.keys(answers).forEach(questionIndex => {
-        const answer = answers[questionIndex];
+        const answer = answers[parseInt(questionIndex)];
         if (answer && typeof answer === 'object') {
           // For matching questions, convert object to string
           submissionAnswers[questionIndex] = JSON.stringify(answer);
         } else {
-          submissionAnswers[questionIndex] = answer;
+          submissionAnswers[questionIndex] = String(answer || '');
         }
       });
 
@@ -542,27 +815,29 @@ const ViewAssignment = () => {
       }
       
       // Extract file objects with URL and original name
-      const fileObjects = uploadedFiles.map(file => {
+      const fileObjects = uploadedFiles.map((file: UploadedFile) => {
         // If file is an object with url and name, use it; otherwise create object from string URL
-        if (typeof file === 'object' && file.url) {
+        if (file.url) {
           return {
             url: file.url,
-            name: file.name || file.originalname || file.url.split('/').pop(),
-            originalname: file.name || file.originalname || file.url.split('/').pop()
-          };
-        } else if (typeof file === 'string') {
-          // Legacy: if it's just a string URL, extract filename from URL
-          const fileName = file.split('/').pop() || 'file';
-          return {
-            url: file,
-            name: fileName,
-            originalname: fileName
+            name: file.name || file.url.split('/').pop() || 'file',
+            originalname: file.name || file.url.split('/').pop() || 'file'
           };
         }
-        return file;
+        return {
+          url: '',
+          name: file.name || 'file',
+          originalname: file.name || 'file'
+        };
       });
       
-      const payload = {
+      const payload: {
+        assignment: string | undefined;
+        answers: Record<string, string>;
+        submittedAt: Date;
+        uploadedFiles: Array<{ url: string; name: string; originalname: string }>;
+        groupId?: string | null;
+      } = {
         assignment: id,
         answers: submissionAnswers,
         submittedAt: new Date(),
@@ -591,8 +866,9 @@ const ViewAssignment = () => {
       // Dispatch event to refresh ToDo panel
       window.dispatchEvent(new Event('assignmentSubmitted'));
     } catch (err) {
-      console.error('Submit error:', err.response?.status, err.response?.data);
-      setError(err.response?.data?.message || 'Error submitting assignment');
+      const axiosError = err as AxiosError<{ message?: string }>;
+      logger.error('Submit error', err instanceof Error ? err : new Error(String(err)), { status: axiosError.response?.status, data: axiosError.response?.data });
+      setError(axiosError.response?.data?.message || 'Error submitting assignment');
     } finally {
       setIsSubmitting(false);
     }
@@ -609,7 +885,8 @@ const ViewAssignment = () => {
         });
         navigate(-1);
       } catch (err) {
-        setError(err.response?.data?.message || 'Error deleting assignment');
+        const axiosError = err as AxiosError<{ message?: string }>;
+        setError(axiosError.response?.data?.message || 'Error deleting assignment');
       }
     }
   };
@@ -624,10 +901,11 @@ const ViewAssignment = () => {
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setAssignment(prev => ({ ...prev, published: res.data.published }));
+      setAssignment(prev => prev ? ({ ...prev, published: res.data.published }) : null);
     } catch (err) {
-      console.error('Error toggling assignment publish:', err);
-      setError(err.response?.data?.message || 'Error toggling publish status');
+      const axiosError = err as AxiosError<{ message?: string }>;
+      logger.error('Error toggling assignment publish', err instanceof Error ? err : new Error(String(err)));
+      setError(axiosError.response?.data?.message || 'Error toggling publish status');
     } finally {
       setIsPublishing(false);
     }
@@ -653,7 +931,6 @@ const ViewAssignment = () => {
     return <div className="text-gray-900 dark:text-gray-100 dark:text-gray-100">Assignment not found</div>;
   }
 
-  const isStudent = user?.role === 'student';
   const isCreator = isInstructor && assignment?.createdBy?._id === user?._id;
   const isPastDue = new Date() > new Date(assignment?.dueDate);
   const isTeacherPreview = isInstructor;
@@ -675,6 +952,37 @@ const ViewAssignment = () => {
             <ArrowLeft className="w-6 h-6" />
           </button>
           <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100 truncate px-2">{assignment.title}</h1>
+          {/* Grade Badge - Mobile - Shows Course-Level Data */}
+          {(() => {
+            console.log('[Grade Badge Mobile Render]', {
+              isInstructor,
+              isStudent,
+              courseAverage,
+              studentCourseGrade
+            });
+            
+            if (isInstructor && courseAverage !== null) {
+              console.log('[Grade Badge Mobile] Rendering teacher badge:', courseAverage);
+              return (
+                <div className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 rounded-full">
+                  <span className="text-xs font-semibold text-blue-800 dark:text-blue-200">
+                    Avg: {courseAverage.toFixed(2)}%
+                  </span>
+                </div>
+              );
+            } else if (isStudent && studentCourseGrade !== null) {
+              console.log('[Grade Badge Mobile] Rendering student badge:', studentCourseGrade);
+              return (
+                <div className="px-2 py-1 bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-full">
+                  <span className="text-xs font-semibold text-green-800 dark:text-green-200">
+                    {studentCourseGrade.toFixed(2)}%
+                  </span>
+                </div>
+              );
+            }
+            console.log('[Grade Badge Mobile] Not rendering badge');
+            return null;
+          })()}
           <div className="w-10"></div> {/* Spacer for centering */}
         </div>
       </nav>
@@ -683,7 +991,46 @@ const ViewAssignment = () => {
         <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 shadow rounded-lg p-2 sm:p-4 lg:p-6 max-w-full overflow-hidden">
           <div className="flex flex-col sm:flex-row justify-between items-start gap-4 max-w-full">
             <div className="flex-1 min-w-0 w-full max-w-full">
-              <h1 className="hidden lg:block text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 dark:text-gray-100 break-words">{assignment.title}</h1>
+              <div className="flex items-center gap-3 flex-wrap">
+                <h1 className="hidden lg:block text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 dark:text-gray-100 break-words">{assignment.title}</h1>
+                {/* Grade Badge - Desktop - Shows Course-Level Data - Visible on all screen sizes */}
+                {(() => {
+                  console.log('[Grade Badge Desktop Render]', {
+                    isInstructor,
+                    isStudent,
+                    courseAverage,
+                    studentCourseGrade,
+                    courseId,
+                    assignment: assignment ? { title: assignment.title } : null
+                  });
+                  
+                  if (isInstructor && courseAverage !== null) {
+                    // Show course class average for teachers
+                    console.log('[Grade Badge Desktop] Rendering teacher course average badge:', courseAverage);
+                    return (
+                      <div className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 rounded-full">
+                        <span className="text-xs sm:text-sm font-semibold text-blue-800 dark:text-blue-200">
+                          Course Avg: {courseAverage.toFixed(2)}%
+                        </span>
+                      </div>
+                    );
+                  } else if (isStudent && studentCourseGrade !== null) {
+                    // Show student's overall course grade
+                    console.log('[Grade Badge Desktop] Rendering student course grade badge:', studentCourseGrade);
+                    return (
+                      <div className="px-3 py-1 bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-full">
+                        <span className="text-xs sm:text-sm font-semibold text-green-800 dark:text-green-200">
+                          Grade: {studentCourseGrade.toFixed(2)}%
+                        </span>
+                      </div>
+                    );
+                  }
+                  console.log('[Grade Badge Desktop] Not rendering badge - conditions not met');
+                  return null;
+                })()}
+              </div>
+              {/* Show assignment title on mobile/tablet (hidden on desktop where it's in the flex above) */}
+              <h1 className="lg:hidden text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 dark:text-gray-100 break-words mt-2">{assignment.title}</h1>
             <p className="mt-1 text-xs sm:text-sm text-gray-500 dark:text-gray-400 dark:text-gray-400">
               <span className="block sm:inline">Due: {format(new Date(assignment.dueDate), 'MMM d, yyyy, h:mm a')}</span>
               {submission && (
@@ -898,7 +1245,7 @@ const ViewAssignment = () => {
 
 
 
-        {assignment.attachments?.length > 0 && (
+        {assignment.attachments && assignment.attachments.length > 0 && (
           <div className="mt-6">
             <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 dark:text-gray-100">Attachments</h3>
             <ul className="mt-2 divide-y divide-gray-200 dark:divide-gray-700">
@@ -950,7 +1297,7 @@ const ViewAssignment = () => {
                   </label>
                   {uploadedFiles.length > 0 && (
                     <button
-                      onClick={() => document.getElementById('file-upload-main').click()}
+                      onClick={() => document.getElementById('file-upload-main')?.click()}
                       className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
                     >
                       <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -976,7 +1323,7 @@ const ViewAssignment = () => {
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{file.name}</p>
                             <p className="text-xs text-gray-500 dark:text-gray-400">
-                              {file.size ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : 'Size unknown'}
+                              {file.size ? `${((file.size || 0) / 1024 / 1024).toFixed(2)} MB` : 'Size unknown'}
                             </p>
                           </div>
                         </div>
@@ -1231,7 +1578,13 @@ const ViewAssignment = () => {
                             <span>Grade Submissions</span>
                           </button>
                           <button
-                            onClick={() => navigate(`/assignments/${id}/edit`)}
+                            onClick={() => {
+                              if (courseId) {
+                                navigate(`/courses/${courseId}/assignments/${id}/edit`);
+                              } else {
+                                navigate(`/assignments/${id}/edit`);
+                              }
+                            }}
                             className="w-full text-left px-3 py-2 text-sm bg-green-50 dark:bg-green-900/50 hover:bg-green-100 dark:hover:bg-green-900/70 rounded-md transition-colors flex items-center space-x-2 text-gray-900 dark:text-gray-100 dark:text-gray-100"
                           >
                             <Edit className="h-4 w-4 text-green-600 dark:text-green-400 dark:text-green-400" />
@@ -1263,8 +1616,9 @@ const ViewAssignment = () => {
         {/* Assignment Questions Section */}
         {assignment.questions && assignment.questions.length > 0 && (() => {
           // Check if we should show questions to students after submission
+          const isQuiz = assignment.isGradedQuiz || assignment.group === 'Quizzes';
           const shouldShowQuestions = !isStudent || !submission || isPastDue || 
-            (assignment.group === 'Quizzes' && 
+            (isQuiz && 
              (submission?.showCorrectAnswers || assignment.showCorrectAnswers || 
               submission?.showStudentAnswers || assignment.showStudentAnswers));
           
@@ -1316,7 +1670,7 @@ const ViewAssignment = () => {
                         
                         {assignment.questions[currentQuestion].type === 'multiple-choice' && assignment.questions[currentQuestion].options && (
                           <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                            {assignment.questions[currentQuestion].options.map((option, optionIndex) => (
+                            {assignment.questions[currentQuestion].options?.map((option, optionIndex) => (
                               <div key={optionIndex} className="relative py-2">
                                 <input
                                   type="radio"
@@ -1347,13 +1701,37 @@ const ViewAssignment = () => {
                           </div>
                         )}
                         
+                        {assignment.questions[currentQuestion].type === 'text' && (
+                          <div className="mt-4">
+                            {submission ? (
+                              <div className="p-4 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md">
+                                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Your Answer:</p>
+                                <p className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
+                                  {typeof answers[currentQuestion] === 'string' && answers[currentQuestion] 
+                                    ? answers[currentQuestion] 
+                                    : 'No answer provided'}
+                                </p>
+                              </div>
+                            ) : (
+                              <textarea
+                                id={`question-${currentQuestion}-answer`}
+                                name={`question-${currentQuestion}-answer`}
+                                className="w-full h-32 p-4 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+                                value={typeof answers[currentQuestion] === 'string' ? answers[currentQuestion] : ''}
+                                onChange={(e) => handleAnswerChange(currentQuestion, e.target.value)}
+                                placeholder="Enter your answer here"
+                              />
+                            )}
+                          </div>
+                        )}
+                        
                         {assignment.questions[currentQuestion].type === 'matching' && (
                           <div className="space-y-4">
                             {/* Check if matching question has data */}
                             {assignment.questions[currentQuestion].leftItems && 
                              assignment.questions[currentQuestion].rightItems && 
                              assignment.questions[currentQuestion].leftItems.length > 0 && 
-                             assignment.questions[currentQuestion].rightItems.length > 0 ? (
+                             assignment.questions[currentQuestion].rightItems && assignment.questions[currentQuestion].rightItems.length > 0 ? (
                               <>
                                 {/* Only show reference columns for teachers/admins, not for students */}
                                 {(user?.role === 'teacher' || user?.role === 'admin') && (
@@ -1362,7 +1740,7 @@ const ViewAssignment = () => {
                                     <div>
                                       <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Left Items</h4>
                                       <div className="space-y-2">
-                                        {assignment.questions[currentQuestion].leftItems.map((leftItem, idx) => (
+                                        {assignment.questions[currentQuestion].leftItems?.map((leftItem, idx) => (
                                           <div key={leftItem.id || idx} className="p-2 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
                                             <span className="text-sm text-gray-900 dark:text-gray-100">{leftItem.text}</span>
                                           </div>
@@ -1373,8 +1751,9 @@ const ViewAssignment = () => {
                                     <div>
                                       <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Right Items (Correct Matches)</h4>
                                       <div className="space-y-2">
-                                        {assignment.questions[currentQuestion].rightItems.map((rightItem, idx) => {
-                                          const matchingLeft = assignment.questions[currentQuestion].leftItems.find(left => left.id === rightItem.id);
+                                        {assignment.questions && assignment.questions[currentQuestion]?.rightItems?.map((rightItem, idx) => {
+                                          const currentQ = assignment.questions?.[currentQuestion];
+                                          const matchingLeft = currentQ?.leftItems?.find(left => left.id === rightItem.id);
                                           return (
                                             <div key={rightItem.id || idx} className="p-2 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
                                               <span className="text-sm text-gray-900 dark:text-gray-100">{rightItem.text}</span>
@@ -1392,11 +1771,12 @@ const ViewAssignment = () => {
                                 {/* Student matching interface */}
                                 {isStudent && !submission && !isPastDue && (
                                   <div className="space-y-3">
-                                    {assignment.questions[currentQuestion].leftItems.map((leftItem, leftIndex) => {
+                                    {assignment.questions && assignment.questions[currentQuestion]?.leftItems?.map((leftItem, leftIndex) => {
+                                      const currentQ = assignment.questions?.[currentQuestion];
                                       const questionShuffledOptions = shuffledOptions[currentQuestion] || 
-                                        (Array.isArray(assignment.questions[currentQuestion].rightItems) && 
-                                         assignment.questions[currentQuestion].rightItems.length > 0 ? 
-                                         shuffleArray([...assignment.questions[currentQuestion].rightItems]) : []);
+                                        (Array.isArray(currentQ?.rightItems) && 
+                                         currentQ?.rightItems && currentQ.rightItems.length > 0 ? 
+                                         shuffleArray([...currentQ.rightItems]) : []);
                                       
                                       const currentAnswers = answers[currentQuestion] || {};
                                       const selectedOptions = Object.values(currentAnswers).filter(option => option !== '');
@@ -1412,12 +1792,12 @@ const ViewAssignment = () => {
                                         </div>
                                           <div className="flex items-center space-x-2 ml-4">
                                         <select
-                                              value={answers[currentQuestion]?.[leftIndex] || ''}
+                                              value={typeof answers[currentQuestion] === 'object' ? (answers[currentQuestion] as Record<number, string>)[leftIndex] || '' : ''}
                                           onChange={(e) => {
-                                                const newAnswers = { ...answers };
+                                                const newAnswers: Record<string, string | Record<number, string>> = { ...answers };
                                                 if (!newAnswers[currentQuestion]) newAnswers[currentQuestion] = {};
-                                                newAnswers[currentQuestion][leftIndex] = e.target.value;
-                                                handleAnswerChange(currentQuestion, newAnswers[currentQuestion]);
+                                                (newAnswers[currentQuestion] as Record<number, string>)[leftIndex] = e.target.value;
+                                                handleAnswerChange(currentQuestion, newAnswers[currentQuestion] as Record<number, string>);
                                           }}
                                               className="border border-gray-300 dark:border-gray-700 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-indigo-500 dark:focus:border-indigo-400 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-w-[150px]"
                                         >
@@ -1436,39 +1816,49 @@ const ViewAssignment = () => {
                                 )}
                                 
                                 {/* Show answers for submitted assignments */}
-                                {submission && (
-                                  <div className="space-y-3">
-                                    {assignment.questions[currentQuestion].leftItems.map((leftItem, leftIndex) => {
-                                      const studentMatch = typeof answers[currentQuestion] === 'object' ? 
-                                        answers[currentQuestion][leftIndex] : '';
-                                      const correctRightItem = assignment.questions[currentQuestion].rightItems.find(rightItem => 
-                                        rightItem.id === leftItem.id
-                                      );
-                                      const isCorrect = studentMatch === (correctRightItem?.text || '');
-                                      
-                                      return (
-                                        <div key={leftItem.id} className={`flex items-center justify-between p-3 rounded-lg border ${
-                                          isCorrect 
-                                            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' 
-                                            : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-                                        }`}>
-                                          <div className="flex items-center space-x-2">
-                                            <span className="font-medium text-gray-900 dark:text-gray-100 text-sm">{leftItem.text}</span>
-                                            <span className="text-gray-500 dark:text-gray-400">→</span>
-                                            <span className="text-gray-900 dark:text-gray-100">{studentMatch || 'No answer'}</span>
-                                          </div>
-                                          {isCorrect ? (
-                                            <span className="text-green-600 dark:text-green-400 text-sm">✓ Correct</span>
-                                          ) : (
-                                            <span className="text-red-600 dark:text-red-400 text-sm">
-                                              ✗ Should be: {correctRightItem?.text || 'N/A'}
-                                            </span>
-                                          )}
-                                  </div>
-                                      );
-                                    })}
-                              </div>
-                            )}
+                                {submission && (() => {
+                                  const currentSubmission: Submission = submission; // Type assertion for IIFE
+                                  const isQuiz = assignment.isGradedQuiz || assignment.group === 'Quizzes';
+                                  const showFeedback = isQuiz && (currentSubmission.showCorrectAnswers || assignment.showCorrectAnswers || currentSubmission.showStudentAnswers || assignment.showStudentAnswers || currentSubmission.autoGraded);
+                                  
+                                  if (!showFeedback) return null;
+                                  
+                                  return (
+                                    <div className="space-y-3">
+                                      {assignment.questions && assignment.questions[currentQuestion]?.leftItems?.map((leftItem, leftIndex) => {
+                                        const currentQ = assignment.questions?.[currentQuestion];
+                                        const studentMatch = typeof answers[currentQuestion] === 'object' ? 
+                                          (answers[currentQuestion] as Record<number, string>)[leftIndex] : '';
+                                        const correctRightItem = currentQ?.rightItems?.find(rightItem => 
+                                          rightItem.id === leftItem.id
+                                        );
+                                        const isCorrect = studentMatch === (correctRightItem?.text || '');
+                                        const showCorrectAnswer = currentSubmission.showCorrectAnswers || assignment.showCorrectAnswers;
+                                        
+                                        return (
+                                          <div key={leftItem.id} className={`flex items-center justify-between p-3 rounded-lg border ${
+                                            isCorrect 
+                                              ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' 
+                                              : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                                          }`}>
+                                            <div className="flex items-center space-x-2">
+                                              <span className="font-medium text-gray-900 dark:text-gray-100 text-sm">{leftItem.text}</span>
+                                              <span className="text-gray-500 dark:text-gray-400">→</span>
+                                              <span className="text-gray-900 dark:text-gray-100">{studentMatch || 'No answer'}</span>
+                                            </div>
+                                            {isCorrect ? (
+                                              <span className="text-green-600 dark:text-green-400 text-sm">✓ Correct</span>
+                                            ) : (
+                                              <span className="text-red-600 dark:text-red-400 text-sm">
+                                                {showCorrectAnswer ? `✗ Should be: ${correctRightItem?.text || 'N/A'}` : '✗ Incorrect'}
+                                              </span>
+                                            )}
+                                    </div>
+                                        );
+                                      })}
+                                </div>
+                                  );
+                                })()}
                               </>
                             ) : (
                               <div className="text-gray-500 dark:text-gray-400 text-sm">Matching question data is incomplete.</div>
@@ -1478,19 +1868,28 @@ const ViewAssignment = () => {
                         
                         <div className="flex justify-between mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
                           <button
-                            onClick={() => setShowUploadSection(false)}
+                            onClick={() => navigateToQuestion(0)}
                             className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:bg-gray-700"
                           >
                             Back to Questions
                           </button>
                           
+                          {currentQuestion === assignment.questions.length - 1 ? (
                             <button
-                            onClick={handleSubmit}
-                            disabled={isSubmitting}
-                            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+                              onClick={handleSubmit}
+                              disabled={isSubmitting}
+                              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
                             >
-                            {isSubmitting ? 'Submitting...' : 'Submit Assignment'}
+                              {isSubmitting ? 'Submitting...' : 'Submit Assignment'}
                             </button>
+                          ) : (
+                            <button
+                              onClick={nextQuestion}
+                              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+                            >
+                              Next Question
+                            </button>
+                          )}
                         </div>
                       </div>
                     ) : (
@@ -1523,7 +1922,7 @@ const ViewAssignment = () => {
                                 </label>
                                 {uploadedFiles.length > 0 && (
                                   <button
-                                    onClick={() => document.getElementById('file-upload-final').click()}
+                                    onClick={() => document.getElementById('file-upload-final')?.click()}
                                   className="inline-flex items-center px-4 py-2 border border-pink-500 dark:border-pink-600 rounded-md shadow-sm text-sm font-medium text-pink-600 dark:text-pink-400 bg-white dark:bg-gray-800 hover:bg-pink-50 dark:hover:bg-pink-900/20"
                                   >
                                     <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1548,7 +1947,7 @@ const ViewAssignment = () => {
                                         </svg>
                                         <div className="flex-1 min-w-0">
                                         <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{file.name}</p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">{file.size ? `${((file.size || 0) / 1024 / 1024).toFixed(2)} MB` : 'Size unknown'}</p>
                                         </div>
                                       </div>
                                       <div className="flex items-center space-x-2 ml-2">
@@ -1590,19 +1989,28 @@ const ViewAssignment = () => {
                         
                         <div className="flex justify-between mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
                           <button
-                            onClick={() => setShowUploadSection(false)}
+                            onClick={() => navigateToQuestion(0)}
                             className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
                           >
                             Back to Questions
                           </button>
                           
-                          <button
-                            onClick={handleSubmit}
-                            disabled={isSubmitting}
-                            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600"
-                          >
-                            {isSubmitting ? 'Submitting...' : 'Submit Assignment'}
-                          </button>
+                          {currentQuestion === assignment.questions.length - 1 ? (
+                            <button
+                              onClick={handleSubmit}
+                              disabled={isSubmitting}
+                              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600"
+                            >
+                              {isSubmitting ? 'Submitting...' : 'Submit Assignment'}
+                            </button>
+                          ) : (
+                            <button
+                              onClick={nextQuestion}
+                              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600"
+                            >
+                              Next Question
+                            </button>
+                          )}
                         </div>
                       </div>
                     )}
@@ -1626,11 +2034,11 @@ const ViewAssignment = () => {
                             <div className="flex items-center space-x-2">
                               {answeredQuestions.has(index) && markedQuestions.has(index) ? (
                                 <div className="relative">
-                                  <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                  <Circle className="h-4 w-4 text-green-600 dark:text-green-400 fill-current" />
                                   <Bookmark className="h-3 w-3 text-yellow-500 absolute -top-1 -right-1" />
                                 </div>
                               ) : answeredQuestions.has(index) ? (
-                                <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                <Circle className="h-4 w-4 text-green-600 dark:text-green-400 fill-current" />
                               ) : markedQuestions.has(index) ? (
                                 <Bookmark className="h-4 w-4 text-yellow-600" />
                               ) : (
@@ -1710,13 +2118,11 @@ const ViewAssignment = () => {
                     <div className="space-y-6">
                                               {assignment.questions.map((question, index) => {
                         // Check if this is a submitted quiz and we should show feedback
+                        const isQuiz = assignment.isGradedQuiz || assignment.group === 'Quizzes';
                         let isCorrect = false;
                         let showFeedback = false;
                         let correctAnswer = null;
-                        
-
-                        
-                        if (submission && assignment.group === 'Quizzes' && 
+                        if (submission && isQuiz && 
                             (submission.showCorrectAnswers || assignment.showCorrectAnswers) &&
                             (question.type === 'multiple-choice' || question.type === 'matching')) {
                           showFeedback = true;
@@ -1763,51 +2169,88 @@ const ViewAssignment = () => {
                         // Enhanced teacher preview styling
                         const isTeacherPreviewMode = isTeacherPreview;
                         
-                        // Only show visual feedback if feedback options are enabled
-                        const feedbackEnabled = submission && assignment.group === 'Quizzes' && 
-                          (submission.showCorrectAnswers || assignment.showCorrectAnswers);
+                        // Determine feedback mode
+                        const showFullFeedback = submission && isQuiz && 
+                          (submission.showCorrectAnswers || assignment.showCorrectAnswers || submission.autoGraded);
+                        const showOnlyCorrectHighlight = submission && isQuiz && 
+                          (submission.showStudentAnswers || assignment.showStudentAnswers) && 
+                          !(submission.showCorrectAnswers || assignment.showCorrectAnswers || submission.autoGraded);
+                        const feedbackEnabled = showFullFeedback || showOnlyCorrectHighlight;
                         
 
                                                   
                                                   return (
-                            <div key={question.id || question._id || index} className={`bg-white dark:bg-gray-800 border-2 rounded-lg p-6 shadow-sm ${
+                            <div key={question.id || question._id || index} className={`bg-white dark:bg-gray-800 border-2 rounded-lg p-4 sm:p-6 shadow-sm ${
                               isTeacherPreview 
                                 ? 'border-blue-400 bg-blue-50 shadow-blue-100' 
                                 : (() => {
-                                    if (submission && submission.autoGraded && (question.type === 'multiple-choice' || question.type === 'matching')) {
+                                    // Determine feedback mode for border colors
+                                    const showFullFeedbackForBorder = submission && submission.autoGraded;
+                                    const showOnlyCorrectForBorder = submission && isQuiz && 
+                                      (submission.showStudentAnswers || assignment.showStudentAnswers) && 
+                                      !(submission.showCorrectAnswers || assignment.showCorrectAnswers || submission.autoGraded);
+                                    
+                                    if (submission && (submission.autoGraded || (isQuiz && (submission.showCorrectAnswers || assignment.showCorrectAnswers || submission.showStudentAnswers || assignment.showStudentAnswers))) && (question.type === 'multiple-choice' || question.type === 'matching')) {
                                       if (question.type === 'multiple-choice') {
                                         const studentAnswer = answers[index];
-                                        const correctOption = question.options.find(opt => opt.isCorrect);
+                                        const correctOption = question.options?.find(opt => opt.isCorrect);
                                         const isCorrect = String(studentAnswer) === String(correctOption?.text);
-                                        return isCorrect 
-                                          ? 'border-green-500' 
-                                          : 'border-yellow-500';
+                                        
+                                        if (showFullFeedbackForBorder || (submission.showCorrectAnswers || assignment.showCorrectAnswers)) {
+                                          // Full feedback: green/red
+                                          return isCorrect 
+                                            ? 'border-green-500 dark:border-green-400' 
+                                            : 'border-red-500 dark:border-red-400';
+                                        } else if (showOnlyCorrectForBorder) {
+                                          // showStudentAnswers: green for correct, red for wrong (but don't show correct answer)
+                                          return isCorrect 
+                                            ? 'border-green-500 dark:border-green-400' 
+                                            : 'border-red-500 dark:border-red-400';
+                                        }
                                       } else if (question.type === 'matching') {
                                         const autoGrade = submission.autoQuestionGrades instanceof Map 
                                           ? submission.autoQuestionGrades.get(index.toString())
                                           : submission.autoQuestionGrades?.[index.toString()];
                                         const maxPoints = question.points || 0;
-                                        const percentageCorrect = autoGrade / maxPoints;
+                                        const percentageCorrect = autoGrade && maxPoints > 0 ? autoGrade / maxPoints : 0;
                                         
-                                        if (percentageCorrect === 1) {
-                                          return 'border-green-500'; // All correct
-                                        } else if (percentageCorrect === 0) {
-                                          return 'border-red-500'; // All incorrect
-                                        } else {
-                                          return 'border-yellow-500'; // Partially correct
+                                        if (showFullFeedbackForBorder || (submission.showCorrectAnswers || assignment.showCorrectAnswers)) {
+                                          // Full feedback: green/red/yellow
+                                          if (percentageCorrect === 1) {
+                                            return 'border-green-500 dark:border-green-400'; // All correct
+                                          } else if (percentageCorrect === 0) {
+                                            return 'border-red-500 dark:border-red-400'; // All incorrect
+                                          } else {
+                                            return 'border-yellow-500 dark:border-yellow-400'; // Partially correct
+                                          }
+                                        } else if (showOnlyCorrectForBorder) {
+                                          // showStudentAnswers: green/red/yellow (but don't show correct answers)
+                                          if (percentageCorrect === 1) {
+                                            return 'border-green-500 dark:border-green-400'; // All correct
+                                          } else if (percentageCorrect === 0) {
+                                            return 'border-red-500 dark:border-red-400'; // All incorrect
+                                          } else {
+                                            return 'border-yellow-500 dark:border-yellow-400'; // Partially correct
+                                          }
                                         }
                                       }
                                     }
                                     if (feedbackEnabled && showFeedback) {
-                                      return isCorrect ? 'border-green-500' : 'border-yellow-500';
+                                      if (showFullFeedback) {
+                                        // Full feedback: green for correct, red/yellow for wrong
+                                        return isCorrect ? 'border-green-500 dark:border-green-400' : 'border-red-500 dark:border-red-400';
+                                      } else if (showOnlyCorrectHighlight) {
+                                        // Only highlight correct: green for correct, gray for wrong
+                                        return isCorrect ? 'border-green-500 dark:border-green-400' : 'border-gray-300 dark:border-gray-600';
+                                      }
                                     }
                                     return 'border-gray-200 dark:border-gray-700';
                                   })()
                             }`}>
-                          <div className={`rounded-lg p-3 mb-3 ${isTeacherPreview ? 'bg-blue-100' : 'bg-gray-100 dark:bg-gray-700'}`}>
-                            <div className="flex justify-between items-center">
-                              <div className="flex items-center space-x-3">
-                                <h4 className="text-base font-semibold text-gray-900 dark:text-gray-100">Question {index + 1}</h4>
+                          <div className={`rounded-lg p-3 sm:p-4 mb-3 ${isTeacherPreview ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-gray-100 dark:bg-gray-700'}`}>
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-0">
+                              <div className="flex items-center space-x-2 sm:space-x-3">
+                                <h4 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-100">Question {index + 1}</h4>
                                 {isTeacherPreview && (
                                   <span className="px-3 py-1 text-xs font-medium bg-blue-500 text-white rounded-full font-bold">
                                     TEACHER PREVIEW
@@ -1837,19 +2280,19 @@ const ViewAssignment = () => {
                                       ? submission.autoQuestionGrades.get(index.toString())
                                       : submission.autoQuestionGrades?.[index.toString()];
                                     return (
-                                      <span className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                                      <span className="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-100">
                                         {(() => {
                                           const earned = Number(autoGrade || 0);
                                           const total = question.points;
-                                          const earnedFormatted = Number.isInteger(earned) ? earned : earned.toFixed(2);
-                                          const totalFormatted = Number.isInteger(total) ? total : total.toFixed(2);
+                                          const earnedFormatted = Number.isInteger(earned) ? earned.toString() : earned.toFixed(2);
+                                          const totalFormatted = Number.isInteger(total) ? total.toString() : total.toFixed(2);
                                           return `${earnedFormatted} / ${totalFormatted} pts`;
                                         })()}
                                       </span>
                                     );
                                   })()
                                 ) : (
-                                  <span className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                                  <span className="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-100">
                                     {question.points} pts
                                   </span>
                                 )}
@@ -1859,28 +2302,41 @@ const ViewAssignment = () => {
                           <div className="border-b border-gray-200 dark:border-gray-700 mb-3"></div>
                           
                           <div className="mb-4">
-                            <p className="text-lg text-gray-900 dark:text-gray-100 leading-relaxed">{question.text}</p>
+                            <p className="text-base sm:text-lg text-gray-900 dark:text-gray-100 leading-relaxed">{question.text}</p>
 
                             {question.type === 'multiple-choice' && (
-                              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Select the correct answer.</p>
+                              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">Select the correct answer.</p>
                             )}
                           </div>
                           
                           {question.type === 'multiple-choice' && question.options && (
                             <div>
                               {/* Show detailed feedback for submitted assignments */}
-                              {submission && submission.autoGraded && (
-                                <div className={`mb-4 p-3 rounded-lg ${
+                              {submission && (submission.autoGraded || (isQuiz && (submission.showCorrectAnswers || assignment.showCorrectAnswers || submission.showStudentAnswers || assignment.showStudentAnswers))) && (
+                                <div className={`mb-4 p-3 sm:p-4 rounded-lg ${
                                   (() => {
                                     const studentAnswer = answers[index];
                                     const correctOption = question.options.find(opt => opt.isCorrect);
                                     const isCorrect = String(studentAnswer) === String(correctOption?.text);
-                                    return isCorrect 
-                                      ? 'bg-green-50 border border-green-200' 
-                                      : 'bg-red-50 border border-red-200';
+                                    const showFullFeedbackForBox = submission && isQuiz && 
+                                      (submission.showCorrectAnswers || assignment.showCorrectAnswers);
+                                    const showOnlyCorrectForBox = submission && isQuiz && 
+                                      (submission.showStudentAnswers || assignment.showStudentAnswers) && 
+                                      !(submission.showCorrectAnswers || assignment.showCorrectAnswers);
+                                    
+                                    if (isCorrect) {
+                                      return 'bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700';
+                                    } else if (showFullFeedbackForBox) {
+                                      return 'bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700';
+                                    } else if (showOnlyCorrectForBox) {
+                                      // showStudentAnswers: red for incorrect (but don't show correct answer)
+                                      return 'bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700';
+                                    } else {
+                                      return 'bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700';
+                                    }
                                   })()
                                 }`}>
-                                  <div className="text-sm text-blue-800 font-medium mb-2">
+                                  <div className="text-sm sm:text-base text-blue-800 dark:text-blue-300 font-medium mb-2 sm:mb-3">
                                     Auto-Graded Results
                                   </div>
                                   {(() => {
@@ -1889,25 +2345,39 @@ const ViewAssignment = () => {
                                       ? submission.autoQuestionGrades.get(index.toString())
                                       : submission.autoQuestionGrades?.[index.toString()];
                                     const maxPoints = question.points || 0;
-                                    const correctOption = question.options.find(opt => opt.isCorrect);
+                                    const correctOption = question.options?.find(opt => opt.isCorrect);
                                     const isCorrect = String(studentAnswer) === String(correctOption?.text);
                                     
                                     return (
-                                      <div className="space-y-2">
-                                        <div className="text-sm text-blue-700">
+                                      <div className="space-y-2 sm:space-y-3">
+                                        <div className="text-sm sm:text-base text-blue-700 dark:text-blue-300 font-semibold">
                                           {(() => {
                                             const earned = Number(autoGrade || 0);
                                             const total = maxPoints;
-                                            const earnedFormatted = Number.isInteger(earned) ? earned : earned.toFixed(2);
-                                            const totalFormatted = Number.isInteger(total) ? total : total.toFixed(2);
+                                            const earnedFormatted = Number.isInteger(earned) ? earned.toString() : earned.toFixed(2);
+                                            const totalFormatted = Number.isInteger(total) ? total.toString() : total.toFixed(2);
                                             return `${earnedFormatted} / ${totalFormatted} pts`;
                                           })()}
                                         </div>
-                                        <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Student Answer:</div>
-                                        <div className="text-sm text-gray-900 dark:text-gray-100 mb-2">{studentAnswer || 'No answer'}</div>
-                                        <div className={`text-sm ${isCorrect ? 'text-green-600 dark:text-green-400' : 'text-red-600'}`}>
-                                          {isCorrect ? 'Correct!' : `Incorrect. Correct answer: ${correctOption?.text || 'Unknown'}`}
-                                        </div>
+                                        {/* Always show student answer if either option is enabled */}
+                                        {((submission.showStudentAnswers || assignment.showStudentAnswers || submission.showCorrectAnswers || assignment.showCorrectAnswers || submission.autoGraded)) && (
+                                          <div>
+                                            <div className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Student Answer:</div>
+                                            <div className="text-sm sm:text-base text-gray-900 dark:text-gray-100 mb-2 break-words">{typeof studentAnswer === 'string' ? studentAnswer : 'No answer'}</div>
+                                          </div>
+                                        )}
+                                        {/* showStudentAnswers: Show correctness (green/red) but NOT the correct answer */}
+                                        {(submission.showStudentAnswers || assignment.showStudentAnswers) && !(submission.showCorrectAnswers || assignment.showCorrectAnswers) && (
+                                          <div className={`text-sm sm:text-base font-medium ${isCorrect ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                            {isCorrect ? '✓ Correct!' : '✗ Incorrect'}
+                                          </div>
+                                        )}
+                                        {/* showCorrectAnswers: Show correctness (green/red) AND show the correct answer for wrong ones */}
+                                        {(submission.showCorrectAnswers || assignment.showCorrectAnswers) && (
+                                          <div className={`text-sm sm:text-base font-medium ${isCorrect ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                            {isCorrect ? '✓ Correct!' : `✗ Incorrect. Correct answer: ${correctOption?.text || 'Unknown'}`}
+                                          </div>
+                                        )}
                                       </div>
                                     );
                                   })()}
@@ -1915,7 +2385,7 @@ const ViewAssignment = () => {
                               )}
                               
                               {/* Show regular multiple-choice interface for non-submitted or non-auto-graded assignments */}
-                              {(!submission || !submission.autoGraded) && (
+                              {(!submission || (!submission.autoGraded && !(isQuiz && (submission.showCorrectAnswers || assignment.showCorrectAnswers || submission.showStudentAnswers || assignment.showStudentAnswers)))) && (
                                 <div className="divide-y divide-gray-200">
                                   {question.options.map((option, optionIndex) => (
                                     <div key={optionIndex} className="relative py-2">
@@ -1957,15 +2427,15 @@ const ViewAssignment = () => {
                           )}
                           
                           {question.type === 'text' && (
-                            <div>
+                            <div className="mt-4">
                               <textarea
                                 id={`question-${index}-answer`}
                                 name={`question-${index}-answer`}
-                                className="w-full h-32 p-4 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 dark:text-gray-100"
-                                value={answers[index] || ''}
+                                className="w-full h-32 p-4 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+                                value={typeof answers[index] === 'string' ? answers[index] : ''}
                                 onChange={(e) => !submission && isStudent && handleAnswerChange(index, e.target.value)}
                                 placeholder={isStudent ? "Enter your answer here" : "Student's answer will appear here"}
-                                disabled={!!submission || !isStudent || isPastDue}
+                                disabled={!!submission || !isStudent || isPastDue || isTeacherPreview}
                               />
                             </div>
                           )}
@@ -1974,26 +2444,40 @@ const ViewAssignment = () => {
                             <div className="space-y-2">
                               
                               {/* Show detailed feedback for submitted assignments */}
-                              {submission && submission.autoGraded && (
-                                <div className={`mb-4 p-3 rounded-lg ${
+                              {submission && (submission.autoGraded || (isQuiz && (submission.showCorrectAnswers || assignment.showCorrectAnswers || submission.showStudentAnswers || assignment.showStudentAnswers))) && (
+                                <div className={`mb-4 p-3 sm:p-4 rounded-lg ${
                                   (() => {
                                     const studentAnswer = answers[index];
                                     const autoGrade = submission.autoQuestionGrades instanceof Map 
                                       ? submission.autoQuestionGrades.get(index.toString())
                                       : submission.autoQuestionGrades?.[index.toString()];
                                     const maxPoints = question.points || 0;
-                                    const percentageCorrect = autoGrade / maxPoints;
+                                    const percentageCorrect = autoGrade && maxPoints > 0 ? autoGrade / maxPoints : 0;
+                                    
+                                    const showFullFeedbackForMatchBox = submission && isQuiz && 
+                                      (submission.showCorrectAnswers || assignment.showCorrectAnswers || submission.autoGraded);
+                                    const showOnlyCorrectForMatchBox = submission && isQuiz && 
+                                      (submission.showStudentAnswers || assignment.showStudentAnswers) && 
+                                      !(submission.showCorrectAnswers || assignment.showCorrectAnswers || submission.autoGraded);
                                     
                                     if (percentageCorrect === 1) {
-                                      return 'bg-green-50 border border-green-200'; // All correct
-                                    } else if (percentageCorrect > 0) {
-                                      return 'bg-yellow-50 border border-yellow-200'; // Partially correct
+                                      return 'bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700'; // All correct
+                                    } else if (showFullFeedbackForMatchBox) {
+                                      // Full feedback: show red/yellow for wrong/partial
+                                      if (percentageCorrect > 0) {
+                                        return 'bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700'; // Partially correct
+                                      } else {
+                                        return 'bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700'; // All incorrect
+                                      }
+                                    } else if (showOnlyCorrectForMatchBox) {
+                                      // Only highlight correct: gray for wrong/partial
+                                      return 'bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700';
                                     } else {
-                                      return 'bg-red-50 border border-red-200'; // All incorrect
+                                      return 'bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700';
                                     }
                                   })()
                                 }`}>
-                                  <div className="text-sm text-blue-800 font-medium mb-2">
+                                  <div className="text-sm sm:text-base text-blue-800 dark:text-blue-300 font-medium mb-2 sm:mb-3">
                                     Auto-Graded Results
                                   </div>
                                   {(() => {
@@ -2004,56 +2488,89 @@ const ViewAssignment = () => {
                                     const maxPoints = question.points || 0;
                                     
                                     return (
-                                      <div className="space-y-2">
-                                        <div className="text-sm text-blue-700">
+                                      <div className="space-y-2 sm:space-y-3">
+                                        <div className="text-sm sm:text-base text-blue-700 dark:text-blue-300 font-semibold">
                                           {(() => {
                                             const earned = Number(autoGrade || 0);
                                             const total = maxPoints;
-                                            const earnedFormatted = Number.isInteger(earned) ? earned : earned.toFixed(2);
-                                            const totalFormatted = Number.isInteger(total) ? total : total.toFixed(2);
+                                            const earnedFormatted = Number.isInteger(earned) ? earned.toString() : earned.toFixed(2);
+                                            const totalFormatted = Number.isInteger(total) ? total.toString() : total.toFixed(2);
                                             return `${earnedFormatted} / ${totalFormatted} pts`;
                                           })()}
                                         </div>
-                                        <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Student Answer:</div>
-                                        {question.leftItems.map((leftItem, leftIndex) => {
+                                        <div className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Student Answer:</div>
+                                        {question.leftItems?.map((leftItem, leftIndex) => {
                                           const studentMatch = typeof studentAnswer === 'object' ? 
-                                            studentAnswer[leftIndex] : '';
-                                          const correctRightItem = question.rightItems.find(rightItem => 
+                                            (studentAnswer as Record<number, string>)[leftIndex] : '';
+                                          const correctRightItem = question.rightItems?.find(rightItem => 
                                             rightItem.id === leftItem.id
                                           );
                                           const isCorrect = studentMatch === (correctRightItem?.text || '');
                                           
                                           return (
-                                            <div key={leftItem.id} className={`flex items-center justify-between p-2 rounded-lg ${
-                                              isCorrect ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
+                                            <div key={leftItem.id} className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 p-2 sm:p-3 rounded-lg ${
+                                              (() => {
+                                                const showFullFeedbackForMatch = submission && isQuiz && 
+                                                  (submission.showCorrectAnswers || assignment.showCorrectAnswers);
+                                                const showOnlyCorrectForMatch = submission && isQuiz && 
+                                                  (submission.showStudentAnswers || assignment.showStudentAnswers) && 
+                                                  !(submission.showCorrectAnswers || assignment.showCorrectAnswers);
+                                                
+                                                if (isCorrect) {
+                                                  return 'bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700';
+                                                } else if (showFullFeedbackForMatch || showOnlyCorrectForMatch) {
+                                                  // Both options show red for incorrect
+                                                  return 'bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700';
+                                                } else {
+                                                  return 'bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700';
+                                                }
+                                              })()
                                             }`}>
-                                              <div className="flex items-center space-x-2">
-                                                <span className="font-medium text-gray-900 dark:text-gray-100 text-sm">{leftItem.text}</span>
-                                                <span className="text-gray-500 dark:text-gray-400">→</span>
-                                                <span className="text-gray-900 dark:text-gray-100">{studentMatch || 'No answer'}</span>
+                                              <div className="flex items-center space-x-2 flex-1 min-w-0">
+                                                <span className="font-medium text-gray-900 dark:text-gray-100 text-sm sm:text-base break-words">{leftItem.text}</span>
+                                                <span className="text-gray-500 dark:text-gray-400 flex-shrink-0">→</span>
+                                                <span className="text-gray-900 dark:text-gray-100 text-sm sm:text-base break-words">{studentMatch || 'No answer'}</span>
                                               </div>
-                                              <div className="flex items-center space-x-2">
+                                              <div className="flex items-center justify-between sm:justify-end space-x-2 sm:ml-4">
                                                 {isCorrect ? (
                                                   <div className="flex items-center text-green-600 dark:text-green-400">
-                                                    <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <svg className="h-4 w-4 sm:h-5 sm:w-5 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                                     </svg>
-                                                    <span className="text-xs">Correct</span>
+                                                    <span className="text-xs sm:text-sm font-medium">Correct</span>
                                                   </div>
                                                 ) : (
-                                                  <div className="flex items-center text-red-600">
-                                                    <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                  <div className={`flex items-center ${
+                                                    (() => {
+                                                      const showFullFeedbackForMatch = submission && isQuiz && 
+                                                        (submission.showCorrectAnswers || assignment.showCorrectAnswers);
+                                                      const showOnlyCorrectForMatch = submission && isQuiz && 
+                                                        (submission.showStudentAnswers || assignment.showStudentAnswers) && 
+                                                        !(submission.showCorrectAnswers || assignment.showCorrectAnswers);
+                                                      
+                                                      if (showFullFeedbackForMatch || showOnlyCorrectForMatch) {
+                                                        // Both options show red for incorrect
+                                                        return 'text-red-600 dark:text-red-400';
+                                                      } else {
+                                                        return 'text-gray-500 dark:text-gray-400';
+                                                      }
+                                                    })()
+                                                  }`}>
+                                                    <svg className="h-4 w-4 sm:h-5 sm:w-5 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                                     </svg>
-                                                    <span className="text-xs">Incorrect</span>
+                                                    <span className="text-xs sm:text-sm font-medium">Incorrect</span>
+                                                  </div>
+                                                )}
+                                                {!isCorrect && correctRightItem && (
+                                                  <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 ml-2 sm:ml-4">
+                                                    {/* Only show correct answer if showCorrectAnswers is enabled (not showStudentAnswers alone) */}
+                                                    {(submission.showCorrectAnswers || assignment.showCorrectAnswers) ? (
+                                                      <>Correct: <span className="font-medium">{correctRightItem.text}</span></>
+                                                    ) : null}
                                                   </div>
                                                 )}
                                               </div>
-                                              {!isCorrect && correctRightItem && (
-                                                <div className="text-xs text-gray-600 dark:text-gray-400">
-                                                  Correct: {correctRightItem.text}
-                                                </div>
-                                              )}
                                             </div>
                                           );
                                         })}
@@ -2088,13 +2605,14 @@ const ViewAssignment = () => {
                                       <div className="flex items-center space-x-2 ml-2">
                                         <select
                                           id={`question-${index}-matching-${leftIndex}`}
-                                          value={answers[index]?.[leftIndex] || ''}
+                                          name={`question-${index}-matching-${leftIndex}`}
+                                          value={typeof answers[index] === 'object' ? (answers[index] as Record<number, string>)[leftIndex] || '' : ''}
                                           onChange={(e) => {
                                             if (!submission && isStudent && !isPastDue) {
-                                              const newAnswers = { ...answers };
+                                              const newAnswers: Record<string, string | Record<number, string>> = { ...answers };
                                               if (!newAnswers[index]) newAnswers[index] = {};
-                                              newAnswers[index][leftIndex] = e.target.value;
-                                              handleAnswerChange(index, newAnswers[index]);
+                                              (newAnswers[index] as Record<number, string>)[leftIndex] = e.target.value;
+                                              handleAnswerChange(index, newAnswers[index] as Record<number, string>);
                                             }
                                           }}
                                           disabled={!!submission || !isStudent || isPastDue}
@@ -2149,7 +2667,7 @@ const ViewAssignment = () => {
                               </label>
                               {uploadedFiles.length > 0 && (
                                 <button
-                                  onClick={() => document.getElementById('file-upload-scrollable').click()}
+                                  onClick={() => document.getElementById('file-upload-scrollable')?.click()}
                                   className="inline-flex items-center px-4 py-2 border border-pink-500 rounded-md shadow-sm text-sm font-medium text-pink-600 bg-white dark:bg-gray-800 hover:bg-pink-50"
                                 >
                                   <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2174,7 +2692,7 @@ const ViewAssignment = () => {
                                       </svg>
                                       <div className="flex-1 min-w-0">
                                         <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{file.name}</p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">{file.size ? `${((file.size || 0) / 1024 / 1024).toFixed(2)} MB` : 'Size unknown'}</p>
                                       </div>
                                     </div>
                                     <div className="flex items-center space-x-2 ml-2">
@@ -2255,11 +2773,11 @@ const ViewAssignment = () => {
                               <div className="flex items-center space-x-2">
                                 {answeredQuestions.has(index) && markedQuestions.has(index) ? (
                                   <div className="relative">
-                                    <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                    <Circle className="h-4 w-4 text-green-600 dark:text-green-400 fill-current" />
                                     <Bookmark className="h-3 w-3 text-yellow-500 absolute -top-1 -right-1" />
                                   </div>
                                 ) : answeredQuestions.has(index) ? (
-                                  <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                  <Circle className="h-4 w-4 text-green-600 dark:text-green-400 fill-current" />
                                 ) : markedQuestions.has(index) ? (
                                   <Bookmark className="h-4 w-4 text-yellow-600" />
                                 ) : (

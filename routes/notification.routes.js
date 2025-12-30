@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const { protect } = require('../middleware/auth');
 const Notification = require('../models/notification.model');
 const NotificationPreferences = require('../models/notificationPreferences.model');
+const logger = require('../utils/logger');
 
 // Get all notifications for current user
 router.get('/', protect, async (req, res) => {
@@ -20,8 +21,8 @@ router.get('/', protect, async (req, res) => {
       query.read = read === 'true';
     }
     
-    if (type) {
-      // Validate type is a string
+    if (type !== undefined) {
+      // Validate type is a non-empty string
       if (typeof type !== 'string' || type.trim() === '') {
         return res.status(400).json({ 
           success: false, 
@@ -238,12 +239,12 @@ async function createNotification(userId, notificationData) {
   try {
     // Validate inputs
     if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
-      console.error('Invalid userId provided to createNotification');
+      logger.warn('Invalid userId provided to createNotification', { userId });
       return null;
     }
     
     if (!notificationData || !notificationData.type || !notificationData.title || !notificationData.message) {
-      console.error('Invalid notificationData provided to createNotification');
+      logger.warn('Invalid notificationData provided to createNotification', { notificationData });
       return null;
     }
     
@@ -274,7 +275,7 @@ async function createNotification(userId, notificationData) {
     
     return null;
   } catch (error) {
-    console.error('Error creating notification:', error);
+    logger.logError(error, { action: 'createNotification', userId });
     return null;
   }
 }

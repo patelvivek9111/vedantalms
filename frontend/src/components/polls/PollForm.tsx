@@ -222,6 +222,7 @@ const PollForm: React.FC<PollFormProps> = ({ courseId, poll, onClose, onSuccess 
             <input
               type="text"
               id="title"
+              name="title"
               value={formData.title}
               onChange={(e) => handleInputChange('title', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-100"
@@ -245,6 +246,7 @@ const PollForm: React.FC<PollFormProps> = ({ courseId, poll, onClose, onSuccess 
                  <input
                    type="date"
                    id="dateInput"
+                   name="dateInput"
                    value={formData.endDate.split('T')[0]}
                    onChange={(e) => {
                      const time = formData.endDate.split('T')[1] || '00:00';
@@ -261,6 +263,7 @@ const PollForm: React.FC<PollFormProps> = ({ courseId, poll, onClose, onSuccess 
                     </label>
                     <select
                       id="hourInput"
+                      name="hourInput"
                       value={(() => {
                         const time = formData.endDate.split('T')[1] || '00:00';
                         const hour = parseInt(time.split(':')[0]);
@@ -299,6 +302,7 @@ const PollForm: React.FC<PollFormProps> = ({ courseId, poll, onClose, onSuccess 
                     </label>
                     <select
                       id="minuteInput"
+                      name="minuteInput"
                       value={formData.endDate.split('T')[1]?.split(':')[1] || '00'}
                       onChange={(e) => {
                         const date = formData.endDate.split('T')[0];
@@ -323,6 +327,7 @@ const PollForm: React.FC<PollFormProps> = ({ courseId, poll, onClose, onSuccess 
                     </label>
                     <select
                       id="ampmInput"
+                      name="ampmInput"
                       value={(() => {
                         const time = formData.endDate.split('T')[1] || '00:00';
                         const hour = parseInt(time.split(':')[0]);
@@ -365,8 +370,11 @@ const PollForm: React.FC<PollFormProps> = ({ courseId, poll, onClose, onSuccess 
             <div className="space-y-3">
               {formData.options.map((option, index) => (
                 <div key={index} className="flex items-center gap-2">
+                  <label htmlFor={`poll-option-${index}`} className="sr-only">Option {index + 1}</label>
                   <input
                     type="text"
+                    id={`poll-option-${index}`}
+                    name={`poll-option-${index}`}
                     value={option}
                     onChange={(e) => handleOptionChange(index, e.target.value)}
                     className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-100"
@@ -412,6 +420,8 @@ const PollForm: React.FC<PollFormProps> = ({ courseId, poll, onClose, onSuccess 
               <label className="relative inline-flex items-center cursor-pointer">
                 <input
                   type="checkbox"
+                  id="allowMultipleVotes"
+                  name="allowMultipleVotes"
                   checked={formData.allowMultipleVotes}
                   onChange={(e) => handleInputChange('allowMultipleVotes', e.target.checked)}
                   className="sr-only peer"
@@ -432,6 +442,8 @@ const PollForm: React.FC<PollFormProps> = ({ courseId, poll, onClose, onSuccess 
               <label className="relative inline-flex items-center cursor-pointer">
                 <input
                   type="checkbox"
+                  id="resultsVisible"
+                  name="resultsVisible"
                   checked={formData.resultsVisible}
                   onChange={(e) => handleInputChange('resultsVisible', e.target.checked)}
                   className="sr-only peer"

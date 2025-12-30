@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { startOfWeek, endOfWeek, isWithinInterval, parseISO } from 'date-fns';
+import logger from '../utils/logger';
 
 export const ToDoPanel: React.FC = () => {
   const { user } = useAuth();
@@ -101,7 +102,7 @@ export const ToDoPanel: React.FC = () => {
       // Navigate to the course students page
       window.location.href = `/courses/${todo.courseId}/students`;
     } catch (err) {
-      console.error('Error removing enrollment notification:', err);
+      logger.error('Error removing enrollment notification', err);
     }
   };
 

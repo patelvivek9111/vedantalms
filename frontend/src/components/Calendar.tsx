@@ -11,6 +11,7 @@ import { ToDoPanel } from './ToDoPanel';
 import { useNavigate } from 'react-router-dom';
 import { FileText, Menu, Folder, Settings, HelpCircle, User as UserIcon, LogOut, Plus, ChevronDown, Calendar as CalendarIcon } from 'lucide-react';
 import { ChangeUserModal } from './ChangeUserModal';
+import logger from '../utils/logger';
 
 const locales = {
   'en-US': enUS,
@@ -419,7 +420,7 @@ const CalendarPage: React.FC = () => {
               resource: { ...event, color: getCalendarColor(user._id, calIdx) },
             })));
         } catch (error) {
-          console.error('Error fetching personal events:', error);
+          logger.error('Error fetching personal events', error instanceof Error ? error : undefined, error instanceof Error ? undefined : { error });
         }
         continue;
       }
@@ -477,7 +478,7 @@ const CalendarPage: React.FC = () => {
                   }
                 });
               } catch (error) {
-                console.error(`Error fetching assignments for module ${module._id}:`, error);
+                logger.error('Error fetching assignments for module', error instanceof Error ? error : undefined, { moduleId: module._id, error: error instanceof Error ? undefined : error });
               }
             }
           } else {
@@ -511,22 +512,22 @@ const CalendarPage: React.FC = () => {
                       }
                     });
                   } catch (error) {
-                    console.error(`Error fetching assignments for module ${module._id}:`, error);
+                    logger.error('Error fetching assignments for module', error instanceof Error ? error : undefined, { moduleId: module._id, error: error instanceof Error ? undefined : error });
                   }
                 }
               }
             } catch (error) {
-              console.error(`Error fetching modules for course ${calId}:`, error);
+              logger.error('Error fetching modules for course', error instanceof Error ? error : undefined, { courseId: calId, error: error instanceof Error ? undefined : error });
             }
           }
         } catch (e) {
-          console.error('Error processing assignments:', e);
+          logger.error('Error processing assignments', e instanceof Error ? e : undefined, e instanceof Error ? undefined : { error: e });
         }
         
 
         allEvents.push(...courseEvents, ...assignmentEvents);
       } catch (error) {
-        console.error(`Error fetching course events for ${calId}:`, error);
+        logger.error('Error fetching course events', error instanceof Error ? error : undefined, { courseId: calId, error: error instanceof Error ? undefined : error });
       }
     }
     setEvents(allEvents);
@@ -635,7 +636,7 @@ const CalendarPage: React.FC = () => {
       setEditingEvent(null);
       fetchEvents();
     } catch (error) {
-      console.error('Error saving event:', error);
+      logger.error('Error saving event', error instanceof Error ? error : undefined, error instanceof Error ? undefined : { error });
       // You might want to show an error message to the user here
     }
   };
@@ -656,8 +657,7 @@ const CalendarPage: React.FC = () => {
         setEditingEvent(null);
         fetchEvents();
       } catch (error: any) {
-        console.error('Error deleting event:', error);
-        console.error('Error response:', error.response?.data);
+        logger.error('Error deleting event', error, { responseData: error.response?.data });
         // Show error message to user
         alert(`Failed to delete event: ${error.response?.data?.message || error.message || 'Unknown error'}`);
       }

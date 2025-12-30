@@ -4,6 +4,7 @@ import { Gauge, ClipboardList, Inbox, User, Calendar, Search, Users, BookOpen } 
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import { useAuth } from '../context/AuthContext';
 import { NavItem, ALL_NAV_OPTIONS, DEFAULT_NAV_ITEMS } from './NavCustomizationModal';
+import logger from '../utils/logger';
 
 const BottomNav: React.FC = () => {
   const location = useLocation();
@@ -44,7 +45,7 @@ const BottomNav: React.FC = () => {
           }
         }
       } catch (error) {
-        console.error('Error loading navigation items:', error);
+        logger.error('Error loading navigation items', error);
       }
       
       // Default items
@@ -86,7 +87,7 @@ const BottomNav: React.FC = () => {
             setNavItems(filteredItems);
           }
         } catch (error) {
-          console.error('Error loading navigation items:', error);
+          logger.error('Error loading navigation items', error);
         }
       }
     };

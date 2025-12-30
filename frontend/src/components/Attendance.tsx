@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import logger from '../utils/logger';
 import { 
   CheckSquare, 
   Calendar, 
@@ -355,7 +356,7 @@ const Attendance: React.FC = () => {
         // Get authentication token
         const token = localStorage.getItem('token');
         if (!token) {
-          console.error('No authentication token found');
+          logger.error('No authentication token found');
           return;
         }
 
@@ -428,7 +429,7 @@ const Attendance: React.FC = () => {
           }
         }
               } catch (error) {
-          console.error('Error fetching attendance data:', error);
+          logger.error('Error fetching attendance data', error);
         } finally {
           setLoading(false);
         }
@@ -496,7 +497,7 @@ const Attendance: React.FC = () => {
       
       alert('Attendance saved successfully!');
     } catch (error: any) {
-      console.error('Error saving attendance:', error);
+      logger.error('Error saving attendance', error);
       alert('Error saving attendance: ' + (error.response?.data?.message || error.message));
     }
   };
@@ -522,7 +523,7 @@ const Attendance: React.FC = () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
-        console.error('No authentication token found');
+        logger.error('No authentication token found');
         return;
       }
 
@@ -546,7 +547,7 @@ const Attendance: React.FC = () => {
       const response = await axios.post(`${API_URL}/api/courses/${courseId}/attendance`, requestData, { headers });
       
     } catch (error: any) {
-      console.error('Error auto-saving attendance:', error);
+      logger.error('Error auto-saving attendance', error);
       // Don't show alert for auto-save errors to avoid spam
     }
   };
@@ -563,7 +564,7 @@ const Attendance: React.FC = () => {
       try {
         const token = localStorage.getItem('token');
         if (!token) {
-          console.error('No authentication token found');
+          logger.error('No authentication token found');
           setLoading(false);
           return;
         }
@@ -617,7 +618,7 @@ const Attendance: React.FC = () => {
           }
         }
       } catch (error) {
-        console.error('Error fetching attendance data:', error);
+        logger.error('Error fetching attendance data', error);
       } finally {
         setLoading(false);
       }
@@ -656,7 +657,7 @@ const Attendance: React.FC = () => {
         }
       }
     } catch (error: any) {
-      console.error('Error assigning instructor:', error);
+      logger.error('Error assigning instructor', error);
       alert('Error assigning instructor: ' + (error.response?.data?.message || error.message));
     }
   };
@@ -705,7 +706,7 @@ const Attendance: React.FC = () => {
       a.click();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Error exporting attendance:', error);
+      logger.error('Error exporting attendance', error);
       alert('Error exporting attendance data');
     }
   };
@@ -779,7 +780,7 @@ const Attendance: React.FC = () => {
       window.URL.revokeObjectURL(url);
       
     } catch (error) {
-      console.error('Error exporting monthly attendance:', error);
+      logger.error('Error exporting monthly attendance', error);
       alert('Error exporting attendance data');
     } finally {
       setLoading(false);
@@ -859,7 +860,7 @@ const Attendance: React.FC = () => {
       
       setShowExportModal(false);
     } catch (error) {
-      console.error('Error exporting custom attendance:', error);
+      logger.error('Error exporting custom attendance', error);
       alert('Error exporting attendance data');
     } finally {
       setLoading(false);
@@ -912,7 +913,7 @@ const Attendance: React.FC = () => {
       const response = await axios.get(`${API_URL}/api/courses/${courseId}/attendance/percentages`, { headers });
       setAttendancePercentages(response.data);
     } catch (error) {
-      console.error('Error fetching attendance percentages:', error);
+      logger.error('Error fetching attendance percentages', error);
     }
   };
 

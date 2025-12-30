@@ -464,7 +464,7 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
                   {isTeacherOrAdmin && item.type === 'assignment' && (
                     <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                       <Link
-                        to={`/assignments/${item._id}/edit`}
+                        to={courseId ? `/courses/${courseId}/assignments/${item._id}/edit` : `/assignments/${item._id}/edit`}
                         className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-blue-700 dark:text-blue-200 bg-blue-100 dark:bg-blue-900 hover:bg-blue-200 dark:hover:bg-blue-800"
                         style={{ textDecoration: 'none' }}
                       >
@@ -596,7 +596,7 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
                         {/* Edit button (only for teacher/admin) */}
                         {isTeacherOrAdmin && item.type === 'assignment' && (
                           <Link
-                            to={`/assignments/${item._id}/edit`}
+                            to={courseId ? `/courses/${courseId}/assignments/${item._id}/edit` : `/assignments/${item._id}/edit`}
                             className="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-blue-700 dark:text-blue-200 bg-blue-100 dark:bg-blue-900 hover:bg-blue-200 dark:hover:bg-blue-800"
                             style={{ textDecoration: 'none' }}
                           >

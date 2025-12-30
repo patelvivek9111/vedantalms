@@ -1,24 +1,23 @@
 const User = require('../models/user.model');
 const LoginActivity = require('../models/loginActivity.model');
 const { validationResult } = require('express-validator');
+const logger = require('../utils/logger');
+const { ValidationError, ConflictError, UnauthorizedError, sendErrorResponse, asyncHandler } = require('../utils/errorHandler');
 
 // @desc    Register user
 // @route   POST /api/auth/register
 // @access  Public
-exports.register = async (req, res) => {
+exports.register = async (req, res, next) => {
   try {
   
     
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-
-      return res.status(400).json({ 
-        success: false,
-        errors: errors.array().map(err => ({
-          field: err.param,
-          message: err.msg
-        }))
-      });
+      const validationErrors = errors.array().map(err => ({
+        field: err.param,
+        message: err.msg
+      }));
+      return sendErrorResponse(res, new ValidationError('Validation error', validationErrors), { action: 'register' });
     }
 
     const { firstName, lastName, email, password, role } = req.body;
@@ -26,11 +25,7 @@ exports.register = async (req, res) => {
     // Check if user exists
     let user = await User.findOne({ email });
     if (user) {
-
-      return res.status(400).json({ 
-        success: false,
-        message: 'User with this email already exists' 
-      });
+      return sendErrorResponse(res, new ConflictError('User with this email already exists'), { action: 'register', email });
     }
 
     // Create user
@@ -61,12 +56,8 @@ exports.register = async (req, res) => {
       }
     });
   } catch (err) {
-    console.error('Registration error:', err);
-    res.status(500).json({ 
-      success: false,
-      message: 'Server error during registration',
-      error: err.message 
-    });
+    // Let the global error handler deal with it
+    next(err);
   }
 };
 
@@ -79,7 +70,7 @@ exports.login = async (req, res) => {
 
     // Validate email & password
     if (!email || !password) {
-      return res.status(400).json({ message: 'Please provide an email and password' });
+      return sendErrorResponse(res, new ValidationError('Please provide an email and password'), { action: 'login' });
     }
 
     // Check for user
@@ -93,7 +84,7 @@ exports.login = async (req, res) => {
         success: false,
         failureReason: 'User not found'
       });
-      return res.status(401).json({ message: 'Invalid credentials' });
+      return sendErrorResponse(res, new UnauthorizedError('Invalid credentials'), { action: 'login', email });
     }
 
     // Check if password matches
@@ -107,7 +98,7 @@ exports.login = async (req, res) => {
         success: false,
         failureReason: 'Invalid password'
       });
-      return res.status(401).json({ message: 'Invalid credentials' });
+      return sendErrorResponse(res, new UnauthorizedError('Invalid credentials'), { action: 'login', email });
     }
 
     // Log successful login
@@ -139,15 +130,15 @@ exports.login = async (req, res) => {
       }
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
+    // Let the global error handler deal with it
+    next(err);
   }
 };
 
 // @desc    Get current logged in user
 // @route   GET /api/auth/me
 // @access  Private
-exports.getMe = async (req, res) => {
+exports.getMe = async (req, res, next) => {
   try {
     // Use _id for consistency with MongoDB (req.user is a Mongoose document)
     const user = await User.findById(req.user._id || req.user.id);
@@ -164,8 +155,8 @@ exports.getMe = async (req, res) => {
       }
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
+    // Let the global error handler deal with it
+    next(err);
   }
 };
 
@@ -210,7 +201,7 @@ exports.getLoginActivity = async (req, res) => {
       }
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
+    // Let the global error handler deal with it
+    next(err);
   }
 }; 

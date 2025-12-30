@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
 import { API_URL } from '../../config';
 import ViewAssignment from './ViewAssignment';
+import logger from '../../utils/logger';
 import { 
   ClipboardList, 
   BookOpen, 
@@ -82,7 +83,7 @@ const AssignmentViewWrapper: React.FC = () => {
           }
         }
       } catch (err) {
-        console.error('Error fetching course data:', err);
+        logger.error('Error fetching course data', err instanceof Error ? err : new Error(String(err)));
       } finally {
         setLoading(false);
       }
@@ -240,7 +241,7 @@ const AssignmentViewWrapper: React.FC = () => {
       {/* Main Content Area */}
       <div className="flex-1 overflow-auto lg:ml-0">
         <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6">
-          <ViewAssignment />
+          <ViewAssignment courseId={course?._id} />
         </div>
       </div>
     </div>

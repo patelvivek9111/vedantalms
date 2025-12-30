@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useModule } from '../contexts/ModuleContext';
 import ReactMarkdown from 'react-markdown';
+import logger from '../utils/logger';
 function sanitizeHtml(html: string): string {
   if (!html) return '';
   let sanitized = html.replace(/<\/(script|style)>/gi, '</removed>');
@@ -31,7 +32,7 @@ const PageView: React.FC = () => {
         }
         setPage(pageData);
       } catch (err) {
-        console.error('Error fetching page:', err);
+        logger.error('Error fetching page', err);
         setError('Failed to load page');
       } finally {
         setLoading(false);

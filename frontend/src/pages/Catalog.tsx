@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { API_URL } from '../config';
+import logger from '../utils/logger';
 import { Search, Filter, BookOpen, User, Calendar, Users, Menu, Folder, Settings, HelpCircle, LogOut } from 'lucide-react';
 import { getImageUrl } from '../services/api';
 import { ChangeUserModal } from '../components/ChangeUserModal';
@@ -86,11 +87,11 @@ const Catalog: React.FC = () => {
         
         setCourses(response.data);
       } catch (err: any) {
-        console.error('Fallback route also failed:', err);
+        logger.error('Fallback route also failed', err);
         setError('Failed to fetch course catalog. Please try again later.');
       }
     } catch (err: any) {
-      console.error('Error fetching catalog:', err);
+      logger.error('Error fetching catalog', err);
       setError(err.response?.data?.message || 'Failed to fetch course catalog');
     } finally {
       setLoading(false);
@@ -323,9 +324,12 @@ const Catalog: React.FC = () => {
           <div className="flex flex-col md:flex-row gap-4">
             {/* Search Bar */}
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5" />
+              <label htmlFor="catalog-search" className="sr-only">Search courses</label>
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5" aria-hidden="true" />
               <input
                 type="text"
+                id="catalog-search"
+                name="catalogSearch"
                 placeholder="Search courses by title, course code, description, or instructor..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -346,19 +350,21 @@ const Catalog: React.FC = () => {
           {/* Filter Options */}
           {showFilters && (
             <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                             <div>
-                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Subject</label>
-                 <select
-                   value={selectedSubject}
-                   onChange={(e) => setSelectedSubject(e.target.value)}
-                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
-                 >
-                   <option value="">All Subjects</option>
-                   {subjects.map(subject => (
-                     <option key={subject} value={subject}>{subject}</option>
-                   ))}
-                 </select>
-               </div>
+              <div>
+                <label htmlFor="catalog-subject-filter" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Subject</label>
+                <select
+                  id="catalog-subject-filter"
+                  name="subjectFilter"
+                  value={selectedSubject}
+                  onChange={(e) => setSelectedSubject(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
+                >
+                  <option value="">All Subjects</option>
+                  {subjects.map(subject => (
+                    <option key={subject} value={subject}>{subject}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           )}
         </div>

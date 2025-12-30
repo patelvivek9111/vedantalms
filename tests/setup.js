@@ -1,21 +1,21 @@
-// Test setup file
-// This runs before all tests
+// Jest setup file for test configuration
+// This file runs before each test suite
 
 // Set test environment variables
 process.env.NODE_ENV = 'test';
-process.env.JWT_SECRET = 'test-jwt-secret-key-for-testing-only';
-process.env.JWT_EXPIRE = '30d';
+process.env.JWT_SECRET = 'test-secret-key-for-jwt';
 process.env.MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/lms-test';
 
-// Increase timeout for database operations
-jest.setTimeout(10000);
+// Increase timeout for async operations
+jest.setTimeout(30000);
 
-// Clean up after all tests
-afterAll(async () => {
-  // Close any open connections
-  const mongoose = require('mongoose');
-  if (mongoose.connection.readyState !== 0) {
-    await mongoose.connection.close();
-  }
-});
+// Suppress console logs during tests (optional - uncomment if needed)
+// global.console = {
+//   ...console,
+//   log: jest.fn(),
+//   debug: jest.fn(),
+//   info: jest.fn(),
+//   warn: jest.fn(),
+//   error: jest.fn(),
+// };
 

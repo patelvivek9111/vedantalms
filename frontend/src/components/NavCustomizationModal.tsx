@@ -208,17 +208,17 @@ export const NavCustomizationModal: React.FC<NavCustomizationModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-[200] flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-gray-800 dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+        <div className="flex items-center justify-between p-4 border-b border-gray-700 dark:border-gray-700">
+          <h2 className="text-xl font-bold text-white dark:text-white">
             Customize Navigation
           </h2>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            className="p-2 hover:bg-gray-700 dark:hover:bg-gray-700 rounded-lg transition-colors"
           >
-            <X className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+            <X className="h-5 w-5 text-white dark:text-white" />
           </button>
         </div>
 
@@ -226,7 +226,7 @@ export const NavCustomizationModal: React.FC<NavCustomizationModalProps> = ({
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {/* Selected Items (Draggable) */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+            <h3 className="text-sm font-semibold text-white dark:text-white mb-2">
               Bottom Navigation ({selectedItems.length}/4)
             </h3>
             <div className="space-y-2">
@@ -245,18 +245,18 @@ export const NavCustomizationModal: React.FC<NavCustomizationModalProps> = ({
                         setDragOverIndex(null);
                       }
                     }}
-                    className={`flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-move transition-all ${
-                      dragOverIndex === index ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20' : ''
-                    } ${draggedItem?.id === item.id ? 'opacity-50' : 'hover:bg-gray-100 dark:hover:bg-gray-600'}`}
+                    className={`flex items-center gap-3 p-3 bg-gray-700 dark:bg-gray-700 rounded-lg cursor-move transition-all ${
+                      dragOverIndex === index ? 'ring-2 ring-blue-500 bg-blue-900/20 dark:bg-blue-900/20' : ''
+                    } ${draggedItem?.id === item.id ? 'opacity-50' : 'hover:bg-gray-600 dark:hover:bg-gray-600'}`}
                   >
-                    <GripVertical className="h-5 w-5 text-gray-400 dark:text-gray-500 flex-shrink-0" />
-                    <Icon className="h-5 w-5 text-gray-600 dark:text-gray-400 flex-shrink-0" />
-                    <span className="flex-1 text-sm font-medium text-gray-900 dark:text-gray-100">
+                    <GripVertical className="h-5 w-5 text-gray-400 dark:text-gray-400 flex-shrink-0" />
+                    <Icon className="h-5 w-5 text-white dark:text-white flex-shrink-0" />
+                    <span className="flex-1 text-sm font-medium text-white dark:text-white">
                       {item.label}
                     </span>
                     <button
                       onClick={() => handleToggleItem(item)}
-                      className="px-3 py-1 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                      className="px-3 py-1 text-xs font-medium text-red-400 dark:text-red-400 hover:bg-red-900/20 dark:hover:bg-red-900/20 rounded transition-colors"
                     >
                       Remove
                     </button>
@@ -264,7 +264,7 @@ export const NavCustomizationModal: React.FC<NavCustomizationModalProps> = ({
                 );
               })}
               {selectedItems.length === 0 && (
-                <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                <p className="text-sm text-gray-400 dark:text-gray-400 text-center py-4">
                   No items selected. Please add at least one item.
                 </p>
               )}
@@ -273,7 +273,7 @@ export const NavCustomizationModal: React.FC<NavCustomizationModalProps> = ({
 
           {/* Available Options */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+            <h3 className="text-sm font-semibold text-white dark:text-white mb-2">
               Available Options
             </h3>
             <div className="space-y-2">
@@ -287,18 +287,18 @@ export const NavCustomizationModal: React.FC<NavCustomizationModalProps> = ({
                       key={option.id}
                       onClick={() => handleToggleItem(option)}
                       disabled={isDisabled}
-                      className={`w-full flex items-center gap-3 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg transition-all ${
+                      className={`w-full flex items-center gap-3 p-3 bg-gray-700 dark:bg-gray-700 border border-gray-600 dark:border-gray-600 rounded-lg transition-all ${
                         isDisabled
                           ? 'opacity-50 cursor-not-allowed'
-                          : 'hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer'
+                          : 'hover:bg-gray-600 dark:hover:bg-gray-600 cursor-pointer'
                       }`}
                     >
-                      <Icon className="h-5 w-5 text-gray-600 dark:text-gray-400 flex-shrink-0" />
-                      <span className="flex-1 text-left text-sm font-medium text-gray-900 dark:text-gray-100">
+                      <Icon className="h-5 w-5 text-white dark:text-white flex-shrink-0" />
+                      <span className="flex-1 text-left text-sm font-medium text-white dark:text-white">
                         {option.label}
                       </span>
                       {isDisabled && (
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                        <span className="text-xs text-gray-400 dark:text-gray-400">
                           Max 4 items
                         </span>
                       )}
@@ -310,24 +310,24 @@ export const NavCustomizationModal: React.FC<NavCustomizationModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-4 border-t border-gray-200 dark:border-gray-700 gap-3">
+        <div className="flex items-center justify-between p-4 border-t border-gray-700 dark:border-gray-700 gap-3">
           <button
             onClick={handleReset}
-            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            className="px-4 py-2 text-sm font-medium text-white dark:text-white hover:bg-gray-700 dark:hover:bg-gray-700 rounded-lg transition-colors"
           >
             Reset to Default
           </button>
           <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              className="px-4 py-2 text-sm font-medium text-white dark:text-white hover:bg-gray-700 dark:hover:bg-gray-700 rounded-lg transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
               disabled={selectedItems.length === 0}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-lg transition-colors"
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg transition-colors"
             >
               Save
             </button>

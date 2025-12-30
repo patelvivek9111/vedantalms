@@ -6,6 +6,7 @@ const Submission = require('../models/Submission');
 const Module = require('../models/module.model');
 const LoginActivity = require('../models/loginActivity.model');
 const SystemSettings = require('../models/systemSettings.model');
+const logger = require('../utils/logger');
 const fs = require('fs');
 const path = require('path');
 
@@ -75,7 +76,7 @@ exports.getSystemStats = async (req, res) => {
         
         return totalSize;
       } catch (err) {
-        console.error(`Error calculating size for ${dirPath}:`, err);
+        logger.warn('Error calculating directory size', { dirPath, error: err.message });
         return 0;
       }
     };
@@ -83,7 +84,7 @@ exports.getSystemStats = async (req, res) => {
     try {
       storageUsed = calculateDirSize(uploadsDir);
     } catch (err) {
-      console.error('Error calculating storage:', err);
+      logger.warn('Error calculating storage', { error: err.message });
       // Default to 0 if calculation fails
     }
 
@@ -123,7 +124,7 @@ exports.getSystemStats = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching system stats:', error);
+    logger.logError(error, { action: 'getSystemStats' });
     res.status(500).json({
       success: false,
       message: 'Failed to fetch system statistics',
@@ -231,7 +232,7 @@ exports.getRecentActivity = async (req, res) => {
       data: formattedActivities
     });
   } catch (error) {
-    console.error('Error fetching recent activity:', error);
+    logger.logError(error, { action: 'getRecentActivity' });
     res.status(500).json({
       success: false,
       message: 'Failed to fetch recent activity',
@@ -391,7 +392,7 @@ exports.getAnalytics = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching analytics:', error);
+    logger.logError(error, { action: 'getAnalytics' });
     res.status(500).json({
       success: false,
       message: 'Failed to fetch analytics data',
@@ -456,7 +457,7 @@ exports.getAllUsers = async (req, res) => {
           lastLoginDate = new Date(activityLogin);
           // Optionally update the User model (non-blocking)
           User.findByIdAndUpdate(user._id, { lastLogin: activityLogin }).catch(err => 
-            console.error('Error updating lastLogin:', err)
+            logger.warn('Error updating lastLogin', { userId: user._id, error: err.message })
           );
         }
       }
@@ -508,7 +509,7 @@ exports.getAllUsers = async (req, res) => {
       data: filteredUsers
     });
   } catch (error) {
-    console.error('Error fetching users:', error);
+    logger.logError(error, { action: 'getAllUsers' });
     res.status(500).json({
       success: false,
       message: 'Failed to fetch users',
@@ -594,7 +595,7 @@ exports.getAllCourses = async (req, res) => {
       data: filteredCourses
     });
   } catch (error) {
-    console.error('Error fetching courses:', error);
+    logger.logError(error, { action: 'getAllCourses' });
     res.status(500).json({
       success: false,
       message: 'Failed to fetch courses',
@@ -676,7 +677,7 @@ exports.getSecurityStats = async (req, res) => {
       }
     });
   } catch (err) {
-    console.error('Error in getSecurityStats:', err);
+    logger.logError(err, { action: 'getSecurityStats' });
     res.status(500).json({
       success: false,
       message: 'Error fetching security statistics',
@@ -751,7 +752,7 @@ exports.getSecurityEvents = async (req, res) => {
       data: events
     });
   } catch (err) {
-    console.error('Error in getSecurityEvents:', err);
+    logger.logError(err, { action: 'getSecurityEvents' });
     res.status(500).json({
       success: false,
       message: 'Error fetching security events',
@@ -778,7 +779,7 @@ exports.getSystemSettings = async (req, res) => {
       data: settingsResponse
     });
   } catch (err) {
-    console.error('Error in getSystemSettings:', err);
+    logger.error('Error in getSystemSettings', { error: err.message, stack: err.stack });
     res.status(500).json({
       success: false,
       message: 'Error fetching system settings',
@@ -832,7 +833,7 @@ exports.updateSystemSettings = async (req, res) => {
       message: 'System settings updated successfully'
     });
   } catch (err) {
-    console.error('Error in updateSystemSettings:', err);
+    logger.error('Error in updateSystemSettings', { error: err.message, stack: err.stack });
     res.status(500).json({
       success: false,
       message: 'Error updating system settings',
@@ -846,18 +847,75 @@ exports.updateSystemSettings = async (req, res) => {
 // @access  Private (Admin)
 exports.testEmailConfig = async (req, res) => {
   try {
-    // For now, return a placeholder response
-    // TODO: Implement actual email sending functionality
+    const emailService = require('../utils/emailService');
+    const { user } = req; // Get current user from auth middleware
+    
+    // Get recipient email from request body or use current user's email
+    const recipientEmail = req.body.testEmail || req.body.email || user?.email;
+    
+    if (!recipientEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'Recipient email is required. Please provide testEmail in request body.'
+      });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(recipientEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid email format'
+      });
+    }
+
+    // If email config is provided in request, update system settings first
+    if (req.body.smtpHost || req.body.smtpUser) {
+      let settings = await SystemSettings.findOne();
+      if (!settings) {
+        settings = new SystemSettings({});
+      }
+      
+      if (req.body.smtpHost) settings.email.smtpHost = req.body.smtpHost;
+      if (req.body.smtpPort) settings.email.smtpPort = req.body.smtpPort;
+      if (req.body.smtpUser) settings.email.smtpUser = req.body.smtpUser;
+      if (req.body.smtpPassword && req.body.smtpPassword !== '***') {
+        settings.email.smtpPassword = req.body.smtpPassword;
+      }
+      if (req.body.fromEmail) settings.email.fromEmail = req.body.fromEmail;
+      if (req.body.fromName) settings.email.fromName = req.body.fromName;
+      
+      await settings.save();
+      
+      // Reinitialize email service with new settings
+      await emailService.initializeTransporter();
+    }
+
+    // Check if email service is configured
+    if (!emailService.isEmailConfigured()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email service is not configured. Please configure SMTP settings first.',
+        hint: 'Set SMTP_HOST, SMTP_USER, and SMTP_PASS environment variables or configure in system settings.'
+      });
+    }
+
+    // Send test email
+    const result = await emailService.sendTestEmail(recipientEmail);
+    
     res.json({
       success: true,
-      message: 'Email test functionality is not yet implemented. Configuration saved successfully.'
+      message: `Test email sent successfully to ${recipientEmail}`,
+      messageId: result.messageId
     });
   } catch (err) {
-    console.error('Error in testEmailConfig:', err);
+    const logger = require('../utils/logger');
+    logger.error('Error in testEmailConfig', { error: err.message, stack: err.stack });
+    
     res.status(500).json({
       success: false,
       message: 'Error testing email configuration',
-      error: err.message
+      error: process.env.NODE_ENV === 'production' ? 'Failed to send test email' : err.message
     });
   }
 };

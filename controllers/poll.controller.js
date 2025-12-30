@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Poll = require('../models/poll.model');
 const Course = require('../models/course.model');
+const logger = require('../utils/logger');
 
 // Create a new poll
 const createPoll = async (req, res) => {
@@ -98,7 +99,7 @@ const createPoll = async (req, res) => {
       data: poll
     });
   } catch (error) {
-    console.error('Create poll error:', error);
+    logger.logError(error, { action: 'createPoll', courseId: req.params.courseId });
     res.status(500).json({
       success: false,
       message: 'Error creating poll',
@@ -200,7 +201,7 @@ const getPollsByCourse = async (req, res) => {
       data: filteredPolls
     });
   } catch (error) {
-    console.error('Get polls error:', error);
+    logger.logError(error, { action: 'getPolls', courseId: req.params.courseId });
     res.status(500).json({
       success: false,
       message: 'Error fetching polls',
@@ -335,7 +336,7 @@ const voteOnPoll = async (req, res) => {
       data: poll
     });
   } catch (error) {
-    console.error('Vote error:', error);
+    logger.logError(error, { action: 'votePoll', pollId: req.params.pollId });
     res.status(500).json({
       success: false,
       message: 'Error recording vote',
@@ -408,7 +409,7 @@ const getPollResults = async (req, res) => {
       data: results
     });
   } catch (error) {
-    console.error('Get poll results error:', error);
+    logger.logError(error, { action: 'getPollResults', pollId: req.params.pollId });
     res.status(500).json({
       success: false,
       message: 'Error fetching poll results',
@@ -503,7 +504,7 @@ const updatePoll = async (req, res) => {
       data: poll
     });
   } catch (error) {
-    console.error('Update poll error:', error);
+    logger.logError(error, { action: 'updatePoll', pollId: req.params.pollId });
     res.status(500).json({
       success: false,
       message: 'Error updating poll',
@@ -565,7 +566,7 @@ const deletePoll = async (req, res) => {
       message: 'Poll deleted successfully'
     });
   } catch (error) {
-    console.error('Delete poll error:', error);
+    logger.logError(error, { action: 'deletePoll', pollId: req.params.pollId });
     res.status(500).json({
       success: false,
       message: 'Error deleting poll',

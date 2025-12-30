@@ -1,151 +1,101 @@
 import api from './api';
 
-// Helper to validate ObjectId-like strings (24 hex characters)
-const isValidId = (id: string): boolean => {
-  return id && typeof id === 'string' && /^[a-fA-F0-9]{24}$/.test(id.trim());
+export interface AnnouncementComment {
+  _id: string;
+  text: string;
+  author: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    profilePicture?: string;
+  };
+  createdAt: string;
+  replies?: AnnouncementComment[];
+  likes?: Array<{
+    user: string;
+    _id: string;
+  }>;
+}
+
+export interface Announcement {
+  _id: string;
+  title: string;
+  body: string;
+  course: string;
+  author: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    profilePicture?: string;
+  };
+  createdAt: string;
+  postTo?: string;
+  options?: {
+    allowComments?: boolean;
+    requirePostBeforeSeeingReplies?: boolean;
+    allowLiking?: boolean;
+    delayPosting?: boolean;
+    enablePodcastFeed?: boolean;
+  };
+  delayedUntil?: string;
+}
+
+export const getAnnouncements = async (courseId: string): Promise<Announcement[]> => {
+  const response = await api.get(`/courses/${courseId}/announcements`);
+  return response.data.data || response.data || [];
 };
 
-// Helper to sanitize text input (prevent XSS)
-const sanitizeText = (text: string): string => {
-  if (!text || typeof text !== 'string') return '';
-  // Remove HTML tags and trim
-  return text.replace(/<[^>]*>/g, '').trim();
+export const getGroupSetAnnouncements = async (courseId: string, groupSetId: string): Promise<Announcement[]> => {
+  const response = await api.get(`/announcements/groupset/${groupSetId}`);
+  return response.data.data || response.data || [];
 };
 
-export const getAnnouncements = async (courseId: string) => {
-  // Validate courseId
-  if (!isValidId(courseId)) {
-    throw new Error('Invalid course ID format');
-  }
-
-  const res = await api.get(`/courses/${courseId}/announcements`);
-  return res.data.data;
+export const createAnnouncement = async (courseId: string, formData: any): Promise<Announcement> => {
+  const response = await api.post(`/announcements`, { ...formData, course: courseId });
+  return response.data.data || response.data;
 };
 
-export const createAnnouncement = async (courseId: string, data: FormData) => {
-  // Validate courseId
-  if (!isValidId(courseId)) {
-    throw new Error('Invalid course ID format');
-  }
-
-  // Validate FormData
-  if (!data || !(data instanceof FormData)) {
-    throw new Error('Invalid form data');
-  }
-
-  const res = await api.post(`/courses/${courseId}/announcements`, data, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  });
-  return res.data.data;
+export const updateAnnouncement = async (announcementId: string, formData: any): Promise<Announcement> => {
+  const response = await api.put(`/announcements/${announcementId}`, formData);
+  return response.data.data || response.data;
 };
 
-export const getAnnouncementComments = async (announcementId: string) => {
-  // Validate announcementId
-  if (!isValidId(announcementId)) {
-    throw new Error('Invalid announcement ID format');
-  }
-
-  const res = await api.get(`/announcements/${announcementId}/comments`);
-  return res.data.data;
+export const deleteAnnouncement = async (announcementId: string): Promise<void> => {
+  await api.delete(`/announcements/${announcementId}`);
 };
 
-export const postAnnouncementComment = async (announcementId: string, text: string) => {
-  // Validate announcementId
-  if (!isValidId(announcementId)) {
-    throw new Error('Invalid announcement ID format');
-  }
-
-  // Validate and sanitize text
-  const sanitizedText = sanitizeText(text);
-  if (!sanitizedText || sanitizedText.length === 0) {
-    throw new Error('Comment text is required');
-  }
-
-  const res = await api.post(`/announcements/${announcementId}/comments`, { text: sanitizedText });
-  return res.data;
+export const getAnnouncementComments = async (announcementId: string): Promise<AnnouncementComment[]> => {
+  const response = await api.get(`/announcements/${announcementId}/comments`);
+  return response.data || [];
 };
 
-export const postAnnouncementReply = async (announcementId: string, commentId: string, text: string) => {
-  // Validate IDs
-  if (!isValidId(announcementId)) {
-    throw new Error('Invalid announcement ID format');
-  }
-  if (!isValidId(commentId)) {
-    throw new Error('Invalid comment ID format');
-  }
-
-  // Validate and sanitize text
-  const sanitizedText = sanitizeText(text);
-  if (!sanitizedText || sanitizedText.length === 0) {
-    throw new Error('Reply text is required');
-  }
-
-  const res = await api.post(`/announcements/${announcementId}/comments/${commentId}/reply`, { text: sanitizedText });
-  return res.data;
+export const postAnnouncementComment = async (announcementId: string, text: string): Promise<AnnouncementComment> => {
+  const response = await api.post(`/announcements/${announcementId}/comments`, { text });
+  return response.data;
 };
 
-export const likeAnnouncementComment = async (announcementId: string, commentId: string) => {
-  // Validate IDs
-  if (!isValidId(announcementId)) {
-    throw new Error('Invalid announcement ID format');
-  }
-  if (!isValidId(commentId)) {
-    throw new Error('Invalid comment ID format');
-  }
-
-  const res = await api.post(`/announcements/${announcementId}/comments/${commentId}/like`);
-  return res.data;
+export const postAnnouncementReply = async (
+  announcementId: string,
+  commentId: string,
+  text: string
+): Promise<AnnouncementComment> => {
+  const response = await api.post(`/announcements/${announcementId}/comments/${commentId}/reply`, { text });
+  return response.data;
 };
 
-export const unlikeAnnouncementComment = async (announcementId: string, commentId: string) => {
-  // Validate IDs
-  if (!isValidId(announcementId)) {
-    throw new Error('Invalid announcement ID format');
-  }
-  if (!isValidId(commentId)) {
-    throw new Error('Invalid comment ID format');
-  }
-
-  const res = await api.post(`/announcements/${announcementId}/comments/${commentId}/unlike`);
-  return res.data;
+export const likeAnnouncementComment = async (
+  announcementId: string,
+  commentId: string
+): Promise<AnnouncementComment> => {
+  const response = await api.post(`/announcements/${announcementId}/comments/${commentId}/like`);
+  return response.data;
 };
 
-export const getGroupSetAnnouncements = async (courseId: string, groupsetId: string) => {
-  // Validate IDs
-  if (!isValidId(courseId)) {
-    throw new Error('Invalid course ID format');
-  }
-  if (!isValidId(groupsetId)) {
-    throw new Error('Invalid groupset ID format');
-  }
-
-  const res = await api.get(`/courses/${courseId}/announcements?groupset=${groupsetId}`);
-  return res.data.data;
+export const unlikeAnnouncementComment = async (
+  announcementId: string,
+  commentId: string
+): Promise<AnnouncementComment> => {
+  const response = await api.post(`/announcements/${announcementId}/comments/${commentId}/unlike`);
+  return response.data;
 };
 
-export const updateAnnouncement = async (announcementId: string, data: FormData) => {
-  // Validate announcementId
-  if (!isValidId(announcementId)) {
-    throw new Error('Invalid announcement ID format');
-  }
-
-  // Validate FormData
-  if (!data || !(data instanceof FormData)) {
-    throw new Error('Invalid form data');
-  }
-
-  const res = await api.put(`/announcements/${announcementId}`, data, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  });
-  return res.data.data;
-};
-
-export const deleteAnnouncement = async (announcementId: string) => {
-  // Validate announcementId
-  if (!isValidId(announcementId)) {
-    throw new Error('Invalid announcement ID format');
-  }
-
-  const res = await api.delete(`/announcements/${announcementId}`);
-  return res.data;
-}; 

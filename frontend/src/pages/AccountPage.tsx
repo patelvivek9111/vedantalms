@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { updateUserProfile, uploadProfilePicture, getUserPreferences, updateUserPreferences, getLoginActivity, getImageUrl } from '../services/api';
+import { updateUserProfile, uploadProfilePicture, getUserPreferences, updateUserPreferences, getLoginActivity, getImageUrl, updatePassword } from '../services/api';
 import api from '../services/api';
 import { useTheme } from '../context/ThemeContext';
+import logger from '../utils/logger';
+import { Sun, Moon, Eye, EyeOff, Lock, Smartphone } from 'lucide-react';
+import { NavCustomizationModal, NavItem, ALL_NAV_OPTIONS, DEFAULT_NAV_ITEMS } from '../components/NavCustomizationModal';
 
 const sections = [
   { key: 'profile', label: 'Profile' },
@@ -41,13 +44,13 @@ function ProfileSection() {
     } catch (err: any) {
       // Show detailed error message if available
       if (err.response && err.response.data && err.response.data.message) {
-        console.error('Profile update error:', err.response.data);
+        logger.error('Profile update error', err.response.data);
         alert('Failed to update profile: ' + err.response.data.message);
       } else if (err.message) {
-        console.error('Profile update error:', err);
+        logger.error('Profile update error', err);
         alert('Failed to update profile: ' + err.message);
       } else {
-        console.error('Profile update error:', err);
+        logger.error('Profile update error', err);
         alert('Failed to update profile: Unknown error');
       }
     } finally {
@@ -171,20 +174,81 @@ function ProfileSection() {
 }
 
 function SettingsSection() {
-  const [prefs, setPrefs] = React.useState({ language: 'en', timeZone: 'UTC', theme: 'light' });
+  const [prefs, setPrefs] = React.useState({ theme: 'light', showOnlineStatus: true });
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState(false);
   const { theme, setTheme } = useTheme();
   const isFirstRender = React.useRef(true);
+  const { user } = useAuth();
+  const [navModalOpen, setNavModalOpen] = useState(false);
+  const [currentNavItems, setCurrentNavItems] = useState<NavItem[]>([]);
+  
+  // Password change state
+  const [passwordData, setPasswordData] = React.useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [passwordSaving, setPasswordSaving] = React.useState(false);
+  const [passwordError, setPasswordError] = React.useState<string | null>(null);
+  const [passwordSuccess, setPasswordSuccess] = React.useState(false);
+
+  // Load current navigation items
+  useEffect(() => {
+    const loadNavItems = () => {
+      try {
+        const saved = localStorage.getItem('bottomNavItems');
+        if (saved) {
+          const savedItems = JSON.parse(saved);
+          const mappedItems = savedItems.map((item: any) => {
+            const option = ALL_NAV_OPTIONS.find(opt => opt.id === item.id);
+            if (option) {
+              return {
+                ...option,
+                ...item
+              };
+            }
+            return null;
+          }).filter((item: NavItem | null): item is NavItem => item !== null);
+          
+          const filteredItems = mappedItems.filter((item: NavItem) => {
+            if (item.id === 'my-course' && user?.role !== 'teacher' && user?.role !== 'admin') {
+              return false;
+            }
+            return true;
+          });
+          
+          if (filteredItems.length > 0) {
+            setCurrentNavItems(filteredItems);
+            return;
+          }
+        }
+      } catch (error) {
+        logger.error('Error loading navigation items', error);
+      }
+      
+      // Default items
+      const defaultItems = DEFAULT_NAV_ITEMS
+        .map(id => ALL_NAV_OPTIONS.find(opt => opt.id === id))
+        .filter((item): item is NavItem => item !== undefined);
+      setCurrentNavItems(defaultItems);
+    };
+
+    loadNavItems();
+  }, [user?.role]);
 
   React.useEffect(() => {
     setLoading(true);
     getUserPreferences()
       .then(res => {
         if (res.data && res.data.preferences) {
-          setPrefs(res.data.preferences);
+          const preferences = res.data.preferences;
+          setPrefs({
+            theme: preferences.theme || 'light',
+            showOnlineStatus: preferences.showOnlineStatus !== undefined ? preferences.showOnlineStatus : true
+          });
         }
       })
       .catch(() => setError('Failed to load preferences'))
@@ -202,23 +266,18 @@ function SettingsSection() {
     }
   }, [prefs.theme, theme, setTheme]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setPrefs(prev => {
-      const updated = { ...prev, [name]: value };
-      if (name === 'theme') setTheme(value as 'light' | 'dark');
-      return updated;
-    });
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    setError(null);
-    setSuccess(false);
+  const handleThemeChange = async (newTheme: 'light' | 'dark') => {
+    const updatedPrefs = { ...prefs, theme: newTheme };
+    setPrefs(updatedPrefs);
+    setTheme(newTheme);
+    
+    // Auto-save on change
     try {
-      await updateUserPreferences(prefs);
+      setSaving(true);
+      setError(null);
+      await updateUserPreferences(updatedPrefs);
       setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
     } catch {
       setError('Failed to save preferences');
     } finally {
@@ -226,59 +285,321 @@ function SettingsSection() {
     }
   };
 
+  const handleOnlineStatusToggle = (value: boolean) => {
+    setPrefs(prev => ({ ...prev, showOnlineStatus: value }));
+  };
+
+  if (loading) {
+    return (
+      <div className="text-gray-500 dark:text-gray-400">Loading settings...</div>
+    );
+  }
+
   return (
-    <div className="text-gray-900 dark:text-gray-100">
-      <h2 className="text-base sm:text-lg lg:text-xl font-semibold mb-2 sm:mb-3">Settings</h2>
-      <p className="text-xs sm:text-sm lg:text-base text-gray-600 dark:text-gray-400 mb-3 sm:mb-4">Manage your password, language, time zone, and theme preferences.</p>
-      {/* Password Change Scaffold */}
-      <div className="mb-4 sm:mb-6 lg:mb-8">
-        <h3 className="text-sm sm:text-base lg:text-lg font-semibold mb-2 text-gray-900 dark:text-gray-100">Change Password</h3>
-        <form className="flex flex-col gap-2 w-full max-w-md">
-          <input type="password" className="border border-gray-300 dark:border-gray-600 rounded px-2 sm:px-3 py-1.5 sm:py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 cursor-not-allowed" placeholder="Current Password" disabled />
-          <input type="password" className="border border-gray-300 dark:border-gray-600 rounded px-2 sm:px-3 py-1.5 sm:py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 cursor-not-allowed" placeholder="New Password" disabled />
-          <input type="password" className="border border-gray-300 dark:border-gray-600 rounded px-2 sm:px-3 py-1.5 sm:py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 cursor-not-allowed" placeholder="Confirm New Password" disabled />
-          <button type="button" className="bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded px-3 sm:px-4 py-1.5 sm:py-2 mt-1 sm:mt-2 cursor-not-allowed text-xs sm:text-sm" disabled>Change Password (Coming Soon)</button>
-        </form>
+    <div className="text-gray-900 dark:text-gray-100 space-y-4 sm:space-y-6">
+      <div>
+        <h2 className="text-base sm:text-lg lg:text-xl font-bold text-gray-900 dark:text-gray-100 mb-1">Settings</h2>
+        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Manage your account preferences and privacy settings.</p>
       </div>
-      {/* Preferences Form */}
-      <form className="flex flex-col gap-3 sm:gap-4 w-full max-w-md bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 p-3 sm:p-4 lg:p-6 rounded-lg shadow-sm" onSubmit={handleSubmit}>
-        <div>
-          <label className="block text-xs sm:text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Language</label>
-          <select name="language" value={prefs.language} onChange={handleChange} className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 sm:px-3 py-1.5 sm:py-2 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-            <option value="en">English</option>
-            <option value="es">Spanish</option>
-            <option value="fr">French</option>
-            <option value="de">German</option>
-            {/* Add more languages as needed */}
-          </select>
+
+      {error && (
+        <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400 text-xs sm:text-sm">
+          {error}
         </div>
-        <div>
-          <label className="block text-xs sm:text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Time Zone</label>
-          <select name="timeZone" value={prefs.timeZone} onChange={handleChange} className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 sm:px-3 py-1.5 sm:py-2 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-            <option value="UTC">UTC</option>
-            <option value="America/New_York">America/New_York</option>
-            <option value="Europe/London">Europe/London</option>
-            <option value="Asia/Kolkata">Asia/Kolkata</option>
-            {/* Add more time zones as needed */}
-          </select>
+      )}
+
+      {success && (
+        <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-green-700 dark:text-green-400 text-xs sm:text-sm">
+          Preferences saved successfully!
         </div>
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-          <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">Theme</label>
-          <div className="flex items-center gap-3 sm:gap-4">
-            <label className="flex items-center gap-1.5 sm:gap-2 cursor-pointer touch-manipulation">
-              <input type="radio" name="theme" value="light" checked={prefs.theme === 'light'} onChange={handleChange} className="text-blue-600 focus:ring-blue-500 w-4 h-4" /> 
-              <span className="text-xs sm:text-sm text-gray-700 dark:text-gray-300">Light</span>
-            </label>
-            <label className="flex items-center gap-1.5 sm:gap-2 cursor-pointer touch-manipulation">
-              <input type="radio" name="theme" value="dark" checked={prefs.theme === 'dark'} onChange={handleChange} className="text-blue-600 focus:ring-blue-500 w-4 h-4" /> 
-              <span className="text-xs sm:text-sm text-gray-700 dark:text-gray-300">Dark</span>
-            </label>
+      )}
+
+      {/* Change Password - Outside Card */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-6 shadow-sm">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
+            <Lock className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+          </div>
+          <div>
+            <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-100">Change Password</h3>
+            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Update your account password</p>
           </div>
         </div>
-        {error && <div className="text-red-600 dark:text-red-400 text-xs sm:text-sm bg-red-50 dark:bg-red-900/20 p-2 rounded">{error}</div>}
-        {success && <div className="text-green-600 dark:text-green-400 text-xs sm:text-sm bg-green-50 dark:bg-green-900/20 p-2 rounded">Preferences saved!</div>}
-        <button type="submit" className="w-full sm:w-auto bg-blue-600 dark:bg-blue-500 text-white rounded px-3 sm:px-4 py-1.5 sm:py-2 hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm touch-manipulation" disabled={saving || loading}>{saving ? 'Saving...' : 'Save Preferences'}</button>
-      </form>
+        
+        {passwordError && (
+          <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400 text-xs sm:text-sm">
+            {passwordError}
+          </div>
+        )}
+        
+        {passwordSuccess && (
+          <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-green-700 dark:text-green-400 text-xs sm:text-sm">
+            Password updated successfully!
+          </div>
+        )}
+        
+        <form 
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setPasswordError(null);
+            setPasswordSuccess(false);
+            
+            // Validation
+            if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+              setPasswordError('All fields are required');
+              return;
+            }
+            
+            if (passwordData.newPassword.length < 6) {
+              setPasswordError('New password must be at least 6 characters long');
+              return;
+            }
+            
+            if (passwordData.newPassword !== passwordData.confirmPassword) {
+              setPasswordError('New password and confirm password do not match');
+              return;
+            }
+            
+            if (passwordData.currentPassword === passwordData.newPassword) {
+              setPasswordError('New password must be different from current password');
+              return;
+            }
+            
+            try {
+              setPasswordSaving(true);
+              await updatePassword(passwordData);
+              setPasswordSuccess(true);
+              setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+              setTimeout(() => setPasswordSuccess(false), 5000);
+            } catch (err: any) {
+              setPasswordError(
+                err?.response?.data?.message || 
+                err?.message || 
+                'Failed to update password. Please check your current password and try again.'
+              );
+            } finally {
+              setPasswordSaving(false);
+            }
+          }}
+          className="flex flex-col gap-3 max-w-md"
+        >
+          <div>
+            <label htmlFor="current-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Current Password
+            </label>
+            <input 
+              type="password" 
+              id="current-password"
+              name="currentPassword"
+              value={passwordData.currentPassword}
+              onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
+              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+              placeholder="Enter your current password" 
+              required
+              disabled={passwordSaving}
+            />
+          </div>
+          <div>
+            <label htmlFor="new-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              New Password
+            </label>
+            <input 
+              type="password" 
+              id="new-password"
+              name="newPassword"
+              value={passwordData.newPassword}
+              onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+              placeholder="Enter your new password (min. 6 characters)" 
+              required
+              minLength={6}
+              disabled={passwordSaving}
+            />
+          </div>
+          <div>
+            <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Confirm New Password
+            </label>
+            <input 
+              type="password" 
+              id="confirm-password"
+              name="confirmPassword"
+              value={passwordData.confirmPassword}
+              onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+              placeholder="Confirm your new password" 
+              required
+              minLength={6}
+              disabled={passwordSaving}
+            />
+          </div>
+          <button 
+            type="submit" 
+            className="bg-blue-600 dark:bg-blue-500 text-white rounded-lg px-4 py-2.5 mt-1 hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium shadow-sm hover:shadow-md" 
+            disabled={passwordSaving}
+          >
+            {passwordSaving ? 'Updating Password...' : 'Change Password'}
+          </button>
+        </form>
+      </div>
+
+      {/* Theme Selection - Separate Card */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-6 shadow-sm">
+        <div>
+          <div id="theme-label" className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+            Theme
+          </div>
+          <div className="grid grid-cols-2 gap-3" role="radiogroup" aria-labelledby="theme-label">
+            <button
+              type="button"
+              id="theme-light"
+              name="theme"
+              value="light"
+              aria-checked={prefs.theme === 'light'}
+              role="radio"
+              onClick={() => handleThemeChange('light')}
+              disabled={saving || loading}
+              className={`relative flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
+                prefs.theme === 'light'
+                  ? 'border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20'
+                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+              } ${saving || loading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+            >
+              <Sun className={`w-6 h-6 mb-2 ${prefs.theme === 'light' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}`} />
+              <span className={`text-sm font-medium ${prefs.theme === 'light' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                Light
+              </span>
+              {prefs.theme === 'light' && (
+                <div className="absolute top-2 right-2 w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full" aria-hidden="true"></div>
+              )}
+            </button>
+            <button
+              type="button"
+              id="theme-dark"
+              name="theme"
+              value="dark"
+              aria-checked={prefs.theme === 'dark'}
+              role="radio"
+              onClick={() => handleThemeChange('dark')}
+              disabled={saving || loading}
+              className={`relative flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
+                prefs.theme === 'dark'
+                  ? 'border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20'
+                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+              } ${saving || loading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+            >
+              <Moon className={`w-6 h-6 mb-2 ${prefs.theme === 'dark' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}`} />
+              <span className={`text-sm font-medium ${prefs.theme === 'dark' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                Dark
+              </span>
+              {prefs.theme === 'dark' && (
+                <div className="absolute top-2 right-2 w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full" aria-hidden="true"></div>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Online Status Visibility - Separate Card */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-6 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {prefs.showOnlineStatus ? (
+              <Eye className="w-5 h-5 text-gray-600 dark:text-gray-400" aria-hidden="true" />
+            ) : (
+              <EyeOff className="w-5 h-5 text-gray-600 dark:text-gray-400" aria-hidden="true" />
+            )}
+            <div>
+              <label htmlFor="show-online-status" className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
+                Show Online Status
+              </label>
+              <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                Let others see when you're active
+              </p>
+            </div>
+          </div>
+          <label htmlFor="show-online-status" className="relative inline-flex items-center cursor-pointer flex-shrink-0 touch-manipulation">
+            <input
+              type="checkbox"
+              id="show-online-status"
+              name="showOnlineStatus"
+              checked={prefs.showOnlineStatus}
+              onChange={(e) => {
+                handleOnlineStatusToggle(e.target.checked);
+                // Auto-save on toggle
+                const updatedPrefs = { ...prefs, showOnlineStatus: e.target.checked };
+                updateUserPreferences(updatedPrefs).then(() => {
+                  setSuccess(true);
+                  setTimeout(() => setSuccess(false), 3000);
+                }).catch(() => {
+                  setError('Failed to save preferences');
+                });
+              }}
+              className="sr-only peer"
+              aria-label="Show online status to others"
+            />
+            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600 dark:peer-checked:bg-blue-500" aria-hidden="true"></div>
+          </label>
+        </div>
+      </div>
+
+      {/* Mobile Navigation Customization - Separate Card */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-6 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
+              <Smartphone className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+            </div>
+            <div>
+              <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-100">Mobile Navigation</h3>
+              <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Customize bottom navigation items for mobile</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setNavModalOpen(true)}
+            className="px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+          >
+            Customize
+          </button>
+        </div>
+      </div>
+
+      {/* Navigation Customization Modal */}
+      <NavCustomizationModal
+        isOpen={navModalOpen}
+        onClose={() => setNavModalOpen(false)}
+        onSave={(items) => {
+          setCurrentNavItems(items);
+          // Reload nav items from localStorage
+          const saved = localStorage.getItem('bottomNavItems');
+          if (saved) {
+            try {
+              const savedItems = JSON.parse(saved);
+              const mappedItems = savedItems.map((item: any) => {
+                const option = ALL_NAV_OPTIONS.find(opt => opt.id === item.id);
+                if (option) {
+                  return { ...option, ...item };
+                }
+                return null;
+              }).filter((item: NavItem | null): item is NavItem => item !== null);
+              
+              const filteredItems = mappedItems.filter((item: NavItem) => {
+                if (item.id === 'my-course' && user?.role !== 'teacher' && user?.role !== 'admin') {
+                  return false;
+                }
+                return true;
+              });
+              
+              if (filteredItems.length > 0) {
+                setCurrentNavItems(filteredItems);
+              }
+            } catch (error) {
+              logger.error('Error reloading navigation items', error);
+            }
+          }
+        }}
+        currentItems={currentNavItems}
+      />
     </div>
   );
 }
@@ -394,23 +715,66 @@ function NotificationsSection() {
     );
   }
 
-  const notificationTypes = [
-    { key: 'messages', label: 'Messages', description: 'New messages in your inbox' },
-    { key: 'grades', label: 'Grades', description: 'When grades are posted or updated' },
-    { key: 'announcements', label: 'Announcements', description: 'New course announcements' },
-    { key: 'assignmentsDue', label: 'Assignments Due', description: 'Reminders for upcoming assignment due dates' },
-    { key: 'assignmentsGraded', label: 'Assignments Graded', description: 'When your assignments are graded' },
-    { key: 'enrollments', label: 'Enrollments', description: 'Enrollment requests and approvals' },
-    { key: 'discussions', label: 'Discussions', description: 'New discussion threads and replies' },
-    { key: 'submissions', label: 'Submissions', description: 'New student submissions (teachers only)' },
-    { key: 'system', label: 'System', description: 'System-wide notifications' }
+  // Grouped notification categories
+  const notificationGroups = [
+    {
+      key: 'courseActivity',
+      label: 'Course Activity',
+      description: 'Announcements, discussions, assignments, grades, and submissions',
+      keys: ['announcements', 'discussions', 'assignmentsDue', 'assignmentsGraded', 'grades', 'submissions']
+    },
+    {
+      key: 'messages',
+      label: 'Messages',
+      description: 'New messages in your inbox',
+      keys: ['messages']
+    },
+    {
+      key: 'accountSystem',
+      label: 'Account & System',
+      description: 'Enrollment updates and system notifications',
+      keys: ['enrollments', 'system']
+    }
   ];
+
+  // Check if all notifications in a group are enabled for a category
+  const isGroupEnabled = (category: string, group: typeof notificationGroups[0]): boolean => {
+    return group.keys.every(key => preferences[category]?.[key] !== false);
+  };
+
+  // Handle group toggle - enable/disable all notifications in the group
+  const handleGroupToggle = async (category: string, group: typeof notificationGroups[0], value: boolean) => {
+    if (!preferences) return;
+    
+    const updated = {
+      ...preferences,
+      [category]: {
+        ...preferences[category],
+        ...Object.fromEntries(group.keys.map(key => [key, value]))
+      }
+    };
+    
+    setPreferences(updated);
+    
+    try {
+      setSaving(true);
+      setError(null);
+      await api.put('/notifications/preferences', updated);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err) {
+      setError('Failed to save preferences');
+      setPreferences(preferences);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="text-gray-900 dark:text-gray-100">
-      <div className="mb-4 sm:mb-6">
-        <h2 className="text-base sm:text-lg lg:text-xl font-bold text-gray-900 dark:text-gray-100 mb-1 sm:mb-2">Notifications</h2>
-        <p className="text-xs sm:text-sm lg:text-base text-gray-600 dark:text-gray-400">Set your notification preferences for email, in-app, and browser push notifications.</p>
+      <div className="mb-3 sm:mb-4">
+        <h2 className="text-base sm:text-lg lg:text-xl font-bold text-gray-900 dark:text-gray-100 mb-1">Notifications</h2>
+        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Set your notification preferences for email, in-app, and browser push notifications.</p>
       </div>
 
       {error && (
@@ -426,141 +790,50 @@ function NotificationsSection() {
       )}
 
       {/* Email Notifications */}
-      <div className="mb-4 sm:mb-6 lg:mb-8">
-        <h3 className="text-sm sm:text-base lg:text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3 sm:mb-4">Email Notifications</h3>
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 sm:p-4 lg:p-6">
-          <div className="space-y-3 sm:space-y-4">
-            {notificationTypes.map((type) => (
-              <div key={type.key} className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0 gap-2 sm:gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-xs sm:text-sm lg:text-base text-gray-900 dark:text-gray-100">{type.label}</div>
-                  <div className="text-[10px] sm:text-xs lg:text-sm text-gray-500 dark:text-gray-400">{type.description}</div>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 touch-manipulation">
-                  <input
-                    type="checkbox"
-                    checked={preferences.email[type.key] || false}
-                    onChange={(e) => handleToggle('email', type.key, e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-10 h-5 sm:w-11 sm:h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 sm:after:h-5 sm:after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600 dark:peer-checked:bg-blue-500"></div>
-                </label>
+      <div className="mb-3 sm:mb-4">
+        <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-100 mb-2">Email Notifications</h3>
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 sm:p-4 space-y-3">
+          {notificationGroups.map((group) => (
+            <div key={group.key} className="flex items-center justify-between py-2 gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-xs sm:text-sm text-gray-900 dark:text-gray-100">{group.label}</div>
+                <div className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">{group.description}</div>
               </div>
-            ))}
-          </div>
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 touch-manipulation">
+                <input
+                  type="checkbox"
+                  checked={isGroupEnabled('email', group)}
+                  onChange={(e) => handleGroupToggle('email', group, e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600 dark:peer-checked:bg-blue-500"></div>
+              </label>
+            </div>
+          ))}
         </div>
       </div>
 
       {/* In-App Notifications */}
-      <div className="mb-4 sm:mb-6 lg:mb-8">
-        <h3 className="text-sm sm:text-base lg:text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3 sm:mb-4">In-App Notifications</h3>
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 sm:p-4 lg:p-6">
-          <div className="space-y-3 sm:space-y-4">
-            {notificationTypes.map((type) => (
-              <div key={type.key} className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0 gap-2 sm:gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-xs sm:text-sm lg:text-base text-gray-900 dark:text-gray-100">{type.label}</div>
-                  <div className="text-[10px] sm:text-xs lg:text-sm text-gray-500 dark:text-gray-400">{type.description}</div>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 touch-manipulation">
-                  <input
-                    type="checkbox"
-                    checked={preferences.inApp[type.key] || false}
-                    onChange={(e) => handleToggle('inApp', type.key, e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-10 h-5 sm:w-11 sm:h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 sm:after:h-5 sm:after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600 dark:peer-checked:bg-blue-500"></div>
-                </label>
+      <div className="mb-3 sm:mb-4">
+        <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-100 mb-2">In-App Notifications</h3>
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 sm:p-4 space-y-3">
+          {notificationGroups.map((group) => (
+            <div key={group.key} className="flex items-center justify-between py-2 gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-xs sm:text-sm text-gray-900 dark:text-gray-100">{group.label}</div>
+                <div className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">{group.description}</div>
               </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Browser Push Notifications */}
-      <div className="mb-4 sm:mb-6 lg:mb-8">
-        <h3 className="text-sm sm:text-base lg:text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3 sm:mb-4">Browser Push Notifications</h3>
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 sm:p-4 lg:p-6">
-          <div className="mb-3 sm:mb-4 flex items-center justify-between gap-2 sm:gap-4">
-            <div className="flex-1 min-w-0">
-              <div className="font-medium text-xs sm:text-sm lg:text-base text-gray-900 dark:text-gray-100">Enable Push Notifications</div>
-              <div className="text-[10px] sm:text-xs lg:text-sm text-gray-500 dark:text-gray-400">Receive notifications even when the app is closed</div>
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 touch-manipulation">
+                <input
+                  type="checkbox"
+                  checked={isGroupEnabled('inApp', group)}
+                  onChange={(e) => handleGroupToggle('inApp', group, e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600 dark:peer-checked:bg-blue-500"></div>
+              </label>
             </div>
-            <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 touch-manipulation">
-              <input
-                type="checkbox"
-                checked={preferences.push.enabled || false}
-                onChange={async (e) => {
-                  if (e.target.checked) {
-                    // Request permission and subscribe
-                    try {
-                      const { subscribeToPushNotifications } = await import('../utils/pushNotifications');
-                      const subscription = await subscribeToPushNotifications();
-                      if (subscription) {
-                        const subData = {
-                          endpoint: subscription.endpoint,
-                          keys: {
-                            p256dh: btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('p256dh')!))),
-                            auth: btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('auth')!)))
-                          }
-                        };
-                        const updated = {
-                          ...preferences,
-                          push: { ...preferences.push, enabled: true },
-                          pushSubscription: subData
-                        };
-                        setPreferences(updated);
-                        await api.put('/notifications/preferences', updated);
-                      } else {
-                        alert('Failed to enable push notifications. Please check your browser settings.');
-                      }
-                    } catch (err) {
-                      console.error('Error enabling push notifications:', err);
-                      alert('Failed to enable push notifications.');
-                    }
-                  } else {
-                    // Unsubscribe
-                    try {
-                      const { unsubscribeFromPushNotifications } = await import('../utils/pushNotifications');
-                      await unsubscribeFromPushNotifications();
-                      const updated = {
-                        ...preferences,
-                        push: { ...preferences.push, enabled: false },
-                        pushSubscription: null
-                      };
-                      setPreferences(updated);
-                      await api.put('/notifications/preferences', updated);
-                    } catch (err) {
-                      console.error('Error disabling push notifications:', err);
-                    }
-                  }
-                }}
-                className="sr-only peer"
-              />
-              <div className="w-10 h-5 sm:w-11 sm:h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 sm:after:h-5 sm:after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600 dark:peer-checked:bg-blue-500"></div>
-            </label>
-          </div>
-          {preferences.push.enabled && (
-            <div className="space-y-3 sm:space-y-4 pt-3 sm:pt-4 border-t border-gray-200 dark:border-gray-700">
-              {notificationTypes.map((type) => (
-                <div key={type.key} className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0 gap-2 sm:gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-xs sm:text-sm lg:text-base text-gray-900 dark:text-gray-100">{type.label}</div>
-                    <div className="text-[10px] sm:text-xs lg:text-sm text-gray-500 dark:text-gray-400">{type.description}</div>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 touch-manipulation">
-                    <input
-                      type="checkbox"
-                      checked={preferences.push[type.key] || false}
-                      onChange={(e) => handleToggle('push', type.key, e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-10 h-5 sm:w-11 sm:h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 sm:after:h-5 sm:after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600 dark:peer-checked:bg-blue-500"></div>
-                  </label>
-                </div>
-              ))}
-            </div>
-          )}
+          ))}
         </div>
       </div>
 

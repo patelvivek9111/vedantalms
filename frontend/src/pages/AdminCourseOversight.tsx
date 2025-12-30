@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { API_URL } from '../config';
+import logger from '../utils/logger';
 import { 
   BookOpen, 
   Search, 
@@ -14,7 +15,8 @@ import {
   Calendar,
   CheckCircle,
   XCircle,
-  TrendingUp
+  TrendingUp,
+  ArrowLeft
 } from 'lucide-react';
 
 interface Course {
@@ -50,6 +52,9 @@ export function AdminCourseOversight() {
     status: 'active' as 'active' | 'draft' | 'archived'
   });
   const [saving, setSaving] = useState(false);
+  
+  // Get previous course ID from localStorage
+  const previousCourseId = localStorage.getItem('previousCourseId');
 
   useEffect(() => {
     const fetchCourses = async () => {
@@ -82,7 +87,7 @@ export function AdminCourseOversight() {
                 }
               } catch (error) {
                 // Skip if we can't get average (course might have no grades yet)
-                console.warn(`Could not fetch class average for course ${course._id}:`, error);
+                logger.warn('Could not fetch class average for course', { courseId: course._id, error });
               }
               
               return {
@@ -90,7 +95,7 @@ export function AdminCourseOversight() {
                 classAverage: classAverage
               };
             } catch (error) {
-              console.error(`Error processing course ${course._id}:`, error);
+              logger.error('Error processing course', error, { courseId: course._id });
               return {
                 ...course,
                 classAverage: undefined
@@ -102,7 +107,7 @@ export function AdminCourseOversight() {
           setFilteredCourses(coursesWithAverages);
         }
       } catch (error) {
-        console.error('Error fetching courses:', error);
+        logger.error('Error fetching courses', error);
       } finally {
         setLoading(false);
       }
@@ -224,7 +229,7 @@ export function AdminCourseOversight() {
                 }
               } catch (error) {
                 // Skip if we can't get average (course might have no grades yet)
-                console.warn(`Could not fetch class average for course ${course._id}:`, error);
+                logger.warn('Could not fetch class average for course', { courseId: course._id, error });
               }
               
               return {
@@ -232,7 +237,7 @@ export function AdminCourseOversight() {
                 classAverage: classAverage
               };
             } catch (error) {
-              console.error(`Error processing course ${course._id}:`, error);
+              logger.error('Error processing course', error, { courseId: course._id });
               return {
                 ...course,
                 classAverage: undefined
@@ -248,7 +253,7 @@ export function AdminCourseOversight() {
         setSelectedCourse(null);
       }
     } catch (error: any) {
-      console.error('Error updating course:', error);
+      logger.error('Error updating course', error);
       alert(error.response?.data?.message || 'Failed to update course');
     } finally {
       setSaving(false);
@@ -264,13 +269,36 @@ export function AdminCourseOversight() {
   }
 
   return (
-    <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">Course Oversight</h1>
-          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">Monitor and manage all courses in the system</p>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Top Navigation Bar (Mobile Only) */}
+      <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+        <div className="relative flex items-center justify-between px-4 py-3">
+          {previousCourseId ? (
+            <button
+              onClick={() => {
+                localStorage.removeItem('previousCourseId');
+                navigate(`/courses/${previousCourseId}`);
+              }}
+              className="text-gray-700 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
+              aria-label="Back to course"
+            >
+              <ArrowLeft className="w-6 h-6" />
+            </button>
+          ) : (
+            <div className="w-10"></div>
+          )}
+          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">My Course</h1>
+          <div className="w-10"></div> {/* Spacer for centering */}
         </div>
+      </nav>
+
+      <div className="pt-14 pb-16 lg:pt-0 lg:pb-0 p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
+          <div>
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100">Course Oversight</h1>
+            <p className="text-xs sm:text-sm lg:text-base text-gray-600 dark:text-gray-400">Monitor and manage all courses in the system</p>
+          </div>
         <div className="flex items-center space-x-2 sm:space-x-4">
           <div className="flex items-center space-x-2">
             <BookOpen className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 dark:text-blue-400" />
@@ -517,6 +545,7 @@ export function AdminCourseOversight() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 } 

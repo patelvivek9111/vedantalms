@@ -1,8 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, X, Check, CheckCheck, Trash2, MessageSquare, Award, Megaphone, FileText, Calendar, Users, AlertCircle } from 'lucide-react';
 import api from '../services/api';
 import { formatDistanceToNow } from 'date-fns';
+import logger from '../utils/logger';
+import { requestCache, CACHE_KEYS } from '../utils/requestCache';
 
 interface Notification {
   _id: string;
@@ -28,14 +30,78 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose
   const navigate = useNavigate();
   const notificationRef = useRef<HTMLDivElement>(null);
 
+  const fetchNotifications = useCallback(async () => {
+    // Don't fetch if tab is hidden
+    if (document.hidden) {
+      return;
+    }
+
+    try {
+      // Use request cache to prevent duplicate requests
+      const data = await requestCache.get(
+        CACHE_KEYS.NOTIFICATIONS,
+        async () => {
+          const response = await api.get('/notifications?limit=20');
+          if (response.data.success) {
+            return {
+              notifications: response.data.data,
+              unreadCount: response.data.unreadCount || 0
+            };
+          }
+          return { notifications: [], unreadCount: 0 };
+        },
+        45000 // Cache for 45 seconds
+      );
+      
+      setNotifications(data.notifications);
+      setUnreadCount(data.unreadCount);
+    } catch (error) {
+      logger.error('Error fetching notifications', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (isOpen) {
       fetchNotifications();
-      // Poll for new notifications every 30 seconds
-      const interval = setInterval(fetchNotifications, 30000);
-      return () => clearInterval(interval);
+      // Poll for new notifications every 60 seconds (increased from 30)
+      // Only poll when notification center is open and tab is visible
+      let interval: NodeJS.Timeout | null = null;
+      let isTabVisible = !document.hidden;
+
+      const handleVisibilityChange = () => {
+        isTabVisible = !document.hidden;
+        if (isTabVisible && isOpen) {
+          // Tab became visible - resume polling and fetch immediately
+          fetchNotifications();
+          if (!interval) {
+            interval = setInterval(fetchNotifications, 60000);
+          }
+        } else {
+          // Tab hidden - pause polling
+          if (interval) {
+            clearInterval(interval);
+            interval = null;
+          }
+        }
+      };
+
+      // Start polling if tab is visible
+      if (isTabVisible) {
+        interval = setInterval(fetchNotifications, 60000);
+      }
+
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      
+      return () => {
+        if (interval) {
+          clearInterval(interval);
+        }
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      };
     }
-  }, [isOpen]);
+  }, [isOpen, fetchNotifications]);
 
   // Close on outside click
   useEffect(() => {
@@ -51,20 +117,6 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose
     }
   }, [isOpen, onClose]);
 
-  const fetchNotifications = async () => {
-    try {
-      const response = await api.get('/notifications?limit=20');
-      if (response.data.success) {
-        setNotifications(response.data.data);
-        setUnreadCount(response.data.unreadCount || 0);
-      }
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleMarkAsRead = async (id: string) => {
     try {
       await api.patch(`/notifications/${id}/read`);
@@ -73,7 +125,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose
       );
       setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (error) {
-      console.error('Error marking notification as read:', error);
+      logger.error('Error marking notification as read', error);
     }
   };
 
@@ -84,7 +136,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose
       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
       setUnreadCount(0);
     } catch (error) {
-      console.error('Error marking all as read:', error);
+      logger.error('Error marking all as read', error);
     } finally {
       setMarkingAll(false);
     }
@@ -99,7 +151,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose
       }
       setNotifications(prev => prev.filter(n => n._id !== id));
     } catch (error) {
-      console.error('Error deleting notification:', error);
+      logger.error('Error deleting notification', error);
     }
   };
 

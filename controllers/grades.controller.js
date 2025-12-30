@@ -5,20 +5,22 @@ const Submission = require('../models/Submission');
 const Thread = require('../models/thread.model');
 const Group = require('../models/Group');
 const { calculateFinalGradeWithWeightedGroups, getWeightedGradeForStudent, getLetterGrade } = require('../utils/gradeCalculation');
+const logger = require('../utils/logger');
+const { asyncHandler } = require('../utils/errorHandler');
+const { ValidationError, NotFoundError, ForbiddenError } = require('../utils/errorHandler');
 
 // GET /api/grades/student/course/:courseId
-exports.getStudentCourseGrade = async (req, res) => {
-  try {
-    const courseId = req.params.courseId;
-    const studentId = req.user._id || req.user.id;
-    
-    if (!studentId) {
-      return res.status(400).json({ message: 'Student ID is required' });
-    }
+exports.getStudentCourseGrade = asyncHandler(async (req, res) => {
+  const courseId = req.params.courseId;
+  const studentId = req.user._id || req.user.id;
+  
+  if (!studentId) {
+    throw new ValidationError('Student ID is required');
+  }
 
-    // Fetch course with groups and gradeScale
-    const course = await Course.findById(courseId);
-    if (!course) return res.status(404).json({ message: 'Course not found' });
+  // Fetch course with groups and gradeScale
+  const course = await Course.findById(courseId);
+  if (!course) throw new NotFoundError('Course');
     const groups = course.groups || [];
     const gradeScale = course.gradeScale || [];
 
@@ -163,24 +165,20 @@ exports.getStudentCourseGrade = async (req, res) => {
     const letterGrade = getLetterGrade(totalPercent, gradeScale);
 
     res.json({ totalPercent, letterGrade });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+});
 
 // GET /api/grades/student/course/:courseId/legacy
-exports.getStudentCourseGradeLegacy = async (req, res) => {
-  try {
-    const courseId = req.params.courseId;
-    const studentId = req.user._id || req.user.id;
-    
-    if (!studentId) {
-      return res.status(400).json({ message: 'Student ID is required' });
-    }
+exports.getStudentCourseGradeLegacy = asyncHandler(async (req, res) => {
+  const courseId = req.params.courseId;
+  const studentId = req.user._id || req.user.id;
+  
+  if (!studentId) {
+    throw new ValidationError('Student ID is required');
+  }
 
-    // Fetch course with groups and gradeScale
-    const course = await Course.findById(courseId);
-    if (!course) return res.status(404).json({ message: 'Course not found' });
+  // Fetch course with groups and gradeScale
+  const course = await Course.findById(courseId);
+  if (!course) throw new NotFoundError('Course');
     const groups = course.groups || [];
     const gradeScale = course.gradeScale || [];
 
@@ -312,27 +310,23 @@ exports.getStudentCourseGradeLegacy = async (req, res) => {
     const letterGrade = getLetterGrade(totalPercent, gradeScale);
 
     res.json({ totalPercent, letterGrade });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+});
 
 // GET /api/grades/course/:courseId/average
-exports.getCourseClassAverage = async (req, res) => {
-  try {
-    const courseId = req.params.courseId;
-    const userId = req.user._id;
+exports.getCourseClassAverage = asyncHandler(async (req, res) => {
+  const courseId = req.params.courseId;
+  const userId = req.user._id;
 
-    // Fetch course
-    const course = await Course.findById(courseId);
-    if (!course) return res.status(404).json({ message: 'Course not found' });
+  // Fetch course
+  const course = await Course.findById(courseId);
+  if (!course) throw new NotFoundError('Course');
 
-    // Check if user is instructor or admin
-    const isInstructor = course.instructor.toString() === userId.toString();
-    const isAdmin = req.user.role === 'admin';
-    if (!isInstructor && !isAdmin) {
-      return res.status(403).json({ message: 'Not authorized to view class average' });
-    }
+  // Check if user is instructor or admin
+  const isInstructor = course.instructor.toString() === userId.toString();
+  const isAdmin = req.user.role === 'admin';
+  if (!isInstructor && !isAdmin) {
+    throw new ForbiddenError('Not authorized to view class average');
+  }
 
     const students = course.students || [];
     if (students.length === 0) {
@@ -500,7 +494,7 @@ exports.getCourseClassAverage = async (req, res) => {
           studentGrades.push(totalPercent);
         }
       } catch (error) {
-        console.error(`Error calculating grade for student ${studentId}:`, error);
+        logger.warn('Error calculating grade for student', { studentId, courseId: req.params.courseId, error: error.message });
         // Continue with other students
       }
     }
@@ -530,8 +524,4 @@ exports.getCourseClassAverage = async (req, res) => {
       studentCount: students.length,
       gradedCount: studentGrades.length
     });
-  } catch (error) {
-    console.error('Error calculating class average:', error);
-    res.status(500).json({ message: error.message });
-  }
-};
+});
