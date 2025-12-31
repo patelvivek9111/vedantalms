@@ -1,6 +1,7 @@
 import api from './api';
 
 export interface QuizQuestion {
+  _id?: string; // Optional, present when loaded from API, absent when creating new
   questionText: string;
   questionType: 'multiple-choice' | 'true-false';
   options: Array<{

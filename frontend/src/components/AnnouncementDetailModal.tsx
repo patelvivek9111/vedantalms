@@ -61,9 +61,16 @@ const AnnouncementDetailModal: React.FC<AnnouncementDetailModalProps> = ({
     setCommentsLoading(true);
     try {
       const data = await getAnnouncementComments(announcementId);
-      setComments(data);
+      // Convert likes format if needed (API returns { user, _id }[] but we use string[])
+      const normalizedData: Comment[] = data.map((comment: any) => ({
+        ...comment,
+        likes: Array.isArray(comment.likes) 
+          ? comment.likes.map((like: any) => typeof like === 'string' ? like : like.user || like._id)
+          : undefined
+      }));
+      setComments(normalizedData);
       if (user && announcement?.options?.requirePostBeforeSeeingReplies) {
-        const hasPosted = data.some((comment: Comment) => comment.author._id === user._id);
+        const hasPosted = normalizedData.some((comment: Comment) => comment.author._id === user._id);
         setUserHasPosted(hasPosted);
       } else {
         setUserHasPosted(true);
