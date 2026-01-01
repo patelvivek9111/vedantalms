@@ -32,7 +32,7 @@ class Logger {
 
   error(message: string, error?: any, extra?: any): void {
     const errorData = error instanceof Error 
-      ? { message: error.message, stack: error.stack, name: error.name, ...(extra || {}) }
+      ? { message: error.message, stack: error.stack, ...error, ...(extra || {}) }
       : error ? { ...error, ...(extra || {}) } : extra;
     console.error(this.formatMessage('error', message, errorData));
   }

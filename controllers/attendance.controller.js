@@ -1,6 +1,7 @@
 const Attendance = require('../models/attendance.model');
 const Course = require('../models/course.model');
 const User = require('../models/user.model');
+const mongoose = require('mongoose');
 
 // Get attendance for a specific course and date
 exports.getAttendance = async (req, res) => {
@@ -8,8 +9,19 @@ exports.getAttendance = async (req, res) => {
     const { courseId } = req.params;
     const { date } = req.query;
 
+    // Validate courseId
+    if (!courseId || !mongoose.Types.ObjectId.isValid(courseId)) {
+      return res.status(400).json({ message: 'Invalid course ID' });
+    }
+
     if (!date) {
       return res.status(400).json({ message: 'Date parameter is required' });
+    }
+
+    // Validate date format
+    const dateObj = new Date(date);
+    if (isNaN(dateObj.getTime())) {
+      return res.status(400).json({ message: 'Invalid date format' });
     }
 
     // Get all students enrolled in the course
@@ -67,8 +79,21 @@ exports.saveAttendance = async (req, res) => {
     const { courseId } = req.params;
     const { date, attendanceData } = req.body;
 
+    // Validate courseId
+    if (!courseId || !mongoose.Types.ObjectId.isValid(courseId)) {
+      return res.status(400).json({ message: 'Invalid course ID' });
+    }
+
     if (!date || !attendanceData || !Array.isArray(attendanceData)) {
       return res.status(400).json({ message: 'Date and attendance data are required' });
+    }
+
+    // Validate attendance status
+    const validStatuses = ['present', 'absent', 'late', 'excused', 'unmarked'];
+    for (const record of attendanceData) {
+      if (record.status && !validStatuses.includes(record.status)) {
+        return res.status(400).json({ message: `Invalid attendance status: ${record.status}` });
+      }
     }
 
     // Verify the course exists and user is instructor
@@ -157,6 +182,16 @@ exports.saveAttendance = async (req, res) => {
 exports.getAttendanceStats = async (req, res) => {
   try {
     const { courseId } = req.params;
+    // Validate courseId
+    if (!courseId || !mongoose.Types.ObjectId.isValid(courseId)) {
+      return res.status(400).json({ message: 'Invalid course ID' });
+    }
+
+    // Check authorization - only teachers and admins can access stats
+    if (req.user.role !== 'teacher' && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Only teachers and admins can access attendance statistics' });
+    }
+
     const { startDate, endDate } = req.query;
 
     const query = { course: courseId };
@@ -241,6 +276,16 @@ exports.getStudentAttendance = async (req, res) => {
 exports.getAttendancePercentages = async (req, res) => {
   try {
     const { courseId } = req.params;
+    // Validate courseId
+    if (!courseId || !mongoose.Types.ObjectId.isValid(courseId)) {
+      return res.status(400).json({ message: 'Invalid course ID' });
+    }
+
+    // Check authorization - only teachers and admins can access percentages
+    if (req.user.role !== 'teacher' && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Only teachers and admins can access attendance percentages' });
+    }
+
     const { startDate, endDate } = req.query;
 
     // Verify the course exists

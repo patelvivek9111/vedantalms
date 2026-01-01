@@ -315,32 +315,38 @@ console.log('✅ Socket.io initialized for QuizWave');
 const { startCleanupScheduler } = require('./utils/quizwaveCleanup');
 startCleanupScheduler();
 
-// Start server
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📱 Health check: http://localhost:${PORT}/health`);
-  console.log(`🔗 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🎮 QuizWave Socket.io ready`);
-});
+// Only start server if not in test mode
+if (process.env.NODE_ENV !== 'test') {
+  // Start server
+  const PORT = process.env.PORT || 5000;
+  server.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`📱 Health check: http://localhost:${PORT}/health`);
+    console.log(`🔗 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🎮 QuizWave Socket.io ready`);
+  });
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('🛑 SIGTERM received, shutting down gracefully');
-  io.close(() => {
-    mongoose.connection.close(() => {
-      console.log('✅ MongoDB connection closed');
-      process.exit(0);
+  // Graceful shutdown
+  process.on('SIGTERM', () => {
+    console.log('🛑 SIGTERM received, shutting down gracefully');
+    io.close(() => {
+      mongoose.connection.close(() => {
+        console.log('✅ MongoDB connection closed');
+        process.exit(0);
+      });
     });
   });
-});
 
-process.on('SIGINT', () => {
-  console.log('🛑 SIGINT received, shutting down gracefully');
-  io.close(() => {
-    mongoose.connection.close(() => {
-      console.log('✅ MongoDB connection closed');
-      process.exit(0);
+  process.on('SIGINT', () => {
+    console.log('🛑 SIGINT received, shutting down gracefully');
+    io.close(() => {
+      mongoose.connection.close(() => {
+        console.log('✅ MongoDB connection closed');
+        process.exit(0);
+      });
     });
   });
-}); 
+}
+
+// Export app for testing
+module.exports = app; 

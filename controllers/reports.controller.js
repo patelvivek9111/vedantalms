@@ -85,6 +85,24 @@ exports.getStudentTranscript = async (req, res) => {
       });
     }
 
+    // Validate term
+    const validTerms = ['Fall', 'Spring', 'Summer', 'Winter'];
+    if (!validTerms.includes(term)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid term. Must be one of: Fall, Spring, Summer, Winter'
+      });
+    }
+
+    // Validate year
+    const yearNum = parseInt(year);
+    if (isNaN(yearNum) || yearNum < 2000 || yearNum > 2100) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid year. Must be a number between 2000 and 2100'
+      });
+    }
+
     // Helper function to get semester with defaults
     const getSemesterWithDefaults = (course) => {
       if (course.semester && course.semester.term && course.semester.year) {
@@ -118,7 +136,7 @@ exports.getStudentTranscript = async (req, res) => {
     // Filter courses by semester (including those with default semester)
     const courses = allCourses.filter(course => {
       const courseSemester = getSemesterWithDefaults(course);
-      return courseSemester.term === term && courseSemester.year === parseInt(year);
+      return courseSemester.term === term && courseSemester.year === yearNum;
     });
 
     const courseGrades = [];
