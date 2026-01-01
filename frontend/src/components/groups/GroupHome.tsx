@@ -240,7 +240,7 @@ const GroupHome: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-6">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
         <div className="animate-pulse">
           <div className="h-8 bg-white dark:bg-gray-800 rounded-lg w-1/3 mb-4 shadow-sm"></div>
           <div className="h-4 bg-white dark:bg-gray-800 rounded-lg w-1/2 mb-6 shadow-sm"></div>
@@ -256,7 +256,7 @@ const GroupHome: React.FC = () => {
 
   if (!groupInfo) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-6">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
         <div className="text-center py-12">
           <div className="text-gray-500 dark:text-gray-400 text-lg">Group not found</div>
         </div>
@@ -265,7 +265,7 @@ const GroupHome: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-900 p-4 sm:p-6">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 sm:p-6">
       {/* 1. Welcome Section - For Both Teachers and Students */}
       <div className="mb-6 sm:mb-8">
         <div className="bg-white dark:bg-gray-800 dark:!bg-gray-800 rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8 border border-gray-100 dark:border-gray-700 dark:!border-gray-700 hover:shadow-xl transition-all duration-300">
