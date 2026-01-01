@@ -3,7 +3,7 @@ const router = express.Router();
 const { check } = require('express-validator');
 const multer = require('multer');
 const { protect, authorize } = require('../middleware/auth');
-const { createPage, getPagesByModule, getPageById, updatePage, getPagesByGroupSet } = require('../controllers/page.controller');
+const { createPage, getPagesByModule, getPageById, updatePage, getPagesByGroupSet, deletePage } = require('../controllers/page.controller');
 const Page = require('../models/page.model');
 const Module = require('../models/module.model');
 
@@ -33,13 +33,25 @@ const pageValidation = [
 router.post('/', protect, authorize('teacher', 'admin'), upload.array('attachments'), pageValidation, createPage);
 router.get('/view/:id', protect, getPageById);
 router.get('/:moduleId', protect, getPagesByModule);
-router.put('/:id', protect, authorize('teacher', 'admin'), upload.array('attachments'), pageValidation, updatePage);
+router.put('/:id', protect, authorize('teacher', 'admin'), upload.array('attachments'), updatePage);
+router.delete('/:id', protect, authorize('teacher', 'admin'), deletePage);
 
 // Get all pages for a course
 router.get('/course/:courseId', protect, async (req, res) => {
   try {
+    const mongoose = require('mongoose');
+    const courseId = req.params.courseId;
+    
+    // Validate course ID
+    if (!courseId || !mongoose.Types.ObjectId.isValid(courseId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid course ID'
+      });
+    }
+    
     // Find all modules for the course
-    const modules = await Module.find({ course: req.params.courseId }).select('_id');
+    const modules = await Module.find({ course: courseId }).select('_id');
     const moduleIds = modules.map(m => m._id);
     // Find all pages for those modules
     const pages = await Page.find({ module: { $in: moduleIds } });

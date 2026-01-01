@@ -10,19 +10,29 @@ router.get('/', protect, async (req, res) => {
     const { read, type, limit = 50, page = 1 } = req.query;
     const query = { user: req.user._id };
     
+    // Validate type if provided
+    if (type !== undefined) {
+      if (!type || !type.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Type cannot be empty'
+        });
+      }
+      query.type = type.trim();
+    }
+    
     if (read !== undefined) {
       query.read = read === 'true';
     }
     
-    if (type) {
-      query.type = type;
-    }
-    
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    // Cap limit at 100
+    const limitNum = Math.min(parseInt(limit) || 50, 100);
+    const pageNum = parseInt(page) || 1;
+    const skip = (pageNum - 1) * limitNum;
     
     const notifications = await Notification.find(query)
       .sort({ createdAt: -1 })
-      .limit(parseInt(limit))
+      .limit(limitNum)
       .skip(skip)
       .lean();
     
@@ -34,9 +44,9 @@ router.get('/', protect, async (req, res) => {
       data: notifications,
       pagination: {
         total,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        pages: Math.ceil(total / parseInt(limit))
+        page: pageNum,
+        limit: limitNum,
+        pages: Math.ceil(total / limitNum)
       },
       unreadCount
     });
@@ -61,8 +71,19 @@ router.get('/unread-count', protect, async (req, res) => {
 // Mark notification as read
 router.patch('/:id/read', protect, async (req, res) => {
   try {
+    const mongoose = require('mongoose');
+    const notificationId = req.params.id;
+    
+    // Validate ObjectId
+    if (!notificationId || !mongoose.Types.ObjectId.isValid(notificationId)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid notification ID' 
+      });
+    }
+    
     const notification = await Notification.findOne({
-      _id: req.params.id,
+      _id: notificationId,
       user: req.user._id
     });
     
@@ -89,7 +110,8 @@ router.patch('/read-all', protect, async (req, res) => {
     );
     
     res.json({ 
-      success: true, 
+      success: true,
+      modifiedCount: result.modifiedCount,
       message: `Marked ${result.modifiedCount} notifications as read` 
     });
   } catch (error) {
@@ -100,8 +122,19 @@ router.patch('/read-all', protect, async (req, res) => {
 // Delete notification
 router.delete('/:id', protect, async (req, res) => {
   try {
+    const mongoose = require('mongoose');
+    const notificationId = req.params.id;
+    
+    // Validate ObjectId
+    if (!notificationId || !mongoose.Types.ObjectId.isValid(notificationId)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid notification ID' 
+      });
+    }
+    
     const notification = await Notification.findOneAndDelete({
-      _id: req.params.id,
+      _id: notificationId,
       user: req.user._id
     });
     
