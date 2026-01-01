@@ -1,11 +1,36 @@
 const Poll = require('../models/poll.model');
 const Course = require('../models/course.model');
+const mongoose = require('mongoose');
 
 // Create a new poll
 const createPoll = async (req, res) => {
   try {
     const { courseId } = req.params;
     const { title, options, endDate, allowMultipleVotes, resultsVisible } = req.body;
+
+    // Validate courseId format
+    if (!courseId || !mongoose.Types.ObjectId.isValid(courseId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid course ID'
+      });
+    }
+
+    // Validate title
+    if (!title || !title.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Title is required'
+      });
+    }
+
+    // Validate endDate
+    if (!endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'End date is required'
+      });
+    }
 
     // Validate course exists and user is instructor
     const course = await Course.findById(courseId);
@@ -73,6 +98,14 @@ const getPollsByCourse = async (req, res) => {
   try {
     const { courseId } = req.params;
     const { user } = req;
+
+    // Validate courseId
+    if (!courseId || !mongoose.Types.ObjectId.isValid(courseId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid course ID'
+      });
+    }
 
     // Validate course exists
     const course = await Course.findById(courseId);
@@ -161,6 +194,14 @@ const voteOnPoll = async (req, res) => {
     const { selectedOptions } = req.body;
     const { user } = req;
 
+    // Validate pollId
+    if (!pollId || !mongoose.Types.ObjectId.isValid(pollId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid poll ID'
+      });
+    }
+
     // Validate poll exists
     const poll = await Poll.findById(pollId).populate('course');
     if (!poll) {
@@ -188,15 +229,17 @@ const voteOnPoll = async (req, res) => {
       });
     }
 
-    // Check if student has already voted
-    const existingVote = poll.studentVotes.find(vote => 
-      vote.student.toString() === user.id
-    );
-    if (existingVote) {
-      return res.status(400).json({
-        success: false,
-        message: 'You have already voted on this poll'
-      });
+    // Check if student has already voted (only if multiple votes not allowed)
+    if (!poll.allowMultipleVotes) {
+      const existingVote = poll.studentVotes.find(vote => 
+        vote.student.toString() === user.id
+      );
+      if (existingVote) {
+        return res.status(400).json({
+          success: false,
+          message: 'You have already voted on this poll'
+        });
+      }
     }
 
     // Validate selected options
@@ -261,6 +304,14 @@ const getPollResults = async (req, res) => {
     const { pollId } = req.params;
     const { user } = req;
 
+    // Validate pollId
+    if (!pollId || !mongoose.Types.ObjectId.isValid(pollId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid poll ID'
+      });
+    }
+
     const poll = await Poll.findById(pollId)
       .populate('course')
       .populate('studentVotes.student', 'firstName lastName email');
@@ -312,6 +363,33 @@ const updatePoll = async (req, res) => {
     const { title, endDate, isActive, resultsVisible } = req.body;
     const { user } = req;
 
+    // Validate pollId
+    if (!pollId || !mongoose.Types.ObjectId.isValid(pollId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid poll ID'
+      });
+    }
+
+    // Validate title if provided
+    if (title !== undefined && (!title || !title.trim())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Title cannot be empty'
+      });
+    }
+
+    // Validate endDate if provided
+    if (endDate) {
+      const endDateObj = new Date(endDate);
+      if (endDateObj <= new Date()) {
+        return res.status(400).json({
+          success: false,
+          message: 'End date must be in the future'
+        });
+      }
+    }
+
     const poll = await Poll.findById(pollId).populate('course');
     if (!poll) {
       return res.status(404).json({
@@ -357,6 +435,14 @@ const deletePoll = async (req, res) => {
   try {
     const { pollId } = req.params;
     const { user } = req;
+
+    // Validate pollId
+    if (!pollId || !mongoose.Types.ObjectId.isValid(pollId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid poll ID'
+      });
+    }
 
     const poll = await Poll.findById(pollId).populate('course');
     if (!poll) {

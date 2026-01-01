@@ -1,6 +1,15 @@
 const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 const ConversationParticipant = require('../models/ConversationParticipant');
+const mongoose = require('mongoose');
+
+// Helper function to validate ObjectId
+const validateObjectId = (id, paramName = 'ID') => {
+  if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+    return { valid: false, error: `Invalid ${paramName}` };
+  }
+  return { valid: true };
+};
 
 // List all conversations for the current user
 exports.getConversations = async (req, res) => {
@@ -55,6 +64,37 @@ exports.createConversation = async (req, res) => {
   try {
     const { subject, participantIds, body, sendIndividually, course } = req.body;
     const userId = req.user._id;
+
+    // Validate required fields
+    if (!subject || !subject.trim()) {
+      return res.status(400).json({ error: 'Subject is required' });
+    }
+    if (!body || !body.trim()) {
+      return res.status(400).json({ error: 'Message body is required' });
+    }
+    if (!participantIds || !Array.isArray(participantIds) || participantIds.length === 0) {
+      return res.status(400).json({ error: 'At least one participant is required' });
+    }
+
+    // Validate participant IDs
+    for (const pid of participantIds) {
+      if (!pid || typeof pid !== 'string') {
+        return res.status(400).json({ error: 'Invalid participant ID format' });
+      }
+      // Check if valid MongoDB ObjectId
+      if (!mongoose.Types.ObjectId.isValid(pid)) {
+        return res.status(400).json({ error: 'Invalid participant ID' });
+      }
+      // Check if trying to send to self
+      if (pid === userId.toString()) {
+        return res.status(400).json({ error: 'Cannot send message to yourself' });
+      }
+    }
+
+    // Validate course ID if provided
+    if (course && !mongoose.Types.ObjectId.isValid(course)) {
+      return res.status(400).json({ error: 'Invalid course ID' });
+    }
     if (sendIndividually) {
       // Create a separate conversation for each recipient
       const results = await Promise.all(participantIds.map(async (recipientId) => {
@@ -116,6 +156,10 @@ exports.createConversation = async (req, res) => {
 exports.getMessages = async (req, res) => {
   try {
     const { conversationId } = req.params;
+    const validation = validateObjectId(conversationId, 'conversation ID');
+    if (!validation.valid) {
+      return res.status(400).json({ error: validation.error });
+    }
     // Check if user is a participant
     const participant = await ConversationParticipant.findOne({ conversationId, userId: req.user._id });
     if (!participant) return res.status(403).json({ error: 'Not a participant' });
@@ -130,7 +174,20 @@ exports.getMessages = async (req, res) => {
 exports.sendMessage = async (req, res) => {
   try {
     const { conversationId } = req.params;
+    const validation = validateObjectId(conversationId, 'conversation ID');
+    if (!validation.valid) {
+      return res.status(400).json({ error: validation.error });
+    }
     const { body, attachments } = req.body;
+    if (!body || !body.trim()) {
+      return res.status(400).json({ error: 'Message body is required' });
+    }
+    
+    // Validate attachments format
+    if (attachments !== undefined && !Array.isArray(attachments)) {
+      return res.status(400).json({ error: 'Attachments must be an array' });
+    }
+    
     const userId = req.user._id;
     // Check if user is a participant
     const participant = await ConversationParticipant.findOne({ conversationId, userId });
@@ -158,6 +215,10 @@ exports.sendMessage = async (req, res) => {
 exports.markAsRead = async (req, res) => {
   try {
     const { conversationId } = req.params;
+    const validation = validateObjectId(conversationId, 'conversation ID');
+    if (!validation.valid) {
+      return res.status(400).json({ error: validation.error });
+    }
     const userId = req.user._id;
     const participant = await ConversationParticipant.findOne({ conversationId, userId });
     if (!participant) return res.status(403).json({ error: 'Not a participant' });
@@ -173,7 +234,15 @@ exports.markAsRead = async (req, res) => {
 exports.moveConversation = async (req, res) => {
   try {
     const { conversationId } = req.params;
+    const validation = validateObjectId(conversationId, 'conversation ID');
+    if (!validation.valid) {
+      return res.status(400).json({ error: validation.error });
+    }
     const { folder } = req.body; // inbox, sent, archived
+    const validFolders = ['inbox', 'sent', 'archived'];
+    if (!folder || !validFolders.includes(folder)) {
+      return res.status(400).json({ error: 'Invalid folder. Must be one of: inbox, sent, archived' });
+    }
     const userId = req.user._id;
     const participant = await ConversationParticipant.findOne({ conversationId, userId });
     if (!participant) return res.status(403).json({ error: 'Not a participant' });
@@ -204,6 +273,10 @@ exports.toggleStar = async (req, res) => {
 exports.deleteForever = async (req, res) => {
   try {
     const { conversationId } = req.params;
+    const validation = validateObjectId(conversationId, 'conversation ID');
+    if (!validation.valid) {
+      return res.status(400).json({ error: validation.error });
+    }
     const userId = req.user._id;
     // Remove the participant record for this user
     await ConversationParticipant.deleteOne({ conversationId, userId });

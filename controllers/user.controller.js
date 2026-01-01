@@ -1,4 +1,5 @@
 const User = require('../models/user.model');
+const bcrypt = require('bcryptjs');
 
 // @desc    Search users by email or name
 // @route   GET /api/users/search
@@ -52,6 +53,14 @@ exports.searchUsers = async (req, res) => {
     
     // Add course filter if specified
     if (courseId) {
+      const mongoose = require('mongoose');
+      // Validate courseId
+      if (!mongoose.Types.ObjectId.isValid(courseId)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid course ID'
+        });
+      }
       searchQuery.courses = courseId;
     }
 
@@ -81,15 +90,42 @@ exports.updateMe = async (req, res) => {
   try {
     const userId = req.user._id;
     const { firstName, lastName, bio, profilePicture } = req.body;
+    
+    // Validate firstName and lastName if provided
+    if (firstName !== undefined) {
+      if (!firstName || !firstName.trim()) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'First name cannot be empty' 
+        });
+      }
+    }
+    if (lastName !== undefined) {
+      if (!lastName || !lastName.trim()) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Last name cannot be empty' 
+        });
+      }
+    }
+    
     const updateFields = {};
-    if (firstName !== undefined) updateFields.firstName = firstName;
-    if (lastName !== undefined) updateFields.lastName = lastName;
+    if (firstName !== undefined) updateFields.firstName = firstName.trim();
+    if (lastName !== undefined) updateFields.lastName = lastName.trim();
     if (bio !== undefined) updateFields.bio = bio;
     if (profilePicture !== undefined) updateFields.profilePicture = profilePicture;
     const updatedUser = await User.findByIdAndUpdate(userId, updateFields, { new: true, runValidators: true }).select('-password');
     res.json({ success: true, user: updatedUser });
   } catch (err) {
     console.error('Update profile error:', err);
+    // Check if it's a validation error
+    if (err.name === 'ValidationError') {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Validation error', 
+        error: err.message 
+      });
+    }
     res.status(500).json({ success: false, message: 'Server error while updating profile', error: err.message });
   }
 };
@@ -234,5 +270,81 @@ exports.updatePreferences = async (req, res) => {
   } catch (err) {
     console.error('Update preferences error:', err);
     res.status(500).json({ success: false, message: 'Server error while updating preferences', error: err.message });
+  }
+};
+
+// @desc    Update current user's password
+// @route   PUT /api/users/me/password
+// @access  Private
+exports.updatePassword = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+
+    // Validate all fields are provided
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current password, new password, and confirm password are required'
+      });
+    }
+
+    // Validate new password matches confirm password
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password and confirm password do not match'
+      });
+    }
+
+    // Validate minimum password length
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters long'
+      });
+    }
+
+    // Validate new password is different from current
+    if (currentPassword === newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password must be different from current password'
+      });
+    }
+
+    // Get user with password
+    const user = await User.findById(userId).select('+password');
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Verify current password
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current password is incorrect'
+      });
+    }
+
+    // Update password
+    user.password = newPassword;
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Password updated successfully'
+    });
+  } catch (err) {
+    console.error('Update password error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while updating password',
+      error: err.message
+    });
   }
 }; 
