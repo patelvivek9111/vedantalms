@@ -74,18 +74,19 @@ const CreatePageForm: React.FC<CreatePageFormProps> = ({ modules, courseId, onSu
   };
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center lg:justify-end bg-black/30 p-2 sm:p-4 lg:pl-72">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-3xl lg:max-w-2xl h-[calc(100vh-8rem)] sm:max-h-[80vh] sm:h-auto p-4 sm:p-6 relative overflow-hidden flex flex-col border dark:border-gray-700">
+    <div className="w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 sm:p-6 border dark:border-gray-700">
+      <div className="flex justify-between items-center mb-4 sm:mb-6">
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100">Create New Page</h2>
         <button
           type="button"
           onClick={handleCancel}
-          className="absolute top-2 right-2 sm:top-4 sm:right-4 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 text-xl sm:text-2xl font-bold focus:outline-none z-10"
+          className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 text-xl sm:text-2xl font-bold focus:outline-none"
           aria-label="Close"
         >
           ×
         </button>
-        <h2 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4 text-center text-gray-800 dark:text-gray-100">Create New Page</h2>
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto pb-4">
+      </div>
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
           <div className="mb-4">
             <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Page Title
@@ -152,7 +153,7 @@ const CreatePageForm: React.FC<CreatePageFormProps> = ({ modules, courseId, onSu
               </select>
             </div>
           </div>
-          <div className="flex justify-end space-x-2 py-3 mt-4 border-t dark:border-gray-700">
+          <div className="flex justify-end space-x-2 pt-4 border-t dark:border-gray-700">
             <button
               type="button"
               onClick={handleCancel}
@@ -169,7 +170,6 @@ const CreatePageForm: React.FC<CreatePageFormProps> = ({ modules, courseId, onSu
             </button>
           </div>
         </form>
-      </div>
     </div>
   );
 };

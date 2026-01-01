@@ -9,7 +9,6 @@ interface CreateModuleFormProps {
 
 const CreateModuleForm: React.FC<CreateModuleFormProps> = ({ courseId, onSuccess, onCancel }) => {
   const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { createModule } = useModule();
 
@@ -19,9 +18,8 @@ const CreateModuleForm: React.FC<CreateModuleFormProps> = ({ courseId, onSuccess
 
     setIsSubmitting(true);
     try {
-      await createModule(courseId, { title, description });
+      await createModule(courseId, { title, description: '' });
       setTitle('');
-      setDescription('');
       onSuccess();
     } catch (error) {
       console.error('Error creating module:', error);
@@ -32,7 +30,6 @@ const CreateModuleForm: React.FC<CreateModuleFormProps> = ({ courseId, onSuccess
 
   const handleCancel = () => {
     setTitle('');
-    setDescription('');
     onCancel();
   };
 
@@ -49,18 +46,6 @@ const CreateModuleForm: React.FC<CreateModuleFormProps> = ({ courseId, onSuccess
           onChange={(e) => setTitle(e.target.value)}
           className="w-full px-3 py-2 text-sm sm:text-base border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
           required
-        />
-      </div>
-      <div className="mb-3 sm:mb-4">
-        <label htmlFor="description" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Description
-        </label>
-        <textarea
-          id="description"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          className="w-full px-3 py-2 text-sm sm:text-base border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-          rows={3}
         />
       </div>
       <div className="flex flex-col sm:flex-row justify-end gap-2 sm:space-x-2">
@@ -84,6 +69,8 @@ const CreateModuleForm: React.FC<CreateModuleFormProps> = ({ courseId, onSuccess
 };
 
 export default CreateModuleForm; 
+
+
 
 
 

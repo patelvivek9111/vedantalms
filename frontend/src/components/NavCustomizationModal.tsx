@@ -40,13 +40,6 @@ export const ALL_NAV_OPTIONS: NavItem[] = [
     activePaths: ['/inbox']
   },
   { 
-    id: 'account', 
-    label: 'Account', 
-    icon: User, 
-    to: '/account',
-    activePaths: ['/account']
-  },
-  { 
     id: 'calendar', 
     label: 'Calendar', 
     icon: Calendar, 
@@ -76,7 +69,7 @@ export const ALL_NAV_OPTIONS: NavItem[] = [
   },
 ];
 
-export const DEFAULT_NAV_ITEMS = ['dashboard', 'todo', 'inbox', 'account'];
+export const DEFAULT_NAV_ITEMS = ['dashboard', 'todo', 'inbox', 'catalog'];
 
 export const NavCustomizationModal: React.FC<NavCustomizationModalProps> = ({
   isOpen,
@@ -97,6 +90,10 @@ export const NavCustomizationModal: React.FC<NavCustomizationModalProps> = ({
 
   // Filter available options based on user role
   const availableOptions = ALL_NAV_OPTIONS.filter(option => {
+    // Remove account option
+    if (option.id === 'account') {
+      return false;
+    }
     if (option.id === 'my-course') {
       return user?.role === 'teacher' || user?.role === 'admin';
     }

@@ -5,9 +5,9 @@ import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import api from '../services/api';
 import { getImageUrl } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { Edit, Reply, Archive, Trash2, Search, ChevronLeft, CheckSquare, Paperclip, CheckSquare2, Menu, Folder, Settings, HelpCircle, User as UserIcon, LogOut } from 'lucide-react';
+import { Edit, Reply, Archive, Trash2, Search, ChevronLeft, CheckSquare, Paperclip, CheckSquare2, User } from 'lucide-react';
 import RichTextEditor from '../components/RichTextEditor';
-import { ChangeUserModal } from '../components/ChangeUserModal';
+import { BurgerMenu } from '../components/BurgerMenu';
 
 function capitalizeFirst(str: string) {
   return str.charAt(0).toUpperCase() + str.slice(1);
@@ -49,7 +49,6 @@ const Inbox: React.FC = () => {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [showBurgerMenu, setShowBurgerMenu] = useState(false);
-  const [showChangeUserModal, setShowChangeUserModal] = useState(false);
 
   // Compose modal state
   const [showCompose, setShowCompose] = useState(false);
@@ -493,136 +492,21 @@ const Inbox: React.FC = () => {
           <button
             onClick={() => setShowBurgerMenu(!showBurgerMenu)}
             className="text-gray-700 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
-            aria-label="Open menu"
+            aria-label="Open account menu"
           >
-            <Menu className="w-6 h-6" />
+            <User className="w-6 h-6" />
           </button>
           <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Inbox</h1>
           <div className="w-10"></div> {/* Spacer for centering */}
           
-          {/* Burger Menu Dropdown */}
-          {showBurgerMenu && (
-            <>
-              {/* Overlay */}
-              <div
-                className="fixed inset-0 bg-black bg-opacity-50 z-[151]"
-                onClick={() => setShowBurgerMenu(false)}
-              />
-              {/* Menu */}
-              <div className="absolute top-full left-0 mt-2 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 w-[280px] z-[152] overflow-hidden">
-                {/* Profile Information */}
-                <div className="px-4 py-4 border-b border-gray-200 dark:border-gray-700">
-                  <div className="flex items-center gap-3">
-                    <div className="relative flex-shrink-0">
-                      {user?.profilePicture ? (
-                        <img
-                          src={user.profilePicture.startsWith('http') 
-                            ? user.profilePicture 
-                            : getImageUrl(user.profilePicture)}
-                          alt={`${user.firstName} ${user.lastName}`}
-                          className="w-12 h-12 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                            const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                            if (fallback) {
-                              fallback.style.display = 'flex';
-                            }
-                          }}
-                        />
-                      ) : null}
-                      {/* Fallback avatar */}
-                      <div
-                        className={`w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-base font-bold ${
-                          user?.profilePicture ? 'hidden' : 'flex'
-                        }`}
-                        style={{
-                          display: user?.profilePicture ? 'none' : 'flex'
-                        }}
-                      >
-                        {user?.firstName?.charAt(0) || ''}{user?.lastName?.charAt(0) || 'U'}
-                      </div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-gray-900 dark:text-gray-100 text-sm truncate">
-                        {user?.firstName} {user?.lastName}
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                        {user?.email}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Main Options */}
-                <div className="py-2">
-                  <button
-                    onClick={() => {
-                      setShowBurgerMenu(false);
-                      navigate('/account');
-                    }}
-                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
-                  >
-                    <Folder className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                    <span>Files</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowBurgerMenu(false);
-                      navigate('/account');
-                    }}
-                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
-                  >
-                    <Settings className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                    <span>Settings</span>
-                  </button>
-                </div>
-
-                {/* Separator */}
-                <div className="border-t border-gray-200 dark:border-gray-700"></div>
-
-                {/* Account Actions */}
-                <div className="py-2">
-                  <button
-                    onClick={() => {
-                      setShowBurgerMenu(false);
-                    }}
-                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
-                  >
-                    <HelpCircle className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                    <span>Help</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowBurgerMenu(false);
-                      setShowChangeUserModal(true);
-                    }}
-                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
-                  >
-                    <UserIcon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                    <span>Change User</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowBurgerMenu(false);
-                      logout();
-                      navigate('/login');
-                    }}
-                    className="w-full text-left px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
-                  >
-                    <LogOut className="h-5 w-5" />
-                    <span>Log Out</span>
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
+          {/* Burger Menu */}
+          <BurgerMenu
+            showBurgerMenu={showBurgerMenu}
+            setShowBurgerMenu={setShowBurgerMenu}
+          />
         </div>
       </nav>
       
-      <ChangeUserModal
-        isOpen={showChangeUserModal}
-        onClose={() => setShowChangeUserModal(false)}
-      />
       
       {/* Top Bar */}
       <div className="flex flex-col gap-2 px-3 sm:px-4 lg:px-6 py-2 sm:py-3 border-b bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-sm sticky top-0 lg:sticky z-20 pt-20 lg:pt-2">

@@ -141,13 +141,14 @@ const CourseDiscussions: React.FC<CourseDiscussionsProps> = ({ courseId, courseG
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      {/* Header - Always visible */}
       <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-4 sm:mb-6">
           <div>
             <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100">Discussions</h2>
             <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">Course discussion threads and conversations</p>
           </div>
-          {isTeacher && (
+          {isTeacher && !isCreateModalOpen && (
             <button
               onClick={handleCreateThread}
               className="w-full sm:w-auto px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors flex items-center justify-center gap-2 text-sm sm:text-base"
@@ -159,8 +160,21 @@ const CourseDiscussions: React.FC<CourseDiscussionsProps> = ({ courseId, courseG
             </button>
           )}
         </div>
+      </div>
 
-        {threads.length === 0 ? (
+      {isTeacher && isCreateModalOpen ? (
+        <CreateThreadModal
+          isOpen={isCreateModalOpen}
+          onClose={() => setIsCreateModalOpen(false)}
+          courseId={courseId}
+          onThreadCreated={handleThreadCreated}
+          courseGroups={courseGroups}
+          modules={modules}
+        />
+      ) : (
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
+
+          {threads.length === 0 ? (
           <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-200 dark:border-gray-700">
             <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -316,18 +330,8 @@ const CourseDiscussions: React.FC<CourseDiscussionsProps> = ({ courseId, courseG
               </div>
             )}
           </div>
-        )}
-      </div>
-
-      {isTeacher && (
-        <CreateThreadModal
-          isOpen={isCreateModalOpen}
-          onClose={() => setIsCreateModalOpen(false)}
-          courseId={courseId}
-          onThreadCreated={handleThreadCreated}
-          courseGroups={courseGroups}
-          modules={modules}
-        />
+          )}
+        </div>
       )}
     </div>
   );

@@ -170,27 +170,51 @@ const PollList: React.FC<PollListProps> = ({ courseId }) => {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Content Polls</h2>
-          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">
-            Vote on upcoming content and topics
-          </p>
+      {/* Header - Always visible */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Content Polls</h2>
+            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">
+              Vote on upcoming content and topics
+            </p>
+          </div>
+          {isInstructor && !showCreateModal && !editingPoll && (
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors text-sm sm:text-base"
+            >
+              <Vote className="w-4 h-4" />
+              Create Poll
+            </button>
+          )}
         </div>
-        {isInstructor && (
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors text-sm sm:text-base"
-          >
-            <Vote className="w-4 h-4" />
-            Create Poll
-          </button>
-        )}
       </div>
 
-      {/* Polls List */}
-      {polls.length === 0 ? (
+      {showCreateModal ? (
+        <PollForm
+          courseId={courseId}
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={() => {
+            fetchPolls();
+            setShowCreateModal(false);
+          }}
+        />
+      ) : editingPoll ? (
+        <PollForm
+          courseId={courseId}
+          poll={editingPoll}
+          onClose={() => setEditingPoll(null)}
+          onSuccess={() => {
+            fetchPolls();
+            setEditingPoll(null);
+          }}
+        />
+      ) : (
+        <>
+
+          {/* Polls List */}
+          {polls.length === 0 ? (
         <div className="text-center py-12">
           <Vote className="mx-auto h-12 w-12 text-gray-400" />
           <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">No polls yet</h3>
@@ -390,30 +414,8 @@ const PollList: React.FC<PollListProps> = ({ courseId }) => {
           })}
         </div>
       )}
-
-             {/* Create/Edit Poll Modal */}
-       {showCreateModal && (
-         <PollForm
-           courseId={courseId}
-           onClose={() => setShowCreateModal(false)}
-           onSuccess={() => {
-             fetchPolls();
-             setShowCreateModal(false);
-           }}
-         />
-       )}
-
-       {editingPoll && (
-         <PollForm
-           courseId={courseId}
-           poll={editingPoll}
-           onClose={() => setEditingPoll(null)}
-           onSuccess={() => {
-             fetchPolls();
-             setEditingPoll(null);
-           }}
-         />
-       )}
+        </>
+      )}
      </div>
    );
  };

@@ -30,8 +30,11 @@ const BottomNav: React.FC = () => {
             return null;
           }).filter((item: NavItem | null): item is NavItem => item !== null);
           
-          // Filter out 'my-course' if user is not a teacher or admin
+          // Filter out 'my-course' if user is not a teacher or admin, and filter out 'account'
           const filteredItems = mappedItems.filter((item: NavItem) => {
+            if (item.id === 'account') {
+              return false;
+            }
             if (item.id === 'my-course' && user?.role !== 'teacher' && user?.role !== 'admin') {
               return false;
             }

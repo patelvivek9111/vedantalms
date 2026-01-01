@@ -1140,26 +1140,25 @@ const ThreadView: React.FC = () => {
         </div>
       </div>
 
-      {/* Grading Modal */}
+      {/* Grading Form */}
       {showGradingModal && selectedStudent && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="flex justify-between items-center p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
-              <h2 className="text-base sm:text-xl font-semibold text-gray-800 dark:text-gray-100 flex items-center space-x-2">
-                <Award className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span className="truncate">Grade Discussion - {selectedStudent.firstName} {selectedStudent.lastName}</span>
-              </h2>
-              <button
-                onClick={() => setShowGradingModal(false)}
-                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+        <div className="w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 sm:p-6 border dark:border-gray-700 mb-4">
+          <div className="flex justify-between items-center mb-4 sm:mb-6">
+            <h2 className="text-base sm:text-xl font-semibold text-gray-800 dark:text-gray-100 flex items-center space-x-2">
+              <Award className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span className="truncate">Grade Discussion - {selectedStudent.firstName} {selectedStudent.lastName}</span>
+            </h2>
+            <button
+              onClick={() => setShowGradingModal(false)}
+              className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
 
-            <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
-              {/* Left Panel - Student Posts */}
-              <div className="flex-1 p-4 sm:p-6 border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
+          <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
+            {/* Left Panel - Student Posts */}
+            <div className="flex-1 p-4 sm:p-6 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 overflow-y-auto max-h-[400px]">
                 <div className="mb-4">
                   <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center space-x-2 mb-3">
                     <MessageSquare className="w-5 h-5" />
@@ -1217,9 +1216,9 @@ const ThreadView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Right Panel - Grading Form */}
-              <div className="w-full lg:w-96 p-4 sm:p-6 overflow-y-auto bg-gray-50 dark:bg-gray-900">
-                <form onSubmit={handleGradeSubmit}>
+            {/* Right Panel - Grading Form */}
+            <div className="w-full lg:w-96 p-4 sm:p-6 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900">
+              <form onSubmit={handleGradeSubmit}>
                   {gradingError && (
                     <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg flex items-center space-x-2">
                       <AlertCircle className="w-5 h-5" />
@@ -1258,24 +1257,23 @@ const ThreadView: React.FC = () => {
                     />
                   </div>
 
-                  <div className="flex justify-end space-x-3">
-                    <button
-                      type="button"
-                      onClick={() => setShowGradingModal(false)}
-                      className="px-6 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isGrading}
-                      className="px-6 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 border border-transparent rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      {isGrading ? 'Submitting...' : 'Submit Grade'}
-                    </button>
-                  </div>
-                </form>
-              </div>
+                <div className="flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowGradingModal(false)}
+                    className="px-6 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isGrading}
+                    className="px-6 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 border border-transparent rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isGrading ? 'Submitting...' : 'Submit Grade'}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>

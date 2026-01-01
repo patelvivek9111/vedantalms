@@ -147,22 +147,20 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-[200] flex items-center justify-center p-2 sm:p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl h-[calc(100vh-8rem)] sm:max-h-[85vh] sm:h-auto flex flex-col">
-        <div className="flex justify-between items-center p-4 sm:p-6 border-b dark:border-gray-700 flex-shrink-0">
-          <h2 className="hidden lg:block text-lg sm:text-2xl font-semibold text-gray-800 dark:text-gray-100 pr-2">Create New Discussion Thread</h2>
-          <button
-            onClick={onClose}
-            className="hidden lg:flex text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none flex-shrink-0"
-          >
-            <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+    <div className="w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 sm:p-6 border dark:border-gray-700">
+      <div className="flex justify-between items-center mb-4 sm:mb-6">
+        <h2 className="text-lg sm:text-2xl font-semibold text-gray-800 dark:text-gray-100">Create New Discussion Thread</h2>
+        <button
+          onClick={onClose}
+          className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none flex-shrink-0"
+        >
+          <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
 
-        <div className="flex-1 overflow-y-auto">
-          <form id="create-thread-form" onSubmit={handleSubmit} className="p-4 sm:p-6 pb-4">
+      <form id="create-thread-form" onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
           {error && (
             <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/20 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 rounded">
               {error}
@@ -373,8 +371,8 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
             </select>
         </div>
 
-          {/* Action Buttons */}
-          <div className="flex justify-end space-x-3 mt-6 pt-4 border-t dark:border-gray-700">
+        {/* Action Buttons */}
+        <div className="flex justify-end space-x-3 pt-4 border-t dark:border-gray-700">
           <button
             type="button"
             onClick={onClose}
@@ -389,10 +387,8 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
           >
             {isSubmitting ? 'Creating...' : 'Create Thread'}
           </button>
-          </div>
-          </form>
         </div>
-      </div>
+      </form>
     </div>
   );
 };
