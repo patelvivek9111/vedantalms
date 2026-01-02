@@ -173,7 +173,7 @@ function ProfileSection() {
 }
 
 function SettingsSection() {
-  const [prefs, setPrefs] = React.useState({ theme: 'light' });
+  const [prefs, setPrefs] = React.useState({ theme: 'light', showOnlineStatus: true });
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -186,7 +186,10 @@ function SettingsSection() {
     getUserPreferences()
       .then(res => {
         if (res.data && res.data.preferences) {
-          setPrefs({ theme: res.data.preferences.theme || 'light' });
+          setPrefs({ 
+            theme: res.data.preferences.theme || 'light',
+            showOnlineStatus: res.data.preferences.showOnlineStatus !== undefined ? res.data.preferences.showOnlineStatus : true
+          });
         }
       })
       .catch(() => setError('Failed to load preferences'))
@@ -205,7 +208,7 @@ function SettingsSection() {
   }, [prefs.theme, theme, setTheme]);
 
   const handleThemeChange = async (newTheme: 'light' | 'dark') => {
-    setPrefs({ theme: newTheme });
+    setPrefs({ ...prefs, theme: newTheme });
     setTheme(newTheme);
     // Auto-save on click
     setSaving(true);
@@ -213,6 +216,23 @@ function SettingsSection() {
     setSuccess(false);
     try {
       await updateUserPreferences({ ...prefs, theme: newTheme });
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 2000);
+    } catch {
+      setError('Failed to save preferences');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleShowOnlineStatusChange = async (showOnlineStatus: boolean) => {
+    const newPrefs = { ...prefs, showOnlineStatus };
+    setPrefs(newPrefs);
+    setSaving(true);
+    setError(null);
+    setSuccess(false);
+    try {
+      await updateUserPreferences(newPrefs);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
     } catch {
@@ -297,6 +317,35 @@ function SettingsSection() {
         
         {error && <div className="text-red-600 dark:text-red-400 text-xs sm:text-sm bg-red-50 dark:bg-red-900/20 p-2 rounded mt-4">{error}</div>}
         {success && <div className="text-green-600 dark:text-green-400 text-xs sm:text-sm bg-green-50 dark:bg-green-900/20 p-2 rounded mt-4">Theme saved!</div>}
+      </div>
+
+      {/* Online Status Toggle */}
+      <div className="w-full max-w-md bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 p-4 sm:p-6 rounded-lg shadow-sm mt-4 sm:mt-6">
+        <h3 className="text-sm sm:text-base font-semibold mb-4 text-gray-900 dark:text-gray-100">Privacy</h3>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-0.5">Show Online Status</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400">Allow others to see when you're online</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => handleShowOnlineStatusChange(!prefs.showOnlineStatus)}
+            disabled={saving || loading}
+            className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+              prefs.showOnlineStatus ? 'bg-green-500 dark:bg-green-600' : 'bg-gray-300 dark:bg-gray-600'
+            } ${saving || loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            role="switch"
+            aria-checked={prefs.showOnlineStatus}
+          >
+            <span
+              className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                prefs.showOnlineStatus ? 'translate-x-5' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
+        {error && <div className="text-red-600 dark:text-red-400 text-xs sm:text-sm bg-red-50 dark:bg-red-900/20 p-2 rounded mt-4">{error}</div>}
+        {success && <div className="text-green-600 dark:text-green-400 text-xs sm:text-sm bg-green-50 dark:bg-green-900/20 p-2 rounded mt-4">Preferences saved!</div>}
       </div>
     </div>
   );

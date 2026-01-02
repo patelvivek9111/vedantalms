@@ -225,11 +225,12 @@ exports.getPreferences = async (req, res) => {
 exports.updatePreferences = async (req, res) => {
   try {
     const userId = req.user._id;
-    const { language, timeZone, theme, courseColors } = req.body;
+    const { language, timeZone, theme, courseColors, showOnlineStatus } = req.body;
     const updateFields = {};
     if (language !== undefined) updateFields['preferences.language'] = language;
     if (timeZone !== undefined) updateFields['preferences.timeZone'] = timeZone;
     if (theme !== undefined) updateFields['preferences.theme'] = theme;
+    if (showOnlineStatus !== undefined) updateFields['preferences.showOnlineStatus'] = showOnlineStatus;
     
     // Handle courseColors - update specific course color(s)
     if (courseColors !== undefined) {

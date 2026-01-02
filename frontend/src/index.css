@@ -231,4 +231,29 @@
 
 .dark .rbc-time-header .rbc-header > a {
   color: #f1f5f9 !important;
+}
+
+/* Online status pulsing animation - Lighter fade in/out */
+@keyframes pulse-green {
+  0% {
+    border-color: rgba(34, 197, 94, 0.8);
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5);
+    opacity: 1;
+  }
+  50% {
+    border-color: rgba(34, 197, 94, 0.5);
+    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.2);
+    opacity: 0.7;
+  }
+  100% {
+    border-color: rgba(34, 197, 94, 0.8);
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5);
+    opacity: 1;
+  }
+}
+
+.online-pulse {
+  animation: pulse-green 2.5s ease-in-out infinite;
+  border: 2px solid rgba(34, 197, 94, 0.8) !important;
+  position: relative;
 } 

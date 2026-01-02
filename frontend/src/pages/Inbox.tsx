@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { Edit, Reply, Archive, Trash2, Search, ChevronLeft, CheckSquare, Paperclip, CheckSquare2, User } from 'lucide-react';
 import RichTextEditor from '../components/RichTextEditor';
 import { BurgerMenu } from '../components/BurgerMenu';
+import { useOnlineStatus, markUserOnline, markUserOffline } from '../hooks/useOnlineStatus';
 
 function capitalizeFirst(str: string) {
   return str.charAt(0).toUpperCase() + str.slice(1);
@@ -38,6 +39,7 @@ const getAvatarColor = (id: string) => {
 const Inbox: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { isUserOnline } = useOnlineStatus(user?._id);
   const [conversations, setConversations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -186,15 +188,42 @@ const Inbox: React.FC = () => {
       setError(null);
       try {
         const data = await fetchConversations();
-        setConversations(data);
+        console.log('Fetched conversations:', data);
+        console.log('Current user ID:', currentUserId);
+        setConversations(data || []);
       } catch (err: any) {
+        console.error('Error loading conversations:', err);
         setError('Failed to load conversations');
+        setConversations([]);
       } finally {
         setLoading(false);
       }
     };
-    loadConversations();
-  }, []);
+    if (currentUserId) {
+      loadConversations();
+    }
+  }, [currentUserId]);
+
+  // Mark conversation participants as online when viewing conversation (for demo)
+  useEffect(() => {
+    if (selectedConversation && selectedConversation.participants) {
+      // Mark all participants except current user as online (for demo)
+      selectedConversation.participants.forEach((participant: any) => {
+        if (participant._id && participant._id !== currentUserId) {
+          markUserOnline(participant._id);
+        }
+      });
+    }
+    
+    // Also mark message senders as online
+    if (messages.length > 0) {
+      messages.forEach((msg: any) => {
+        if (msg.senderId?._id && msg.senderId._id !== currentUserId) {
+          markUserOnline(msg.senderId._id);
+        }
+      });
+    }
+  }, [selectedConversation, messages, currentUserId]);
 
   // 1. In handleSelectConversation, mark as read if unreadCount > 0
   const handleSelectConversation = async (conv: any) => {
@@ -436,28 +465,46 @@ const Inbox: React.FC = () => {
       // Course filter - Skip for admins
       if (user?.role !== 'admin' && selectedCourse !== 'all' && conv.course !== selectedCourse) return false;
       // Folder filter (find participant for current user)
-      const participant = conv.participants.find((p: any) => p._id === currentUserId);
+      // Convert both to strings for comparison to handle ObjectId vs string mismatch
+      const participant = conv.participants.find((p: any) => String(p._id) === String(currentUserId));
       const folder = participant?.folder || conv.folder || 'inbox';
       
+      // Search filter - if searching, search across all folders (inbox, sent, archived, favorite)
+      const searchLower = search.toLowerCase();
+      if (searchLower) {
+        // When searching, check if conversation matches search query
+        const subject = conv.subject?.toLowerCase() || '';
+        const snippet = conv.lastMessage?.body?.toLowerCase() || '';
+        const senders = conv.participants.map((p: any) => (p.name || `${p.firstName || ''} ${p.lastName || ''}`)).join(', ').toLowerCase();
+        const matchesSearch = subject.includes(searchLower) || snippet.includes(searchLower) || senders.includes(searchLower);
+        
+        if (!matchesSearch) return false;
+        
+        // If search matches, check if conversation is in one of the searchable folders
+        // Searchable folders: inbox, sent, archived, favorite (but not deleted)
+        const isInInbox = folder === 'inbox';
+        const isSent = String(conv.createdBy) === String(currentUserId);
+        const isArchived = folder === 'archived';
+        const isFavorite = participant?.starred === true;
+        const isDeleted = folder === 'deleted';
+        
+        // When searching, include conversations from inbox, sent, archived, and favorite (but exclude deleted)
+        if (isDeleted) return false;
+        if (isInInbox || isSent || isArchived || isFavorite) return true;
+        return false;
+      }
+      
+      // No search query - apply normal folder filter
       // Show conversations based on selected folder
       if (selectedFolder === 'inbox' && folder !== 'inbox') return false;
       if (selectedFolder === 'sent') {
-        if (conv.createdBy !== currentUserId) return false;
+        // Convert to strings for comparison
+        if (String(conv.createdBy) !== String(currentUserId)) return false;
       }
       if (selectedFolder === 'archived' && folder !== 'archived') return false;
       if (selectedFolder === 'favorite' && !participant?.starred) return false;
       if (selectedFolder === 'deleted' && folder !== 'deleted') return false;
       
-      // Search filter
-      const searchLower = search.toLowerCase();
-      if (searchLower) {
-        const subject = conv.subject?.toLowerCase() || '';
-        const snippet = conv.lastMessage?.body?.toLowerCase() || '';
-        const senders = conv.participants.map((p: any) => (p.name || `${p.firstName || ''} ${p.lastName || ''}`)).join(', ').toLowerCase();
-        if (!subject.includes(searchLower) && !snippet.includes(searchLower) && !senders.includes(searchLower)) {
-          return false;
-        }
-      }
       return true;
     });
   }, [conversations, selectedCourse, selectedFolder, search, currentUserId, user]);
@@ -737,31 +784,33 @@ const Inbox: React.FC = () => {
                         {composeUserResults.map((u: any) => (
                           <div key={u._id} className="px-4 py-2 hover:bg-blue-100 dark:hover:bg-blue-900/50 cursor-pointer flex items-center gap-3" onClick={() => { handleAddRecipient(u); setComposeToInput(''); setComposeUserResults([]); }}>
                             <div className="relative flex-shrink-0">
-                              {u.profilePicture ? (
-                                <img
-                                  src={u.profilePicture.startsWith('http') ? u.profilePicture : getImageUrl(u.profilePicture)}
-                                  alt={`${u.firstName} ${u.lastName}`}
-                                  className="w-8 h-8 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
-                                  onError={(e) => {
-                                    e.currentTarget.style.display = 'none';
-                                    const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                                    if (fallback) {
-                                      fallback.style.display = 'flex';
-                                    }
+                              <div className={`w-8 h-8 rounded-full overflow-hidden ${u.profilePicture ? '' : 'bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center'} ${isUserOnline(u._id) ? 'online-pulse' : 'border-2 border-transparent'}`}>
+                                {u.profilePicture ? (
+                                  <img
+                                    src={u.profilePicture.startsWith('http') ? u.profilePicture : getImageUrl(u.profilePicture)}
+                                    alt={`${u.firstName} ${u.lastName}`}
+                                    className="w-8 h-8 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                      const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                      if (fallback) {
+                                        fallback.style.display = 'flex';
+                                      }
+                                    }}
+                                  />
+                                ) : null}
+                                {/* Fallback avatar with initials */}
+                                <div
+                                  className={`w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold ${
+                                    u.profilePicture ? 'hidden' : 'flex'
+                                  }`}
+                                  style={{
+                                    display: u.profilePicture ? 'none' : 'flex'
                                   }}
-                                />
-                              ) : null}
-                              {/* Fallback avatar with initials */}
-                              <div
-                                className={`w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold ${
-                                  u.profilePicture ? 'hidden' : 'flex'
-                                }`}
-                                style={{
-                                  display: u.profilePicture ? 'none' : 'flex'
-                                }}
-                              >
-                                {u.firstName?.charAt(0) || ''}
-                                {u.lastName?.charAt(0) || ''}
+                                >
+                                  {u.firstName?.charAt(0) || ''}
+                                  {u.lastName?.charAt(0) || ''}
+                                </div>
                               </div>
                             </div>
                             <div className="flex-1 min-w-0">
@@ -786,31 +835,33 @@ const Inbox: React.FC = () => {
                         {composeGroupUsers.map((u: any) => (
                           <div key={u._id} className="px-4 py-2 hover:bg-blue-100 dark:hover:bg-blue-900/50 cursor-pointer flex items-center gap-3" onClick={() => { handleAddRecipient(u); setComposeToGroup(''); }}>
                             <div className="relative flex-shrink-0">
-                              {u.profilePicture ? (
-                                <img
-                                  src={u.profilePicture.startsWith('http') ? u.profilePicture : getImageUrl(u.profilePicture)}
-                                  alt={`${u.firstName} ${u.lastName}`}
-                                  className="w-8 h-8 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
-                                  onError={(e) => {
-                                    e.currentTarget.style.display = 'none';
-                                    const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                                    if (fallback) {
-                                      fallback.style.display = 'flex';
-                                    }
+                              <div className={`w-8 h-8 rounded-full overflow-hidden ${u.profilePicture ? '' : 'bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center'} ${isUserOnline(u._id) ? 'online-pulse' : 'border-2 border-transparent'}`}>
+                                {u.profilePicture ? (
+                                  <img
+                                    src={u.profilePicture.startsWith('http') ? u.profilePicture : getImageUrl(u.profilePicture)}
+                                    alt={`${u.firstName} ${u.lastName}`}
+                                    className="w-8 h-8 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                      const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                      if (fallback) {
+                                        fallback.style.display = 'flex';
+                                      }
+                                    }}
+                                  />
+                                ) : null}
+                                {/* Fallback avatar with initials */}
+                                <div
+                                  className={`w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold ${
+                                    u.profilePicture ? 'hidden' : 'flex'
+                                  }`}
+                                  style={{
+                                    display: u.profilePicture ? 'none' : 'flex'
                                   }}
-                                />
-                              ) : null}
-                              {/* Fallback avatar with initials */}
-                              <div
-                                className={`w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold ${
-                                  u.profilePicture ? 'hidden' : 'flex'
-                                }`}
-                                style={{
-                                  display: u.profilePicture ? 'none' : 'flex'
-                                }}
-                              >
-                                {u.firstName?.charAt(0) || ''}
-                                {u.lastName?.charAt(0) || ''}
+                                >
+                                  {u.firstName?.charAt(0) || ''}
+                                  {u.lastName?.charAt(0) || ''}
+                                </div>
                               </div>
                             </div>
                             <div className="flex-1 min-w-0">
@@ -971,19 +1022,21 @@ const Inbox: React.FC = () => {
                           className="mr-1.5 sm:mr-2 accent-blue-600 w-4 h-4 touch-manipulation flex-shrink-0"
                           onClick={e => e.stopPropagation()}
                         />
-                        {/* Avatar */}
-                        <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white font-bold text-xs sm:text-sm mr-1.5 sm:mr-2 overflow-hidden flex-shrink-0 ${getAvatarColor(conv._id)}`}>
-                          {otherParticipants[0]?.profilePicture ? (
-                            <img
-                              src={otherParticipants[0].profilePicture.startsWith('http')
-                                ? otherParticipants[0].profilePicture
-                                : getImageUrl(otherParticipants[0].profilePicture)}
-                              alt={participantNames}
-                              className="w-8 h-8 sm:w-10 sm:h-10 object-cover rounded-full"
-                            />
-                          ) : (
-                            getInitials(otherParticipants[0])
-                          )}
+                        {/* Avatar with Online Status */}
+                        <div className="relative flex-shrink-0 mr-1.5 sm:mr-2">
+                          <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white font-bold text-xs sm:text-sm overflow-hidden ${getAvatarColor(conv._id)} ${otherParticipants[0]?._id && isUserOnline(otherParticipants[0]._id) ? 'online-pulse' : 'border-2 border-transparent'}`}>
+                            {otherParticipants[0]?.profilePicture ? (
+                              <img
+                                src={otherParticipants[0].profilePicture.startsWith('http')
+                                  ? otherParticipants[0].profilePicture
+                                  : getImageUrl(otherParticipants[0].profilePicture)}
+                                alt={participantNames}
+                                className="w-8 h-8 sm:w-10 sm:h-10 object-cover rounded-full"
+                              />
+                            ) : (
+                              getInitials(otherParticipants[0])
+                            )}
+                          </div>
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 sm:gap-2">
@@ -1082,19 +1135,21 @@ const Inbox: React.FC = () => {
                         {/* Email Header */}
                         <div className="flex items-start justify-between mb-3 sm:mb-4 gap-2">
                           <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
-                            {/* Avatar */}
-                            <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white font-bold text-sm sm:text-lg overflow-hidden flex-shrink-0 ${getAvatarColor(msg.senderId?._id)}`}>
-                              {msg.senderId?.profilePicture ? (
-                                <img
-                                  src={msg.senderId.profilePicture.startsWith('http')
-                                    ? msg.senderId.profilePicture
-                                    : getImageUrl(msg.senderId.profilePicture)}
-                                  alt={senderName}
-                                  className="w-8 h-8 sm:w-10 sm:h-10 object-cover rounded-full"
-                                />
-                              ) : (
-                                getInitials(msg.senderId)
-                              )}
+                            {/* Avatar with Online Status */}
+                            <div className="relative flex-shrink-0">
+                              <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white font-bold text-sm sm:text-lg overflow-hidden ${getAvatarColor(msg.senderId?._id)} ${isUserOnline(msg.senderId?._id) ? 'online-pulse' : 'border-2 border-transparent'}`}>
+                                {msg.senderId?.profilePicture ? (
+                                  <img
+                                    src={msg.senderId.profilePicture.startsWith('http')
+                                      ? msg.senderId.profilePicture
+                                      : getImageUrl(msg.senderId.profilePicture)}
+                                    alt={senderName}
+                                    className="w-8 h-8 sm:w-10 sm:h-10 object-cover rounded-full"
+                                  />
+                                ) : (
+                                  getInitials(msg.senderId)
+                                )}
+                              </div>
                             </div>
                             <div className="min-w-0 flex-1">
                               <div className="font-semibold text-sm sm:text-base text-gray-900 dark:text-gray-100 truncate">

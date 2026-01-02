@@ -68,6 +68,7 @@ export const updateUserPreferences = async (prefs: {
   timeZone?: string;
   theme?: string;
   courseColors?: { [courseId: string]: string };
+  showOnlineStatus?: boolean;
 }) => {
   return api.put('/users/me/preferences', prefs);
 };

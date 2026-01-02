@@ -137,7 +137,7 @@ function ProfileSectionInline() {
 
 function SettingsSectionInline() {
   const { theme, setTheme } = useTheme();
-  const [prefs, setPrefs] = useState({ theme: 'light' });
+  const [prefs, setPrefs] = useState({ theme: 'light', showOnlineStatus: true });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -145,19 +145,40 @@ function SettingsSectionInline() {
   useEffect(() => {
     getUserPreferences().then(res => {
       if (res.data && res.data.preferences) {
-        setPrefs({ theme: res.data.preferences.theme || 'light' });
+        setPrefs({ 
+          theme: res.data.preferences.theme || 'light',
+          showOnlineStatus: res.data.preferences.showOnlineStatus !== undefined ? res.data.preferences.showOnlineStatus : true
+        });
       }
     });
   }, []);
 
   const handleThemeChange = async (newTheme: 'light' | 'dark') => {
-    setPrefs({ theme: newTheme });
+    const newPrefs = { ...prefs, theme: newTheme };
+    setPrefs(newPrefs);
     setTheme(newTheme);
     setSaving(true);
     setError(null);
     setSuccess(false);
     try {
-      await updateUserPreferences({ ...prefs, theme: newTheme });
+      await updateUserPreferences(newPrefs);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 2000);
+    } catch {
+      setError('Failed to save preferences');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleShowOnlineStatusChange = async (showOnlineStatus: boolean) => {
+    const newPrefs = { ...prefs, showOnlineStatus };
+    setPrefs(newPrefs);
+    setSaving(true);
+    setError(null);
+    setSuccess(false);
+    try {
+      await updateUserPreferences(newPrefs);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
     } catch {
@@ -221,6 +242,37 @@ function SettingsSectionInline() {
         </div>
         {error && <div className="text-red-600 dark:text-red-400 text-xs mt-2">{error}</div>}
         {success && <div className="text-green-600 dark:text-green-400 text-xs mt-2">Theme saved!</div>}
+      </div>
+      
+      {/* Online Status Toggle */}
+      <div>
+        <h3 className="text-sm font-semibold mb-3 text-gray-900 dark:text-gray-100">Privacy</h3>
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-0.5">Show Online Status</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">Allow others to see when you're online</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleShowOnlineStatusChange(!prefs.showOnlineStatus)}
+              disabled={saving}
+              className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                prefs.showOnlineStatus ? 'bg-green-500 dark:bg-green-600' : 'bg-gray-300 dark:bg-gray-600'
+              } ${saving ? 'opacity-50 cursor-not-allowed' : ''}`}
+              role="switch"
+              aria-checked={prefs.showOnlineStatus}
+            >
+              <span
+                className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                  prefs.showOnlineStatus ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+        </div>
+        {error && <div className="text-red-600 dark:text-red-400 text-xs mt-2">{error}</div>}
+        {success && <div className="text-green-600 dark:text-green-400 text-xs mt-2">Preferences saved!</div>}
       </div>
     </div>
   );
