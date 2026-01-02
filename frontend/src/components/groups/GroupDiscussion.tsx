@@ -241,79 +241,26 @@ const GroupDiscussion: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Mobile Top Navigation */}
-      {isMobileDevice && (
-        <nav className="fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
-          <div className="relative flex items-center justify-between px-4 py-3">
-            {/* Group Dropdown */}
-            <div className="relative flex-1 max-w-[60%]">
-              <button
-                onClick={() => setShowGroupDropdown(!showGroupDropdown)}
-                className="flex items-center justify-between w-full px-3 py-2 text-left bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors touch-manipulation"
-                aria-label="Select group"
-              >
-                <span className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
-                  {groupSetName} / {groupName}
-                </span>
-                <ChevronDown className={`w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform ${showGroupDropdown ? 'rotate-180' : ''}`} />
-              </button>
-              
-              {/* Group Dropdown Menu */}
-              {showGroupDropdown && (
-                <>
-                  <div
-                    className="fixed inset-0 bg-black bg-opacity-50 z-[151]"
-                    onClick={() => setShowGroupDropdown(false)}
-                  />
-                  <div className="absolute top-full left-0 mt-2 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 w-full max-h-[60vh] overflow-y-auto z-[152]">
-                    {groupsInSet && groupsInSet.length > 0 ? (
-                      groupsInSet.map((g) => (
-                        <button
-                          key={g._id}
-                          onClick={() => {
-                            setShowGroupDropdown(false);
-                            navigate(`/groups/${g._id}/discussion`);
-                          }}
-                          className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-100 dark:border-gray-700 last:border-0 ${
-                            g._id === groupId ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
-                          }`}
-                        >
-                          <div className="font-medium">{groupSetName} / {g.name}</div>
-                        </button>
-                      ))
-                    ) : (
-                      <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">No groups available</div>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-            
-            <button
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="text-blue-600 dark:text-blue-400 p-2.5 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-all touch-manipulation active:scale-95 shadow-sm hover:shadow-md"
-              aria-label="Toggle group menu"
-            >
-              <BookOpen className="w-6 h-6" strokeWidth={2} />
-            </button>
-          </div>
-        </nav>
-      )}
-
-      {/* Header - Always visible */}
-      <div className={`bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 ${isMobileDevice ? 'mt-16 mb-4' : 'mb-6'}`}>
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
+    <div className={`w-full h-full overflow-y-auto ${isMobileDevice ? 'pb-20' : ''}`}>
+      {/* Header - Mobile Optimized */}
+      <div className={`bg-white dark:bg-gray-800 ${isMobileDevice ? 'p-3 mb-3' : 'p-4 sm:p-6 mb-4 sm:mb-6'} border-b border-gray-200 dark:border-gray-700`}>
+        <div className="flex flex-col gap-3">
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Group Discussions</h2>
-            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">Group-specific discussion threads and conversations</p>
+            <h2 className={`${isMobileDevice ? 'text-lg' : 'text-xl sm:text-2xl'} font-bold text-gray-900 dark:text-gray-100`}>
+              Group Discussions
+            </h2>
+            {!isMobileDevice && (
+              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">
+                Group-specific discussion threads and conversations
+              </p>
+            )}
           </div>
           {isTeacher && !isCreateModalOpen && (
             <button
               onClick={handleCreateThread}
-              className="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 dark:from-blue-500 dark:to-blue-600 text-white rounded-lg hover:from-blue-700 hover:to-blue-600 dark:hover:from-blue-600 dark:hover:to-blue-700 transition-all flex items-center justify-center gap-2 text-sm sm:text-base font-semibold shadow-md hover:shadow-lg active:scale-95"
+              className={`${isMobileDevice ? 'w-full px-4 py-2.5 text-sm' : 'w-full sm:w-auto px-5 py-2.5 text-sm sm:text-base'} bg-gradient-to-r from-blue-600 to-blue-500 dark:from-blue-500 dark:to-blue-600 text-white rounded-lg hover:from-blue-700 hover:to-blue-600 dark:hover:from-blue-600 dark:hover:to-blue-700 transition-all flex items-center justify-center gap-2 font-semibold shadow-md hover:shadow-lg active:scale-95 touch-manipulation`}
             >
-              <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className={`${isMobileDevice ? 'w-4 h-4' : 'w-4 h-4 sm:w-5 sm:h-5'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
               </svg>
               Create New Thread
@@ -333,28 +280,28 @@ const GroupDiscussion: React.FC = () => {
           defaultGroupSetId={groupSetId}
         />
       ) : (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 mb-6">
+        <div className={`${isMobileDevice ? 'px-0' : 'px-4 sm:px-6'} pb-4 sm:pb-6`}>
 
           {threads.length === 0 ? (
-          <div className="text-center py-16 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700/50 dark:to-gray-800/50 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600">
-            <div className="mx-auto w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mb-4">
-              <svg className="h-8 w-8 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className={`text-center ${isMobileDevice ? 'py-12 px-4' : 'py-16'} bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700/50 dark:to-gray-800/50 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600`}>
+            <div className={`mx-auto ${isMobileDevice ? 'w-12 h-12' : 'w-16 h-16'} bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mb-4`}>
+              <svg className={`${isMobileDevice ? 'h-6 w-6' : 'h-8 w-8'} text-blue-600 dark:text-blue-400`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
             </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2">No group discussion threads</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 max-w-md mx-auto">
+            <h3 className={`${isMobileDevice ? 'text-base' : 'text-lg'} font-bold text-gray-900 dark:text-gray-100 mb-2`}>No group discussion threads</h3>
+            <p className={`${isMobileDevice ? 'text-xs' : 'text-sm'} text-gray-600 dark:text-gray-400 ${isMobileDevice ? 'px-2' : 'max-w-md'} mx-auto`}>
               {isTeacher 
                 ? "Get started by creating a new discussion thread for this group."
                 : "There are no discussion threads yet for this group. Teachers will create threads here."}
             </p>
             {isTeacher && (
-              <div className="mt-6">
+              <div className={`${isMobileDevice ? 'mt-4' : 'mt-6'}`}>
                 <button
                   onClick={handleCreateThread}
-                  className="inline-flex items-center px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 dark:from-blue-500 dark:to-blue-600 text-white rounded-lg font-semibold shadow-md hover:shadow-lg hover:from-blue-700 hover:to-blue-600 dark:hover:from-blue-600 dark:hover:to-blue-700 transition-all active:scale-95"
+                  className={`inline-flex items-center ${isMobileDevice ? 'px-4 py-2 text-sm' : 'px-5 py-2.5'} bg-gradient-to-r from-blue-600 to-blue-500 dark:from-blue-500 dark:to-blue-600 text-white rounded-lg font-semibold shadow-md hover:shadow-lg hover:from-blue-700 hover:to-blue-600 dark:hover:from-blue-600 dark:hover:to-blue-700 transition-all active:scale-95 touch-manipulation`}
                 >
-                  <svg className="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className={`${isMobileDevice ? '-ml-1 mr-2 h-4 w-4' : '-ml-1 mr-2 h-5 w-5'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                   </svg>
                   Create Thread
@@ -366,39 +313,39 @@ const GroupDiscussion: React.FC = () => {
           <div className="space-y-4">
             {/* Pinned threads */}
             {threads.filter(thread => thread.isPinned).length > 0 && (
-              <div className="mb-6">
-                <div className="flex items-center gap-2 mb-4">
+              <div className={`${isMobileDevice ? 'mb-4' : 'mb-6'}`}>
+                <div className={`flex items-center gap-2 ${isMobileDevice ? 'mb-3 px-4' : 'mb-4'}`}>
                   <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-600 to-transparent"></div>
-                  <h3 className="text-sm font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wide px-3">Pinned Threads</h3>
+                  <h3 className={`${isMobileDevice ? 'text-xs' : 'text-sm'} font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wide px-3`}>Pinned Threads</h3>
                   <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-600 to-transparent"></div>
                 </div>
-                <div className="space-y-4">
+                <div className={`${isMobileDevice ? 'space-y-3 px-4' : 'space-y-4'}`}>
                   {threads
                     .filter(thread => thread.isPinned)
                     .map((thread) => (
                       <div
                         key={thread._id}
                         onClick={() => handleThreadClick(thread._id)}
-                        className="p-5 bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-800/50 border-2 border-yellow-300 dark:border-yellow-700 rounded-xl hover:shadow-xl transition-all cursor-pointer relative hover:border-yellow-400 dark:hover:border-yellow-600 active:scale-[0.98] group"
+                        className={`${isMobileDevice ? 'p-3' : 'p-5'} bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-800/50 border-2 border-yellow-300 dark:border-yellow-700 rounded-xl hover:shadow-xl transition-all cursor-pointer relative hover:border-yellow-400 dark:hover:border-yellow-600 active:scale-[0.98] group touch-manipulation`}
                       >
-                        <div className="absolute top-3 right-3 text-yellow-500 dark:text-yellow-400 group-hover:scale-110 transition-transform">
-                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <div className={`absolute ${isMobileDevice ? 'top-2 right-2' : 'top-3 right-3'} text-yellow-500 dark:text-yellow-400 group-hover:scale-110 transition-transform`}>
+                          <svg className={`${isMobileDevice ? 'w-4 h-4' : 'w-5 h-5'}`} fill="currentColor" viewBox="0 0 20 20">
                             <path d="M10 2a1 1 0 011 1v1.323l3.954 1.582 1.599-.8a1 1 0 01.894 1.79l-1.233.616 1.738 5.42a1 1 0 01-.285 1.05A3.989 3.989 0 0115 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.715-5.349L11 4.477V16h2a1 1 0 110 2H7a1 1 0 110-2h2V4.477L6.237 7.582l1.715 5.349a1 1 0 01-.285 1.05A3.989 3.989 0 015 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.738-5.42-1.233-.616a1 1 0 01.894-1.79l1.599.8L9 4.323V3a1 1 0 011-1z" />
                           </svg>
                         </div>
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                        <div className={`${isMobileDevice ? 'flex flex-col gap-2 pr-8' : 'flex justify-between items-start'}`}>
+                          <div className="flex-1 min-w-0">
+                            <h3 className={`${isMobileDevice ? 'text-base pr-6' : 'text-lg'} font-bold text-gray-900 dark:text-gray-100 ${isMobileDevice ? 'mb-1' : 'mb-2'} group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors break-words`}>
                               {thread.title}
                               {thread.isGraded && (
-                                <span className="ml-2 px-2.5 py-1 text-xs font-semibold bg-gradient-to-r from-green-100 to-green-50 dark:from-green-900/50 dark:to-green-800/50 text-green-800 dark:text-green-300 rounded-full shadow-sm">
-                                  Graded ({thread.totalPoints} points)
+                                <span className={`ml-2 ${isMobileDevice ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-1 text-xs'} font-semibold bg-gradient-to-r from-green-100 to-green-50 dark:from-green-900/50 dark:to-green-800/50 text-green-800 dark:text-green-300 rounded-full shadow-sm inline-block`}>
+                                  Graded ({thread.totalPoints} pts)
                                 </span>
                               )}
                             </h3>
-                            <div className="flex items-center text-sm text-gray-600 dark:text-gray-400 space-x-4">
+                            <div className={`${isMobileDevice ? 'flex flex-col gap-1.5' : 'flex items-center'} ${isMobileDevice ? 'text-xs' : 'text-sm'} text-gray-600 dark:text-gray-400 ${isMobileDevice ? '' : 'space-x-4'}`}>
                               <div className="flex items-center space-x-2">
-                                <div className="relative">
+                                <div className="relative flex-shrink-0">
                                   {thread.author.profilePicture || thread.author.avatarUrl ? (
                                     <img
                                       src={
@@ -413,7 +360,7 @@ const GroupDiscussion: React.FC = () => {
                                           : '/default-avatar.png'
                                       }
                                       alt={`${thread.author.firstName} ${thread.author.lastName}`}
-                                      className="w-8 h-8 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
+                                      className={`${isMobileDevice ? 'w-6 h-6' : 'w-8 h-8'} rounded-full object-cover border-2 border-gray-200 dark:border-gray-700`}
                                       onError={(e) => {
                                         e.currentTarget.style.display = 'none';
                                         const fallback = e.currentTarget.nextElementSibling as HTMLElement;
@@ -425,7 +372,7 @@ const GroupDiscussion: React.FC = () => {
                                   ) : null}
                                   {/* Fallback avatar with initials */}
                                   <div
-                                    className={`w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold ${
+                                    className={`${isMobileDevice ? 'w-6 h-6 text-[10px]' : 'w-8 h-8 text-xs'} bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold ${
                                       thread.author.profilePicture || thread.author.avatarUrl ? 'hidden' : 'flex'
                                     }`}
                                     style={{
@@ -436,37 +383,63 @@ const GroupDiscussion: React.FC = () => {
                                     {thread.author.lastName?.charAt(0) || ''}
                                   </div>
                                 </div>
-                                <span>
-                                  Posted by {thread.author.firstName} {thread.author.lastName}
-                                  <span className="ml-1 px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 rounded-full">
+                                <span className="truncate">
+                                  {thread.author.firstName} {thread.author.lastName}
+                                  <span className={`ml-1 ${isMobileDevice ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-0.5 text-xs'} font-medium bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 rounded-full`}>
                                     {thread.author.role}
                                   </span>
                                 </span>
                               </div>
-                              <span className="text-gray-400 dark:text-gray-500">•</span>
-                              <span title={new Date(thread.createdAt).toLocaleString()}>
-                                {formatDistanceToNow(new Date(thread.createdAt), { addSuffix: true })}
-                              </span>
-                              {thread.dueDate && (
+                              {!isMobileDevice && (
                                 <>
                                   <span className="text-gray-400 dark:text-gray-500">•</span>
-                                  <span className="text-orange-600 dark:text-orange-400">
-                                    Due {formatDistanceToNow(new Date(thread.dueDate), { addSuffix: true })}
+                                  <span title={new Date(thread.createdAt).toLocaleString()}>
+                                    {formatDistanceToNow(new Date(thread.createdAt), { addSuffix: true })}
                                   </span>
+                                  {thread.dueDate && (
+                                    <>
+                                      <span className="text-gray-400 dark:text-gray-500">•</span>
+                                      <span className="text-orange-600 dark:text-orange-400">
+                                        Due {formatDistanceToNow(new Date(thread.dueDate), { addSuffix: true })}
+                                      </span>
+                                    </>
+                                  )}
                                 </>
                               )}
                             </div>
+                            {isMobileDevice && (
+                              <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                                <span title={new Date(thread.createdAt).toLocaleString()}>
+                                  {formatDistanceToNow(new Date(thread.createdAt), { addSuffix: true })}
+                                </span>
+                                {thread.dueDate && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="text-orange-600 dark:text-orange-400">
+                                      Due {formatDistanceToNow(new Date(thread.dueDate), { addSuffix: true })}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            )}
                           </div>
-                          <div className="flex items-center space-x-4">
+                          <div className={`${isMobileDevice ? 'flex items-center justify-between w-full pt-1 border-t border-gray-200 dark:border-gray-700' : 'flex items-center space-x-4'}`}>
                             <div className="flex items-center text-gray-600 dark:text-gray-400">
-                              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className={`${isMobileDevice ? 'w-3.5 h-3.5 mr-1' : 'w-4 h-4 mr-1'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                               </svg>
-                              {thread.replyCount} {thread.replyCount === 1 ? 'reply' : 'replies'}
+                              <span className={isMobileDevice ? 'text-xs' : ''}>{thread.replyCount} {thread.replyCount === 1 ? 'reply' : 'replies'}</span>
                             </div>
-                            <div className="text-gray-500 dark:text-gray-400" title={new Date(thread.lastActivity).toLocaleString()}>
-                              Last activity {formatDistanceToNow(new Date(thread.lastActivity), { addSuffix: true })}
-                            </div>
+                            {!isMobileDevice && (
+                              <div className="text-gray-500 dark:text-gray-400 text-sm" title={new Date(thread.lastActivity).toLocaleString()}>
+                                Last activity {formatDistanceToNow(new Date(thread.lastActivity), { addSuffix: true })}
+                              </div>
+                            )}
+                            {isMobileDevice && (
+                              <div className="text-gray-500 dark:text-gray-400 text-xs" title={new Date(thread.lastActivity).toLocaleString()}>
+                                {formatDistanceToNow(new Date(thread.lastActivity), { addSuffix: true })}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -478,33 +451,33 @@ const GroupDiscussion: React.FC = () => {
             {/* Regular threads */}
             {threads.filter(thread => !thread.isPinned).length > 0 && (
               <div>
-                <div className="flex items-center gap-2 mb-4">
+                <div className={`flex items-center gap-2 ${isMobileDevice ? 'mb-3 px-4' : 'mb-4'}`}>
                   <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-600 to-transparent"></div>
-                  <h3 className="text-sm font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wide px-3">All Threads</h3>
+                  <h3 className={`${isMobileDevice ? 'text-xs' : 'text-sm'} font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wide px-3`}>All Threads</h3>
                   <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-600 to-transparent"></div>
                 </div>
-                <div className="space-y-4">
+                <div className={`${isMobileDevice ? 'space-y-3 px-4' : 'space-y-4'}`}>
                   {threads
                     .filter(thread => !thread.isPinned)
                     .map((thread) => (
                       <div
                         key={thread._id}
                         onClick={() => handleThreadClick(thread._id)}
-                        className="p-5 bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl hover:shadow-xl transition-all cursor-pointer hover:border-blue-300 dark:hover:border-blue-600 active:scale-[0.98] group"
+                        className={`${isMobileDevice ? 'p-3' : 'p-5'} bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl hover:shadow-xl transition-all cursor-pointer hover:border-blue-300 dark:hover:border-blue-600 active:scale-[0.98] group touch-manipulation`}
                       >
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2">
+                        <div className={`${isMobileDevice ? 'flex flex-col gap-2' : 'flex justify-between items-start'}`}>
+                          <div className="flex-1 min-w-0">
+                            <h3 className={`${isMobileDevice ? 'text-base' : 'text-lg'} font-bold text-gray-900 dark:text-gray-100 ${isMobileDevice ? 'mb-1' : 'mb-2'} break-words`}>
                               {thread.title}
                               {thread.isGraded && (
-                                <span className="ml-2 px-2.5 py-1 text-xs font-semibold bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300 rounded-full shadow-sm">
-                                  Graded ({thread.totalPoints} points)
+                                <span className={`ml-2 ${isMobileDevice ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-1 text-xs'} font-semibold bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300 rounded-full shadow-sm inline-block`}>
+                                  Graded ({thread.totalPoints} pts)
                                 </span>
                               )}
                             </h3>
-                            <div className="flex items-center text-sm text-gray-600 dark:text-gray-400 space-x-4">
+                            <div className={`${isMobileDevice ? 'flex flex-col gap-1.5' : 'flex items-center'} ${isMobileDevice ? 'text-xs' : 'text-sm'} text-gray-600 dark:text-gray-400 ${isMobileDevice ? '' : 'space-x-4'}`}>
                               <div className="flex items-center space-x-2">
-                                <div className="relative">
+                                <div className="relative flex-shrink-0">
                                   {thread.author.profilePicture || thread.author.avatarUrl ? (
                                     <img
                                       src={
@@ -519,7 +492,7 @@ const GroupDiscussion: React.FC = () => {
                                           : '/default-avatar.png'
                                       }
                                       alt={`${thread.author.firstName} ${thread.author.lastName}`}
-                                      className="w-8 h-8 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
+                                      className={`${isMobileDevice ? 'w-6 h-6' : 'w-8 h-8'} rounded-full object-cover border-2 border-gray-200 dark:border-gray-700`}
                                       onError={(e) => {
                                         e.currentTarget.style.display = 'none';
                                         const fallback = e.currentTarget.nextElementSibling as HTMLElement;
@@ -531,7 +504,7 @@ const GroupDiscussion: React.FC = () => {
                                   ) : null}
                                   {/* Fallback avatar with initials */}
                                   <div
-                                    className={`w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold ${
+                                    className={`${isMobileDevice ? 'w-6 h-6 text-[10px]' : 'w-8 h-8 text-xs'} bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold ${
                                       thread.author.profilePicture || thread.author.avatarUrl ? 'hidden' : 'flex'
                                     }`}
                                     style={{
@@ -542,37 +515,63 @@ const GroupDiscussion: React.FC = () => {
                                     {thread.author.lastName?.charAt(0) || ''}
                                   </div>
                                 </div>
-                                <span>
-                                  Posted by {thread.author.firstName} {thread.author.lastName}
-                                  <span className="ml-1 px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 rounded-full">
+                                <span className="truncate">
+                                  {thread.author.firstName} {thread.author.lastName}
+                                  <span className={`ml-1 ${isMobileDevice ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-0.5 text-xs'} font-medium bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 rounded-full`}>
                                     {thread.author.role}
                                   </span>
                                 </span>
                               </div>
-                              <span className="text-gray-400 dark:text-gray-500">•</span>
-                              <span title={new Date(thread.createdAt).toLocaleString()}>
-                                {formatDistanceToNow(new Date(thread.createdAt), { addSuffix: true })}
-                              </span>
-                              {thread.dueDate && (
+                              {!isMobileDevice && (
                                 <>
                                   <span className="text-gray-400 dark:text-gray-500">•</span>
-                                  <span className="text-orange-600 dark:text-orange-400">
-                                    Due {formatDistanceToNow(new Date(thread.dueDate), { addSuffix: true })}
+                                  <span title={new Date(thread.createdAt).toLocaleString()}>
+                                    {formatDistanceToNow(new Date(thread.createdAt), { addSuffix: true })}
                                   </span>
+                                  {thread.dueDate && (
+                                    <>
+                                      <span className="text-gray-400 dark:text-gray-500">•</span>
+                                      <span className="text-orange-600 dark:text-orange-400">
+                                        Due {formatDistanceToNow(new Date(thread.dueDate), { addSuffix: true })}
+                                      </span>
+                                    </>
+                                  )}
                                 </>
                               )}
                             </div>
+                            {isMobileDevice && (
+                              <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                                <span title={new Date(thread.createdAt).toLocaleString()}>
+                                  {formatDistanceToNow(new Date(thread.createdAt), { addSuffix: true })}
+                                </span>
+                                {thread.dueDate && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="text-orange-600 dark:text-orange-400">
+                                      Due {formatDistanceToNow(new Date(thread.dueDate), { addSuffix: true })}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            )}
                           </div>
-                          <div className="flex items-center space-x-4">
+                          <div className={`${isMobileDevice ? 'flex items-center justify-between w-full pt-1 border-t border-gray-200 dark:border-gray-700' : 'flex items-center space-x-4'}`}>
                             <div className="flex items-center text-gray-600 dark:text-gray-400">
-                              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className={`${isMobileDevice ? 'w-3.5 h-3.5 mr-1' : 'w-4 h-4 mr-1'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                               </svg>
-                              {thread.replyCount} {thread.replyCount === 1 ? 'reply' : 'replies'}
+                              <span className={isMobileDevice ? 'text-xs' : ''}>{thread.replyCount} {thread.replyCount === 1 ? 'reply' : 'replies'}</span>
                             </div>
-                            <div className="text-gray-500 dark:text-gray-400" title={new Date(thread.lastActivity).toLocaleString()}>
-                              Last activity {formatDistanceToNow(new Date(thread.lastActivity), { addSuffix: true })}
-                            </div>
+                            {!isMobileDevice && (
+                              <div className="text-gray-500 dark:text-gray-400 text-sm" title={new Date(thread.lastActivity).toLocaleString()}>
+                                Last activity {formatDistanceToNow(new Date(thread.lastActivity), { addSuffix: true })}
+                              </div>
+                            )}
+                            {isMobileDevice && (
+                              <div className="text-gray-500 dark:text-gray-400 text-xs" title={new Date(thread.lastActivity).toLocaleString()}>
+                                {formatDistanceToNow(new Date(thread.lastActivity), { addSuffix: true })}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>

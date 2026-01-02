@@ -185,9 +185,9 @@ const QuizBuilder: React.FC<QuizBuilderProps> = ({ courseId, quiz, onClose }) =>
   };
 
   return (
-    <div className="p-4 sm:p-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
+    <div className="p-2 sm:p-4 lg:p-6 bg-gray-50 dark:bg-gray-900 min-h-screen overflow-x-hidden">
       <div className="max-w-4xl mx-auto">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 sm:p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-3 sm:p-4 lg:p-6 overflow-x-hidden">
           <div className="flex justify-between items-center mb-4 sm:mb-6">
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
               {quiz ? 'Edit Quiz' : 'Create New Quiz'}
@@ -319,7 +319,7 @@ const QuizBuilder: React.FC<QuizBuilderProps> = ({ courseId, quiz, onClose }) =>
                       type="text"
                       value={question.questionText}
                       onChange={(e) => updateQuestion(qIndex, { questionText: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 mb-3"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 mb-3 text-sm sm:text-base"
                       placeholder="Enter question text"
                     />
 
@@ -333,19 +333,19 @@ const QuizBuilder: React.FC<QuizBuilderProps> = ({ courseId, quiz, onClose }) =>
                         max="300"
                         value={question.timeLimit}
                         onChange={(e) => updateQuestion(qIndex, { timeLimit: parseInt(e.target.value) || 30 })}
-                        className="w-full px-3 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm sm:text-base"
                       />
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="space-y-2 overflow-x-hidden">
                       <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Options (click to mark correct answer)
                       </label>
                       {question.options.map((option, oIndex) => (
-                        <div key={oIndex} className="flex items-center gap-2">
+                        <div key={oIndex} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                           <button
                             onClick={() => setCorrectAnswer(qIndex, oIndex)}
-                            className={`flex-1 px-3 py-2 rounded-lg border-2 transition-colors ${
+                            className={`flex-1 min-w-0 px-3 py-2 rounded-lg border-2 transition-colors ${
                               option.isCorrect
                                 ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
                                 : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800'
@@ -355,13 +355,13 @@ const QuizBuilder: React.FC<QuizBuilderProps> = ({ courseId, quiz, onClose }) =>
                               type="text"
                               value={option.text}
                               onChange={(e) => updateOption(qIndex, oIndex, e.target.value)}
-                              className="w-full bg-transparent text-gray-900 dark:text-gray-100 outline-none"
+                              className="w-full bg-transparent text-gray-900 dark:text-gray-100 outline-none text-sm sm:text-base"
                               placeholder={`Option ${oIndex + 1}`}
                               onClick={(e) => e.stopPropagation()}
                             />
                           </button>
                           {option.isCorrect && (
-                            <span className="text-green-600 dark:text-green-400 font-medium text-sm">
+                            <span className="text-green-600 dark:text-green-400 font-medium text-xs sm:text-sm flex-shrink-0 text-center sm:text-left">
                               ✓ Correct
                             </span>
                           )}

@@ -42,6 +42,7 @@ const ViewAssignment = () => {
   const [showTimer, setShowTimer] = useState(true);
   const [showUploadSection, setShowUploadSection] = useState(false);
   const [shuffledOptions, setShuffledOptions] = useState({});
+  const [hasAutoSubmitted, setHasAutoSubmitted] = useState(false);
 
   // Teacher analytics state
   const [submissionStats, setSubmissionStats] = useState({
@@ -313,7 +314,7 @@ const ViewAssignment = () => {
 
   useEffect(() => {
     // Only run timer if quiz is started, no submission exists, and user is actively taking the quiz
-    if (quizStarted && quizStartTime && assignment?.isTimedQuiz && assignment?.quizTimeLimit && !submission && user?.role === 'student') {
+    if (quizStarted && quizStartTime && assignment?.isTimedQuiz && assignment?.quizTimeLimit && !submission && user?.role === 'student' && !hasAutoSubmitted && !isSubmitting) {
       const timer = setInterval(() => {
         const now = new Date();
         const elapsed = Math.floor((now - quizStartTime) / 1000); // seconds
@@ -321,11 +322,18 @@ const ViewAssignment = () => {
         const remaining = totalSeconds - elapsed;
         
         if (remaining <= 0) {
-          // Time's up! Auto-submit only if no submission exists and user is actively taking quiz
+          // Time's up! Auto-submit the quiz
           clearInterval(timer);
           setTimeLeft(0);
-          // Don't auto-submit if there's no submission - let the user submit manually
-  
+          setHasAutoSubmitted(true);
+          
+          // Auto-submit the assignment/quiz
+          if (user && user.role === 'student' && !submission) {
+            handleSubmit().catch(err => {
+              console.error('Auto-submit error:', err);
+              setError('Error auto-submitting quiz. Please submit manually.');
+            });
+          }
         } else {
           setTimeLeft(remaining);
         }
@@ -333,7 +341,7 @@ const ViewAssignment = () => {
 
       return () => clearInterval(timer);
     }
-  }, [quizStarted, quizStartTime, assignment, id, submission, user]);
+  }, [quizStarted, quizStartTime, assignment, submission, user, hasAutoSubmitted, isSubmitting]);
 
   const startQuiz = () => {
     if (assignment?.isTimedQuiz && assignment?.quizTimeLimit) {
@@ -999,9 +1007,8 @@ const ViewAssignment = () => {
         {assignment.questions && assignment.questions.length > 0 && (() => {
           // Check if we should show questions to students after submission
           const shouldShowQuestions = !isStudent || !submission || isPastDue || 
-            (assignment.group === 'Quizzes' && 
-             (submission?.showCorrectAnswers || assignment.showCorrectAnswers || 
-              submission?.showStudentAnswers || assignment.showStudentAnswers));
+            (submission?.showCorrectAnswers || assignment.showCorrectAnswers || 
+             submission?.showStudentAnswers || assignment.showStudentAnswers);
           
           return (
             <div className="mt-8">
@@ -1048,6 +1055,50 @@ const ViewAssignment = () => {
                         <div className="mb-6">
                           <p className="text-lg text-gray-900 dark:text-gray-100 dark:text-gray-100 leading-relaxed">{assignment.questions[currentQuestion].text}</p>
                         </div>
+                        
+                        {/* Text input area - ALWAYS show for questions that are NOT multiple-choice or matching */}
+                        {(() => {
+                          const q = assignment.questions[currentQuestion];
+                          if (!q) return null;
+                          
+                          // Only hide textarea if it's a valid multiple-choice or matching question
+                          const isMultipleChoice = q.type === 'multiple-choice' && q.options && Array.isArray(q.options) && q.options.length > 0;
+                          const isMatching = q.type === 'matching' && q.leftItems && Array.isArray(q.leftItems) && q.leftItems.length > 0;
+                          
+                          // If it's multiple-choice or matching, don't show textarea (they have their own UI)
+                          if (isMultipleChoice || isMatching) {
+                            return null;
+                          }
+                          
+                          // For ALL other questions (text, or any other type), show textarea
+                          return (
+                            <div className="mt-4">
+                              <label htmlFor={`question-${currentQuestion}-answer`} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Your Answer:
+                              </label>
+                              {submission && isStudent ? (
+                                <div className="p-4 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md">
+                                  <p className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
+                                    {typeof answers[currentQuestion] === 'string' && answers[currentQuestion] 
+                                      ? answers[currentQuestion] 
+                                      : 'No answer provided'}
+                                  </p>
+                                </div>
+                              ) : (
+                                <textarea
+                                  id={`question-${currentQuestion}-answer`}
+                                  name={`question-${currentQuestion}-answer`}
+                                  className="w-full min-h-[120px] sm:min-h-[128px] p-3 sm:p-4 border-2 border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 resize-y text-sm sm:text-base"
+                                  value={typeof answers[currentQuestion] === 'string' ? answers[currentQuestion] : ''}
+                                  onChange={(e) => handleAnswerChange(currentQuestion, e.target.value)}
+                                  placeholder="Enter your answer here..."
+                                  rows={5}
+                                  disabled={!!submission || !isStudent || isPastDue}
+                                />
+                              )}
+                            </div>
+                          );
+                        })()}
                         
                         {assignment.questions[currentQuestion].type === 'multiple-choice' && assignment.questions[currentQuestion].options && (
                           <div className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -1429,8 +1480,10 @@ const ViewAssignment = () => {
                         
 
                         
+                        // Check if feedback should be shown (either option enabled)
                         if (submission && assignment.group === 'Quizzes' && 
-                            (submission.showCorrectAnswers || assignment.showCorrectAnswers) &&
+                            ((submission.showCorrectAnswers || assignment.showCorrectAnswers) ||
+                             (submission.showStudentAnswers || assignment.showStudentAnswers)) &&
                             (question.type === 'multiple-choice' || question.type === 'matching')) {
                           showFeedback = true;
                           // Use the parsed answers from state instead of raw submission answers
@@ -1476,9 +1529,10 @@ const ViewAssignment = () => {
                         // Enhanced teacher preview styling
                         const isTeacherPreviewMode = isTeacherPreview;
                         
-                        // Only show visual feedback if feedback options are enabled
+                        // Only show visual feedback if feedback options are enabled (either option)
                         const feedbackEnabled = submission && assignment.group === 'Quizzes' && 
-                          (submission.showCorrectAnswers || assignment.showCorrectAnswers);
+                          ((submission.showCorrectAnswers || assignment.showCorrectAnswers) ||
+                           (submission.showStudentAnswers || assignment.showStudentAnswers));
                         
 
                                                   
@@ -1616,11 +1670,32 @@ const ViewAssignment = () => {
                                             return `${earnedFormatted} / ${totalFormatted} pts`;
                                           })()}
                                         </div>
-                                        <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Student Answer:</div>
-                                        <div className="text-sm text-gray-900 dark:text-gray-100 mb-2">{studentAnswer || 'No answer'}</div>
-                                        <div className={`text-sm ${isCorrect ? 'text-green-600 dark:text-green-400' : 'text-red-600'}`}>
-                                          {isCorrect ? 'Correct!' : `Incorrect. Correct answer: ${correctOption?.text || 'Unknown'}`}
-                                        </div>
+                                        {/* Option 1: showCorrectAnswers - Show correctness (green/red) but NOT the correct answer */}
+                                        {(submission.showCorrectAnswers || assignment.showCorrectAnswers) && !(submission.showStudentAnswers || assignment.showStudentAnswers) && (
+                                          <div className={`text-sm font-medium ${isCorrect ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                            {isCorrect ? '✓ Correct!' : '✗ Incorrect'}
+                                          </div>
+                                        )}
+                                        {/* Option 2: showStudentAnswers - Show student's answer, mark wrong in red, and show correct answer for wrong ones */}
+                                        {(submission.showStudentAnswers || assignment.showStudentAnswers) && !(submission.showCorrectAnswers || assignment.showCorrectAnswers) && (
+                                          <>
+                                            <div>
+                                              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Your Answer:</div>
+                                              <div className={`text-sm mb-2 ${isCorrect ? 'text-green-600 dark:text-green-400 font-medium' : 'text-red-600 dark:text-red-400 font-medium'}`}>
+                                                {studentAnswer || 'No answer'}
+                                                {isCorrect ? ' ✓' : ' ✗'}
+                                              </div>
+                                            </div>
+                                            {!isCorrect && correctOption && (
+                                              <div className="mt-2">
+                                                <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Correct Answer:</div>
+                                                <div className="text-sm text-green-600 dark:text-green-400 font-medium">
+                                                  {correctOption.text}
+                                                </div>
+                                              </div>
+                                            )}
+                                          </>
+                                        )}
                                       </div>
                                     );
                                   })()}
@@ -1670,15 +1745,19 @@ const ViewAssignment = () => {
                           )}
                           
                           {question.type === 'text' && (
-                            <div>
+                            <div className="mt-4">
+                              <label htmlFor={`question-${index}-answer`} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Your Answer:
+                              </label>
                               <textarea
                                 id={`question-${index}-answer`}
                                 name={`question-${index}-answer`}
-                                className="w-full h-32 p-4 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 dark:text-gray-100"
+                                className="w-full min-h-[120px] sm:min-h-[128px] p-3 sm:p-4 border-2 border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 resize-y text-sm sm:text-base"
                                 value={answers[index] || ''}
                                 onChange={(e) => !submission && isStudent && handleAnswerChange(index, e.target.value)}
-                                placeholder={isStudent ? "Enter your answer here" : "Student's answer will appear here"}
+                                placeholder={isStudent ? "Enter your answer here..." : "Student's answer will appear here"}
                                 disabled={!!submission || !isStudent || isPastDue}
+                                rows={5}
                               />
                             </div>
                           )}

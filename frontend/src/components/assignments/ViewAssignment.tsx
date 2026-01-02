@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios, { AxiosError } from 'axios';
 import ReactMarkdown from 'react-markdown';
@@ -174,6 +174,8 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
   const [showUploadSection, setShowUploadSection] = useState<boolean>(false);
   const [shuffledOptions, setShuffledOptions] = useState<Record<number, Question['rightItems']>>({});
   const [previewFile, setPreviewFile] = useState<PreviewFile | null>(null);
+  const [hasAutoSubmitted, setHasAutoSubmitted] = useState<boolean>(false);
+  const handleSubmitRef = useRef<(() => Promise<void>) | null>(null);
   
   // Course-level grade data
   const [courseAverage, setCourseAverage] = useState<number | null>(null); // For teachers
@@ -593,7 +595,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
 
   useEffect(() => {
     // Only run timer if quiz is started, no submission exists, and user is actively taking the quiz
-    if (quizStarted && quizStartTime && assignment?.isTimedQuiz && assignment?.quizTimeLimit && !submission && user?.role === 'student') {
+    if (quizStarted && quizStartTime && assignment?.isTimedQuiz && assignment?.quizTimeLimit && !submission && user?.role === 'student' && !hasAutoSubmitted && !isSubmitting) {
       const timer = setInterval(() => {
         const now = new Date();
         const elapsed = Math.floor((now.getTime() - (quizStartTime?.getTime() || 0)) / 1000); // seconds
@@ -601,11 +603,18 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
         const remaining = totalSeconds - elapsed;
         
         if (remaining <= 0) {
-          // Time's up! Auto-submit only if no submission exists and user is actively taking quiz
+          // Time's up! Auto-submit the quiz
           clearInterval(timer);
           setTimeLeft(0);
-          // Don't auto-submit if there's no submission - let the user submit manually
-  
+          setHasAutoSubmitted(true);
+          
+          // Auto-submit the assignment/quiz
+          if (user && user.role === 'student' && !submission && handleSubmitRef.current) {
+            handleSubmitRef.current().catch(err => {
+              logger.error('Auto-submit error', err instanceof Error ? err : new Error(String(err)));
+              setError('Error auto-submitting quiz. Please submit manually.');
+            });
+          }
         } else {
           setTimeLeft(remaining);
         }
@@ -613,7 +622,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
 
       return () => clearInterval(timer);
     }
-  }, [quizStarted, quizStartTime, assignment, id, submission, user]);
+  }, [quizStarted, quizStartTime, assignment, submission, user, hasAutoSubmitted, isSubmitting, id]);
 
   const startQuiz = () => {
     if (assignment?.isTimedQuiz && assignment?.quizTimeLimit && user?._id) {
@@ -1618,9 +1627,8 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
           // Check if we should show questions to students after submission
           const isQuiz = assignment.isGradedQuiz || assignment.group === 'Quizzes';
           const shouldShowQuestions = !isStudent || !submission || isPastDue || 
-            (isQuiz && 
-             (submission?.showCorrectAnswers || assignment.showCorrectAnswers || 
-              submission?.showStudentAnswers || assignment.showStudentAnswers));
+            (submission?.showCorrectAnswers || assignment.showCorrectAnswers || 
+             submission?.showStudentAnswers || assignment.showStudentAnswers);
           
           return (
             <div className="mt-8">
@@ -1668,6 +1676,50 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                           <p className="text-lg text-gray-900 dark:text-gray-100 dark:text-gray-100 leading-relaxed">{assignment.questions[currentQuestion].text}</p>
                         </div>
                         
+                        {/* Text input area - ALWAYS show for questions that are NOT multiple-choice or matching */}
+                        {(() => {
+                          const q = assignment.questions[currentQuestion];
+                          if (!q) return null;
+                          
+                          // Only hide textarea if it's a valid multiple-choice or matching question
+                          const isMultipleChoice = q.type === 'multiple-choice' && q.options && Array.isArray(q.options) && q.options.length > 0;
+                          const isMatching = q.type === 'matching' && q.leftItems && Array.isArray(q.leftItems) && q.leftItems.length > 0;
+                          
+                          // If it's multiple-choice or matching, don't show textarea (they have their own UI)
+                          if (isMultipleChoice || isMatching) {
+                            return null;
+                          }
+                          
+                          // For ALL other questions (text, or any other type), show textarea
+                          return (
+                            <div className="mt-4">
+                              <label htmlFor={`question-${currentQuestion}-answer`} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Your Answer:
+                              </label>
+                              {submission && isStudent ? (
+                                <div className="p-4 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md">
+                                  <p className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
+                                    {typeof answers[currentQuestion] === 'string' && answers[currentQuestion] 
+                                      ? answers[currentQuestion] 
+                                      : 'No answer provided'}
+                                  </p>
+                                </div>
+                              ) : (
+                                <textarea
+                                  id={`question-${currentQuestion}-answer`}
+                                  name={`question-${currentQuestion}-answer`}
+                                  className="w-full min-h-[120px] sm:min-h-[128px] p-3 sm:p-4 border-2 border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 resize-y text-sm sm:text-base"
+                                  value={typeof answers[currentQuestion] === 'string' ? answers[currentQuestion] : ''}
+                                  onChange={(e) => handleAnswerChange(currentQuestion, e.target.value)}
+                                  placeholder="Enter your answer here..."
+                                  rows={5}
+                                  disabled={!!submission || !isStudent || isPastDue || isTeacherPreview}
+                                />
+                              )}
+                            </div>
+                          );
+                        })()}
+                        
                         {assignment.questions[currentQuestion].type === 'multiple-choice' && assignment.questions[currentQuestion].options && (
                           <div className="divide-y divide-gray-200 dark:divide-gray-700">
                             {assignment.questions[currentQuestion].options?.map((option, optionIndex) => (
@@ -1701,29 +1753,6 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                           </div>
                         )}
                         
-                        {assignment.questions[currentQuestion].type === 'text' && (
-                          <div className="mt-4">
-                            {submission ? (
-                              <div className="p-4 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md">
-                                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Your Answer:</p>
-                                <p className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
-                                  {typeof answers[currentQuestion] === 'string' && answers[currentQuestion] 
-                                    ? answers[currentQuestion] 
-                                    : 'No answer provided'}
-                                </p>
-                              </div>
-                            ) : (
-                              <textarea
-                                id={`question-${currentQuestion}-answer`}
-                                name={`question-${currentQuestion}-answer`}
-                                className="w-full h-32 p-4 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
-                                value={typeof answers[currentQuestion] === 'string' ? answers[currentQuestion] : ''}
-                                onChange={(e) => handleAnswerChange(currentQuestion, e.target.value)}
-                                placeholder="Enter your answer here"
-                              />
-                            )}
-                          </div>
-                        )}
                         
                         {assignment.questions[currentQuestion].type === 'matching' && (
                           <div className="space-y-4">
@@ -1819,7 +1848,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                 {submission && (() => {
                                   const currentSubmission: Submission = submission; // Type assertion for IIFE
                                   const isQuiz = assignment.isGradedQuiz || assignment.group === 'Quizzes';
-                                  const showFeedback = isQuiz && (currentSubmission.showCorrectAnswers || assignment.showCorrectAnswers || currentSubmission.showStudentAnswers || assignment.showStudentAnswers || currentSubmission.autoGraded);
+                                  const showFeedback = (currentSubmission.showCorrectAnswers || assignment.showCorrectAnswers || currentSubmission.showStudentAnswers || assignment.showStudentAnswers || currentSubmission.autoGraded);
                                   
                                   if (!showFeedback) return null;
                                   
@@ -1843,7 +1872,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                           }`}>
                                             <div className="flex items-center space-x-2">
                                               <span className="font-medium text-gray-900 dark:text-gray-100 text-sm">{leftItem.text}</span>
-                                              <span className="text-gray-500 dark:text-gray-400">→</span>
+                                              <span className="text-gray-500 dark:text-gray-300">→</span>
                                               <span className="text-gray-900 dark:text-gray-100">{studentMatch || 'No answer'}</span>
                                             </div>
                                             {isCorrect ? (
@@ -2190,7 +2219,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                       (submission.showStudentAnswers || assignment.showStudentAnswers) && 
                                       !(submission.showCorrectAnswers || assignment.showCorrectAnswers || submission.autoGraded);
                                     
-                                    if (submission && (submission.autoGraded || (isQuiz && (submission.showCorrectAnswers || assignment.showCorrectAnswers || submission.showStudentAnswers || assignment.showStudentAnswers))) && (question.type === 'multiple-choice' || question.type === 'matching')) {
+                                    if (submission && (submission.autoGraded || (submission.showCorrectAnswers || assignment.showCorrectAnswers || submission.showStudentAnswers || assignment.showStudentAnswers)) && (question.type === 'multiple-choice' || question.type === 'matching')) {
                                       if (question.type === 'multiple-choice') {
                                         const studentAnswer = answers[index];
                                         const correctOption = question.options?.find(opt => opt.isCorrect);
@@ -2199,13 +2228,13 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                         if (showFullFeedbackForBorder || (submission.showCorrectAnswers || assignment.showCorrectAnswers)) {
                                           // Full feedback: green/red
                                           return isCorrect 
-                                            ? 'border-green-500 dark:border-green-400' 
-                                            : 'border-red-500 dark:border-red-400';
+                                            ? 'border-green-500 dark:border-green-500' 
+                                            : 'border-red-500 dark:border-red-500';
                                         } else if (showOnlyCorrectForBorder) {
                                           // showStudentAnswers: green for correct, red for wrong (but don't show correct answer)
                                           return isCorrect 
-                                            ? 'border-green-500 dark:border-green-400' 
-                                            : 'border-red-500 dark:border-red-400';
+                                            ? 'border-green-500 dark:border-green-500' 
+                                            : 'border-red-500 dark:border-red-500';
                                         }
                                       } else if (question.type === 'matching') {
                                         const autoGrade = submission.autoQuestionGrades instanceof Map 
@@ -2217,20 +2246,20 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                         if (showFullFeedbackForBorder || (submission.showCorrectAnswers || assignment.showCorrectAnswers)) {
                                           // Full feedback: green/red/yellow
                                           if (percentageCorrect === 1) {
-                                            return 'border-green-500 dark:border-green-400'; // All correct
+                                            return 'border-green-500 dark:border-green-500'; // All correct
                                           } else if (percentageCorrect === 0) {
-                                            return 'border-red-500 dark:border-red-400'; // All incorrect
+                                            return 'border-red-500 dark:border-red-500'; // All incorrect
                                           } else {
-                                            return 'border-yellow-500 dark:border-yellow-400'; // Partially correct
+                                            return 'border-yellow-500 dark:border-yellow-500'; // Partially correct
                                           }
                                         } else if (showOnlyCorrectForBorder) {
                                           // showStudentAnswers: green/red/yellow (but don't show correct answers)
                                           if (percentageCorrect === 1) {
-                                            return 'border-green-500 dark:border-green-400'; // All correct
+                                            return 'border-green-500 dark:border-green-500'; // All correct
                                           } else if (percentageCorrect === 0) {
-                                            return 'border-red-500 dark:border-red-400'; // All incorrect
+                                            return 'border-red-500 dark:border-red-500'; // All incorrect
                                           } else {
-                                            return 'border-yellow-500 dark:border-yellow-400'; // Partially correct
+                                            return 'border-yellow-500 dark:border-yellow-500'; // Partially correct
                                           }
                                         }
                                       }
@@ -2312,7 +2341,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                           {question.type === 'multiple-choice' && question.options && (
                             <div>
                               {/* Show detailed feedback for submitted assignments */}
-                              {submission && (submission.autoGraded || (isQuiz && (submission.showCorrectAnswers || assignment.showCorrectAnswers || submission.showStudentAnswers || assignment.showStudentAnswers))) && (
+                              {submission && (submission.autoGraded || (submission.showCorrectAnswers || assignment.showCorrectAnswers || submission.showStudentAnswers || assignment.showStudentAnswers)) && (
                                 <div className={`mb-4 p-3 sm:p-4 rounded-lg ${
                                   (() => {
                                     const studentAnswer = answers[index];
@@ -2325,18 +2354,18 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                       !(submission.showCorrectAnswers || assignment.showCorrectAnswers);
                                     
                                     if (isCorrect) {
-                                      return 'bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700';
+                                      return 'bg-green-50 dark:bg-green-900/50 border border-green-200 dark:border-green-600';
                                     } else if (showFullFeedbackForBox) {
-                                      return 'bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700';
+                                      return 'bg-red-50 dark:bg-red-900/50 border border-red-200 dark:border-red-600';
                                     } else if (showOnlyCorrectForBox) {
                                       // showStudentAnswers: red for incorrect (but don't show correct answer)
-                                      return 'bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700';
+                                      return 'bg-red-50 dark:bg-red-900/50 border border-red-200 dark:border-red-600';
                                     } else {
-                                      return 'bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700';
+                                      return 'bg-gray-50 dark:bg-gray-700/80 border border-gray-200 dark:border-gray-600';
                                     }
                                   })()
                                 }`}>
-                                  <div className="text-sm sm:text-base text-blue-800 dark:text-blue-300 font-medium mb-2 sm:mb-3">
+                                  <div className="text-sm sm:text-base text-blue-800 dark:text-blue-400 font-medium mb-2 sm:mb-3">
                                     Auto-Graded Results
                                   </div>
                                   {(() => {
@@ -2350,7 +2379,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                     
                                     return (
                                       <div className="space-y-2 sm:space-y-3">
-                                        <div className="text-sm sm:text-base text-blue-700 dark:text-blue-300 font-semibold">
+                                        <div className="text-sm sm:text-base text-blue-700 dark:text-blue-400 font-semibold">
                                           {(() => {
                                             const earned = Number(autoGrade || 0);
                                             const total = maxPoints;
@@ -2359,24 +2388,31 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                             return `${earnedFormatted} / ${totalFormatted} pts`;
                                           })()}
                                         </div>
-                                        {/* Always show student answer if either option is enabled */}
-                                        {((submission.showStudentAnswers || assignment.showStudentAnswers || submission.showCorrectAnswers || assignment.showCorrectAnswers || submission.autoGraded)) && (
-                                          <div>
-                                            <div className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Student Answer:</div>
-                                            <div className="text-sm sm:text-base text-gray-900 dark:text-gray-100 mb-2 break-words">{typeof studentAnswer === 'string' ? studentAnswer : 'No answer'}</div>
-                                          </div>
-                                        )}
-                                        {/* showStudentAnswers: Show correctness (green/red) but NOT the correct answer */}
-                                        {(submission.showStudentAnswers || assignment.showStudentAnswers) && !(submission.showCorrectAnswers || assignment.showCorrectAnswers) && (
-                                          <div className={`text-sm sm:text-base font-medium ${isCorrect ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                        {/* Option 1: showCorrectAnswers - Show correctness (green/red) but NOT the correct answer */}
+                                        {(submission.showCorrectAnswers || assignment.showCorrectAnswers) && !(submission.showStudentAnswers || assignment.showStudentAnswers) && (
+                                          <div className={`text-sm sm:text-base font-medium ${isCorrect ? 'text-green-600 dark:text-green-300' : 'text-red-600 dark:text-red-300'}`}>
                                             {isCorrect ? '✓ Correct!' : '✗ Incorrect'}
                                           </div>
                                         )}
-                                        {/* showCorrectAnswers: Show correctness (green/red) AND show the correct answer for wrong ones */}
-                                        {(submission.showCorrectAnswers || assignment.showCorrectAnswers) && (
-                                          <div className={`text-sm sm:text-base font-medium ${isCorrect ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                                            {isCorrect ? '✓ Correct!' : `✗ Incorrect. Correct answer: ${correctOption?.text || 'Unknown'}`}
-                                          </div>
+                                        {/* Option 2: showStudentAnswers - Show student's answer, mark wrong in red, and show correct answer for wrong ones */}
+                                        {(submission.showStudentAnswers || assignment.showStudentAnswers) && !(submission.showCorrectAnswers || assignment.showCorrectAnswers) && (
+                                          <>
+                                            <div>
+                                              <div className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-100 mb-1.5 sm:mb-2">Your Answer:</div>
+                                              <div className={`text-sm sm:text-base mb-2 sm:mb-3 break-words ${isCorrect ? 'text-green-600 dark:text-green-300 font-medium' : 'text-red-600 dark:text-red-300 font-medium'}`}>
+                                                {typeof studentAnswer === 'string' ? studentAnswer : 'No answer'}
+                                                {isCorrect ? ' ✓' : ' ✗'}
+                                              </div>
+                                            </div>
+                                            {!isCorrect && correctOption && (
+                                              <div className="mt-2 sm:mt-3">
+                                                <div className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-100 mb-1.5 sm:mb-2">Correct Answer:</div>
+                                                <div className="text-sm sm:text-base text-green-600 dark:text-green-300 font-medium break-words">
+                                                  {correctOption.text}
+                                                </div>
+                                              </div>
+                                            )}
+                                          </>
                                         )}
                                       </div>
                                     );
@@ -2385,7 +2421,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                               )}
                               
                               {/* Show regular multiple-choice interface for non-submitted or non-auto-graded assignments */}
-                              {(!submission || (!submission.autoGraded && !(isQuiz && (submission.showCorrectAnswers || assignment.showCorrectAnswers || submission.showStudentAnswers || assignment.showStudentAnswers)))) && (
+                              {(!submission || (!submission.autoGraded && !(submission.showCorrectAnswers || assignment.showCorrectAnswers || submission.showStudentAnswers || assignment.showStudentAnswers))) && (
                                 <div className="divide-y divide-gray-200">
                                   {question.options.map((option, optionIndex) => (
                                     <div key={optionIndex} className="relative py-2">
@@ -2428,14 +2464,18 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                           
                           {question.type === 'text' && (
                             <div className="mt-4">
+                              <label htmlFor={`question-${index}-answer`} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Your Answer:
+                              </label>
                               <textarea
                                 id={`question-${index}-answer`}
                                 name={`question-${index}-answer`}
-                                className="w-full h-32 p-4 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+                                className="w-full min-h-[120px] sm:min-h-[128px] p-3 sm:p-4 border-2 border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 resize-y text-sm sm:text-base"
                                 value={typeof answers[index] === 'string' ? answers[index] : ''}
                                 onChange={(e) => !submission && isStudent && handleAnswerChange(index, e.target.value)}
-                                placeholder={isStudent ? "Enter your answer here" : "Student's answer will appear here"}
+                                placeholder={isStudent ? "Enter your answer here..." : "Student's answer will appear here"}
                                 disabled={!!submission || !isStudent || isPastDue || isTeacherPreview}
+                                rows={5}
                               />
                             </div>
                           )}
@@ -2444,7 +2484,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                             <div className="space-y-2">
                               
                               {/* Show detailed feedback for submitted assignments */}
-                              {submission && (submission.autoGraded || (isQuiz && (submission.showCorrectAnswers || assignment.showCorrectAnswers || submission.showStudentAnswers || assignment.showStudentAnswers))) && (
+                              {submission && (submission.autoGraded || (submission.showCorrectAnswers || assignment.showCorrectAnswers || submission.showStudentAnswers || assignment.showStudentAnswers)) && (
                                 <div className={`mb-4 p-3 sm:p-4 rounded-lg ${
                                   (() => {
                                     const studentAnswer = answers[index];
@@ -2454,30 +2494,30 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                     const maxPoints = question.points || 0;
                                     const percentageCorrect = autoGrade && maxPoints > 0 ? autoGrade / maxPoints : 0;
                                     
-                                    const showFullFeedbackForMatchBox = submission && isQuiz && 
-                                      (submission.showCorrectAnswers || assignment.showCorrectAnswers || submission.autoGraded);
-                                    const showOnlyCorrectForMatchBox = submission && isQuiz && 
+                                    // Option 1: showCorrectAnswers - just show green/red
+                                    const showOption1MatchBox = submission && isQuiz && 
+                                      (submission.showCorrectAnswers || assignment.showCorrectAnswers) &&
+                                      !(submission.showStudentAnswers || assignment.showStudentAnswers);
+                                    // Option 2: showStudentAnswers - show student answer and correct answer for wrong ones
+                                    const showOption2MatchBox = submission && isQuiz && 
                                       (submission.showStudentAnswers || assignment.showStudentAnswers) && 
-                                      !(submission.showCorrectAnswers || assignment.showCorrectAnswers || submission.autoGraded);
+                                      !(submission.showCorrectAnswers || assignment.showCorrectAnswers);
                                     
                                     if (percentageCorrect === 1) {
-                                      return 'bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700'; // All correct
-                                    } else if (showFullFeedbackForMatchBox) {
-                                      // Full feedback: show red/yellow for wrong/partial
+                                      return 'bg-green-50 dark:bg-green-900/50 border border-green-200 dark:border-green-600'; // All correct
+                                    } else if (showOption1MatchBox || showOption2MatchBox || submission.autoGraded) {
+                                      // Both options show red/yellow for wrong/partial
                                       if (percentageCorrect > 0) {
-                                        return 'bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700'; // Partially correct
+                                        return 'bg-yellow-50 dark:bg-yellow-900/50 border border-yellow-200 dark:border-yellow-600'; // Partially correct
                                       } else {
-                                        return 'bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700'; // All incorrect
+                                        return 'bg-red-50 dark:bg-red-900/50 border border-red-200 dark:border-red-600'; // All incorrect
                                       }
-                                    } else if (showOnlyCorrectForMatchBox) {
-                                      // Only highlight correct: gray for wrong/partial
-                                      return 'bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700';
                                     } else {
-                                      return 'bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700';
+                                      return 'bg-gray-50 dark:bg-gray-700/80 border border-gray-200 dark:border-gray-600';
                                     }
                                   })()
                                 }`}>
-                                  <div className="text-sm sm:text-base text-blue-800 dark:text-blue-300 font-medium mb-2 sm:mb-3">
+                                  <div className="text-sm sm:text-base text-blue-800 dark:text-blue-400 font-medium mb-2 sm:mb-3">
                                     Auto-Graded Results
                                   </div>
                                   {(() => {
@@ -2489,7 +2529,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                     
                                     return (
                                       <div className="space-y-2 sm:space-y-3">
-                                        <div className="text-sm sm:text-base text-blue-700 dark:text-blue-300 font-semibold">
+                                        <div className="text-sm sm:text-base text-blue-700 dark:text-blue-400 font-semibold">
                                           {(() => {
                                             const earned = Number(autoGrade || 0);
                                             const total = maxPoints;
@@ -2498,7 +2538,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                             return `${earnedFormatted} / ${totalFormatted} pts`;
                                           })()}
                                         </div>
-                                        <div className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Student Answer:</div>
+                                        <div className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-100 mb-2 sm:mb-3">Student Answer:</div>
                                         {question.leftItems?.map((leftItem, leftIndex) => {
                                           const studentMatch = typeof studentAnswer === 'object' ? 
                                             (studentAnswer as Record<number, string>)[leftIndex] : '';
@@ -2508,32 +2548,35 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                           const isCorrect = studentMatch === (correctRightItem?.text || '');
                                           
                                           return (
-                                            <div key={leftItem.id} className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 p-2 sm:p-3 rounded-lg ${
+                                            <div key={leftItem.id} className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-lg ${
                                               (() => {
-                                                const showFullFeedbackForMatch = submission && isQuiz && 
-                                                  (submission.showCorrectAnswers || assignment.showCorrectAnswers);
-                                                const showOnlyCorrectForMatch = submission && isQuiz && 
+                                                // Option 1: showCorrectAnswers - just show green/red
+                                                const showOption1Match = submission && isQuiz && 
+                                                  (submission.showCorrectAnswers || assignment.showCorrectAnswers) &&
+                                                  !(submission.showStudentAnswers || assignment.showStudentAnswers);
+                                                // Option 2: showStudentAnswers - show student answer and correct answer for wrong ones
+                                                const showOption2Match = submission && isQuiz && 
                                                   (submission.showStudentAnswers || assignment.showStudentAnswers) && 
                                                   !(submission.showCorrectAnswers || assignment.showCorrectAnswers);
                                                 
                                                 if (isCorrect) {
-                                                  return 'bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700';
-                                                } else if (showFullFeedbackForMatch || showOnlyCorrectForMatch) {
+                                                  return 'bg-green-50 dark:bg-green-900/40 border border-green-200 dark:border-green-700';
+                                                } else if (showOption1Match || showOption2Match) {
                                                   // Both options show red for incorrect
-                                                  return 'bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700';
+                                                  return 'bg-red-50 dark:bg-red-900/40 border border-red-200 dark:border-red-700';
                                                 } else {
-                                                  return 'bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700';
+                                                  return 'bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700';
                                                 }
                                               })()
                                             }`}>
                                               <div className="flex items-center space-x-2 flex-1 min-w-0">
                                                 <span className="font-medium text-gray-900 dark:text-gray-100 text-sm sm:text-base break-words">{leftItem.text}</span>
-                                                <span className="text-gray-500 dark:text-gray-400 flex-shrink-0">→</span>
+                                                <span className="text-gray-500 dark:text-gray-300 flex-shrink-0 text-sm sm:text-base">→</span>
                                                 <span className="text-gray-900 dark:text-gray-100 text-sm sm:text-base break-words">{studentMatch || 'No answer'}</span>
                                               </div>
-                                              <div className="flex items-center justify-between sm:justify-end space-x-2 sm:ml-4">
+                                              <div className="flex items-center justify-between sm:justify-end space-x-2 sm:ml-4 flex-wrap sm:flex-nowrap gap-2 sm:gap-0">
                                                 {isCorrect ? (
-                                                  <div className="flex items-center text-green-600 dark:text-green-400">
+                                                  <div className="flex items-center text-green-600 dark:text-green-300">
                                                     <svg className="h-4 w-4 sm:h-5 sm:w-5 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                                     </svg>
@@ -2542,17 +2585,18 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                                 ) : (
                                                   <div className={`flex items-center ${
                                                     (() => {
-                                                      const showFullFeedbackForMatch = submission && isQuiz && 
-                                                        (submission.showCorrectAnswers || assignment.showCorrectAnswers);
-                                                      const showOnlyCorrectForMatch = submission && isQuiz && 
+                                                      const showOption1Match = submission && isQuiz && 
+                                                        (submission.showCorrectAnswers || assignment.showCorrectAnswers) &&
+                                                        !(submission.showStudentAnswers || assignment.showStudentAnswers);
+                                                      const showOption2Match = submission && isQuiz && 
                                                         (submission.showStudentAnswers || assignment.showStudentAnswers) && 
                                                         !(submission.showCorrectAnswers || assignment.showCorrectAnswers);
                                                       
-                                                      if (showFullFeedbackForMatch || showOnlyCorrectForMatch) {
+                                                      if (showOption1Match || showOption2Match) {
                                                         // Both options show red for incorrect
-                                                        return 'text-red-600 dark:text-red-400';
+                                                        return 'text-red-600 dark:text-red-300';
                                                       } else {
-                                                        return 'text-gray-500 dark:text-gray-400';
+                                                        return 'text-gray-500 dark:text-gray-300';
                                                       }
                                                     })()
                                                   }`}>
@@ -2563,10 +2607,10 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                                   </div>
                                                 )}
                                                 {!isCorrect && correctRightItem && (
-                                                  <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 ml-2 sm:ml-4">
-                                                    {/* Only show correct answer if showCorrectAnswers is enabled (not showStudentAnswers alone) */}
-                                                    {(submission.showCorrectAnswers || assignment.showCorrectAnswers) ? (
-                                                      <>Correct: <span className="font-medium">{correctRightItem.text}</span></>
+                                                  <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-200 ml-0 sm:ml-4 mt-1 sm:mt-0 w-full sm:w-auto">
+                                                    {/* Only show correct answer if showStudentAnswers is enabled (Option 2) */}
+                                                    {(submission.showStudentAnswers || assignment.showStudentAnswers) && !(submission.showCorrectAnswers || assignment.showCorrectAnswers) ? (
+                                                      <>Correct: <span className="font-medium text-green-600 dark:text-green-300 break-words">{correctRightItem.text}</span></>
                                                     ) : null}
                                                   </div>
                                                 )}

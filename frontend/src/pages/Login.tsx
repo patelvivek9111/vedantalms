@@ -56,16 +56,20 @@ export function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-6 sm:space-y-8">
         <div className="text-center">
-          <div className="flex justify-center">
+          {/* Logo Container - Framed and larger design */}
+          <div className="flex flex-col items-center justify-center mb-4">
+            <div className="relative inline-block p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg border-2 border-gray-200 dark:border-gray-700">
             <img 
               src={logoPath} 
               alt="Vedanta Logo" 
-              className="h-32 w-48 sm:h-42 sm:w-60"
+                className="h-32 w-auto sm:h-40 object-contain"
+                style={{ maxWidth: '320px', display: 'block' }}
             />
+            </div>
           </div>
           
           {/* Interactive Eyes */}
-          <div className="mt-1">
+          <div className="mt-2">
             <InteractiveEyes
               isPasswordFocused={isPasswordFocused}
               isUsernameFocused={isEmailFocused}
@@ -76,11 +80,11 @@ export function Login() {
             />
           </div>
           
-          <h2 className="mt-4 sm:mt-6 text-center text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-gray-100">
+          <h2 className="mt-6 text-center text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-gray-100">
             Sign in to Vedanta
           </h2>
           
-          <p className="mt-4 sm:mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
+          <p className="mt-3 text-center text-sm text-gray-600 dark:text-gray-400">
             Or{' '}
             <Link to="/signup" className="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300">
               create a new account

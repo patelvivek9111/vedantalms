@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { ChevronDown, BookOpen } from 'lucide-react';
 
 interface MobileNavigationProps {
@@ -10,6 +10,7 @@ interface MobileNavigationProps {
   user: any;
   courses: any[];
   courseId: string;
+  isMobileMenuOpen: boolean;
   setIsMobileMenuOpen: (open: boolean) => void;
 }
 
@@ -21,9 +22,11 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({
   user,
   courses,
   courseId,
+  isMobileMenuOpen,
   setIsMobileMenuOpen,
 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
 
   if (!isMobileDevice) {
     return null;
@@ -40,7 +43,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({
             aria-label="Select course"
           >
             <span className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
-              {course?.title || course?.catalog?.courseCode || 'Select Course'}
+              {course?.catalog?.courseCode || course?.title || 'Select Course'}
             </span>
             <ChevronDown className={`w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform ${showCourseDropdown ? 'rotate-180' : ''}`} />
           </button>
@@ -60,26 +63,45 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({
                     ? courses 
                     : courses.filter((c: any) => c.published);
                   
-                  return availableCourses && availableCourses.length > 0 ? (
-                    availableCourses.map((c: any) => (
-                      <button
-                        key={c._id}
-                        onClick={() => {
-                          setShowCourseDropdown(false);
-                          navigate(`/courses/${c._id}`);
-                        }}
-                        className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-100 dark:border-gray-700 last:border-0 ${
-                          c._id === courseId ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
-                        }`}
-                      >
-                        <div className="font-medium">{c.title || c.catalog?.courseCode}</div>
-                        {c.catalog?.courseCode && c.title && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{c.catalog.courseCode}</div>
-                        )}
-                      </button>
-                    ))
-                  ) : (
-                    <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">No courses available</div>
+                  return (
+                    <>
+                      {availableCourses && availableCourses.length > 0 ? (
+                        availableCourses.map((c: any) => (
+                          <button
+                            key={c._id}
+                            onClick={() => {
+                              setShowCourseDropdown(false);
+                              navigate(`/courses/${c._id}`);
+                            }}
+                            className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-100 dark:border-gray-700 ${
+                              c._id === courseId ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+                            }`}
+                          >
+                            <div className="font-medium">{c.catalog?.courseCode || c.title}</div>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">No courses available</div>
+                      )}
+                      {user?.role === 'teacher' && (
+                        <>
+                          {availableCourses && availableCourses.length > 0 && (
+                            <div className="border-t border-gray-200 dark:border-gray-700"></div>
+                          )}
+                          <button
+                            onClick={() => {
+                              setShowCourseDropdown(false);
+                              navigate('/teacher/courses');
+                            }}
+                            className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium ${
+                              location.pathname === '/teacher/courses' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+                            }`}
+                          >
+                            My Courses
+                          </button>
+                        </>
+                      )}
+                    </>
                   );
                 })()}
               </div>

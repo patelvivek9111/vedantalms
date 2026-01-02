@@ -144,3 +144,4 @@ const GradeScaleModal: React.FC<GradeScaleModalProps> = ({
 
 export default GradeScaleModal;
 
+

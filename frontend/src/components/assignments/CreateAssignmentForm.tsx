@@ -228,15 +228,39 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
       // Ensure boolean values are properly converted
       const allowStudentUploads = Boolean(assignmentData.allowStudentUploads);
       
+      // Strip HTML tags from description for editing
+      const stripHtml = (html: string) => {
+        if (!html) return '';
+        const tmp = document.createElement('DIV');
+        tmp.innerHTML = html;
+        return tmp.textContent || tmp.innerText || '';
+      };
+      
+      // Ensure questions array is properly formatted with required fields
+      let questions: Question[] = [];
+      if (Array.isArray(assignmentData.questions) && assignmentData.questions.length > 0) {
+        questions = assignmentData.questions.map((q: any) => ({
+          id: q.id || q._id || Math.random().toString(36).substr(2, 9),
+          type: (q.type || 'text') as 'text' | 'multiple-choice' | 'matching',
+          text: q.text || '',
+          points: q.points || 0,
+          options: q.options || [],
+          leftItems: q.leftItems || [],
+          rightItems: q.rightItems || []
+        }));
+      }
+      
+      console.log('Loading assignment for edit - Questions:', questions);
+      
       const formDataToSet = {
         title: assignmentData.title || '',
-        description: assignmentData.description || '',
+        description: stripHtml(assignmentData.description || ''),
         availableFrom: availableFromDate,
         dueDate: assignmentData.dueDate ? format(new Date(assignmentData.dueDate), "yyyy-MM-dd'T'HH:mm") : '',
         attachments: [],
         moduleId: assignmentData.module || '',
-        totalPoints: assignmentData.questions?.reduce((sum: number, q: any) => sum + (q.points || 0), 0) || assignmentData.totalPoints || 0,
-        questions: assignmentData.questions || [],
+        totalPoints: questions.reduce((sum, q) => sum + (q.points || 0), 0) || assignmentData.totalPoints || 0,
+        questions: questions,
         isGroupAssignment: Boolean(assignmentData.isGroupAssignment),
         groupSetId: assignmentData.groupSet || null,
         allowStudentUploads: allowStudentUploads,
@@ -518,8 +542,8 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
   };
 
   return (
-    <div className="w-full px-2 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
-      <div className="max-w-4xl mx-auto bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 sm:p-6">
+    <div className="w-full px-2 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8 overflow-x-hidden">
+      <div className="max-w-4xl mx-auto bg-white dark:bg-gray-800 rounded-lg shadow-lg p-2 sm:p-4 lg:p-6 overflow-x-hidden">
       <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 text-gray-800 dark:text-gray-100">
         {editMode 
           ? (formData.isGradedQuiz ? 'Edit Quiz' : 'Edit Assignment')
@@ -751,26 +775,41 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                     <div className="mt-2 space-y-3">
                       <div className="flex items-center">
                         <input
-                          type="checkbox"
-                          id="showCorrectAnswers"
-                          checked={formData.showCorrectAnswers}
-                          onChange={(e) => setFormData({ ...formData, showCorrectAnswers: e.target.checked })}
-                          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600 rounded"
+                          type="radio"
+                          id="feedbackNone"
+                          name="feedbackOption"
+                          checked={!formData.showCorrectAnswers && !formData.showStudentAnswers}
+                          onChange={() => setFormData({ ...formData, showCorrectAnswers: false, showStudentAnswers: false })}
+                          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600"
                         />
-                        <label htmlFor="showCorrectAnswers" className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
-                          Show students which questions they got correct after submission
+                        <label htmlFor="feedbackNone" className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
+                          No feedback (students won't see results)
                         </label>
                       </div>
                       <div className="flex items-center">
                         <input
-                          type="checkbox"
+                          type="radio"
+                          id="showCorrectAnswers"
+                          name="feedbackOption"
+                          checked={formData.showCorrectAnswers && !formData.showStudentAnswers}
+                          onChange={() => setFormData({ ...formData, showCorrectAnswers: true, showStudentAnswers: false })}
+                          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600"
+                        />
+                        <label htmlFor="showCorrectAnswers" className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
+                          Show students which questions they got correct after submission (green for correct, red for wrong)
+                        </label>
+                      </div>
+                      <div className="flex items-center">
+                        <input
+                          type="radio"
                           id="showStudentAnswers"
-                          checked={formData.showStudentAnswers}
-                          onChange={(e) => setFormData({ ...formData, showStudentAnswers: e.target.checked })}
-                          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600 rounded"
+                          name="feedbackOption"
+                          checked={formData.showStudentAnswers && !formData.showCorrectAnswers}
+                          onChange={() => setFormData({ ...formData, showStudentAnswers: true, showCorrectAnswers: false })}
+                          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600"
                         />
                         <label htmlFor="showStudentAnswers" className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
-                          Show students their submitted answers after submission
+                          Show students their submitted answers after submission (green for correct, red for wrong, and show correct answer for wrong ones)
                         </label>
                       </div>
                     </div>
@@ -911,26 +950,26 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                 </div>
               </div>
             </div>
-            <div className="flex justify-between">
+            <div className="flex flex-col sm:flex-row justify-between gap-3">
               <button
                 type="button"
                 onClick={prevStep}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-700 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:bg-gray-700 dark:hover:bg-gray-700"
+                className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-700 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:bg-gray-700 dark:hover:bg-gray-700"
               >
                 Back
               </button>
-              <div className="space-x-2">
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                 <button
                   type="button"
                   onClick={() => setPreview(!preview)}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-700 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:bg-gray-700 dark:hover:bg-gray-700"
+                  className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-700 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:bg-gray-700 dark:hover:bg-gray-700"
                 >
                   {preview ? 'Edit' : 'Preview'}
                 </button>
                 <button
                   type="button"
                   onClick={nextStep}
-                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+                  className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
                 >
                   Continue
                 </button>
@@ -1054,14 +1093,14 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
               </div>
             </div>
             <div className="space-y-4">
-              <div className="flex justify-between items-center">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
                 <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Questions</h3>
-                <div className="space-x-2">
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                   <button
                     type="button"
                     onClick={() => addQuestion('text')}
                     disabled={editMode && hasSubmissions}
-                    className={`inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md ${
+                    className={`inline-flex items-center justify-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md ${
                       editMode && hasSubmissions 
                         ? 'bg-gray-400 dark:bg-gray-600 text-gray-200 dark:text-gray-300 cursor-not-allowed' 
                         : 'text-white bg-indigo-600 hover:bg-indigo-700'
@@ -1075,7 +1114,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                     type="button"
                     onClick={() => addQuestion('multiple-choice')}
                     disabled={editMode && hasSubmissions}
-                    className={`inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md ${
+                    className={`inline-flex items-center justify-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md ${
                       editMode && hasSubmissions 
                         ? 'bg-gray-400 dark:bg-gray-600 text-gray-200 dark:text-gray-300 cursor-not-allowed' 
                         : 'text-white bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600'
@@ -1089,7 +1128,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                     type="button"
                     onClick={() => addQuestion('matching')}
                     disabled={editMode && hasSubmissions}
-                    className={`inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md ${
+                    className={`inline-flex items-center justify-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md ${
                       editMode && hasSubmissions 
                         ? 'bg-gray-400 dark:bg-gray-600 text-gray-200 dark:text-gray-300 cursor-not-allowed' 
                         : 'text-white bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600'
@@ -1102,10 +1141,10 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                 </div>
               </div>
               {formData.questions.map((question, index) => (
-                <div key={question.id} className="border rounded-lg p-4 space-y-4">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-grow">
-                      <div className="flex items-center space-x-2">
+                <div key={question.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 sm:p-4 space-y-4 bg-white dark:bg-gray-800 overflow-x-hidden">
+                  <div className="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-0">
+                    <div className="flex-grow w-full sm:w-auto min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
                         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Question {index + 1}</span>
                         <span className="text-sm text-gray-500 dark:text-gray-400">({question.type === 'text' ? 'Text Entry' : question.type === 'multiple-choice' ? 'Multiple Choice' : 'Matching'})</span>
                       </div>
@@ -1116,10 +1155,10 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                         value={question.text}
                         onChange={(e) => updateQuestion(index, 'text', e.target.value)}
                         placeholder="Enter question text"
-                        className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 text-sm sm:text-base"
                       />
                     </div>
-                    <div className="flex items-center space-x-2 ml-4">
+                    <div className="flex items-center space-x-2 sm:ml-4 flex-shrink-0 w-full sm:w-auto justify-between sm:justify-start">
                       <input
                         type="number"
                         id={`question-points-${index}`}
@@ -1132,9 +1171,9 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                           }
                         }}
                         min="0"
-                        className="w-20 rounded-md border-gray-300 dark:border-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        className="w-16 sm:w-20 rounded-md border-gray-300 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none text-sm"
                       />
-                      <span className="text-sm text-gray-500 dark:text-gray-400">points</span>
+                      <span className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">points</span>
                       <button
                         type="button"
                         onClick={() => removeQuestion(index)}
@@ -1169,10 +1208,10 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                     </div>
                   </div>
                   {question.type === 'multiple-choice' && (
-                    <div className="ml-4 space-y-2">
+                    <div className="ml-0 sm:ml-4 space-y-2 overflow-x-hidden">
                       <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Options:</h4>
                       {question.options?.map((option, optionIndex) => (
-                        <div key={optionIndex} className="flex items-center space-x-2">
+                        <div key={optionIndex} className="flex items-center gap-2">
                           <input
                             type="radio"
                             name={`question-${index}-correct`}
@@ -1182,7 +1221,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                               newQuestions[index].options = newQuestions[index].options?.map((opt, i) => ({ ...opt, isCorrect: i === optionIndex }));
                               setFormData({ ...formData, questions: newQuestions });
                             }}
-                            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700"
+                            className="h-4 w-4 flex-shrink-0 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700"
                           />
                           <input
                             type="text"
@@ -1194,18 +1233,18 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                                 setFormData({ ...formData, questions: newQuestions });
                               }
                             }}
-                            className="flex-grow rounded-md border-gray-300 dark:border-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            className="flex-1 min-w-0 rounded-md border-gray-300 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 text-sm sm:text-base"
                           />
                           <button
                             type="button"
                             onClick={() => removeOption(index, optionIndex)}
-                            className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
+                            className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 flex-shrink-0"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
                       ))}
-                      <div className="flex space-x-2">
+                      <div className="flex flex-col sm:flex-row gap-2">
                         <input
                           type="text"
                           id={`new-option-${index}`}
@@ -1213,12 +1252,12 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                           value={newOption.text}
                           onChange={(e) => setNewOption({ ...newOption, text: e.target.value })}
                           placeholder="Add new option"
-                          className="flex-grow rounded-md border-gray-300 dark:border-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                          className="flex-1 min-w-0 rounded-md border-gray-300 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 text-sm sm:text-base"
                         />
                         <button
                           type="button"
                           onClick={() => addOption(index)}
-                          className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+                          className="px-3 sm:px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 whitespace-nowrap"
                         >
                           Add Option
                         </button>
@@ -1226,13 +1265,13 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                     </div>
                   )}
                   {question.type === 'matching' && (
-                    <div className="mt-2 border rounded p-3 bg-gray-50 dark:bg-gray-700">
-                      <div className="font-semibold mb-2">Matching Pairs</div>
+                    <div className="mt-2 border border-gray-200 dark:border-gray-700 rounded p-3 bg-gray-50 dark:bg-gray-700 overflow-x-hidden">
+                      <div className="font-semibold mb-2 text-gray-900 dark:text-gray-100">Matching Pairs</div>
                       {question.leftItems && question.leftItems.map((left, idx) => (
-                        <div key={left.id} className="flex items-center mb-2 gap-2">
+                        <div key={left.id} className="flex flex-col sm:flex-row items-stretch sm:items-center mb-2 gap-2">
                           <input
                             type="text"
-                            className="border p-1 rounded w-40"
+                            className="flex-1 min-w-0 border border-gray-300 dark:border-gray-600 p-2 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 text-sm"
                             value={left.text}
                             onChange={e => {
                               const updated = [...(question.leftItems || [])];
@@ -1241,10 +1280,10 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                             }}
                             placeholder="Prompt (e.g., Red)"
                           />
-                          <span className="mx-2">→</span>
+                          <span className="hidden sm:inline mx-2 text-gray-700 dark:text-gray-300 flex-shrink-0">→</span>
                           <input
                             type="text"
-                            className="border p-1 rounded w-40"
+                            className="flex-1 min-w-0 border border-gray-300 dark:border-gray-600 p-2 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 text-sm"
                             value={question.rightItems && question.rightItems[idx] ? question.rightItems[idx].text : ''}
                             onChange={e => {
                               const updated = [...(question.rightItems || [])];
@@ -1255,7 +1294,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                             }}
                             placeholder="Correct Match (e.g., Green)"
                           />
-                          <button type="button" className="ml-2 text-red-600 dark:text-red-400" onClick={() => {
+                          <button type="button" className="sm:ml-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 flex-shrink-0" onClick={() => {
                             const newLeft = (question.leftItems || []).filter((_, i) => i !== idx);
                             const newRight = (question.rightItems || []).filter((_, i) => i !== idx);
                             updateQuestion(index, 'leftItems', newLeft);
@@ -1263,17 +1302,17 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                           }}>Remove</button>
                         </div>
                       ))}
-                      <button type="button" className="mt-2 px-2 py-1 bg-blue-100 rounded" onClick={() => {
+                      <button type="button" className="mt-2 px-3 py-2 text-sm bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-900/70" onClick={() => {
                         const newId = Math.random().toString(36).substr(2, 9);
                         updateQuestion(index, 'leftItems', [...(question.leftItems || []), { id: newId, text: '' }]);
                         updateQuestion(index, 'rightItems', [...(question.rightItems || []), { id: newId, text: '' }]);
                       }}>Add Pair</button>
-                      <div className="font-semibold mt-4 mb-2">Distractor Options (Right Side Only)</div>
+                      <div className="font-semibold mt-4 mb-2 text-gray-900 dark:text-gray-100">Distractor Options (Right Side Only)</div>
                       {(question.rightItems || []).slice((question.leftItems || []).length).map((right, idx) => (
-                        <div key={right.id || idx} className="flex items-center mb-2 gap-2">
+                        <div key={right.id || idx} className="flex flex-col sm:flex-row items-stretch sm:items-center mb-2 gap-2">
                           <input
                             type="text"
-                            className="border p-1 rounded w-40"
+                            className="flex-1 min-w-0 border border-gray-300 dark:border-gray-600 p-2 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 text-sm"
                             value={right.text}
                             onChange={e => {
                               const base = question.leftItems ? question.leftItems.length : 0;
@@ -1283,7 +1322,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                             }}
                             placeholder="Distractor (e.g., Aqua)"
                           />
-                          <button type="button" className="ml-2 text-red-600 dark:text-red-400" onClick={() => {
+                          <button type="button" className="sm:ml-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 flex-shrink-0" onClick={() => {
                             const base = question.leftItems ? question.leftItems.length : 0;
                             const updated = [...(question.rightItems || [])];
                             updated.splice(base + idx, 1);
@@ -1291,17 +1330,17 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                           }}>Remove</button>
                         </div>
                       ))}
-                      <button type="button" className="mt-2 px-2 py-1 bg-blue-100 rounded" onClick={() => {
+                      <button type="button" className="mt-2 px-3 py-2 text-sm bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-900/70" onClick={() => {
                         const base = question.leftItems ? question.leftItems.length : 0;
                         updateQuestion(index, 'rightItems', [...(question.rightItems || []), { id: Math.random().toString(36).substr(2, 9), text: '' }]);
                       }}>Add Distractor</button>
                       {/* Preview for matching question */}
-                      <div className="mt-4">
-                        <div className="font-semibold mb-1">Preview:</div>
+                      <div className="mt-4 overflow-x-hidden">
+                        <div className="font-semibold mb-1 text-gray-900 dark:text-gray-100">Preview:</div>
                         {(question.leftItems || []).map((left, idx) => (
-                          <div key={left.id} className="flex items-center mb-2 gap-2">
-                            <span className="w-40">{left.text || <em>Prompt</em>}</span>
-                            <select className="border p-1 rounded w-40" disabled>
+                          <div key={left.id} className="flex flex-col sm:flex-row items-stretch sm:items-center mb-2 gap-2">
+                            <span className="flex-1 min-w-0 text-sm text-gray-900 dark:text-gray-100 break-words">{left.text || <em className="text-gray-500 dark:text-gray-400">Prompt</em>}</span>
+                            <select className="flex-1 min-w-0 border border-gray-300 dark:border-gray-600 p-2 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm" disabled>
                               <option>[ Choose ]</option>
                               {shuffleArray((question.rightItems || []).map(r => r.text)).map((opt, i) => (
                                 <option key={i}>{opt}</option>
@@ -1334,32 +1373,32 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
             )}
             
             {/* Navigation buttons for both offline and regular assignments */}
-            <div className="flex justify-between">
+            <div className="flex flex-col sm:flex-row justify-between gap-3">
               <button
                 type="button"
                 onClick={prevStep}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white hover:bg-gray-50 dark:bg-gray-700"
+                className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white hover:bg-gray-50 dark:bg-gray-700"
               >
                 Back
               </button>
-              <div className="space-x-2">
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                 <button
                   type="button"
                   onClick={() => setPreview(!preview)}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white hover:bg-gray-50 dark:bg-gray-700"
+                  className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white hover:bg-gray-50 dark:bg-gray-700"
                 >
                   {preview ? 'Edit' : 'Preview'}
                 </button>
                 <button
                   type="button"
                   onClick={() => navigate(`/modules/${formData.moduleId}/assignments`)}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white hover:bg-gray-50 dark:bg-gray-700"
+                  className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white hover:bg-gray-50 dark:bg-gray-700"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+                  className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
                 >
                   {editMode 
                     ? (formData.isGradedQuiz ? 'Update Quiz' : 'Update Assignment')
@@ -1373,9 +1412,9 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
       </form>
 
       {preview && (
-        <div className="mt-8 p-6 border rounded-lg bg-gray-50 dark:bg-gray-700">
-          <h3 className="text-xl font-semibold mb-4">{formData.title}</h3>
-          <div className="prose max-w-none">
+        <div className="mt-6 sm:mt-8 p-4 sm:p-6 border rounded-lg bg-gray-50 dark:bg-gray-700 overflow-x-hidden">
+          <h3 className="text-lg sm:text-xl font-semibold mb-4 break-words">{formData.title}</h3>
+          <div className="prose max-w-none overflow-x-hidden">
             <ReactMarkdown>{formData.description}</ReactMarkdown>
           </div>
           <div className="mt-4 space-y-2 text-sm text-gray-500 dark:text-gray-400">
@@ -1387,15 +1426,15 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
             )}
             <p>Display Mode: {formData.displayMode === 'single' ? 'Single Question View' : 'Scrollable View'}</p>
           </div>
-          <div className="mt-6 space-y-6">
+          <div className="mt-6 space-y-6 overflow-x-hidden">
             {formData.questions.map((question, index) => (
-              <div key={question.id} className="border-t pt-4">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h4 className="font-medium">Question {index + 1} ({question.points} points)</h4>
-                    <p className="mt-1">{question.text}</p>
+              <div key={question.id} className="border-t pt-4 overflow-x-hidden">
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-medium break-words">Question {index + 1} ({question.points} points)</h4>
+                    <p className="mt-1 break-words">{question.text}</p>
                   </div>
-                  <span className="text-sm text-gray-500 dark:text-gray-400">{question.type === 'text' ? 'Text Entry' : question.type === 'multiple-choice' ? 'Multiple Choice' : 'Matching'}</span>
+                  <span className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 flex-shrink-0">{question.type === 'text' ? 'Text Entry' : question.type === 'multiple-choice' ? 'Multiple Choice' : 'Matching'}</span>
                 </div>
                 {question.type === 'multiple-choice' && question.options && (
                   <div className="mt-4 space-y-2">
@@ -1418,21 +1457,25 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                 )}
                 {question.type === 'text' && (
                   <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Answer Field (Student View):
+                    </label>
                     <textarea
-                      className="w-full h-32 p-2 border rounded-md bg-gray-50 dark:bg-gray-700"
-                      placeholder="Student's answer will appear here"
+                      className="w-full min-h-[120px] p-3 sm:p-4 border-2 border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 resize-y text-sm sm:text-base"
+                      placeholder="Student's answer will appear here..."
                       readOnly
+                      rows={5}
                     />
                   </div>
                 )}
                 {question.type === 'matching' && (
-                  <div className="mt-4 space-y-2">
+                  <div className="mt-4 space-y-2 overflow-x-hidden">
                     <h4 className="font-medium">Matching Pairs:</h4>
                     {(question.leftItems || []).map((left, idx) => (
-                      <div key={left.id} className="flex items-center space-x-2">
-                        <span className="w-32">{left.text || <em>Prompt</em>}</span>
-                        <span className="mx-2">→</span>
-                        <select className="border p-1 rounded w-32" disabled>
+                      <div key={left.id} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                        <span className="flex-1 min-w-0 text-sm break-words">{left.text || <em>Prompt</em>}</span>
+                        <span className="hidden sm:inline mx-2 flex-shrink-0">→</span>
+                        <select className="flex-1 min-w-0 border p-2 rounded text-sm" disabled>
                           <option>[ Choose ]</option>
                           {shuffleArray((question.rightItems || []).map(r => r.text)).map((opt, i) => (
                             <option key={i}>{opt}</option>

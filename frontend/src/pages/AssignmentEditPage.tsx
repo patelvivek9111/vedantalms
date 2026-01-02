@@ -46,7 +46,10 @@ const AssignmentEditPage: React.FC = () => {
         });
 
         if (response.data) {
-          const assignment = response.data;
+          // Handle both direct response.data and nested response.data.data
+          const assignment = response.data.data || response.data;
+          console.log('Fetched assignment:', assignment);
+          console.log('Assignment questions:', assignment.questions);
           setAssignment(assignment);
           
           // Get module ID from assignment
@@ -203,9 +206,9 @@ const AssignmentEditPage: React.FC = () => {
         )}
 
         {/* Main Content Area */}
-        <div className="flex-1 overflow-auto lg:ml-0">
-          <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6 pt-16 lg:pt-6">
-            <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-4 sm:p-6">
+        <div className="flex-1 overflow-x-hidden lg:ml-0">
+          <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6 pt-16 lg:pt-6 overflow-x-hidden">
+            <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-2 sm:p-4 lg:p-6 overflow-x-hidden">
               <div className="hidden lg:block mb-4 sm:mb-6">
                 <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Edit Assignment</h1>
                 <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">

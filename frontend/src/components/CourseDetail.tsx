@@ -976,6 +976,7 @@ const CourseDetail: React.FC = () => {
         user={user}
         courses={courses}
         courseId={id || ''}
+        isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
       />
 

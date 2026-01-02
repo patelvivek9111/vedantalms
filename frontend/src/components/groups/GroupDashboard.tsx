@@ -311,31 +311,55 @@ export default function GroupDashboard() {
         <main className={`flex-1 min-w-0 ${isMobileMenuOpen ? 'lg:overflow-auto overflow-hidden' : ''}`}>
           {/* Only show one section at a time based on current path */}
           {isAssignments && (
-            <div className="p-4 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-              <h3 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">Group Assignments</h3>
-              {assignmentsLoading ? (
-                <div className="text-center py-8 text-gray-500 dark:text-gray-400">Loading assignments...</div>
-              ) : assignments.length === 0 ? (
-                <div className="text-center py-16">
-                  <div className="flex flex-col items-center">
-                    <ClipboardList className="h-16 w-16 text-gray-300 dark:text-gray-600 mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No assignments yet</h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">There are no assignments for this group set yet.</p>
+            <div className={`w-full h-full overflow-y-auto ${isMobileDevice ? 'pb-20' : ''}`}>
+              {/* Header - Mobile Optimized */}
+              <div className={`bg-white dark:bg-gray-800 ${isMobileDevice ? 'p-3 mb-3 border-b' : 'p-4 sm:p-6 mb-4 sm:mb-6'} border-gray-200 dark:border-gray-700`}>
+                <h3 className={`${isMobileDevice ? 'text-lg' : 'text-xl sm:text-2xl'} font-bold text-gray-900 dark:text-gray-100`}>
+                  Group Assignments
+                </h3>
+                {!isMobileDevice && (
+                  <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">
+                    Assignments for this group set
+                  </p>
+                )}
+              </div>
+
+              <div className={`${isMobileDevice ? 'px-4' : 'px-4 sm:px-6'} pb-4 sm:pb-6`}>
+                {assignmentsLoading ? (
+                  <div className={`text-center ${isMobileDevice ? 'py-8' : 'py-12'}`}>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 dark:border-blue-400 mx-auto"></div>
+                    <p className={`${isMobileDevice ? 'text-xs mt-2' : 'text-sm mt-2'} text-gray-500 dark:text-gray-400`}>
+                      Loading assignments...
+                    </p>
                   </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {assignments.map(assignment => (
-                    <AssignmentCard
-                      key={assignment._id}
-                      assignment={assignment}
-                      isInstructor={isInstructor}
-                      isAdmin={isAdmin}
-                      navigate={navigate}
-                    />
-                  ))}
-                </div>
-              )}
+                ) : assignments.length === 0 ? (
+                  <div className={`text-center ${isMobileDevice ? 'py-12 px-4' : 'py-16'} bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700/50 dark:to-gray-800/50 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600`}>
+                    <div className="flex flex-col items-center">
+                      <div className={`${isMobileDevice ? 'w-12 h-12' : 'w-16 h-16'} bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mb-4`}>
+                        <ClipboardList className={`${isMobileDevice ? 'h-6 w-6' : 'h-8 w-8'} text-gray-400 dark:text-gray-500`} />
+                      </div>
+                      <h3 className={`${isMobileDevice ? 'text-base' : 'text-lg'} font-bold text-gray-900 dark:text-gray-100 mb-2`}>
+                        No assignments yet
+                      </h3>
+                      <p className={`${isMobileDevice ? 'text-xs' : 'text-sm'} text-gray-600 dark:text-gray-400`}>
+                        There are no assignments for this group set yet.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className={`grid ${isMobileDevice ? 'grid-cols-1 gap-3' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'}`}>
+                    {assignments.map(assignment => (
+                      <AssignmentCard
+                        key={assignment._id}
+                        assignment={assignment}
+                        isInstructor={isInstructor}
+                        isAdmin={isAdmin}
+                        navigate={navigate}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
           {isPages && groupId && (
@@ -346,7 +370,7 @@ export default function GroupDashboard() {
           )}
           {/* Other tab content (home, discussion, people) */}
           {(isHome || isDiscussion || isPeople) && (
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+            <div className={`bg-white dark:bg-gray-800 ${isMobileDevice ? 'rounded-none shadow-none border-0' : 'rounded-xl shadow-sm border border-gray-200 dark:border-gray-700'}`}>
               <Outlet context={{ groupSetId, setIsMobileMenuOpen, isMobileMenuOpen }} />
             </div>
           )}

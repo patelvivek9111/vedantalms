@@ -21,3 +21,4 @@ const ModulesSection: React.FC<ModulesSectionProps> = ({ courseId }) => {
 
 export default ModulesSection;
 
+

@@ -251,12 +251,19 @@ const AssignmentDetails = () => {
                   </div>
                 ))}
                 {q.type === 'text' && (
+                  <div className="mt-2">
+                    <label htmlFor={`question-${index}-answer`} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Your Answer:
+                    </label>
                   <textarea
+                      id={`question-${index}-answer`}
                     value={answers[index] || ''}
                     onChange={(e) => handleAnswerChange(index, e.target.value)}
-                    className="mt-2 block w-full rounded-md border-gray-300 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 sm:text-sm"
-                    rows="4"
+                      className="block w-full min-h-[120px] p-3 sm:p-4 rounded-md border-2 border-gray-300 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:focus:border-indigo-400 resize-y text-sm sm:text-base"
+                      placeholder="Enter your answer here..."
+                      rows={5}
                   />
+                  </div>
                 )}
               </div>
             ))}

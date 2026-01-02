@@ -107,3 +107,4 @@ const CourseQuizzes: React.FC<CourseQuizzesProps> = ({
 
 export default CourseQuizzes;
 
+

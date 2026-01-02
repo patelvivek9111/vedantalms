@@ -163,28 +163,41 @@ const GradeSubmissions = () => {
               <div className="space-y-3">
                 <div className="flex items-center">
                   <input
-                    type="checkbox"
-                    id="showCorrectAnswers"
-                    name="showCorrectAnswers"
-                    checked={formData.showCorrectAnswers}
-                    onChange={(e) => setFormData({ ...formData, showCorrectAnswers: e.target.checked })}
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                    type="radio"
+                    id="feedbackNone"
+                    name="feedbackOption"
+                    checked={!formData.showCorrectAnswers && !formData.showStudentAnswers}
+                    onChange={() => setFormData({ ...formData, showCorrectAnswers: false, showStudentAnswers: false })}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
                   />
-                  <label htmlFor="showCorrectAnswers" className="ml-2 block text-sm text-gray-900">
-                    Show correct answers to student
+                  <label htmlFor="feedbackNone" className="ml-2 block text-sm text-gray-900">
+                    No feedback (students won't see results)
                   </label>
                 </div>
                 <div className="flex items-center">
                   <input
-                    type="checkbox"
+                    type="radio"
+                    id="showCorrectAnswers"
+                    name="feedbackOption"
+                    checked={formData.showCorrectAnswers && !formData.showStudentAnswers}
+                    onChange={() => setFormData({ ...formData, showCorrectAnswers: true, showStudentAnswers: false })}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                  />
+                  <label htmlFor="showCorrectAnswers" className="ml-2 block text-sm text-gray-900">
+                    Show students which questions they got correct (green for correct, red for wrong)
+                  </label>
+                </div>
+                <div className="flex items-center">
+                  <input
+                    type="radio"
                     id="showStudentAnswers"
-                    name="showStudentAnswers"
-                    checked={formData.showStudentAnswers}
-                    onChange={(e) => setFormData({ ...formData, showStudentAnswers: e.target.checked })}
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                    name="feedbackOption"
+                    checked={formData.showStudentAnswers && !formData.showCorrectAnswers}
+                    onChange={() => setFormData({ ...formData, showStudentAnswers: true, showCorrectAnswers: false })}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
                   />
                   <label htmlFor="showStudentAnswers" className="ml-2 block text-sm text-gray-900">
-                    Show student's submitted answers
+                    Show students their submitted answers (green for correct, red for wrong, and show correct answer for wrong ones)
                   </label>
                 </div>
               </div>

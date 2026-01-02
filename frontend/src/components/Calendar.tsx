@@ -333,6 +333,7 @@ const CalendarPage: React.FC = () => {
   const prevEventId = useRef<string | undefined>();
   const [miniSelectedDate, setMiniSelectedDate] = useState(new Date());
   // Store calendar colors in state (by calendar id)
+  // Only stores custom colors set by user - default colors come from palette based on calendarOptions index
   const [calendarColors, setCalendarColors] = useState<Record<string, string>>({});
   // For color wheel popover
   const [colorWheelOpen, setColorWheelOpen] = useState<string | null>(null); // calendarId or null
@@ -348,9 +349,24 @@ const CalendarPage: React.FC = () => {
   const isTeacherOrAdmin = user && (user.role === 'teacher' || user.role === 'admin');
 
   // Build calendar options: admin only gets personal calendar, teachers get personal + courses
+  // For teachers/admins: show all their courses (published and unpublished) - same as dashboard
+  // For students: only show published courses they're enrolled in
+  // Debug: Log courses to help identify any discrepancies
+  useEffect(() => {
+    if (courses.length > 0) {
+      console.log('Calendar - All courses from context:', courses.map((c: any) => ({ id: c._id, title: c.title, published: c.published })));
+    }
+  }, [courses]);
+
   const calendarOptions = user ? [
     { label: `${user.firstName} ${user.lastName}`, value: user._id },
-    ...(user.role === 'admin' ? [] : courses.map((course: any) => ({ label: course.title, value: course._id, course })))
+    ...(user.role === 'admin' 
+      ? [] 
+      : (user.role === 'student' 
+        ? courses.filter((course: any) => course.published).map((course: any) => ({ label: course.title, value: course._id, course }))
+        : courses.map((course: any) => ({ label: course.title, value: course._id, course }))
+      )
+    )
   ] : [];
 
   // Update: Multi-calendar selection logic
@@ -362,9 +378,15 @@ const CalendarPage: React.FC = () => {
     );
   };
 
-  // Helper to get a calendar's color, fallback to palette or blue/green
-  const getCalendarColor = (calendarId: string, idx: number) =>
-    calendarColors[calendarId] || colorPalette[idx % colorPalette.length] || '#60a5fa';
+  // Helper to get a calendar's color - always use stored color or fallback to palette
+  const getCalendarColor = (calendarId: string, idx: number) => {
+    // If color is already set in state, use it (this preserves custom colors)
+    if (calendarColors[calendarId]) {
+      return calendarColors[calendarId];
+    }
+    // Otherwise, use palette color based on calendarOptions index (consistent)
+    return colorPalette[idx % colorPalette.length] || '#60a5fa';
+  };
 
   // Handler to change a calendar's color
   const handleCalendarColorChange = (calendarId: string, color: string) => {
@@ -406,6 +428,8 @@ const CalendarPage: React.FC = () => {
           const res = await api.get('/events?calendar=' + user._id);
           const data = res.data.data || res.data; // Handle both new and old response formats
           const calIdx = calendarOptions.findIndex(opt => opt.value === user._id);
+          // If calendar not found in options (shouldn't happen), use 0 as fallback
+          const colorIdx = calIdx >= 0 ? calIdx : 0;
           allEvents.push(...data
             .filter((event: any) => event.calendar === user._id)
             .map((event: any) => ({
@@ -414,8 +438,8 @@ const CalendarPage: React.FC = () => {
               end: new Date(event.end),
               title: event.title,
               allDay: false,
-              color: getCalendarColor(user._id, calIdx),
-              resource: { ...event, color: getCalendarColor(user._id, calIdx) },
+              color: getCalendarColor(user._id, colorIdx),
+              resource: { ...event, color: getCalendarColor(user._id, colorIdx) },
             })));
         } catch (error) {
           console.error('Error fetching personal events:', error);
@@ -430,6 +454,10 @@ const CalendarPage: React.FC = () => {
       try {
         const res = await api.get('/events?calendar=' + calId);
         const data = res.data.data || res.data; // Handle both new and old response formats
+        // Use calendarOptions index instead of selectedCalendars index to maintain consistent colors
+        const calIdx = calendarOptions.findIndex(opt => opt.value === calId);
+        // If calendar not found in options (shouldn't happen), use 0 as fallback
+        const colorIdx = calIdx >= 0 ? calIdx : 0;
         let courseEvents = data
           .filter((event: any) => event.calendar === calId)
           .map((event: any) => ({
@@ -438,8 +466,8 @@ const CalendarPage: React.FC = () => {
             end: new Date(event.end),
             title: event.title,
             allDay: false,
-            color: getCalendarColor(calId, idx),
-            resource: { ...event, color: getCalendarColor(calId, idx) },
+            color: getCalendarColor(calId, colorIdx),
+            resource: { ...event, color: getCalendarColor(calId, colorIdx) },
           }));
         
         // Fetch assignments for all modules in this course
@@ -461,13 +489,17 @@ const CalendarPage: React.FC = () => {
                   if (!globalSeenAssignmentIds.has(a._id)) {
                     globalSeenAssignmentIds.add(a._id);
                     
+                    // Use calendarOptions index instead of selectedCalendars index
+                    const calIdxForAssignments = calendarOptions.findIndex(opt => opt.value === calId);
+                    // If calendar not found in options (shouldn't happen), use 0 as fallback
+                    const colorIdxForAssignments = calIdxForAssignments >= 0 ? calIdxForAssignments : 0;
                     assignmentEvents.push({
                       _id: a._id,
                       title: a.title,
                       start: new Date(a.dueDate),
                       end: new Date(a.dueDate),
                       type: 'Assignment',
-                      color: getCalendarColor(calId, idx),
+                      color: getCalendarColor(calId, colorIdxForAssignments),
                       allDay: false,
                       resource: { ...a, readOnly: true, courseId: calId },
                     } as RBCEvent);
@@ -495,13 +527,17 @@ const CalendarPage: React.FC = () => {
                       if (!globalSeenAssignmentIds.has(a._id)) {
                         globalSeenAssignmentIds.add(a._id);
 
+                        // Use calendarOptions index instead of selectedCalendars index
+                        const calIdxForAssignments2 = calendarOptions.findIndex(opt => opt.value === calId);
+                        // If calendar not found in options (shouldn't happen), use 0 as fallback
+                        const colorIdxForAssignments2 = calIdxForAssignments2 >= 0 ? calIdxForAssignments2 : 0;
                         assignmentEvents.push({
                           _id: a._id,
                           title: a.title,
                           start: new Date(a.dueDate),
                           end: new Date(a.dueDate),
                           type: 'Assignment',
-                          color: getCalendarColor(calId, idx),
+                          color: getCalendarColor(calId, colorIdxForAssignments2),
                           allDay: false,
                           resource: { ...a, readOnly: true, courseId: calId },
                         } as RBCEvent);
@@ -532,9 +568,12 @@ const CalendarPage: React.FC = () => {
   };
 
   useEffect(() => {
-    if (selectedCalendars.length) {
+    if (selectedCalendars.length && user && calendarOptions.length > 0) {
       fetchEvents();
+    } else {
+      setEvents([]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCalendars]);
 
   // On mount, select personal calendar by default (admin only gets their personal calendar)

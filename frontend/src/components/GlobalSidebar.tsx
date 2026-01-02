@@ -224,27 +224,6 @@ export default function GlobalSidebar() {
                     onMouseEnter={handleMouseEnter}
                     onMouseLeave={handleMouseLeave}
                   >
-                    {user?.role === 'teacher' && (
-                      <Link
-                        to="/teacher/courses"
-                        onClick={() => {
-                          setShowCourseDropdown(false);
-                        }}
-                        className={`block px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium ${
-                          location.pathname === '/teacher/courses' ? 'bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span>My Courses</span>
-                          {location.pathname === '/teacher/courses' && (
-                            <div className="w-2 h-2 bg-blue-500 rounded-full ml-2"></div>
-                          )}
-                        </div>
-                      </Link>
-                    )}
-                    {user?.role === 'teacher' && availableCourses.length > 0 && (
-                      <div className="border-t border-gray-100 dark:border-gray-700 my-1"></div>
-                    )}
                     {(!user || user.role !== 'teacher') && (
                       <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-700">
                         <span className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">Your Courses</span>
@@ -275,6 +254,29 @@ export default function GlobalSidebar() {
                       );
                     }) : user?.role === 'teacher' ? null : (
                       <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No courses available</div>
+                    )}
+                    {user?.role === 'teacher' && (
+                      <>
+                        {availableCourses.length > 0 && (
+                          <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+                        )}
+                        <Link
+                          to="/teacher/courses"
+                          onClick={() => {
+                            setShowCourseDropdown(false);
+                          }}
+                          className={`block px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium ${
+                            location.pathname === '/teacher/courses' ? 'bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span>My Courses</span>
+                            {location.pathname === '/teacher/courses' && (
+                              <div className="w-2 h-2 bg-blue-500 rounded-full ml-2"></div>
+                            )}
+                          </div>
+                        </Link>
+                      </>
                     )}
                   </div>
                 )}

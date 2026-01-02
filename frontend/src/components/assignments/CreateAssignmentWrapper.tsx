@@ -246,8 +246,8 @@ const CreateAssignmentWrapper: React.FC = () => {
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-auto lg:ml-0 pt-16 lg:pt-0">
-        <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6">
+      <div className="flex-1 overflow-x-hidden lg:ml-0 pt-16 lg:pt-0">
+        <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6 overflow-x-hidden">
           <CreateAssignmentForm moduleId={moduleId} />
         </div>
       </div>
