@@ -64,7 +64,7 @@ export const exportGradebookCSV = (
         // Compute using the same utility and the augmented assignments + submissions
         const weightedPercent = calculateFinalGradeWithWeightedGroups(
           student._id,
-          course,
+          course as any,
           augmentedAssignments,
           grades,
           submissionMap
