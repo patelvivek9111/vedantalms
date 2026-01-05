@@ -39,9 +39,16 @@ export async function subscribeToPushNotifications(): Promise<PushSubscription |
     await navigator.serviceWorker.ready;
 
     // Subscribe to push notifications
+    const vapidKey = process.env.VITE_VAPID_PUBLIC_KEY || '';
+    const keyArray = urlBase64ToUint8Array(vapidKey);
+    // Ensure we have a Uint8Array with ArrayBuffer (not ArrayBufferLike)
+    // Create a new ArrayBuffer and copy the data
+    const buffer = new ArrayBuffer(keyArray.length);
+    const applicationServerKey = new Uint8Array(buffer);
+    applicationServerKey.set(keyArray);
     const subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(process.env.VITE_VAPID_PUBLIC_KEY || '')
+      applicationServerKey
     });
 
     return subscription;
@@ -96,6 +103,8 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   }
   return outputArray;
 }
+
+
 
 
 
