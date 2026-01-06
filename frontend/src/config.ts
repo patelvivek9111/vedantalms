@@ -1,12 +1,14 @@
 // Support both Vite environment variables and fallback for production
 // If frontend is served from same domain as backend, use relative URL
 const getApiUrl = () => {
-  // PRIORITY 1: Runtime check - if on vedantaed.com, always use relative URL (avoids CORS)
-  // This overrides any build-time environment variables
+  // PRIORITY 1: Runtime check - if on vedantaed.com, use backend URL directly
+  // Since Vercel (frontend) and Render (backend) are on different domains,
+  // we need to point to the backend URL directly
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
     if (hostname.includes('vedantaed.com')) {
-      return ''; // Use relative URL (same domain) - avoids CORS
+      // Frontend is on Vercel, backend is on Render - use backend URL
+      return 'https://vedantalms-backend.onrender.com';
     }
   }
   
