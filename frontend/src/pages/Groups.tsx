@@ -110,7 +110,6 @@ const Groups: React.FC = () => {
                 totalMembers: uniqueMembers.size
               };
             } catch (err) {
-              console.error(`Error fetching groups for set ${groupSet._id}:`, err);
               return {
                 ...groupSet,
                 totalGroups: 0,
@@ -127,7 +126,6 @@ const Groups: React.FC = () => {
           setGroups(res.data.data || []);
         }
       } catch (err: any) {
-        console.error('Error fetching data:', err);
         if (err.response?.status === 401) {
           setError('Please log in to view groups');
         } else if (err.response?.status === 500) {
@@ -187,8 +185,7 @@ const Groups: React.FC = () => {
           setUserCourseColors(response.data.preferences.courseColors || {});
         }
       } catch (err) {
-        console.error('Error loading user preferences:', err);
-      }
+        }
     };
 
     loadUserPreferences();

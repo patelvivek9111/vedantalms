@@ -71,8 +71,7 @@ const StudentGroupView: React.FC<StudentGroupViewProps> = ({ courseId, userId })
               enrolledGroupsData.push({ groupSet, group });
             });
           } catch (err) {
-            console.error(`Error fetching groups for set ${groupSet._id}:`, err);
-          }
+            }
         }
         
         setEnrolledGroups(enrolledGroupsData);

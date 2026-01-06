@@ -20,8 +20,7 @@ const EnrollmentRequestsHandler: React.FC<EnrollmentRequestsHandlerProps> = ({ c
         );
         setEnrollmentRequests(enrollmentTodos);
       } catch (err) {
-        console.error('Error fetching enrollment requests:', err);
-      } finally {
+        } finally {
         setLoading(false);
       }
     };
@@ -36,7 +35,6 @@ const EnrollmentRequestsHandler: React.FC<EnrollmentRequestsHandlerProps> = ({ c
       await api.post(`/courses/${courseId}/enrollment/${studentId}/approve`);
       setEnrollmentRequests(prev => prev.filter(req => req.studentId !== studentId));
     } catch (err) {
-      console.error('Error approving enrollment:', err);
       alert('Failed to approve enrollment');
     }
   };
@@ -46,7 +44,6 @@ const EnrollmentRequestsHandler: React.FC<EnrollmentRequestsHandlerProps> = ({ c
       await api.post(`/courses/${courseId}/enrollment/${studentId}/deny`);
       setEnrollmentRequests(prev => prev.filter(req => req.studentId !== studentId));
     } catch (err) {
-      console.error('Error denying enrollment:', err);
       alert('Failed to deny enrollment');
     }
   };

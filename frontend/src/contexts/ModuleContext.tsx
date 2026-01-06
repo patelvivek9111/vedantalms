@@ -57,7 +57,6 @@ export const ModuleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setError(res.data.message || 'Failed to fetch modules');
       }
     } catch (err: any) {
-      console.error('Error fetching modules:', err);
       setError(err.response?.data?.message || 'Error fetching modules');
     } finally {
       setLoading(false);
@@ -85,7 +84,6 @@ export const ModuleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setError(res.data.message || 'Failed to create module');
       }
     } catch (err: any) {
-      console.error('Error creating module:', err);
       setError(err.response?.data?.message || 'Error creating module');
     } finally {
       setLoading(false);
@@ -99,7 +97,6 @@ export const ModuleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       await api.put(`/modules/${moduleId}`, data);
       await getModulesRef.current(courseId);
     } catch (err: any) {
-      console.error('Error updating module:', err);
       setError(err.response?.data?.message || 'Error updating module');
     } finally {
       setLoading(false);
@@ -135,7 +132,6 @@ export const ModuleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setError(res.data.message || 'Failed to create page');
       }
     } catch (err: any) {
-      console.error('Error creating page:', err);
       setError(err.response?.data?.message || 'Error creating page');
     } finally {
       setLoading(false);
@@ -150,11 +146,9 @@ export const ModuleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (res.data.success) {
         return res.data.data;
       } else {
-        console.error('Failed to fetch pages:', res.data.message);
         return [];
       }
     } catch (err: any) {
-      console.error('Error fetching pages:', err);
       return [];
     }
   }, []);
@@ -174,7 +168,6 @@ export const ModuleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         throw new Error(res.data.message || 'Failed to fetch page');
       }
     } catch (err: any) {
-      console.error('Error fetching page:', err);
       throw err;
     }
   };
@@ -186,7 +179,6 @@ export const ModuleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       await api.delete(`/modules/${moduleId}`);
       await getModulesRef.current(courseId);
     } catch (err: any) {
-      console.error('Error deleting module:', err);
       setError(err.response?.data?.message || 'Error deleting module');
     } finally {
       setLoading(false);
@@ -204,7 +196,6 @@ export const ModuleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         );
       }
     } catch (err: any) {
-      console.error('Error toggling module publish status:', err);
       setError(err.response?.data?.message || 'Error toggling module publish status');
     }
   };

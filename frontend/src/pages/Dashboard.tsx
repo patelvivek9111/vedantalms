@@ -504,7 +504,6 @@ export function Dashboard() {
           setUserCourseColors({});
         }
       } catch (err) {
-        console.error('Error loading user preferences:', err);
         setUserCourseColors({});
       } finally {
         setLoadingPreferences(false);
@@ -523,8 +522,7 @@ export function Dashboard() {
           setNotificationCount(response.data.count || 0);
         }
       } catch (error) {
-        console.error('Error fetching notification count:', error);
-      }
+        }
     };
 
     fetchNotificationCount();
@@ -561,7 +559,6 @@ export function Dashboard() {
           if (isTeacherOrAdmin) {
             // Fetch class average for teachers/admin
             const response = await api.get(`/grades/course/${courseId}/average`);
-            console.log(`Grade response for course ${courseId} (teacher/admin):`, response.data);
             if (response.data && response.data.average !== null && response.data.average !== undefined) {
               const average = response.data.average;
               setCourseGrades(prev => ({
@@ -577,7 +574,6 @@ export function Dashboard() {
           } else {
             // Fetch student's own grade
             const response = await api.get(`/grades/student/course/${courseId}`);
-            console.log(`Grade response for course ${courseId} (student):`, response.data);
             if (response.data && response.data.totalPercent !== null && response.data.totalPercent !== undefined) {
               const grade = response.data.totalPercent;
               const letter = response.data.letterGrade || '';
@@ -593,8 +589,6 @@ export function Dashboard() {
             }
           }
         } catch (error: any) {
-          console.error(`Error fetching grade for course ${courseId}:`, error);
-          console.error('Error details:', error.response?.data || error.message);
           setCourseGrades(prev => ({
             ...prev,
             [courseId]: { grade: null }
@@ -640,8 +634,7 @@ export function Dashboard() {
           }
         }
       } catch (error) {
-        console.error('Error loading navigation items:', error);
-      }
+        }
       
       // Default items
       const availableOptions = ALL_NAV_OPTIONS.filter(option => {
@@ -737,7 +730,6 @@ export function Dashboard() {
       }
     setOpenColorPicker(null);
     } catch (err) {
-      console.error('Error updating course color:', err);
       // Optionally show an error message to the user
     }
   };

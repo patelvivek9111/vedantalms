@@ -207,15 +207,24 @@ const initializeQuizWaveSocket = (io) => {
     // Submit answer (student)
     socket.on('quizwave:answer', async (data) => {
       try {
+        console.log(`📝 Answer received from ${socket.userId}:`, data);
         const { sessionId, questionIndex, selectedOptions, timeTaken } = data;
 
+        if (!sessionId) {
+          console.error('Missing sessionId in answer data');
+          socket.emit('quizwave:error', { message: 'Session ID is required' });
+          return;
+        }
+
         if (!socket.gamePin) {
+          console.error('Socket not in a session');
           socket.emit('quizwave:error', { message: 'Not in a session' });
           return;
         }
 
         const session = await QuizSession.findById(sessionId).populate('quiz');
         if (!session) {
+          console.error('Session not found:', sessionId);
           socket.emit('quizwave:error', { message: 'Session not found' });
           return;
         }
@@ -282,6 +291,8 @@ const initializeQuizWaveSocket = (io) => {
           }
           // Add streak bonus
           points += (streak * 50);
+          // Round to whole number
+          points = Math.round(points);
         } else {
           // Incorrect answer = 0 points
           points = 0;
@@ -310,16 +321,20 @@ const initializeQuizWaveSocket = (io) => {
         });
 
         // Notify teacher of answer submission
-        io.to(`quizwave:teacher:${session.gamePin}`).emit('quizwave:answer-submitted', {
+        const answerSubmittedData = {
           participantId: socket.userId,
           nickname: participant.nickname,
           questionIndex,
           selectedOptions,
           timeTaken
-        });
+        };
+        console.log(`📤 Emitting answer-submitted to teacher room: quizwave:teacher:${session.gamePin}`, answerSubmittedData);
+        io.to(`quizwave:teacher:${session.gamePin}`).emit('quizwave:answer-submitted', answerSubmittedData);
+        
+        console.log(`✅ Answer saved for ${participant.nickname}: ${isCorrect ? 'Correct' : 'Incorrect'}, ${points} points`);
       } catch (error) {
-        console.error('Answer error:', error);
-        socket.emit('quizwave:error', { message: 'Error submitting answer' });
+        console.error('❌ Answer error:', error);
+        socket.emit('quizwave:error', { message: 'Error submitting answer: ' + error.message });
       }
     });
 

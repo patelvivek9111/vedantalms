@@ -47,15 +47,17 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
       setParticipants(data.participants || []);
       setCurrentQuestionIndex(data.currentQuestionIndex);
       
-      // Calculate leaderboard
-      const lb = data.participants
-        .map((p: any) => ({
-          nickname: p.nickname,
-          totalScore: p.totalScore,
-          answers: p.answers.length
-        }))
-        .sort((a: any, b: any) => b.totalScore - a.totalScore);
-      setLeaderboard(lb);
+      // Only calculate leaderboard when quiz has ended
+      if (data.status === 'ended') {
+        const lb = data.participants
+          .map((p: any) => ({
+            nickname: p.nickname,
+            totalScore: p.totalScore,
+            answers: p.answers.length
+          }))
+          .sort((a: any, b: any) => b.totalScore - a.totalScore);
+        setLeaderboard(lb);
+      }
       
       // Set current question if quiz has started
       if (data.currentQuestionIndex >= 0 && quiz.questions[data.currentQuestionIndex]) {
@@ -64,7 +66,6 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
       
       return data;
     } catch (error) {
-      console.error('Error loading session:', error);
       return null;
     }
   };
@@ -80,10 +81,42 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
       sock = getQuizWaveSocket(token);
       setSocket(sock);
 
+      // Wait for socket to connect if not already connected
+      if (!sock.connected) {
+        await new Promise((resolve) => {
+          if (sock.connected) {
+            resolve(true);
+          } else {
+            sock.once('connect', () => resolve(true));
+            sock.once('connect_error', () => resolve(false));
+          }
+        });
+      }
+
+      // Remove any existing listeners first to prevent duplicates
+      sock.off('quizwave:teacher-joined');
+      sock.off('quizwave:participant-joined');
+      sock.off('quizwave:answer-submitted');
+      sock.off('quizwave:started');
+      sock.off('quizwave:question-advanced');
+      sock.off('quizwave:ended');
+
       sock.on('quizwave:teacher-joined', (data) => {
+        console.log('Teacher joined:', data);
         setParticipantCount(data.participantCount);
         setCurrentQuestionIndex(data.currentQuestionIndex);
-        setLeaderboard(data.participants || []);
+        // Only set leaderboard if quiz has ended
+        // During active questions, we don't want to show leaderboard
+        if (data.status === 'ended' && data.participants) {
+          const lb = data.participants
+            .map((p: any) => ({
+              nickname: p.nickname,
+              totalScore: p.totalScore || 0,
+              answers: p.answers?.length || 0
+            }))
+            .sort((a: any, b: any) => b.totalScore - a.totalScore);
+          setLeaderboard(lb);
+        }
       });
 
       sock.on('quizwave:participant-joined', (data) => {
@@ -99,6 +132,7 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
       });
 
       sock.on('quizwave:answer-submitted', (data) => {
+        console.log('Answer submitted:', data);
         setAnswerCount((prev) => prev + 1);
         // Update answer distribution
         if (data.selectedOptions && data.selectedOptions.length > 0) {
@@ -111,42 +145,21 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
             return newDist;
           });
         }
-        // Refresh leaderboard
-        loadSession();
+        // Don't reload session here - it's too expensive and causes lag
+        // The answer count and distribution are already updated above
       });
 
       sock.on('quizwave:started', (data) => {
-        setCurrentQuestionIndex(0);
+        // First question - ensure questionIndex is set correctly
+        const questionIndex = data.questionData?.questionIndex ?? 0;
+        setCurrentQuestionIndex(questionIndex);
         setCurrentQuestion(data.questionData);
         setAnswerCount(0);
         setAnswerDistribution({});
         setShowAnswerDistribution(false);
         setShowCorrectAnswer(false);
         setCountdown(0);
-        setTimeRemaining(data.questionData.timeLimit || 30);
-        // Clear any existing timers
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
-        }
-        if (countdownRef.current) {
-          clearInterval(countdownRef.current);
-        }
-        // Update session status to active
-        setSession((prev) => prev ? { ...prev, status: 'active' as const, currentQuestionIndex: 0 } : null);
-        // Also reload session to get latest state
-        loadSession();
-      });
-
-      sock.on('quizwave:question-advanced', (data) => {
-        console.log('Question advanced:', data);
-        setCurrentQuestionIndex(data.questionIndex);
-        setCurrentQuestion(data.questionData);
-        setAnswerCount(0);
-        setAnswerDistribution({});
-        setShowAnswerDistribution(false);
-        setShowCorrectAnswer(false);
-        setCountdown(0);
-        setTimeRemaining(data.questionData.timeLimit || 30);
+        setTimeRemaining(data.questionData?.timeLimit || 30);
         // Clear any existing timers
         if (timerRef.current) {
           clearInterval(timerRef.current);
@@ -156,27 +169,40 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
           clearInterval(countdownRef.current);
           countdownRef.current = null;
         }
+        // Update session status to active
+        setSession((prev) => prev ? { ...prev, status: 'active' as const, currentQuestionIndex: questionIndex } : null);
+        // Also reload session to get latest state
+        loadSession();
       });
 
-      sock.on('quizwave:question-started', (data) => {
-        console.log('Question started (teacher view):', data);
-        // This event is also sent to teacher, update accordingly
-        setCurrentQuestionIndex(data.questionIndex || 0);
+      sock.on('quizwave:question-advanced', (data) => {
+        // This is the teacher-specific event with correct answers
+        setCurrentQuestionIndex(data.questionIndex);
         setCurrentQuestion(data);
         setAnswerCount(0);
         setAnswerDistribution({});
         setShowAnswerDistribution(false);
         setShowCorrectAnswer(false);
+        setCountdown(0);
         setTimeRemaining(data.timeLimit || 30);
+        // Clear any existing timers
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+        if (countdownRef.current) {
+          clearInterval(countdownRef.current);
+          countdownRef.current = null;
+        }
         // Update session status to active
-        setSession((prev) => prev ? { ...prev, status: 'active' as const, currentQuestionIndex: data.questionIndex || 0 } : null);
+        setSession((prev) => prev ? { ...prev, status: 'active' as const, currentQuestionIndex: data.questionIndex } : null);
       });
 
+      // Note: We intentionally do NOT listen to 'quizwave:question-started' for subsequent questions
+      // because it's meant for students only (doesn't have isCorrect flags)
+      // The teacher should only use 'quizwave:question-advanced' which has the correct answer data
+
       sock.on('quizwave:ended', (data) => {
-        console.log('Quiz ended, leaderboard:', data);
-        console.log('Leaderboard data:', data.leaderboard);
-        console.log('Leaderboard length:', data.leaderboard?.length);
-        
         // Set leaderboard first
         setLeaderboard(data.leaderboard || []);
         setShowFullLeaderboard(false);
@@ -202,7 +228,6 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
         setSession((prev) => {
           if (prev) {
             const updated: QuizSession = { ...prev, status: 'ended' as const };
-            console.log('Updated session status to ended:', updated);
             return updated;
           }
           return null;
@@ -218,7 +243,6 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
         
         // Reload session to get final state with all saved data
         loadSession().then((sessionData) => {
-          console.log('Reloaded session after end:', sessionData);
           if (sessionData) {
             // Recalculate leaderboard from session data
             const lb = sessionData.participants
@@ -228,7 +252,6 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
                 answers: p.answers.length
               }))
               .sort((a: any, b: any) => b.totalScore - a.totalScore);
-            console.log('Recalculated leaderboard:', lb);
             setLeaderboard(lb);
           }
         });
@@ -236,7 +259,13 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
 
       // Join as teacher after session is loaded
       if (currentSession?.gamePin) {
-        sock.emit('quizwave:teacher-join', { gamePin: currentSession.gamePin });
+        if (sock.connected) {
+          sock.emit('quizwave:teacher-join', { gamePin: currentSession.gamePin });
+        } else {
+          sock.once('connect', () => {
+            sock.emit('quizwave:teacher-join', { gamePin: currentSession.gamePin });
+          });
+        }
       }
     };
 
@@ -262,8 +291,12 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
   }, [session?.gamePin, socket]);
 
   const handleStart = () => {
-    if (socket) {
+    if (socket && socket.connected) {
+      console.log('Starting quiz:', sessionId);
       socket.emit('quizwave:start', { sessionId });
+    } else {
+      console.error('Socket not connected');
+      alert('Connection lost. Please refresh the page.');
     }
   };
 
@@ -275,8 +308,12 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
     setAnswerDistribution({});
     setAnswerCount(0);
     
-    if (socket) {
+    if (socket && socket.connected) {
+      console.log('Next question:', sessionId);
       socket.emit('quizwave:next-question', { sessionId });
+    } else {
+      console.error('Socket not connected');
+      alert('Connection lost. Please refresh the page.');
     }
   };
 
@@ -301,10 +338,33 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
   };
 
   // Calculate status flags (before useEffects that use them)
-  // Also check if we have leaderboard data as a fallback indicator that quiz ended
-  const isEnded = session?.status === 'ended' || (leaderboard.length > 0 && !currentQuestion && session?.status !== 'waiting');
+  // Only check session status for ended - don't use leaderboard as indicator
+  const isEnded = session?.status === 'ended';
   const isWaiting = session?.status === 'waiting' && !currentQuestion;
   const isActive = (session?.status === 'active' || currentQuestion) && !isEnded;
+
+  // Check if all participants have answered - auto-advance if so
+  useEffect(() => {
+    if (
+      isActive && 
+      currentQuestion && 
+      participantCount > 0 && 
+      answerCount >= participantCount && 
+      !showCorrectAnswer && 
+      !showAnswerDistribution && 
+      !countdown &&
+      timeRemaining > 0
+    ) {
+      // All students have answered - trigger the same flow as time's up
+      // Clear the timer first
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      // Set timeRemaining to 0 to trigger the time's up flow
+      setTimeRemaining(0);
+    }
+  }, [isActive, currentQuestion, answerCount, participantCount, showCorrectAnswer, showAnswerDistribution, countdown, timeRemaining]);
 
   // Handle time's up - separate effect to ensure it runs
   useEffect(() => {
@@ -334,7 +394,6 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
           setCountdown(3);
         }, 3000);
       }).catch((error) => {
-        console.error('Error loading session on time up:', error);
         // Still show correct answer even if loading fails
         setShowCorrectAnswer(true);
         setCountdown(3);
@@ -367,12 +426,9 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
     // Only start countdown if showCorrectAnswer is true and countdown is greater than 0
     // Don't re-run if countdown is already running
     if (showCorrectAnswer && countdown > 0 && !countdownRef.current) {
-      console.log('Starting countdown from:', countdown);
       countdownRef.current = setInterval(() => {
         setCountdown((prev) => {
           const newCount = prev - 1;
-          console.log('Countdown:', newCount);
-          
           if (newCount <= 0) {
             // Clear interval before advancing
             if (countdownRef.current) {
@@ -384,8 +440,6 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
             // Check if there's a next question (currentQuestionIndex + 1)
             const nextIndex = currentQuestionIndex + 1;
             const totalQuestions = quiz.questions.length;
-            
-            console.log('Countdown finished. Current index:', currentQuestionIndex, 'Next index:', nextIndex, 'Total questions:', totalQuestions);
             
             if (nextIndex < totalQuestions) {
               // Reset state before advancing
@@ -462,109 +516,133 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Waiting Screen */}
       {isWaiting && (
-        <div className="p-3 sm:p-4 lg:p-6">
-          <div className="max-w-6xl mx-auto">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 sm:p-6 mb-4 sm:mb-6">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-4 sm:mb-6">
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30 dark:from-gray-900 dark:via-blue-900/20 dark:to-purple-900/20 p-4 sm:p-6 lg:p-8">
+          <div className="max-w-5xl mx-auto">
+            {/* Header */}
+            <div className="mb-6 sm:mb-8">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
                 <div>
-                  <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2 break-words">
+                  <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-2">
                     {quiz.title}
-                  </h2>
-                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                    Session Status: <span className="font-semibold capitalize">{session.status}</span>
-                  </p>
+                  </h1>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs sm:text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+                      <span className="w-2 h-2 bg-blue-500 rounded-full mr-2 animate-pulse"></span>
+                      Session Status: {session.status.charAt(0).toUpperCase() + session.status.slice(1)}
+                    </span>
+                  </div>
                 </div>
                 <button
                   onClick={onEnd}
-                  className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 text-sm sm:text-base"
+                  className="px-4 sm:px-6 py-2.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 transition-all shadow-sm hover:shadow-md text-sm sm:text-base font-medium"
                 >
                   Close Session
                 </button>
               </div>
+            </div>
 
-              {/* Game PIN */}
-              <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg p-4 sm:p-6 mb-4 sm:mb-6 text-center">
-                <p className="text-white text-xs sm:text-sm mb-2">Game PIN</p>
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
-                  <p className="text-4xl sm:text-5xl font-bold text-white">{session.gamePin}</p>
-                  <button
-                    onClick={copyGamePin}
-                    className="w-full sm:w-auto bg-white/20 hover:bg-white/30 text-white px-3 sm:px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors text-sm sm:text-base"
-                  >
-                    {copied ? (
-                      <>
-                        <Check className="w-5 h-5" />
-                        Copied!
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-5 h-5" />
-                        Copy
-                      </>
-                    )}
-                  </button>
-                </div>
-                <p className="text-white/80 text-xs sm:text-sm mt-2">
-                  Share this PIN with your students to join the quiz
-                </p>
-              </div>
-
-              {/* Stats */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
-                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 sm:p-4 text-center">
-                  <Users className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600 dark:text-blue-400 mx-auto mb-2" />
-                  <p className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-400">{participantCount}</p>
-                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Participants</p>
-                </div>
-                <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3 sm:p-4 text-center">
-                  <p className="text-xl sm:text-2xl font-bold text-green-600 dark:text-green-400">
-                    {quiz.questions.length}
+            {/* Game PIN Card - Enhanced */}
+            <div className="mb-6 sm:mb-8">
+              <div className="bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 rounded-2xl p-6 sm:p-8 lg:p-10 shadow-2xl transform hover:scale-[1.01] transition-transform duration-200">
+                <div className="text-center">
+                  <p className="text-white/90 text-sm sm:text-base font-medium mb-3 uppercase tracking-wider">
+                    Game PIN
                   </p>
-                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Questions</p>
-                </div>
-                <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3 sm:p-4 text-center">
-                  <Trophy className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600 dark:text-purple-400 mx-auto mb-2" />
-                  <p className="text-xl sm:text-2xl font-bold text-purple-600 dark:text-purple-400">0</p>
-                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Top Score</p>
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6 mb-4">
+                    <p className="text-6xl sm:text-7xl lg:text-8xl font-black text-white tracking-wider drop-shadow-lg">
+                      {session.gamePin}
+                    </p>
+                    <button
+                      onClick={copyGamePin}
+                      className="bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white px-5 sm:px-6 py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-xl font-medium text-sm sm:text-base"
+                    >
+                      {copied ? (
+                        <>
+                          <Check className="w-5 h-5" />
+                          Copied!
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-5 h-5" />
+                          Copy
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-white/80 text-sm sm:text-base mt-2">
+                    Share this PIN with your students to join the quiz
+                  </p>
                 </div>
               </div>
+            </div>
 
-              {/* Start Button */}
-              <div className="flex flex-col items-center gap-4">
-                <button
-                  onClick={handleStart}
-                  className="bg-green-600 text-white px-4 sm:px-6 lg:px-8 py-2 sm:py-2.5 lg:py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 text-sm sm:text-base lg:text-lg"
-                >
-                  <Play className="w-4 h-4 sm:w-5 sm:h-5" />
-                  Start Quiz
-                </button>
+            {/* Stats Cards - Enhanced */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
+              <div className="bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 rounded-xl p-5 sm:p-6 text-center shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1">
+                <div className="bg-white/20 rounded-full w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center mx-auto mb-3">
+                  <Users className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
+                </div>
+                <p className="text-3xl sm:text-4xl font-bold text-white mb-1">{participantCount}</p>
+                <p className="text-white/90 text-sm sm:text-base font-medium">Participants</p>
+              </div>
+              <div className="bg-gradient-to-br from-green-500 to-green-600 dark:from-green-600 dark:to-green-700 rounded-xl p-5 sm:p-6 text-center shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1">
+                <div className="bg-white/20 rounded-full w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center mx-auto mb-3">
+                  <svg className="w-7 h-7 sm:w-8 sm:h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <p className="text-3xl sm:text-4xl font-bold text-white mb-1">{quiz.questions.length}</p>
+                <p className="text-white/90 text-sm sm:text-base font-medium">Questions</p>
+              </div>
+              <div className="bg-gradient-to-br from-purple-500 to-purple-600 dark:from-purple-600 dark:to-purple-700 rounded-xl p-5 sm:p-6 text-center shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1">
+                <div className="bg-white/20 rounded-full w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center mx-auto mb-3">
+                  <Trophy className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
+                </div>
+                <p className="text-3xl sm:text-4xl font-bold text-white mb-1">
+                  {leaderboard.length > 0 ? leaderboard[0].totalScore : 0}
+                </p>
+                <p className="text-white/90 text-sm sm:text-base font-medium">Top Score</p>
+              </div>
+            </div>
 
-                {/* Participants List */}
-                {participants.length > 0 && (
-                  <div className="w-full max-w-md">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3 text-center">
-                      Joined Students ({participants.length})
+            {/* Start Button - Enhanced */}
+            <div className="flex flex-col items-center gap-6 mb-6 sm:mb-8">
+              <button
+                onClick={handleStart}
+                className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-8 sm:px-12 py-4 sm:py-5 rounded-xl transition-all shadow-xl hover:shadow-2xl transform hover:scale-105 flex items-center gap-3 text-lg sm:text-xl font-bold"
+              >
+                <Play className="w-6 h-6 sm:w-7 sm:h-7" />
+                Start Quiz
+              </button>
+
+              {/* Participants List - Enhanced */}
+              {participants.length > 0 && (
+                <div className="w-full max-w-2xl">
+                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-5 sm:p-6">
+                    <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-4 text-center">
+                      Joined Students <span className="text-blue-600 dark:text-blue-400">({participants.length})</span>
                     </h3>
-                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 max-h-64 overflow-y-auto">
-                      <div className="space-y-2">
+                    <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 max-h-80 overflow-y-auto">
+                      <div className="space-y-3">
                         {participants.map((participant: any, index: number) => (
                           <div
                             key={index}
-                            className="flex items-center gap-3 p-2 bg-white dark:bg-gray-800 rounded-lg"
+                            className="flex items-center gap-4 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-all border border-gray-100 dark:border-gray-700"
                           >
-                            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold">
+                            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-md">
                               {participant.nickname.charAt(0).toUpperCase()}
                             </div>
-                            <span className="text-gray-900 dark:text-gray-100 font-medium">
+                            <span className="text-gray-900 dark:text-white font-semibold text-base sm:text-lg flex-1">
                               {participant.nickname}
                             </span>
+                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                           </div>
                         ))}
                       </div>
                     </div>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

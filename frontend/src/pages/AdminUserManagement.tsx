@@ -68,8 +68,7 @@ export function AdminUserManagement() {
           setUsers(response.data.data);
         }
       } catch (error) {
-        console.error('Error fetching users:', error);
-      } finally {
+        } finally {
         setLoading(false);
       }
     };
@@ -198,7 +197,6 @@ export function AdminUserManagement() {
         }
       }
     } catch (error: any) {
-      console.error('Error creating user:', error);
       setCreateUserError(
         error.response?.data?.message || 
         error.response?.data?.errors?.map((e: any) => e.message).join(', ') ||

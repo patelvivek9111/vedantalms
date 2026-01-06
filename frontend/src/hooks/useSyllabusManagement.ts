@@ -52,7 +52,6 @@ export const useSyllabusManagement = ({
         setEditingSyllabus(false);
       }
     } catch (err: any) {
-      console.error('Error saving syllabus fields:', err);
       alert('Failed to save syllabus fields');
     } finally {
       setSavingSyllabus(false);
@@ -88,7 +87,6 @@ export const useSyllabusManagement = ({
       setUploadedSyllabusFiles(prev => [...prev, ...newFiles]);
       setSyllabusFiles(prev => [...prev, ...files]);
     } catch (error: any) {
-      console.error('Error uploading files:', error);
       alert('Error uploading files. Please try again.');
     } finally {
       setUploadingFiles(false);
@@ -121,7 +119,6 @@ export const useSyllabusManagement = ({
         setSyllabusFiles([]);
       }
     } catch (err: any) {
-      console.error('Error saving syllabus:', err);
       alert('Failed to save syllabus');
     } finally {
       setSavingSyllabus(false);

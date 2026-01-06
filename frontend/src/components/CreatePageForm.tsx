@@ -59,8 +59,7 @@ const CreatePageForm: React.FC<CreatePageFormProps> = ({ modules, courseId, onSu
       setAttachments([]);
       onSuccess();
     } catch (error) {
-      console.error('Error creating page:', error);
-    } finally {
+      } finally {
       setIsSubmitting(false);
     }
   };

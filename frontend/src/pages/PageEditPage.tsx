@@ -41,7 +41,6 @@ const PageEditPage: React.FC = () => {
           setError('Failed to load page data');
         }
       } catch (err: any) {
-        console.error('Error fetching page:', err);
         setError(err.response?.data?.message || 'Error loading page');
       } finally {
         setLoading(false);
@@ -81,7 +80,6 @@ const PageEditPage: React.FC = () => {
         throw new Error(response.data.message || 'Failed to update page');
       }
     } catch (err: any) {
-      console.error('Error updating page:', err);
       setError(err.response?.data?.message || 'Error updating page');
     } finally {
       setIsSubmitting(false);

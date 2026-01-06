@@ -121,7 +121,6 @@ const GroupAnnouncements: React.FC<GroupAnnouncementsProps> = ({ courseId, group
       setReplyingTo(null);
       await fetchComments(selectedAnnouncement._id);
     } catch (err) {
-      console.error('Failed to post reply:', err);
     }
     setPosting(false);
   };

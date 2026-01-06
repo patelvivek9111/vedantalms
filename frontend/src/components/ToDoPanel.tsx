@@ -126,7 +126,6 @@ export const ToDoPanel: React.FC = () => {
       setPersonalTodos(todos => todos.filter((t: any) => t._id !== todo._id));
       window.location.href = `/courses/${todo.courseId}/students`;
     } catch (err) {
-      console.error('Error removing enrollment notification:', err);
     }
   };
 

@@ -170,8 +170,7 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
       await onEdit(reply._id, editContent);
       setIsEditing(false);
     } catch (error) {
-      console.error('Error editing reply:', error);
-    } finally {
+      } finally {
       setIsSubmitting(false);
     }
   };
@@ -181,8 +180,7 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
       try {
         await onDelete(reply._id);
       } catch (error) {
-        console.error('Error deleting reply:', error);
-      }
+        }
     }
   };
 
@@ -403,8 +401,7 @@ const ThreadView: React.FC = () => {
         try {
           setReplyContent(savedDraft);
         } catch (e) {
-          console.error('Error loading draft:', e);
-        }
+          }
       }
     }
   }, [threadId, user?._id]);
@@ -471,7 +468,6 @@ const ThreadView: React.FC = () => {
             setLoading(false);
           }
         } catch (err) {
-          console.error('Error fetching group:', err);
           setError('Failed to load group information');
           setLoading(false);
         }
@@ -547,7 +543,6 @@ const ThreadView: React.FC = () => {
             setModules(modulesRes.data.data || []);
           }
       } catch (err) {
-        console.error('Error fetching thread or students:', err);
         setError('Failed to load thread or students');
       } finally {
         setLoading(false);
@@ -599,8 +594,7 @@ const ThreadView: React.FC = () => {
         setShowReplyEditor(false);
       }
     } catch (error) {
-      console.error('Error posting reply:', error);
-    } finally {
+      } finally {
       setIsSubmitting(false);
     }
   };
@@ -622,8 +616,7 @@ const ThreadView: React.FC = () => {
         setThread(response.data.data);
       }
     } catch (error) {
-      console.error('Error liking reply:', error);
-    }
+      }
   };
 
   const handleEditThread = async (e: React.FormEvent) => {
@@ -649,8 +642,7 @@ const ThreadView: React.FC = () => {
         setIsEditing(false);
       }
     } catch (error) {
-      console.error('Error updating thread:', error);
-    } finally {
+      } finally {
       setIsSubmitting(false);
     }
   };
@@ -671,8 +663,7 @@ const ThreadView: React.FC = () => {
         navigate(-1);
       }
     } catch (error) {
-      console.error('Error deleting thread:', error);
-    }
+      }
   };
 
   const handleTogglePin = async () => {
@@ -692,8 +683,7 @@ const ThreadView: React.FC = () => {
         setThread(response.data.data);
       }
     } catch (error) {
-      console.error('Error toggling pin status:', error);
-    }
+      }
   };
 
   const handleEditReply = async (replyId: string, content: string) => {
@@ -713,7 +703,6 @@ const ThreadView: React.FC = () => {
         setThread(response.data.data);
       }
     } catch (error) {
-      console.error('Error updating reply:', error);
       throw error;
     }
   };
@@ -740,7 +729,6 @@ const ThreadView: React.FC = () => {
         }
       }
     } catch (error) {
-      console.error('Error deleting reply:', error);
       throw error;
     }
   };
@@ -782,7 +770,6 @@ const ThreadView: React.FC = () => {
         setGradingError('Failed to submit grade');
       }
     } catch (err) {
-      console.error('Error submitting grade:', err);
       setGradingError('Failed to submit grade. Please try again.');
     } finally {
       setIsGrading(false);
@@ -825,7 +812,6 @@ const ThreadView: React.FC = () => {
         setShowEditModal(false);
       }
     } catch (err) {
-      console.error('Error updating thread settings:', err);
       setError('Failed to update thread settings');
     }
   };

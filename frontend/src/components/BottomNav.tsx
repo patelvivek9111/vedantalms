@@ -47,8 +47,7 @@ const BottomNav: React.FC = () => {
           }
         }
       } catch (error) {
-        console.error('Error loading navigation items:', error);
-      }
+        }
       
       // Default items
       const defaultItems = DEFAULT_NAV_ITEMS
@@ -89,8 +88,7 @@ const BottomNav: React.FC = () => {
             setNavItems(filteredItems);
           }
         } catch (error) {
-          console.error('Error loading navigation items:', error);
-        }
+          }
       }
     };
 

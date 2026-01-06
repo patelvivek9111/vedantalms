@@ -59,7 +59,6 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
           const fetchedPages = await getPages(module._id);
           setPages(fetchedPages);
         } catch (err) {
-          console.error('Error fetching pages:', err);
           setError('Failed to load pages');
         } finally {
           setIsLoadingPages(false);
@@ -82,7 +81,6 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
           });
           setAssignments(res.data);
         } catch (err) {
-          console.error('Assignments fetch error:', err);
           setAssignmentsError('Failed to load assignments');
         } finally {
           setIsLoadingAssignments(false);
@@ -105,7 +103,6 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
           const discussions = res.data.data || res.data || [];
           setDiscussions(discussions);
         } catch (err) {
-          console.error('Discussions fetch error:', err);
           setDiscussionsError('Failed to load discussions');
         } finally {
           setIsLoadingDiscussions(false);
@@ -144,8 +141,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
     try {
       await toggleModulePublish(module._id);
     } catch (err) {
-      console.error('Error toggling publish:', err);
-    } finally {
+      } finally {
       setIsPublishing(false);
     }
   };
@@ -161,8 +157,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
       );
       setAssignmentPublished(prev => ({ ...prev, [assignment._id]: res.data.published }));
     } catch (err) {
-      console.error('Error toggling assignment publish:', err);
-    } finally {
+      } finally {
       setAssignmentPublishing(null);
     }
   };

@@ -73,8 +73,7 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
         });
         setGroupSets(response.data);
       } catch (err: any) {
-        console.error('Error fetching group sets:', err);
-      }
+        }
     };
     fetchGroupSets();
   }, [courseId, isOpen]);
@@ -137,7 +136,6 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
         setError('Failed to create thread');
       }
     } catch (err) {
-      console.error('Error creating thread:', err);
       setError('Failed to create thread. Please try again.');
     } finally {
       setIsSubmitting(false);

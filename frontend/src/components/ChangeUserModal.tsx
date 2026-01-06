@@ -88,7 +88,6 @@ export const ChangeUserModal: React.FC<ChangeUserModalProps> = ({
       const sortedUsers = users.sort((a, b) => b.lastUsed - a.lastUsed);
       setStoredUsers(sortedUsers);
     } catch (error) {
-      console.error('Error loading stored users:', error);
       setStoredUsers([]);
     }
     };
@@ -117,8 +116,7 @@ export const ChangeUserModal: React.FC<ChangeUserModalProps> = ({
       localStorage.setItem(STORAGE_KEY, JSON.stringify(users));
       setStoredUsers(users.sort((a, b) => b.lastUsed - a.lastUsed));
     } catch (error) {
-      console.error('Error saving stored user:', error);
-    }
+      }
   };
 
   const handleSwitchUser = (selectedUser: StoredUser) => {
@@ -184,8 +182,7 @@ export const ChangeUserModal: React.FC<ChangeUserModalProps> = ({
       }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to login. Please check your credentials.');
-      console.error('Login error:', err);
-    } finally {
+      } finally {
       setLoading(false);
     }
   };
@@ -200,8 +197,7 @@ export const ChangeUserModal: React.FC<ChangeUserModalProps> = ({
         setStoredUsers(users);
       }
     } catch (error) {
-      console.error('Error removing user:', error);
-    }
+      }
   };
 
   const isCurrentUser = (userEmail: string) => {

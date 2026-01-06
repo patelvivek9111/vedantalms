@@ -245,7 +245,6 @@ const AssignmentGrading = () => {
       setSelectedSubmission(null);
       setError('');
     } catch (err) {
-      console.error('Delete error:', err.response?.data || err.message);
       setError(err.response?.data?.message || 'Error deleting submission');
     } finally {
       setIsDeleting(false);

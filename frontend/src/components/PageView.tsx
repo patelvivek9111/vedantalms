@@ -31,7 +31,6 @@ const PageView: React.FC = () => {
         }
         setPage(pageData);
       } catch (err) {
-        console.error('Error fetching page:', err);
         setError('Failed to load page');
       } finally {
         setLoading(false);

@@ -17,24 +17,19 @@ class Logger {
   }
 
   debug(message: string, data?: any): void {
-    if (process.env.NODE_ENV === 'development') {
-      console.debug(this.formatMessage('debug', message, data));
-    }
+    // Debug logging disabled
   }
 
   info(message: string, data?: any): void {
-    console.info(this.formatMessage('info', message, data));
+    // Info logging disabled
   }
 
   warn(message: string, data?: any): void {
-    console.warn(this.formatMessage('warn', message, data));
+    // Warn logging disabled
   }
 
   error(message: string, error?: any, extra?: any): void {
-    const errorData = error instanceof Error 
-      ? { message: error.message, stack: error.stack, name: error.name, ...(extra || {}) }
-      : error ? { ...error, ...(extra || {}) } : extra;
-    console.error(this.formatMessage('error', message, errorData));
+    // Error logging disabled
   }
 
   logApiError(message: string, error: any, extra?: any): void {

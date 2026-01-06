@@ -159,9 +159,6 @@ const QuizBuilder: React.FC<QuizBuilderProps> = ({ courseId, quiz, onClose }) =>
 
       onClose();
     } catch (error: any) {
-      console.error('Error saving quiz:', error);
-      console.error('Error response:', error.response?.data);
-      
       let errorMessage = 'Error saving quiz';
       
       if (error.response?.data) {

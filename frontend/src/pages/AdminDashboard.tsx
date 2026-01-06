@@ -80,7 +80,6 @@ export function AdminDashboard() {
           setRecentActivity(activityResponse.data.data || []);
         }
       } catch (error) {
-        console.error('Error fetching admin dashboard data:', error);
         // Keep default values on error
       } finally {
         setLoading(false);

@@ -12,7 +12,6 @@ export const useUnreadMessages = () => {
       const totalUnread = conversations.reduce((sum: number, conv: any) => sum + (conv.unreadCount || 0), 0);
       setUnreadCount(totalUnread);
     } catch (error) {
-      console.error('Error fetching unread messages:', error);
       setUnreadCount(0);
     } finally {
       setLoading(false);

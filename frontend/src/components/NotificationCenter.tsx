@@ -59,8 +59,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose
         setUnreadCount(response.data.unreadCount || 0);
       }
     } catch (error) {
-      console.error('Error fetching notifications:', error);
-    } finally {
+      } finally {
       setLoading(false);
     }
   };
@@ -73,8 +72,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose
       );
       setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (error) {
-      console.error('Error marking notification as read:', error);
-    }
+      }
   };
 
   const handleMarkAllAsRead = async () => {
@@ -84,8 +82,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose
       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
       setUnreadCount(0);
     } catch (error) {
-      console.error('Error marking all as read:', error);
-    } finally {
+      } finally {
       setMarkingAll(false);
     }
   };
@@ -99,8 +96,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose
       }
       setNotifications(prev => prev.filter(n => n._id !== id));
     } catch (error) {
-      console.error('Error deleting notification:', error);
-    }
+      }
   };
 
   const handleNotificationClick = async (notification: Notification) => {

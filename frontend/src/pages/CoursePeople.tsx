@@ -63,8 +63,7 @@ const CoursePeople: React.FC = () => {
         }
       } catch (err: any) {
         setError('Failed to load course people');
-        console.error('Error fetching course people:', err);
-      } finally {
+        } finally {
         setLoading(false);
       }
     };
@@ -85,7 +84,6 @@ const CoursePeople: React.FC = () => {
       
       alert('Enrollment approved successfully!');
     } catch (err: any) {
-      console.error('Error approving enrollment:', err);
       alert('Failed to approve enrollment');
     }
   };
@@ -99,7 +97,6 @@ const CoursePeople: React.FC = () => {
       
       alert('Enrollment denied successfully!');
     } catch (err: any) {
-      console.error('Error denying enrollment:', err);
       alert('Failed to deny enrollment');
     }
   };
@@ -113,7 +110,6 @@ const CoursePeople: React.FC = () => {
       await api.post(`/courses/${courseId}/unenroll`, { studentId });
       setStudents(prev => prev.filter(student => student._id !== studentId));
     } catch (err: any) {
-      console.error('Error removing student:', err);
       alert('Failed to remove student');
     }
   };

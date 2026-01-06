@@ -73,8 +73,7 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
           semesterYear: course.semester?.year?.toString() || new Date().getFullYear().toString()
         });
         } catch (err) {
-          console.error('Error fetching course:', err);
-        }
+          }
       };
       fetchCourse();
     }
@@ -151,8 +150,7 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
        }
        navigate('/dashboard');
     } catch (err) {
-      console.error('Error submitting form:', err);
-    }
+      }
   };
 
   const handleChange = (

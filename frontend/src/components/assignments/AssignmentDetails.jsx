@@ -51,7 +51,6 @@ const AssignmentDetails = () => {
         }
         setLoading(false);
       } catch (err) {
-        console.error('Error fetching assignment details:', err);
         setError('Error fetching assignment details');
         setLoading(false);
       }
@@ -109,8 +108,7 @@ const AssignmentDetails = () => {
       );
       setAssignment(prev => ({ ...prev, published: res.data.published }));
     } catch (err) {
-      console.error('Error toggling assignment publish:', err);
-    } finally {
+      } finally {
       setIsPublishing(false);
     }
   };

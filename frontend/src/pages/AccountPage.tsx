@@ -43,13 +43,10 @@ function ProfileSection() {
     } catch (err: any) {
       // Show detailed error message if available
       if (err.response && err.response.data && err.response.data.message) {
-        console.error('Profile update error:', err.response.data);
         alert('Failed to update profile: ' + err.response.data.message);
       } else if (err.message) {
-        console.error('Profile update error:', err);
         alert('Failed to update profile: ' + err.message);
       } else {
-        console.error('Profile update error:', err);
         alert('Failed to update profile: Unknown error');
       }
     } finally {

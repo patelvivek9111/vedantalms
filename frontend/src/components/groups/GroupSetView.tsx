@@ -45,7 +45,6 @@ const GroupSetView: React.FC = () => {
         const groupSetRes = await api.get(`/groups/sets/id/${groupSetId}`);
         setGroupSet(groupSetRes.data);
       } catch (err: any) {
-        console.error('Error fetching groupset data:', err);
         setError('Failed to load groupset data');
       } finally {
         setLoading(false);

@@ -82,15 +82,13 @@ export function AdminCourseOversight() {
                 }
               } catch (error) {
                 // Skip if we can't get average (course might have no grades yet)
-                console.warn(`Could not fetch class average for course ${course._id}:`, error);
-              }
+                }
               
               return {
                 ...course,
                 classAverage: classAverage
               };
             } catch (error) {
-              console.error(`Error processing course ${course._id}:`, error);
               return {
                 ...course,
                 classAverage: undefined
@@ -102,8 +100,7 @@ export function AdminCourseOversight() {
           setFilteredCourses(coursesWithAverages);
         }
       } catch (error) {
-        console.error('Error fetching courses:', error);
-      } finally {
+        } finally {
         setLoading(false);
       }
     };
@@ -224,15 +221,13 @@ export function AdminCourseOversight() {
                 }
               } catch (error) {
                 // Skip if we can't get average (course might have no grades yet)
-                console.warn(`Could not fetch class average for course ${course._id}:`, error);
-              }
+                }
               
               return {
                 ...course,
                 classAverage: classAverage
               };
             } catch (error) {
-              console.error(`Error processing course ${course._id}:`, error);
               return {
                 ...course,
                 classAverage: undefined
@@ -248,7 +243,6 @@ export function AdminCourseOversight() {
         setSelectedCourse(null);
       }
     } catch (error: any) {
-      console.error('Error updating course:', error);
       alert(error.response?.data?.message || 'Failed to update course');
     } finally {
       setSaving(false);

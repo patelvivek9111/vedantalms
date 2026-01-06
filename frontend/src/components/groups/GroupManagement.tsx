@@ -192,7 +192,6 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
       // Redirect to the new group's page
       navigate(`/groups/${response.data._id}`);
     } catch (err: any) {
-      console.error("Error creating group:", err.response?.data || err.message);
       setError(err.response?.data?.message || err.response?.data?.error || 'Error creating group');
     }
   };

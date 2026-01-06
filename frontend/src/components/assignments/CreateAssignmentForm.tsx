@@ -156,7 +156,6 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
           setError('Error fetching current module');
         }
       } catch (err: any) {
-        console.error('Error fetching modules:', err);
         if (err.response?.status === 404) {
           setError('Module not found. Please make sure you are accessing a valid module.');
           // Redirect to course page after 3 seconds
@@ -188,8 +187,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
         });
         setGroupSets(response.data);
       } catch (err: any) {
-        console.error('Error fetching group sets:', err);
-      }
+        }
     };
     fetchGroupSets();
   }, [courseId]);
@@ -208,7 +206,6 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
           setSubmissionCount(response.data.length);
           setHasSubmissions(response.data.length > 0);
         } catch (err) {
-          console.error('Error fetching submission count:', err);
           setSubmissionCount(0);
           setHasSubmissions(false);
         }
@@ -249,8 +246,6 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
           rightItems: q.rightItems || []
         }));
       }
-      
-      console.log('Loading assignment for edit - Questions:', questions);
       
       const formDataToSet = {
         title: assignmentData.title || '',
@@ -530,7 +525,6 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
         }
       }
     } catch (err: any) {
-      console.error(editMode ? 'Error updating assignment:' : 'Error creating assignment:', err);
       if (err.response?.status === 403) {
         setError(`You are not authorized to ${editMode ? 'update' : 'create'} assignments. Please contact your administrator.`);
       } else if (err.response?.status === 400 && err.response?.data?.submissionCount) {

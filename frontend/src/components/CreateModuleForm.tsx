@@ -22,8 +22,7 @@ const CreateModuleForm: React.FC<CreateModuleFormProps> = ({ courseId, onSuccess
       setTitle('');
       onSuccess();
     } catch (error) {
-      console.error('Error creating module:', error);
-    } finally {
+      } finally {
       setIsSubmitting(false);
     }
   };

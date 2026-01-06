@@ -39,7 +39,6 @@ const ModuleEditPage: React.FC = () => {
           setError('Failed to load module data');
         }
       } catch (err: any) {
-        console.error('Error fetching module:', err);
         setError(err.response?.data?.message || 'Error loading module');
       } finally {
         setLoading(false);
@@ -73,7 +72,6 @@ const ModuleEditPage: React.FC = () => {
       await updateModule(moduleId, formData, courseId);
       navigate(-1); // Go back to previous page after successful update
     } catch (err: any) {
-      console.error('Error updating module:', err);
       setError(err.response?.data?.message || 'Error updating module');
     } finally {
       setIsSubmitting(false);

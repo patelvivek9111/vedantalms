@@ -33,7 +33,6 @@ const QuizWaveDashboard: React.FC<QuizWaveDashboardProps> = ({ courseId }) => {
 
   const loadQuizzes = async () => {
     if (!courseId || courseId.trim() === '') {
-      console.error('Course ID is missing');
       setLoading(false);
       return;
     }
@@ -46,8 +45,7 @@ const QuizWaveDashboard: React.FC<QuizWaveDashboardProps> = ({ courseId }) => {
       // Check for active sessions and restore if any
       await checkActiveSessions(data);
     } catch (error) {
-      console.error('Error loading quizzes:', error);
-    } finally {
+      } finally {
       setLoading(false);
     }
   };
@@ -68,7 +66,6 @@ const QuizWaveDashboard: React.FC<QuizWaveDashboardProps> = ({ courseId }) => {
         return null;
       } catch (error) {
         // Silently fail - quiz might not have sessions yet
-        console.error(`Error checking sessions for quiz ${quiz._id}:`, error);
         return null;
       }
     });
@@ -122,7 +119,6 @@ const QuizWaveDashboard: React.FC<QuizWaveDashboardProps> = ({ courseId }) => {
       setActiveSession(session._id);
       setRetryingQuiz(null);
     } catch (error: any) {
-      console.error('Error starting session:', error);
       setRetryingQuiz(null);
       
       const errorMessage = error.response?.data?.message || 
@@ -244,15 +240,10 @@ const QuizWaveDashboard: React.FC<QuizWaveDashboardProps> = ({ courseId }) => {
                 key={quiz._id}
                 className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 sm:p-6 hover:shadow-xl transition-shadow"
               >
-                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100 mb-3 sm:mb-4 text-center">
                   {quiz.title}
                 </h3>
-                {quiz.description && (
-                  <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm mb-3 sm:mb-4 line-clamp-2">
-                    {quiz.description}
-                  </p>
-                )}
-                <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm text-gray-500 dark:text-gray-400 mb-3 sm:mb-4">
+                <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 text-xs sm:text-sm text-gray-500 dark:text-gray-400 mb-3 sm:mb-4">
                   <div className="flex items-center gap-1">
                     <List className="w-3 h-3 sm:w-4 sm:h-4" />
                     <span>{quiz.questions.length} questions</span>
@@ -291,6 +282,8 @@ const QuizWaveDashboard: React.FC<QuizWaveDashboardProps> = ({ courseId }) => {
                   >
                     <Edit className="w-4 h-4" />
                   </button>
+                </div>
+                <div className="flex justify-center mt-2">
                   <button
                     onClick={() => handleDeleteQuiz(quiz._id)}
                     className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"

@@ -61,16 +61,38 @@ const StudentGameScreen: React.FC = () => {
       return;
     }
 
+    let sock: any = null;
+
     const initializeGame = async () => {
       try {
         // Load session first to verify it exists and is joinable
         await loadSession();
         
         // Then set up socket
-        const sock = getQuizWaveSocket(token);
+        sock = getQuizWaveSocket(token);
         setSocket(sock);
 
-        sock.on('quizwave:joined', (data) => {
+        // Wait for socket to connect if not already connected
+        if (!sock.connected) {
+          await new Promise((resolve) => {
+            if (sock.connected) {
+              resolve(true);
+            } else {
+              sock.once('connect', () => resolve(true));
+              sock.once('connect_error', () => resolve(false));
+            }
+          });
+        }
+
+        // Remove any existing listeners first to prevent duplicates
+        sock.off('quizwave:joined');
+        sock.off('quizwave:question-started');
+        sock.off('quizwave:answer-received');
+        sock.off('quizwave:quiz-ended');
+        sock.off('quizwave:error');
+
+        sock.on('quizwave:joined', (data: any) => {
+          console.log('Student joined:', data);
           setStatus(data.status);
           // Reload session to get full quiz data if quiz has started
           if (data.currentQuestionIndex >= 0) {
@@ -78,7 +100,7 @@ const StudentGameScreen: React.FC = () => {
               if (sessionData?.quiz && typeof sessionData.quiz === 'object' && 'questions' in sessionData.quiz && data.currentQuestionIndex >= 0) {
                 const question = sessionData.quiz.questions[data.currentQuestionIndex];
                 if (question) {
-                  setCurrentQuestion(question);
+                  setCurrentQuestion({ ...question, questionIndex: data.currentQuestionIndex });
                   setTimeRemaining(question.timeLimit);
                 }
               }
@@ -86,19 +108,26 @@ const StudentGameScreen: React.FC = () => {
           }
         });
 
-        sock.on('quizwave:question-started', (data) => {
-          setCurrentQuestion(data);
-          setTimeRemaining(data.timeLimit);
-          setSelectedAnswer([]);
-          setAnswered(false);
-          setAnswerResult(null);
-          setShowColorAnimation(false);
-          setTimeUp(false);
-          setShowResultMessage(false);
-          setStatus('active');
+        sock.on('quizwave:question-started', (data: any) => {
+          console.log('Question started:', data);
+          // Ensure questionIndex is set correctly
+          if (data && typeof data.questionIndex === 'number') {
+            setCurrentQuestion(data);
+            setTimeRemaining(data.timeLimit || 30);
+            setSelectedAnswer([]);
+            setAnswered(false);
+            setAnswerResult(null);
+            setShowColorAnimation(false);
+            setTimeUp(false);
+            setShowResultMessage(false);
+            setStatus('active');
+          } else {
+            console.error('Invalid question data received:', data);
+          }
         });
 
-        sock.on('quizwave:answer-received', (data) => {
+        sock.on('quizwave:answer-received', (data: any) => {
+          console.log('Answer received:', data);
           setAnswerResult({
             isCorrect: data.isCorrect,
             points: data.points
@@ -107,21 +136,20 @@ const StudentGameScreen: React.FC = () => {
           // Just store the result for later display
         });
 
-        sock.on('quizwave:quiz-ended', (data) => {
+        sock.on('quizwave:quiz-ended', (data: any) => {
+          console.log('Quiz ended:', data);
           setLeaderboard(data.leaderboard);
           setStatus('ended');
         });
 
-        sock.on('quizwave:error', (data) => {
-          console.error('QuizWave error:', data);
+        sock.on('quizwave:error', (data: any) => {
+          console.error('Socket error:', data);
           const errorMessage = data.message || 'An error occurred';
           
           // Don't show alert for "Question not found" - it might be a timing issue
           // Instead, try to reload the session
           if (errorMessage.includes('Question not found')) {
-            console.warn('Question not found, attempting to reload session...');
             loadSession().catch(err => {
-              console.error('Failed to reload session:', err);
               alert('Error loading question. Please refresh the page.');
             });
             return;
@@ -135,7 +163,13 @@ const StudentGameScreen: React.FC = () => {
         });
 
         // Join session via socket
-        sock.emit('quizwave:join', { gamePin: pin, nickname });
+        if (sock.connected) {
+          sock.emit('quizwave:join', { gamePin: pin, nickname });
+        } else {
+          sock.once('connect', () => {
+            sock.emit('quizwave:join', { gamePin: pin, nickname });
+          });
+        }
       } catch (error) {
         console.error('Error initializing game:', error);
         navigate('/quizwave/join');
@@ -148,12 +182,12 @@ const StudentGameScreen: React.FC = () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
-      if (socket) {
-        socket.off('quizwave:joined');
-        socket.off('quizwave:question-started');
-        socket.off('quizwave:answer-received');
-        socket.off('quizwave:quiz-ended');
-        socket.off('quizwave:error');
+      if (sock) {
+        sock.off('quizwave:joined');
+        sock.off('quizwave:question-started');
+        sock.off('quizwave:answer-received');
+        sock.off('quizwave:quiz-ended');
+        sock.off('quizwave:error');
       }
     };
   }, [pin, nickname, token, navigate]);
@@ -220,10 +254,33 @@ const StudentGameScreen: React.FC = () => {
   };
 
   const handleSubmitAnswerWithSelection = (selection: number[]) => {
-    if (answered || selection.length === 0 || !socket) return;
+    if (answered || selection.length === 0 || !socket || !currentQuestion) {
+      console.log('Cannot submit answer:', { answered, selection, socket: !!socket, currentQuestion: !!currentQuestion });
+      return;
+    }
+    
+    // Safety check: ensure questionIndex is valid
+    if (typeof currentQuestion.questionIndex !== 'number') {
+      console.error('Invalid questionIndex:', currentQuestion.questionIndex);
+      return;
+    }
+
+    // Check if socket is connected
+    if (!socket.connected) {
+      console.error('Socket not connected');
+      alert('Connection lost. Please refresh the page.');
+      return;
+    }
 
     const startTime = currentQuestion.timeLimit;
     const timeTaken = (startTime - timeRemaining) * 1000; // Convert to milliseconds
+
+    console.log('Submitting answer:', {
+      sessionId: session?._id,
+      questionIndex: currentQuestion.questionIndex,
+      selectedOptions: selection,
+      timeTaken
+    });
 
     socket.emit('quizwave:answer', {
       sessionId: session?._id,
@@ -240,10 +297,33 @@ const StudentGameScreen: React.FC = () => {
   };
 
   const handleSubmitAnswer = () => {
-    if (answered || selectedAnswer.length === 0 || !socket) return;
+    if (answered || selectedAnswer.length === 0 || !socket || !currentQuestion) {
+      console.log('Cannot submit answer:', { answered, selectedAnswer, socket: !!socket, currentQuestion: !!currentQuestion });
+      return;
+    }
+    
+    // Safety check: ensure questionIndex is valid
+    if (typeof currentQuestion.questionIndex !== 'number') {
+      console.error('Invalid questionIndex:', currentQuestion.questionIndex);
+      return;
+    }
+
+    // Check if socket is connected
+    if (!socket.connected) {
+      console.error('Socket not connected');
+      alert('Connection lost. Please refresh the page.');
+      return;
+    }
 
     const startTime = currentQuestion.timeLimit;
     const timeTaken = (startTime - timeRemaining) * 1000; // Convert to milliseconds
+
+    console.log('Submitting answer:', {
+      sessionId: session?._id,
+      questionIndex: currentQuestion.questionIndex,
+      selectedOptions: selectedAnswer,
+      timeTaken
+    });
 
     socket.emit('quizwave:answer', {
       sessionId: session?._id,

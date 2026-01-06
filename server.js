@@ -51,17 +51,6 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Add request logging (both dev and production for debugging)
-app.use((req, res, next) => {
-  if (process.env.NODE_ENV !== 'production' || req.path.startsWith('/api')) {
-    console.log(`${req.method} ${req.path} - Headers:`, {
-      'content-type': req.headers['content-type'],
-      'origin': req.headers.origin,
-      'user-agent': req.headers['user-agent']?.substring(0, 50)
-    });
-  }
-  next();
-});
 
 // Set default JWT secret if not in environment
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-123';
@@ -101,7 +90,7 @@ if (!MONGODB_URI.startsWith('mongodb://') && !MONGODB_URI.startsWith('mongodb+sr
   // Look for mongodb:// or mongodb+srv:// in the string
   const mongodbMatch = MONGODB_URI.match(/(mongodb(?:\+srv)?:\/\/[^\s]+)/);
   if (mongodbMatch) {
-    console.warn('⚠️  Warning: Found MongoDB URI embedded in string, extracting it...');
+    // Warning: Found MongoDB URI embedded in string, extracting it...
     MONGODB_URI = mongodbMatch[1];
   } else {
     console.error('❌ MongoDB connection error: Invalid connection string format');
@@ -121,27 +110,7 @@ if (!MONGODB_URI.startsWith('mongodb://') && !MONGODB_URI.startsWith('mongodb+sr
 
 mongoose.connect(MONGODB_URI, mongoOptions)
   .then(() => {
-    console.log('✅ Connected to MongoDB');
-    console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-    
-    // Log connection details (without password)
-    const connection = mongoose.connection;
-    const dbName = connection.db.databaseName;
-    const host = connection.host;
-    const port = connection.port;
-    
-    // Extract cluster name from URI if it's Atlas
-    let clusterInfo = '';
-    if (MONGODB_URI.includes('mongodb+srv://')) {
-      const clusterMatch = MONGODB_URI.match(/@([^.]+)\.mongodb\.net/);
-      if (clusterMatch) {
-        clusterInfo = ` (Cluster: ${clusterMatch[1]})`;
-      }
-    }
-    
-    console.log(`📊 Database: ${dbName}`);
-    console.log(`🔗 Connection: ${host}${port ? ':' + port : ''}${clusterInfo}`);
-    console.log(`📝 MongoDB URI: ${MONGODB_URI.replace(/:[^:@]+@/, ':****@')}`); // Hide password
+    // Connected to MongoDB
   })
   .catch((err) => {
     console.error('❌ MongoDB connection error:', err.message);
@@ -232,7 +201,7 @@ app.post('/api/upload', protect, upload.array('files', 10), async (req, res) => 
           cloudinary: true
         }));
       } catch (cloudinaryError) {
-        console.error('Cloudinary upload failed, falling back to local storage:', cloudinaryError);
+        // Cloudinary upload failed, falling back to local storage
         // Fallback to local storage
         files = req.files.map(file => ({
           originalname: file.originalname,
@@ -280,8 +249,6 @@ app.use((err, req, res, next) => {
 
 // API route not found handler (must be after all API routes but before static files)
 app.use('/api/*', (req, res) => {
-  // Log the request for debugging
-  console.log(`API route not found: ${req.method} ${req.path}`);
   res.status(404).json({ 
     message: 'API route not found', 
     path: req.path,
@@ -345,7 +312,7 @@ const io = new Server(server, {
 const { initializeQuizWaveSocket } = require('./socket/quizwave.socket');
 initializeQuizWaveSocket(io);
 
-console.log('✅ Socket.io initialized for QuizWave');
+// Socket.io initialized for QuizWave
 
 // Start QuizWave auto-cleanup scheduler
 const { startCleanupScheduler } = require('./utils/quizwaveCleanup');
@@ -356,28 +323,25 @@ if (process.env.NODE_ENV !== 'test') {
   // Start server
   const PORT = process.env.PORT || 5000;
   server.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`📱 Health check: http://localhost:${PORT}/health`);
-    console.log(`🔗 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🎮 QuizWave Socket.io ready`);
+    // Server running
   });
 
   // Graceful shutdown
   process.on('SIGTERM', () => {
-    console.log('🛑 SIGTERM received, shutting down gracefully');
+    // SIGTERM received, shutting down gracefully
     io.close(() => {
       mongoose.connection.close(() => {
-        console.log('✅ MongoDB connection closed');
+        // MongoDB connection closed
         process.exit(0);
       });
     });
   });
 
   process.on('SIGINT', () => {
-    console.log('🛑 SIGINT received, shutting down gracefully');
+    // SIGINT received, shutting down gracefully
     io.close(() => {
       mongoose.connection.close(() => {
-        console.log('✅ MongoDB connection closed');
+        // MongoDB connection closed
         process.exit(0);
       });
     });

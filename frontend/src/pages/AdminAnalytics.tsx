@@ -62,8 +62,7 @@ export function AdminAnalytics() {
           });
         }
       } catch (error) {
-        console.error('Error fetching analytics:', error);
-      } finally {
+        } finally {
         setLoading(false);
       }
     };

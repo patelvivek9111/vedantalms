@@ -52,7 +52,6 @@ const Transcript: React.FC = () => {
           setAvailableSemesters(semesters);
         }
       } catch (err: any) {
-        console.error('Error fetching semesters:', err);
         setError(err.response?.data?.message || 'Failed to load semesters');
       }
     };
@@ -77,7 +76,6 @@ const Transcript: React.FC = () => {
         setTranscriptData(response.data.data);
       }
     } catch (err: any) {
-      console.error('Error fetching transcript:', err);
       setError(err.response?.data?.message || 'Failed to load transcript');
     } finally {
       setLoading(false);
@@ -114,8 +112,7 @@ const Transcript: React.FC = () => {
             allCourses.push(...response.data.data.courses);
           }
         } catch (err) {
-          console.error(`Error fetching courses for ${semester.term} ${semester.year}:`, err);
-        }
+          }
       }
       
       setAllCoursesData({
@@ -123,8 +120,7 @@ const Transcript: React.FC = () => {
         totalCredits: allCourses.reduce((sum, course) => sum + (course.creditHours || 0), 0)
       });
     } catch (err: any) {
-      console.error('Error fetching all courses:', err);
-    } finally {
+      } finally {
       setLoadingAllCourses(false);
     }
   };

@@ -22,8 +22,7 @@ const ModuleList: React.FC<ModuleListProps> = ({ courseId }) => {
   useEffect(() => {
     if (courseId) {
       getModulesRef.current(courseId).catch(err => {
-        console.error('Error in ModuleList useEffect:', err);
-      });
+        });
     }
   }, [courseId]);
 

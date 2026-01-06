@@ -114,8 +114,7 @@ const Announcements: React.FC<AnnouncementsProps> = ({ courseId }) => {
       setReplyingTo(null);
       await fetchComments(selectedAnnouncement._id);
     } catch (err) {
-      console.error('Failed to post reply:', err);
-    }
+      }
     setPosting(false);
   };
 

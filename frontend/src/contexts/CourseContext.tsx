@@ -78,7 +78,6 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setError(response.data.message || 'Failed to fetch courses');
       }
     } catch (err: any) {
-      console.error('Error fetching courses:', err);
       setError(err.response?.data?.message || 'Error fetching courses');
     } finally {
       setLoading(false);
@@ -100,7 +99,6 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         throw new Error(response.data.message || 'Failed to fetch course');
       }
     } catch (err: any) {
-      console.error('Error fetching course:', err);
       setError(err.response?.data?.message || 'Error fetching course');
       throw err;
     } finally {
@@ -124,7 +122,6 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setError(response.data.message || 'Failed to create course');
       }
     } catch (err: any) {
-      console.error('Error creating course:', err);
       setError(err.response?.data?.message || 'Error creating course');
       throw err;
     } finally {
@@ -152,7 +149,6 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setError(response.data.message || 'Failed to update course');
       }
     } catch (err: any) {
-      console.error('Error updating course:', err);
       setError(err.response?.data?.message || 'Error updating course');
       throw err;
     } finally {
@@ -171,7 +167,6 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setError(response.data.message || 'Failed to delete course');
       }
     } catch (err: any) {
-      console.error('Error deleting course:', err);
       setError(err.response?.data?.message || 'Error deleting course');
       throw err;
     } finally {
@@ -192,7 +187,6 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setError(response.data.message || 'Failed to enroll student');
       }
     } catch (err: any) {
-      console.error('Error enrolling student:', err);
       setError(err.response?.data?.message || 'Error enrolling student');
       throw err;
     } finally {
@@ -208,7 +202,6 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         await getCourse(courseId);
       }
     } catch (err) {
-      console.error('Error unenrolling student:', err);
       throw err;
     }
   };
@@ -217,8 +210,7 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (token && user?._id) {
       // Fetch courses when token and user are available
       getCourses().catch(err => {
-        console.error('Error in CourseProvider useEffect:', err);
-      });
+        });
     } else {
       // Clear courses when token is removed or user changes (logout or new login)
       setCourses([]);
@@ -252,7 +244,6 @@ export const useCourse = () => {
   const context = useContext(CourseContext);
   if (!context) {
     // Return a default value instead of throwing to prevent crashes during transitions
-    console.warn('useCourse called outside CourseProvider, returning default values');
     return {
       courses: [],
       loading: false,

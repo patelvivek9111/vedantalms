@@ -94,7 +94,6 @@ export const exportGradebookCSV = (
     a.click();
     window.URL.revokeObjectURL(url);
   } catch (error) {
-    console.error('Error exporting gradebook:', error);
     alert('Failed to export gradebook CSV');
   }
 };

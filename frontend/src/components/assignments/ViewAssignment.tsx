@@ -149,9 +149,9 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
   const navigate = useNavigate();
   const [courseId, setCourseId] = useState<string | undefined>(propCourseId);
   
-  // Debug: Log when courseId changes
+  // Track courseId changes
   useEffect(() => {
-    console.log('[CourseId] courseId changed:', courseId, 'propCourseId:', propCourseId);
+    // courseId tracking
   }, [courseId, propCourseId]);
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [submission, setSubmission] = useState<Submission | null>(null);
@@ -325,7 +325,6 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
             });
             if (moduleRes.data.success) {
               const fetchedCourseId = moduleRes.data.data.course._id || moduleRes.data.data.course;
-              console.log('[CourseId] Setting courseId from module:', fetchedCourseId);
               setCourseId(fetchedCourseId);
             }
           } catch (err) {
@@ -475,72 +474,47 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
   // Fetch course-level grade data
   useEffect(() => {
     const fetchCourseGradeData = async () => {
-      console.log('[Course Grade Fetch] Starting fetch', {
-        courseId,
-        userId: user?._id,
-        userRole: user?.role,
-        isInstructor,
-        isStudent,
-        hasToken: !!localStorage.getItem('token')
-      });
-      
       if (!courseId) {
-        console.log('[Course Grade Fetch] No courseId, cannot fetch');
         return;
       }
       
       if (!user) {
-        console.log('[Course Grade Fetch] No user, cannot fetch');
         return;
       }
       
       try {
         const token = localStorage.getItem('token');
         if (!token) {
-          console.log('[Course Grade Fetch] No token, cannot fetch');
           return;
         }
 
         if (isInstructor) {
           // Fetch course class average for teachers
-          console.log('[Course Grade Fetch] Fetching teacher course average for courseId:', courseId);
           try {
             const response = await axios.get(`${API_URL}/api/grades/course/${courseId}/average`, {
               headers: { 'Authorization': `Bearer ${token}` }
             });
-            console.log('[Course Grade Fetch] Teacher API response:', response.data);
             if (response.data && response.data.average !== null && response.data.average !== undefined) {
               setCourseAverage(response.data.average);
-              console.log('[Course Grade] Teacher course average set:', response.data.average);
-            } else {
-              console.log('[Course Grade] Teacher response has no average:', response.data);
             }
           } catch (err: any) {
-            console.log('[Course Grade] Error fetching course average:', err.response?.data || err.message);
+            // Error fetching course average
           }
         } else if (isStudent) {
           // Fetch student's overall course grade
-          console.log('[Course Grade Fetch] Fetching student course grade for courseId:', courseId);
           try {
             const response = await axios.get(`${API_URL}/api/grades/student/course/${courseId}`, {
               headers: { 'Authorization': `Bearer ${token}` }
             });
-            console.log('[Course Grade Fetch] Student API response:', response.data);
             if (response.data && response.data.totalPercent !== null && response.data.totalPercent !== undefined) {
               setStudentCourseGrade(response.data.totalPercent);
-              console.log('[Course Grade] Student course grade set:', response.data.totalPercent);
-            } else {
-              console.log('[Course Grade] Student response has no totalPercent:', response.data);
             }
           } catch (err: any) {
-            console.log('[Course Grade] Error fetching student course grade:', err.response?.data || err.message);
+            // Error fetching student course grade
           }
-        } else {
-          console.log('[Course Grade Fetch] User is neither instructor nor student');
         }
       } catch (err) {
         logger.error('Error fetching course grade data', err instanceof Error ? err : new Error(String(err)));
-        console.log('[Course Grade Fetch] General error:', err);
       }
     };
 
@@ -963,15 +937,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
           <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100 truncate px-2">{assignment.title}</h1>
           {/* Grade Badge - Mobile - Shows Course-Level Data */}
           {(() => {
-            console.log('[Grade Badge Mobile Render]', {
-              isInstructor,
-              isStudent,
-              courseAverage,
-              studentCourseGrade
-            });
-            
             if (isInstructor && courseAverage !== null) {
-              console.log('[Grade Badge Mobile] Rendering teacher badge:', courseAverage);
               return (
                 <div className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 rounded-full">
                   <span className="text-xs font-semibold text-blue-800 dark:text-blue-200">
@@ -980,7 +946,6 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                 </div>
               );
             } else if (isStudent && studentCourseGrade !== null) {
-              console.log('[Grade Badge Mobile] Rendering student badge:', studentCourseGrade);
               return (
                 <div className="px-2 py-1 bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-full">
                   <span className="text-xs font-semibold text-green-800 dark:text-green-200">
@@ -989,7 +954,6 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                 </div>
               );
             }
-            console.log('[Grade Badge Mobile] Not rendering badge');
             return null;
           })()}
           <div className="w-10"></div> {/* Spacer for centering */}
@@ -1004,18 +968,8 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                 <h1 className="hidden lg:block text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 dark:text-gray-100 break-words">{assignment.title}</h1>
                 {/* Grade Badge - Desktop - Shows Course-Level Data - Visible on all screen sizes */}
                 {(() => {
-                  console.log('[Grade Badge Desktop Render]', {
-                    isInstructor,
-                    isStudent,
-                    courseAverage,
-                    studentCourseGrade,
-                    courseId,
-                    assignment: assignment ? { title: assignment.title } : null
-                  });
-                  
                   if (isInstructor && courseAverage !== null) {
                     // Show course class average for teachers
-                    console.log('[Grade Badge Desktop] Rendering teacher course average badge:', courseAverage);
                     return (
                       <div className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 rounded-full">
                         <span className="text-xs sm:text-sm font-semibold text-blue-800 dark:text-blue-200">
@@ -1025,7 +979,6 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                     );
                   } else if (isStudent && studentCourseGrade !== null) {
                     // Show student's overall course grade
-                    console.log('[Grade Badge Desktop] Rendering student course grade badge:', studentCourseGrade);
                     return (
                       <div className="px-3 py-1 bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-full">
                         <span className="text-xs sm:text-sm font-semibold text-green-800 dark:text-green-200">
@@ -1034,7 +987,6 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                       </div>
                     );
                   }
-                  console.log('[Grade Badge Desktop] Not rendering badge - conditions not met');
                   return null;
                 })()}
               </div>

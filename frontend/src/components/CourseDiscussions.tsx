@@ -72,7 +72,6 @@ const CourseDiscussions: React.FC<CourseDiscussionsProps> = ({ courseId, courseG
           setError('Failed to fetch discussion threads');
         }
       } catch (err) {
-        console.error('Error fetching threads:', err);
         setError('Failed to load discussion threads');
       } finally {
         setLoading(false);

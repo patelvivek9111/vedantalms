@@ -78,7 +78,6 @@ const AssignmentGradingWrapper: React.FC = () => {
           }
         }
       } catch (err) {
-        console.error('Error fetching course data:', err);
       } finally {
         setLoading(false);
       }

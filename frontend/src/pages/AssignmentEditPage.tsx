@@ -48,8 +48,6 @@ const AssignmentEditPage: React.FC = () => {
         if (response.data) {
           // Handle both direct response.data and nested response.data.data
           const assignment = response.data.data || response.data;
-          console.log('Fetched assignment:', assignment);
-          console.log('Assignment questions:', assignment.questions);
           setAssignment(assignment);
           
           // Get module ID from assignment
@@ -79,7 +77,6 @@ const AssignmentEditPage: React.FC = () => {
           setError('Failed to load assignment data');
         }
       } catch (err: any) {
-        console.error('Error fetching assignment:', err);
         setError(err.response?.data?.message || 'Error loading assignment');
       } finally {
         setLoading(false);

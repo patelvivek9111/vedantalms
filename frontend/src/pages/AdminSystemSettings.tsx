@@ -68,7 +68,6 @@ export function AdminSystemSettings() {
           setConfig(response.data.data);
         }
       } catch (error) {
-        console.error('Error fetching system settings:', error);
         setSaveMessage({ type: 'error', text: 'Failed to load system settings' });
       } finally {
         setLoading(false);
@@ -104,7 +103,6 @@ export function AdminSystemSettings() {
       setSaveMessage({ type: 'success', text: 'Settings saved successfully!' });
       setTimeout(() => setSaveMessage(null), 3000);
     } catch (error: any) {
-      console.error('Error saving settings:', error);
       setSaveMessage({ 
         type: 'error', 
         text: error.response?.data?.message || 'Failed to save settings' 
@@ -130,7 +128,6 @@ export function AdminSystemSettings() {
         setSaveMessage({ type: 'success', text: response.data.message });
       }
     } catch (error: any) {
-      console.error('Error testing email:', error);
       setSaveMessage({ 
         type: 'error', 
         text: error.response?.data?.message || 'Failed to test email configuration' 

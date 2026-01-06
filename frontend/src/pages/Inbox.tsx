@@ -188,11 +188,8 @@ const Inbox: React.FC = () => {
       setError(null);
       try {
         const data = await fetchConversations();
-        console.log('Fetched conversations:', data);
-        console.log('Current user ID:', currentUserId);
         setConversations(data || []);
       } catch (err: any) {
-        console.error('Error loading conversations:', err);
         setError('Failed to load conversations');
         setConversations([]);
       } finally {

@@ -82,8 +82,7 @@ export function TeacherCourseOversight() {
                 }
               } catch (error) {
                 // Skip if we can't get average (course might have no grades yet)
-                console.warn(`Could not fetch class average for course ${course._id}:`, error);
-              }
+                }
               
               // Determine status
               let status: 'active' | 'draft' | 'archived' = 'active';
@@ -106,7 +105,6 @@ export function TeacherCourseOversight() {
                 status: status
               };
             } catch (error) {
-              console.error(`Error processing course ${course._id}:`, error);
               return {
                 ...course,
                 enrollmentCount: course.students?.length || 0,
@@ -120,8 +118,7 @@ export function TeacherCourseOversight() {
           setFilteredCourses(coursesWithStats);
         }
       } catch (error) {
-        console.error('Error fetching courses:', error);
-      } finally {
+        } finally {
         setLoading(false);
       }
     };
@@ -238,7 +235,6 @@ export function TeacherCourseOversight() {
       setShowCourseModal(false);
       setSelectedCourse(null);
     } catch (error: any) {
-      console.error('Error updating course:', error);
       alert(error.response?.data?.message || 'Failed to update course');
     } finally {
       setSaving(false);
@@ -256,7 +252,6 @@ export function TeacherCourseOversight() {
       setCourses(courses.filter(c => c._id !== courseId));
       setFilteredCourses(filteredCourses.filter(c => c._id !== courseId));
     } catch (error: any) {
-      console.error('Error deleting course:', error);
       alert(error.response?.data?.message || 'Failed to delete course');
     }
   };

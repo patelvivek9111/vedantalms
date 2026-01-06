@@ -199,9 +199,7 @@ const CourseDetail: React.FC = () => {
   const fetchCourseAndModulesWithAssignments = useCallback(async () => {
     if (id && id !== 'undefined' && id !== 'null' && id.trim() !== '') {
       try {
-        console.log('Fetching course with ID:', id);
         const courseData = await getCourseRef.current(id);
-        console.log('Course data received:', courseData);
         setCourse(courseData);
 
         // Fetch modules for the course
@@ -230,12 +228,9 @@ const CourseDetail: React.FC = () => {
           setModules(modulesWithAssignments);
         }
       } catch (err) {
-        console.error('Error fetching course or modules:', err);
         // Log more details for debugging
         if (err instanceof Error) {
-          console.error('Error message:', err.message);
-          console.error('Error stack:', err.stack);
-        }
+          }
       }
     }
   }, [id, getCourseRef]);
@@ -346,8 +341,7 @@ const CourseDetail: React.FC = () => {
             setModules(modulesWithAssignments);
           }
         } catch (err) {
-          console.error('Error fetching course or modules:', err);
-        }
+          }
       }
     };
     fetchCourseAndModulesWithAssignments();
@@ -436,8 +430,7 @@ const CourseDetail: React.FC = () => {
         setCourse(updatedCourse);
       }
     } catch (err) {
-      console.error('Error enrolling student:', err);
-    }
+      }
   };
 
   const handleUnenroll = async (studentId: string) => {
@@ -445,8 +438,7 @@ const CourseDetail: React.FC = () => {
     try {
       await unenrollStudent(id, studentId);
     } catch (err) {
-      console.error('Error unenrolling student:', err);
-    }
+      }
   };
 
   const handleApproveEnrollment = async (studentId: string) => {
@@ -467,7 +459,6 @@ const CourseDetail: React.FC = () => {
       
       alert('Enrollment approved successfully!');
     } catch (err: any) {
-      console.error('Error approving enrollment:', err);
       alert('Failed to approve enrollment: ' + (err.response?.data?.message || err.message));
     }
   };
@@ -490,7 +481,6 @@ const CourseDetail: React.FC = () => {
       
       alert('Enrollment denied successfully!');
     } catch (err: any) {
-      console.error('Error denying enrollment:', err);
       alert('Failed to deny enrollment: ' + (err.response?.data?.message || err.message));
     }
   };

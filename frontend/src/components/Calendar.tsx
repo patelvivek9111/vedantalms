@@ -351,12 +351,6 @@ const CalendarPage: React.FC = () => {
   // Build calendar options: admin only gets personal calendar, teachers get personal + courses
   // For teachers/admins: show all their courses (published and unpublished) - same as dashboard
   // For students: only show published courses they're enrolled in
-  // Debug: Log courses to help identify any discrepancies
-  useEffect(() => {
-    if (courses.length > 0) {
-      console.log('Calendar - All courses from context:', courses.map((c: any) => ({ id: c._id, title: c.title, published: c.published })));
-    }
-  }, [courses]);
 
   const calendarOptions = user ? [
     { label: `${user.firstName} ${user.lastName}`, value: user._id },
@@ -442,8 +436,7 @@ const CalendarPage: React.FC = () => {
               resource: { ...event, color: getCalendarColor(user._id, colorIdx) },
             })));
         } catch (error) {
-          console.error('Error fetching personal events:', error);
-        }
+          }
         continue;
       }
       // Else, course calendar: fetch events for course and assignments as events
@@ -508,8 +501,7 @@ const CalendarPage: React.FC = () => {
                   }
                 });
               } catch (error) {
-                console.error(`Error fetching assignments for module ${module._id}:`, error);
-              }
+                }
             }
           } else {
             try {
@@ -546,23 +538,19 @@ const CalendarPage: React.FC = () => {
                       }
                     });
                   } catch (error) {
-                    console.error(`Error fetching assignments for module ${module._id}:`, error);
-                  }
+                    }
                 }
               }
             } catch (error) {
-              console.error(`Error fetching modules for course ${calId}:`, error);
-            }
+              }
           }
         } catch (e) {
-          console.error('Error processing assignments:', e);
-        }
+          }
         
 
         allEvents.push(...courseEvents, ...assignmentEvents);
       } catch (error) {
-        console.error(`Error fetching course events for ${calId}:`, error);
-      }
+        }
     }
     setEvents(allEvents);
   };
@@ -673,7 +661,6 @@ const CalendarPage: React.FC = () => {
       setEditingEvent(null);
       fetchEvents();
     } catch (error) {
-      console.error('Error saving event:', error);
       // You might want to show an error message to the user here
     }
   };
@@ -694,8 +681,6 @@ const CalendarPage: React.FC = () => {
         setEditingEvent(null);
         fetchEvents();
       } catch (error: any) {
-        console.error('Error deleting event:', error);
-        console.error('Error response:', error.response?.data);
         // Show error message to user
         alert(`Failed to delete event: ${error.response?.data?.message || error.message || 'Unknown error'}`);
       }

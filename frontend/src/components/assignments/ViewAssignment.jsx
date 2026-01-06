@@ -97,7 +97,6 @@ const ViewAssignment = () => {
         setSubmissionStats(response.data.stats);
       }
     } catch (error) {
-      console.error('Error fetching submission stats:', error);
       // Fallback: calculate basic stats from submissions
       try {
         const submissionsResponse = await axios.get(`/api/submissions/assignment/${assignment._id}`, {
@@ -124,7 +123,6 @@ const ViewAssignment = () => {
         
         setSubmissionStats(stats);
       } catch (err) {
-        console.error('Error calculating basic stats:', err);
         // Set default stats if all else fails
         setSubmissionStats({
           totalStudents: 0,
@@ -252,8 +250,7 @@ const ViewAssignment = () => {
                   setUploadedFiles(draft.uploadedFiles);
                 }
               } catch (e) {
-                console.error('Error loading draft:', e);
-              }
+                }
             }
           }
         } else if (user?.role === 'teacher' || user?.role === 'admin') {
@@ -330,7 +327,6 @@ const ViewAssignment = () => {
           // Auto-submit the assignment/quiz
           if (user && user.role === 'student' && !submission) {
             handleSubmit().catch(err => {
-              console.error('Auto-submit error:', err);
               setError('Error auto-submitting quiz. Please submit manually.');
             });
           }
@@ -393,14 +389,12 @@ const ViewAssignment = () => {
             draft.uploadedFiles = updated;
             localStorage.setItem(draftKey, JSON.stringify(draft));
           } catch (e) {
-            console.error('Error saving draft:', e);
-          }
+            }
         }
         
         return updated;
       });
     } catch (error) {
-      console.error('Error uploading files:', error);
       setError('Error uploading files. Please try again.');
     } finally {
       setIsUploading(false);
@@ -421,8 +415,7 @@ const ViewAssignment = () => {
           draft.uploadedFiles = updated;
           localStorage.setItem(draftKey, JSON.stringify(draft));
         } catch (e) {
-          console.error('Error saving draft:', e);
-        }
+          }
       }
       
       return updated;
@@ -456,8 +449,7 @@ const ViewAssignment = () => {
           draft.uploadedFiles = uploadedFiles;
           localStorage.setItem(draftKey, JSON.stringify(draft));
         } catch (e) {
-          console.error('Error saving draft:', e);
-        }
+          }
       }
       
       return newAnswers;
@@ -557,7 +549,6 @@ const ViewAssignment = () => {
       // Dispatch event to refresh ToDo panel
       window.dispatchEvent(new Event('assignmentSubmitted'));
     } catch (err) {
-      console.error('Submit error:', err.response?.status, err.response?.data);
       setError(err.response?.data?.message || 'Error submitting assignment');
     } finally {
       setIsSubmitting(false);
@@ -592,7 +583,6 @@ const ViewAssignment = () => {
       );
       setAssignment(prev => ({ ...prev, published: res.data.published }));
     } catch (err) {
-      console.error('Error toggling assignment publish:', err);
       setError(err.response?.data?.message || 'Error toggling publish status');
     } finally {
       setIsPublishing(false);

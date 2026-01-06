@@ -116,8 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       localStorage.setItem(storedUsersKey, JSON.stringify(users));
     } catch (error) {
-      console.error('Error saving user to stored users:', error);
-    }
+      }
     
     setToken(token);
     setUser(user);
@@ -170,13 +169,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         localStorage.setItem(storedUsersKey, JSON.stringify(users));
       } catch (error) {
-        console.error('Error saving user to stored users:', error);
-      }
+        }
       
       setToken(token);
       setUser(user);
     } catch (error: any) {
-      console.error('Signup error:', error.response?.data || error);
       throw error;
     }
   };

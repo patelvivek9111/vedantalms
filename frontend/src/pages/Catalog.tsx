@@ -84,11 +84,9 @@ const Catalog: React.FC = () => {
         
         setCourses(response.data);
       } catch (err: any) {
-        console.error('Fallback route also failed:', err);
         setError('Failed to fetch course catalog. Please try again later.');
       }
     } catch (err: any) {
-      console.error('Error fetching catalog:', err);
       setError(err.response?.data?.message || 'Failed to fetch course catalog');
     } finally {
       setLoading(false);

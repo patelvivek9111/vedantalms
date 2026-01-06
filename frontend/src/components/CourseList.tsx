@@ -13,8 +13,7 @@ const CourseList: React.FC = () => {
       try {
         await deleteCourse(id);
       } catch (err) {
-        console.error('Error deleting course:', err);
-      }
+        }
     }
   };
 

@@ -2,7 +2,6 @@
 
 export async function requestNotificationPermission(): Promise<NotificationPermission> {
   if (!('Notification' in window)) {
-    console.warn('This browser does not support notifications');
     return 'denied';
   }
 
@@ -20,7 +19,6 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
 
 export async function subscribeToPushNotifications(): Promise<PushSubscription | null> {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    console.warn('Push messaging is not supported');
     return null;
   }
 
@@ -28,7 +26,6 @@ export async function subscribeToPushNotifications(): Promise<PushSubscription |
     // Request notification permission first
     const permission = await requestNotificationPermission();
     if (permission !== 'granted') {
-      console.warn('Notification permission not granted');
       return null;
     }
 
@@ -53,7 +50,6 @@ export async function subscribeToPushNotifications(): Promise<PushSubscription |
 
     return subscription;
   } catch (error) {
-    console.error('Error subscribing to push notifications:', error);
     return null;
   }
 }
@@ -69,7 +65,6 @@ export async function unsubscribeFromPushNotifications(): Promise<boolean> {
     }
     return false;
   } catch (error) {
-    console.error('Error unsubscribing from push notifications:', error);
     return false;
   }
 }
@@ -83,7 +78,6 @@ export async function getPushSubscription(): Promise<PushSubscription | null> {
     const registration = await navigator.serviceWorker.ready;
     return await registration.pushManager.getSubscription();
   } catch (error) {
-    console.error('Error getting push subscription:', error);
     return null;
   }
 }
