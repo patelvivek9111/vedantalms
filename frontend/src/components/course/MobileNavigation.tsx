@@ -66,22 +66,22 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({
                   return (
                     <>
                       {availableCourses && availableCourses.length > 0 ? (
-                        availableCourses.map((c: any) => (
-                          <button
-                            key={c._id}
-                            onClick={() => {
-                              setShowCourseDropdown(false);
-                              navigate(`/courses/${c._id}`);
-                            }}
+                    availableCourses.map((c: any) => (
+                      <button
+                        key={c._id}
+                        onClick={() => {
+                          setShowCourseDropdown(false);
+                          navigate(`/courses/${c._id}`);
+                        }}
                             className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-100 dark:border-gray-700 ${
-                              c._id === courseId ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
-                            }`}
-                          >
+                          c._id === courseId ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+                        }`}
+                      >
                             <div className="font-medium">{c.catalog?.courseCode || c.title}</div>
-                          </button>
-                        ))
-                      ) : (
-                        <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">No courses available</div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">No courses available</div>
                       )}
                       {user?.role === 'teacher' && (
                         <>

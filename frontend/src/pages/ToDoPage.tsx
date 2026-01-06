@@ -33,8 +33,8 @@ const ToDoPage: React.FC = () => {
         </div>
       </nav>
       
-      <div className="px-4 sm:px-6 py-4 lg:pt-8 pt-20">
-        <div className="max-w-4xl mx-auto">
+      <div className="lg:px-4 sm:px-6 lg:py-4 lg:pt-8 pt-16 pb-20">
+        <div className="lg:max-w-4xl lg:mx-auto">
           <ToDoPanel />
         </div>
       </div>

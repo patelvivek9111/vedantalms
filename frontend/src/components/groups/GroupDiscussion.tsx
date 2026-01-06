@@ -392,16 +392,16 @@ const GroupDiscussion: React.FC = () => {
                               </div>
                               {!isMobileDevice && (
                                 <>
+                              <span className="text-gray-400 dark:text-gray-500">•</span>
+                              <span title={new Date(thread.createdAt).toLocaleString()}>
+                                {formatDistanceToNow(new Date(thread.createdAt), { addSuffix: true })}
+                              </span>
+                              {thread.dueDate && (
+                                <>
                                   <span className="text-gray-400 dark:text-gray-500">•</span>
-                                  <span title={new Date(thread.createdAt).toLocaleString()}>
-                                    {formatDistanceToNow(new Date(thread.createdAt), { addSuffix: true })}
+                                  <span className="text-orange-600 dark:text-orange-400">
+                                    Due {formatDistanceToNow(new Date(thread.dueDate), { addSuffix: true })}
                                   </span>
-                                  {thread.dueDate && (
-                                    <>
-                                      <span className="text-gray-400 dark:text-gray-500">•</span>
-                                      <span className="text-orange-600 dark:text-orange-400">
-                                        Due {formatDistanceToNow(new Date(thread.dueDate), { addSuffix: true })}
-                                      </span>
                                     </>
                                   )}
                                 </>
@@ -432,8 +432,8 @@ const GroupDiscussion: React.FC = () => {
                             </div>
                             {!isMobileDevice && (
                               <div className="text-gray-500 dark:text-gray-400 text-sm" title={new Date(thread.lastActivity).toLocaleString()}>
-                                Last activity {formatDistanceToNow(new Date(thread.lastActivity), { addSuffix: true })}
-                              </div>
+                              Last activity {formatDistanceToNow(new Date(thread.lastActivity), { addSuffix: true })}
+                            </div>
                             )}
                             {isMobileDevice && (
                               <div className="text-gray-500 dark:text-gray-400 text-xs" title={new Date(thread.lastActivity).toLocaleString()}>
@@ -524,16 +524,16 @@ const GroupDiscussion: React.FC = () => {
                               </div>
                               {!isMobileDevice && (
                                 <>
+                              <span className="text-gray-400 dark:text-gray-500">•</span>
+                              <span title={new Date(thread.createdAt).toLocaleString()}>
+                                {formatDistanceToNow(new Date(thread.createdAt), { addSuffix: true })}
+                              </span>
+                              {thread.dueDate && (
+                                <>
                                   <span className="text-gray-400 dark:text-gray-500">•</span>
-                                  <span title={new Date(thread.createdAt).toLocaleString()}>
-                                    {formatDistanceToNow(new Date(thread.createdAt), { addSuffix: true })}
+                                  <span className="text-orange-600 dark:text-orange-400">
+                                    Due {formatDistanceToNow(new Date(thread.dueDate), { addSuffix: true })}
                                   </span>
-                                  {thread.dueDate && (
-                                    <>
-                                      <span className="text-gray-400 dark:text-gray-500">•</span>
-                                      <span className="text-orange-600 dark:text-orange-400">
-                                        Due {formatDistanceToNow(new Date(thread.dueDate), { addSuffix: true })}
-                                      </span>
                                     </>
                                   )}
                                 </>
@@ -564,8 +564,8 @@ const GroupDiscussion: React.FC = () => {
                             </div>
                             {!isMobileDevice && (
                               <div className="text-gray-500 dark:text-gray-400 text-sm" title={new Date(thread.lastActivity).toLocaleString()}>
-                                Last activity {formatDistanceToNow(new Date(thread.lastActivity), { addSuffix: true })}
-                              </div>
+                              Last activity {formatDistanceToNow(new Date(thread.lastActivity), { addSuffix: true })}
+                            </div>
                             )}
                             {isMobileDevice && (
                               <div className="text-gray-500 dark:text-gray-400 text-xs" title={new Date(thread.lastActivity).toLocaleString()}>

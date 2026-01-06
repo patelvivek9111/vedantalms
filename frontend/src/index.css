@@ -231,7 +231,7 @@
 
 .dark .rbc-time-header .rbc-header > a {
   color: #f1f5f9 !important;
-}
+} 
 
 /* Online status pulsing animation - Lighter fade in/out */
 @keyframes pulse-green {

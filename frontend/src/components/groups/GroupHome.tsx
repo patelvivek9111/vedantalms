@@ -327,7 +327,7 @@ const GroupHome: React.FC = () => {
                   Create Assignment
                 </div>
                 {!isMobileDevice && (
-                  <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Add new group assignment</div>
+                <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Add new group assignment</div>
                 )}
               </div>
             </button>

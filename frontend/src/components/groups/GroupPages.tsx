@@ -105,7 +105,7 @@ const GroupPages: React.FC<GroupPagesProps> = ({ groupSetId, groupId, isInstruct
       {/* Header - Mobile Optimized */}
       <div className={`bg-white dark:bg-gray-800 ${isMobileDevice ? 'p-3 mb-3 border-b' : 'p-4 sm:p-6 mb-4 sm:mb-6'} border-gray-200 dark:border-gray-700`}>
         <div className="flex flex-col gap-3">
-          <div>
+        <div>
             <h2 className={`${isMobileDevice ? 'text-lg' : 'text-xl sm:text-2xl'} font-bold text-gray-800 dark:text-gray-100`}>
               Group Pages
             </h2>
@@ -114,18 +114,18 @@ const GroupPages: React.FC<GroupPagesProps> = ({ groupSetId, groupId, isInstruct
                 Pages shared with this group set
               </p>
             )}
-          </div>
-          {isInstructor && (
-            <button
-              onClick={() => setShowCreate(true)}
+        </div>
+        {isInstructor && (
+          <button
+            onClick={() => setShowCreate(true)}
               className={`${isMobileDevice ? 'w-full px-4 py-2.5 text-sm' : 'w-full sm:w-auto px-4 py-2 text-sm sm:text-base'} bg-gradient-to-r from-blue-600 to-blue-500 dark:from-blue-500 dark:to-blue-600 text-white rounded-lg hover:from-blue-700 hover:to-blue-600 dark:hover:from-blue-600 dark:hover:to-blue-700 transition-all flex items-center justify-center gap-2 font-semibold shadow-md hover:shadow-lg active:scale-95 touch-manipulation`}
-            >
+          >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
               </svg>
               Create Page
-            </button>
-          )}
+          </button>
+        )}
         </div>
       </div>
       {showCreate && (
@@ -139,14 +139,14 @@ const GroupPages: React.FC<GroupPagesProps> = ({ groupSetId, groupId, isInstruct
         </ModuleProvider>
       )}
       <div className={`${isMobileDevice ? 'px-4' : 'px-4 sm:px-6'} pb-4 sm:pb-6`}>
-        {loading ? (
+      {loading ? (
           <div className={`text-center ${isMobileDevice ? 'py-8' : 'py-12'} text-gray-500 dark:text-gray-400`}>
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 dark:border-blue-400 mx-auto"></div>
             <p className="mt-2 text-sm">Loading pages...</p>
           </div>
-        ) : pages.length === 0 ? (
+      ) : pages.length === 0 ? (
           <div className={`text-center ${isMobileDevice ? 'py-12 px-4' : 'py-16'} bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700/50 dark:to-gray-800/50 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600`}>
-            <div className="flex flex-col items-center">
+          <div className="flex flex-col items-center">
               <div className={`${isMobileDevice ? 'w-12 h-12' : 'w-16 h-16'} bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mb-4`}>
                 <FileText className={`${isMobileDevice ? 'h-6 w-6' : 'h-8 w-8'} text-blue-600 dark:text-blue-400`} />
               </div>
@@ -154,15 +154,15 @@ const GroupPages: React.FC<GroupPagesProps> = ({ groupSetId, groupId, isInstruct
                 No pages yet
               </h3>
               <p className={`${isMobileDevice ? 'text-xs px-2' : 'text-sm max-w-md'} text-gray-600 dark:text-gray-400`}>
-                {isInstructor 
-                  ? "Get started by creating a page to share with this group set."
-                  : "There are no pages available for this group set yet."}
-              </p>
-            </div>
+              {isInstructor 
+                ? "Get started by creating a page to share with this group set."
+                : "There are no pages available for this group set yet."}
+            </p>
           </div>
-        ) : (
+        </div>
+      ) : (
           <div className={`${isMobileDevice ? 'space-y-3' : 'space-y-4'}`}>
-            {pages.map(page => (
+          {pages.map(page => (
               <div 
                 key={page._id} 
                 onClick={() => navigate(`/pages/${page._id}`)}
@@ -175,11 +175,11 @@ const GroupPages: React.FC<GroupPagesProps> = ({ groupSetId, groupId, isInstruct
                   <span className={`${isMobileDevice ? 'text-sm' : 'text-base'} group-hover:text-blue-600 dark:group-hover:text-blue-400 font-medium text-gray-900 dark:text-gray-100 flex-1 truncate transition-colors`}>
                     {page.title}
                   </span>
-                </div>
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          ))}
+        </div>
+      )}
       </div>
     </div>
   );

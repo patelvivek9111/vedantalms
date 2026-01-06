@@ -227,24 +227,277 @@ Vedanta LMS is a full-featured learning management platform that enables educato
 
 ```
 lms/
-├── frontend/                 # React frontend application
+├── frontend/                           # React frontend application
 │   ├── src/
-│   │   ├── components/      # Reusable React components
-│   │   ├── pages/           # Page components
-│   │   ├── context/         # React context providers
-│   │   ├── services/        # API service layer
-│   │   ├── hooks/           # Custom React hooks
-│   │   ├── utils/           # Utility functions
-│   │   └── config.ts        # Configuration
-│   └── dist/                # Production build output
-├── controllers/             # Express route controllers
-├── models/                  # Mongoose data models
-├── routes/                  # Express route definitions
-├── middleware/             # Express middleware (auth, upload)
-├── utils/                   # Utility functions
-├── uploads/                # File upload directory
-├── server.js               # Express server entry point
-└── package.json           # Node.js dependencies
+│   │   ├── components/                 # Reusable React components
+│   │   │   ├── announcements/          # Announcement-related components
+│   │   │   │   ├── AnnouncementForm.tsx
+│   │   │   │   └── AnnouncementList.tsx
+│   │   │   ├── assignments/            # Assignment-related components
+│   │   │   │   ├── AssignmentCard.tsx
+│   │   │   │   ├── AssignmentDetails.jsx
+│   │   │   │   ├── AssignmentDetailsWrapper.tsx
+│   │   │   │   ├── AssignmentGrading.jsx
+│   │   │   │   ├── AssignmentGradingWrapper.tsx
+│   │   │   │   ├── AssignmentList.tsx
+│   │   │   │   ├── AssignmentViewWrapper.tsx
+│   │   │   │   ├── CreateAssignmentForm.tsx
+│   │   │   │   ├── CreateAssignmentWrapper.tsx
+│   │   │   │   ├── FilePreview.tsx
+│   │   │   │   ├── GradeSubmissions.jsx
+│   │   │   │   ├── ViewAssignment.jsx
+│   │   │   │   └── ViewAssignment.tsx
+│   │   │   ├── course/                 # Course-related components
+│   │   │   │   ├── AssignmentsSection.tsx
+│   │   │   │   ├── CourseAssignments.tsx
+│   │   │   │   ├── CourseOverview.tsx
+│   │   │   │   ├── CourseQuizzes.tsx
+│   │   │   │   ├── CourseSidebar.tsx
+│   │   │   │   ├── MobileNavigation.tsx
+│   │   │   │   ├── ModulesSection.tsx
+│   │   │   │   ├── OverviewSection.tsx
+│   │   │   │   ├── PollsSection.tsx
+│   │   │   │   ├── QuizzesSection.tsx
+│   │   │   │   └── SyllabusSection.tsx
+│   │   │   ├── enrollment/             # Enrollment-related components
+│   │   │   │   └── EnrollmentRequestsHandler.tsx
+│   │   │   ├── grades/                 # Grade-related components
+│   │   │   │   ├── AssignmentGroupsModal.tsx
+│   │   │   │   ├── GradebookView.tsx
+│   │   │   │   ├── GradeScaleModal.tsx
+│   │   │   │   └── StudentGradesView.tsx
+│   │   │   ├── groups/                 # Group-related components
+│   │   │   │   ├── GroupAnnouncements.tsx
+│   │   │   │   ├── GroupDashboard.tsx
+│   │   │   │   ├── GroupDiscussion.tsx
+│   │   │   │   ├── GroupHome.tsx
+│   │   │   │   ├── GroupManagement.tsx
+│   │   │   │   ├── GroupPages.tsx
+│   │   │   │   ├── GroupPeople.tsx
+│   │   │   │   ├── GroupPeopleWrapper.tsx
+│   │   │   │   ├── GroupSetView.tsx
+│   │   │   │   └── StudentGroupView.tsx
+│   │   │   ├── polls/                  # Poll-related components
+│   │   │   │   ├── PollForm.tsx
+│   │   │   │   ├── PollList.tsx
+│   │   │   │   └── PollVote.tsx
+│   │   │   ├── quizwave/               # QuizWave interactive quiz components
+│   │   │   │   ├── QuizBuilder.tsx
+│   │   │   │   ├── QuizSessionControl.tsx
+│   │   │   │   ├── QuizWaveDashboard.tsx
+│   │   │   │   ├── StudentGameScreen.tsx
+│   │   │   │   ├── StudentJoinScreen.tsx
+│   │   │   │   └── StudentQuizWaveView.tsx
+│   │   │   ├── students/               # Student-related components
+│   │   │   │   ├── StudentCard.tsx
+│   │   │   │   └── StudentsManagement.tsx
+│   │   │   ├── AnnouncementDetailModal.tsx
+│   │   │   ├── Attendance.tsx
+│   │   │   ├── BottomNav.tsx
+│   │   │   ├── BurgerMenu.tsx
+│   │   │   ├── Calendar.tsx
+│   │   │   ├── ChangeUserModal.tsx
+│   │   │   ├── CourseDetail.tsx
+│   │   │   ├── CourseDiscussions.tsx
+│   │   │   ├── CourseForm.tsx
+│   │   │   ├── CourseList.tsx
+│   │   │   ├── CoursePages.tsx
+│   │   │   ├── CreateModuleForm.tsx
+│   │   │   ├── CreatePageForm.tsx
+│   │   │   ├── CreateThreadModal.tsx
+│   │   │   ├── ErrorBoundary.tsx
+│   │   │   ├── GlobalSidebar.tsx
+│   │   │   ├── InteractiveEyes.tsx
+│   │   │   ├── LatestAnnouncements.tsx
+│   │   │   ├── LoadingSpinner.tsx
+│   │   │   ├── ModuleCard.tsx
+│   │   │   ├── ModuleList.tsx
+│   │   │   ├── NavCustomizationModal.tsx
+│   │   │   ├── Navigation.tsx
+│   │   │   ├── NotificationCenter.tsx
+│   │   │   ├── OverviewConfigModal.tsx
+│   │   │   ├── PageView.tsx
+│   │   │   ├── PageViewer.tsx
+│   │   │   ├── PageViewWrapper.tsx
+│   │   │   ├── PrivateRoute.tsx
+│   │   │   ├── ProfileImage.tsx
+│   │   │   ├── RichTextEditor.tsx
+│   │   │   ├── SidebarConfigModal.tsx
+│   │   │   ├── StudentGradeSidebar.tsx
+│   │   │   ├── ThreadView.tsx
+│   │   │   ├── ThreadViewWrapper.tsx
+│   │   │   ├── ToDoPanel.tsx
+│   │   │   └── WhatIfScores.tsx
+│   │   ├── pages/                      # Page-level components (routes)
+│   │   │   ├── AccountPage.tsx
+│   │   │   ├── AdminAnalytics.tsx
+│   │   │   ├── AdminCourseOversight.tsx
+│   │   │   ├── AdminDashboard.tsx
+│   │   │   ├── AdminSecurity.tsx
+│   │   │   ├── AdminSystemSettings.tsx
+│   │   │   ├── AdminUserManagement.tsx
+│   │   │   ├── Announcements.tsx
+│   │   │   ├── AssignmentEditPage.tsx
+│   │   │   ├── Catalog.tsx
+│   │   │   ├── CourseDetail.tsx
+│   │   │   ├── CoursePeople.tsx
+│   │   │   ├── Dashboard.tsx
+│   │   │   ├── Groups.tsx
+│   │   │   ├── Inbox.tsx
+│   │   │   ├── LandingPage.tsx
+│   │   │   ├── Login.tsx
+│   │   │   ├── ModuleEditPage.tsx
+│   │   │   ├── PageEditPage.tsx
+│   │   │   ├── Signup.tsx
+│   │   │   ├── TeacherCourseOversight.tsx
+│   │   │   ├── ToDoPage.tsx
+│   │   │   └── Transcript.tsx
+│   │   ├── services/                   # API service layer
+│   │   │   ├── announcementService.ts
+│   │   │   ├── api.ts
+│   │   │   ├── inboxService.ts
+│   │   │   └── quizwaveService.ts
+│   │   ├── hooks/                      # Custom React hooks
+│   │   │   ├── useAssignmentGroupsManagement.ts
+│   │   │   ├── useDiscussions.ts
+│   │   │   ├── useGradebookData.ts
+│   │   │   ├── useGradeManagement.ts
+│   │   │   ├── useGradeScaleManagement.ts
+│   │   │   ├── useInstructorGradebookData.ts
+│   │   │   ├── useOnlineStatus.ts
+│   │   │   ├── useSidebarConfig.ts
+│   │   │   ├── useStudentGradeData.ts
+│   │   │   ├── useStudentSubmissions.ts
+│   │   │   ├── useSubmissionIds.ts
+│   │   │   └── useSyllabusManagement.ts
+│   │   │   └── useUnreadMessages.ts
+│   │   ├── utils/                      # Utility functions
+│   │   │   ├── gradebookExport.ts
+│   │   │   ├── gradeUtils.ts
+│   │   │   ├── logger.ts
+│   │   │   ├── pushNotifications.ts
+│   │   │   └── quizwaveSocket.ts
+│   │   ├── context/                    # React context providers
+│   │   │   ├── AuthContext.tsx
+│   │   │   └── ThemeContext.tsx
+│   │   ├── contexts/                   # Additional context providers
+│   │   │   ├── CourseContext.tsx
+│   │   │   └── ModuleContext.tsx
+│   │   ├── store/                      # Redux store configuration
+│   │   │   └── store.ts
+│   │   ├── constants/                  # Application constants
+│   │   │   └── courseNavigation.ts
+│   │   ├── App.tsx                     # Main application component
+│   │   ├── main.tsx                    # Application entry point
+│   │   ├── index.css                   # Global styles
+│   │   ├── config.ts                   # Frontend configuration
+│   │   └── global.d.ts                 # TypeScript global type definitions
+│   ├── public/                         # Static assets
+│   │   └── assets/                     # Images and other static files
+│   ├── dist/                           # Production build output
+│   ├── index.html                      # HTML template
+│   ├── package.json                    # Frontend dependencies
+│   ├── tsconfig.json                   # TypeScript configuration
+│   ├── vite.config.ts                  # Vite build configuration
+│   ├── tailwind.config.js              # Tailwind CSS configuration
+│   └── postcss.config.js               # PostCSS configuration
+│
+├── controllers/                        # Express route controllers
+│   ├── admin.controller.js             # Admin operations controller
+│   ├── announcement.controller.js      # Announcement operations controller
+│   ├── assignment.controller.js        # Assignment operations controller
+│   ├── attendance.controller.js       # Attendance operations controller
+│   ├── auth.controller.js              # Authentication controller
+│   ├── course.controller.js            # Course operations controller
+│   ├── event.controller.js             # Event operations controller
+│   ├── grades.controller.js            # Grade operations controller
+│   ├── group.controller.js             # Group operations controller
+│   ├── inbox.controller.js             # Messaging/inbox controller
+│   ├── module.controller.js            # Module operations controller
+│   ├── page.controller.js              # Page operations controller
+│   ├── poll.controller.js              # Poll operations controller
+│   ├── quizwave.controller.js          # QuizWave operations controller
+│   ├── reports.controller.js           # Reports controller
+│   ├── submission.controller.js        # Submission operations controller
+│   ├── todo.controller.js              # Todo operations controller
+│   └── user.controller.js              # User operations controller
+│
+├── models/                             # Mongoose data models
+│   ├── announcement.model.js           # Announcement model
+│   ├── Assignment.js                   # Assignment model
+│   ├── attendance.model.js             # Attendance model
+│   ├── Conversation.js                 # Conversation model (messaging)
+│   ├── ConversationParticipant.js      # Conversation participant model
+│   ├── course.model.js                 # Course model
+│   ├── event.model.js                  # Event model
+│   ├── Group.js                        # Group model
+│   ├── GroupSet.js                     # Group set model
+│   ├── loginActivity.model.js         # Login activity tracking model
+│   ├── Message.js                      # Message model (messaging)
+│   ├── module.model.js                 # Module model
+│   ├── notification.model.js           # Notification model
+│   ├── notificationPreferences.model.js # Notification preferences model
+│   ├── page.model.js                   # Page model
+│   ├── poll.model.js                   # Poll model
+│   ├── quizwave.model.js               # QuizWave model
+│   ├── Submission.js                   # Submission model
+│   ├── systemSettings.model.js         # System settings model
+│   ├── thread.model.js                 # Discussion thread model
+│   ├── todo.model.js                   # Todo model
+│   └── user.model.js                   # User model
+│
+├── routes/                             # Express route definitions
+│   ├── admin.routes.js                 # Admin routes
+│   ├── announcement.routes.js         # Announcement routes
+│   ├── assignment.routes.js            # Assignment routes
+│   ├── attendance.routes.js            # Attendance routes
+│   ├── auth.routes.js                  # Authentication routes
+│   ├── catalog.routes.js               # Course catalog routes
+│   ├── course.routes.js                # Course routes
+│   ├── event.routes.js                 # Event routes
+│   ├── grades.routes.js                # Grade routes
+│   ├── groupRoutes.js                  # Group routes
+│   ├── inbox.routes.js                 # Messaging/inbox routes
+│   ├── module.routes.js                # Module routes
+│   ├── notification.routes.js          # Notification routes
+│   ├── page.routes.js                  # Page routes
+│   ├── poll.routes.js                  # Poll routes
+│   ├── quizwave.routes.js              # QuizWave routes
+│   ├── reports.routes.js               # Report routes
+│   ├── submission.routes.js            # Submission routes
+│   ├── thread.routes.js                # Discussion thread routes
+│   ├── todo.routes.js                  # Todo routes
+│   └── user.routes.js                  # User routes
+│
+├── middleware/                         # Express middleware
+│   ├── auth.js                         # Authentication middleware
+│   ├── roleCheck.js                    # Role-based access control middleware
+│   └── upload.js                       # File upload middleware
+│
+├── middlewares/                        # Additional middleware
+│   └── auth.middleware.js              # Alternative auth middleware
+│
+├── utils/                              # Backend utility functions
+│   ├── cloudinary.js                   # Cloudinary integration for file storage
+│   ├── gradeCalculation.js             # Grade calculation utilities
+│   └── quizwaveCleanup.js              # QuizWave cleanup utilities
+│
+├── socket/                             # Socket.io real-time functionality
+│   └── quizwave.socket.js              # QuizWave socket handlers
+│
+├── scripts/                            # Utility scripts
+│   ├── checkQuizWaveStatus.js          # QuizWave status checking script
+│   ├── cleanupOldSessions.js           # Session cleanup script
+│   ├── fixDuplicatePins.js             # Fix duplicate pins script
+│   └── fixPinIndex.js                  # Fix pin index script
+│
+├── uploads/                            # File upload directory
+│
+├── server.js                           # Express server entry point
+├── package.json                        # Backend dependencies
+├── vercel.json                         # Vercel deployment configuration
+├── generate-secret.js                  # Secret generation utility
+└── jest.config.js                      # Jest testing configuration
 ```
 
 ---

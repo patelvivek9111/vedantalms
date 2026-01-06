@@ -325,16 +325,16 @@ export default function GroupDashboard() {
               </div>
 
               <div className={`${isMobileDevice ? 'px-4' : 'px-4 sm:px-6'} pb-4 sm:pb-6`}>
-                {assignmentsLoading ? (
+              {assignmentsLoading ? (
                   <div className={`text-center ${isMobileDevice ? 'py-8' : 'py-12'}`}>
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 dark:border-blue-400 mx-auto"></div>
                     <p className={`${isMobileDevice ? 'text-xs mt-2' : 'text-sm mt-2'} text-gray-500 dark:text-gray-400`}>
                       Loading assignments...
                     </p>
                   </div>
-                ) : assignments.length === 0 ? (
+              ) : assignments.length === 0 ? (
                   <div className={`text-center ${isMobileDevice ? 'py-12 px-4' : 'py-16'} bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700/50 dark:to-gray-800/50 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600`}>
-                    <div className="flex flex-col items-center">
+                  <div className="flex flex-col items-center">
                       <div className={`${isMobileDevice ? 'w-12 h-12' : 'w-16 h-16'} bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mb-4`}>
                         <ClipboardList className={`${isMobileDevice ? 'h-6 w-6' : 'h-8 w-8'} text-gray-400 dark:text-gray-500`} />
                       </div>
@@ -344,21 +344,21 @@ export default function GroupDashboard() {
                       <p className={`${isMobileDevice ? 'text-xs' : 'text-sm'} text-gray-600 dark:text-gray-400`}>
                         There are no assignments for this group set yet.
                       </p>
-                    </div>
                   </div>
-                ) : (
+                </div>
+              ) : (
                   <div className={`grid ${isMobileDevice ? 'grid-cols-1 gap-3' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'}`}>
-                    {assignments.map(assignment => (
-                      <AssignmentCard
-                        key={assignment._id}
-                        assignment={assignment}
-                        isInstructor={isInstructor}
-                        isAdmin={isAdmin}
-                        navigate={navigate}
-                      />
-                    ))}
-                  </div>
-                )}
+                  {assignments.map(assignment => (
+                    <AssignmentCard
+                      key={assignment._id}
+                      assignment={assignment}
+                      isInstructor={isInstructor}
+                      isAdmin={isAdmin}
+                      navigate={navigate}
+                    />
+                  ))}
+                </div>
+              )}
               </div>
             </div>
           )}

@@ -18,3 +18,5 @@ const PollsSection: React.FC<PollsSectionProps> = ({ courseId }) => {
 export default PollsSection;
 
 
+
+

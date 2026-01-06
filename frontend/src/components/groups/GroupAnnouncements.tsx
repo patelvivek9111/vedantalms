@@ -261,14 +261,14 @@ const GroupAnnouncements: React.FC<GroupAnnouncementsProps> = ({ courseId, group
       </div>
 
       <div className={`${isMobileDevice ? 'px-4' : 'px-4 sm:px-6'} pb-4 sm:pb-6`}>
-        {selectedAnnouncement ? (
+      {selectedAnnouncement ? (
           <div className={`bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 ${isMobileDevice ? 'p-4' : 'p-4 sm:p-6'}`}>
-            <button
+          <button
               className={`mb-3 sm:mb-4 px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 ${isMobileDevice ? 'text-xs' : 'text-sm'} font-medium transition-colors touch-manipulation active:scale-95`}
-              onClick={() => setSelectedAnnouncement(null)}
-            >
-              ← Back to Announcements
-            </button>
+            onClick={() => setSelectedAnnouncement(null)}
+          >
+            ← Back to Announcements
+          </button>
             <div className={`${isMobileDevice ? 'flex flex-col gap-2' : 'flex flex-col sm:flex-row justify-between items-start sm:items-start gap-2'} mb-3`}>
               <h3 className={`${isMobileDevice ? 'text-base' : 'text-base sm:text-lg'} font-bold text-gray-900 dark:text-gray-100 break-words`}>
                 {selectedAnnouncement.title}
@@ -276,21 +276,21 @@ const GroupAnnouncements: React.FC<GroupAnnouncementsProps> = ({ courseId, group
               <span className={`${isMobileDevice ? 'text-xs' : 'text-xs'} text-gray-400 dark:text-gray-500 ${isMobileDevice ? '' : 'whitespace-nowrap'}`}>
                 {new Date(selectedAnnouncement.createdAt).toLocaleString()}
               </span>
-            </div>
+          </div>
             <div className={`${isMobileDevice ? 'text-sm' : 'text-sm'} text-gray-800 dark:text-gray-200 mb-3 prose max-w-none dark:prose-invert`} dangerouslySetInnerHTML={{ __html: selectedAnnouncement.body }} />
             <div className={`${isMobileDevice ? 'text-xs' : 'text-xs'} text-gray-500 dark:text-gray-400 mb-3`}>
               By {selectedAnnouncement.author.firstName} {selectedAnnouncement.author.lastName}
             </div>
-            {selectedAnnouncement.options && Object.values(selectedAnnouncement.options).some(Boolean) && user && user.role !== 'student' && (
+          {selectedAnnouncement.options && Object.values(selectedAnnouncement.options).some(Boolean) && user && user.role !== 'student' && (
               <div className={`${isMobileDevice ? 'mt-2' : 'mt-1'} flex flex-wrap gap-2`}>
                 {selectedAnnouncement.options.delayPosting && <span className={`${isMobileDevice ? 'px-2 py-0.5 text-[10px]' : 'px-2 py-0.5 text-xs'} bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-300 rounded-full font-semibold`}>Delay posting</span>}
                 {selectedAnnouncement.options.allowComments && <span className={`${isMobileDevice ? 'px-2 py-0.5 text-[10px]' : 'px-2 py-0.5 text-xs'} bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 rounded-full font-semibold`}>Comments enabled</span>}
                 {selectedAnnouncement.options.requirePostBeforeSeeingReplies && <span className={`${isMobileDevice ? 'px-2 py-0.5 text-[10px]' : 'px-2 py-0.5 text-xs'} bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-300 rounded-full font-semibold`}>Post before seeing replies</span>}
                 {selectedAnnouncement.options.enablePodcastFeed && <span className={`${isMobileDevice ? 'px-2 py-0.5 text-[10px]' : 'px-2 py-0.5 text-xs'} bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300 rounded-full font-semibold`}>Podcast feed</span>}
                 {selectedAnnouncement.options.allowLiking && <span className={`${isMobileDevice ? 'px-2 py-0.5 text-[10px]' : 'px-2 py-0.5 text-xs'} bg-pink-100 dark:bg-pink-900/50 text-pink-800 dark:text-pink-300 rounded-full font-semibold`}>Liking enabled</span>}
-              </div>
-            )}
-            {/* Comments Section */}
+            </div>
+          )}
+          {/* Comments Section */}
             <div className={`${isMobileDevice ? 'mt-6' : 'mt-10'}`}>
               <h4 className={`${isMobileDevice ? 'text-base' : 'text-lg'} font-bold mb-4 text-gray-900 dark:text-gray-100`}>Comments</h4>
             {user && user.role === 'student' && selectedAnnouncement?.options?.requirePostBeforeSeeingReplies && !userHasPosted && (
@@ -328,18 +328,18 @@ const GroupAnnouncements: React.FC<GroupAnnouncementsProps> = ({ courseId, group
             )}
           </div>
         </div>
-        ) : (
-          loading ? (
+      ) : (
+        loading ? (
             <div className={`${isMobileDevice ? 'py-8' : 'py-12'} text-center`}>
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 dark:border-blue-400 mx-auto"></div>
               <p className={`${isMobileDevice ? 'text-xs mt-2' : 'text-sm mt-2'} text-gray-500 dark:text-gray-400`}>
                 Loading announcements...
               </p>
             </div>
-          ) : (
-            <AnnouncementList announcements={announcements} onSelect={setSelectedAnnouncement} />
-          )
-        )}
+        ) : (
+          <AnnouncementList announcements={announcements} onSelect={setSelectedAnnouncement} />
+        )
+      )}
       </div>
     </div>
   );

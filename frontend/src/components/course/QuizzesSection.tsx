@@ -104,3 +104,5 @@ const QuizzesSection: React.FC<QuizzesSectionProps> = ({
 export default QuizzesSection;
 
 
+
+

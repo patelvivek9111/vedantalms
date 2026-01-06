@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { format } from 'date-fns';
-import { CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { CheckCircle, XCircle, AlertCircle, ArrowLeft } from 'lucide-react';
 
 const AssignmentGrading = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [assignment, setAssignment] = useState(null);
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -321,69 +322,98 @@ const AssignmentGrading = () => {
   }
 
   return (
-    <div className="w-full px-2 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
-      <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-4 sm:p-6 border dark:border-gray-700">
-        <div className="mb-4 sm:mb-6">
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2 break-words">{assignment.title} - Grading</h1>
-          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-            {submissions.length} submission{submissions.length !== 1 ? 's' : ''} to grade
-          </p>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Top Navigation Bar (Mobile Only) */}
+      <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+        <div className="relative flex items-center justify-between px-4 py-3">
+          <button
+            onClick={() => navigate(-1)}
+            className="text-gray-700 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
+            aria-label="Go back"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100 truncate px-2">
+            {assignment.title} - Grading
+          </h1>
+          <div className="w-10"></div> {/* Spacer for centering */}
         </div>
+      </nav>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-          {/* Submissions List */}
-          <div className="lg:col-span-1 order-2 lg:order-1">
-            <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-gray-900 dark:text-gray-100">Submissions</h2>
-            <div className="space-y-2 sm:space-y-3 max-h-96 overflow-y-auto">
-              {submissions.map((submission) => (
-                <div
-                  key={submission._id}
-                  onClick={() => setSelectedSubmission(submission)}
-                  className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                    selectedSubmission?._id === submission._id
-                      ? 'border-indigo-500 dark:border-indigo-400 bg-indigo-50 dark:bg-indigo-900/30'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-900'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="font-medium text-gray-900 dark:text-gray-100">
-                      {submission.student?.firstName} {submission.student?.lastName}
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      {submission.autoGraded && (
-                        <div className="flex items-center text-blue-600 dark:text-blue-400">
-                          <CheckCircle className="h-4 w-4 mr-1" />
-                          <span className="text-xs">Auto</span>
-                        </div>
-                      )}
-                      {submission.teacherApproved && (
-                        <div className="flex items-center text-green-600 dark:text-green-400">
-                          <CheckCircle className="h-4 w-4 mr-1" />
-                          <span className="text-xs">Graded</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
-                    Submitted: {format(new Date(submission.submittedAt), 'MMM d, yyyy h:mm a')}
-                  </div>
-                  {submission.autoGraded && (
-                    <div className="text-sm text-blue-600 dark:text-blue-400 mt-1">
-                      Auto-grade: {submission.autoGrade} points
-                    </div>
-                  )}
-                  {submission.teacherApproved && (
-                    <div className="text-sm text-green-600 dark:text-green-400 mt-1">
-                      Final grade: {submission.finalGrade || submission.grade} points
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+      <div className="w-full px-2 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8 pt-16 lg:pt-4">
+        <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-4 sm:p-6 border dark:border-gray-700">
+          {/* Desktop Header */}
+          <div className="mb-4 sm:mb-6 hidden lg:block">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2 break-words">{assignment.title} - Grading</h1>
+            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+              {submissions.length} submission{submissions.length !== 1 ? 's' : ''} to grade
+            </p>
           </div>
 
-          {/* Grading Interface */}
-          <div className="lg:col-span-2">
+          {/* Mobile Header Info */}
+          <div className="mb-4 sm:mb-6 lg:hidden">
+            <p className="text-center text-sm text-gray-600 dark:text-gray-400 mb-2">
+              {submissions.length} submission{submissions.length !== 1 ? 's' : ''} to grade
+            </p>
+            <p className="text-center text-sm text-gray-500 dark:text-gray-500">
+              Select a submission to grade
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+            {/* Submissions List */}
+            <div className="lg:col-span-1 order-2 lg:order-1">
+              <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-gray-900 dark:text-gray-100">Submissions</h2>
+              <div className="space-y-2 sm:space-y-3 max-h-96 overflow-y-auto">
+                {submissions.map((submission) => (
+                  <div
+                    key={submission._id}
+                    onClick={() => setSelectedSubmission(submission)}
+                    className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                      selectedSubmission?._id === submission._id
+                        ? 'border-indigo-500 dark:border-indigo-400 bg-indigo-50 dark:bg-indigo-900/30'
+                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-900'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="font-medium text-gray-900 dark:text-gray-100">
+                        {submission.student?.firstName} {submission.student?.lastName}
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {submission.autoGraded && (
+                          <div className="flex items-center text-blue-600 dark:text-blue-400">
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            <span className="text-xs">Auto</span>
+                          </div>
+                        )}
+                        {submission.teacherApproved && (
+                          <div className="flex items-center text-green-600 dark:text-green-400">
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            <span className="text-xs">Graded</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      Submitted: {format(new Date(submission.submittedAt), 'MMM d, yyyy h:mm a')}
+                    </div>
+                    {submission.autoGraded && (
+                      <div className="text-sm text-blue-600 dark:text-blue-400 mt-1">
+                        Auto-grade: {submission.autoGrade} points
+                      </div>
+                    )}
+                    {submission.teacherApproved && (
+                      <div className="text-sm text-green-600 dark:text-green-400 mt-1">
+                        Final grade: {submission.finalGrade || submission.grade} points
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Grading Interface */}
+            <div className="lg:col-span-2">
             {selectedSubmission ? (
               <div>
                 <div className="mb-6">
@@ -412,11 +442,12 @@ const AssignmentGrading = () => {
                       </div>
                     </div>
                   )}
+                </div>
 
-                  {/* Questions */}
-                  {assignment.questions && (
-                    <div className="space-y-4">
-                      {assignment.questions.map((question, index) => {
+                {/* Questions */}
+                {assignment.questions && (
+                  <div className="space-y-4">
+                    {assignment.questions.map((question, index) => {
                         const questionType = getQuestionType(index);
                         const autoGrade = getAutoGradeForQuestion(index);
                         const maxPoints = getMaxPointsForQuestion(index);
@@ -567,12 +598,12 @@ const AssignmentGrading = () => {
                             )}
                           </div>
                         );
-                      })}
-                    </div>
-                  )}
+                    })}
+                  </div>
+                )}
 
-                  {/* Feedback */}
-                  <div className="mt-6">
+                {/* Feedback */}
+                <div className="mt-6">
                     <label htmlFor="feedback" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Feedback:
                     </label>
@@ -584,10 +615,10 @@ const AssignmentGrading = () => {
                       className="w-full h-32 p-3 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-indigo-500 dark:focus:border-indigo-400"
                       placeholder="Provide feedback for the student..."
                     />
-                  </div>
+                </div>
 
-                  {/* Action Buttons */}
-                  <div className="mt-6 flex space-x-3">
+                {/* Action Buttons */}
+                <div className="mt-6 flex space-x-3">
                     {selectedSubmission.autoGraded ? (
                       <>
                         <button
@@ -625,7 +656,6 @@ const AssignmentGrading = () => {
                     >
                       {isDeleting ? 'Deleting...' : 'Delete Submission'}
                     </button>
-                  </div>
                 </div>
               </div>
             ) : (
@@ -633,6 +663,7 @@ const AssignmentGrading = () => {
                 Select a submission to grade
               </div>
             )}
+            </div>
           </div>
         </div>
       </div>

@@ -785,31 +785,31 @@ const Inbox: React.FC = () => {
                           <div key={u._id} className="px-4 py-2 hover:bg-blue-100 dark:hover:bg-blue-900/50 cursor-pointer flex items-center gap-3" onClick={() => { handleAddRecipient(u); setComposeToInput(''); setComposeUserResults([]); }}>
                             <div className="relative flex-shrink-0">
                               <div className={`w-8 h-8 rounded-full overflow-hidden ${u.profilePicture ? '' : 'bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center'} ${isUserOnline(u._id) ? 'online-pulse' : 'border-2 border-transparent'}`}>
-                                {u.profilePicture ? (
-                                  <img
-                                    src={u.profilePicture.startsWith('http') ? u.profilePicture : getImageUrl(u.profilePicture)}
-                                    alt={`${u.firstName} ${u.lastName}`}
-                                    className="w-8 h-8 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
-                                    onError={(e) => {
-                                      e.currentTarget.style.display = 'none';
-                                      const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                                      if (fallback) {
-                                        fallback.style.display = 'flex';
-                                      }
-                                    }}
-                                  />
-                                ) : null}
-                                {/* Fallback avatar with initials */}
-                                <div
-                                  className={`w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold ${
-                                    u.profilePicture ? 'hidden' : 'flex'
-                                  }`}
-                                  style={{
-                                    display: u.profilePicture ? 'none' : 'flex'
+                              {u.profilePicture ? (
+                                <img
+                                  src={u.profilePicture.startsWith('http') ? u.profilePicture : getImageUrl(u.profilePicture)}
+                                  alt={`${u.firstName} ${u.lastName}`}
+                                  className="w-8 h-8 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                    const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                    if (fallback) {
+                                      fallback.style.display = 'flex';
+                                    }
                                   }}
-                                >
-                                  {u.firstName?.charAt(0) || ''}
-                                  {u.lastName?.charAt(0) || ''}
+                                />
+                              ) : null}
+                              {/* Fallback avatar with initials */}
+                              <div
+                                className={`w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold ${
+                                  u.profilePicture ? 'hidden' : 'flex'
+                                }`}
+                                style={{
+                                  display: u.profilePicture ? 'none' : 'flex'
+                                }}
+                              >
+                                {u.firstName?.charAt(0) || ''}
+                                {u.lastName?.charAt(0) || ''}
                                 </div>
                               </div>
                             </div>
@@ -836,31 +836,31 @@ const Inbox: React.FC = () => {
                           <div key={u._id} className="px-4 py-2 hover:bg-blue-100 dark:hover:bg-blue-900/50 cursor-pointer flex items-center gap-3" onClick={() => { handleAddRecipient(u); setComposeToGroup(''); }}>
                             <div className="relative flex-shrink-0">
                               <div className={`w-8 h-8 rounded-full overflow-hidden ${u.profilePicture ? '' : 'bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center'} ${isUserOnline(u._id) ? 'online-pulse' : 'border-2 border-transparent'}`}>
-                                {u.profilePicture ? (
-                                  <img
-                                    src={u.profilePicture.startsWith('http') ? u.profilePicture : getImageUrl(u.profilePicture)}
-                                    alt={`${u.firstName} ${u.lastName}`}
-                                    className="w-8 h-8 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
-                                    onError={(e) => {
-                                      e.currentTarget.style.display = 'none';
-                                      const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                                      if (fallback) {
-                                        fallback.style.display = 'flex';
-                                      }
-                                    }}
-                                  />
-                                ) : null}
-                                {/* Fallback avatar with initials */}
-                                <div
-                                  className={`w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold ${
-                                    u.profilePicture ? 'hidden' : 'flex'
-                                  }`}
-                                  style={{
-                                    display: u.profilePicture ? 'none' : 'flex'
+                              {u.profilePicture ? (
+                                <img
+                                  src={u.profilePicture.startsWith('http') ? u.profilePicture : getImageUrl(u.profilePicture)}
+                                  alt={`${u.firstName} ${u.lastName}`}
+                                  className="w-8 h-8 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                    const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                    if (fallback) {
+                                      fallback.style.display = 'flex';
+                                    }
                                   }}
-                                >
-                                  {u.firstName?.charAt(0) || ''}
-                                  {u.lastName?.charAt(0) || ''}
+                                />
+                              ) : null}
+                              {/* Fallback avatar with initials */}
+                              <div
+                                className={`w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold ${
+                                  u.profilePicture ? 'hidden' : 'flex'
+                                }`}
+                                style={{
+                                  display: u.profilePicture ? 'none' : 'flex'
+                                }}
+                              >
+                                {u.firstName?.charAt(0) || ''}
+                                {u.lastName?.charAt(0) || ''}
                                 </div>
                               </div>
                             </div>
@@ -1025,17 +1025,17 @@ const Inbox: React.FC = () => {
                         {/* Avatar with Online Status */}
                         <div className="relative flex-shrink-0 mr-1.5 sm:mr-2">
                           <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white font-bold text-xs sm:text-sm overflow-hidden ${getAvatarColor(conv._id)} ${otherParticipants[0]?._id && isUserOnline(otherParticipants[0]._id) ? 'online-pulse' : 'border-2 border-transparent'}`}>
-                            {otherParticipants[0]?.profilePicture ? (
-                              <img
-                                src={otherParticipants[0].profilePicture.startsWith('http')
-                                  ? otherParticipants[0].profilePicture
-                                  : getImageUrl(otherParticipants[0].profilePicture)}
-                                alt={participantNames}
-                                className="w-8 h-8 sm:w-10 sm:h-10 object-cover rounded-full"
-                              />
-                            ) : (
-                              getInitials(otherParticipants[0])
-                            )}
+                          {otherParticipants[0]?.profilePicture ? (
+                            <img
+                              src={otherParticipants[0].profilePicture.startsWith('http')
+                                ? otherParticipants[0].profilePicture
+                                : getImageUrl(otherParticipants[0].profilePicture)}
+                              alt={participantNames}
+                              className="w-8 h-8 sm:w-10 sm:h-10 object-cover rounded-full"
+                            />
+                          ) : (
+                            getInitials(otherParticipants[0])
+                          )}
                           </div>
                         </div>
                         <div className="flex-1 min-w-0">
@@ -1138,17 +1138,17 @@ const Inbox: React.FC = () => {
                             {/* Avatar with Online Status */}
                             <div className="relative flex-shrink-0">
                               <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white font-bold text-sm sm:text-lg overflow-hidden ${getAvatarColor(msg.senderId?._id)} ${isUserOnline(msg.senderId?._id) ? 'online-pulse' : 'border-2 border-transparent'}`}>
-                                {msg.senderId?.profilePicture ? (
-                                  <img
-                                    src={msg.senderId.profilePicture.startsWith('http')
-                                      ? msg.senderId.profilePicture
-                                      : getImageUrl(msg.senderId.profilePicture)}
-                                    alt={senderName}
-                                    className="w-8 h-8 sm:w-10 sm:h-10 object-cover rounded-full"
-                                  />
-                                ) : (
-                                  getInitials(msg.senderId)
-                                )}
+                              {msg.senderId?.profilePicture ? (
+                                <img
+                                  src={msg.senderId.profilePicture.startsWith('http')
+                                    ? msg.senderId.profilePicture
+                                    : getImageUrl(msg.senderId.profilePicture)}
+                                  alt={senderName}
+                                  className="w-8 h-8 sm:w-10 sm:h-10 object-cover rounded-full"
+                                />
+                              ) : (
+                                getInitials(msg.senderId)
+                              )}
                               </div>
                             </div>
                             <div className="min-w-0 flex-1">
