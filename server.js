@@ -281,8 +281,15 @@ app.use('/api/*', (req, res) => {
 
 // Serve frontend static files in production
 if (process.env.NODE_ENV === 'production') {
-  // Serve static files from the frontend/dist directory
-  app.use(express.static(path.join(__dirname, 'frontend', 'dist')));
+  // Serve static files from the frontend/dist directory (only for GET requests to non-API paths)
+  app.use((req, res, next) => {
+    // Skip static file serving for API routes, uploads, and non-GET requests
+    if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.method !== 'GET') {
+      return next();
+    }
+    // Use static middleware only for GET requests to non-API paths
+    express.static(path.join(__dirname, 'frontend', 'dist'))(req, res, next);
+  });
   
   // Handle all non-API routes by serving the frontend (must be last)
   app.get('*', (req, res, next) => {
