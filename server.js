@@ -51,13 +51,17 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Add request logging in development
-if (process.env.NODE_ENV !== 'production') {
-  app.use((req, res, next) => {
-    console.log(`${req.method} ${req.path}`);
-    next();
-  });
-}
+// Add request logging (both dev and production for debugging)
+app.use((req, res, next) => {
+  if (process.env.NODE_ENV !== 'production' || req.path.startsWith('/api')) {
+    console.log(`${req.method} ${req.path} - Headers:`, {
+      'content-type': req.headers['content-type'],
+      'origin': req.headers.origin,
+      'user-agent': req.headers['user-agent']?.substring(0, 50)
+    });
+  }
+  next();
+});
 
 // Set default JWT secret if not in environment
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-123';
@@ -276,7 +280,32 @@ app.use((err, req, res, next) => {
 
 // API route not found handler (must be after all API routes but before static files)
 app.use('/api/*', (req, res) => {
-  res.status(404).json({ message: 'API route not found', path: req.path });
+  // Log the request for debugging
+  console.log(`API route not found: ${req.method} ${req.path}`);
+  res.status(404).json({ 
+    message: 'API route not found', 
+    path: req.path,
+    method: req.method 
+  });
+});
+
+// Health check endpoint (before static files)
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV 
+  });
+});
+
+// Test POST endpoint to verify POST requests work
+app.post('/api/test-post', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    message: 'POST request received',
+    body: req.body,
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Serve frontend static files in production
