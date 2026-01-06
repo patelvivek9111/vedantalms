@@ -28,6 +28,8 @@ const StudentGameScreen: React.FC = () => {
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const colorAnimationRef = useRef<NodeJS.Timeout | null>(null);
+  const submitTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isSubmittingRef = useRef<boolean>(false);
   const token = localStorage.getItem('token') || '';
 
   const colors = ['bg-red-500', 'bg-blue-500', 'bg-yellow-500', 'bg-green-500'];
@@ -112,6 +114,13 @@ const StudentGameScreen: React.FC = () => {
           console.log('Question started:', data);
           // Ensure questionIndex is set correctly
           if (data && typeof data.questionIndex === 'number') {
+            // Clear any pending submissions
+            if (submitTimeoutRef.current) {
+              clearTimeout(submitTimeoutRef.current);
+              submitTimeoutRef.current = null;
+            }
+            isSubmittingRef.current = false;
+            
             setCurrentQuestion(data);
             setTimeRemaining(data.timeLimit || 30);
             setSelectedAnswer([]);
@@ -182,6 +191,9 @@ const StudentGameScreen: React.FC = () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
+      if (submitTimeoutRef.current) {
+        clearTimeout(submitTimeoutRef.current);
+      }
       if (sock) {
         sock.off('quizwave:joined');
         sock.off('quizwave:question-started');
@@ -239,29 +251,63 @@ const StudentGameScreen: React.FC = () => {
     };
   }, [currentQuestion, timeRemaining, timeUp, answered, selectedAnswer, answerResult]);
 
-  const handleSelectAnswer = (index: number) => {
-    if (answered || timeRemaining === 0) return;
+  const handleSelectAnswer = (index: number, event?: React.MouseEvent) => {
+    // Prevent accidental clicks
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
 
+    // Prevent if already answered or submitting
+    if (answered || timeRemaining === 0 || isSubmittingRef.current) {
+      console.log('Cannot select answer:', { answered, timeRemaining, isSubmitting: isSubmittingRef.current });
+      return;
+    }
+
+    // Clear any pending submit timeout
+    if (submitTimeoutRef.current) {
+      clearTimeout(submitTimeoutRef.current);
+      submitTimeoutRef.current = null;
+    }
+
+    console.log('Answer selected:', index);
     const newSelected = [index];
     setSelectedAnswer(newSelected);
     
-    // Auto-submit immediately when answer is selected
-    setTimeout(() => {
-      if (!answered) {
+    // Mark as submitting to prevent double submissions
+    isSubmittingRef.current = true;
+    
+    // Add a delay before auto-submitting to prevent accidental clicks
+    // This gives the user a moment to see their selection
+    submitTimeoutRef.current = setTimeout(() => {
+      // Double-check again before submitting
+      if (!answered && newSelected.length > 0 && !isSubmittingRef.current) {
+        console.log('Auto-submitting answer:', newSelected);
         handleSubmitAnswerWithSelection(newSelected);
       }
-    }, 100);
+      isSubmittingRef.current = false;
+      submitTimeoutRef.current = null;
+    }, 500); // Increased to 500ms to give user time to see selection
   };
 
   const handleSubmitAnswerWithSelection = (selection: number[]) => {
-    if (answered || selection.length === 0 || !socket || !currentQuestion) {
-      console.log('Cannot submit answer:', { answered, selection, socket: !!socket, currentQuestion: !!currentQuestion });
+    // Prevent double submission
+    if (answered || isSubmittingRef.current || selection.length === 0 || !socket || !currentQuestion) {
+      console.log('Cannot submit answer:', { 
+        answered, 
+        isSubmitting: isSubmittingRef.current,
+        selection, 
+        socket: !!socket, 
+        currentQuestion: !!currentQuestion 
+      });
+      isSubmittingRef.current = false;
       return;
     }
     
     // Safety check: ensure questionIndex is valid
     if (typeof currentQuestion.questionIndex !== 'number') {
       console.error('Invalid questionIndex:', currentQuestion.questionIndex);
+      isSubmittingRef.current = false;
       return;
     }
 
@@ -269,8 +315,12 @@ const StudentGameScreen: React.FC = () => {
     if (!socket.connected) {
       console.error('Socket not connected');
       alert('Connection lost. Please refresh the page.');
+      isSubmittingRef.current = false;
       return;
     }
+
+    // Mark as submitting
+    isSubmittingRef.current = true;
 
     const startTime = currentQuestion.timeLimit;
     const timeTaken = (startTime - timeRemaining) * 1000; // Convert to milliseconds
@@ -290,6 +340,8 @@ const StudentGameScreen: React.FC = () => {
     });
 
     setAnswered(true);
+    isSubmittingRef.current = false;
+    
     // Start colorful animation if time hasn't run out yet
     if (timeRemaining > 0) {
       setShowColorAnimation(true);
@@ -513,14 +565,18 @@ const StudentGameScreen: React.FC = () => {
               return (
                 <button
                   key={index}
-                  onClick={() => handleSelectAnswer(index)}
+                  onClick={(e) => handleSelectAnswer(index, e)}
+                  onTouchStart={(e) => {
+                    // Prevent accidental touch submissions
+                    e.preventDefault();
+                  }}
                   disabled={answered || timeRemaining === 0}
                   className={`${colorClass} rounded-2xl p-8 sm:p-10 lg:p-12 shadow-2xl transition-all transform ${
                     isSelected && !showColorAnimation
                       ? 'scale-110 ring-4 ring-white ring-offset-4 ring-offset-transparent'
                       : showColorAnimation
                       ? 'scale-105'
-                      : 'hover:scale-105'
+                      : 'hover:scale-105 active:scale-95'
                   } ${
                     showResultMessage
                       ? isCorrect
@@ -529,7 +585,8 @@ const StudentGameScreen: React.FC = () => {
                         ? 'ring-4 ring-red-300 opacity-70'
                         : 'opacity-50'
                       : ''
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  } disabled:opacity-50 disabled:cursor-not-allowed select-none`}
+                  style={{ touchAction: 'manipulation' }}
                 >
                   <div className="flex flex-col items-center justify-center">
                     {/* Shape Icon - Large */}
