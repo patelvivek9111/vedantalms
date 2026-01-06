@@ -1,20 +1,31 @@
 // Support both Vite environment variables and fallback for production
 // If frontend is served from same domain as backend, use relative URL
 const getApiUrl = () => {
-  // Check for explicit environment variable
-  if ((import.meta as any).env?.VITE_API_URL) {
-    return (import.meta as any).env.VITE_API_URL;
+  // PRIORITY 1: Runtime check - if on vedantaed.com, always use relative URL (avoids CORS)
+  // This overrides any build-time environment variables
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    if (hostname.includes('vedantaed.com')) {
+      return ''; // Use relative URL (same domain) - avoids CORS
+    }
   }
   
-  // In production, check if we're on the same domain
+  // PRIORITY 2: Check for explicit environment variable (only if not on vedantaed.com)
+  if ((import.meta as any).env?.VITE_API_URL) {
+    const envUrl = (import.meta as any).env.VITE_API_URL;
+    // Remove trailing /api if present to avoid double /api/api
+    if (envUrl.endsWith('/api')) {
+      return envUrl.slice(0, -4);
+    }
+    return envUrl;
+  }
+  
+  // PRIORITY 3: In production, check if on Render domain
   if ((import.meta as any).env?.MODE === 'production') {
-    // If frontend is served from same domain as backend, use relative URL (same domain)
-    // Check window.location at runtime (safe for browser)
     if (typeof window !== 'undefined') {
       const hostname = window.location.hostname;
-      // Use relative URL if on custom domain or Render domain (same origin)
-      if (hostname.includes('vedantaed.com') || hostname.includes('onrender.com')) {
-      return ''; // Use relative URL (same domain) - avoids CORS
+      if (hostname.includes('onrender.com')) {
+        return ''; // Use relative URL (same domain) - avoids CORS
       }
     }
     // Fallback to Render backend URL (shouldn't happen if properly configured)
