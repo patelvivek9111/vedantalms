@@ -230,12 +230,16 @@ const StudentGameScreen: React.FC = () => {
             setShowColorAnimation(false);
             setShowResultMessage(true);
             
-            // Auto-submit if not answered yet
+            // Auto-submit if not answered yet and answer is selected
             if (!answered && selectedAnswer.length > 0) {
               handleSubmitAnswer();
             } else if (answered && answerResult) {
               // Already answered - just show the result
               setShowResultMessage(true);
+            } else if (!answered && selectedAnswer.length === 0) {
+              // No answer selected - show message
+              setShowResultMessage(true);
+              setAnswerResult({ isCorrect: false, points: 0 });
             }
             return 0;
           }
@@ -258,36 +262,16 @@ const StudentGameScreen: React.FC = () => {
       event.stopPropagation();
     }
 
-    // Prevent if already answered or submitting
-    if (answered || timeRemaining === 0 || isSubmittingRef.current) {
-      console.log('Cannot select answer:', { answered, timeRemaining, isSubmitting: isSubmittingRef.current });
+    // Prevent if already answered
+    if (answered || timeRemaining === 0) {
+      console.log('Cannot select answer:', { answered, timeRemaining });
       return;
-    }
-
-    // Clear any pending submit timeout
-    if (submitTimeoutRef.current) {
-      clearTimeout(submitTimeoutRef.current);
-      submitTimeoutRef.current = null;
     }
 
     console.log('Answer selected:', index);
     const newSelected = [index];
     setSelectedAnswer(newSelected);
-    
-    // Mark as submitting to prevent double submissions
-    isSubmittingRef.current = true;
-    
-    // Add a delay before auto-submitting to prevent accidental clicks
-    // This gives the user a moment to see their selection
-    submitTimeoutRef.current = setTimeout(() => {
-      // Double-check again before submitting
-      if (!answered && newSelected.length > 0 && !isSubmittingRef.current) {
-        console.log('Auto-submitting answer:', newSelected);
-        handleSubmitAnswerWithSelection(newSelected);
-      }
-      isSubmittingRef.current = false;
-      submitTimeoutRef.current = null;
-    }, 500); // Increased to 500ms to give user time to see selection
+    // Do NOT auto-submit - user must click submit button
   };
 
   const handleSubmitAnswerWithSelection = (selection: number[]) => {
@@ -616,6 +600,23 @@ const StudentGameScreen: React.FC = () => {
               );
             })}
           </div>
+
+          {/* Submit Button - Only show if answer is selected but not submitted */}
+          {!answered && selectedAnswer.length > 0 && timeRemaining > 0 && (
+            <div className="mt-8 text-center">
+              <button
+                onClick={() => {
+                  if (selectedAnswer.length > 0) {
+                    handleSubmitAnswerWithSelection(selectedAnswer);
+                  }
+                }}
+                disabled={answered || isSubmittingRef.current || selectedAnswer.length === 0}
+                className="bg-white text-blue-600 px-8 py-4 rounded-xl font-bold text-xl shadow-2xl hover:bg-blue-50 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              >
+                Submit Answer
+              </button>
+            </div>
+          )}
 
           {/* Answer Result - Below blocks - Only show when timer runs out */}
           {showResultMessage && answerResult && (
