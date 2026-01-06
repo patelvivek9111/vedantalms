@@ -28,8 +28,6 @@ const StudentGameScreen: React.FC = () => {
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const colorAnimationRef = useRef<NodeJS.Timeout | null>(null);
-  const submitTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isSubmittingRef = useRef<boolean>(false);
   const token = localStorage.getItem('token') || '';
 
   const colors = ['bg-red-500', 'bg-blue-500', 'bg-yellow-500', 'bg-green-500'];
@@ -114,22 +112,17 @@ const StudentGameScreen: React.FC = () => {
           console.log('Question started:', data);
           // Ensure questionIndex is set correctly
           if (data && typeof data.questionIndex === 'number') {
-            // Clear any pending submissions
-            if (submitTimeoutRef.current) {
-              clearTimeout(submitTimeoutRef.current);
-              submitTimeoutRef.current = null;
-            }
-            isSubmittingRef.current = false;
-            
+            // Reset ALL answer-related state when new question starts
             setCurrentQuestion(data);
             setTimeRemaining(data.timeLimit || 30);
-            setSelectedAnswer([]);
-            setAnswered(false);
-            setAnswerResult(null);
+            setSelectedAnswer([]); // Clear any previous selection
+            setAnswered(false); // Reset answered flag
+            setAnswerResult(null); // Clear previous result
             setShowColorAnimation(false);
             setTimeUp(false);
             setShowResultMessage(false);
             setStatus('active');
+            console.log('Question state reset - ready for new answer');
           } else {
             console.error('Invalid question data received:', data);
           }
@@ -191,9 +184,6 @@ const StudentGameScreen: React.FC = () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
-      if (submitTimeoutRef.current) {
-        clearTimeout(submitTimeoutRef.current);
-      }
       if (sock) {
         sock.off('quizwave:joined');
         sock.off('quizwave:question-started');
@@ -229,15 +219,16 @@ const StudentGameScreen: React.FC = () => {
             setTimeUp(true);
             setShowColorAnimation(false);
             
-            // Auto-submit if not answered yet
-            if (!answered) {
-              if (selectedAnswer.length > 0) {
-                // Answer was selected but not submitted - submit it
-                handleSubmitAnswer();
-              } else {
-                // No answer selected - submit empty answer (will be marked as wrong)
-                handleSubmitNoAnswer();
-              }
+            // Only auto-submit if user has actually selected an answer AND hasn't already submitted
+            if (!answered && selectedAnswer.length > 0) {
+              console.log('Time ran out - auto-submitting selected answer:', selectedAnswer);
+              handleSubmitAnswer();
+            } else if (!answered && selectedAnswer.length === 0) {
+              // No answer selected - don't submit anything, just show that time ran out
+              console.log('Time ran out - no answer selected, not submitting');
+              setShowResultMessage(true);
+              // Set a null result to indicate no answer was submitted
+              setAnswerResult({ isCorrect: false, points: 0 });
             } else if (answered && answerResult) {
               // Already answered - just show the result
               setShowResultMessage(true);
@@ -256,43 +247,34 @@ const StudentGameScreen: React.FC = () => {
     };
   }, [currentQuestion, timeRemaining, timeUp, answered, selectedAnswer, answerResult]);
 
-  const handleSelectAnswer = (index: number, event?: React.MouseEvent) => {
-    // Prevent accidental clicks
-    if (event) {
-      event.preventDefault();
-      event.stopPropagation();
-    }
-
-    // Prevent if already answered
+  const handleSelectAnswer = (index: number) => {
     if (answered || timeRemaining === 0) {
       console.log('Cannot select answer:', { answered, timeRemaining });
       return;
     }
 
-    console.log('Answer selected:', index);
+    console.log('Answer selected by user click:', index);
     const newSelected = [index];
     setSelectedAnswer(newSelected);
-    // Do NOT auto-submit - user must click submit button
+    
+    // Auto-submit immediately when answer is selected (only if user actually clicked)
+    setTimeout(() => {
+      if (!answered && selectedAnswer.length > 0) {
+        console.log('Auto-submitting after user selection:', newSelected);
+        handleSubmitAnswerWithSelection(newSelected);
+      }
+    }, 100);
   };
 
   const handleSubmitAnswerWithSelection = (selection: number[]) => {
-    // Prevent double submission
-    if (answered || isSubmittingRef.current || selection.length === 0 || !socket || !currentQuestion) {
-      console.log('Cannot submit answer:', { 
-        answered, 
-        isSubmitting: isSubmittingRef.current,
-        selection, 
-        socket: !!socket, 
-        currentQuestion: !!currentQuestion 
-      });
-      isSubmittingRef.current = false;
+    if (answered || selection.length === 0 || !socket || !currentQuestion) {
+      console.log('Cannot submit answer:', { answered, selection, socket: !!socket, currentQuestion: !!currentQuestion });
       return;
     }
     
     // Safety check: ensure questionIndex is valid
     if (typeof currentQuestion.questionIndex !== 'number') {
       console.error('Invalid questionIndex:', currentQuestion.questionIndex);
-      isSubmittingRef.current = false;
       return;
     }
 
@@ -300,12 +282,8 @@ const StudentGameScreen: React.FC = () => {
     if (!socket.connected) {
       console.error('Socket not connected');
       alert('Connection lost. Please refresh the page.');
-      isSubmittingRef.current = false;
       return;
     }
-
-    // Mark as submitting
-    isSubmittingRef.current = true;
 
     const startTime = currentQuestion.timeLimit;
     const timeTaken = (startTime - timeRemaining) * 1000; // Convert to milliseconds
@@ -325,8 +303,6 @@ const StudentGameScreen: React.FC = () => {
     });
 
     setAnswered(true);
-    isSubmittingRef.current = false;
-    
     // Start colorful animation if time hasn't run out yet
     if (timeRemaining > 0) {
       setShowColorAnimation(true);
@@ -339,15 +315,6 @@ const StudentGameScreen: React.FC = () => {
       return;
     }
     
-    handleSubmitAnswerWithSelection(selectedAnswer);
-  };
-
-  const handleSubmitNoAnswer = () => {
-    // Submit empty answer when timer runs out and no answer was selected
-    if (answered || !socket || !currentQuestion) {
-      return;
-    }
-    
     // Safety check: ensure questionIndex is valid
     if (typeof currentQuestion.questionIndex !== 'number') {
       console.error('Invalid questionIndex:', currentQuestion.questionIndex);
@@ -357,28 +324,32 @@ const StudentGameScreen: React.FC = () => {
     // Check if socket is connected
     if (!socket.connected) {
       console.error('Socket not connected');
+      alert('Connection lost. Please refresh the page.');
       return;
     }
 
     const startTime = currentQuestion.timeLimit;
-    const timeTaken = startTime * 1000; // Full time was taken (timer ran out)
+    const timeTaken = (startTime - timeRemaining) * 1000; // Convert to milliseconds
 
-    console.log('Submitting no answer (time ran out):', {
+    console.log('Submitting answer:', {
       sessionId: session?._id,
-      questionIndex: currentQuestion.questionIndex
+      questionIndex: currentQuestion.questionIndex,
+      selectedOptions: selectedAnswer,
+      timeTaken
     });
 
-    // Submit with empty array - backend will mark as wrong
     socket.emit('quizwave:answer', {
       sessionId: session?._id,
       questionIndex: currentQuestion.questionIndex,
-      selectedOptions: [], // Empty array = no answer = wrong
+      selectedOptions: selectedAnswer,
       timeTaken
     });
 
     setAnswered(true);
-    setAnswerResult({ isCorrect: false, points: 0 });
-    setShowResultMessage(true);
+    // Start colorful animation if time hasn't run out yet
+    if (timeRemaining > 0) {
+      setShowColorAnimation(true);
+    }
   };
 
   if (status === 'waiting') {
@@ -555,9 +526,14 @@ const StudentGameScreen: React.FC = () => {
               return (
                 <button
                   key={index}
-                  onClick={(e) => handleSelectAnswer(index, e)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('Button clicked for option:', index);
+                    handleSelectAnswer(index);
+                  }}
                   onTouchStart={(e) => {
-                    // Prevent accidental touch submissions
+                    // Prevent accidental touches on mobile
                     e.preventDefault();
                   }}
                   disabled={answered || timeRemaining === 0}
@@ -566,7 +542,7 @@ const StudentGameScreen: React.FC = () => {
                       ? 'scale-110 ring-4 ring-white ring-offset-4 ring-offset-transparent'
                       : showColorAnimation
                       ? 'scale-105'
-                      : 'hover:scale-105 active:scale-95'
+                      : 'hover:scale-105'
                   } ${
                     showResultMessage
                       ? isCorrect
@@ -575,8 +551,7 @@ const StudentGameScreen: React.FC = () => {
                         ? 'ring-4 ring-red-300 opacity-70'
                         : 'opacity-50'
                       : ''
-                  } disabled:opacity-50 disabled:cursor-not-allowed select-none`}
-                  style={{ touchAction: 'manipulation' }}
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   <div className="flex flex-col items-center justify-center">
                     {/* Shape Icon - Large */}
@@ -606,23 +581,6 @@ const StudentGameScreen: React.FC = () => {
               );
             })}
           </div>
-
-          {/* Submit Button - Only show if answer is selected but not submitted */}
-          {!answered && selectedAnswer.length > 0 && timeRemaining > 0 && (
-            <div className="mt-8 text-center">
-              <button
-                onClick={() => {
-                  if (selectedAnswer.length > 0) {
-                    handleSubmitAnswerWithSelection(selectedAnswer);
-                  }
-                }}
-                disabled={answered || isSubmittingRef.current || selectedAnswer.length === 0}
-                className="bg-white text-blue-600 px-8 py-4 rounded-xl font-bold text-xl shadow-2xl hover:bg-blue-50 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-              >
-                Submit Answer
-              </button>
-            </div>
-          )}
 
           {/* Answer Result - Below blocks - Only show when timer runs out */}
           {showResultMessage && answerResult && (
