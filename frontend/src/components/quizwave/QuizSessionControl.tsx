@@ -82,13 +82,15 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
       setSocket(sock);
 
       // Wait for socket to connect if not already connected
-      if (!sock.connected) {
+      if (sock && !sock.connected) {
         await new Promise((resolve) => {
-          if (sock.connected) {
+          if (sock && sock.connected) {
             resolve(true);
-          } else {
+          } else if (sock) {
             sock.once('connect', () => resolve(true));
             sock.once('connect_error', () => resolve(false));
+          } else {
+            resolve(false);
           }
         });
       }
@@ -258,12 +260,14 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
       });
 
       // Join as teacher after session is loaded
-      if (currentSession?.gamePin) {
+      if (currentSession?.gamePin && sock) {
         if (sock.connected) {
           sock.emit('quizwave:teacher-join', { gamePin: currentSession.gamePin });
         } else {
           sock.once('connect', () => {
-            sock.emit('quizwave:teacher-join', { gamePin: currentSession.gamePin });
+            if (sock) {
+              sock.emit('quizwave:teacher-join', { gamePin: currentSession.gamePin });
+            }
           });
         }
       }
