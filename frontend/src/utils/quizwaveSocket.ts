@@ -28,7 +28,9 @@ export const getQuizWaveSocket = (token: string): Socket => {
     reconnection: true,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
-    reconnectionAttempts: 5
+    reconnectionAttempts: Infinity, // Keep trying to reconnect
+    timeout: 20000,
+    forceNew: false // Reuse connection if possible
   });
 
   socket.on('connect', () => {
