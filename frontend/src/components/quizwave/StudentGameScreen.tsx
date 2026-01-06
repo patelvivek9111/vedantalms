@@ -228,18 +228,19 @@ const StudentGameScreen: React.FC = () => {
             // Time's up
             setTimeUp(true);
             setShowColorAnimation(false);
-            setShowResultMessage(true);
             
-            // Auto-submit if not answered yet and answer is selected
-            if (!answered && selectedAnswer.length > 0) {
-              handleSubmitAnswer();
+            // Auto-submit if not answered yet
+            if (!answered) {
+              if (selectedAnswer.length > 0) {
+                // Answer was selected but not submitted - submit it
+                handleSubmitAnswer();
+              } else {
+                // No answer selected - submit empty answer (will be marked as wrong)
+                handleSubmitNoAnswer();
+              }
             } else if (answered && answerResult) {
               // Already answered - just show the result
               setShowResultMessage(true);
-            } else if (!answered && selectedAnswer.length === 0) {
-              // No answer selected - show message
-              setShowResultMessage(true);
-              setAnswerResult({ isCorrect: false, points: 0 });
             }
             return 0;
           }
@@ -338,6 +339,15 @@ const StudentGameScreen: React.FC = () => {
       return;
     }
     
+    handleSubmitAnswerWithSelection(selectedAnswer);
+  };
+
+  const handleSubmitNoAnswer = () => {
+    // Submit empty answer when timer runs out and no answer was selected
+    if (answered || !socket || !currentQuestion) {
+      return;
+    }
+    
     // Safety check: ensure questionIndex is valid
     if (typeof currentQuestion.questionIndex !== 'number') {
       console.error('Invalid questionIndex:', currentQuestion.questionIndex);
@@ -347,32 +357,28 @@ const StudentGameScreen: React.FC = () => {
     // Check if socket is connected
     if (!socket.connected) {
       console.error('Socket not connected');
-      alert('Connection lost. Please refresh the page.');
       return;
     }
 
     const startTime = currentQuestion.timeLimit;
-    const timeTaken = (startTime - timeRemaining) * 1000; // Convert to milliseconds
+    const timeTaken = startTime * 1000; // Full time was taken (timer ran out)
 
-    console.log('Submitting answer:', {
+    console.log('Submitting no answer (time ran out):', {
       sessionId: session?._id,
-      questionIndex: currentQuestion.questionIndex,
-      selectedOptions: selectedAnswer,
-      timeTaken
+      questionIndex: currentQuestion.questionIndex
     });
 
+    // Submit with empty array - backend will mark as wrong
     socket.emit('quizwave:answer', {
       sessionId: session?._id,
       questionIndex: currentQuestion.questionIndex,
-      selectedOptions: selectedAnswer,
+      selectedOptions: [], // Empty array = no answer = wrong
       timeTaken
     });
 
     setAnswered(true);
-    // Start colorful animation if time hasn't run out yet
-    if (timeRemaining > 0) {
-      setShowColorAnimation(true);
-    }
+    setAnswerResult({ isCorrect: false, points: 0 });
+    setShowResultMessage(true);
   };
 
   if (status === 'waiting') {

@@ -216,12 +216,15 @@ const initializeQuizWaveSocket = (io) => {
           return;
         }
 
-        // Ensure selectedOptions is an array
-        if (!selectedOptions || !Array.isArray(selectedOptions) || selectedOptions.length === 0) {
+        // Ensure selectedOptions is an array (empty array is allowed for time-out scenarios)
+        if (!selectedOptions || !Array.isArray(selectedOptions)) {
           console.error('Invalid selectedOptions:', selectedOptions);
           socket.emit('quizwave:error', { message: 'Invalid answer selection' });
           return;
         }
+
+        // Empty array means no answer was selected (time ran out) - will be marked as wrong
+        const hasNoAnswer = selectedOptions.length === 0;
 
         if (!socket.gamePin) {
           console.error('Socket not in a session');
@@ -264,33 +267,42 @@ const initializeQuizWaveSocket = (io) => {
           return;
         }
 
-        // Validate selectedOptions indices are within bounds
-        const maxOptionIndex = question.options.length - 1;
-        const invalidIndices = selectedOptions.filter(idx => idx < 0 || idx > maxOptionIndex);
-        if (invalidIndices.length > 0) {
-          console.error('Invalid option indices:', { selectedOptions, maxOptionIndex, invalidIndices });
-          socket.emit('quizwave:error', { message: 'Invalid answer selection - option index out of bounds' });
-          return;
+        let isCorrect = false;
+        let normalizedSelected = [];
+
+        // Handle no answer (time ran out)
+        if (hasNoAnswer) {
+          // No answer selected = automatically wrong
+          isCorrect = false;
+          normalizedSelected = [];
+        } else {
+          // Validate selectedOptions indices are within bounds
+          const maxOptionIndex = question.options.length - 1;
+          const invalidIndices = selectedOptions.filter(idx => idx < 0 || idx > maxOptionIndex);
+          if (invalidIndices.length > 0) {
+            console.error('Invalid option indices:', { selectedOptions, maxOptionIndex, invalidIndices });
+            socket.emit('quizwave:error', { message: 'Invalid answer selection - option index out of bounds' });
+            return;
+          }
+
+          // Check if correct
+          const correctOptions = question.options
+            .map((opt, idx) => opt.isCorrect ? idx : -1)
+            .filter(idx => idx !== -1)
+            .sort();
+
+          // Normalize selectedOptions to ensure it's an array and sorted
+          normalizedSelected = [...selectedOptions].sort();
+          
+          isCorrect = JSON.stringify(normalizedSelected) === JSON.stringify(correctOptions);
         }
-
-        // Check if correct
-        const correctOptions = question.options
-          .map((opt, idx) => opt.isCorrect ? idx : -1)
-          .filter(idx => idx !== -1)
-          .sort();
-
-        // Normalize selectedOptions to ensure it's an array and sorted
-        const normalizedSelected = Array.isArray(selectedOptions) 
-          ? [...selectedOptions].sort() 
-          : [selectedOptions].sort();
-        
-        const isCorrect = JSON.stringify(normalizedSelected) === JSON.stringify(correctOptions);
         
         console.log(`✅ Answer check for question ${questionIndex} (${question.questionType}):`, {
           questionText: question.questionText.substring(0, 50) + '...',
           selectedOptions: normalizedSelected,
-          correctOptions: correctOptions,
+          correctOptions: hasNoAnswer ? 'N/A (no answer)' : correctOptions,
           isCorrect: isCorrect,
+          hasNoAnswer: hasNoAnswer,
           questionOptions: question.options.map((opt, idx) => ({ idx, text: opt.text, isCorrect: opt.isCorrect }))
         });
 
