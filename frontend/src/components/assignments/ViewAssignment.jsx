@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../../services/api';
+import { API_URL } from '../../config';
 import ReactMarkdown from 'react-markdown';
 import { format } from 'date-fns';
 import { Lock, Unlock, HelpCircle, CheckCircle, Circle, Bookmark, BarChart3, Edit, Eye, ArrowLeft } from 'lucide-react';
-import { API_URL } from '../../config';
 
 // Fisher-Yates shuffle algorithm for proper randomization
 const shuffleArray = (array) => {
@@ -89,7 +89,7 @@ const ViewAssignment = () => {
     try {
       setLoadingStats(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get(`/api/assignments/${assignment._id}/stats`, {
+      const response = await api.get(`/assignments/${assignment._id}/stats`);
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -99,7 +99,7 @@ const ViewAssignment = () => {
     } catch (error) {
       // Fallback: calculate basic stats from submissions
       try {
-        const submissionsResponse = await axios.get(`/api/submissions/assignment/${assignment._id}`, {
+        const submissionsResponse = await api.get(`/submissions/assignment/${assignment._id}`);
           headers: { Authorization: `Bearer ${token}` }
         });
         
@@ -142,9 +142,7 @@ const ViewAssignment = () => {
       try {
         const token = localStorage.getItem('token');
         
-        const assignmentRes = await axios.get(`/api/assignments/${id}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const assignmentRes = await api.get(`/assignments/${id}`);
         setAssignment(assignmentRes.data);
 
         // Initialize shuffled options for matching questions
@@ -175,9 +173,7 @@ const ViewAssignment = () => {
         // If group assignment, fetch student's group
         if (assignmentRes.data.isGroupAssignment && assignmentRes.data.groupSet && user?.role === 'student') {
           const userId = user._id;
-          const groupsRes = await axios.get(`/api/groups/sets/${assignmentRes.data.groupSet}/groups`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
+          const groupsRes = await api.get(`/groups/sets/${assignmentRes.data.groupSet}/groups`);
           const groupsData = Array.isArray(groupsRes.data) ? groupsRes.data : [];
           const userGroup = groupsData.find(group =>
             Array.isArray(group.members) && group.members.some(member => String(member._id) === String(userId))
@@ -189,9 +185,7 @@ const ViewAssignment = () => {
         let hasSubmission = false;
         if (user?.role === 'student') {
           try {
-            const submissionRes = await axios.get(`/api/submissions/student/${id}`, {
-              headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const submissionRes = await api.get(`/submissions/student/${id}`);
             
             if (submissionRes.data) {
               hasSubmission = true;
@@ -256,9 +250,7 @@ const ViewAssignment = () => {
           }
         } else if (user?.role === 'teacher' || user?.role === 'admin') {
           try {
-            const submissionRes = await axios.get(`/api/submissions/assignment/${id}`, {
-              headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const submissionRes = await api.get(`/submissions/assignment/${id}`);
             setSubmission(submissionRes.data[0] || null);
           } catch (err) {
             setSubmission(null);
@@ -535,9 +527,7 @@ const ViewAssignment = () => {
       
 
       
-      const response = await axios.post(`/api/submissions`, payload, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const response = await api.post(`/submissions`, payload);
       
 
       setSubmission(response.data);
@@ -564,9 +554,7 @@ const ViewAssignment = () => {
     if (window.confirm('Are you sure you want to delete this assignment?')) {
       try {
         const token = localStorage.getItem('token');
-        await axios.delete(`/api/assignments/${id}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        await api.delete(`/assignments/${id}`);
         navigate(-1);
       } catch (err) {
         setError(err.response?.data?.message || 'Error deleting assignment');
@@ -579,11 +567,7 @@ const ViewAssignment = () => {
     setIsPublishing(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.patch(
-        `${API_URL}/api/assignments/${id}/publish`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const res = await api.patch(`/assignments/${id}/publish`, {});
       setAssignment(prev => ({ ...prev, published: res.data.published }));
     } catch (err) {
       setError(err.response?.data?.message || 'Error toggling publish status');

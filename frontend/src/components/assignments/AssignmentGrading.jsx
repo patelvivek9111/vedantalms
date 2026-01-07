@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../../services/api';
+import { API_URL } from '../../config';
 import { format } from 'date-fns';
 import { CheckCircle, XCircle, AlertCircle, ArrowLeft } from 'lucide-react';
 
@@ -77,39 +78,63 @@ const AssignmentGrading = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const token = localStorage.getItem('token');
+        // Fetch assignment details using the api service (which has proper baseURL)
+        const assignmentRes = await api.get(`/assignments/${id}`);
         
-        // Fetch assignment details
-        const assignmentRes = await axios.get(`/api/assignments/${id}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        // Check if response is HTML (means API call failed and returned frontend page)
+        if (typeof assignmentRes.data === 'string' && assignmentRes.data.trim().startsWith('<!DOCTYPE')) {
+          console.error('API returned HTML instead of JSON. Check API_URL configuration.');
+          setError('API configuration error: Unable to reach backend server. Please check your network connection.');
+          setLoading(false);
+          return;
+        }
+        
         // Handle both { success: true, data: {...} } and direct object responses
         const assignmentData = assignmentRes.data?.data || assignmentRes.data;
-        // Ensure questions is always an array
-        if (assignmentData) {
-          assignmentData.questions = Array.isArray(assignmentData.questions) ? assignmentData.questions : [];
+        
+        // Ensure assignmentData is an object, not a string
+        if (!assignmentData || typeof assignmentData !== 'object') {
+          console.error('Invalid assignment data:', assignmentData);
+          setError('Invalid assignment data received from server');
+          setLoading(false);
+          return;
         }
+        
+        // Ensure questions is always an array
+        assignmentData.questions = Array.isArray(assignmentData.questions) ? assignmentData.questions : [];
         setAssignment(assignmentData);
 
-        // Fetch submissions
-        const submissionsRes = await axios.get(`/api/submissions/assignment/${id}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        // Handle both { success: true, data: [...] } and direct array responses
-        const submissionsDataRaw = submissionsRes.data?.data || submissionsRes.data;
-        const submissionsData = Array.isArray(submissionsDataRaw) ? submissionsDataRaw : [];
-        console.log('Submissions response:', { 
-          raw: submissionsRes.data, 
-          processed: submissionsData,
-          isArray: Array.isArray(submissionsDataRaw)
-        });
-        setSubmissions(submissionsData);
+        // Fetch submissions using the api service
+        const submissionsRes = await api.get(`/submissions/assignment/${id}`);
+        
+        // Check if response is HTML
+        if (typeof submissionsRes.data === 'string' && submissionsRes.data.trim().startsWith('<!DOCTYPE')) {
+          console.error('Submissions API returned HTML instead of JSON.');
+          setSubmissions([]);
+        } else {
+          // Handle both { success: true, data: [...] } and direct array responses
+          const submissionsDataRaw = submissionsRes.data?.data || submissionsRes.data;
+          const submissionsData = Array.isArray(submissionsDataRaw) ? submissionsDataRaw : [];
+          console.log('Submissions response:', { 
+            raw: submissionsRes.data, 
+            processed: submissionsData,
+            isArray: Array.isArray(submissionsDataRaw)
+          });
+          setSubmissions(submissionsData);
+        }
         
         setLoading(false);
       } catch (err) {
         console.error('Error fetching assignment data:', err);
         console.error('Error response:', err.response?.data);
-        setError('Error fetching assignment data');
+        console.error('Error config:', err.config);
+        
+        // Check if error response is HTML
+        if (err.response?.data && typeof err.response.data === 'string' && err.response.data.trim().startsWith('<!DOCTYPE')) {
+          setError('API configuration error: Backend server not reachable. Please check your network connection and API configuration.');
+        } else {
+          setError(err.response?.data?.message || 'Error fetching assignment data');
+        }
         setLoading(false);
       }
     };
@@ -202,9 +227,7 @@ const AssignmentGrading = () => {
         payload.questionGrades = gradesToSend;
       }
 
-      const response = await axios.put(`/api/submissions/${selectedSubmission._id}`, payload, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const response = await api.put(`/submissions/${selectedSubmission._id}`, payload);
 
       // Update the submission in the list
       setSubmissions(prev => {
@@ -253,9 +276,7 @@ const AssignmentGrading = () => {
     try {
       const token = localStorage.getItem('token');
       
-      const response = await axios.delete(`/api/submissions/${selectedSubmission._id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.delete(`/submissions/${selectedSubmission._id}`);
       
       // Remove the deleted submission from the list
       setSubmissions(prev => prev.filter(s => s._id !== selectedSubmission._id));
