@@ -143,7 +143,19 @@ const ViewAssignment = () => {
         const token = localStorage.getItem('token');
         
         const assignmentRes = await api.get(`/assignments/${id}`);
-        setAssignment(assignmentRes.data);
+        // Check if response is HTML (means API call failed)
+        if (typeof assignmentRes.data === 'string' && assignmentRes.data.trim().startsWith('<!DOCTYPE')) {
+          setError('API configuration error: Unable to reach backend server');
+          setLoading(false);
+          return;
+        }
+        const assignmentData = assignmentRes.data?.data || assignmentRes.data;
+        // Ensure questions and attachments are arrays
+        if (assignmentData && typeof assignmentData === 'object') {
+          assignmentData.questions = Array.isArray(assignmentData.questions) ? assignmentData.questions : [];
+          assignmentData.attachments = Array.isArray(assignmentData.attachments) ? assignmentData.attachments : [];
+        }
+        setAssignment(assignmentData);
 
         // Initialize shuffled options for matching questions
         if (assignmentRes.data.questions) {
@@ -355,10 +367,8 @@ const ViewAssignment = () => {
         formData.append('files', file);
       });
 
-      const token = localStorage.getItem('token');
-      const response = await axios.post('/api/upload', formData, {
+      const response = await api.post('/upload', formData, {
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
         }
       });
