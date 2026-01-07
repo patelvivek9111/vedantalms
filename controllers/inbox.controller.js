@@ -238,10 +238,10 @@ exports.moveConversation = async (req, res) => {
     if (!validation.valid) {
       return res.status(400).json({ error: validation.error });
     }
-    const { folder } = req.body; // inbox, sent, archived
-    const validFolders = ['inbox', 'sent', 'archived'];
+    const { folder } = req.body; // inbox, sent, archived, deleted
+    const validFolders = ['inbox', 'sent', 'archived', 'deleted'];
     if (!folder || !validFolders.includes(folder)) {
-      return res.status(400).json({ error: 'Invalid folder. Must be one of: inbox, sent, archived' });
+      return res.status(400).json({ error: 'Invalid folder. Must be one of: inbox, sent, archived, deleted' });
     }
     const userId = req.user._id;
     const participant = await ConversationParticipant.findOne({ conversationId, userId });
