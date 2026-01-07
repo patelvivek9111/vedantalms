@@ -116,13 +116,32 @@ const Inbox: React.FC = () => {
     
     setBulkActionLoading(true);
     try {
-      await bulkMoveConversations(selectedConversations, 'archived');
+      // If we're in the archived folder, unarchive conversations
+      if (selectedFolder === 'archived') {
+        // Unarchive: move conversations back to their original folder
+        // If user created the conversation, it goes to "sent", otherwise "inbox"
+        const promises = selectedConversations.map(async (convId: string) => {
+          const conv = conversations.find(c => c._id === convId);
+          if (!conv) return;
+          
+          // Determine original folder: sent if user created it, inbox otherwise
+          const originalFolder = String(conv.createdBy) === String(currentUserId) ? 'sent' : 'inbox';
+          await moveConversation(convId, originalFolder);
+        });
+        await Promise.all(promises);
+      } else {
+        // Archive: move conversations to archived folder
+        await bulkMoveConversations(selectedConversations, 'archived');
+      }
+      
       // Refresh conversations
       const data = await fetchConversations();
-      setConversations(data);
+      setConversations(Array.isArray(data) ? data : []);
       setSelectedConversations([]);
-    } catch (err) {
-      alert('Failed to archive conversations');
+    } catch (err: any) {
+      console.error('Archive/Unarchive error:', err);
+      const action = selectedFolder === 'archived' ? 'unarchive' : 'archive';
+      alert(`Failed to ${action} conversations`);
     } finally {
       setBulkActionLoading(false);
     }
@@ -629,10 +648,10 @@ const Inbox: React.FC = () => {
             >
               <Reply size={18} className="sm:w-[22px] sm:h-[22px]" />
             </button>
-            {/* Archive */}
+            {/* Archive/Unarchive */}
             <button 
               className={`p-1.5 sm:p-2 rounded touch-manipulation ${selectedConversations.length > 0 ? 'hover:bg-yellow-200 dark:hover:bg-yellow-900/50 text-yellow-600 dark:text-yellow-400' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500'}`} 
-              title="Archive" 
+              title={selectedFolder === 'archived' ? 'Unarchive' : 'Archive'} 
               onClick={handleArchive}
               disabled={selectedConversations.length === 0 || bulkActionLoading}
             >
