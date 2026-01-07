@@ -85,6 +85,10 @@ const AssignmentGrading = () => {
         });
         // Handle both { success: true, data: {...} } and direct object responses
         const assignmentData = assignmentRes.data?.data || assignmentRes.data;
+        // Ensure questions is always an array
+        if (assignmentData) {
+          assignmentData.questions = Array.isArray(assignmentData.questions) ? assignmentData.questions : [];
+        }
         setAssignment(assignmentData);
 
         // Fetch submissions
@@ -94,10 +98,17 @@ const AssignmentGrading = () => {
         // Handle both { success: true, data: [...] } and direct array responses
         const submissionsDataRaw = submissionsRes.data?.data || submissionsRes.data;
         const submissionsData = Array.isArray(submissionsDataRaw) ? submissionsDataRaw : [];
+        console.log('Submissions response:', { 
+          raw: submissionsRes.data, 
+          processed: submissionsData,
+          isArray: Array.isArray(submissionsDataRaw)
+        });
         setSubmissions(submissionsData);
         
         setLoading(false);
       } catch (err) {
+        console.error('Error fetching assignment data:', err);
+        console.error('Error response:', err.response?.data);
         setError('Error fetching assignment data');
         setLoading(false);
       }
@@ -196,11 +207,12 @@ const AssignmentGrading = () => {
       });
 
       // Update the submission in the list
-      setSubmissions(prev => 
-        prev.map(sub => 
+      setSubmissions(prev => {
+        if (!Array.isArray(prev)) return [];
+        return prev.map(sub => 
           sub._id === selectedSubmission._id ? response.data : sub
-        )
-      );
+        );
+      });
       
       setSelectedSubmission(response.data);
       
@@ -369,7 +381,7 @@ const AssignmentGrading = () => {
             <div className="lg:col-span-1 order-2 lg:order-1">
               <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-gray-900 dark:text-gray-100">Submissions</h2>
               <div className="space-y-2 sm:space-y-3 max-h-96 overflow-y-auto">
-                {submissions.map((submission) => (
+                {Array.isArray(submissions) ? submissions.map((submission) => (
                   <div
                     key={submission._id}
                     onClick={() => setSelectedSubmission(submission)}
@@ -412,7 +424,12 @@ const AssignmentGrading = () => {
                       </div>
                     )}
                   </div>
-                ))}
+                    )) : (
+                      <div className="text-center text-gray-500 dark:text-gray-400 py-4">
+                        <p className="text-sm">No submissions available</p>
+                        <p className="text-xs mt-1">Submissions data format error</p>
+                      </div>
+                    )}
               </div>
             </div>
 
@@ -449,7 +466,7 @@ const AssignmentGrading = () => {
                 </div>
 
                 {/* Questions */}
-                {assignment.questions && (
+                {assignment.questions && Array.isArray(assignment.questions) && (
                   <div className="space-y-4">
                     {assignment.questions.map((question, index) => {
                         const questionType = getQuestionType(index);
@@ -481,7 +498,7 @@ const AssignmentGrading = () => {
                                 <div className="text-sm text-gray-900 dark:text-gray-100">{studentAnswer || 'No answer'}</div>
                               ) : questionType === 'matching' ? (
                                 <div className="space-y-2">
-                                  {question.leftItems && question.leftItems.map((leftItem, leftIndex) => {
+                                  {question.leftItems && Array.isArray(question.leftItems) && question.leftItems.map((leftItem, leftIndex) => {
                                     const studentMatch = typeof studentAnswer === 'object' ? 
                                       studentAnswer[leftIndex] : '';
                                     const correctMatch = question.rightItems && question.rightItems.find(rightItem => 
