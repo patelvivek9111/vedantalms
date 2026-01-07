@@ -32,14 +32,39 @@ export const toggleStar = async (conversationId: string) => {
 
 // Move conversation to a folder (archive, delete, etc.)
 export const moveConversation = async (conversationId: string, folder: string) => {
-  const res = await api.post(`/inbox/conversations/${conversationId}/move`, { folder });
-  return res.data;
+  // Ensure conversationId is a string
+  const id = typeof conversationId === 'string' ? conversationId : String(conversationId);
+  console.log(`Moving conversation ${id} to folder: ${folder}`);
+  console.log(`API URL will be: /inbox/conversations/${id}/move`);
+  console.log(`Request body:`, { folder });
+  
+  try {
+    const res = await api.post(`/inbox/conversations/${id}/move`, { folder });
+    console.log(`Move response for ${id}:`, res.data);
+    return res.data;
+  } catch (error: any) {
+    console.error(`Error moving conversation ${id} to ${folder}:`, error);
+    console.error('Error response status:', error.response?.status);
+    console.error('Error response data:', error.response?.data);
+    console.error('Error response headers:', error.response?.headers);
+    console.error('Request config:', error.config);
+    throw error;
+  }
 };
 
 // Bulk operations
 export const bulkMoveConversations = async (conversationIds: string[], folder: string) => {
-  const promises = conversationIds.map(id => moveConversation(id, folder));
-  return Promise.all(promises);
+  console.log(`Bulk moving ${conversationIds.length} conversations to folder: ${folder}`);
+  console.log('Conversation IDs:', conversationIds);
+  try {
+    const promises = conversationIds.map(id => moveConversation(id, folder));
+    const results = await Promise.all(promises);
+    console.log('Bulk move results:', results);
+    return results;
+  } catch (error: any) {
+    console.error('Bulk move error:', error);
+    throw error;
+  }
 };
 
 export const deleteForever = async (conversationId: string) => {

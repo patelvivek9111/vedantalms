@@ -144,17 +144,26 @@ const Inbox: React.FC = () => {
     }
     setBulkActionLoading(true);
     try {
+      console.log('Deleting conversations:', selectedConversations);
+      console.log('Selected folder:', selectedFolder);
+      
       if (selectedFolder === 'deleted') {
+        console.log('Calling bulkDeleteForever');
         await bulkDeleteForever(selectedConversations);
       } else {
+        console.log('Calling bulkMoveConversations with folder: deleted');
         await bulkMoveConversations(selectedConversations, 'deleted');
       }
       // Refresh conversations
       const data = await fetchConversations();
       setConversations(data);
       setSelectedConversations([]);
-    } catch (err) {
-      alert('Failed to delete conversations');
+    } catch (err: any) {
+      console.error('Delete error:', err);
+      console.error('Error response:', err.response);
+      console.error('Error message:', err.message);
+      const errorMsg = err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to delete conversations';
+      alert(`Failed to delete conversations: ${errorMsg}`);
     } finally {
       setBulkActionLoading(false);
     }
