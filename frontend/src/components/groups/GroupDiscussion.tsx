@@ -190,7 +190,8 @@ const GroupDiscussion: React.FC = () => {
         });
         
         if (response.data.success) {
-          setThreads(response.data.data);
+          const threadsData = response.data.data;
+          setThreads(Array.isArray(threadsData) ? threadsData : []);
         } else {
           setError('Failed to fetch discussion threads');
         }

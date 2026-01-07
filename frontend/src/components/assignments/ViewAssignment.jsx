@@ -370,11 +370,13 @@ const ViewAssignment = () => {
         }
       });
 
-      const newFiles = response.data.files.map(file => ({
-        name: file.originalname,
-        url: file.path,
-        size: file.size
-      }));
+      const newFiles = Array.isArray(response.data?.files) 
+        ? response.data.files.map(file => ({
+            name: file.originalname,
+            url: file.path,
+            size: file.size
+          }))
+        : [];
 
       setUploadedFiles(prev => {
         const updated = [...prev, ...newFiles];

@@ -66,7 +66,9 @@ export function TeacherCourseOversight() {
         
         if (response.data) {
           // Process courses to add stats
-          const coursesWithStats = await Promise.all((response.data.data || response.data).map(async (course: any) => {
+          const coursesData = response.data.data || response.data;
+          const coursesArray = Array.isArray(coursesData) ? coursesData : [];
+          const coursesWithStats = await Promise.all(coursesArray.map(async (course: any) => {
             try {
               // Calculate class average
               let classAverage: number | undefined = undefined;

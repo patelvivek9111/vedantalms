@@ -77,12 +77,14 @@ export const useSyllabusManagement = ({
         }
       });
 
-      const newFiles = response.data.files.map((file: any) => ({
-        name: file.originalname,
-        url: file.path,
-        size: file.size,
-        uploadedAt: new Date()
-      }));
+      const newFiles = Array.isArray(response.data?.files)
+        ? response.data.files.map((file: any) => ({
+            name: file.originalname,
+            url: file.path,
+            size: file.size,
+            uploadedAt: new Date()
+          }))
+        : [];
 
       setUploadedSyllabusFiles(prev => [...prev, ...newFiles]);
       setSyllabusFiles(prev => [...prev, ...files]);
@@ -147,6 +149,7 @@ export const useSyllabusManagement = ({
     handleSaveSyllabus,
   };
 };
+
 
 
 

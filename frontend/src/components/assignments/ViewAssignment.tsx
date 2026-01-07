@@ -333,7 +333,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
         }
 
         // Initialize shuffled options for matching questions
-        if (assignmentRes.data.questions) {
+        if (assignmentRes.data.questions && Array.isArray(assignmentRes.data.questions)) {
           const shuffled: Record<number, Question['rightItems']> = {};
           assignmentRes.data.questions.forEach((question: Question, index: number) => {
             if (question.type === 'matching' && Array.isArray(question.rightItems) && question.rightItems.length > 0) {
@@ -345,7 +345,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
         }
 
         // Initialize answers object for student submission
-        if (assignmentRes.data.questions) {
+        if (assignmentRes.data.questions && Array.isArray(assignmentRes.data.questions)) {
           const initialAnswers: Answers = {};
           assignmentRes.data.questions.forEach((q: Question, index: number) => {
             if (q.type === 'matching') {
@@ -363,8 +363,9 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
           const groupsRes = await axios.get(`/api/groups/sets/${assignmentRes.data.groupSet}/groups`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
-          const userGroup = groupsRes.data.find((group: any) =>
-            group.members.some((member: any) => String(member._id) === String(userId))
+          const groupsData = Array.isArray(groupsRes.data) ? groupsRes.data : [];
+          const userGroup = groupsData.find((group: any) =>
+            Array.isArray(group.members) && group.members.some((member: any) => String(member._id) === String(userId))
           );
           setStudentGroupId(userGroup ? userGroup._id : null);
         }
@@ -402,7 +403,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
           }
           
           // Load saved draft from localStorage if no submission exists
-          if (!hasSubmission && assignmentRes.data.questions) {
+          if (!hasSubmission && assignmentRes.data.questions && Array.isArray(assignmentRes.data.questions)) {
             const draftKey = `assignment_draft_${id}_${user._id}`;
             const savedDraft = localStorage.getItem(draftKey);
             if (savedDraft) {
@@ -634,11 +635,13 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
         }
       });
 
-      const newFiles = response.data.files.map((file: any) => ({
-        name: file.originalname,
-        url: file.path,
-        size: file.size
-      }));
+      const newFiles = Array.isArray(response.data?.files) 
+        ? response.data.files.map((file: any) => ({
+            name: file.originalname,
+            url: file.path,
+            size: file.size
+          }))
+        : [];
 
       setUploadedFiles(prev => {
         const updated = [...prev, ...newFiles];

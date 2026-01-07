@@ -48,10 +48,13 @@ export function AdminAnalytics() {
           const storageUsed = statsResponse.data.success ? statsResponse.data.data.storageUsed : 0;
           
           // Add storage data to systemUsage
-          const systemUsageWithStorage = response.data.data.systemUsage.map((usage: any) => ({
-            ...usage,
-            storageUsed: storageUsed
-          }));
+          const systemUsage = response.data.data?.systemUsage;
+          const systemUsageWithStorage = Array.isArray(systemUsage)
+            ? systemUsage.map((usage: any) => ({
+                ...usage,
+                storageUsed: storageUsed
+              }))
+            : [];
           
           setAnalyticsData({
             userGrowth: response.data.data.userGrowth || [],

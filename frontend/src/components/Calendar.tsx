@@ -424,17 +424,19 @@ const CalendarPage: React.FC = () => {
           const calIdx = calendarOptions.findIndex(opt => opt.value === user._id);
           // If calendar not found in options (shouldn't happen), use 0 as fallback
           const colorIdx = calIdx >= 0 ? calIdx : 0;
-          allEvents.push(...data
-            .filter((event: any) => event.calendar === user._id)
-            .map((event: any) => ({
-              ...event,
-              start: new Date(event.start),
-              end: new Date(event.end),
-              title: event.title,
-              allDay: false,
-              color: getCalendarColor(user._id, colorIdx),
-              resource: { ...event, color: getCalendarColor(user._id, colorIdx) },
-            })));
+          if (Array.isArray(data)) {
+            allEvents.push(...data
+              .filter((event: any) => event.calendar === user._id)
+              .map((event: any) => ({
+                ...event,
+                start: new Date(event.start),
+                end: new Date(event.end),
+                title: event.title,
+                allDay: false,
+                color: getCalendarColor(user._id, colorIdx),
+                resource: { ...event, color: getCalendarColor(user._id, colorIdx) },
+              })));
+          }
         } catch (error) {
           }
         continue;
@@ -451,17 +453,20 @@ const CalendarPage: React.FC = () => {
         const calIdx = calendarOptions.findIndex(opt => opt.value === calId);
         // If calendar not found in options (shouldn't happen), use 0 as fallback
         const colorIdx = calIdx >= 0 ? calIdx : 0;
-        let courseEvents = data
-          .filter((event: any) => event.calendar === calId)
-          .map((event: any) => ({
-            ...event,
-            start: new Date(event.start),
-            end: new Date(event.end),
-            title: event.title,
-            allDay: false,
-            color: getCalendarColor(calId, colorIdx),
-            resource: { ...event, color: getCalendarColor(calId, colorIdx) },
-          }));
+        let courseEvents: RBCEvent[] = [];
+        if (Array.isArray(data)) {
+          courseEvents = data
+            .filter((event: any) => event.calendar === calId)
+            .map((event: any) => ({
+              ...event,
+              start: new Date(event.start),
+              end: new Date(event.end),
+              title: event.title,
+              allDay: false,
+              color: getCalendarColor(calId, colorIdx),
+              resource: { ...event, color: getCalendarColor(calId, colorIdx) },
+            }));
+        }
         
         // Fetch assignments for all modules in this course
         let assignmentEvents: RBCEvent[] = [];
@@ -476,8 +481,8 @@ const CalendarPage: React.FC = () => {
                 const response = await api.get(`/assignments/module/${module._id}`);
                 const assignments = response.data;
                 
-                
-                assignments.forEach((a: any) => {
+                if (Array.isArray(assignments)) {
+                  assignments.forEach((a: any) => {
                   // Only add if we haven't seen this assignment before globally
                   if (!globalSeenAssignmentIds.has(a._id)) {
                     globalSeenAssignmentIds.add(a._id);
@@ -499,7 +504,8 @@ const CalendarPage: React.FC = () => {
                   } else {
                     
                   }
-                });
+                  });
+                }
               } catch (error) {
                 }
             }
@@ -513,8 +519,8 @@ const CalendarPage: React.FC = () => {
                     const response = await api.get(`/assignments/module/${module._id}`);
                     const assignments = response.data;
 
-                    
-                    assignments.forEach((a: any) => {
+                    if (Array.isArray(assignments)) {
+                      assignments.forEach((a: any) => {
                       // Only add if we haven't seen this assignment before globally
                       if (!globalSeenAssignmentIds.has(a._id)) {
                         globalSeenAssignmentIds.add(a._id);
@@ -536,7 +542,8 @@ const CalendarPage: React.FC = () => {
                       } else {
 
                       }
-                    });
+                      });
+                    }
                   } catch (error) {
                     }
                 }

@@ -27,7 +27,9 @@ export const useDiscussions = ({
         } catch (e) {
           threadsRes = await axios.get(`${API_URL}/api/threads?course=${course._id}`, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined);
         }
-        let gradedDiscussions = (threadsRes.data.data || []).filter((thread: any) => thread.isGraded);
+        const threadsData = threadsRes.data.data || threadsRes.data;
+        const threadsArray = Array.isArray(threadsData) ? threadsData : [];
+        let gradedDiscussions = threadsArray.filter((thread: any) => thread.isGraded);
 
         // Fetch module-level graded discussions and merge
         if (modules.length > 0) {
@@ -35,7 +37,9 @@ export const useDiscussions = ({
             modules.map(async (module: any) => {
               try {
                 const res = await axios.get(`${API_URL}/api/threads/module/${module._id}`, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined);
-                return (res.data.data || res.data || []).filter((thread: any) => thread.isGraded);
+                const moduleThreadsData = res.data.data || res.data;
+                const moduleThreadsArray = Array.isArray(moduleThreadsData) ? moduleThreadsData : [];
+                return moduleThreadsArray.filter((thread: any) => thread.isGraded);
               } catch (err) {
                 return [];
               }
@@ -57,6 +61,7 @@ export const useDiscussions = ({
     fetchDiscussions();
   }, [course?._id, modules, setDiscussions, setDiscussionsLoading]);
 };
+
 
 
 

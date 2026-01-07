@@ -59,9 +59,10 @@ export const ToDoPanel: React.FC = () => {
         setTodoError(null);
         try {
           const res = await api.get('/assignments/todo/ungraded');
-          setTodoAssignments(res.data);
+          setTodoAssignments(Array.isArray(res.data) ? res.data : []);
         } catch (err: any) {
           setTodoError('Failed to load To-Do assignments');
+          setTodoAssignments([]);
         } finally {
           setTodoLoading(false);
         }
@@ -74,9 +75,10 @@ export const ToDoPanel: React.FC = () => {
         setStudentDueError(null);
         try {
           const res = await api.get('/assignments/todo/due-all');
-          setStudentDueItems(res.data);
+          setStudentDueItems(Array.isArray(res.data) ? res.data : []);
         } catch (err: any) {
           setStudentDueError('Failed to load items due this week');
+          setStudentDueItems([]);
         } finally {
           setStudentDueLoading(false);
         }
@@ -91,9 +93,10 @@ export const ToDoPanel: React.FC = () => {
       setPersonalError(null);
       try {
         const res = await api.get('/todos');
-        setPersonalTodos(res.data);
+        setPersonalTodos(Array.isArray(res.data) ? res.data : []);
       } catch (err: any) {
         setPersonalError('Failed to load personal to-dos');
+        setPersonalTodos([]);
       } finally {
         setPersonalLoading(false);
       }

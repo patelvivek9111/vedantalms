@@ -35,8 +35,9 @@ export const useStudentSubmissions = ({
         // Build submissionMap and grades
         const newSubmissionMap: { [key: string]: string } = {};
         const newGrades: { [studentId: string]: { [assignmentId: string]: number | string } } = { [String(studentId)]: {} };
-        setStudentSubmissions(res.data); // Save full submissions for use in table
-        res.data.forEach((submission: any) => {
+        const submissionsData = Array.isArray(res.data) ? res.data : [];
+        setStudentSubmissions(submissionsData); // Save full submissions for use in table
+        submissionsData.forEach((submission: any) => {
           if (submission.assignment && submission._id) {
             // For group assignments, treat as submitted for all group members
             if (submission.assignment.isGroupAssignment && submission.group && submission.group.members) {
@@ -76,6 +77,7 @@ export const useStudentSubmissions = ({
     fetchStudentSubmissions();
   }, [course?._id, user, modules, setStudentSubmissions, setSubmissionMap, setGradebookData]);
 };
+
 
 
 

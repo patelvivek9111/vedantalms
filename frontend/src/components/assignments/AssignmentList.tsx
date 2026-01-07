@@ -90,7 +90,7 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
         const response = await axios.get(`/api/assignments/module/${moduleId}`,
           token ? { headers: { Authorization: `Bearer ${token}` } } : undefined
         );
-        setAssignments(response.data);
+        setAssignments(Array.isArray(response.data) ? response.data : []);
         // Fetch graded discussions (threads)
         let threadsRes;
         try {
@@ -112,8 +112,11 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
   }, [moduleId, propAssignments]);
 
   useEffect(() => {
+    const assignmentsList = propAssignments 
+      ? (Array.isArray(propAssignments) ? propAssignments : [])
+      : (Array.isArray(assignments) ? assignments : []);
     const mergedList = [
-      ...(propAssignments ? propAssignments : assignments).map(a => ({
+      ...assignmentsList.map(a => ({
         _id: a._id,
         title: a.title,
         dueDate: a.dueDate || (a as any).due_date || (a as any).discussionDueDate || null,
@@ -306,8 +309,11 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
   };
 
   // For teacher/admin, normalize and filter the flat list
+  const assignmentsList = propAssignments 
+    ? (Array.isArray(propAssignments) ? propAssignments : [])
+    : (Array.isArray(assignments) ? assignments : []);
   const flatList = filterList(
-    (propAssignments ? propAssignments : assignments).map(item => ({
+    assignmentsList.map(item => ({
       _id: item._id,
       title: item.title,
       dueDate: item.dueDate || (item as any).due_date || (item as any).discussionDueDate || null,

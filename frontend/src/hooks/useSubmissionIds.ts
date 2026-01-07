@@ -65,7 +65,8 @@ export const useSubmissionIds = ({
               headers: { Authorization: `Bearer ${token}` }
             });
             // Map student submissions and grades
-            res.data.forEach((submission: any) => {
+            const submissionsData = Array.isArray(res.data) ? res.data : [];
+            submissionsData.forEach((submission: any) => {
               if (assignment.isGroupAssignment && submission.group && submission.group.members) {
                 // For group assignments, create entries for all group members
                 submission.group.members.forEach((member: any) => {
@@ -113,7 +114,9 @@ export const useSubmissionIds = ({
           const discussionRes = await axios.get(`${API_URL}/api/threads/course/${course._id}`, {
             headers: { Authorization: `Bearer ${token}` }
           });
-          const gradedDiscussions = (discussionRes.data.data || []).filter((thread: any) => thread.isGraded);
+          const discussionsData = discussionRes.data.data || discussionRes.data;
+          const discussionsArray = Array.isArray(discussionsData) ? discussionsData : [];
+          const gradedDiscussions = discussionsArray.filter((thread: any) => thread.isGraded);
           for (const discussion of gradedDiscussions) {
             for (const student of gradebookData.students) {
               if (!newGrades[String(student._id)]) newGrades[String(student._id)] = {};
@@ -147,6 +150,7 @@ export const useSubmissionIds = ({
     fetchSubmissionIds();
   }, [gradebookData.assignments, gradebookData.students, isInstructor, isAdmin, course?._id, user._id, studentDiscussions, setSubmissionMap, setGradebookData]);
 };
+
 
 
 

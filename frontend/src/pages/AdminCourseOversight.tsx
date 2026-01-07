@@ -66,7 +66,9 @@ export function AdminCourseOversight() {
         
         if (response.data.success) {
           // Process courses to add class averages
-          const coursesWithAverages = await Promise.all((response.data.data || []).map(async (course: any) => {
+          const coursesData = response.data.data;
+          const coursesArray = Array.isArray(coursesData) ? coursesData : [];
+          const coursesWithAverages = await Promise.all(coursesArray.map(async (course: any) => {
             try {
               // Calculate class average
               let classAverage: number | undefined = undefined;
@@ -205,7 +207,9 @@ export function AdminCourseOversight() {
         const refreshResponse = await axios.get(`${API_URL}/api/admin/courses?${params.toString()}`, { headers });
         if (refreshResponse.data.success) {
           // Process courses to add class averages
-          const coursesWithAverages = await Promise.all((refreshResponse.data.data || []).map(async (course: any) => {
+          const coursesData = refreshResponse.data.data;
+          const coursesArray = Array.isArray(coursesData) ? coursesData : [];
+          const coursesWithAverages = await Promise.all(coursesArray.map(async (course: any) => {
             try {
               // Calculate class average
               let classAverage: number | undefined = undefined;

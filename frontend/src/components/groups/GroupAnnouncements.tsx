@@ -76,9 +76,10 @@ const GroupAnnouncements: React.FC<GroupAnnouncementsProps> = ({ courseId, group
     setCommentsLoading(true);
     try {
       const data = await getAnnouncementComments(announcementId);
-      setComments(data);
+      const commentsData = Array.isArray(data) ? data : [];
+      setComments(commentsData);
       if (user && selectedAnnouncement?.options?.requirePostBeforeSeeingReplies) {
-        const hasPosted = data.some((comment: Comment) => comment.author._id === user._id);
+        const hasPosted = commentsData.some((comment: Comment) => comment.author._id === user._id);
         setUserHasPosted(hasPosted);
       } else {
         setUserHasPosted(true);
@@ -146,6 +147,9 @@ const GroupAnnouncements: React.FC<GroupAnnouncementsProps> = ({ courseId, group
   };
 
   const renderComments = (comments: Comment[], level = 0, parentKey = '') => {
+    if (!Array.isArray(comments)) {
+      return null;
+    }
     let visibleComments = comments;
     const shouldHideOthers =
       level === 0 &&

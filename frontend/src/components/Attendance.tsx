@@ -400,7 +400,8 @@ const Attendance: React.FC = () => {
           if (isUserInstructor || user?.role === 'admin') {
             // For teachers/admins, create records for all students
             const studentsResponse = await axios.get(`${API_URL}/api/courses/${courseId}/students`, { headers });
-            const defaultAttendanceData = studentsResponse.data.map((student: any) => ({
+            const students = Array.isArray(studentsResponse.data) ? studentsResponse.data : [];
+            const defaultAttendanceData = students.map((student: any) => ({
               studentId: student._id,
               studentName: `${student.firstName} ${student.lastName}`,
               email: student.email,

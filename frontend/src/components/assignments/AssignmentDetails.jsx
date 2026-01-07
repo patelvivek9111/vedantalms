@@ -30,7 +30,13 @@ const AssignmentDetails = () => {
         const assignmentRes = await axios.get(`${API_URL}/api/assignments/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        setAssignment(assignmentRes.data);
+        const assignmentData = assignmentRes.data;
+        // Ensure questions and attachments are arrays
+        if (assignmentData) {
+          assignmentData.questions = Array.isArray(assignmentData.questions) ? assignmentData.questions : [];
+          assignmentData.attachments = Array.isArray(assignmentData.attachments) ? assignmentData.attachments : [];
+        }
+        setAssignment(assignmentData);
 
         if (currentUserRole === 'student') {
           try {
@@ -38,8 +44,14 @@ const AssignmentDetails = () => {
               headers: { 'Authorization': `Bearer ${token}` }
             });
             if (submissionRes.data) {
-              setSubmission(submissionRes.data);
-              setAnswers(submissionRes.data.answers || {});
+              const submissionData = submissionRes.data;
+              // Ensure submission is an array if it's a list, or ensure answers is an object
+              if (Array.isArray(submissionData)) {
+                setSubmission(submissionData);
+              } else {
+                setSubmission(submissionData);
+                setAnswers(submissionData.answers || {});
+              }
             }
           } catch (err) {
             if (err.response && err.response.status === 404) {
@@ -211,12 +223,12 @@ const AssignmentDetails = () => {
           <div className="mt-8">
             <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Questions</h3>
             <div className="mt-4 space-y-6">
-              {assignment.questions.map((q, index) => (
+              {(Array.isArray(assignment.questions) ? assignment.questions : []).map((q, index) => (
                 <div key={index}>
                   <p className="font-semibold text-gray-900 dark:text-gray-100">{index + 1}. {q.text} ({q.points} pts)</p>
                   {q.type === 'multiple-choice' && (
                     <ul className="list-disc ml-8 mt-2 space-y-1 text-gray-700 dark:text-gray-300">
-                      {q.options.map((opt, optIndex) => (
+                      {(Array.isArray(q.options) ? q.options : []).map((opt, optIndex) => (
                         <li key={optIndex}>{opt.text}</li>
                       ))}
                     </ul>
@@ -280,7 +292,7 @@ const AssignmentDetails = () => {
               <div className="mt-6">
                 <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Attachments</h3>
                 <ul className="mt-2 divide-y divide-gray-200 dark:divide-gray-700">
-                  {assignment.attachments.map((attachment, index) => (
+                  {(Array.isArray(assignment.attachments) ? assignment.attachments : []).map((attachment, index) => (
                     <li key={index} className="py-3">
                       <a
                         href={attachment}
@@ -303,7 +315,7 @@ const AssignmentDetails = () => {
                   <p className="mt-2 text-gray-500 dark:text-gray-400">No submissions yet</p>
                 ) : (
                   <ul className="mt-2 divide-y divide-gray-200 dark:divide-gray-700">
-                    {submission && submission.map((sub) => (
+                    {submission && Array.isArray(submission) && submission.map((sub) => (
                       <li key={sub._id} className="py-4">
                         <div className="flex items-center justify-between">
                           <div>

@@ -41,28 +41,33 @@ export const useInstructorGradebookData = ({
         const groupAssignmentsResponse = await axios.get(`${API_URL}/api/assignments/course/${course?._id}/group-assignments`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        const groupAssignments = groupAssignmentsResponse.data.map((assignment: any) => ({
-          ...assignment,
-          moduleTitle: 'Group Assignments'
-        }));
+        const groupAssignments = Array.isArray(groupAssignmentsResponse.data) 
+          ? groupAssignmentsResponse.data.map((assignment: any) => ({
+              ...assignment,
+              moduleTitle: 'Group Assignments'
+            }))
+          : [];
 
         // 4. Get all graded discussions
         const threadsResponse = await axios.get(`${API_URL}/api/threads/course/${course?._id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        const gradedDiscussions = threadsResponse.data.data
-          .filter((thread: any) => thread.isGraded)
-          .map((thread: any) => ({
-            _id: thread._id,
-            title: thread.title,
-            totalPoints: thread.totalPoints,
-            group: thread.group,
-            moduleTitle: 'Discussions',
-            isDiscussion: true,
-            studentGrades: thread.studentGrades || [],
-            dueDate: thread.dueDate,
-            replies: thread.replies || []
-          }));
+        const threadsData = threadsResponse.data?.data || threadsResponse.data || [];
+        const gradedDiscussions = Array.isArray(threadsData)
+          ? threadsData
+              .filter((thread: any) => thread.isGraded)
+              .map((thread: any) => ({
+                _id: thread._id,
+                title: thread.title,
+                totalPoints: thread.totalPoints,
+                group: thread.group,
+                moduleTitle: 'Discussions',
+                isDiscussion: true,
+                studentGrades: thread.studentGrades || [],
+                dueDate: thread.dueDate,
+                replies: thread.replies || []
+              }))
+          : [];
 
         // 5. Get all submissions for assignments (both regular and group assignments)
         let grades: { [studentId: string]: { [assignmentId: string]: number | string } } = {};
@@ -72,7 +77,8 @@ export const useInstructorGradebookData = ({
             headers: { Authorization: `Bearer ${token}` }
           });
           // Map: { studentId: grade }
-          for (const submission of res.data) {
+          const submissions = Array.isArray(res.data) ? res.data : [];
+          for (const submission of submissions) {
             if (assignment.isGroupAssignment && submission.group && submission.group.members) {
               // For group assignments, create grades for all group members
               submission.group.members.forEach((member: any) => {
@@ -166,6 +172,7 @@ export const useInstructorGradebookData = ({
     fetchInstructorGradebookData();
   }, [activeSection, isInstructor, course, modules, setGradebookData]);
 };
+
 
 
 

@@ -517,12 +517,24 @@ const ThreadView: React.FC = () => {
               headers: { Authorization: `Bearer ${token}` }
             });
             if (participantRes.data.success) {
-              setThread(participantRes.data.data);
+              const threadData = participantRes.data.data;
+              setThread({
+                ...threadData,
+                replies: Array.isArray(threadData.replies) ? threadData.replies : []
+              });
             } else {
-              setThread(threadRes.data.data);
+              const threadData = threadRes.data.data;
+              setThread({
+                ...threadData,
+                replies: Array.isArray(threadData.replies) ? threadData.replies : []
+              });
             }
           } else {
-            setThread(threadRes.data.data);
+            const threadData = threadRes.data.data;
+            setThread({
+              ...threadData,
+              replies: Array.isArray(threadData.replies) ? threadData.replies : []
+            });
           }
         } else {
           setError('Failed to load thread');
@@ -532,7 +544,8 @@ const ThreadView: React.FC = () => {
             headers: { Authorization: `Bearer ${token}` }
           });
           if (courseRes.data.success) {
-            setStudents(courseRes.data.data.students || []);
+            const studentsData = courseRes.data.data.students;
+            setStudents(Array.isArray(studentsData) ? studentsData : []);
           }
           
           // Fetch modules for the course
@@ -720,8 +733,13 @@ const ThreadView: React.FC = () => {
       );
 
       if (response.data.success) {
-        setThread(response.data.data);
-        const hasUserReplies = response.data.data.replies.some(
+        const threadData = response.data.data;
+        setThread({
+          ...threadData,
+          replies: Array.isArray(threadData.replies) ? threadData.replies : []
+        });
+        const replies = Array.isArray(threadData.replies) ? threadData.replies : [];
+        const hasUserReplies = replies.some(
           (reply: Reply) => reply.author._id === user?._id
         );
         if (!hasUserReplies) {
@@ -845,7 +863,8 @@ const ThreadView: React.FC = () => {
   const replyMap = new Map<string, Reply[]>();
   const rootReplies: Reply[] = [];
 
-  thread.replies.forEach(reply => {
+  const replies = Array.isArray(thread.replies) ? thread.replies : [];
+  replies.forEach(reply => {
     if (reply.parentReply) {
       if (!replyMap.has(reply.parentReply)) {
         replyMap.set(reply.parentReply, []);
@@ -857,7 +876,7 @@ const ThreadView: React.FC = () => {
   });
 
   // Check if the user has already replied to the main post
-  const hasUserMainReply = thread.replies.some(
+  const hasUserMainReply = replies.some(
     (reply) => reply.parentReply === null && reply.author._id === user?._id
   );
 

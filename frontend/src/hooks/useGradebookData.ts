@@ -47,10 +47,12 @@ export const useGradebookData = ({
         const groupAssignmentsResponse = await axios.get(`${API_URL}/api/assignments/course/${course?._id}/group-assignments`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        let groupAssignments = groupAssignmentsResponse.data.map((assignment: any) => ({
-          ...assignment,
-          moduleTitle: 'Group Assignments'
-        }));
+        let groupAssignments = Array.isArray(groupAssignmentsResponse.data)
+          ? groupAssignmentsResponse.data.map((assignment: any) => ({
+              ...assignment,
+              moduleTitle: 'Group Assignments'
+            }))
+          : [];
 
         // Remove group assignments that are also present in regular assignments (same title)
         const normalizeTitle = (t: any) => String(t || '').trim().toLowerCase();
@@ -187,6 +189,7 @@ export const useGradebookData = ({
     fetchGradebookData();
   }, [activeSection, isInstructor, isAdmin, course, modules, gradebookRefresh, user, setGradebookData]);
 };
+
 
 
 

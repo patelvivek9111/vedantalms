@@ -307,7 +307,7 @@ const Inbox: React.FC = () => {
       if (composeToGroup === 'sections') {
         // Fetch all students for the course
         const res = await api.get(`/courses/${composeCourse}/students`);
-        recipients = res.data.map((u: any) => u._id);
+        recipients = Array.isArray(res.data) ? res.data.map((u: any) => u._id) : [];
       }
       // For admins, course can be empty/null
       await api.post('/inbox/conversations', {

@@ -39,13 +39,15 @@ const GroupSetView: React.FC = () => {
       try {
         // Fetch groups in the groupset
         const groupsRes = await api.get(`/groups/sets/${groupSetId}/groups`);
-        setGroups(groupsRes.data || []);
+        const groupsData = groupsRes.data;
+        setGroups(Array.isArray(groupsData) ? groupsData : []);
         
         // Fetch groupset details
         const groupSetRes = await api.get(`/groups/sets/id/${groupSetId}`);
         setGroupSet(groupSetRes.data);
       } catch (err: any) {
         setError('Failed to load groupset data');
+        setGroups([]);
       } finally {
         setLoading(false);
       }
