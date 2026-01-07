@@ -83,13 +83,17 @@ const AssignmentGrading = () => {
         const assignmentRes = await axios.get(`/api/assignments/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        setAssignment(assignmentRes.data);
+        // Handle both { success: true, data: {...} } and direct object responses
+        const assignmentData = assignmentRes.data?.data || assignmentRes.data;
+        setAssignment(assignmentData);
 
         // Fetch submissions
         const submissionsRes = await axios.get(`/api/submissions/assignment/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        const submissionsData = Array.isArray(submissionsRes.data) ? submissionsRes.data : [];
+        // Handle both { success: true, data: [...] } and direct array responses
+        const submissionsDataRaw = submissionsRes.data?.data || submissionsRes.data;
+        const submissionsData = Array.isArray(submissionsDataRaw) ? submissionsDataRaw : [];
         setSubmissions(submissionsData);
         
         setLoading(false);
