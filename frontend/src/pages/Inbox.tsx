@@ -502,10 +502,16 @@ const Inbox: React.FC = () => {
       
       // No search query - apply normal folder filter
       // Show conversations based on selected folder
+      
+      // Always exclude deleted conversations unless viewing the deleted folder
+      if (selectedFolder !== 'deleted' && folder === 'deleted') return false;
+      
       if (selectedFolder === 'inbox' && folder !== 'inbox') return false;
       if (selectedFolder === 'sent') {
         // Convert to strings for comparison
         if (String(conv.createdBy) !== String(currentUserId)) return false;
+        // Exclude deleted conversations from sent folder
+        if (folder === 'deleted') return false;
       }
       if (selectedFolder === 'archived' && folder !== 'archived') return false;
       if (selectedFolder === 'favorite' && !participant?.starred) return false;
