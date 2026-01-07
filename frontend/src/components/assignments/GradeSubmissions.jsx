@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../../services/api';
 import ReactMarkdown from 'react-markdown';
 import { format } from 'date-fns';
 
@@ -21,13 +21,20 @@ const GradeSubmissions = () => {
   useEffect(() => {
     const fetchSubmission = async () => {
       try {
-        const response = await axios.get(`/api/submissions/${id}`);
-        setSubmission(response.data);
+        const response = await api.get(`/submissions/${id}`);
+        // Check if response is HTML
+        if (typeof response.data === 'string' && response.data.trim().startsWith('<!DOCTYPE')) {
+          setError('API configuration error: Unable to reach backend server');
+          setLoading(false);
+          return;
+        }
+        const submissionData = response.data?.data || response.data;
+        setSubmission(submissionData);
         setFormData({
-          grade: response.data.grade || '',
-          feedback: response.data.feedback || '',
-          showCorrectAnswers: response.data.showCorrectAnswers || false,
-          showStudentAnswers: response.data.showStudentAnswers || false
+          grade: submissionData.grade || '',
+          feedback: submissionData.feedback || '',
+          showCorrectAnswers: submissionData.showCorrectAnswers || false,
+          showStudentAnswers: submissionData.showStudentAnswers || false
         });
         setLoading(false);
       } catch (err) {
@@ -52,7 +59,7 @@ const GradeSubmissions = () => {
     setSuccess('');
 
     try {
-      await axios.put(`/api/submissions/${id}/grade`, formData);
+      await api.put(`/submissions/${id}/grade`, formData);
       setSuccess('Grade and feedback updated successfully');
       setTimeout(() => {
         navigate(-1);
@@ -99,7 +106,7 @@ const GradeSubmissions = () => {
             {submission.student.firstName} {submission.student.lastName}
           </p>
           <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-            Submitted: {format(new Date(submission.submittedAt), 'PPp')}
+            Submitted: {safeFormatDate(submission.submittedAt, 'PPp')}
           </p>
         </div>
 

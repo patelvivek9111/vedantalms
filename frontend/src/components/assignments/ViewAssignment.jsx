@@ -4,6 +4,7 @@ import api from '../../services/api';
 import { API_URL } from '../../config';
 import ReactMarkdown from 'react-markdown';
 import { format } from 'date-fns';
+import { safeFormatDate } from '../../utils/dateUtils';
 import { Lock, Unlock, HelpCircle, CheckCircle, Circle, Bookmark, BarChart3, Edit, Eye, ArrowLeft } from 'lucide-react';
 
 // Fisher-Yates shuffle algorithm for proper randomization
@@ -88,10 +89,7 @@ const ViewAssignment = () => {
     
     try {
       setLoadingStats(true);
-      const token = localStorage.getItem('token');
       const response = await api.get(`/assignments/${assignment._id}/stats`);
-        headers: { Authorization: `Bearer ${token}` }
-      });
       
       if (response.data.success) {
         setSubmissionStats(response.data.stats);
@@ -100,8 +98,6 @@ const ViewAssignment = () => {
       // Fallback: calculate basic stats from submissions
       try {
         const submissionsResponse = await api.get(`/submissions/assignment/${assignment._id}`);
-          headers: { Authorization: `Bearer ${token}` }
-        });
         
         const submissions = submissionsResponse.data || [];
         const stats = {
@@ -158,9 +154,9 @@ const ViewAssignment = () => {
         setAssignment(assignmentData);
 
         // Initialize shuffled options for matching questions
-        if (assignmentRes.data.questions) {
+        if (assignmentData.questions && Array.isArray(assignmentData.questions)) {
           const shuffled = {};
-          assignmentRes.data.questions.forEach((question, index) => {
+          assignmentData.questions.forEach((question, index) => {
             if (question.type === 'matching' && Array.isArray(question.rightItems) && question.rightItems.length > 0) {
               // Shuffle the rightItems to randomize the order using Fisher-Yates algorithm
               shuffled[index] = shuffleArray([...question.rightItems]);
@@ -170,9 +166,9 @@ const ViewAssignment = () => {
         }
 
         // Initialize answers object for student submission
-        if (assignmentRes.data.questions) {
+        if (assignmentData.questions && Array.isArray(assignmentData.questions)) {
           const initialAnswers = {};
-          assignmentRes.data.questions.forEach((q, index) => {
+          assignmentData.questions.forEach((q, index) => {
             if (q.type === 'matching') {
               initialAnswers[index] = {}; // Object for matching questions
             } else {
@@ -224,7 +220,7 @@ const ViewAssignment = () => {
           }
           
           // Load saved draft from localStorage if no submission exists
-          if (!hasSubmission && assignmentRes.data.questions) {
+          if (!hasSubmission && assignmentData.questions && Array.isArray(assignmentData.questions)) {
             const draftKey = `assignment_draft_${id}_${user._id}`;
             const savedDraft = localStorage.getItem(draftKey);
             if (savedDraft) {
@@ -233,7 +229,7 @@ const ViewAssignment = () => {
                 if (draft.answers) {
                   // Merge saved answers with initial structure
                   const initialAnswers = {};
-                  assignmentRes.data.questions.forEach((q, index) => {
+                  assignmentData.questions.forEach((q, index) => {
                     if (q.type === 'matching') {
                       initialAnswers[index] = {}; // Object for matching questions
                     } else {
@@ -638,9 +634,9 @@ const ViewAssignment = () => {
             <div className="flex-1 min-w-0">
               <h1 className="hidden lg:block text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 dark:text-gray-100 break-words">{assignment.title}</h1>
             <p className="mt-1 text-xs sm:text-sm text-gray-500 dark:text-gray-400 dark:text-gray-400">
-              <span className="block sm:inline">Due: {format(new Date(assignment.dueDate), 'PPp')}</span>
+              <span className="block sm:inline">Due: {safeFormatDate(assignment.dueDate, 'PPp')}</span>
               {submission && (
-                <span className="block sm:inline sm:ml-4 mt-1 sm:mt-0 text-green-600 dark:text-green-400 dark:text-green-400">Submitted: {format(new Date(submission.submittedAt), 'PPp')}</span>
+                <span className="block sm:inline sm:ml-4 mt-1 sm:mt-0 text-green-600 dark:text-green-400 dark:text-green-400">Submitted: {safeFormatDate(submission.submittedAt, 'PPp')}</span>
               )}
             </p>
             {/* Show feedback if student and feedback exists */}
@@ -939,7 +935,7 @@ const ViewAssignment = () => {
                           </div>
                           <div className="flex justify-between">
                             <span className="text-gray-600 dark:text-gray-400 dark:text-gray-400">Due Date:</span>
-                            <span className="font-medium text-gray-900 dark:text-gray-100 dark:text-gray-100">{format(new Date(assignment.dueDate), 'MMM d, yyyy')}</span>
+                            <span className="font-medium text-gray-900 dark:text-gray-100 dark:text-gray-100">{safeFormatDate(assignment.dueDate, 'MMM d, yyyy')}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-gray-600 dark:text-gray-400 dark:text-gray-400">Past Due:</span>
@@ -1427,7 +1423,7 @@ const ViewAssignment = () => {
                           {showTimer && (
                             <div className="space-y-1">
                               <div className="text-xs text-gray-500 dark:text-gray-400">
-                                Attempt due: {format(new Date(assignment.dueDate), 'MMM d \'at\' h:mm a')}
+                                Attempt due: {safeFormatDate(assignment.dueDate, 'MMM d \'at\' h:mm a')}
                               </div>
                               {quizStarted && timeLeft !== null ? (
                                 <div className={`text-sm font-medium ${timeLeft <= 300 ? 'text-red-600' : 'text-gray-700 dark:text-gray-300'}`}>
@@ -2062,7 +2058,7 @@ const ViewAssignment = () => {
                           {showTimer && (
                             <div className="space-y-1">
                               <div className="text-xs text-gray-500 dark:text-gray-400">
-                                Attempt due: {format(new Date(assignment.dueDate), 'MMM d \'at\' h:mm a')}
+                                Attempt due: {safeFormatDate(assignment.dueDate, 'MMM d \'at\' h:mm a')}
                               </div>
                               {quizStarted && timeLeft !== null ? (
                                 <div className={`text-sm font-medium ${timeLeft <= 300 ? 'text-red-600' : 'text-gray-700 dark:text-gray-300'}`}>

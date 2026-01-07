@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../../services/api';
 import { format } from 'date-fns';
 import { API_URL } from '../../config';
 import ProfileImage from '../ProfileImage';
@@ -87,17 +87,16 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
     const fetchAssignments = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await axios.get(`/api/assignments/module/${moduleId}`,
-          token ? { headers: { Authorization: `Bearer ${token}` } } : undefined
-        );
-        setAssignments(Array.isArray(response.data) ? response.data : []);
+        const response = await api.get(`/assignments/module/${moduleId}`);
+        const assignmentsData = response.data?.data || response.data;
+        setAssignments(Array.isArray(assignmentsData) ? assignmentsData : []);
         // Fetch graded discussions (threads)
         let threadsRes;
         try {
-          threadsRes = await axios.get(`/api/threads/module/${moduleId}`, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined);
+          threadsRes = await api.get(`/threads/module/${moduleId}`);
         } catch (e) {
           // fallback if /api/threads/module/:moduleId does not exist
-          threadsRes = await axios.get(`/api/threads?module=${moduleId}`, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined);
+          threadsRes = await api.get(`/threads?module=${moduleId}`);
         }
         // Only include graded discussions
         const gradedDiscussions = (threadsRes.data.data || threadsRes.data || []).filter((thread: any) => thread.isGraded);
@@ -230,17 +229,9 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
         // Find the item in the flatList to determine its type
         const item = flatList.find(a => a._id === id);
         if (item?.type === 'discussion') {
-          await axios.patch(
-            `${API_URL}/api/threads/${id}/publish`,
-            { published: true },
-            token ? { headers: { Authorization: `Bearer ${token}` } } : undefined
-          );
+          await api.patch(`/threads/${id}/publish`, { published: true });
         } else {
-          await axios.patch(
-            `${API_URL}/api/assignments/${id}/publish`,
-            { published: true },
-            token ? { headers: { Authorization: `Bearer ${token}` } } : undefined
-          );
+          await api.patch(`/assignments/${id}/publish`, { published: true });
         }
       }));
       alert('Selected items published!');
@@ -255,17 +246,9 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
       await Promise.all(selectedIds.map(async (id) => {
         const item = flatList.find(a => a._id === id);
         if (item?.type === 'discussion') {
-          await axios.patch(
-            `${API_URL}/api/threads/${id}/publish`,
-            { published: false },
-            token ? { headers: { Authorization: `Bearer ${token}` } } : undefined
-          );
+          await api.patch(`/threads/${id}/publish`, { published: false });
         } else {
-          await axios.patch(
-            `${API_URL}/api/assignments/${id}/publish`,
-            { published: false },
-            token ? { headers: { Authorization: `Bearer ${token}` } } : undefined
-          );
+          await api.patch(`/assignments/${id}/publish`, { published: false });
         }
       }));
       alert('Selected items unpublished!');
@@ -280,10 +263,10 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
     try {
       await Promise.all(selectedIds.map(async (id) => {
         try {
-          await axios.delete(`/api/assignments/${id}`, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined);
+          await api.delete(`/assignments/${id}`);
         } catch (e) {
           try {
-            await axios.delete(`/api/threads/${id}`, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined);
+            await api.delete(`/threads/${id}`);
           } catch (err) {
             // Ignore if both fail
           }

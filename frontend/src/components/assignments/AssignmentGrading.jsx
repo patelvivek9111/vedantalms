@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { API_URL } from '../../config';
 import { format } from 'date-fns';
+import { safeFormatDate } from '../../utils/dateUtils';
 import { CheckCircle, XCircle, AlertCircle, ArrowLeft } from 'lucide-react';
 
 const AssignmentGrading = () => {
@@ -432,7 +433,7 @@ const AssignmentGrading = () => {
                       </div>
                     </div>
                     <div className="text-sm text-gray-600 dark:text-gray-400">
-                      Submitted: {format(new Date(submission.submittedAt), 'MMM d, yyyy h:mm a')}
+                      Submitted: {safeFormatDate(submission.submittedAt, 'MMM d, yyyy h:mm a', 'No date')}
                     </div>
                     {submission.autoGraded && (
                       <div className="text-sm text-blue-600 dark:text-blue-400 mt-1">

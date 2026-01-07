@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
 import { format } from 'date-fns';
+import { safeFormatDate } from '../../utils/dateUtils';
 import { Lock, Unlock } from 'lucide-react';
 import { API_URL } from '../../config';
 
@@ -152,10 +153,10 @@ const AssignmentDetails = () => {
           <div className="flex-1 min-w-0">
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 break-words">{assignment.title}</h1>
             <p className="mt-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-              <span className="block sm:inline">Due: {format(new Date(assignment.dueDate), 'PPp')}</span>
+              <span className="block sm:inline">Due: {safeFormatDate(assignment.dueDate, 'PPp')}</span>
               {userRole === 'student' && assignment.submission && (
                 <span className="block sm:inline sm:ml-4 mt-1 sm:mt-0 text-green-600 dark:text-green-400">
-                  Submitted: {format(new Date(assignment.submission.submittedAt), 'PPp')}
+                  Submitted: {safeFormatDate(assignment.submission.submittedAt, 'PPp')}
                 </span>
               )}
             </p>
@@ -323,7 +324,7 @@ const AssignmentDetails = () => {
                               {sub.student?.firstName} {sub.student?.lastName}
                             </p>
                             <p className="text-sm text-gray-500 dark:text-gray-400">
-                              Submitted at: {format(new Date(sub.submittedAt), 'PPp')}
+                              Submitted at: {safeFormatDate(sub.submittedAt, 'PPp')}
                             </p>
                           </div>
                           <div className="text-right">

@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios, { AxiosError } from 'axios';
+import api from '../../services/api';
+import { API_URL } from '../../config';
 import ReactMarkdown from 'react-markdown';
 import { format } from 'date-fns';
+import { safeFormatDate } from '../../utils/dateUtils';
 import { Lock, Unlock, HelpCircle, CheckCircle, Circle, Bookmark, BarChart3, Edit, Eye, ArrowLeft, X, Download } from 'lucide-react';
-import { API_URL } from '../../config';
 import FilePreview from './FilePreview';
 import logger from '../../utils/logger';
 
@@ -234,10 +235,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
     
     try {
       setLoadingStats(true);
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`/api/assignments/${assignment._id}/stats`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get(`/assignments/${assignment._id}/stats`);
       
       if (response.data.success) {
         setSubmissionStats(response.data.stats);
@@ -246,10 +244,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
       logger.error('Error fetching submission stats', error instanceof Error ? error : new Error(String(error)));
       // Fallback: calculate basic stats from submissions
       try {
-        const token = localStorage.getItem('token');
-        const submissionsResponse = await axios.get(`/api/submissions/assignment/${assignment._id}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const submissionsResponse = await api.get(`/submissions/assignment/${assignment._id}`);
         
         const submissions = submissionsResponse.data || [];
         const questionStats = assignment.questions?.map((q: Question, index: number) => ({
@@ -309,20 +304,28 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
       try {
         const token = localStorage.getItem('token');
         
-        const assignmentRes = await axios.get(`/api/assignments/${id}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        setAssignment(assignmentRes.data);
+        const assignmentRes = await api.get(`/assignments/${id}`);
+        // Check if response is HTML
+        if (typeof assignmentRes.data === 'string' && assignmentRes.data.trim().startsWith('<!DOCTYPE')) {
+          setError('API configuration error: Unable to reach backend server');
+          setLoading(false);
+          return;
+        }
+        const assignmentData = assignmentRes.data?.data || assignmentRes.data;
+        // Ensure questions and attachments are arrays
+        if (assignmentData && typeof assignmentData === 'object') {
+          assignmentData.questions = Array.isArray(assignmentData.questions) ? assignmentData.questions : [];
+          assignmentData.attachments = Array.isArray(assignmentData.attachments) ? assignmentData.attachments : [];
+        }
+        setAssignment(assignmentData);
         
         // Fetch courseId if not provided
-        if (!courseId && assignmentRes.data?.module) {
-          const moduleId = typeof assignmentRes.data.module === 'string' 
-            ? assignmentRes.data.module 
-            : assignmentRes.data.module._id;
+        if (!courseId && assignmentData?.module) {
+          const moduleId = typeof assignmentData.module === 'string' 
+            ? assignmentData.module 
+            : assignmentData.module._id;
           try {
-            const moduleRes = await axios.get(`${API_URL}/api/modules/view/${moduleId}`, {
-              headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const moduleRes = await api.get(`/modules/view/${moduleId}`);
             if (moduleRes.data.success) {
               const fetchedCourseId = moduleRes.data.data.course._id || moduleRes.data.data.course;
               setCourseId(fetchedCourseId);
@@ -333,9 +336,9 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
         }
 
         // Initialize shuffled options for matching questions
-        if (assignmentRes.data.questions && Array.isArray(assignmentRes.data.questions)) {
+        if (assignmentData.questions && Array.isArray(assignmentData.questions)) {
           const shuffled: Record<number, Question['rightItems']> = {};
-          assignmentRes.data.questions.forEach((question: Question, index: number) => {
+          assignmentData.questions.forEach((question: Question, index: number) => {
             if (question.type === 'matching' && Array.isArray(question.rightItems) && question.rightItems.length > 0) {
               // Shuffle the rightItems to randomize the order using Fisher-Yates algorithm
               shuffled[index] = shuffleArray([...question.rightItems]);
@@ -345,9 +348,9 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
         }
 
         // Initialize answers object for student submission
-        if (assignmentRes.data.questions && Array.isArray(assignmentRes.data.questions)) {
+        if (assignmentData.questions && Array.isArray(assignmentData.questions)) {
           const initialAnswers: Answers = {};
-          assignmentRes.data.questions.forEach((q: Question, index: number) => {
+          assignmentData.questions.forEach((q: Question, index: number) => {
             if (q.type === 'matching') {
               initialAnswers[index] = {}; // Object for matching questions
             } else {
@@ -358,11 +361,9 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
         }
 
         // If group assignment, fetch student's group
-        if (assignmentRes.data.isGroupAssignment && assignmentRes.data.groupSet && user?.role === 'student') {
+        if (assignmentData.isGroupAssignment && assignmentData.groupSet && user?.role === 'student') {
           const userId = user._id;
-          const groupsRes = await axios.get(`/api/groups/sets/${assignmentRes.data.groupSet}/groups`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
+          const groupsRes = await api.get(`/groups/sets/${assignmentData.groupSet}/groups`);
           const groupsData = Array.isArray(groupsRes.data) ? groupsRes.data : [];
           const userGroup = groupsData.find((group: any) =>
             Array.isArray(group.members) && group.members.some((member: any) => String(member._id) === String(userId))
@@ -374,9 +375,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
         let hasSubmission = false;
         if (user?.role === 'student') {
           try {
-            const submissionRes = await axios.get(`/api/submissions/student/${id}`, {
-              headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const submissionRes = await api.get(`/submissions/student/${id}`);
             
             if (submissionRes.data) {
               hasSubmission = true;
@@ -403,7 +402,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
           }
           
           // Load saved draft from localStorage if no submission exists
-          if (!hasSubmission && assignmentRes.data.questions && Array.isArray(assignmentRes.data.questions)) {
+          if (!hasSubmission && assignmentData.questions && Array.isArray(assignmentData.questions)) {
             const draftKey = `assignment_draft_${id}_${user._id}`;
             const savedDraft = localStorage.getItem(draftKey);
             if (savedDraft) {
@@ -412,7 +411,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                 if (draft.answers) {
                   // Merge saved answers with initial structure
                   const initialAnswers: Record<string, string | Record<number, string>> = {};
-                  assignmentRes.data.questions.forEach((q: Question, index: number) => {
+                  assignmentData.questions.forEach((q: Question, index: number) => {
                     if (q.type === 'matching') {
                       initialAnswers[index.toString()] = {}; // Object for matching questions
                     } else {
@@ -443,9 +442,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
           }
         } else if (user?.role === 'teacher' || user?.role === 'admin') {
           try {
-            const submissionRes = await axios.get(`/api/submissions/assignment/${id}`, {
-              headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const submissionRes = await api.get(`/submissions/assignment/${id}`);
             setSubmission(submissionRes.data[0] || null);
           } catch (err) {
             setSubmission(null);
@@ -492,9 +489,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
         if (isInstructor) {
           // Fetch course class average for teachers
           try {
-            const response = await axios.get(`${API_URL}/api/grades/course/${courseId}/average`, {
-              headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const response = await api.get(`/grades/course/${courseId}/average`);
             if (response.data && response.data.average !== null && response.data.average !== undefined) {
               setCourseAverage(response.data.average);
             }
@@ -504,9 +499,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
         } else if (isStudent) {
           // Fetch student's overall course grade
           try {
-            const response = await axios.get(`${API_URL}/api/grades/student/course/${courseId}`, {
-              headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const response = await api.get(`/grades/student/course/${courseId}`);
             if (response.data && response.data.totalPercent !== null && response.data.totalPercent !== undefined) {
               setStudentCourseGrade(response.data.totalPercent);
             }
@@ -628,9 +621,8 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
         setIsUploading(false);
         return;
       }
-      const response = await axios.post('/api/upload', formData, {
+      const response = await api.post('/upload', formData, {
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
         }
       });
@@ -835,9 +827,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
       
 
       
-      const response = await axios.post(`/api/submissions`, payload, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const response = await api.post(`/submissions`, payload);
       
 
       setSubmission(response.data);
@@ -851,10 +841,9 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
       
       // Dispatch event to refresh ToDo panel
       window.dispatchEvent(new Event('assignmentSubmitted'));
-    } catch (err) {
-      const axiosError = err as AxiosError<{ message?: string }>;
-      logger.error('Submit error', err instanceof Error ? err : new Error(String(err)), { status: axiosError.response?.status, data: axiosError.response?.data });
-      setError(axiosError.response?.data?.message || 'Error submitting assignment');
+    } catch (err: any) {
+      logger.error('Submit error', err instanceof Error ? err : new Error(String(err)), { status: err.response?.status, data: err.response?.data });
+      setError(err.response?.data?.message || 'Error submitting assignment');
     } finally {
       setIsSubmitting(false);
     }
@@ -866,13 +855,10 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
     if (window.confirm('Are you sure you want to delete this assignment?')) {
       try {
         const token = localStorage.getItem('token');
-        await axios.delete(`/api/assignments/${id}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        await api.delete(`/assignments/${id}`);
         navigate(-1);
-      } catch (err) {
-        const axiosError = err as AxiosError<{ message?: string }>;
-        setError(axiosError.response?.data?.message || 'Error deleting assignment');
+      } catch (err: any) {
+        setError(err.response?.data?.message || 'Error deleting assignment');
       }
     }
   };
@@ -881,17 +867,11 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
     if (!user || (user.role !== 'teacher' && user.role !== 'admin')) return;
     setIsPublishing(true);
     try {
-      const token = localStorage.getItem('token');
-      const res = await axios.patch(
-        `${API_URL}/api/assignments/${id}/publish`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const res = await api.patch(`/assignments/${id}/publish`, {});
       setAssignment(prev => prev ? ({ ...prev, published: res.data.published }) : null);
-    } catch (err) {
-      const axiosError = err as AxiosError<{ message?: string }>;
+    } catch (err: any) {
       logger.error('Error toggling assignment publish', err instanceof Error ? err : new Error(String(err)));
-      setError(axiosError.response?.data?.message || 'Error toggling publish status');
+      setError(err.response?.data?.message || 'Error toggling publish status');
     } finally {
       setIsPublishing(false);
     }
@@ -996,9 +976,9 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
               {/* Show assignment title on mobile/tablet (hidden on desktop where it's in the flex above) */}
               <h1 className="lg:hidden text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 dark:text-gray-100 break-words mt-2">{assignment.title}</h1>
             <p className="mt-1 text-xs sm:text-sm text-gray-500 dark:text-gray-400 dark:text-gray-400">
-              <span className="block sm:inline">Due: {format(new Date(assignment.dueDate), 'MMM d, yyyy, h:mm a')}</span>
+              <span className="block sm:inline">Due: {safeFormatDate(assignment.dueDate, 'MMM d, yyyy, h:mm a')}</span>
               {submission && (
-                <span className="block sm:inline sm:ml-4 mt-1 sm:mt-0 text-green-600 dark:text-green-400 dark:text-green-400">Submitted: {format(new Date(submission.submittedAt), 'MMM d, yyyy, h:mm a')}</span>
+                <span className="block sm:inline sm:ml-4 mt-1 sm:mt-0 text-green-600 dark:text-green-400 dark:text-green-400">Submitted: {safeFormatDate(submission.submittedAt, 'MMM d, yyyy, h:mm a')}</span>
               )}
             </p>
             {/* Show feedback if student and feedback exists */}
@@ -1520,7 +1500,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                           </div>
                           <div className="flex justify-between">
                             <span className="text-gray-600 dark:text-gray-400 dark:text-gray-400">Due Date:</span>
-                            <span className="font-medium text-gray-900 dark:text-gray-100 dark:text-gray-100">{format(new Date(assignment.dueDate), 'MMM d, yyyy')}</span>
+                            <span className="font-medium text-gray-900 dark:text-gray-100 dark:text-gray-100">{safeFormatDate(assignment.dueDate, 'MMM d, yyyy')}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-gray-600 dark:text-gray-400 dark:text-gray-400">Past Due:</span>
@@ -2068,7 +2048,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                           {showTimer && (
                             <div className="space-y-1">
                               <div className="text-xs text-gray-500 dark:text-gray-400">
-                                Attempt due: {format(new Date(assignment.dueDate), 'MMM d \'at\' h:mm a')}
+                                Attempt due: {safeFormatDate(assignment.dueDate, 'MMM d \'at\' h:mm a')}
                               </div>
                               {quizStarted && timeLeft !== null ? (
                                 <div className={`text-sm font-medium ${timeLeft <= 300 ? 'text-red-600' : 'text-gray-700 dark:text-gray-300'}`}>
@@ -2822,7 +2802,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                           {showTimer && (
                             <div className="space-y-1">
                               <div className="text-xs text-gray-500 dark:text-gray-400">
-                                Attempt due: {format(new Date(assignment.dueDate), 'MMM d \'at\' h:mm a')}
+                                Attempt due: {safeFormatDate(assignment.dueDate, 'MMM d \'at\' h:mm a')}
                               </div>
                               {quizStarted && timeLeft !== null ? (
                                 <div className={`text-sm font-medium ${timeLeft <= 300 ? 'text-red-600' : 'text-gray-700 dark:text-gray-300'}`}>

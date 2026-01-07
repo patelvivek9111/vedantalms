@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import api from '../../services/api';
 import { getImageUrl } from '../../services/api';
 
 // Detect mobile device
@@ -47,13 +47,14 @@ const GroupPeople: React.FC<GroupPeopleProps> = ({ groupId, groupSetId }) => {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    axios
-      .get(`/api/groups/${groupId}/members`)
-      .then((res) => {
-        setMembers(res.data);
+    api
+      .get(`/groups/${groupId}/members`)
+      .then((res: any) => {
+        const membersData = res.data?.data || res.data;
+        setMembers(Array.isArray(membersData) ? membersData : []);
         setLoading(false);
       })
-      .catch((err) => {
+      .catch((err: any) => {
         setError('Failed to load group members');
         setLoading(false);
       });
@@ -66,10 +67,11 @@ const GroupPeople: React.FC<GroupPeopleProps> = ({ groupId, groupSetId }) => {
       return;
     }
     setSearchLoading(true);
-    axios
-      .get(`/api/groups/sets/${groupSetId}/available-students?search=${encodeURIComponent(search)}`)
-      .then((res) => {
-        setSearchResults(res.data);
+    api
+      .get(`/groups/sets/${groupSetId}/available-students?search=${encodeURIComponent(search)}`)
+      .then((res: any) => {
+        const studentsData = res.data?.data || res.data;
+        setSearchResults(Array.isArray(studentsData) ? studentsData : []);
         setSearchLoading(false);
       })
       .catch(() => {
@@ -80,8 +82,8 @@ const GroupPeople: React.FC<GroupPeopleProps> = ({ groupId, groupSetId }) => {
 
   const handleRemove = (userId: string) => {
     setRemoving(userId);
-    axios
-      .delete(`/api/groups/${groupId}/members/${userId}`)
+    api
+      .delete(`/groups/${groupId}/members/${userId}`)
       .then(() => {
         setMembers((prev) => prev.filter((m) => m._id !== userId));
         setRemoving(null);
@@ -94,11 +96,14 @@ const GroupPeople: React.FC<GroupPeopleProps> = ({ groupId, groupSetId }) => {
 
   const handleAdd = (userId: string) => {
     setAdding(userId);
-    axios
-      .post(`/api/groups/${groupId}/members`, { userId })
+    api
+      .post(`/groups/${groupId}/members`, { userId })
       .then(() => {
         // Refetch members and clear search
-        axios.get(`/api/groups/${groupId}/members`).then((res) => setMembers(res.data));
+        api.get(`/groups/${groupId}/members`).then((res: any) => {
+          const membersData = res.data?.data || res.data;
+          setMembers(Array.isArray(membersData) ? membersData : []);
+        }).catch(() => setMembers([]));
         setSearch('');
         setSearchResults([]);
         setAdding(null);
