@@ -73,14 +73,16 @@ const Groups: React.FC = () => {
         if (user.role === 'teacher' || user.role === 'admin') {
           // For teachers, fetch groupsets and their group/member counts
           const res = await api.get('/groups/sets/my');
-          const groupSetsData = res.data.data || [];
+          const groupSetsDataRaw = res.data?.data || res.data;
+          const groupSetsData = Array.isArray(groupSetsDataRaw) ? groupSetsDataRaw : [];
           
             // Fetch group and member counts for each group set
         const groupSetsWithCounts = await Promise.all(
           groupSetsData.map(async (groupSet: GroupSet) => {
             try {
               const groupsRes = await api.get(`/groups/sets/${groupSet._id}/groups`);
-              const groups = groupsRes.data || [];
+              const groupsDataRaw = groupsRes.data?.data || groupsRes.data;
+              const groups = Array.isArray(groupsDataRaw) ? groupsDataRaw : [];
               
               // Store groups data for this group set
               setAllGroupsData(prev => ({

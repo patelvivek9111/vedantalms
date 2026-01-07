@@ -89,7 +89,8 @@ const AssignmentGrading = () => {
         const submissionsRes = await axios.get(`/api/submissions/assignment/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        setSubmissions(submissionsRes.data);
+        const submissionsData = Array.isArray(submissionsRes.data) ? submissionsRes.data : [];
+        setSubmissions(submissionsData);
         
         setLoading(false);
       } catch (err) {

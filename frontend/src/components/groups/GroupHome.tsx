@@ -136,7 +136,8 @@ const GroupHome: React.FC = () => {
           const membersResponse = await axios.get(`${API_URL}/api/groups/${groupId}/members`, {
             headers: { Authorization: `Bearer ${token}` }
           });
-          members = membersResponse.data || [];
+          const membersData = membersResponse.data?.data || membersResponse.data;
+          members = Array.isArray(membersData) ? membersData : [];
         } catch (membersError) {
           members = [];
         }

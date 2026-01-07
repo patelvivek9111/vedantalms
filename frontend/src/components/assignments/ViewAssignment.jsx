@@ -178,8 +178,9 @@ const ViewAssignment = () => {
           const groupsRes = await axios.get(`/api/groups/sets/${assignmentRes.data.groupSet}/groups`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
-          const userGroup = groupsRes.data.find(group =>
-            group.members.some(member => String(member._id) === String(userId))
+          const groupsData = Array.isArray(groupsRes.data) ? groupsRes.data : [];
+          const userGroup = groupsData.find(group =>
+            Array.isArray(group.members) && group.members.some(member => String(member._id) === String(userId))
           );
           setStudentGroupId(userGroup ? userGroup._id : null);
         }
