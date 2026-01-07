@@ -13,7 +13,9 @@ const EnrollmentRequestsHandler: React.FC<EnrollmentRequestsHandlerProps> = ({ c
     const fetchEnrollmentRequests = async () => {
       try {
         const todosRes = await api.get('/todos');
-        const enrollmentTodos = todosRes.data.filter((todo: any) => 
+        const todosData = todosRes.data?.data || todosRes.data;
+        const todosArray = Array.isArray(todosData) ? todosData : [];
+        const enrollmentTodos = todosArray.filter((todo: any) => 
           todo.type === 'enrollment_request' && 
           todo.courseId === courseId && 
           todo.action === 'pending'

@@ -63,7 +63,9 @@ export const useGradebookData = ({
         const threadsResponse = await axios.get(`${API_URL}/api/threads/course/${course?._id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        const gradedDiscussions = threadsResponse.data.data
+        const threadsData = threadsResponse.data?.data || threadsResponse.data || [];
+        const threadsArray = Array.isArray(threadsData) ? threadsData : [];
+        const gradedDiscussions = threadsArray
           .filter((thread: any) => thread.isGraded)
           .map((thread: any) => ({
             _id: thread._id,
@@ -87,7 +89,8 @@ export const useGradebookData = ({
           });
         
         // Process student's submissions to build grades object
-        for (const submission of studentSubmissionsResponse.data) {
+        const submissionsData = Array.isArray(studentSubmissionsResponse.data) ? studentSubmissionsResponse.data : [];
+        for (const submission of submissionsData) {
           const assignment = allAssignmentsWithGroups.find(a => a._id === submission.assignment);
           if (assignment) {
             if (assignment.isGroupAssignment && submission.group && submission.group.members) {

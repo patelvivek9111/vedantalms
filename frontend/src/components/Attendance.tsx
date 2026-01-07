@@ -808,7 +808,7 @@ const Attendance: React.FC = () => {
         
         try {
           const response = await axios.get(`${API_URL}/api/courses/${courseId}/attendance?date=${dateString}`, { headers });
-          if (response.data && response.data.length > 0) {
+          if (response.data && Array.isArray(response.data) && response.data.length > 0) {
             // Filter by selected students
             const filteredData = response.data.filter((record: any) => 
               studentsToExport.includes(record.studentId)
