@@ -26,13 +26,10 @@ const StudentGameScreen: React.FC = () => {
   const [timeUp, setTimeUp] = useState(false);
   const [showResultMessage, setShowResultMessage] = useState(false);
   const [showFullLeaderboard, setShowFullLeaderboard] = useState(false);
-  const [showResultScreen, setShowResultScreen] = useState(false);
-  const [showEndQuizModal, setShowEndQuizModal] = useState(false);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const colorAnimationRef = useRef<NodeJS.Timeout | null>(null);
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const resultScreenTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const token = localStorage.getItem('token') || '';
 
   const colors = ['bg-red-500', 'bg-blue-500', 'bg-yellow-500', 'bg-green-500'];
@@ -127,17 +124,12 @@ const StudentGameScreen: React.FC = () => {
             setShowColorAnimation(false);
             setTimeUp(false);
             setShowResultMessage(false);
-            setShowResultScreen(false); // Hide result screen for new question
             setStatus('active');
             
-            // Clear any existing timers and timeouts
+            // Clear any existing timers
             if (timerRef.current) {
               clearInterval(timerRef.current);
               timerRef.current = null;
-            }
-            if (resultScreenTimeoutRef.current) {
-              clearTimeout(resultScreenTimeoutRef.current);
-              resultScreenTimeoutRef.current = null;
             }
             
             console.log('Question state reset - ready for new answer');
@@ -168,17 +160,6 @@ const StudentGameScreen: React.FC = () => {
                 points: myResult.points
               });
               setShowResultMessage(true);
-              // Show full-screen result screen
-              setShowResultScreen(true);
-              
-              // Auto-hide result screen after 5 seconds (in case next question is delayed)
-              if (resultScreenTimeoutRef.current) {
-                clearTimeout(resultScreenTimeoutRef.current);
-              }
-              resultScreenTimeoutRef.current = setTimeout(() => {
-                setShowResultScreen(false);
-                resultScreenTimeoutRef.current = null;
-              }, 5000);
             }
           }
         });
@@ -190,8 +171,6 @@ const StudentGameScreen: React.FC = () => {
             setLeaderboard(data.leaderboard);
           }
           setStatus('ended');
-          // Show modal popup
-          setShowEndQuizModal(true);
           // Also reload session to get final state
           loadSession().then((sessionData) => {
             if (sessionData && sessionData.status === 'ended' && sessionData.participants) {
@@ -261,9 +240,6 @@ const StudentGameScreen: React.FC = () => {
       }
       if (refreshIntervalRef.current) {
         clearInterval(refreshIntervalRef.current);
-      }
-      if (resultScreenTimeoutRef.current) {
-        clearTimeout(resultScreenTimeoutRef.current);
       }
       if (sock) {
         sock.off('quizwave:joined');
@@ -524,26 +500,7 @@ const StudentGameScreen: React.FC = () => {
       const myPodium = podiumData[podiumPosition - 1];
 
       return (
-        <div className="min-h-screen bg-gradient-to-b from-indigo-900 via-blue-900 to-purple-900 flex items-center justify-center p-4 relative">
-          {/* End Quiz Modal Popup */}
-          {showEndQuizModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 sm:p-8 max-w-md w-full mx-4">
-                <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-4">
-                  Quiz Ended
-                </h3>
-                <p className="text-gray-600 dark:text-gray-300 mb-6">
-                  The teacher has ended the quiz session.
-                </p>
-                <button
-                  onClick={() => setShowEndQuizModal(false)}
-                  className="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg font-semibold transition-colors"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          )}
+        <div className="min-h-screen bg-gradient-to-b from-indigo-900 via-blue-900 to-purple-900 flex items-center justify-center p-4">
           <div className="w-full max-w-2xl">
             <div className="bg-white/10 backdrop-blur-lg rounded-xl shadow-2xl p-4 sm:p-6 lg:p-8">
               <div className="text-center mb-6 sm:mb-8">
@@ -652,26 +609,7 @@ const StudentGameScreen: React.FC = () => {
 
     // Rank 4+ View - Show only their rank
     return (
-      <div className="min-h-screen bg-gradient-to-b from-indigo-900 via-blue-900 to-purple-900 flex items-center justify-center p-4 relative">
-        {/* End Quiz Modal Popup */}
-        {showEndQuizModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 sm:p-8 max-w-md w-full mx-4">
-              <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-4">
-                Quiz Ended
-              </h3>
-              <p className="text-gray-600 dark:text-gray-300 mb-6">
-                The teacher has ended the quiz session.
-              </p>
-              <button
-                onClick={() => setShowEndQuizModal(false)}
-                className="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg font-semibold transition-colors"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        )}
+      <div className="min-h-screen bg-gradient-to-b from-indigo-900 via-blue-900 to-purple-900 flex items-center justify-center p-4">
         <div className="w-full max-w-2xl">
           <div className="bg-white/10 backdrop-blur-lg rounded-xl shadow-2xl p-4 sm:p-6 lg:p-8">
             <div className="text-center">
@@ -787,50 +725,7 @@ const StudentGameScreen: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-500 via-purple-600 to-pink-500 flex flex-col relative">
-      {/* Full-Screen Result Overlay - Shows after each question */}
-      {showResultScreen && answerResult && (
-        <div className={`fixed inset-0 z-50 flex items-center justify-center ${
-          answerResult.isCorrect ? 'bg-green-500' : 'bg-red-500'
-        }`}>
-          <div className="text-center">
-            <div className="mb-8">
-              {answerResult.isCorrect ? (
-                <CheckCircle className="w-32 h-32 sm:w-40 sm:h-40 text-white mx-auto" />
-              ) : (
-                <XCircle className="w-32 h-32 sm:w-40 sm:h-40 text-white mx-auto" />
-              )}
-            </div>
-            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-4">
-              {answerResult.isCorrect ? 'Correct!' : 'Incorrect'}
-            </h2>
-            <p className="text-3xl sm:text-4xl lg:text-5xl font-semibold text-white">
-              {answerResult.points} points
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* End Quiz Modal Popup */}
-      {showEndQuizModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 sm:p-8 max-w-md w-full mx-4">
-            <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-4">
-              Quiz Ended
-            </h3>
-            <p className="text-gray-600 dark:text-gray-300 mb-6">
-              The teacher has ended the quiz session.
-            </p>
-            <button
-              onClick={() => setShowEndQuizModal(false)}
-              className="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg font-semibold transition-colors"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
-
+    <div className="min-h-screen bg-gradient-to-br from-blue-500 via-purple-600 to-pink-500 flex flex-col">
       {/* Top Bar - Minimal */}
       <div className="bg-white/10 backdrop-blur-lg p-3 sm:p-4 flex justify-end items-center">
         <div className="text-white text-xs sm:text-sm">
