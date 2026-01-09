@@ -39,13 +39,30 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
   const podiumTimerRef = useRef<NodeJS.Timeout | null>(null);
   const token = localStorage.getItem('token') || '';
 
-  const loadSession = async () => {
+  const loadSession = async (preserveQuestionState = false) => {
     try {
       const data = await quizwaveService.getSession(sessionId);
       setSession(data);
       setParticipantCount(data.participants.length);
       setParticipants(data.participants || []);
-      setCurrentQuestionIndex(data.currentQuestionIndex);
+      
+      // Only update question index if not preserving state (to avoid overwriting socket updates)
+      if (!preserveQuestionState) {
+        setCurrentQuestionIndex(data.currentQuestionIndex);
+        
+        // Set current question if quiz has started and we're not preserving state
+        if (data.currentQuestionIndex >= 0 && quiz.questions[data.currentQuestionIndex]) {
+          // For teacher, we need to preserve isCorrect flags from socket events
+          // Don't overwrite currentQuestion if it was set by socket event
+          if (!currentQuestion || currentQuestion.questionIndex !== data.currentQuestionIndex) {
+            const questionFromQuiz = quiz.questions[data.currentQuestionIndex];
+            setCurrentQuestion({
+              ...questionFromQuiz,
+              questionIndex: data.currentQuestionIndex
+            });
+          }
+        }
+      }
       
       // Only calculate leaderboard when quiz has ended
       if (data.status === 'ended') {
@@ -57,11 +74,6 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
           }))
           .sort((a: any, b: any) => b.totalScore - a.totalScore);
         setLeaderboard(lb);
-      }
-      
-      // Set current question if quiz has started
-      if (data.currentQuestionIndex >= 0 && quiz.questions[data.currentQuestionIndex]) {
-        setCurrentQuestion(quiz.questions[data.currentQuestionIndex]);
       }
       
       return data;
@@ -161,6 +173,7 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
         setShowAnswerDistribution(false);
         setShowCorrectAnswer(false);
         setCountdown(0);
+        // Use the question's own timeLimit - each question has its own time
         setTimeRemaining(data.questionData?.timeLimit || 30);
         // Clear any existing timers
         if (timerRef.current) {
@@ -179,15 +192,9 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
 
       sock.on('quizwave:question-advanced', (data) => {
         // This is the teacher-specific event with correct answers
-        setCurrentQuestionIndex(data.questionIndex);
-        setCurrentQuestion(data);
-        setAnswerCount(0);
-        setAnswerDistribution({});
-        setShowAnswerDistribution(false);
-        setShowCorrectAnswer(false);
-        setCountdown(0);
-        setTimeRemaining(data.timeLimit || 30);
-        // Clear any existing timers
+        console.log('Teacher: Question advanced to:', data.questionIndex);
+        
+        // Clear ALL timers first to prevent race conditions
         if (timerRef.current) {
           clearInterval(timerRef.current);
           timerRef.current = null;
@@ -196,8 +203,28 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
           clearInterval(countdownRef.current);
           countdownRef.current = null;
         }
+        
+        // Reset ALL state for new question - IMPORTANT: Reset in correct order
+        // First reset flags to prevent "time's up" from triggering
+        setShowAnswerDistribution(false);
+        setShowCorrectAnswer(false);
+        setCountdown(0);
+        setAnswerCount(0);
+        setAnswerDistribution({});
+        
+        // Then set new question data
+        setCurrentQuestionIndex(data.questionIndex);
+        setCurrentQuestion(data);
+        
+        // Finally set time remaining - use the question's own timeLimit
+        // Each question has its own time limit from the question data
+        setTimeRemaining(data.timeLimit);
+        
         // Update session status to active
         setSession((prev) => prev ? { ...prev, status: 'active' as const, currentQuestionIndex: data.questionIndex } : null);
+        
+        // Don't reload session here - it can cause timing issues
+        // The state is already set correctly from the socket event
       });
 
       // Note: We intentionally do NOT listen to 'quizwave:question-started' for subsequent questions
@@ -372,9 +399,43 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
 
   // Handle time's up - separate effect to ensure it runs
   useEffect(() => {
-    if (isActive && currentQuestion && timeRemaining === 0 && !showCorrectAnswer && !showAnswerDistribution && !countdown) {
-      // Time's up - load session to get final answer distribution
-      loadSession().then((sessionData) => {
+    // Only trigger if:
+    // 1. Quiz is active
+    // 2. Current question exists and questionIndex matches
+    // 3. Time has actually run out (timeRemaining === 0)
+    // 4. We haven't already shown results
+    // 5. Question index is valid
+    const questionIndexMatches = currentQuestion && 
+                                 typeof currentQuestion.questionIndex === 'number' &&
+                                 currentQuestion.questionIndex === currentQuestionIndex;
+    
+    if (isActive && 
+        currentQuestion && 
+        questionIndexMatches &&
+        timeRemaining === 0 && 
+        !showCorrectAnswer && 
+        !showAnswerDistribution && 
+        !countdown && 
+        currentQuestionIndex >= 0) {
+      console.log('Time\'s up for question:', currentQuestionIndex);
+      
+      // Use a flag to prevent multiple triggers
+      let timeoutId: NodeJS.Timeout;
+      
+      // Load session to get final answer distribution (preserve question state)
+      loadSession(true).then((sessionData) => {
+        // Double-check we're still on the same question (prevent race conditions)
+        if (sessionData?.currentQuestionIndex !== currentQuestionIndex) {
+          console.log('Question index changed during load, ignoring time-up handler');
+          return;
+        }
+        
+        // Double-check question index matches current question
+        if (currentQuestion?.questionIndex !== currentQuestionIndex) {
+          console.log('Question index mismatch, ignoring time-up handler');
+          return;
+        }
+        
         // Calculate distribution from session data
         if (sessionData?.participants) {
           const dist: { [key: number]: number } = {};
@@ -388,48 +449,111 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
           });
           setAnswerDistribution(dist);
         }
-        // Show answer distribution first
+        // Show answer distribution first - give more time to see results
         setShowAnswerDistribution(true);
-        // After 3 seconds, show correct answer and start countdown
-        setTimeout(() => {
-          setShowCorrectAnswer(true);
-          setShowAnswerDistribution(false);
-          // Start countdown from 3
-          setCountdown(3);
-        }, 3000);
+        // After 5 seconds, show correct answer and start countdown
+        timeoutId = setTimeout(() => {
+          // Triple-check before showing correct answer
+          if (session?.currentQuestionIndex === currentQuestionIndex && 
+              currentQuestion?.questionIndex === currentQuestionIndex) {
+            setShowCorrectAnswer(true);
+            setShowAnswerDistribution(false);
+            // Start countdown from 5 seconds (longer to allow teacher to see results)
+            setCountdown(5);
+          }
+        }, 5000);
       }).catch((error) => {
-        // Still show correct answer even if loading fails
-        setShowCorrectAnswer(true);
-        setCountdown(3);
+        console.error('Error loading session for answer distribution:', error);
+        // Still show correct answer even if loading fails, but only if question matches
+        if (session?.currentQuestionIndex === currentQuestionIndex && 
+            currentQuestion?.questionIndex === currentQuestionIndex) {
+          setShowCorrectAnswer(true);
+          setCountdown(5);
+        }
       });
+      
+      return () => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+      };
     }
-  }, [isActive, currentQuestion, timeRemaining, showCorrectAnswer, showAnswerDistribution, countdown, currentQuestionIndex]);
+  }, [isActive, currentQuestion, timeRemaining, showCorrectAnswer, showAnswerDistribution, countdown, currentQuestionIndex, session]);
 
   // Timer effect for teacher view
   useEffect(() => {
-    if (isActive && currentQuestion && timeRemaining > 0 && !showCorrectAnswer && !showAnswerDistribution) {
+    // Only start timer if:
+    // 1. Question is active
+    // 2. Current question exists and has valid questionIndex
+    // 3. Question index matches (prevent timer from running on wrong question)
+    // 4. Time is remaining (greater than 0)
+    // 5. We're not showing results
+    const questionIndexMatches = currentQuestion && 
+                                 typeof currentQuestion.questionIndex === 'number' &&
+                                 currentQuestion.questionIndex === currentQuestionIndex;
+    
+    if (isActive && 
+        currentQuestion && 
+        questionIndexMatches &&
+        timeRemaining > 0 && 
+        !showCorrectAnswer && 
+        !showAnswerDistribution) {
+      
+      // Clear any existing timer first
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      
       timerRef.current = setInterval(() => {
         setTimeRemaining((prev) => {
+          // Double-check we're still on the same question
+          if (currentQuestion?.questionIndex !== currentQuestionIndex) {
+            if (timerRef.current) {
+              clearInterval(timerRef.current);
+              timerRef.current = null;
+            }
+            return prev;
+          }
+          
           if (prev <= 1) {
+            // Stop timer when it reaches 0
+            if (timerRef.current) {
+              clearInterval(timerRef.current);
+              timerRef.current = null;
+            }
             return 0;
           }
           return prev - 1;
         });
       }, 1000);
+    } else {
+      // Clear timer if conditions are not met
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
     }
 
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
+        timerRef.current = null;
       }
     };
-  }, [isActive, currentQuestion, timeRemaining, showCorrectAnswer, showAnswerDistribution]);
+  }, [isActive, currentQuestion, currentQuestionIndex, timeRemaining, showCorrectAnswer, showAnswerDistribution]);
 
   // Countdown effect - separate to manage countdown independently
   useEffect(() => {
     // Only start countdown if showCorrectAnswer is true and countdown is greater than 0
     // Don't re-run if countdown is already running
     if (showCorrectAnswer && countdown > 0 && !countdownRef.current) {
+      // Clear any existing countdown first
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current);
+        countdownRef.current = null;
+      }
+      
       countdownRef.current = setInterval(() => {
         setCountdown((prev) => {
           const newCount = prev - 1;
@@ -453,7 +577,7 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
               setAnswerCount(0);
               setCountdown(0);
               
-              if (socket) {
+              if (socket && socket.connected) {
                 socket.emit('quizwave:next-question', { sessionId });
               }
             } else {
@@ -462,7 +586,7 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
               setShowAnswerDistribution(false);
               setCountdown(0);
               
-              if (socket) {
+              if (socket && socket.connected) {
                 socket.emit('quizwave:end', { sessionId });
               }
             }
@@ -474,9 +598,8 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
     }
 
     return () => {
-      // Don't clear the interval here - let it run until countdown reaches 0
-      // Only clear if showCorrectAnswer becomes false
-      if (!showCorrectAnswer && countdownRef.current) {
+      // Clear interval if showCorrectAnswer becomes false or countdown changes
+      if ((!showCorrectAnswer || countdown === 0) && countdownRef.current) {
         clearInterval(countdownRef.current);
         countdownRef.current = null;
       }
@@ -618,36 +741,36 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
                 <Play className="w-6 h-6 sm:w-7 sm:h-7" />
                 Start Quiz
               </button>
+            </div>
 
-              {/* Participants List - Enhanced */}
-              {participants.length > 0 && (
-                <div className="w-full max-w-2xl">
-                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-5 sm:p-6">
-                    <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-4 text-center">
-                      Joined Students <span className="text-blue-600 dark:text-blue-400">({participants.length})</span>
-                    </h3>
-                    <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 max-h-80 overflow-y-auto">
-                      <div className="space-y-3">
-                        {participants.map((participant: any, index: number) => (
-                          <div
-                            key={index}
-                            className="flex items-center gap-4 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-all border border-gray-100 dark:border-gray-700"
-                          >
-                            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-md">
-                              {participant.nickname.charAt(0).toUpperCase()}
-                            </div>
-                            <span className="text-gray-900 dark:text-white font-semibold text-base sm:text-lg flex-1">
-                              {participant.nickname}
-                            </span>
-                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            {/* Participants List - Enhanced */}
+            {participants.length > 0 && (
+              <div className="mb-6 sm:mb-8">
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-5 sm:p-6">
+                  <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-4 text-center">
+                    Joined Students <span className="text-blue-600 dark:text-blue-400">({participants.length})</span>
+                  </h3>
+                  <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-5 sm:p-6 max-h-80 overflow-y-auto">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                      {participants.map((participant: any, index: number) => (
+                        <div
+                          key={index}
+                          className="flex items-center gap-4 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-all border border-gray-100 dark:border-gray-700"
+                        >
+                          <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg sm:text-xl shadow-md flex-shrink-0">
+                            {participant.nickname.charAt(0).toUpperCase()}
                           </div>
-                        ))}
-                      </div>
+                          <span className="text-gray-900 dark:text-white font-semibold text-base sm:text-lg flex-1 truncate">
+                            {participant.nickname}
+                          </span>
+                          <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse flex-shrink-0"></div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -704,13 +827,13 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
               {/* Answer Distribution Chart */}
               {showAnswerDistribution && (
                 <div className="mb-4 sm:mb-6 lg:mb-8 w-full">
-                  <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:gap-6">
+                  <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
                     {currentQuestion.options.map((opt: any, idx: number) => {
                       const colorClass = getAnswerColor(idx);
                       const shape = getAnswerShape(idx);
                       const count = answerDistribution[idx] || 0;
                       const maxCount = Math.max(...Object.values(answerDistribution), 1);
-                      const barHeight = maxCount > 0 ? Math.max((count / maxCount) * 200, count > 0 ? 40 : 0) : 0;
+                      const barHeight = maxCount > 0 ? Math.max((count / maxCount) * 150, count > 0 ? 30 : 0) : 0;
                       const isCorrect = opt.isCorrect;
                       
                       return (
@@ -723,14 +846,14 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
                             )}
                           </div>
                           {/* Bar Chart Container */}
-                          <div className="w-full flex items-end justify-center" style={{ height: '250px' }}>
+                          <div className="w-full flex items-end justify-center" style={{ height: '180px' }}>
                             <div className="w-full relative">
                               {/* Bar */}
                               <div
                                 className={`${colorClass} rounded-t-lg transition-all duration-500 ease-out flex items-end justify-center relative`}
                                 style={{ 
                                   height: `${barHeight}px`,
-                                  minHeight: count > 0 ? '40px' : '0px'
+                                  minHeight: count > 0 ? '30px' : '0px'
                                 }}
                               >
                                 {/* Shape icon at the bottom of the bar */}
@@ -886,10 +1009,10 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
                       <div className="flex flex-col items-center">
                         <div className="relative mb-4">
                           {/* Character/Avatar with emote */}
-                          <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center text-4xl animate-bounce">
+                          <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center text-4xl">
                             {leaderboard[1].nickname.charAt(0).toUpperCase()}
                           </div>
-                          <div className="absolute -top-2 -right-2 text-3xl animate-pulse">🎉</div>
+                          <div className="absolute -top-2 -right-2 text-3xl">🎉</div>
                         </div>
                         <div className="bg-red-500 rounded-t-lg px-3 sm:px-4 lg:px-6 py-3 sm:py-4 text-center min-w-[120px] sm:min-w-[140px] lg:min-w-[150px]" style={{ height: '200px' }}>
                           <div className="text-white text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold mb-2">2</div>
@@ -904,11 +1027,11 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
                       <div className="flex flex-col items-center">
                         <div className="relative mb-4">
                           {/* Character/Avatar with emote */}
-                          <div className="w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 bg-yellow-400 rounded-full flex items-center justify-center text-3xl sm:text-4xl lg:text-5xl font-bold animate-bounce shadow-2xl">
+                          <div className="w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 bg-yellow-400 rounded-full flex items-center justify-center text-3xl sm:text-4xl lg:text-5xl font-bold shadow-2xl">
                             {leaderboard[0].nickname.charAt(0).toUpperCase()}
                           </div>
-                          <div className="absolute -top-4 -right-4 text-5xl animate-pulse">👑</div>
-                          <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 text-4xl animate-bounce">🏆</div>
+                          <div className="absolute -top-4 -right-4 text-5xl">👑</div>
+                          <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 text-4xl">🏆</div>
                         </div>
                         <div className="bg-orange-500 rounded-t-lg px-4 sm:px-6 lg:px-8 py-4 sm:py-5 lg:py-6 text-center min-w-[140px] sm:min-w-[160px] lg:min-w-[180px]" style={{ height: '280px' }}>
                           <div className="text-white text-4xl sm:text-5xl lg:text-6xl font-bold mb-2">1</div>
@@ -923,10 +1046,10 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
                       <div className="flex flex-col items-center">
                         <div className="relative mb-4">
                           {/* Character/Avatar with emote */}
-                          <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center text-4xl animate-bounce">
+                          <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center text-4xl">
                             {leaderboard[2].nickname.charAt(0).toUpperCase()}
                           </div>
-                          <div className="absolute -top-2 -right-2 text-3xl animate-pulse">🎊</div>
+                          <div className="absolute -top-2 -right-2 text-3xl">🎊</div>
                         </div>
                         <div className="bg-blue-500 rounded-t-lg px-3 sm:px-4 lg:px-6 py-3 sm:py-4 text-center min-w-[120px] sm:min-w-[140px] lg:min-w-[150px]" style={{ height: '160px' }}>
                           <div className="text-white text-3xl sm:text-4xl lg:text-5xl font-bold mb-2">3</div>

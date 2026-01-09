@@ -25,6 +25,7 @@ const StudentGameScreen: React.FC = () => {
   const [currentColorIndex, setCurrentColorIndex] = useState(0);
   const [timeUp, setTimeUp] = useState(false);
   const [showResultMessage, setShowResultMessage] = useState(false);
+  const [showFullLeaderboard, setShowFullLeaderboard] = useState(false);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const colorAnimationRef = useRef<NodeJS.Timeout | null>(null);
@@ -114,6 +115,7 @@ const StudentGameScreen: React.FC = () => {
           if (data && typeof data.questionIndex === 'number') {
             // Reset ALL answer-related state when new question starts
             setCurrentQuestion(data);
+            // Use the question's own timeLimit - each question has its own time
             setTimeRemaining(data.timeLimit || 30);
             setSelectedAnswer([]); // Clear any previous selection
             setAnswered(false); // Reset answered flag
@@ -122,6 +124,13 @@ const StudentGameScreen: React.FC = () => {
             setTimeUp(false);
             setShowResultMessage(false);
             setStatus('active');
+            
+            // Clear any existing timers
+            if (timerRef.current) {
+              clearInterval(timerRef.current);
+              timerRef.current = null;
+            }
+            
             console.log('Question state reset - ready for new answer');
           } else {
             console.error('Invalid question data received:', data);
@@ -161,6 +170,18 @@ const StudentGameScreen: React.FC = () => {
           // If it's a critical error, redirect back to join
           if (errorMessage.includes('Session not found') || errorMessage.includes('ended')) {
             setTimeout(() => navigate('/quizwave/join'), 2000);
+          }
+        });
+
+        // Handle socket reconnection
+        sock.on('disconnect', () => {
+          console.log('Socket disconnected, attempting to reconnect...');
+        });
+
+        sock.on('reconnect', () => {
+          console.log('Socket reconnected, rejoining session...');
+          if (sock.connected) {
+            sock.emit('quizwave:join', { gamePin: pin, nickname });
           }
         });
 
@@ -253,21 +274,27 @@ const StudentGameScreen: React.FC = () => {
       return;
     }
 
+    // Prevent double submission
+    if (answered) {
+      return;
+    }
+
     console.log('Answer selected by user click:', index);
     const newSelected = [index];
     setSelectedAnswer(newSelected);
     
-    // Auto-submit immediately when answer is selected (only if user actually clicked)
-    setTimeout(() => {
-      if (!answered && selectedAnswer.length > 0) {
-        console.log('Auto-submitting after user selection:', newSelected);
-        handleSubmitAnswerWithSelection(newSelected);
-      }
-    }, 100);
+    // Submit immediately with the new selection
+    handleSubmitAnswerWithSelection(newSelected);
   };
 
   const handleSubmitAnswerWithSelection = (selection: number[]) => {
-    if (answered || selection.length === 0 || !socket || !currentQuestion) {
+    // Prevent double submission - check answered state first
+    if (answered) {
+      console.log('Already answered, ignoring duplicate submission');
+      return;
+    }
+
+    if (selection.length === 0 || !socket || !currentQuestion) {
       console.log('Cannot submit answer:', { answered, selection, socket: !!socket, currentQuestion: !!currentQuestion });
       return;
     }
@@ -284,6 +311,9 @@ const StudentGameScreen: React.FC = () => {
       alert('Connection lost. Please refresh the page.');
       return;
     }
+
+    // Set answered immediately to prevent double submission
+    setAnswered(true);
 
     const startTime = currentQuestion.timeLimit;
     const timeTaken = (startTime - timeRemaining) * 1000; // Convert to milliseconds
@@ -302,7 +332,6 @@ const StudentGameScreen: React.FC = () => {
       timeTaken
     });
 
-    setAnswered(true);
     // Start colorful animation if time hasn't run out yet
     if (timeRemaining > 0) {
       setShowColorAnimation(true);
@@ -402,20 +431,20 @@ const StudentGameScreen: React.FC = () => {
                 <div className="flex flex-col items-center">
                   <div className="relative mb-4">
                     {/* Character/Avatar with emote */}
-                    <div className={`${myPodium.avatarSize} bg-yellow-400 rounded-full flex items-center justify-center text-5xl font-bold animate-bounce shadow-2xl`}>
+                    <div className={`${myPodium.avatarSize} bg-yellow-400 rounded-full flex items-center justify-center text-5xl font-bold shadow-2xl`}>
                       {myEntry.nickname.charAt(0).toUpperCase()}
                     </div>
                     {myRank === 1 && (
                       <>
-                        <div className="absolute -top-4 -right-4 text-5xl animate-pulse">👑</div>
-                        <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 text-4xl animate-bounce">🏆</div>
+                        <div className="absolute -top-4 -right-4 text-5xl">👑</div>
+                        <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 text-4xl">🏆</div>
                       </>
                     )}
                     {myRank === 2 && (
-                      <div className="absolute -top-2 -right-2 text-3xl animate-pulse">🎉</div>
+                      <div className="absolute -top-2 -right-2 text-3xl">🎉</div>
                     )}
                     {myRank === 3 && (
-                      <div className="absolute -top-2 -right-2 text-3xl animate-pulse">🎊</div>
+                      <div className="absolute -top-2 -right-2 text-3xl">🎊</div>
                     )}
                   </div>
                   <div className={`${myPodium.color} rounded-t-lg px-8 py-6 text-center min-w-[180px] ring-4 ring-yellow-300 ring-offset-2`} style={{ height: myPodium.height }}>
@@ -426,12 +455,66 @@ const StudentGameScreen: React.FC = () => {
                 </div>
               </div>
 
-              <button
-                onClick={() => navigate('/quizwave/join')}
-                className="w-full mt-6 bg-white/20 hover:bg-white/30 text-white py-3 rounded-lg font-semibold transition-colors"
-              >
-                Join Another Game
-              </button>
+              <div className="flex flex-col sm:flex-row gap-3 mt-6">
+                <button
+                  onClick={() => setShowFullLeaderboard(!showFullLeaderboard)}
+                  className="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg font-semibold transition-colors"
+                >
+                  {showFullLeaderboard ? 'Hide Leaderboard' : 'View Full Leaderboard'}
+                </button>
+                <button
+                  onClick={() => navigate('/quizwave/join')}
+                  className="flex-1 bg-white/20 hover:bg-white/30 text-white py-3 rounded-lg font-semibold transition-colors"
+                >
+                  Join Another Game
+                </button>
+              </div>
+
+              {/* Full Leaderboard */}
+              {showFullLeaderboard && leaderboard.length > 0 && (
+                <div className="mt-6 bg-white/10 backdrop-blur-sm rounded-lg p-4 sm:p-6 max-h-96 overflow-y-auto">
+                  <h3 className="text-xl font-bold text-white mb-4 text-center">Full Leaderboard</h3>
+                  <div className="space-y-2">
+                    {leaderboard.map((entry: any, index: number) => {
+                      const rank = index + 1;
+                      const isMe = entry.nickname === nickname;
+                      return (
+                        <div
+                          key={index}
+                          className={`flex items-center justify-between p-3 rounded-lg ${
+                            isMe 
+                              ? 'bg-yellow-500/30 border-2 border-yellow-400' 
+                              : 'bg-white/5'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                              rank === 1 ? 'bg-yellow-400 text-gray-900' :
+                              rank === 2 ? 'bg-gray-300 text-gray-900' :
+                              rank === 3 ? 'bg-orange-400 text-white' :
+                              'bg-white/20 text-white'
+                            }`}>
+                              {rank}
+                            </div>
+                            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-lg font-bold text-white">
+                              {entry.nickname.charAt(0).toUpperCase()}
+                            </div>
+                            <span className={`font-semibold ${isMe ? 'text-yellow-300' : 'text-white'}`}>
+                              {entry.nickname}
+                              {isMe && ' (You)'}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <div className={`font-bold ${isMe ? 'text-yellow-300' : 'text-white'}`}>
+                              {entry.totalScore} pts
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -469,12 +552,66 @@ const StudentGameScreen: React.FC = () => {
                 <p className="text-white/80 text-xs sm:text-sm mt-2">points</p>
               </div>
 
-              <button
-                onClick={() => navigate('/quizwave/join')}
-                className="w-full bg-white/20 hover:bg-white/30 text-white py-2 sm:py-3 rounded-lg font-semibold transition-colors text-sm sm:text-base"
-              >
-                Join Another Game
-              </button>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={() => setShowFullLeaderboard(!showFullLeaderboard)}
+                  className="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 sm:py-3 rounded-lg font-semibold transition-colors text-sm sm:text-base"
+                >
+                  {showFullLeaderboard ? 'Hide Leaderboard' : 'View Full Leaderboard'}
+                </button>
+                <button
+                  onClick={() => navigate('/quizwave/join')}
+                  className="flex-1 bg-white/20 hover:bg-white/30 text-white py-2 sm:py-3 rounded-lg font-semibold transition-colors text-sm sm:text-base"
+                >
+                  Join Another Game
+                </button>
+              </div>
+
+              {/* Full Leaderboard */}
+              {showFullLeaderboard && leaderboard.length > 0 && (
+                <div className="mt-6 bg-white/10 backdrop-blur-sm rounded-lg p-4 sm:p-6 max-h-96 overflow-y-auto">
+                  <h3 className="text-xl font-bold text-white mb-4 text-center">Full Leaderboard</h3>
+                  <div className="space-y-2">
+                    {leaderboard.map((entry: any, index: number) => {
+                      const rank = index + 1;
+                      const isMe = entry.nickname === nickname;
+                      return (
+                        <div
+                          key={index}
+                          className={`flex items-center justify-between p-3 rounded-lg ${
+                            isMe 
+                              ? 'bg-yellow-500/30 border-2 border-yellow-400' 
+                              : 'bg-white/5'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                              rank === 1 ? 'bg-yellow-400 text-gray-900' :
+                              rank === 2 ? 'bg-gray-300 text-gray-900' :
+                              rank === 3 ? 'bg-orange-400 text-white' :
+                              'bg-white/20 text-white'
+                            }`}>
+                              {rank}
+                            </div>
+                            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-lg font-bold text-white">
+                              {entry.nickname.charAt(0).toUpperCase()}
+                            </div>
+                            <span className={`font-semibold ${isMe ? 'text-yellow-300' : 'text-white'}`}>
+                              {entry.nickname}
+                              {isMe && ' (You)'}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <div className={`font-bold ${isMe ? 'text-yellow-300' : 'text-white'}`}>
+                              {entry.totalScore} pts
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
