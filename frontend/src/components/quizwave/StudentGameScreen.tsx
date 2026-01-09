@@ -29,6 +29,7 @@ const StudentGameScreen: React.FC = () => {
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const colorAnimationRef = useRef<NodeJS.Timeout | null>(null);
+  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const token = localStorage.getItem('token') || '';
 
   const colors = ['bg-red-500', 'bg-blue-500', 'bg-yellow-500', 'bg-green-500'];
@@ -147,10 +148,42 @@ const StudentGameScreen: React.FC = () => {
           // Just store the result for later display
         });
 
+        // Listen for when teacher shows answer distribution - show student their points
+        sock.on('quizwave:show-results', (data: any) => {
+          console.log('Teacher showing results:', data);
+          // Find this student's result from the broadcast
+          if (data.results && data.questionIndex === currentQuestion?.questionIndex) {
+            const myResult = data.results.find((r: any) => r.nickname === nickname);
+            if (myResult) {
+              setAnswerResult({
+                isCorrect: myResult.isCorrect,
+                points: myResult.points
+              });
+              setShowResultMessage(true);
+            }
+          }
+        });
+
         sock.on('quizwave:quiz-ended', (data: any) => {
           console.log('Quiz ended:', data);
-          setLeaderboard(data.leaderboard);
+          // Update leaderboard from socket data
+          if (data.leaderboard && Array.isArray(data.leaderboard)) {
+            setLeaderboard(data.leaderboard);
+          }
           setStatus('ended');
+          // Also reload session to get final state
+          loadSession().then((sessionData) => {
+            if (sessionData && sessionData.status === 'ended' && sessionData.participants) {
+              const lb = sessionData.participants
+                .map((p: any) => ({
+                  nickname: p.nickname,
+                  totalScore: p.totalScore || 0,
+                  answers: p.answers?.length || 0
+                }))
+                .sort((a: any, b: any) => b.totalScore - a.totalScore);
+              setLeaderboard(lb);
+            }
+          });
         });
 
         sock.on('quizwave:error', (data: any) => {
@@ -205,15 +238,68 @@ const StudentGameScreen: React.FC = () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+      }
       if (sock) {
         sock.off('quizwave:joined');
         sock.off('quizwave:question-started');
         sock.off('quizwave:answer-received');
         sock.off('quizwave:quiz-ended');
+        sock.off('quizwave:show-results');
         sock.off('quizwave:error');
       }
     };
   }, [pin, nickname, token, navigate]);
+
+  // Background refresh to keep student screen in sync
+  useEffect(() => {
+    if (status !== 'ended' && pin) {
+      // Refresh session every 3 seconds to stay in sync
+      refreshIntervalRef.current = setInterval(() => {
+        loadSession().then((sessionData) => {
+          if (sessionData) {
+            // Update status if it changed
+            if (sessionData.status !== status) {
+              setStatus(sessionData.status);
+            }
+            
+            // Update leaderboard if quiz ended
+            if (sessionData.status === 'ended' && sessionData.participants) {
+              const lb = sessionData.participants
+                .map((p: any) => ({
+                  nickname: p.nickname,
+                  totalScore: p.totalScore,
+                  answers: p.answers.length
+                }))
+                .sort((a: any, b: any) => b.totalScore - a.totalScore);
+              setLeaderboard(lb);
+            }
+            
+            // Update current question if quiz is active
+            if (sessionData.status === 'active' && sessionData.currentQuestionIndex >= 0) {
+              if (sessionData.quiz && typeof sessionData.quiz === 'object' && 'questions' in sessionData.quiz) {
+                const question = sessionData.quiz.questions[sessionData.currentQuestionIndex];
+                if (question && (!currentQuestion || currentQuestion.questionIndex !== sessionData.currentQuestionIndex)) {
+                  setCurrentQuestion({ ...question, questionIndex: sessionData.currentQuestionIndex });
+                  setTimeRemaining(question.timeLimit || 30);
+                }
+              }
+            }
+          }
+        }).catch(err => {
+          console.error('Background refresh error:', err);
+        });
+      }, 3000); // Refresh every 3 seconds
+    }
+
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+        refreshIntervalRef.current = null;
+      }
+    };
+  }, [status, pin, currentQuestion]);
 
   // Color animation effect when student has answered early
   useEffect(() => {

@@ -456,6 +456,48 @@ const initializeQuizWaveSocket = (io) => {
       }
     });
 
+    // Broadcast results to students (when teacher shows answer distribution)
+    socket.on('quizwave:broadcast-results', async (data) => {
+      try {
+        const { sessionId, questionIndex } = data;
+
+        const session = await QuizSession.findById(sessionId).populate('quiz');
+        if (!session) {
+          socket.emit('quizwave:error', { message: 'Session not found' });
+          return;
+        }
+
+        // Check authorization
+        if (session.createdBy.toString() !== socket.userId && socket.userRole !== 'admin') {
+          socket.emit('quizwave:error', { message: 'Unauthorized' });
+          return;
+        }
+
+        // Get all participants' answers for this question
+        const results = session.participants.map(p => {
+          const answer = p.answers.find(a => a.questionIndex === questionIndex);
+          return {
+            studentId: p.student.toString(),
+            nickname: p.nickname,
+            isCorrect: answer ? answer.isCorrect : false,
+            points: answer ? answer.points : 0,
+            selectedOptions: answer ? answer.selectedOptions : []
+          };
+        });
+
+        // Broadcast to all students
+        io.to(`quizwave:${session.gamePin}`).emit('quizwave:show-results', {
+          questionIndex,
+          results
+        });
+
+        console.log(`📊 Results broadcasted for question ${questionIndex} to ${session.participants.length} participants`);
+      } catch (error) {
+        console.error('Broadcast results error:', error);
+        socket.emit('quizwave:error', { message: 'Error broadcasting results' });
+      }
+    });
+
     // End session (teacher)
     socket.on('quizwave:end', async (data) => {
       try {

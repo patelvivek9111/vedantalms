@@ -37,6 +37,7 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const podiumTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const timeUpTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const token = localStorage.getItem('token') || '';
 
   const loadSession = async (preserveQuestionState = false) => {
@@ -62,6 +63,26 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
             });
           }
         }
+      }
+      
+      // Update answer count for current question if quiz is active
+      if (data.status === 'active' && data.currentQuestionIndex >= 0 && data.participants) {
+        const answeredCount = data.participants.filter((p: any) => {
+          return p.answers && p.answers.some((a: any) => a.questionIndex === data.currentQuestionIndex);
+        }).length;
+        setAnswerCount(answeredCount);
+        
+        // Also update answer distribution
+        const dist: { [key: number]: number } = {};
+        data.participants.forEach((p: any) => {
+          const answer = p.answers.find((a: any) => a.questionIndex === data.currentQuestionIndex);
+          if (answer && answer.selectedOptions) {
+            answer.selectedOptions.forEach((optIdx: number) => {
+              dist[optIdx] = (dist[optIdx] || 0) + 1;
+            });
+          }
+        });
+        setAnswerDistribution(dist);
       }
       
       // Only calculate leaderboard when quiz has ended
@@ -166,16 +187,8 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
       sock.on('quizwave:started', (data) => {
         // First question - ensure questionIndex is set correctly
         const questionIndex = data.questionData?.questionIndex ?? 0;
-        setCurrentQuestionIndex(questionIndex);
-        setCurrentQuestion(data.questionData);
-        setAnswerCount(0);
-        setAnswerDistribution({});
-        setShowAnswerDistribution(false);
-        setShowCorrectAnswer(false);
-        setCountdown(0);
-        // Use the question's own timeLimit - each question has its own time
-        setTimeRemaining(data.questionData?.timeLimit || 30);
-        // Clear any existing timers
+        
+        // Clear ALL timers and timeouts first
         if (timerRef.current) {
           clearInterval(timerRef.current);
           timerRef.current = null;
@@ -184,17 +197,57 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
           clearInterval(countdownRef.current);
           countdownRef.current = null;
         }
-        // Update session status to active
-        setSession((prev) => prev ? { ...prev, status: 'active' as const, currentQuestionIndex: questionIndex } : null);
-        // Also reload session to get latest state
-        loadSession();
+        if (timeUpTimeoutRef.current) {
+          clearTimeout(timeUpTimeoutRef.current);
+          timeUpTimeoutRef.current = null;
+        }
+        
+        // Reset ALL state for new question
+        setShowAnswerDistribution(false);
+        setShowCorrectAnswer(false);
+        setCountdown(0);
+        setAnswerCount(0);
+        setAnswerDistribution({});
+        setCurrentQuestionIndex(questionIndex);
+        setCurrentQuestion(data.questionData);
+        // Use the question's own timeLimit - each question has its own time
+        setTimeRemaining(data.questionData?.timeLimit || 30);
+        
+        // Update session status to active and initialize answer count
+        setSession((prev) => {
+          const updated = prev ? { ...prev, status: 'active' as const, currentQuestionIndex: questionIndex } : null;
+          
+          // Initialize answer count from session data if available
+          if (updated && updated.participants) {
+            const answeredCount = updated.participants.filter((p: any) => {
+              return p.answers && p.answers.some((a: any) => a.questionIndex === questionIndex);
+            }).length;
+            setAnswerCount(answeredCount);
+            
+            // Also initialize answer distribution
+            const dist: { [key: number]: number } = {};
+            updated.participants.forEach((p: any) => {
+              const answer = p.answers.find((a: any) => a.questionIndex === questionIndex);
+              if (answer && answer.selectedOptions) {
+                answer.selectedOptions.forEach((optIdx: number) => {
+                  dist[optIdx] = (dist[optIdx] || 0) + 1;
+                });
+              }
+            });
+            setAnswerDistribution(dist);
+          }
+          
+          return updated;
+        });
+        // Don't reload session here - it can cause timing issues and state conflicts
+        // The state is already set correctly from the socket event
       });
 
       sock.on('quizwave:question-advanced', (data) => {
         // This is the teacher-specific event with correct answers
         console.log('Teacher: Question advanced to:', data.questionIndex);
         
-        // Clear ALL timers first to prevent race conditions
+        // Clear ALL timers and timeouts first to prevent race conditions
         if (timerRef.current) {
           clearInterval(timerRef.current);
           timerRef.current = null;
@@ -202,6 +255,10 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
         if (countdownRef.current) {
           clearInterval(countdownRef.current);
           countdownRef.current = null;
+        }
+        if (timeUpTimeoutRef.current) {
+          clearTimeout(timeUpTimeoutRef.current);
+          timeUpTimeoutRef.current = null;
         }
         
         // Reset ALL state for new question - IMPORTANT: Reset in correct order
@@ -221,7 +278,31 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
         setTimeRemaining(data.timeLimit);
         
         // Update session status to active
-        setSession((prev) => prev ? { ...prev, status: 'active' as const, currentQuestionIndex: data.questionIndex } : null);
+        setSession((prev) => {
+          const updated = prev ? { ...prev, status: 'active' as const, currentQuestionIndex: data.questionIndex } : null;
+          
+          // Initialize answer count from session data if available
+          if (updated && updated.participants) {
+            const answeredCount = updated.participants.filter((p: any) => {
+              return p.answers && p.answers.some((a: any) => a.questionIndex === data.questionIndex);
+            }).length;
+            setAnswerCount(answeredCount);
+            
+            // Also initialize answer distribution
+            const dist: { [key: number]: number } = {};
+            updated.participants.forEach((p: any) => {
+              const answer = p.answers.find((a: any) => a.questionIndex === data.questionIndex);
+              if (answer && answer.selectedOptions) {
+                answer.selectedOptions.forEach((optIdx: number) => {
+                  dist[optIdx] = (dist[optIdx] || 0) + 1;
+                });
+              }
+            });
+            setAnswerDistribution(dist);
+          }
+          
+          return updated;
+        });
         
         // Don't reload session here - it can cause timing issues
         // The state is already set correctly from the socket event
@@ -419,8 +500,11 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
         currentQuestionIndex >= 0) {
       console.log('Time\'s up for question:', currentQuestionIndex);
       
-      // Use a flag to prevent multiple triggers
-      let timeoutId: NodeJS.Timeout;
+      // Clear any existing timeout first
+      if (timeUpTimeoutRef.current) {
+        clearTimeout(timeUpTimeoutRef.current);
+        timeUpTimeoutRef.current = null;
+      }
       
       // Load session to get final answer distribution (preserve question state)
       loadSession(true).then((sessionData) => {
@@ -451,8 +535,18 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
         }
         // Show answer distribution first - give more time to see results
         setShowAnswerDistribution(true);
+        
+        // Emit event to students to show their results
+        if (socket && socket.connected) {
+          socket.emit('quizwave:broadcast-results', {
+            sessionId: session?._id,
+            questionIndex: currentQuestionIndex
+          });
+        }
+        
         // After 5 seconds, show correct answer and start countdown
-        timeoutId = setTimeout(() => {
+        // Store timeout in ref so we can clear it if question changes
+        timeUpTimeoutRef.current = setTimeout(() => {
           // Triple-check before showing correct answer
           if (session?.currentQuestionIndex === currentQuestionIndex && 
               currentQuestion?.questionIndex === currentQuestionIndex) {
@@ -461,6 +555,7 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
             // Start countdown from 5 seconds (longer to allow teacher to see results)
             setCountdown(5);
           }
+          timeUpTimeoutRef.current = null;
         }, 5000);
       }).catch((error) => {
         console.error('Error loading session for answer distribution:', error);
@@ -473,8 +568,9 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
       });
       
       return () => {
-        if (timeoutId) {
-          clearTimeout(timeoutId);
+        if (timeUpTimeoutRef.current) {
+          clearTimeout(timeUpTimeoutRef.current);
+          timeUpTimeoutRef.current = null;
         }
       };
     }
