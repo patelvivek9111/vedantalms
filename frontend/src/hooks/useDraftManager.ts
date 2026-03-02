@@ -4,12 +4,13 @@ interface UseDraftManagerOptions {
   formId: string;
   autoSaveDelay?: number; // milliseconds
   storageKey?: string;
+  enabled?: boolean;
 }
 
 export const useDraftManager = <T extends Record<string, any>>(
   options: UseDraftManagerOptions
 ) => {
-  const { formId, autoSaveDelay = 1000, storageKey = 'formDrafts' } = options;
+  const { formId, autoSaveDelay = 1000, storageKey = 'formDrafts', enabled = true } = options;
   const [draft, setDraft] = useState<T | null>(null);
   const [isDraftSaved, setIsDraftSaved] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -17,6 +18,7 @@ export const useDraftManager = <T extends Record<string, any>>(
 
   // Load draft on mount
   useEffect(() => {
+    if (!enabled) return;
     try {
       const savedDrafts = localStorage.getItem(storageKey);
       if (savedDrafts) {
@@ -30,10 +32,11 @@ export const useDraftManager = <T extends Record<string, any>>(
     } catch (error) {
       console.error('Error loading draft:', error);
     }
-  }, [formId, storageKey]);
+  }, [enabled, formId, storageKey]);
 
   // Save draft to localStorage
   const saveDraft = useCallback((data: T) => {
+    if (!enabled) return;
     try {
       const savedDrafts = localStorage.getItem(storageKey);
       const drafts = savedDrafts ? JSON.parse(savedDrafts) : {};
@@ -53,10 +56,11 @@ export const useDraftManager = <T extends Record<string, any>>(
     } catch (error) {
       console.error('Error saving draft:', error);
     }
-  }, [formId, storageKey]);
+  }, [enabled, formId, storageKey]);
 
   // Auto-save with debounce
   const autoSave = useCallback((data: T) => {
+    if (!enabled) return;
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
@@ -64,7 +68,7 @@ export const useDraftManager = <T extends Record<string, any>>(
     saveTimeoutRef.current = setTimeout(() => {
       saveDraft(data);
     }, autoSaveDelay);
-  }, [saveDraft, autoSaveDelay]);
+  }, [enabled, saveDraft, autoSaveDelay]);
 
   // Cleanup timeout on unmount
   useEffect(() => {

@@ -291,6 +291,21 @@ const Catalog: React.FC = () => {
                     )}
         </div>
       </div>
+      
+      {/* Unenroll Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showUnenrollConfirm}
+        onClose={() => {
+          setShowUnenrollConfirm(false);
+          setCourseToUnenroll(null);
+        }}
+        onConfirm={confirmUnenrollment}
+        title="Unenroll from Course"
+        message="Are you sure you want to unenroll from this course? This action cannot be undone."
+        confirmText="Unenroll"
+        cancelText="Cancel"
+        variant="warning"
+      />
       </div>
     </SwipeableContainer>
   );
@@ -563,20 +578,6 @@ const CourseListItem: React.FC<CourseListItemProps> = ({ course, onEnroll, onUne
         </div>
       )}
 
-      {/* Unenroll Confirmation Modal */}
-      <ConfirmationModal
-        isOpen={showUnenrollConfirm}
-        onClose={() => {
-          setShowUnenrollConfirm(false);
-          setCourseToUnenroll(null);
-        }}
-        onConfirm={confirmUnenrollment}
-        title="Unenroll from Course"
-        message="Are you sure you want to unenroll from this course? This action cannot be undone."
-        confirmText="Unenroll"
-        cancelText="Cancel"
-        variant="warning"
-      />
     </div>
   );
 };
