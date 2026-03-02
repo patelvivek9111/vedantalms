@@ -5,9 +5,11 @@ import { API_URL } from '../../config';
 import ReactMarkdown from 'react-markdown';
 import { format } from 'date-fns';
 import { safeFormatDate } from '../../utils/dateUtils';
-import { Lock, Unlock, HelpCircle, CheckCircle, Circle, Bookmark, BarChart3, Edit, Eye, ArrowLeft, X, Download } from 'lucide-react';
+import { Lock, Unlock, HelpCircle, CheckCircle, Circle, Bookmark, BarChart3, Edit, Eye, X, Download } from 'lucide-react';
 import FilePreview from './FilePreview';
 import logger from '../../utils/logger';
+import ConfirmationModal from '../common/ConfirmationModal';
+import BackButton from '../common/BackButton';
 
 interface ViewAssignmentProps {
   courseId?: string;
@@ -172,6 +174,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [showTimer, setShowTimer] = useState<boolean>(true);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
   const [showUploadSection, setShowUploadSection] = useState<boolean>(false);
   const [shuffledOptions, setShuffledOptions] = useState<Record<number, Question['rightItems']>>({});
   const [previewFile, setPreviewFile] = useState<PreviewFile | null>(null);
@@ -849,10 +852,13 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!user || (user.role !== 'teacher' && user.role !== 'admin')) return;
+    setShowDeleteConfirm(true);
+  };
     
-    if (window.confirm('Are you sure you want to delete this assignment?')) {
+  const confirmDelete = async () => {
+    setShowDeleteConfirm(false);
       try {
         const token = localStorage.getItem('token');
         await api.delete(`/assignments/${id}`);
@@ -909,15 +915,13 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Top Navigation Bar (Mobile Only) */}
       <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
-        <div className="relative flex items-center justify-between px-4 py-3">
-          <button
-            onClick={() => navigate(-1)}
-            className="text-gray-700 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
-            aria-label="Go back"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100 truncate px-2">{assignment.title}</h1>
+        <div className="relative flex items-center justify-between px-4 py-3 gap-2">
+          <BackButton 
+            fallbackPath={courseId ? `/courses/${courseId}/assignments` : '/dashboard'}
+            className="flex-shrink-0"
+            ariaLabel="Go back"
+          />
+          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100 truncate px-2 flex-1 text-center">{assignment.title}</h1>
           {/* Grade Badge - Mobile - Shows Course-Level Data */}
           {(() => {
             if (isInstructor && courseAverage !== null) {
@@ -2836,6 +2840,18 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
 
         </div>
       </div>
+
+      {/* Delete Assignment Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmDelete}
+        title="Delete Assignment"
+        message="Are you sure you want to delete this assignment? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </div>
   );
 };

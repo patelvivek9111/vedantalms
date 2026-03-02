@@ -109,8 +109,11 @@ if (!MONGODB_URI.startsWith('mongodb://') && !MONGODB_URI.startsWith('mongodb+sr
 }
 
 mongoose.connect(MONGODB_URI, mongoOptions)
-  .then(() => {
+  .then(async () => {
     // Connected to MongoDB
+    // Initialize email service
+    const { initializeEmailService } = require('./utils/emailService');
+    await initializeEmailService();
   })
   .catch((err) => {
     console.error('❌ MongoDB connection error:', err.message);

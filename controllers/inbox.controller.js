@@ -205,6 +205,35 @@ exports.sendMessage = async (req, res) => {
     await ConversationParticipant.updateOne({ conversationId, userId }, { lastReadAt: new Date(), folder: 'sent' });
     // Mark as unread for other participants (do not update their lastReadAt)
     await ConversationParticipant.updateMany({ conversationId, userId: { $ne: userId }, folder: { $ne: 'archived' } }, { folder: 'inbox' });
+    
+    // Notify other participants about new message
+    try {
+      const { createNotification } = require('../routes/notification.routes');
+      const conversation = await Conversation.findById(conversationId);
+      const otherParticipants = await ConversationParticipant.find({ 
+        conversationId, 
+        userId: { $ne: userId } 
+      }).populate('userId', 'firstName lastName');
+      
+      const senderName = `${req.user.firstName} ${req.user.lastName}`;
+      const messagePreview = body.length > 100 ? body.substring(0, 100) + '...' : body;
+      
+      await Promise.all(otherParticipants.map(participant => 
+        createNotification(participant.userId._id, {
+          type: 'message',
+          title: 'New Message',
+          message: `${senderName}: ${messagePreview}`,
+          link: `/inbox?conversation=${conversationId}`,
+          relatedId: message._id,
+          relatedType: 'message',
+          priority: 'high'
+        }).catch(err => console.error(`Error notifying user ${participant.userId._id}:`, err))
+      ));
+    } catch (notifError) {
+      console.error('Error creating message notifications:', notifError);
+      // Don't fail the message if notification fails
+    }
+    
     res.status(201).json(message);
   } catch (err) {
     res.status(500).json({ error: err.message });

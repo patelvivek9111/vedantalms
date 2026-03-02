@@ -3,6 +3,8 @@ const router = express.Router();
 const { protect } = require('../middleware/auth');
 const Notification = require('../models/notification.model');
 const NotificationPreferences = require('../models/notificationPreferences.model');
+const User = require('../models/user.model');
+// Email service removed - using in-app notifications only
 
 // Get all notifications for current user
 router.get('/', protect, async (req, res) => {
@@ -51,6 +53,7 @@ router.get('/', protect, async (req, res) => {
       unreadCount
     });
   } catch (error) {
+    console.error('Error fetching notifications:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -64,6 +67,7 @@ router.get('/unread-count', protect, async (req, res) => {
     });
     res.json({ success: true, count });
   } catch (error) {
+    console.error('Error fetching unread count:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -205,37 +209,99 @@ router.put('/preferences', protect, async (req, res) => {
 // Helper function to create notification (can be used by other routes)
 async function createNotification(userId, notificationData) {
   try {
-    // Check user preferences
-    const preferences = await NotificationPreferences.findOne({ user: userId });
-    
-    if (!preferences) {
-      // No preferences set, create notification by default
-      const notification = new Notification({
-        user: userId,
-        ...notificationData
-      });
-      return await notification.save();
+    // Ensure userId is in correct format for MongoDB
+    const mongoose = require('mongoose');
+    let userObjectId = userId;
+    if (typeof userId === 'string') {
+      if (mongoose.Types.ObjectId.isValid(userId)) {
+        userObjectId = new mongoose.Types.ObjectId(userId);
+      } else {
+        console.error(`Invalid user ID format: ${userId}`);
+        return null;
+      }
     }
     
-    // Check if in-app notifications are enabled for this type
+    // Get user
+    const user = await User.findById(userObjectId).select('email firstName lastName');
+    if (!user) {
+      console.error(`User not found for notification: ${userObjectId}`);
+      return null;
+    }
+
+    // Check user preferences
+    const preferences = await NotificationPreferences.findOne({ user: userObjectId });
+    
+    // Map notification type to preference key
     const typeKey = notificationData.type === 'assignment_due' ? 'assignmentsDue' :
                     notificationData.type === 'assignment_graded' ? 'assignmentsGraded' :
+                    notificationData.type === 'grade' ? 'grades' :
                     notificationData.type;
     
-    if (preferences.inApp && preferences.inApp[typeKey] !== false) {
+    let inAppNotification = null;
+
+    // Create in-app notification if enabled
+    // Default to true if no preferences exist, or if preference is not explicitly false
+    const inAppEnabled = !preferences || 
+                        !preferences.inApp || 
+                        preferences.inApp[typeKey] === undefined || 
+                        preferences.inApp[typeKey] !== false;
+    
+    if (inAppEnabled) {
       const notification = new Notification({
-        user: userId,
+        user: userObjectId,
         ...notificationData
       });
-      return await notification.save();
+      inAppNotification = await notification.save();
     }
     
-    return null;
+    return inAppNotification;
   } catch (error) {
     console.error('Error creating notification:', error);
     return null;
   }
 }
+
+// Test endpoint to manually create a notification (for debugging)
+router.post('/test-create', protect, async (req, res) => {
+  try {
+    const { userId, title, message } = req.body;
+    const testUserId = userId || req.user._id;
+    
+    const notification = await createNotification(testUserId, {
+      type: 'assignment_graded',
+      title: title || 'Test Notification',
+      message: message || 'This is a test notification',
+      link: null,
+      relatedId: null,
+      relatedType: 'assignment',
+      priority: 'high'
+    });
+    
+    if (notification) {
+      res.json({
+        success: true,
+        message: 'Test notification created',
+        notification: {
+          _id: notification._id,
+          title: notification.title,
+          user: notification.user
+        }
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: 'Notification not created (check preferences)'
+      });
+    }
+  } catch (error) {
+    console.error('❌ TEST: Error creating test notification:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creating test notification',
+      error: error.message
+    });
+  }
+});
 
 module.exports = { router, createNotification };
 

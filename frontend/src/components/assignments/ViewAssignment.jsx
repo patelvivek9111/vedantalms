@@ -6,6 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import { format } from 'date-fns';
 import { safeFormatDate } from '../../utils/dateUtils';
 import { Lock, Unlock, HelpCircle, CheckCircle, Circle, Bookmark, BarChart3, Edit, Eye, ArrowLeft } from 'lucide-react';
+import ConfirmationModal from '../common/ConfirmationModal';
 
 // Fisher-Yates shuffle algorithm for proper randomization
 const shuffleArray = (array) => {
@@ -44,6 +45,7 @@ const ViewAssignment = () => {
   const [showUploadSection, setShowUploadSection] = useState(false);
   const [shuffledOptions, setShuffledOptions] = useState({});
   const [hasAutoSubmitted, setHasAutoSubmitted] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Teacher analytics state
   const [submissionStats, setSubmissionStats] = useState({
@@ -554,17 +556,19 @@ const ViewAssignment = () => {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!user || (user.role !== 'teacher' && user.role !== 'admin')) return;
+    setShowDeleteConfirm(true);
+  };
     
-    if (window.confirm('Are you sure you want to delete this assignment?')) {
+  const confirmDelete = async () => {
+    setShowDeleteConfirm(false);
       try {
         const token = localStorage.getItem('token');
         await api.delete(`/assignments/${id}`);
         navigate(-1);
       } catch (err) {
         setError(err.response?.data?.message || 'Error deleting assignment');
-      }
     }
   };
 
@@ -2092,6 +2096,18 @@ const ViewAssignment = () => {
 
         </div>
       </div>
+
+      {/* Delete Assignment Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmDelete}
+        title="Delete Assignment"
+        message="Are you sure you want to delete this assignment? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </div>
   );
 };

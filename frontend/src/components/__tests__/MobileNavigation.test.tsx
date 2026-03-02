@@ -18,10 +18,16 @@ const mockedUseCourse = useCourse as any;
 const mockedUseAuth = useAuth as any;
 
 describe('MobileNavigation', () => {
+  const mockSetShowCourseDropdown = vi.fn();
   const mockSetIsMobileMenuOpen = vi.fn();
-  const mockSetShowChangeUserModal = vi.fn();
-  const mockLogout = vi.fn();
   const mockGetCourses = vi.fn();
+
+  const mockCourse = {
+    _id: 'course1',
+    title: 'Course 1',
+    catalog: { courseCode: 'CS101' },
+    published: true,
+  };
 
   const mockCourses = [
     {
@@ -53,13 +59,15 @@ describe('MobileNavigation', () => {
     const { container } = render(
       <BrowserRouter>
         <MobileNavigation
-          courseTitle="Test Course"
+          course={mockCourse}
           user={{ _id: 'user1' }}
           isMobileDevice={false}
+          showCourseDropdown={false}
+          setShowCourseDropdown={mockSetShowCourseDropdown}
+          courses={mockCourses}
+          courseId="course1"
           isMobileMenuOpen={false}
           setIsMobileMenuOpen={mockSetIsMobileMenuOpen}
-          setShowChangeUserModal={mockSetShowChangeUserModal}
-          logout={mockLogout}
         />
       </BrowserRouter>
     );
@@ -71,31 +79,35 @@ describe('MobileNavigation', () => {
     render(
       <BrowserRouter>
         <MobileNavigation
-          courseTitle="Test Course"
+          course={mockCourse}
           user={{ _id: 'user1' }}
           isMobileDevice={true}
+          showCourseDropdown={false}
+          setShowCourseDropdown={mockSetShowCourseDropdown}
+          courses={mockCourses}
+          courseId="course1"
           isMobileMenuOpen={false}
           setIsMobileMenuOpen={mockSetIsMobileMenuOpen}
-          setShowChangeUserModal={mockSetShowChangeUserModal}
-          logout={mockLogout}
         />
       </BrowserRouter>
     );
 
-    expect(screen.getByText('Test Course')).toBeInTheDocument();
+    expect(screen.getByText('CS101')).toBeInTheDocument();
   });
 
   it('should toggle course menu', () => {
     render(
       <BrowserRouter>
         <MobileNavigation
-          courseTitle="Test Course"
+          course={mockCourse}
           user={{ _id: 'user1' }}
           isMobileDevice={true}
+          showCourseDropdown={false}
+          setShowCourseDropdown={mockSetShowCourseDropdown}
+          courses={mockCourses}
+          courseId="course1"
           isMobileMenuOpen={false}
           setIsMobileMenuOpen={mockSetIsMobileMenuOpen}
-          setShowChangeUserModal={mockSetShowChangeUserModal}
-          logout={mockLogout}
         />
       </BrowserRouter>
     );
@@ -110,44 +122,52 @@ describe('MobileNavigation', () => {
     render(
       <MemoryRouter initialEntries={['/courses/course1']}>
         <MobileNavigation
-          courseTitle="Test Course"
+          course={mockCourse}
           user={{ _id: 'user1' }}
           isMobileDevice={true}
+          showCourseDropdown={false}
+          setShowCourseDropdown={mockSetShowCourseDropdown}
+          courses={mockCourses}
+          courseId="course1"
           isMobileMenuOpen={false}
           setIsMobileMenuOpen={mockSetIsMobileMenuOpen}
-          setShowChangeUserModal={mockSetShowChangeUserModal}
-          logout={mockLogout}
         />
       </MemoryRouter>
     );
 
-    const dropdownButton = screen.getByLabelText('Switch course');
+    const dropdownButton = screen.getByLabelText('Select course');
     fireEvent.click(dropdownButton);
 
-    expect(screen.getByText('CS101')).toBeInTheDocument();
+    expect(mockSetShowCourseDropdown).toHaveBeenCalledWith(true);
   });
 
-  it('should filter published courses for students', () => {
+  it('should filter published courses for students', async () => {
     render(
       <MemoryRouter initialEntries={['/courses/course1']}>
         <MobileNavigation
-          courseTitle="Test Course"
-          user={{ _id: 'user1' }}
+          course={mockCourse}
+          user={{ _id: 'user1', role: 'student' }}
           isMobileDevice={true}
+          showCourseDropdown={true}
+          setShowCourseDropdown={mockSetShowCourseDropdown}
+          courses={mockCourses}
+          courseId="course1"
           isMobileMenuOpen={false}
           setIsMobileMenuOpen={mockSetIsMobileMenuOpen}
-          setShowChangeUserModal={mockSetShowChangeUserModal}
-          logout={mockLogout}
         />
       </MemoryRouter>
     );
 
-    const dropdownButton = screen.getByLabelText('Switch course');
-    fireEvent.click(dropdownButton);
-
-    // Should only show published courses
-    expect(screen.getByText('CS101')).toBeInTheDocument();
-    expect(screen.queryByText('CS102')).not.toBeInTheDocument();
+    // Wait for dropdown to render and check that only published courses are shown
+    // Use getAllByText since CS101 appears in both the button and dropdown
+    await waitFor(() => {
+      const cs101Elements = screen.getAllByText('CS101');
+      expect(cs101Elements.length).toBeGreaterThan(0);
+    });
+    
+    // CS102 should not be visible since it's not published (only appears in dropdown, not button)
+    const cs102Elements = screen.queryAllByText('CS102');
+    expect(cs102Elements.length).toBe(0);
   });
 
   it('should show all courses for teachers', () => {
@@ -158,70 +178,81 @@ describe('MobileNavigation', () => {
     render(
       <MemoryRouter initialEntries={['/courses/course1']}>
         <MobileNavigation
-          courseTitle="Test Course"
+          course={mockCourse}
           user={{ _id: 'user1', role: 'teacher' }}
           isMobileDevice={true}
+          showCourseDropdown={true}
+          setShowCourseDropdown={mockSetShowCourseDropdown}
+          courses={mockCourses}
+          courseId="course1"
           isMobileMenuOpen={false}
           setIsMobileMenuOpen={mockSetIsMobileMenuOpen}
-          setShowChangeUserModal={mockSetShowChangeUserModal}
-          logout={mockLogout}
         />
       </MemoryRouter>
     );
-
-    const dropdownButton = screen.getByLabelText('Switch course');
-    fireEvent.click(dropdownButton);
 
     expect(screen.getByText('My Courses')).toBeInTheDocument();
   });
 
-  it('should highlight current course', () => {
+  it('should highlight current course', async () => {
     render(
       <MemoryRouter initialEntries={['/courses/course1']}>
         <MobileNavigation
-          courseTitle="Test Course"
+          course={mockCourse}
           user={{ _id: 'user1' }}
           isMobileDevice={true}
+          showCourseDropdown={true}
+          setShowCourseDropdown={mockSetShowCourseDropdown}
+          courses={mockCourses}
+          courseId="course1"
           isMobileMenuOpen={false}
           setIsMobileMenuOpen={mockSetIsMobileMenuOpen}
-          setShowChangeUserModal={mockSetShowChangeUserModal}
-          logout={mockLogout}
         />
       </MemoryRouter>
     );
 
-    const dropdownButton = screen.getByLabelText('Switch course');
-    fireEvent.click(dropdownButton);
+    // Wait for dropdown to render
+    await waitFor(() => {
+      const cs101Elements = screen.getAllByText('CS101');
+      expect(cs101Elements.length).toBeGreaterThan(0);
+    });
 
-    const currentCourse = screen.getByText('CS101');
-    const button = currentCourse.closest('button');
-    // Check if button has active/selected styling (could be different class names)
-    expect(button).toBeInTheDocument();
+    // Find all buttons and locate the one in the dropdown menu with active styling
+    const allButtons = screen.getAllByRole('button');
+    // The dropdown menu button should have bg-blue-50 class and contain CS101
+    const courseButton = allButtons.find(btn => 
+      btn.classList.contains('bg-blue-50') && btn.textContent?.includes('CS101')
+    );
+    
+    // Check if the course button in dropdown has active/selected styling
+    expect(courseButton).toBeDefined();
+    if (courseButton) {
+      expect(courseButton).toHaveClass('bg-blue-50');
+    }
   });
 
   it('should close dropdown when clicking outside', () => {
     render(
       <MemoryRouter initialEntries={['/courses/course1']}>
         <MobileNavigation
-          courseTitle="Test Course"
+          course={mockCourse}
           user={{ _id: 'user1' }}
           isMobileDevice={true}
+          showCourseDropdown={true}
+          setShowCourseDropdown={mockSetShowCourseDropdown}
+          courses={mockCourses}
+          courseId="course1"
           isMobileMenuOpen={false}
           setIsMobileMenuOpen={mockSetIsMobileMenuOpen}
-          setShowChangeUserModal={mockSetShowChangeUserModal}
-          logout={mockLogout}
         />
       </MemoryRouter>
     );
-
-    const dropdownButton = screen.getByLabelText('Switch course');
-    fireEvent.click(dropdownButton);
 
     // Click overlay
     const overlay = document.querySelector('.fixed.inset-0');
     if (overlay) {
       fireEvent.click(overlay);
-      // Dropdown should close
+      expect(mockSetShowCourseDropdown).toHaveBeenCalledWith(false);
     }
   });
 
@@ -234,18 +265,22 @@ describe('MobileNavigation', () => {
     render(
       <BrowserRouter>
         <MobileNavigation
-          courseTitle="Test Course"
+          course={mockCourse}
           user={{ _id: 'user1' }}
           isMobileDevice={true}
+          showCourseDropdown={false}
+          setShowCourseDropdown={mockSetShowCourseDropdown}
+          courses={[]}
+          courseId="course1"
           isMobileMenuOpen={false}
           setIsMobileMenuOpen={mockSetIsMobileMenuOpen}
-          setShowChangeUserModal={mockSetShowChangeUserModal}
-          logout={mockLogout}
         />
       </BrowserRouter>
     );
 
-    expect(mockGetCourses).toHaveBeenCalled();
+    // Component doesn't call getCourses on mount, it receives courses as props
+    // So we just verify it renders
+    expect(screen.getByText('CS101')).toBeInTheDocument();
   });
 });
 

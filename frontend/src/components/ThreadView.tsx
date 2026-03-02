@@ -25,6 +25,8 @@ import {
   Settings,
   Heart
 } from 'lucide-react';
+import ConfirmationModal from './common/ConfirmationModal';
+import PullToRefresh from './common/PullToRefresh';
 
 interface User {
   _id: string;
@@ -145,6 +147,7 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
+  const [showDeleteReplyConfirm, setShowDeleteReplyConfirm] = useState(false);
 
   const isAuthorOrTeacher = String(user?._id) === String(reply.author._id) || user?.role === 'teacher';
 
@@ -175,12 +178,15 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
     }
   };
 
-  const handleDelete = async () => {
-    if (window.confirm('Are you sure you want to delete this reply?')) {
+  const handleDelete = () => {
+    setShowDeleteReplyConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    setShowDeleteReplyConfirm(false);
       try {
         await onDelete(reply._id);
       } catch (error) {
-        }
     }
   };
 
@@ -377,6 +383,18 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
           </div>
         </div>
       )}
+
+      {/* Delete Reply Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteReplyConfirm}
+        onClose={() => setShowDeleteReplyConfirm(false)}
+        onConfirm={confirmDelete}
+        title="Delete Reply"
+        message="Are you sure you want to delete this reply? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </div>
   );
 };
@@ -447,6 +465,7 @@ const ThreadView: React.FC = () => {
   
   // Add state for modules
   const [modules, setModules] = useState<{ _id: string; title: string }[]>([]);
+  const [showDeleteThreadConfirm, setShowDeleteThreadConfirm] = useState(false);
 
   const isTeacher = user?.role === 'teacher' || user?.role === 'admin';
 
@@ -478,57 +497,49 @@ const ThreadView: React.FC = () => {
     fetchGroupCourseId();
   }, [groupId, courseId]);
 
-  useEffect(() => {
-    const fetchThreadAndStudents = async () => {
-      if (!threadId) {
-        setError('Invalid thread ID');
-        setLoading(false);
-        return;
-      }
+  const fetchThreadAndStudents = async () => {
+    if (!threadId) {
+      setError('Invalid thread ID');
+      setLoading(false);
+      return;
+    }
+    
+    // If in group context and still loading courseId, wait
+    if (groupId && !resolvedCourseId) {
+      return; // Still loading group info
+    }
+    
+    if (!resolvedCourseId) {
+      setError('Invalid course ID');
+      setLoading(false);
+      return;
+    }
+    try {
+      const token = localStorage.getItem('token');
       
-      // If in group context and still loading courseId, wait
-      if (groupId && !resolvedCourseId) {
-        return; // Still loading group info
-      }
+      // First, fetch the thread to check settings
+      const threadRes = await api.get(`/threads/${threadId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       
-      if (!resolvedCourseId) {
-        setError('Invalid course ID');
-        setLoading(false);
-        return;
-      }
-      try {
-        const token = localStorage.getItem('token');
+      if (threadRes.data.success) {
+        if (threadRes.data.data.course !== resolvedCourseId) {
+          setError('Thread not found in this course');
+          setLoading(false);
+          return;
+        }
         
-        // First, fetch the thread to check settings
-        const threadRes = await api.get(`/threads/${threadId}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        
-        if (threadRes.data.success) {
-          if (threadRes.data.data.course !== resolvedCourseId) {
-            setError('Thread not found in this course');
-            setLoading(false);
-            return;
-          }
-          
-          // If "post before see" is enabled and user is a student, use participant endpoint
-          if (threadRes.data.data.settings?.requirePostBeforeSee && user?.role === 'student') {
-            const participantRes = await api.get(`/threads/${threadId}/participant/${user._id}`, {
-              headers: { Authorization: `Bearer ${token}` }
+        // If "post before see" is enabled and user is a student, use participant endpoint
+        if (threadRes.data.data.settings?.requirePostBeforeSee && user?.role === 'student') {
+          const participantRes = await api.get(`/threads/${threadId}/participant/${user._id}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (participantRes.data.success) {
+            const threadData = participantRes.data.data;
+            setThread({
+              ...threadData,
+              replies: Array.isArray(threadData.replies) ? threadData.replies : []
             });
-            if (participantRes.data.success) {
-              const threadData = participantRes.data.data;
-              setThread({
-                ...threadData,
-                replies: Array.isArray(threadData.replies) ? threadData.replies : []
-              });
-            } else {
-              const threadData = threadRes.data.data;
-              setThread({
-                ...threadData,
-                replies: Array.isArray(threadData.replies) ? threadData.replies : []
-              });
-            }
           } else {
             const threadData = threadRes.data.data;
             setThread({
@@ -537,32 +548,46 @@ const ThreadView: React.FC = () => {
             });
           }
         } else {
-          setError('Failed to load thread');
+          const threadData = threadRes.data.data;
+          setThread({
+            ...threadData,
+            replies: Array.isArray(threadData.replies) ? threadData.replies : []
+          });
         }
-          // Fetch course to get students
-          const courseRes = await api.get(`/courses/${resolvedCourseId}`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          if (courseRes.data.success) {
-            const studentsData = courseRes.data.data.students;
-            setStudents(Array.isArray(studentsData) ? studentsData : []);
-          }
-          
-          // Fetch modules for the course
-          const modulesRes = await api.get(`/modules/${resolvedCourseId}`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          if (modulesRes.data.success) {
-            setModules(modulesRes.data.data || []);
-          }
-      } catch (err) {
-        setError('Failed to load thread or students');
-      } finally {
-        setLoading(false);
+      } else {
+        setError('Failed to load thread');
       }
-    };
+        // Fetch course to get students
+        const courseRes = await api.get(`/courses/${resolvedCourseId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (courseRes.data.success) {
+          const studentsData = courseRes.data.data.students;
+          setStudents(Array.isArray(studentsData) ? studentsData : []);
+        }
+        
+        // Fetch modules for the course
+        const modulesRes = await api.get(`/modules/${resolvedCourseId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (modulesRes.data.success) {
+          setModules(modulesRes.data.data || []);
+        }
+    } catch (err) {
+      setError('Failed to load thread or students');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchThreadAndStudents();
   }, [resolvedCourseId, threadId, groupId, user?._id]);
+
+  // Refresh function for pull-to-refresh
+  const handleRefresh = async () => {
+    await fetchThreadAndStudents();
+  };
 
   useEffect(() => {
     const handleThreadUpdate = (event: CustomEvent) => {
@@ -660,9 +685,14 @@ const ThreadView: React.FC = () => {
     }
   };
 
-  const handleDeleteThread = async () => {
-    if (!thread || !window.confirm('Are you sure you want to delete this thread?')) return;
+  const handleDeleteThread = () => {
+    if (!thread) return;
+    setShowDeleteThreadConfirm(true);
+  };
 
+  const confirmDeleteThread = async () => {
+    if (!thread) return;
+    setShowDeleteThreadConfirm(false);
     try {
       const token = localStorage.getItem('token');
       const response = await api.delete(
@@ -910,14 +940,15 @@ const ThreadView: React.FC = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-4 sm:space-y-8 px-2 sm:px-4">
+    <PullToRefresh onRefresh={handleRefresh} className="min-h-screen">
+      <div className="max-w-4xl mx-auto space-y-4 sm:space-y-8 px-2 sm:px-4">
       {/* Main Thread Card */}
       <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-100 dark:border-gray-700">
           <div className="flex flex-col sm:flex-row items-start justify-between gap-3">
             <div className="flex-1 w-full">
-              <div className="flex flex-wrap items-center gap-2 mb-2 sm:mb-3">
+              <div className="flex flex-wrap items-center gap-3 sm:gap-2 mb-2 sm:mb-3">
                 {thread.isPinned && (
                   <div className="flex items-center space-x-1 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/50 px-2 sm:px-3 py-1 rounded-full">
                     <Pin className="w-3 h-3 sm:w-4 sm:h-4" />
@@ -973,7 +1004,7 @@ const ThreadView: React.FC = () => {
                   <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-3 sm:mb-4 break-words">{thread.title}</h1>
                   
                   {/* Author info */}
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 gap-2 sm:gap-0">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 gap-3 sm:gap-0">
                     <div className="flex items-center space-x-2 sm:space-x-3">
                       <div className="relative">
                         <img
@@ -1111,7 +1142,7 @@ const ThreadView: React.FC = () => {
                         className="mb-4"
                       />
                     </div>
-                    <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 sm:space-x-0">
+                    <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-3 sm:space-x-0">
                       <button
                         type="button"
                         onClick={() => {
@@ -1570,7 +1601,20 @@ const ThreadView: React.FC = () => {
         </div>
         {renderReplies(rootReplies, 0, handleEditReply, handleDeleteReply)}
       </div>
-    </div>
+
+      {/* Delete Thread Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteThreadConfirm}
+        onClose={() => setShowDeleteThreadConfirm(false)}
+        onConfirm={confirmDeleteThread}
+        title="Delete Thread"
+        message="Are you sure you want to delete this thread? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
+      </div>
+    </PullToRefresh>
   );
 };
 

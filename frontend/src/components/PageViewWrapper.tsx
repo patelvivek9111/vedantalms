@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useCourse } from '../contexts/CourseContext';
 import axios from 'axios';
 import { API_URL } from '../config';
 import PageView from './PageView';
+import Breadcrumb from './common/Breadcrumb';
+import MobileNavigation from './course/MobileNavigation';
 import { 
   ClipboardList, 
   BookOpen, 
@@ -18,8 +21,7 @@ import {
   ClipboardCheck,
   GraduationCap,
   Menu,
-  X,
-  ArrowLeft
+  X
 } from 'lucide-react';
 
 // Navigation items for the course sidebar
@@ -42,11 +44,43 @@ const navigationItems = [
 const PageViewWrapper: React.FC = () => {
   const { courseId, pageId } = useParams<{ courseId: string; pageId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
+  const { courses } = useCourse();
   const [course, setCourse] = useState<any>(null);
+  const [page, setPage] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
+  const [showCourseDropdown, setShowCourseDropdown] = useState(false);
 
+  // Check if it's actually a mobile phone (not tablet/iPad)
+  useEffect(() => {
+    const checkMobile = () => {
+      const userAgent = navigator.userAgent.toLowerCase();
+      const screenWidth = window.screen.width;
+      const viewportWidth = window.innerWidth;
+      
+      // Detect tablets/iPads more accurately
+      const isTablet = /ipad|tablet|playbook|silk|(android(?!.*mobile))|kindle/i.test(userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ||
+        (screenWidth >= 768 && screenWidth <= 1024 && 'ontouchstart' in window);
+      
+      // Detect phones - must be mobile user agent AND not a tablet AND small screen
+      const isPhone = (
+        /android|webos|iphone|ipod|blackberry|iemobile|opera mini/i.test(userAgent) ||
+        (/mobile/i.test(userAgent) && !isTablet)
+      ) && !isTablet;
+      
+      // Only show mobile view on actual phones with small screens (< 768px)
+      const shouldShowMobile = isPhone && screenWidth < 768 && viewportWidth < 768;
+      
+      setIsMobileDevice(shouldShowMobile);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     const fetchCourse = async () => {
@@ -78,8 +112,29 @@ const PageViewWrapper: React.FC = () => {
       }
     };
 
+    const fetchPage = async () => {
+      if (!pageId) return;
+      
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        
+        const response = await axios.get(`${API_URL}/api/pages/view/${pageId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        if (response.data.success) {
+          setPage(response.data.data);
+        }
+      } catch (err) {
+        // Silently fail - page title is optional
+        console.debug('Failed to fetch page:', err);
+      }
+    };
+
     fetchCourse();
-  }, [courseId]);
+    fetchPage();
+  }, [courseId, pageId]);
 
   // Merge existing config with default navigationItems to ensure all items are included
   const existingItems = course?.sidebarConfig?.items || [];
@@ -183,26 +238,25 @@ const PageViewWrapper: React.FC = () => {
 
   return (
     <div className="flex flex-col lg:flex-row w-full max-w-7xl mx-auto">
-      {/* Top Navigation Bar (Mobile Only) */}
-      <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
-        <div className="relative flex items-center justify-between px-4 py-3">
-          <button
-            onClick={() => navigate(`/courses/${courseId}/pages`)}
-            className="text-gray-700 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
-            aria-label="Go back to pages"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Page</h1>
-          <div className="w-10"></div> {/* Spacer for centering */}
-        </div>
-      </nav>
+      {/* Mobile Top Navigation */}
+      <MobileNavigation
+        isMobileDevice={isMobileDevice}
+        course={course}
+        showCourseDropdown={showCourseDropdown}
+        setShowCourseDropdown={setShowCourseDropdown}
+        user={user}
+        courses={courses}
+        courseId={courseId || ''}
+        isMobileMenuOpen={isMobileMenuOpen}
+        setIsMobileMenuOpen={setIsMobileMenuOpen}
+      />
 
       {/* Mobile Overlay */}
-      {isMobileMenuOpen && (
+      {isMobileMenuOpen && isMobileDevice && (
         <div
           className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-[90]"
           onClick={() => setIsMobileMenuOpen(false)}
+          style={{ touchAction: 'none', pointerEvents: 'auto' }}
         />
       )}
 
@@ -238,8 +292,31 @@ const PageViewWrapper: React.FC = () => {
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-auto w-full pt-16 lg:pt-0">
+      <div className={`flex-1 overflow-auto w-full ${isMobileDevice ? 'pt-16' : 'pt-0'}`}>
         <div className="container mx-auto px-4 py-6">
+          {/* Breadcrumb Navigation - Desktop Only */}
+          {course && (
+            <div className="hidden lg:block mb-4">
+              <Breadcrumb
+                items={[
+                  { label: 'Dashboard', path: '/dashboard' },
+                  { label: 'Courses', path: '/courses' },
+                  { 
+                    label: course.catalog?.courseCode || course.title || 'Course', 
+                    path: `/courses/${courseId}` 
+                  },
+                  { 
+                    label: 'Pages', 
+                    path: `/courses/${courseId}/pages` 
+                  },
+                  { 
+                    label: page?.title || 'Page', 
+                    path: location.pathname 
+                  }
+                ]}
+              />
+            </div>
+          )}
           <PageView />
         </div>
       </div>

@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import LatestAnnouncements from '../LatestAnnouncements';
+import ConfirmationModal from '../common/ConfirmationModal';
 
 interface CourseOverviewProps {
   course: {
@@ -50,6 +51,7 @@ const CourseOverview: React.FC<CourseOverviewProps> = ({
   setActiveSection,
 }) => {
   const navigate = useNavigate();
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   return (
     <div className="space-y-6">
@@ -82,11 +84,7 @@ const CourseOverview: React.FC<CourseOverviewProps> = ({
             </button>
             {isAdmin && (
               <button
-                onClick={() => {
-                  if (window.confirm('Are you sure you want to delete this course?')) {
-                    // Handle delete
-                  }
-                }}
+                onClick={() => setShowDeleteConfirm(true)}
                 className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
               >
                 Delete Course
@@ -162,11 +160,27 @@ const CourseOverview: React.FC<CourseOverviewProps> = ({
           numberOfAnnouncements={course.overviewConfig.numberOfAnnouncements || 3}
         />
       )}
+
+      {/* Delete Course Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={() => {
+          setShowDeleteConfirm(false);
+          // Handle delete - to be implemented
+        }}
+        title="Delete Course"
+        message="Are you sure you want to delete this course? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </div>
   );
 };
 
 export default CourseOverview;
+
 
 
 

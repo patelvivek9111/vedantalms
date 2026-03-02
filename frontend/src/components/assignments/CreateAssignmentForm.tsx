@@ -4,7 +4,14 @@ import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
 import { format } from 'date-fns';
 import { API_URL } from '../../config';
-import { Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Trash2, ArrowUp, ArrowDown, Save, RefreshCw } from 'lucide-react';
+import FloatingLabelInput from '../common/FloatingLabelInput';
+import FloatingLabelTextarea from '../common/FloatingLabelTextarea';
+import FloatingLabelSelect from '../common/FloatingLabelSelect';
+import DatePicker from '../common/DatePicker';
+import FormFieldGroup from '../common/FormFieldGroup';
+import { useDraftManager } from '../../hooks/useDraftManager';
+import ConfirmationModal from '../common/ConfirmationModal';
 
 interface CreateAssignmentFormProps {
   moduleId: string;
@@ -103,6 +110,63 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
   const [submissionCount, setSubmissionCount] = useState(0);
   const [hasSubmissions, setHasSubmissions] = useState(false);
   const [totalPointsInput, setTotalPointsInput] = useState<string>('');
+  const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({});
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  // Draft manager
+  const formId = editMode ? `assignment-edit-${assignmentData?._id}` : `assignment-create-${moduleId}`;
+  const { draft, isDraftSaved, saveDraft, autoSave, clearDraft } = useDraftManager<FormData>({
+    formId,
+    autoSaveDelay: 2000
+  });
+
+  // Load draft on mount (only for create mode)
+  useEffect(() => {
+    if (!editMode && draft) {
+      setFormData(draft);
+    }
+  }, [editMode, draft]);
+
+  // Auto-save draft on form changes
+  useEffect(() => {
+    if (!editMode && formData.title) {
+      autoSave(formData);
+    }
+  }, [formData, editMode, autoSave]);
+
+  // Reset form function
+  const handleResetForm = () => {
+    setShowResetConfirm(true);
+  };
+
+  const confirmResetForm = () => {
+    setShowResetConfirm(false);
+      clearDraft();
+      setFormData({
+        title: '',
+        description: '',
+        availableFrom: '',
+        dueDate: '',
+        attachments: [],
+        moduleId: '',
+        totalPoints: 0,
+        questions: [],
+        isGroupAssignment: false,
+        groupSetId: null,
+        allowStudentUploads: false,
+        displayMode: 'single',
+        isGradedQuiz: false,
+        isTimedQuiz: false,
+        quizTimeLimit: 60,
+        showCorrectAnswers: false,
+        showStudentAnswers: false,
+        isOfflineAssignment: false
+      });
+      setTotalPointsInput('');
+      setFieldErrors({});
+      setCurrentStep(1);
+      setNewOption({ text: '', isCorrect: false });
+  };
 
   useEffect(() => {
     const fetchModules = async () => {
@@ -358,11 +422,51 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
     setFormData({ ...formData, questions: newQuestions });
   };
 
-  const validateStep1 = () => {
-    if (!formData.title.trim()) {
-      setError('Title is required');
+  // Inline validation functions
+  const validateTitle = (value: string) => {
+    if (!value.trim()) {
+      setFieldErrors(prev => ({ ...prev, title: 'Title is required' }));
       return false;
     }
+    setFieldErrors(prev => {
+      const newErrors = { ...prev };
+      delete newErrors.title;
+      return newErrors;
+    });
+    return true;
+  };
+
+  const validateDates = () => {
+    let isValid = true;
+    if (!formData.availableFrom || formData.availableFrom.trim() === '') {
+      setFieldErrors(prev => ({ ...prev, availableFrom: 'Available from date is required' }));
+      isValid = false;
+    } else {
+      setFieldErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors.availableFrom;
+        return newErrors;
+      });
+    }
+    if (!formData.dueDate || formData.dueDate.trim() === '') {
+      setFieldErrors(prev => ({ ...prev, dueDate: 'Due date is required' }));
+      isValid = false;
+    } else if (formData.availableFrom && new Date(formData.availableFrom) >= new Date(formData.dueDate)) {
+      setFieldErrors(prev => ({ ...prev, dueDate: 'Due date must be after available from date' }));
+      isValid = false;
+    } else {
+      setFieldErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors.dueDate;
+        return newErrors;
+      });
+    }
+    return isValid;
+  };
+
+  const validateStep1 = () => {
+    const isTitleValid = validateTitle(formData.title);
+    const areDatesValid = validateDates();
     if (!(formData.isGroupAssignment && formData.groupSetId) && !formData.moduleId) {
       setError('Please select a module');
       return false;
@@ -371,21 +475,8 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
       setError('Please select a group set for the group assignment');
       return false;
     }
-    if (!formData.availableFrom || formData.availableFrom.trim() === '') {
-      setError('Available from date is required');
-      return false;
-    }
-    if (!formData.dueDate || formData.dueDate.trim() === '') {
-      setError('Due date is required');
-      return false;
-    }
-    // Check if availableFrom is before dueDate
-    if (new Date(formData.availableFrom) >= new Date(formData.dueDate)) {
-      setError('Available from date must be before due date');
-      return false;
-    }
     setError('');
-    return true;
+    return isTitleValid && areDatesValid;
   };
 
   const validateStep2 = () => {
@@ -417,12 +508,14 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
     setError('');
 
     // Final validation
-    if (!formData.title.trim()) {
-      setError('Title is required');
+    if (!validateTitle(formData.title)) {
       return;
     }
     if (!formData.description.trim()) {
       setError('Description is required');
+      return;
+    }
+    if (!validateDates()) {
       return;
     }
     // Only require module if not a group assignment, or if group assignment but no group set selected
@@ -442,6 +535,11 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
     if (formData.isOfflineAssignment && (!formData.totalPoints || formData.totalPoints <= 0)) {
       setError('Total points is required for offline assignments');
       return;
+    }
+
+    // Clear draft on successful submit
+    if (!editMode) {
+      clearDraft();
     }
 
     try {
@@ -605,47 +703,79 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Draft saved indicator and reset button */}
+        {!editMode && (
+          <div className="flex items-center justify-between bg-green-50 dark:bg-green-900/20 px-4 py-2 rounded-md">
+            {isDraftSaved ? (
+              <div className="flex items-center text-sm text-green-600 dark:text-green-400">
+                <Save className="w-4 h-4 mr-2" />
+                Draft saved automatically
+              </div>
+            ) : (
+              <div></div>
+            )}
+            <button
+              type="button"
+              onClick={handleResetForm}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-white dark:hover:bg-gray-800 rounded-md transition-colors"
+              title="Clear form and start fresh"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Reset Form
+            </button>
+          </div>
+        )}
+
         {/* Step 1: Basic Details */}
         {currentStep === 1 && (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label htmlFor="assignment-title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Title</label>
-                <input
-                  type="text"
+            <FormFieldGroup
+              title="Basic Information"
+              description="Enter the title and select the module for this assignment"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FloatingLabelInput
                   id="assignment-title"
                   name="title"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  type="text"
+                  label="Assignment Title"
                   required
-                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 dark:text-gray-100 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400"
+                  value={formData.title}
+                  onChange={(e) => {
+                    setFormData({ ...formData, title: e.target.value });
+                    if (fieldErrors.title) {
+                      validateTitle(e.target.value);
+                    }
+                  }}
+                  onBlur={(e) => validateTitle(e.target.value)}
+                  error={fieldErrors.title}
+                  showCharacterCount
+                  maxLength={200}
                 />
-              </div>
-              {!(formData.isGroupAssignment && formData.groupSetId) && (
-                <div>
-                  <label htmlFor="assignment-module" className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Module</label>
-                  <select
+                {!(formData.isGroupAssignment && formData.groupSetId) && (
+                  <FloatingLabelSelect
                     id="assignment-module"
                     name="moduleId"
-                    value={formData.moduleId}
-                    onChange={(e) => setFormData({ ...formData, moduleId: e.target.value })}
+                    label="Module"
                     required={!formData.isGroupAssignment}
                     disabled={formData.isGroupAssignment}
-                    className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 dark:text-gray-100 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400"
-                  >
-                    <option value="" disabled>Select a module</option>
-                    {modules.map((module) => (
-                      <option key={module._id} value={module._id}>{module.title}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
+                    value={formData.moduleId}
+                    onChange={(e) => setFormData({ ...formData, moduleId: e.target.value })}
+                    options={[
+                      ...modules.map((module) => ({
+                        value: module._id,
+                        label: module.title
+                      }))
+                    ]}
+                  />
+                )}
+              </div>
+            </FormFieldGroup>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label htmlFor="isGroupAssignment" className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Assignment Type</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Assignment Type</label>
                 <div className="mt-2 space-y-4">
-                  <div className="flex items-center">
+                  <label htmlFor="isGroupAssignment" className="flex items-center min-h-[44px] cursor-pointer">
                     <input
                       type="checkbox"
                       id="isGroupAssignment"
@@ -653,10 +783,10 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                       onChange={(e) => setFormData({ ...formData, isGroupAssignment: e.target.checked })}
                       className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600 rounded"
                     />
-                    <label htmlFor="isGroupAssignment" className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
+                    <span className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
                       This is a group assignment
-                    </label>
-                  </div>
+                    </span>
+                  </label>
                 </div>
               </div>
 
@@ -679,7 +809,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
 
             {/* Graded Quiz Checkbox */}
             <div className="space-y-4">
-              <div className="flex items-center">
+              <label htmlFor="isGradedQuiz" className="flex items-center min-h-[44px] cursor-pointer">
                 <input
                   type="checkbox"
                   id="isGradedQuiz"
@@ -687,13 +817,13 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                   onChange={(e) => setFormData({ ...formData, isGradedQuiz: e.target.checked })}
                   className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600 rounded"
                 />
-                <label htmlFor="isGradedQuiz" className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
+                <span className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
                   Graded Quiz
-                </label>
-              </div>
+                </span>
+              </label>
               
               {/* Offline Assignment Checkbox */}
-              <div className="flex items-center">
+              <label htmlFor="isOfflineAssignment" className="flex items-center min-h-[44px] cursor-pointer">
                 <input
                   type="checkbox"
                   id="isOfflineAssignment"
@@ -701,10 +831,10 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                   onChange={(e) => setFormData({ ...formData, isOfflineAssignment: e.target.checked })}
                   className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600 rounded"
                 />
-                <label htmlFor="isOfflineAssignment" className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
+                <span className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
                   Offline Assignment (Paper Based - manual grade entry)
-                </label>
-              </div>
+                </span>
+              </label>
             </div>
 
             {/* Timer Options - Show when Graded Quiz is checked */}
@@ -713,7 +843,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Quiz Timer</label>
                   <div className="mt-2 space-y-4">
-                    <div className="flex items-center">
+                    <label htmlFor="noTimer" className="flex items-center min-h-[44px] cursor-pointer">
                       <input
                         type="radio"
                         id="noTimer"
@@ -723,11 +853,11 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                         onChange={() => setFormData({ ...formData, isTimedQuiz: false })}
                         className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600"
                       />
-                      <label htmlFor="noTimer" className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
+                      <span className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
                         No timer (unlimited time)
-                      </label>
-                    </div>
-                    <div className="flex items-center">
+                      </span>
+                    </label>
+                    <label htmlFor="withTimer" className="flex items-center min-h-[44px] cursor-pointer">
                       <input
                         type="radio"
                         id="withTimer"
@@ -737,10 +867,10 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                         onChange={() => setFormData({ ...formData, isTimedQuiz: true })}
                         className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600"
                       />
-                      <label htmlFor="withTimer" className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
+                      <span className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
                         Timed quiz
-                      </label>
-                    </div>
+                      </span>
+                    </label>
                   </div>
                 </div>
 
@@ -755,7 +885,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                       onChange={(e) => setFormData({ ...formData, quizTimeLimit: parseInt(e.target.value) || 60 })}
                       min="1"
                       max="480"
-                      className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 dark:text-gray-100 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400"
+                      className="mt-1 block w-full min-h-[48px] px-4 sm:px-3 py-3 sm:py-2 rounded-md border-gray-300 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-base sm:text-sm focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:outline-none focus:ring-2"
                       placeholder="60"
                     />
                     <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 dark:text-gray-400">Enter time limit in minutes (1-480 minutes)</p>
@@ -767,7 +897,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Quiz Feedback Options</label>
                     <div className="mt-2 space-y-3">
-                      <div className="flex items-center">
+                      <label htmlFor="feedbackNone" className="flex items-center min-h-[44px] cursor-pointer">
                         <input
                           type="radio"
                           id="feedbackNone"
@@ -776,11 +906,11 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                           onChange={() => setFormData({ ...formData, showCorrectAnswers: false, showStudentAnswers: false })}
                           className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600"
                         />
-                        <label htmlFor="feedbackNone" className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
+                        <span className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
                           No feedback (students won't see results)
-                        </label>
-                      </div>
-                      <div className="flex items-center">
+                        </span>
+                      </label>
+                      <label htmlFor="showCorrectAnswers" className="flex items-center min-h-[44px] cursor-pointer">
                         <input
                           type="radio"
                           id="showCorrectAnswers"
@@ -789,11 +919,11 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                           onChange={() => setFormData({ ...formData, showCorrectAnswers: true, showStudentAnswers: false })}
                           className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600"
                         />
-                        <label htmlFor="showCorrectAnswers" className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
+                        <span className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
                           Show students which questions they got correct after submission (green for correct, red for wrong)
-                        </label>
-                      </div>
-                      <div className="flex items-center">
+                        </span>
+                      </label>
+                      <label htmlFor="showStudentAnswers" className="flex items-center min-h-[44px] cursor-pointer">
                         <input
                           type="radio"
                           id="showStudentAnswers"
@@ -802,10 +932,10 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                           onChange={() => setFormData({ ...formData, showStudentAnswers: true, showCorrectAnswers: false })}
                           className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600"
                         />
-                        <label htmlFor="showStudentAnswers" className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
+                        <span className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
                           Show students their submitted answers after submission (green for correct, red for wrong, and show correct answer for wrong ones)
-                        </label>
-                      </div>
+                        </span>
+                      </label>
                     </div>
                     <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 dark:text-gray-400">
                       Note: These options can be modified later in the grading page for individual submissions.
@@ -836,34 +966,46 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                 )}
               </div>
             )}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label htmlFor="assignment-available-from" className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Available From</label>
-                <input
-                  type="datetime-local"
+            <FormFieldGroup
+              title="Schedule"
+              description="Set when the assignment becomes available and when it's due"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <DatePicker
                   id="assignment-available-from"
                   name="availableFrom"
-                  value={formData.availableFrom}
-                  onChange={(e) => setFormData({ ...formData, availableFrom: e.target.value })}
-                  step="600"
+                  label="Available From"
+                  showTime={true}
                   required
-                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 dark:text-gray-100 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400"
+                  value={formData.availableFrom}
+                  onChange={(e) => {
+                    setFormData({ ...formData, availableFrom: e.target.value });
+                    if (fieldErrors.availableFrom || fieldErrors.dueDate) {
+                      validateDates();
+                    }
+                  }}
+                  onBlur={validateDates}
+                  error={fieldErrors.availableFrom}
                 />
-              </div>
-              <div>
-                <label htmlFor="assignment-due-date" className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Due Date</label>
-                <input
-                  type="datetime-local"
+                <DatePicker
                   id="assignment-due-date"
                   name="dueDate"
-                  value={formData.dueDate}
-                  onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                  step="600"
+                  label="Due Date"
+                  showTime={true}
                   required
-                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 dark:text-gray-100 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400"
+                  value={formData.dueDate}
+                  onChange={(e) => {
+                    setFormData({ ...formData, dueDate: e.target.value });
+                    if (fieldErrors.dueDate) {
+                      validateDates();
+                    }
+                  }}
+                  onBlur={validateDates}
+                  error={fieldErrors.dueDate}
+                  helperText={formData.availableFrom ? `Must be after ${new Date(formData.availableFrom).toLocaleString()}` : ''}
                 />
               </div>
-            </div>
+            </FormFieldGroup>
             <div className="flex justify-end">
               <button
                 type="button"
@@ -878,19 +1020,22 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
         {/* Step 2: Description */}
         {currentStep === 2 && (
           <div className="space-y-6">
-            <div>
-              <label htmlFor="assignment-description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Description</label>
-              <div className="mt-1">
-                <textarea
-                  id="assignment-description"
-                  name="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows={6}
-                  className="block w-full rounded-md border-gray-300 dark:border-gray-700 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400"
-                  placeholder="Enter a detailed description of the assignment..."
-                />
-              </div>
+            <FormFieldGroup
+              title="Assignment Description"
+              description="Provide a detailed description of the assignment"
+            >
+              <FloatingLabelTextarea
+                id="assignment-description"
+                name="description"
+                label="Description"
+                required
+                rows={6}
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                showCharacterCount
+                maxLength={2000}
+                placeholder="Enter a detailed description of the assignment..."
+              />
               <div className="mt-3">
                 <div className="flex items-center">
                   <input
@@ -943,7 +1088,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                   </div>
                 </div>
               </div>
-            </div>
+            </FormFieldGroup>
             <div className="flex flex-col sm:flex-row justify-between gap-3">
               <button
                 type="button"
@@ -1379,20 +1524,20 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
                 <button
                   type="button"
                   onClick={() => setPreview(!preview)}
-                  className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white hover:bg-gray-50 dark:bg-gray-700"
+                  className="w-full sm:w-auto min-h-[44px] inline-flex items-center justify-center px-4 py-2.5 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white hover:bg-gray-50 dark:bg-gray-700 touch-manipulation active:scale-95 transition-transform"
                 >
                   {preview ? 'Edit' : 'Preview'}
                 </button>
                 <button
                   type="button"
                   onClick={() => navigate(`/modules/${formData.moduleId}/assignments`)}
-                  className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white hover:bg-gray-50 dark:bg-gray-700"
+                  className="w-full sm:w-auto min-h-[44px] inline-flex items-center justify-center px-4 py-2.5 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white hover:bg-gray-50 dark:bg-gray-700 touch-manipulation active:scale-95 transition-transform"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+                  className="w-full sm:w-auto min-h-[44px] inline-flex items-center justify-center px-4 py-2.5 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 touch-manipulation active:scale-95 transition-transform"
                 >
                   {editMode 
                     ? (formData.isGradedQuiz ? 'Update Quiz' : 'Update Assignment')
@@ -1497,6 +1642,18 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
           )}
         </div>
       )}
+
+      {/* Reset Form Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showResetConfirm}
+        onClose={() => setShowResetConfirm(false)}
+        onConfirm={confirmResetForm}
+        title="Clear Form"
+        message="Are you sure you want to clear all fields and start fresh? This will delete your saved draft."
+        confirmText="Clear"
+        cancelText="Cancel"
+        variant="warning"
+      />
       </div>
     </div>
   );

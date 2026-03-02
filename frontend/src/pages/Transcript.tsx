@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { API_URL } from '../config';
-import { format } from 'date-fns';
+import DataTable, { Column } from '../components/common/DataTable';
 
 interface CourseGrade {
   courseId: string;
@@ -242,6 +242,62 @@ const Transcript: React.FC = () => {
     return totalCredits > 0 ? totalPoints / totalCredits : 0;
   };
 
+  // Define columns for transcript table
+  const transcriptColumns = useMemo<Column<CourseGrade>[]>(() => [
+    {
+      key: 'courseCode',
+      label: 'Course Code',
+      sortable: true,
+      render: (course) => course.courseCode || 'N/A',
+      className: 'whitespace-nowrap'
+    },
+    {
+      key: 'courseTitle',
+      label: 'Course Title',
+      sortable: true,
+      className: ''
+    },
+    {
+      key: 'creditHours',
+      label: 'Credits',
+      sortable: true,
+      render: (course) => course.creditHours || 0,
+      className: 'whitespace-nowrap text-gray-500 dark:text-gray-400',
+      sortFn: (a, b) => (a.creditHours || 0) - (b.creditHours || 0)
+    },
+    {
+      key: 'finalGrade',
+      label: 'Grade',
+      sortable: true,
+      render: (course) => `${course.finalGrade.toFixed(2)}%`,
+      className: 'whitespace-nowrap text-gray-500 dark:text-gray-400',
+      sortFn: (a, b) => a.finalGrade - b.finalGrade
+    },
+    {
+      key: 'letterGrade',
+      label: 'Letter Grade',
+      sortable: true,
+      render: (course) => (
+        <span className="font-medium">{course.letterGrade}</span>
+      ),
+      className: 'whitespace-nowrap',
+      sortFn: (a, b) => {
+        const gradeOrder = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'D-', 'F'];
+        return gradeOrder.indexOf(a.letterGrade) - gradeOrder.indexOf(b.letterGrade);
+      }
+    },
+    {
+      key: 'gradePoints',
+      label: 'Grade Points',
+      sortable: true,
+      render: (course) => getIndianGradePoints(course.letterGrade).toFixed(1),
+      className: 'whitespace-nowrap text-gray-500 dark:text-gray-400',
+      sortFn: (a, b) => {
+        return getIndianGradePoints(a.letterGrade) - getIndianGradePoints(b.letterGrade);
+      }
+    }
+  ], []);
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-4 sm:py-6 lg:py-8 px-2 sm:px-4 lg:px-8">
       <div className="max-w-5xl mx-auto">
@@ -367,56 +423,13 @@ const Transcript: React.FC = () => {
                   <p>No courses found for {selectedSemester.term} {selectedSemester.year}</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead className="bg-gray-50 dark:bg-gray-700">
-                      <tr>
-                        <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Course Code
-                        </th>
-                        <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Course Title
-                        </th>
-                        <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Credits
-                        </th>
-                        <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Grade
-                        </th>
-                        <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Letter Grade
-                        </th>
-                        <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Grade Points
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                      {transcriptData.courses.map((course, index) => (
-                        <tr key={course.courseId} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                          <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-gray-100">
-                            {course.courseCode || 'N/A'}
-                          </td>
-                          <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 text-xs sm:text-sm text-gray-900 dark:text-gray-100">
-                            {course.courseTitle}
-                          </td>
-                          <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                            {course.creditHours || 0}
-                          </td>
-                          <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                            {course.finalGrade.toFixed(2)}%
-                          </td>
-                          <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-900 dark:text-gray-100">
-                            {course.letterGrade}
-                          </td>
-                          <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                            {getIndianGradePoints(course.letterGrade).toFixed(1)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <DataTable<CourseGrade>
+                  data={transcriptData.courses}
+                  columns={transcriptColumns}
+                  keyExtractor={(course) => course.courseId}
+                  emptyMessage={`No courses found for ${selectedSemester.term} ${selectedSemester.year}`}
+                  pageSize={25}
+                />
               )}
             </>
           )}

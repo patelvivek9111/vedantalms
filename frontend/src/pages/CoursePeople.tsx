@@ -35,6 +35,8 @@ const CoursePeople: React.FC = () => {
   const [enrollmentRequests, setEnrollmentRequests] = useState<EnrollmentRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+  const [studentToRemove, setStudentToRemove] = useState<string | null>(null);
 
   const isTeacherOrAdmin = user?.role === 'teacher' || user?.role === 'admin';
 
@@ -101,14 +103,18 @@ const CoursePeople: React.FC = () => {
     }
   };
 
-  const handleRemoveStudent = async (studentId: string) => {
-    if (!confirm('Are you sure you want to remove this student from the course?')) {
-      return;
-    }
+  const handleRemoveStudent = (studentId: string) => {
+    setStudentToRemove(studentId);
+    setShowRemoveConfirm(true);
+  };
 
+  const confirmRemoveStudent = async () => {
+    if (!studentToRemove) return;
+    setShowRemoveConfirm(false);
     try {
-      await api.post(`/courses/${courseId}/unenroll`, { studentId });
-      setStudents(prev => prev.filter(student => student._id !== studentId));
+      await api.post(`/courses/${courseId}/unenroll`, { studentId: studentToRemove });
+      setStudents(prev => prev.filter(student => student._id !== studentToRemove));
+      setStudentToRemove(null);
     } catch (err: any) {
       alert('Failed to remove student');
     }
@@ -242,6 +248,21 @@ const CoursePeople: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Remove Student Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showRemoveConfirm}
+        onClose={() => {
+          setShowRemoveConfirm(false);
+          setStudentToRemove(null);
+        }}
+        onConfirm={confirmRemoveStudent}
+        title="Remove Student"
+        message="Are you sure you want to remove this student from the course?"
+        confirmText="Remove"
+        cancelText="Cancel"
+        variant="warning"
+      />
     </div>
   );
 };

@@ -101,9 +101,9 @@ const GroupPages: React.FC<GroupPagesProps> = ({ groupSetId, groupId, isInstruct
   }, [courseId, groupSetId]);
 
   return (
-    <div className={`w-full h-full overflow-y-auto ${isMobileDevice ? 'pb-20' : ''}`}>
+    <div className={`bg-white dark:bg-gray-800 ${isMobileDevice ? 'rounded-none shadow-none border-0' : 'rounded-xl shadow-sm border border-gray-200 dark:border-gray-700'} w-full ${isMobileDevice ? 'pb-20' : ''}`}>
       {/* Header - Mobile Optimized */}
-      <div className={`bg-white dark:bg-gray-800 ${isMobileDevice ? 'p-3 mb-3 border-b' : 'p-4 sm:p-6 mb-4 sm:mb-6'} border-gray-200 dark:border-gray-700`}>
+      <div className={`${isMobileDevice ? 'p-3 mb-3 border-b border-gray-200 dark:border-gray-700' : 'p-4 sm:p-6 mb-4 sm:mb-6'}`}>
         <div className="flex flex-col gap-3">
         <div>
             <h2 className={`${isMobileDevice ? 'text-lg' : 'text-xl sm:text-2xl'} font-bold text-gray-800 dark:text-gray-100`}>
@@ -165,7 +165,7 @@ const GroupPages: React.FC<GroupPagesProps> = ({ groupSetId, groupId, isInstruct
           {pages.map(page => (
               <div 
                 key={page._id} 
-                onClick={() => navigate(`/pages/${page._id}`)}
+                onClick={() => navigate(`/groups/${groupId}/pages/${page._id}`)}
                 className={`${isMobileDevice ? 'p-3' : 'p-4'} bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl hover:shadow-lg transition-all cursor-pointer hover:border-blue-300 dark:hover:border-blue-600 active:scale-[0.98] group touch-manipulation`}
               >
                 <div className="flex items-center space-x-3">

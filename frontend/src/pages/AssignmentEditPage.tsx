@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import CreateAssignmentForm from '../components/assignments/CreateAssignmentForm';
-import { ArrowLeft, Menu, X, ClipboardList, BookOpen, FileText, PenTool, MessageSquare, Megaphone, Users, BarChart3, UserPlus, CheckSquare, ClipboardCheck, GraduationCap } from 'lucide-react';
+import { ArrowLeft, ClipboardList, BookOpen, FileText, PenTool, MessageSquare, Megaphone, Users, BarChart3, UserPlus, CheckSquare, ClipboardCheck, GraduationCap, X } from 'lucide-react';
 import axios from 'axios';
 import { API_URL } from '../config';
+import Breadcrumb from '../components/common/Breadcrumb';
+import { hapticNavigation } from '../utils/hapticFeedback';
 
 // Navigation items for the course sidebar
 const navigationItems = [
@@ -27,6 +29,7 @@ const navigationItems = [
 const AssignmentEditPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -156,66 +159,58 @@ const AssignmentEditPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Top Navigation Bar (Mobile Only) */}
-      <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
-        <div className="relative flex items-center justify-between px-4 py-3">
+      <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm safe-area-inset-top">
+        <div className="relative flex items-center justify-between px-4 py-3 gap-2">
           <button
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="text-gray-700 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
-            aria-label="Toggle menu"
-          >
-            {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
-          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Edit Assignment</h1>
-          <button
-            onClick={() => navigate(-1)}
-            className="text-gray-700 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
+            onClick={() => {
+              hapticNavigation();
+              navigate(course?._id ? `/courses/${course._id}/assignments` : '/dashboard');
+            }}
+            className="text-gray-700 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
             aria-label="Go back"
           >
             <ArrowLeft className="w-6 h-6" />
           </button>
+          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100 flex-1 text-center">Editing</h1>
+          <div className="w-10 flex-shrink-0"></div> {/* Spacer for centering */}
         </div>
       </nav>
 
       <div className="flex flex-col lg:flex-row w-full max-w-7xl mx-auto">
-        {/* Course Sidebar */}
-        {course && (
-          <aside
-            className={`fixed lg:relative top-16 lg:top-0 left-0 h-[calc(100vh-4rem)] lg:h-auto w-64 bg-white/95 dark:bg-gray-900/95 backdrop-blur lg:bg-white/80 dark:lg:bg-gray-900/80 z-[95] lg:z-auto transform ${
-              isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-            } transition-transform duration-300 ease-in-out lg:mr-8 lg:mt-4`}
-          >
-            <nav className="rounded-2xl shadow-lg p-3 sm:p-4 flex flex-col gap-1 border border-gray-100 dark:border-gray-700 h-full lg:h-auto overflow-y-auto pb-20 lg:pb-4">
-              {filteredNavigationItems.map((item: any) => (
-                <button
-                  key={item.id}
-                  className={`flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 rounded-lg transition-colors font-medium text-sm sm:text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-700 dark:hover:text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 ${item.id === 'assignments' ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-semibold shadow' : ''}`}
-                  onClick={() => {
-                    navigate(`/courses/${course._id}/${item.id}`);
-                    setIsMobileMenuOpen(false);
-                  }}
-                >
-                  <item.icon className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
-                  <span>{item.label}</span>
-                </button>
-              ))}
-            </nav>
-          </aside>
-        )}
 
         {/* Main Content Area */}
         <div className="flex-1 overflow-x-hidden lg:ml-0">
           <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6 pt-16 lg:pt-6 overflow-x-hidden">
+            {/* Breadcrumb Navigation - Desktop Only */}
+            {course && assignment && (
+              <div className="hidden lg:block mb-4">
+                <Breadcrumb
+                  items={[
+                    { label: 'Dashboard', path: '/dashboard' },
+                    { label: 'Courses', path: '/courses' },
+                    { 
+                      label: course.catalog?.courseCode || course.title || 'Course', 
+                      path: `/courses/${course._id}` 
+                    },
+                    { 
+                      label: assignment.isGradedQuiz ? 'Quizzes' : 'Assignments', 
+                      path: `/courses/${course._id}/${assignment.isGradedQuiz ? 'quizzes' : 'assignments'}` 
+                    },
+                    { 
+                      label: assignment.title || 'Assignment', 
+                      path: `/assignments/${id}` 
+                    },
+                    { 
+                      label: 'Edit', 
+                      path: location.pathname 
+                    }
+                  ]}
+                />
+              </div>
+            )}
             <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-2 sm:p-4 lg:p-6 overflow-x-hidden">
               <div className="hidden lg:block mb-4 sm:mb-6">
                 <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Edit Assignment</h1>
-                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                  Editing: {assignment?.title}
-                </p>
-              </div>
-              <div className="lg:hidden mb-4 sm:mb-6">
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Editing: {assignment?.title}
-                </p>
               </div>
               
               <CreateAssignmentForm 

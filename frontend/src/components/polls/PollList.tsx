@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import PollForm from './PollForm';
 import PollVote from './PollVote';
+import ConfirmationModal from '../common/ConfirmationModal';
 
 interface Poll {
   _id: string;
@@ -54,6 +55,8 @@ const PollList: React.FC<PollListProps> = ({ courseId }) => {
   const [editingPoll, setEditingPoll] = useState<Poll | null>(null);
   const [deletingPoll, setDeletingPoll] = useState<string | null>(null);
   const [votingPoll, setVotingPoll] = useState<Poll | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [pollToDelete, setPollToDelete] = useState<string | null>(null);
 
   const isInstructor = user?.role === 'teacher' || user?.role === 'admin';
 
@@ -76,16 +79,22 @@ const PollList: React.FC<PollListProps> = ({ courseId }) => {
     }
   };
 
-  const handleDeletePoll = async (pollId: string) => {
-    if (!window.confirm('Are you sure you want to delete this poll?')) return;
-    
-    setDeletingPoll(pollId);
+  const handleDeletePoll = (pollId: string) => {
+    setPollToDelete(pollId);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeletePoll = async () => {
+    if (!pollToDelete) return;
+    setShowDeleteConfirm(false);
+    setDeletingPoll(pollToDelete);
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`${API_URL}/api/polls/${pollId}`, {
+      await axios.delete(`${API_URL}/api/polls/${pollToDelete}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setPolls(polls.filter(poll => poll._id !== pollId));
+      setPolls(polls.filter(poll => poll._id !== pollToDelete));
+      setPollToDelete(null);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to delete poll');
     } finally {
@@ -281,21 +290,24 @@ const PollList: React.FC<PollListProps> = ({ courseId }) => {
                           onClick={() => handleToggleResults(poll._id, poll.resultsVisible)}
                           className="p-2 sm:p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
                           title={poll.resultsVisible ? 'Hide results' : 'Show results'}
+                          aria-label={poll.resultsVisible ? 'Hide poll results' : 'Show poll results'}
                         >
-                          {poll.resultsVisible ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5" />}
+                          {poll.resultsVisible ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" aria-hidden="true" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5" aria-hidden="true" />}
                         </button>
                         <button
                           onClick={() => setEditingPoll(poll)}
                           className="p-2 sm:p-2 text-blue-500 hover:text-blue-700 transition-colors"
                           title="Edit poll"
+                          aria-label={`Edit poll: ${poll.title}`}
                         >
-                          <Edit className="w-4 h-4 sm:w-5 sm:h-5" />
+                          <Edit className="w-4 h-4 sm:w-5 sm:h-5" aria-hidden="true" />
                         </button>
                         <button
                           onClick={() => handleDeletePoll(poll._id)}
                           disabled={deletingPoll === poll._id}
                           className="p-2 sm:p-2 text-red-500 hover:text-red-700 transition-colors disabled:opacity-50"
                           title="Delete poll"
+                          aria-label={`Delete poll: ${poll.title}`}
                         >
                           {deletingPoll === poll._id ? (
                             <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-red-500"></div>
@@ -416,6 +428,22 @@ const PollList: React.FC<PollListProps> = ({ courseId }) => {
       )}
         </>
       )}
+
+      {/* Delete Poll Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setPollToDelete(null);
+        }}
+        onConfirm={confirmDeletePoll}
+        title="Delete Poll"
+        message="Are you sure you want to delete this poll? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={!!deletingPoll}
+      />
      </div>
    );
  };

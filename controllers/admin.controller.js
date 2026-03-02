@@ -777,6 +777,18 @@ exports.updateSystemSettings = async (req, res) => {
     
     await settings.save();
     
+    // Re-initialize email service if email settings were updated
+    if (req.body.email) {
+      try {
+        const { initializeEmailService } = require('../utils/emailService');
+        await initializeEmailService();
+        console.log('Email service re-initialized after settings update');
+      } catch (emailError) {
+        console.warn('Warning: Could not re-initialize email service:', emailError.message);
+        // Don't fail the request if email re-init fails
+      }
+    }
+    
     // Don't send the password in response
     const settingsResponse = settings.toObject();
     if (settingsResponse.email && settingsResponse.email.smtpPassword) {
@@ -803,12 +815,57 @@ exports.updateSystemSettings = async (req, res) => {
 // @access  Private (Admin)
 exports.testEmailConfig = async (req, res) => {
   try {
-    // For now, return a placeholder response
-    // TODO: Implement actual email sending functionality
-    res.json({
-      success: true,
-      message: 'Email test functionality is not yet implemented. Configuration saved successfully.'
-    });
+    const { sendEmail, initializeEmailService } = require('../utils/emailService');
+    const User = require('../models/user.model');
+    
+    // Get the current user's email for testing
+    const user = await User.findById(req.user._id);
+    if (!user || !user.email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Your user account does not have an email address configured'
+      });
+    }
+    
+    // Re-initialize email service with new settings
+    const initialized = await initializeEmailService();
+    if (!initialized) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email service could not be initialized. Please check your SMTP settings.'
+      });
+    }
+    
+    // Send test email
+    const testSubject = 'LMS Email Configuration Test';
+    const testHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #4F46E5;">Email Configuration Test</h2>
+        <p>This is a test email from your LMS system.</p>
+        <p>If you received this email, your SMTP configuration is working correctly!</p>
+        <hr style="margin: 20px 0; border: none; border-top: 1px solid #e5e7eb;">
+        <p style="color: #6b7280; font-size: 12px;">
+          Sent at: ${new Date().toLocaleString()}<br>
+          From: ${req.body.fromEmail || req.body.smtpUser}
+        </p>
+      </div>
+    `;
+    const testText = 'This is a test email from your LMS system. If you received this email, your SMTP configuration is working correctly!';
+    
+    const result = await sendEmail(user.email, testSubject, testHtml, testText);
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        message: `Test email sent successfully to ${user.email}. Please check your inbox.`,
+        messageId: result.messageId
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: `Failed to send test email: ${result.error}`
+      });
+    }
   } catch (err) {
     console.error('Error in testEmailConfig:', err);
     res.status(500).json({

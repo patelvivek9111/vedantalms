@@ -107,6 +107,33 @@ exports.createAnnouncement = async (req, res) => {
       options: options ? JSON.parse(options) : {},
       delayedUntil: req.body.delayedUntil || undefined,
     });
+
+    // Notify all enrolled students about new announcement
+    try {
+      const { createNotification } = require('../routes/notification.routes');
+      const populatedCourse = await Course.findById(courseId).populate('students', '_id');
+      
+      if (populatedCourse && populatedCourse.students) {
+        const studentIds = populatedCourse.students.map(s => s._id || s);
+        
+        // Create notifications for all students (in parallel, but don't wait)
+        Promise.all(studentIds.map(studentId => 
+          createNotification(studentId, {
+            type: 'announcement',
+            title: 'New Announcement',
+            message: `New announcement in ${populatedCourse.title}: "${title}"`,
+            link: `/courses/${courseId}/announcements`,
+            relatedId: announcement._id,
+            relatedType: 'announcement',
+            priority: 'medium'
+          }).catch(err => console.error(`Error notifying student ${studentId}:`, err))
+        )).catch(err => console.error('Error creating announcement notifications:', err));
+      }
+    } catch (notifError) {
+      console.error('Error creating announcement notifications:', notifError);
+      // Don't fail the announcement creation if notification fails
+    }
+
     res.status(201).json({ success: true, data: announcement });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error', error: err.message });

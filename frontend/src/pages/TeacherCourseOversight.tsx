@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { toast } from 'react-toastify';
 import { API_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { getImageUrl } from '../services/api';
@@ -11,6 +12,7 @@ import {
   Edit, 
   Trash2, 
   Eye,
+  EyeOff,
   Users,
   CheckCircle,
   XCircle,
@@ -18,6 +20,8 @@ import {
   User
 } from 'lucide-react';
 import { BurgerMenu } from '../components/BurgerMenu';
+import DataTable, { Column } from '../components/common/DataTable';
+import ConfirmationModal from '../components/common/ConfirmationModal';
 
 interface Course {
   _id: string;
@@ -54,6 +58,11 @@ export function TeacherCourseOversight() {
   });
   const [saving, setSaving] = useState(false);
   const [showBurgerMenu, setShowBurgerMenu] = useState(false);
+  const [selectedCourseIds, setSelectedCourseIds] = useState<string[]>([]);
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
+  // Confirmation modal state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [courseToDelete, setCourseToDelete] = useState<Course | null>(null);
 
   useEffect(() => {
     const fetchCourses = async () => {
@@ -205,9 +214,8 @@ export function TeacherCourseOversight() {
         navigate(`/courses/${course._id}`);
         break;
       case 'delete':
-        if (window.confirm(`Are you sure you want to delete "${course.title}"? This action cannot be undone.`)) {
-          handleDeleteCourse(course._id);
-        }
+        setCourseToDelete(course);
+        setShowDeleteConfirm(true);
         break;
     }
   };
@@ -237,7 +245,7 @@ export function TeacherCourseOversight() {
       setShowCourseModal(false);
       setSelectedCourse(null);
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to update course');
+      toast.error(error.response?.data?.message || 'Failed to update course');
     } finally {
       setSaving(false);
     }
@@ -253,10 +261,316 @@ export function TeacherCourseOversight() {
       // Remove from local state
       setCourses(courses.filter(c => c._id !== courseId));
       setFilteredCourses(filteredCourses.filter(c => c._id !== courseId));
+      toast.success('Course deleted successfully');
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to delete course');
+      toast.error(error.response?.data?.message || 'Failed to delete course');
     }
   };
+
+  // Bulk action handlers
+  const handleBulkPublish = async () => {
+    if (selectedCourseIds.length === 0) {
+      toast.warn('Please select at least one course');
+      return;
+    }
+
+    setBulkActionLoading(true);
+    const token = localStorage.getItem('token');
+    const headers = { Authorization: `Bearer ${token}` };
+
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      await Promise.all(selectedCourseIds.map(async (id) => {
+        try {
+          await axios.patch(`${API_URL}/api/courses/${id}/publish`, { published: true }, { headers });
+          successCount++;
+        } catch (error) {
+          failCount++;
+        }
+      }));
+
+      if (successCount > 0) {
+        // Refresh courses
+        const response = await axios.get(`${API_URL}/api/courses`, { headers });
+        if (response.data) {
+          const coursesData = response.data.data || response.data;
+          const coursesArray = Array.isArray(coursesData) ? coursesData : [];
+          const coursesWithStats = await Promise.all(coursesArray.map(async (course: any) => {
+            try {
+              let classAverage: number | undefined = undefined;
+              try {
+                const averageResponse = await axios.get(
+                  `${API_URL}/api/grades/course/${course._id}/average`,
+                  { headers }
+                );
+                if (averageResponse.data && averageResponse.data.average !== null && averageResponse.data.average !== undefined) {
+                  classAverage = averageResponse.data.average;
+                }
+              } catch (error) {
+                // Skip if we can't get average
+              }
+              
+              let status: 'active' | 'draft' | 'archived' = 'active';
+              if (!course.published) {
+                status = 'draft';
+              }
+              
+              return {
+                _id: course._id,
+                title: course.title,
+                description: course.description || '',
+                instructor: course.instructor,
+                published: course.published || false,
+                students: course.students || [],
+                enrollmentCount: course.students?.length || 0,
+                classAverage: classAverage,
+                catalog: course.catalog,
+                createdAt: course.createdAt,
+                updatedAt: course.updatedAt,
+                status: status
+              };
+            } catch (error) {
+              return {
+                ...course,
+                enrollmentCount: course.students?.length || 0,
+                classAverage: undefined,
+                status: course.published ? 'active' : 'draft'
+              };
+            }
+          }));
+          setCourses(coursesWithStats);
+          setFilteredCourses(coursesWithStats);
+        }
+        toast.success(`Successfully published ${successCount} course${successCount !== 1 ? 's' : ''}`);
+      }
+      if (failCount > 0) {
+        toast.error(`Failed to publish ${failCount} course${failCount !== 1 ? 's' : ''}`);
+      }
+      setSelectedCourseIds([]);
+    } catch (error) {
+      toast.error('Error during bulk publish operation');
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handleBulkUnpublish = async () => {
+    if (selectedCourseIds.length === 0) {
+      toast.warn('Please select at least one course');
+      return;
+    }
+
+    setBulkActionLoading(true);
+    const token = localStorage.getItem('token');
+    const headers = { Authorization: `Bearer ${token}` };
+
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      await Promise.all(selectedCourseIds.map(async (id) => {
+        try {
+          await axios.patch(`${API_URL}/api/courses/${id}/publish`, { published: false }, { headers });
+          successCount++;
+        } catch (error) {
+          failCount++;
+        }
+      }));
+
+      if (successCount > 0) {
+        // Refresh courses
+        const response = await axios.get(`${API_URL}/api/courses`, { headers });
+        if (response.data) {
+          const coursesData = response.data.data || response.data;
+          const coursesArray = Array.isArray(coursesData) ? coursesData : [];
+          const coursesWithStats = await Promise.all(coursesArray.map(async (course: any) => {
+            try {
+              let classAverage: number | undefined = undefined;
+              try {
+                const averageResponse = await axios.get(
+                  `${API_URL}/api/grades/course/${course._id}/average`,
+                  { headers }
+                );
+                if (averageResponse.data && averageResponse.data.average !== null && averageResponse.data.average !== undefined) {
+                  classAverage = averageResponse.data.average;
+                }
+              } catch (error) {
+                // Skip if we can't get average
+              }
+              
+              let status: 'active' | 'draft' | 'archived' = 'active';
+              if (!course.published) {
+                status = 'draft';
+              }
+              
+              return {
+                _id: course._id,
+                title: course.title,
+                description: course.description || '',
+                instructor: course.instructor,
+                published: course.published || false,
+                students: course.students || [],
+                enrollmentCount: course.students?.length || 0,
+                classAverage: classAverage,
+                catalog: course.catalog,
+                createdAt: course.createdAt,
+                updatedAt: course.updatedAt,
+                status: status
+              };
+            } catch (error) {
+              return {
+                ...course,
+                enrollmentCount: course.students?.length || 0,
+                classAverage: undefined,
+                status: course.published ? 'active' : 'draft'
+              };
+            }
+          }));
+          setCourses(coursesWithStats);
+          setFilteredCourses(coursesWithStats);
+        }
+        toast.success(`Successfully unpublished ${successCount} course${successCount !== 1 ? 's' : ''}`);
+      }
+      if (failCount > 0) {
+        toast.error(`Failed to unpublish ${failCount} course${failCount !== 1 ? 's' : ''}`);
+      }
+      setSelectedCourseIds([]);
+    } catch (error) {
+      toast.error('Error during bulk unpublish operation');
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  // Define columns for courses table
+  const teacherCourseColumns = useMemo<Column<Course>[]>(() => [
+    {
+      key: 'title',
+      label: 'Course',
+      sortable: true,
+      render: (course) => (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate(`/courses/${course._id}`);
+          }}
+          className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium text-left"
+        >
+          {course.catalog?.courseCode || course.title}
+        </button>
+      ),
+      className: 'whitespace-nowrap',
+      sortFn: (a, b) => {
+        const aTitle = a.catalog?.courseCode || a.title;
+        const bTitle = b.catalog?.courseCode || b.title;
+        return aTitle.localeCompare(bTitle);
+      }
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      sortable: true,
+      render: (course) => (
+        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(course.status)}`}>
+          {course.status}
+        </span>
+      ),
+      className: 'whitespace-nowrap',
+      sortFn: (a, b) => {
+        const statusOrder = ['active', 'draft', 'archived'];
+        return statusOrder.indexOf(a.status) - statusOrder.indexOf(b.status);
+      }
+    },
+    {
+      key: 'published',
+      label: 'Published',
+      sortable: true,
+      render: (course) => (
+        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getPublishedColor(course.published)}`}>
+          {course.published ? 'Published' : 'Unpublished'}
+        </span>
+      ),
+      className: 'whitespace-nowrap',
+      sortFn: (a, b) => (a.published ? 1 : 0) - (b.published ? 1 : 0)
+    },
+    {
+      key: 'enrollmentCount',
+      label: 'Enrollment',
+      sortable: true,
+      render: (course) => (
+        <div className="flex items-center gap-2">
+          <Users className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+          <span className="text-sm text-gray-900 dark:text-gray-100">{course.enrollmentCount || 0}</span>
+        </div>
+      ),
+      className: 'whitespace-nowrap',
+      sortFn: (a, b) => (a.enrollmentCount || 0) - (b.enrollmentCount || 0)
+    },
+    {
+      key: 'classAverage',
+      label: 'Average',
+      sortable: true,
+      render: (course) => (
+        <div className="flex items-center gap-2">
+          <TrendingUp className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+          <span className={`text-sm font-medium ${getAverageColor(course.classAverage)}`}>
+            {course.classAverage !== undefined && course.classAverage !== null 
+              ? `${course.classAverage.toFixed(1)}%` 
+              : 'N/A'}
+          </span>
+        </div>
+      ),
+      className: 'whitespace-nowrap',
+      sortFn: (a, b) => {
+        const aAvg = a.classAverage ?? -1;
+        const bAvg = b.classAverage ?? -1;
+        return aAvg - bAvg;
+      }
+    },
+    {
+      key: 'updatedAt',
+      label: 'Updated',
+      sortable: true,
+      render: (course) => formatDate(course.updatedAt),
+      className: 'whitespace-nowrap text-gray-500 dark:text-gray-400',
+      sortFn: (a, b) => {
+        return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+      }
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      sortable: false,
+      render: (course) => (
+        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={() => handleCourseAction('edit', course)}
+            className="text-yellow-600 dark:text-yellow-400 hover:text-yellow-900 dark:hover:text-yellow-300"
+            title="Edit Course"
+          >
+            <Edit className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => handleCourseAction('view', course)}
+            className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300"
+            title="View Course"
+          >
+            <Eye className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => handleCourseAction('delete', course)}
+            className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
+            title="Delete Course"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      ),
+      className: 'whitespace-nowrap'
+    }
+  ], [navigate, handleCourseAction]);
 
   if (loading) {
     return (
@@ -348,115 +662,52 @@ export function TeacherCourseOversight() {
       </div>
 
       {/* Courses Table */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-900">
-              <tr>
-                <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Course
-                </th>
-                <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Published
-                </th>
-                <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Enrollment
-                </th>
-                <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Average
-                </th>
-                <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Updated
-                </th>
-                <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {filteredCourses.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-3 sm:px-4 lg:px-6 py-8 sm:py-12 text-center text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                    {searchTerm || statusFilter !== 'all' || publishedFilter !== 'all'
+      <DataTable<Course>
+        data={filteredCourses}
+        columns={teacherCourseColumns}
+        keyExtractor={(course) => course._id}
+        emptyMessage={
+          searchTerm || statusFilter !== 'all' || publishedFilter !== 'all'
                       ? 'No courses match your filters'
-                      : 'You haven\'t created any courses yet. Click "Create Course" to get started.'}
-                  </td>
-                </tr>
-              ) : (
-                filteredCourses.map((course) => (
-                  <tr key={course._id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
+            : 'You haven\'t created any courses yet. Click "Create Course" to get started.'
+        }
+        pageSize={25}
+        selectable={true}
+        selectedKeys={selectedCourseIds}
+        onSelectionChange={setSelectedCourseIds}
+        virtualScrolling={true}
+        virtualScrollingThreshold={100}
+        virtualScrollingHeight={600}
+        estimatedRowHeight={60}
+        bulkActions={
+          <>
                       <button
-                        onClick={() => navigate(`/courses/${course._id}`)}
-                        className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium text-left"
-                      >
-                        {course.catalog?.courseCode || course.title}
-                      </button>
-                    </td>
-                    <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(course.status)}`}>
-                        {course.status}
-                      </span>
-                    </td>
-                    <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getPublishedColor(course.published)}`}>
-                        {course.published ? 'Published' : 'Unpublished'}
-                      </span>
-                    </td>
-                    <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
-                      <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                        <span className="text-sm text-gray-900 dark:text-gray-100">{course.enrollmentCount || 0}</span>
-                      </div>
-                    </td>
-                    <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
-                      <div className="flex items-center gap-2">
-                        <TrendingUp className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                        <span className={`text-sm font-medium ${getAverageColor(course.classAverage)}`}>
-                          {course.classAverage !== undefined && course.classAverage !== null 
-                            ? `${course.classAverage.toFixed(1)}%` 
-                            : 'N/A'}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {formatDate(course.updatedAt)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleCourseAction('edit', course)}
-                          className="text-yellow-600 dark:text-yellow-400 hover:text-yellow-900 dark:hover:text-yellow-300"
-                          title="Edit Course"
-                        >
-                          <Edit className="h-4 w-4" />
+              onClick={handleBulkPublish}
+              disabled={bulkActionLoading}
+              className="px-3 py-1.5 text-xs sm:text-sm bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 rounded hover:bg-green-200 dark:hover:bg-green-900/70 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+            >
+              <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
+              Publish
                         </button>
                         <button
-                          onClick={() => handleCourseAction('view', course)}
-                          className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300"
-                          title="View Course"
+              onClick={handleBulkUnpublish}
+              disabled={bulkActionLoading}
+              className="px-3 py-1.5 text-xs sm:text-sm bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-300 rounded hover:bg-yellow-200 dark:hover:bg-yellow-900/70 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                         >
-                          <Eye className="h-4 w-4" />
+              <EyeOff className="w-3 h-3 sm:w-4 sm:h-4" />
+              Unpublish
                         </button>
-                        <button
-                          onClick={() => handleCourseAction('delete', course)}
-                          className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
-                          title="Delete Course"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+          </>
+        }
+        onRowClick={(course, e) => {
+          // Don't navigate if clicking on buttons
+          const target = e.target as HTMLElement;
+          if (target.tagName === 'BUTTON' || target.closest('button')) {
+            return;
+          }
+          navigate(`/courses/${course._id}`);
+        }}
+      />
 
       {/* Edit Course Modal */}
       {showCourseModal && selectedCourse && (
@@ -517,6 +768,27 @@ export function TeacherCourseOversight() {
           </div>
         </div>
       )}
+
+      {/* Delete Course Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setCourseToDelete(null);
+        }}
+        onConfirm={() => {
+          if (courseToDelete) {
+            handleDeleteCourse(courseToDelete._id);
+            setShowDeleteConfirm(false);
+            setCourseToDelete(null);
+          }
+        }}
+        title="Delete Course"
+        message={`Are you sure you want to delete "${courseToDelete?.title}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
       </div>
     </div>
   );

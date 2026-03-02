@@ -33,10 +33,10 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({
   }
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
-      <div className="relative flex items-center justify-between px-4 py-3">
+    <nav className="fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm safe-area-inset-top">
+      <div className="relative flex items-center justify-between px-4 py-3 gap-2">
         {/* Course Dropdown */}
-        <div className="relative flex-1 max-w-[60%]">
+        <div className="relative flex-1 max-w-[60%] min-w-0">
           <button
             onClick={() => setShowCourseDropdown(!showCourseDropdown)}
             className="flex items-center justify-between w-full px-3 py-2 text-left bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors touch-manipulation"

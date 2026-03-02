@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 import { API_URL } from '../config';
+import DatePicker from './common/DatePicker';
 
 // Attendance status types
 const ATTENDANCE_STATUSES = {
@@ -493,6 +494,9 @@ const Attendance: React.FC = () => {
         attendanceData: attendanceData.filter(record => record.status !== ATTENDANCE_STATUSES.UNMARKED)
       }, { headers });
       
+      // Refresh attendance percentages after successful save
+      fetchAttendancePercentages();
+      
       alert('Attendance saved successfully!');
     } catch (error: any) {
       alert('Error saving attendance: ' + (error.response?.data?.message || error.message));
@@ -541,6 +545,9 @@ const Attendance: React.FC = () => {
       
       
       const response = await axios.post(`${API_URL}/api/courses/${courseId}/attendance`, requestData, { headers });
+      
+      // Refresh attendance percentages after successful save
+      fetchAttendancePercentages();
       
     } catch (error: any) {
       // Don't show alert for auto-save errors to avoid spam
@@ -987,16 +994,14 @@ const Attendance: React.FC = () => {
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-2 sm:gap-3">
             <Calendar className="h-5 w-5 text-gray-500 dark:text-gray-400 flex-shrink-0" />
-            <label htmlFor="attendance-date" className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
-              Select Date:
-            </label>
-            <input
-              type="date"
-              id="attendance-date"
-              value={selectedDate}
-              onChange={(e) => handleDateChange(e.target.value)}
-              className="flex-1 border border-gray-300 dark:border-gray-700 rounded-md px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
-            />
+            <div className="flex-1">
+              <DatePicker
+                id="attendance-date"
+                label="Select Date"
+                value={selectedDate}
+                onChange={(e) => handleDateChange(e.target.value)}
+              />
+            </div>
           </div>
           
           {isInstructor && (
@@ -1272,8 +1277,10 @@ const Attendance: React.FC = () => {
                                 : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
                             }`}
                             title={config.label}
+                            aria-label={`Set attendance to ${config.label} for ${record.studentName || 'student'}`}
+                            aria-pressed={record.status === status}
                           >
-                            <Icon className="h-4 w-4 sm:h-4 sm:w-4" />
+                            <Icon className="h-4 w-4 sm:h-4 sm:w-4" aria-hidden="true" />
                             {record.status === status && (
                               <span className="text-xs sm:hidden">{config.label}</span>
                             )}
@@ -1402,22 +1409,20 @@ const Attendance: React.FC = () => {
               <div>
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Date Range</label>
                 <div className="flex gap-2 mt-1">
-                  <div>
-                    <label className="text-xs text-gray-500 dark:text-gray-400">Start Date</label>
-                    <input
-                      type="date"
+                  <div className="flex-1">
+                    <DatePicker
+                      id="export-start-date"
+                      label="Start Date"
                       value={exportDateRange.startDate}
                       onChange={(e) => setExportDateRange(prev => ({ ...prev, startDate: e.target.value }))}
-                      className="w-full border border-gray-300 dark:border-gray-700 rounded-md px-3 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm"
                     />
                   </div>
-                  <div>
-                    <label className="text-xs text-gray-500 dark:text-gray-400">End Date</label>
-                    <input
-                      type="date"
+                  <div className="flex-1">
+                    <DatePicker
+                      id="export-end-date"
+                      label="End Date"
                       value={exportDateRange.endDate}
                       onChange={(e) => setExportDateRange(prev => ({ ...prev, endDate: e.target.value }))}
-                      className="w-full border border-gray-300 dark:border-gray-700 rounded-md px-3 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm"
                     />
                   </div>
                 </div>

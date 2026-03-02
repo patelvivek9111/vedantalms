@@ -7,6 +7,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import CreatePageForm from './CreatePageForm';
 import axios from 'axios';
 import { API_URL } from '../config';
+import ConfirmationModal from './common/ConfirmationModal';
 
 // Vite env type for TypeScript
 interface ImportMeta {
@@ -49,6 +50,11 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
   const [discussions, setDiscussions] = useState<any[]>([]);
   const [isLoadingDiscussions, setIsLoadingDiscussions] = useState(false);
   const [discussionsError, setDiscussionsError] = useState<string | null>(null);
+  // Confirmation modal states
+  const [showDeletePageConfirm, setShowDeletePageConfirm] = useState(false);
+  const [showDeleteAssignmentConfirm, setShowDeleteAssignmentConfirm] = useState(false);
+  const [showDeleteModuleConfirm, setShowDeleteModuleConfirm] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<{ type: 'page' | 'assignment' | 'module'; id: string } | null>(null);
 
   useEffect(() => {
     const fetchPages = async () => {
@@ -162,31 +168,43 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
     }
   };
 
-  const handleDeletePage = async (pageId: string) => {
-    if (window.confirm('Are you sure you want to delete this page?')) {
+  const handleDeletePage = (pageId: string) => {
+    setItemToDelete({ type: 'page', id: pageId });
+    setShowDeletePageConfirm(true);
+  };
+
+  const confirmDeletePage = async () => {
+    if (!itemToDelete || itemToDelete.type !== 'page') return;
+    setShowDeletePageConfirm(false);
       try {
         const token = localStorage.getItem('token');
-        await axios.delete(`${API_URL}/api/pages/${pageId}`, {
+      await axios.delete(`${API_URL}/api/pages/${itemToDelete.id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        setPages(pages.filter((p) => p._id !== pageId));
+      setPages(pages.filter((p) => p._id !== itemToDelete.id));
+      setItemToDelete(null);
       } catch (err) {
         alert('Error deleting page');
       }
-    }
   };
 
-  const handleDeleteAssignment = async (assignmentId: string) => {
-    if (window.confirm('Are you sure you want to delete this assignment?')) {
+  const handleDeleteAssignment = (assignmentId: string) => {
+    setItemToDelete({ type: 'assignment', id: assignmentId });
+    setShowDeleteAssignmentConfirm(true);
+  };
+
+  const confirmDeleteAssignment = async () => {
+    if (!itemToDelete || itemToDelete.type !== 'assignment') return;
+    setShowDeleteAssignmentConfirm(false);
       try {
         const token = localStorage.getItem('token');
-        await axios.delete(`${API_URL}/api/assignments/${assignmentId}`, {
+      await axios.delete(`${API_URL}/api/assignments/${itemToDelete.id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        setAssignments(assignments.filter((a) => a._id !== assignmentId));
+      setAssignments(assignments.filter((a) => a._id !== itemToDelete.id));
+      setItemToDelete(null);
       } catch (err) {
         alert('Error deleting assignment');
-      }
     }
   };
 
@@ -231,9 +249,8 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
               <button
                 onClick={e => {
                   e.stopPropagation();
-                  if (window.confirm('Are you sure you want to delete this module? This will remove all its pages and assignments.')) {
-                    deleteModule(module._id, module.course);
-                  }
+                  setItemToDelete({ type: 'module', id: module._id });
+                  setShowDeleteModuleConfirm(true);
                 }}
                 className="p-1.5 sm:p-1 hover:bg-red-100 dark:hover:bg-red-900/50 active:bg-red-200 dark:active:bg-red-900/70 rounded text-red-600 dark:text-red-400 touch-manipulation"
                 title="Delete Module"
@@ -454,6 +471,57 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
           <PageViewer pageId={selectedPage} />
         </div>
       )}
+
+      {/* Delete Page Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeletePageConfirm}
+        onClose={() => {
+          setShowDeletePageConfirm(false);
+          setItemToDelete(null);
+        }}
+        onConfirm={confirmDeletePage}
+        title="Delete Page"
+        message="Are you sure you want to delete this page? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
+
+      {/* Delete Assignment Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteAssignmentConfirm}
+        onClose={() => {
+          setShowDeleteAssignmentConfirm(false);
+          setItemToDelete(null);
+        }}
+        onConfirm={confirmDeleteAssignment}
+        title="Delete Assignment"
+        message="Are you sure you want to delete this assignment? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
+
+      {/* Delete Module Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteModuleConfirm}
+        onClose={() => {
+          setShowDeleteModuleConfirm(false);
+          setItemToDelete(null);
+        }}
+        onConfirm={() => {
+          if (itemToDelete && itemToDelete.type === 'module') {
+            deleteModule(itemToDelete.id, module.course);
+            setShowDeleteModuleConfirm(false);
+            setItemToDelete(null);
+          }
+        }}
+        title="Delete Module"
+        message="Are you sure you want to delete this module? This will remove all its pages and assignments. This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </div>
   );
 };

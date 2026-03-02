@@ -5,6 +5,7 @@ import { getAnnouncements, createAnnouncement, getAnnouncementComments, postAnno
 import { useAuth } from '../context/AuthContext';
 import { useState as useReactState } from 'react';
 import { ThumbsUp, Info, Lightbulb } from 'lucide-react';
+import ConfirmationModal from '../components/common/ConfirmationModal';
 
 interface AnnouncementsProps {
   courseId: string;
@@ -29,6 +30,7 @@ const Announcements: React.FC<AnnouncementsProps> = ({ courseId }) => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentText, setCommentText] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState<{ [key: string]: string }>({});
   const [posting, setPosting] = useState(false);
@@ -160,9 +162,14 @@ const Announcements: React.FC<AnnouncementsProps> = ({ courseId }) => {
     }
   };
 
-  const handleDeleteAnnouncement = async () => {
+  const handleDeleteAnnouncement = () => {
     if (!selectedAnnouncement) return;
-    if (!window.confirm('Are you sure you want to delete this announcement?')) return;
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteAnnouncement = async () => {
+    if (!selectedAnnouncement) return;
+    setShowDeleteConfirm(false);
     setFormLoading(true);
     setError(null);
     try {
@@ -418,6 +425,19 @@ const Announcements: React.FC<AnnouncementsProps> = ({ courseId }) => {
           <AnnouncementList announcements={announcements} onSelect={setSelectedAnnouncement} />
         )
       )}
+
+      {/* Delete Announcement Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmDeleteAnnouncement}
+        title="Delete Announcement"
+        message="Are you sure you want to delete this announcement? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={formLoading}
+      />
     </div>
   );
 };

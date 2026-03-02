@@ -1,10 +1,12 @@
 const Submission = require('../models/Submission');
 const Assignment = require('../models/Assignment');
 const Group = require('../models/Group');
+const Course = require('../models/course.model');
 const fs = require('fs').promises;
 const path = require('path');
 const Module = require('../models/module.model');
 const { deleteFromCloudinary, extractPublicId, isCloudinaryConfigured } = require('../utils/cloudinary');
+const { createNotification } = require('../routes/notification.routes');
 
 // Submit an assignment
 exports.submitAssignment = async (req, res) => {
@@ -255,6 +257,28 @@ exports.createSubmission = async (req, res) => {
       }
       
       await submission.save();
+    }
+
+    // Notify teacher about new submission
+    try {
+      const assignmentWithCourse = await Assignment.findById(assignment).populate('course', 'instructor');
+      if (assignmentWithCourse && assignmentWithCourse.course && assignmentWithCourse.course.instructor) {
+        const instructorId = assignmentWithCourse.course.instructor._id || assignmentWithCourse.course.instructor;
+        const studentName = `${req.user.firstName} ${req.user.lastName}`;
+        
+        await createNotification(instructorId, {
+          type: 'submission',
+          title: 'New Assignment Submission',
+          message: `${studentName} submitted "${assignmentWithCourse.title}"`,
+          link: `/courses/${assignmentWithCourse.course._id}/assignments/${assignment._id}/grading`,
+          relatedId: submission._id,
+          relatedType: 'submission',
+          priority: 'medium'
+        });
+      }
+    } catch (notifError) {
+      console.error('Error creating submission notification:', notifError);
+      // Don't fail the submission if notification fails
     }
 
     res.status(201).json(submission);
@@ -741,15 +765,28 @@ exports.gradeSubmission = async (req, res) => {
           Object.entries(questionGrades).map(([key, value]) => [key, parseFloat(value) || 0])
         );
         
-        // Recalculate final grade based on manual grades
+        // Recalculate final grade combining manual grades with auto-grades
         const assignment = await Assignment.findById(submission.assignment);
         if (assignment && assignment.questions) {
           let earnedPoints = 0;
           
           for (let i = 0; i < assignment.questions.length; i++) {
-            const teacherGrade = submission.questionGrades.get(i.toString());
+            const questionIndex = i.toString();
+            
+            // Check if there's a manual grade override
+            const teacherGrade = submission.questionGrades.get(questionIndex);
             if (teacherGrade !== undefined) {
+              // Use manual grade if provided
               earnedPoints += teacherGrade;
+            } else {
+              // If no manual grade, use auto-grade if available
+              let autoGrade = 0;
+              if (submission.autoQuestionGrades instanceof Map) {
+                autoGrade = submission.autoQuestionGrades.get(questionIndex) || 0;
+              } else if (submission.autoQuestionGrades && typeof submission.autoQuestionGrades === 'object') {
+                autoGrade = submission.autoQuestionGrades[questionIndex] || 0;
+              }
+              earnedPoints += autoGrade;
             }
           }
           
@@ -786,10 +823,142 @@ exports.gradeSubmission = async (req, res) => {
       .populate('memberGrades.student', 'firstName lastName email')
       .populate('memberGrades.gradedBy', 'firstName lastName');
 
-    res.json(populatedSubmission);
+    // Notify student when assignment is graded
+    // Initialize notificationCreated outside the if block
+    let notificationCreated = false;
+    
+    if (submission.teacherApproved) {
+      try {
+        const { createNotification } = require('../routes/notification.routes');
+        // Get assignment without populating course (course might not be in schema)
+        const assignmentDoc = await Assignment.findById(submission.assignment);
+        
+        // Get student ID - handle both populated and unpopulated cases
+        let studentId = null;
+        if (populatedSubmission.student) {
+          studentId = populatedSubmission.student._id || populatedSubmission.student;
+        } else if (submission.student) {
+          studentId = submission.student._id || submission.student;
+        }
+        
+        if (studentId) {
+          const studentName = populatedSubmission.student ? 
+            `${populatedSubmission.student.firstName} ${populatedSubmission.student.lastName}` : 'Student';
+          const grade = submission.finalGrade || submission.grade || submission.autoGrade || 0;
+          const assignmentTitle = assignmentDoc ? assignmentDoc.title : 'Assignment';
+          
+          // Get course ID and course code from assignment through module (Assignment -> Module -> Course)
+          let courseId = null;
+          let courseCode = null;
+          if (assignmentDoc && assignmentDoc.module) {
+            const Module = require('../models/module.model');
+            const module = await Module.findById(assignmentDoc.module).populate('course');
+            if (module && module.course) {
+              courseId = module.course._id || module.course;
+              
+              // Get course details to extract course code
+              const Course = require('../models/course.model');
+              const courseDoc = await Course.findById(courseId).select('catalog.courseCode');
+              if (courseDoc && courseDoc.catalog && courseDoc.catalog.courseCode) {
+                courseCode = courseDoc.catalog.courseCode;
+              }
+            }
+          }
+          
+          // Ensure studentId is ObjectId format (not string)
+          const mongoose = require('mongoose');
+          const studentObjectId = mongoose.Types.ObjectId.isValid(studentId) ? 
+            (typeof studentId === 'string' ? new mongoose.Types.ObjectId(studentId) : studentId) : 
+            studentId;
+          
+          // Build notification message with course code if available
+          let notificationMessage = `Your submission for "${assignmentTitle}" has been graded. You received ${grade} points.`;
+          if (courseCode) {
+            notificationMessage = `[${courseCode}] Your submission for "${assignmentTitle}" has been graded. You received ${grade} points.`;
+          }
+          
+          const notification = await createNotification(studentObjectId, {
+            type: 'assignment_graded',
+            title: 'Assignment Graded',
+            message: notificationMessage,
+            link: courseId ? 
+              `/courses/${courseId}/assignments/${assignmentDoc._id}` : null,
+            relatedId: assignmentDoc ? assignmentDoc._id : null,
+            relatedType: 'assignment',
+            priority: 'high'
+          });
+          
+          if (notification) {
+            notificationCreated = true;
+          }
+        }
+      } catch (notifError) {
+        console.error('Error creating grade notification:', notifError);
+        // Don't fail the grading if notification fails
+      }
+    }
+
+    // Add notification status to response
+    let responseData;
+    try {
+      if (populatedSubmission && typeof populatedSubmission.toObject === 'function') {
+        responseData = populatedSubmission.toObject();
+      } else if (populatedSubmission && typeof populatedSubmission === 'object') {
+        responseData = { ...populatedSubmission };
+      } else {
+        responseData = populatedSubmission;
+      }
+      
+      // Ensure responseData is an object
+      if (!responseData || typeof responseData !== 'object') {
+        responseData = {};
+      }
+      
+      // Ensure Map fields are properly converted to plain objects
+      // Mongoose Maps need explicit conversion for JSON serialization
+      if (populatedSubmission) {
+        // Convert autoQuestionGrades Map to plain object if it exists
+        if (populatedSubmission.autoQuestionGrades instanceof Map) {
+          responseData.autoQuestionGrades = Object.fromEntries(populatedSubmission.autoQuestionGrades);
+        } else if (populatedSubmission.autoQuestionGrades && typeof populatedSubmission.autoQuestionGrades === 'object') {
+          // Already an object, ensure it's a plain object (not a Mongoose Map wrapper)
+          responseData.autoQuestionGrades = { ...populatedSubmission.autoQuestionGrades };
+        }
+        
+        // Convert questionGrades Map to plain object if it exists
+        if (populatedSubmission.questionGrades instanceof Map) {
+          responseData.questionGrades = Object.fromEntries(populatedSubmission.questionGrades);
+        } else if (populatedSubmission.questionGrades && typeof populatedSubmission.questionGrades === 'object') {
+          responseData.questionGrades = { ...populatedSubmission.questionGrades };
+        }
+        
+        // Convert answers Map to plain object if it exists
+        if (populatedSubmission.answers instanceof Map) {
+          responseData.answers = Object.fromEntries(populatedSubmission.answers);
+        } else if (populatedSubmission.answers && typeof populatedSubmission.answers === 'object') {
+          responseData.answers = { ...populatedSubmission.answers };
+        }
+      }
+      
+      responseData.notificationCreated = notificationCreated || false;
+      responseData.teacherApproved = submission.teacherApproved || false;
+      
+      res.json(responseData);
+    } catch (responseError) {
+      console.error('Error formatting response:', responseError);
+      // Fallback: send basic response
+      res.json({
+        ...(populatedSubmission || {}),
+        notificationCreated: notificationCreated || false,
+        teacherApproved: submission.teacherApproved || false
+      });
+    }
   } catch (error) {
     console.error('Error grading submission:', error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ 
+      message: error.message || 'Error grading submission',
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 };
 

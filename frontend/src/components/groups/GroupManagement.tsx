@@ -3,8 +3,9 @@ import axios from 'axios';
 import { API_URL } from '../../config';
 import { Plus, Users, Trash2, Edit2, UserPlus, Shuffle, MessageSquare, Activity, ChevronDown, ChevronUp } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../../services/api';
+import ConfirmationModal from '../common/ConfirmationModal';
 
 interface GroupSet {
   _id: string;
@@ -54,10 +55,12 @@ interface GroupActivity {
 }
 
 const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
+  const location = useLocation();
   const [groupSets, setGroupSets] = useState<GroupSet[]>([]);
   const [selectedSet, setSelectedSet] = useState<GroupSet | null>(null);
   const [groups, setGroups] = useState<Group[]>([]);
   const [students, setStudents] = useState<User[]>([]);
+  const [course, setCourse] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreateSetModal, setShowCreateSetModal] = useState(false);
@@ -75,6 +78,8 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
   const [groupActivity, setGroupActivity] = useState<GroupActivity | null>(null);
   const [messageSubject, setMessageSubject] = useState('');
   const [messageContent, setMessageContent] = useState('');
+  const [showDeleteGroupConfirm, setShowDeleteGroupConfirm] = useState(false);
+  const [groupToDelete, setGroupToDelete] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [groupStructure, setGroupStructure] = useState('manual');
   const [groupCount, setGroupCount] = useState(2);
@@ -87,12 +92,16 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
     const fetchData = async () => {
       try {
         const token = localStorage.getItem('token');
-        const [setsRes, studentsRes] = await Promise.all([
+        const [setsRes, studentsRes, courseRes] = await Promise.all([
           api.get(`/groups/sets/${courseId}`),
-          api.get(`/courses/${courseId}/students`)
+          api.get(`/courses/${courseId}/students`),
+          api.get(`/courses/${courseId}`)
         ]);
         setGroupSets(setsRes.data);
         setStudents(studentsRes.data);
+        if (courseRes.data.success) {
+          setCourse(courseRes.data.data);
+        }
       } catch (err: any) {
         setError(err.response?.data?.message || 'Error loading data');
       } finally {
@@ -218,14 +227,21 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
     }
   };
 
-  const handleDeleteGroup = async (groupId: string) => {
-    if (!confirm('Are you sure you want to delete this group?')) return;
+  const handleDeleteGroup = (groupId: string) => {
+    setGroupToDelete(groupId);
+    setShowDeleteGroupConfirm(true);
+  };
+
+  const confirmDeleteGroup = async () => {
+    if (!groupToDelete) return;
+    setShowDeleteGroupConfirm(false);
     try {
       const token = localStorage.getItem('token');
-      await api.delete(`/groups/${groupId}`, {
+      await api.delete(`/groups/${groupToDelete}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setGroups(groups.filter(g => g._id !== groupId));
+      setGroups(groups.filter(g => g._id !== groupToDelete));
+      setGroupToDelete(null);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error deleting group');
     }
@@ -947,6 +963,21 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
           </div>
         </div>
       )}
+
+      {/* Delete Group Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteGroupConfirm}
+        onClose={() => {
+          setShowDeleteGroupConfirm(false);
+          setGroupToDelete(null);
+        }}
+        onConfirm={confirmDeleteGroup}
+        title="Delete Group"
+        message="Are you sure you want to delete this group?"
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </div>
   );
 };

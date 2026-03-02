@@ -181,7 +181,7 @@ const GroupSetView: React.FC = () => {
                   </div>
                 )}
                 
-                <div className={`flex gap-2 ${isMobileDevice ? 'mt-3' : 'mt-4'}`}>
+                <div className={`flex gap-3 sm:gap-2 ${isMobileDevice ? 'mt-3' : 'mt-4'}`}>
                   <button
                     className={`flex-1 ${isMobileDevice ? 'px-4 py-2.5' : 'px-3 py-2'} bg-blue-600 dark:bg-blue-500 text-white ${isMobileDevice ? 'rounded-lg' : 'rounded-md'} hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors duration-200 ${isMobileDevice ? 'text-sm' : 'text-xs sm:text-sm'} font-medium`}
                     onClick={() => navigate(`/groups/${group._id}`)}

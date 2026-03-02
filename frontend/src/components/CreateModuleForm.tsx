@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useModule } from '../contexts/ModuleContext';
+import FloatingLabelInput from './common/FloatingLabelInput';
 
 interface CreateModuleFormProps {
   courseId: string;
@@ -10,16 +11,36 @@ interface CreateModuleFormProps {
 const CreateModuleForm: React.FC<CreateModuleFormProps> = ({ courseId, onSuccess, onCancel }) => {
   const [title, setTitle] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({});
   const { createModule } = useModule();
+
+  // Validation
+  const validateTitle = (value: string) => {
+    if (!value.trim()) {
+      setFieldErrors(prev => ({ ...prev, title: 'Module title is required' }));
+      return false;
+    }
+    setFieldErrors(prev => {
+      const newErrors = { ...prev };
+      delete newErrors.title;
+      return newErrors;
+    });
+    return true;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    
+    const isTitleValid = validateTitle(title);
+    if (!isTitleValid) {
+      return;
+    }
 
     setIsSubmitting(true);
     try {
       await createModule(courseId, { title, description: '' });
       setTitle('');
+      setFieldErrors({});
       onSuccess();
     } catch (error) {
       } finally {
@@ -35,16 +56,20 @@ const CreateModuleForm: React.FC<CreateModuleFormProps> = ({ courseId, onSuccess
   return (
     <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-lg shadow mb-4 border dark:border-gray-700">
       <div className="mb-3 sm:mb-4">
-        <label htmlFor="title" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Module Title
-        </label>
-        <input
-          type="text"
+        <FloatingLabelInput
           id="title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="w-full px-3 py-2 text-sm sm:text-base border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+          type="text"
+          label="Module Title"
           required
+          value={title}
+          onChange={(e) => {
+            setTitle(e.target.value);
+            if (fieldErrors.title) {
+              validateTitle(e.target.value);
+            }
+          }}
+          onBlur={(e) => validateTitle(e.target.value)}
+          error={fieldErrors.title}
         />
       </div>
       <div className="flex flex-col sm:flex-row justify-end gap-2 sm:space-x-2">

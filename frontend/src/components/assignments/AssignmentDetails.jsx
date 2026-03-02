@@ -18,6 +18,7 @@ const AssignmentDetails = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [answers, setAnswers] = useState({});
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user'));
@@ -94,8 +95,12 @@ const AssignmentDetails = () => {
     }
   };
 
-  const handleDelete = async () => {
-    if (window.confirm('Are you sure you want to delete this assignment?')) {
+  const handleDelete = () => {
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    setShowDeleteConfirm(false);
       try {
         const token = localStorage.getItem('token');
         await axios.delete(`${API_URL}/api/assignments/${id}`, {
@@ -106,7 +111,6 @@ const AssignmentDetails = () => {
         navigate(-1);
       } catch (err) {
         setError('Error deleting assignment');
-      }
     }
   };
 
@@ -161,7 +165,7 @@ const AssignmentDetails = () => {
               )}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2 sm:gap-4 w-full sm:w-auto">
+          <div className="flex flex-wrap gap-3 sm:gap-4 w-full sm:w-auto">
             {(userRole === 'teacher' || userRole === 'admin') && (
               <>
                 <button
@@ -342,6 +346,18 @@ const AssignmentDetails = () => {
           </>
         )}
       </div>
+
+      {/* Delete Assignment Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmDelete}
+        title="Delete Assignment"
+        message="Are you sure you want to delete this assignment? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </div>
   );
 };

@@ -6,6 +6,7 @@ import { API_URL } from '../../config';
 import { AssignmentCard } from '../CourseDetail';
 import GroupPages from './GroupPages';
 import GroupAnnouncements from './GroupAnnouncements';
+import Breadcrumb from '../common/Breadcrumb';
 
 const tabs = [
   { name: 'Home', path: 'home', icon: Home },
@@ -30,6 +31,9 @@ export default function GroupDashboard() {
   const [assignments, setAssignments] = useState<any[]>([]);
   const [assignmentsLoading, setAssignmentsLoading] = useState(false);
   const [courseId, setCourseId] = useState('');
+  const [course, setCourse] = useState<any>(null);
+  const [pageTitle, setPageTitle] = useState<string>('');
+  const [threadTitle, setThreadTitle] = useState<string>('');
 
   // Add user role detection (assume user is stored in localStorage)
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -58,11 +62,15 @@ export default function GroupDashboard() {
     : pathSegments[pathSegments.length - 1];
   
   // Only show one section at a time based on the last path segment
+  // Check if we're viewing a page (pages/:pageId) vs the pages list (pages)
+  const isViewingPage = currentPath.match(/\/groups\/[^/]+\/pages\/[^/]+$/);
+  // Check if we're viewing a thread (discussion/:threadId) vs the discussion list (discussion)
+  const isViewingThread = currentPath.match(/\/groups\/[^/]+\/discussion\/[^/]+$/);
+  const isPages = lastSegment === 'pages' && !isViewingPage;
   const isAssignments = lastSegment === 'assignments';
-  const isPages = lastSegment === 'pages';
   const isAnnouncements = lastSegment === 'announcements';
   const isHome = lastSegment === 'home' || lastSegment === groupId || !lastSegment || groupIndex === pathSegments.length - 1;
-  const isDiscussion = lastSegment === 'discussion' && !currentPath.includes('/discussion/');
+  const isDiscussion = lastSegment === 'discussion' && !isViewingThread;
   const isPeople = lastSegment === 'people';
 
   useEffect(() => {
@@ -78,7 +86,22 @@ export default function GroupDashboard() {
         setGroupName(res.data.name || 'Group');
         setGroupSetId(res.data.groupSet);
         setGroupSetName(res.data.groupSetName || 'Group Set');
-        setCourseId(res.data.course?._id || res.data.course || '');
+        const fetchedCourseId = res.data.course?._id || res.data.course || '';
+        setCourseId(fetchedCourseId);
+        
+        // Fetch course data for breadcrumb
+        if (fetchedCourseId) {
+          try {
+            const courseRes = await axios.get(`${API_URL}/api/courses/${fetchedCourseId}`, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            if (courseRes.data.success) {
+              setCourse(courseRes.data.data);
+            }
+          } catch (err) {
+            // Silently fail - course name is optional
+          }
+        }
       } catch (err) {
         setGroupName('Group');
         setGroupSetName('Group Set');
@@ -125,6 +148,56 @@ export default function GroupDashboard() {
     };
     fetchGroupAssignments();
   }, [groupSetId]);
+
+  // Fetch page title when viewing a page
+  useEffect(() => {
+    const fetchPageTitle = async () => {
+      if (!isViewingPage || !groupId) return;
+      
+      try {
+        const pathSegments = location.pathname.split('/').filter(Boolean);
+        const pageIdIndex = pathSegments.findIndex(seg => seg === 'pages');
+        if (pageIdIndex >= 0 && pageIdIndex < pathSegments.length - 1) {
+          const pageId = pathSegments[pageIdIndex + 1];
+          const token = localStorage.getItem('token');
+          const res = await axios.get(`${API_URL}/api/pages/${pageId}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (res.data.success) {
+            setPageTitle(res.data.data.title || 'Page');
+          }
+        }
+      } catch (err) {
+        setPageTitle('Page');
+      }
+    };
+    fetchPageTitle();
+  }, [isViewingPage, location.pathname, groupId]);
+
+  // Fetch thread title when viewing a thread
+  useEffect(() => {
+    const fetchThreadTitle = async () => {
+      if (!isViewingThread || !groupId) return;
+      
+      try {
+        const pathSegments = location.pathname.split('/').filter(Boolean);
+        const threadIdIndex = pathSegments.findIndex(seg => seg === 'discussion');
+        if (threadIdIndex >= 0 && threadIdIndex < pathSegments.length - 1) {
+          const threadId = pathSegments[threadIdIndex + 1];
+          const token = localStorage.getItem('token');
+          const res = await axios.get(`${API_URL}/api/threads/${threadId}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (res.data.success) {
+            setThreadTitle(res.data.data.title || 'Thread');
+          }
+        }
+      } catch (err) {
+        setThreadTitle('Thread');
+      }
+    };
+    fetchThreadTitle();
+  }, [isViewingThread, location.pathname, groupId]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -188,15 +261,6 @@ export default function GroupDashboard() {
       )}
 
       <div className={`max-w-6xl mx-auto py-4 sm:py-6 lg:py-8 flex flex-col gap-4 px-4 sm:px-6 ${isMobileDevice ? 'pt-16' : ''}`}>
-        {/* Simple Breadcrumb - Desktop Only */}
-        {!isMobileDevice && (
-          <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-500 dark:text-gray-400 mb-4 px-1">
-            <Link to="/groups" className="hover:underline text-gray-700 dark:text-gray-300 font-medium">Group Management</Link>
-            <span className="mx-1 text-gray-300 dark:text-gray-600">&gt;</span>
-            <span className="text-gray-700 dark:text-gray-300 font-semibold truncate">{groupName}</span>
-          </div>
-        )}
-        
         <div className="flex flex-col lg:flex-row gap-4 lg:gap-8">
           {/* Mobile Overlay */}
           {isMobileMenuOpen && isMobileDevice && (
@@ -309,6 +373,49 @@ export default function GroupDashboard() {
           </aside>
         {/* Main Content */}
         <main className={`flex-1 min-w-0 ${isMobileMenuOpen ? 'lg:overflow-auto overflow-hidden' : ''}`}>
+          {/* Breadcrumb Navigation - Desktop Only */}
+          {!isMobileDevice && course && courseId && (
+            <div className="mb-4">
+              <Breadcrumb
+                items={[
+                  { label: 'Dashboard', path: '/dashboard' },
+                  { label: 'Courses', path: '/courses' },
+                  { 
+                    label: course.catalog?.courseCode || course.title || 'Course', 
+                    path: `/courses/${courseId}` 
+                  },
+                  { 
+                    label: 'Groups', 
+                    path: `/courses/${courseId}/groups` 
+                  },
+                  { 
+                    label: groupSetName, 
+                    path: `/courses/${courseId}/groups` 
+                  },
+                  { 
+                    label: groupName, 
+                    path: `/groups/${groupId}` 
+                  },
+                  ...(isViewingPage ? [{
+                    label: 'Pages',
+                    path: `/groups/${groupId}/pages`
+                  }, {
+                    label: pageTitle || 'Page',
+                    path: location.pathname
+                  }] : isViewingThread ? [{
+                    label: 'Discussion',
+                    path: `/groups/${groupId}/discussion`
+                  }, {
+                    label: threadTitle || 'Thread',
+                    path: location.pathname
+                  }] : lastSegment && lastSegment !== groupId && lastSegment !== 'home' ? [{
+                    label: tabs.find(t => t.path === lastSegment)?.name || lastSegment.charAt(0).toUpperCase() + lastSegment.slice(1),
+                    path: location.pathname
+                  }] : [])
+                ]}
+              />
+            </div>
+          )}
           {/* Only show one section at a time based on current path */}
           {isAssignments && (
             <div className={`w-full h-full overflow-y-auto ${isMobileDevice ? 'pb-20' : ''}`}>
@@ -367,6 +474,18 @@ export default function GroupDashboard() {
           )}
           {isAnnouncements && groupSetId && courseId && (
             <GroupAnnouncements groupSetId={groupSetId} courseId={courseId} />
+          )}
+          {/* Page view - render within group layout */}
+          {isViewingPage && (
+            <div className={`bg-white dark:bg-gray-800 ${isMobileDevice ? 'rounded-none shadow-none border-0' : 'rounded-xl shadow-sm border border-gray-200 dark:border-gray-700'}`}>
+              <Outlet context={{ groupSetId, setIsMobileMenuOpen, isMobileMenuOpen }} />
+            </div>
+          )}
+          {/* Thread view - render within group layout */}
+          {isViewingThread && (
+            <div className={`bg-white dark:bg-gray-800 ${isMobileDevice ? 'rounded-none shadow-none border-0' : 'rounded-xl shadow-sm border border-gray-200 dark:border-gray-700'}`}>
+              <Outlet context={{ groupSetId, setIsMobileMenuOpen, isMobileMenuOpen }} />
+            </div>
           )}
           {/* Other tab content (home, discussion, people) */}
           {(isHome || isDiscussion || isPeople) && (

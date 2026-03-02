@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
 import { API_URL } from '../../config';
 import CreateAssignmentForm from './CreateAssignmentForm';
+import Breadcrumb from '../common/Breadcrumb';
+import BackButton from '../common/BackButton';
 import { 
   ClipboardList, 
   BookOpen, 
@@ -19,8 +21,7 @@ import {
   ClipboardCheck,
   GraduationCap,
   Menu,
-  X,
-  ArrowLeft
+  X
 } from 'lucide-react';
 
 // Navigation items for the course sidebar
@@ -44,6 +45,7 @@ const navigationItems = [
 const CreateAssignmentWrapper: React.FC = () => {
   const { moduleId } = useParams<{ moduleId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const [course, setCourse] = useState<any>(null);
@@ -190,22 +192,14 @@ const CreateAssignmentWrapper: React.FC = () => {
     <div className="flex flex-col lg:flex-row w-full max-w-7xl mx-auto">
       {/* Top Navigation Bar (Mobile Only) */}
       <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
-        <div className="relative flex items-center justify-between px-4 py-3">
-          <button
-            onClick={() => {
-              if (course?._id) {
-                navigate(`/courses/${course._id}/assignments`);
-              } else {
-                navigate(-1);
-              }
-            }}
-            className="text-gray-700 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
-            aria-label="Go back"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Create Assignment</h1>
-          <div className="w-10"></div> {/* Spacer for centering */}
+        <div className="relative flex items-center justify-between px-4 py-3 gap-2">
+          <BackButton 
+            fallbackPath={course?._id ? `/courses/${course._id}/assignments` : '/dashboard'}
+            className="flex-shrink-0"
+            ariaLabel="Go back"
+          />
+          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100 flex-1 text-center">Create Assignment</h1>
+          <div className="w-10 flex-shrink-0"></div> {/* Spacer for centering */}
         </div>
       </nav>
 
@@ -247,6 +241,29 @@ const CreateAssignmentWrapper: React.FC = () => {
       {/* Main Content Area */}
       <div className="flex-1 overflow-x-hidden lg:ml-0 pt-16 lg:pt-0">
         <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6 overflow-x-hidden">
+          {/* Breadcrumb Navigation - Desktop Only */}
+          {course && (
+            <div className="hidden lg:block mb-4">
+              <Breadcrumb
+                items={[
+                  { label: 'Dashboard', path: '/dashboard' },
+                  { label: 'Courses', path: '/courses' },
+                  { 
+                    label: course.catalog?.courseCode || course.title || 'Course', 
+                    path: `/courses/${course._id}` 
+                  },
+                  { 
+                    label: isGradedQuiz ? 'Quizzes' : 'Assignments', 
+                    path: `/courses/${course._id}/${isGradedQuiz ? 'quizzes' : 'assignments'}` 
+                  },
+                  { 
+                    label: isGradedQuiz ? 'Create Quiz' : 'Create Assignment', 
+                    path: location.pathname 
+                  }
+                ]}
+              />
+            </div>
+          )}
           <CreateAssignmentForm moduleId={moduleId} />
         </div>
       </div>

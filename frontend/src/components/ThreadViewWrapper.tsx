@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { API_URL } from '../config';
 import ThreadView from './ThreadView';
+import Breadcrumb from './common/Breadcrumb';
 import { 
+  ArrowLeft,
   ClipboardList, 
   BookOpen, 
   FileText, 
@@ -18,9 +20,9 @@ import {
   ClipboardCheck,
   GraduationCap,
   Menu,
-  X,
-  ArrowLeft
+  X
 } from 'lucide-react';
+import { hapticNavigation } from '../utils/hapticFeedback';
 
 // Navigation items for the course sidebar
 const navigationItems = [
@@ -42,6 +44,7 @@ const navigationItems = [
 const ThreadViewWrapper: React.FC = () => {
   const { courseId, threadId, groupId } = useParams<{ courseId?: string; threadId: string; groupId?: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const [course, setCourse] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -184,25 +187,26 @@ const ThreadViewWrapper: React.FC = () => {
   return (
     <div className="flex flex-col lg:flex-row w-full max-w-7xl mx-auto">
       {/* Top Navigation Bar (Mobile Only) */}
-      <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
-        <div className="relative flex items-center justify-between px-4 py-3">
+      <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm safe-area-inset-top">
+        <div className="relative flex items-center justify-between px-4 py-3 gap-2">
           <button
             onClick={() => {
-              if (groupId) {
-                navigate(`/groups/${groupId}/discussion`);
-              } else if (courseId) {
-                navigate(`/courses/${courseId}/discussions`);
-              } else {
-                navigate(-1);
-              }
+              hapticNavigation();
+              navigate(
+                groupId 
+                  ? `/groups/${groupId}/discussion`
+                  : courseId 
+                    ? `/courses/${courseId}/discussions`
+                    : '/dashboard'
+              );
             }}
-            className="text-gray-700 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
+            className="text-gray-700 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
             aria-label="Go back to discussions"
           >
             <ArrowLeft className="w-6 h-6" />
           </button>
-          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Discussion</h1>
-          <div className="w-10"></div> {/* Spacer for centering */}
+          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100 flex-1 text-center">Discussion</h1>
+          <div className="w-10 flex-shrink-0"></div> {/* Spacer for centering */}
         </div>
       </nav>
 
@@ -242,6 +246,29 @@ const ThreadViewWrapper: React.FC = () => {
       {/* Main Content Area */}
       <div className="flex-1 overflow-auto lg:ml-0 pt-16 lg:pt-0">
         <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6">
+          {/* Breadcrumb Navigation - Desktop Only */}
+          {course && courseId && (
+            <div className="hidden lg:block mb-4">
+              <Breadcrumb
+                items={[
+                  { label: 'Dashboard', path: '/dashboard' },
+                  { label: 'Courses', path: '/courses' },
+                  { 
+                    label: course.catalog?.courseCode || course.title || 'Course', 
+                    path: `/courses/${courseId}` 
+                  },
+                  { 
+                    label: 'Discussions', 
+                    path: `/courses/${courseId}/discussions` 
+                  },
+                  { 
+                    label: 'Discussion Thread', 
+                    path: location.pathname 
+                  }
+                ]}
+              />
+            </div>
+          )}
           <ThreadView />
         </div>
       </div>

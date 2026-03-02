@@ -9,6 +9,10 @@ import { Edit, Reply, Archive, Trash2, Search, ChevronLeft, CheckSquare, Papercl
 import RichTextEditor from '../components/RichTextEditor';
 import { BurgerMenu } from '../components/BurgerMenu';
 import { useOnlineStatus, markUserOnline, markUserOffline } from '../hooks/useOnlineStatus';
+import ConfirmationModal from '../components/common/ConfirmationModal';
+import PullToRefresh from '../components/common/PullToRefresh';
+import SwipeableContainer from '../components/common/SwipeableContainer';
+import { useBottomNavSwipe } from '../hooks/useBottomNavSwipe';
 
 function capitalizeFirst(str: string) {
   return str.charAt(0).toUpperCase() + str.slice(1);
@@ -75,6 +79,10 @@ const Inbox: React.FC = () => {
   // Add state for selected conversations
   const [selectedConversations, setSelectedConversations] = useState<string[]>([]);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
+  // Confirmation modal states
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showDeleteForeverConfirm, setShowDeleteForeverConfirm] = useState(false);
+  const [isPermanentDelete, setIsPermanentDelete] = useState(false);
   // 2. Add showReplyBox state
   const [showReplyBox, setShowReplyBox] = useState(false);
 
@@ -128,26 +136,23 @@ const Inbox: React.FC = () => {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (selectedConversations.length === 0) {
       alert('Please select conversations to delete');
       return;
     }
-    if (selectedFolder === 'deleted') {
-      if (!confirm(`Are you sure you want to permanently delete ${selectedConversations.length} conversation(s)? This cannot be undone.`)) {
-        return;
-      }
-    } else {
-      if (!confirm(`Are you sure you want to delete ${selectedConversations.length} conversation(s)?`)) {
-        return;
-      }
-    }
+    setIsPermanentDelete(selectedFolder === 'deleted');
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    setShowDeleteConfirm(false);
     setBulkActionLoading(true);
     try {
       console.log('Deleting conversations:', selectedConversations);
       console.log('Selected folder:', selectedFolder);
       
-      if (selectedFolder === 'deleted') {
+      if (isPermanentDelete) {
         console.log('Calling bulkDeleteForever');
         await bulkDeleteForever(selectedConversations);
       } else {
@@ -169,14 +174,16 @@ const Inbox: React.FC = () => {
     }
   };
 
-  const handleDeleteForever = async () => {
+  const handleDeleteForever = () => {
     if (selectedConversations.length === 0) {
       alert('Please select conversations to permanently delete');
       return;
     }
-    if (!confirm(`Are you sure you want to permanently delete ${selectedConversations.length} conversation(s)? This cannot be undone.`)) {
-      return;
-    }
+    setShowDeleteForeverConfirm(true);
+  };
+
+  const confirmDeleteForever = async () => {
+    setShowDeleteForeverConfirm(false);
     setBulkActionLoading(true);
     try {
       await bulkDeleteForever(selectedConversations);
@@ -191,24 +198,33 @@ const Inbox: React.FC = () => {
     }
   };
 
+  const loadConversations = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchConversations();
+      setConversations(data || []);
+    } catch (err: any) {
+      setError('Failed to load conversations');
+      setConversations([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const loadConversations = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await fetchConversations();
-        setConversations(data || []);
-      } catch (err: any) {
-        setError('Failed to load conversations');
-        setConversations([]);
-      } finally {
-        setLoading(false);
-      }
-    };
     if (currentUserId) {
       loadConversations();
     }
   }, [currentUserId]);
+
+  // Refresh function for pull-to-refresh
+  const handleRefresh = async () => {
+    await loadConversations();
+  };
+
+  // Swipe navigation for bottom nav
+  const { handleSwipeLeft, handleSwipeRight, enabled: swipeEnabled } = useBottomNavSwipe();
 
   // Mark conversation participants as online when viewing conversation (for demo)
   useEffect(() => {
@@ -544,9 +560,17 @@ const Inbox: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full min-h-[80vh] bg-gray-100 dark:bg-gray-900">
+    <SwipeableContainer
+      onSwipeLeft={swipeEnabled ? handleSwipeLeft : undefined}
+      onSwipeRight={swipeEnabled ? handleSwipeRight : undefined}
+      enabled={swipeEnabled}
+      preventScrollInterference={true}
+      className="flex flex-col h-full min-h-[80vh] bg-gray-100 dark:bg-gray-900"
+    >
+      <PullToRefresh onRefresh={handleRefresh} className="flex flex-col h-full min-h-[80vh] bg-gray-100 dark:bg-gray-900">
+        <div className="flex flex-col h-full min-h-[80vh] bg-gray-100 dark:bg-gray-900">
       {/* Top Navigation Bar (Mobile Only) */}
-      <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+      <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm safe-area-inset-top">
         <div className="relative flex items-center justify-between px-4 py-3">
           <button
             onClick={() => setShowBurgerMenu(!showBurgerMenu)}
@@ -570,7 +594,7 @@ const Inbox: React.FC = () => {
       {/* Top Bar */}
       <div className="flex flex-col gap-2 px-3 sm:px-4 lg:px-6 py-2 sm:py-3 border-b bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-sm sticky top-0 lg:sticky z-20 pt-20 lg:pt-2">
         {/* First Row: Dropdowns */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-3 sm:gap-2 flex-wrap">
           {/* Course Dropdown - Hide for admins */}
           {user?.role !== 'admin' && (
             <div className="relative flex-1 min-w-[120px]">
@@ -609,43 +633,47 @@ const Inbox: React.FC = () => {
           </div>
         </div>
         {/* Second Row: Action Icons and Search */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3 sm:gap-2">
           {/* Icon Row */}
-          <div className="flex items-center gap-1 sm:gap-2">
+          <div className="flex items-center gap-2 sm:gap-2">
             {/* Compose (modern icon) */}
             <button
               className="p-1.5 sm:p-2 rounded hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400 touch-manipulation"
               title="Compose"
+              aria-label="Compose new message"
               onClick={() => setShowCompose(true)}
             >
-              <Edit size={18} className="sm:w-[22px] sm:h-[22px]" />
+              <Edit size={18} className="sm:w-[22px] sm:h-[22px]" aria-hidden="true" />
             </button>
             {/* Reply */}
             <button 
               className={`p-1.5 sm:p-2 rounded touch-manipulation ${selectedConversations.length > 0 ? 'hover:bg-blue-200 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500'}`} 
               title="Reply" 
+              aria-label={`Reply to ${selectedConversations.length} selected conversation${selectedConversations.length !== 1 ? 's' : ''}`}
               onClick={handleReply}
               disabled={selectedConversations.length === 0 || bulkActionLoading}
             >
-              <Reply size={18} className="sm:w-[22px] sm:h-[22px]" />
+              <Reply size={18} className="sm:w-[22px] sm:h-[22px]" aria-hidden="true" />
             </button>
             {/* Archive */}
             <button 
               className={`p-1.5 sm:p-2 rounded touch-manipulation ${selectedConversations.length > 0 ? 'hover:bg-yellow-200 dark:hover:bg-yellow-900/50 text-yellow-600 dark:text-yellow-400' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500'}`} 
               title="Archive" 
+              aria-label={`Archive ${selectedConversations.length} selected conversation${selectedConversations.length !== 1 ? 's' : ''}`}
               onClick={handleArchive}
               disabled={selectedConversations.length === 0 || bulkActionLoading}
             >
-              <Archive size={18} className="sm:w-[22px] sm:h-[22px]" />
+              <Archive size={18} className="sm:w-[22px] sm:h-[22px]" aria-hidden="true" />
             </button>
             {/* Delete */}
             <button 
               className={`p-1.5 sm:p-2 rounded touch-manipulation ${selectedConversations.length > 0 ? 'hover:bg-red-200 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500'}`} 
               title="Delete" 
+              aria-label={`Delete ${selectedConversations.length} selected conversation${selectedConversations.length !== 1 ? 's' : ''}`}
               onClick={handleDelete}
               disabled={selectedConversations.length === 0 || bulkActionLoading}
             >
-              <Trash2 size={18} className="sm:w-[22px] sm:h-[22px]" />
+              <Trash2 size={18} className="sm:w-[22px] sm:h-[22px]" aria-hidden="true" />
             </button>
           </div>
           {/* Search Bar */}
@@ -678,7 +706,7 @@ const Inbox: React.FC = () => {
               <form onSubmit={handleCompose} className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
                 {/* Course Dropdown - Hide for admins */}
                 {user?.role !== 'admin' && (
-                  <div className="mb-3 sm:mb-4 flex flex-col sm:flex-row sm:items-center gap-2">
+                  <div className="mb-3 sm:mb-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-2">
                     <label htmlFor="compose-course" className="w-full sm:w-20 text-gray-700 dark:text-gray-300 font-medium text-xs sm:text-sm">Course</label>
                     <select
                       id="compose-course"
@@ -905,7 +933,7 @@ const Inbox: React.FC = () => {
                   </div>
                 </div>
                 {/* Subject */}
-                <div className="mb-3 sm:mb-4 flex flex-col sm:flex-row sm:items-center gap-2">
+                <div className="mb-3 sm:mb-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-2">
                   <label htmlFor="compose-subject" className="w-full sm:w-20 text-gray-700 dark:text-gray-300 font-medium text-xs sm:text-sm">Subject</label>
                   <input
                     id="compose-subject"
@@ -918,7 +946,7 @@ const Inbox: React.FC = () => {
                   />
                 </div>
                 {/* Send individually checkbox */}
-                <div className="mb-3 sm:mb-4 flex items-start sm:items-center gap-2">
+                <div className="mb-3 sm:mb-4 flex items-start sm:items-center gap-3 sm:gap-2">
                   <input
                     id="send-individually"
                     name="sendIndividually"
@@ -946,13 +974,13 @@ const Inbox: React.FC = () => {
                   />
                 </div>
                 {/* Attachment icon */}
-                <div className="flex items-center justify-between gap-2">
-                  <button type="button" className="p-1.5 sm:p-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 touch-manipulation" title="Attach file" disabled>
+                <div className="flex items-center justify-between gap-3 sm:gap-2">
+                  <button type="button" className="min-h-[44px] min-w-[44px] p-2 sm:p-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 touch-manipulation active:scale-95 transition-transform" title="Attach file" disabled>
                     <Paperclip size={18} className="sm:w-[22px] sm:h-[22px]" />
                   </button>
-                  <div className="flex gap-2">
-                    <button type="button" className="px-3 sm:px-4 py-1.5 sm:py-2 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 text-xs sm:text-sm touch-manipulation" onClick={() => setShowCompose(false)} disabled={composeLoading}>Cancel</button>
-                    <button type="submit" className="px-3 sm:px-4 py-1.5 sm:py-2 rounded bg-red-600 dark:bg-red-500 text-white hover:bg-red-700 dark:hover:bg-red-600 text-xs sm:text-sm touch-manipulation" disabled={composeLoading || (!composeRecipients.length && (composeToGroup !== 'sections' || !composeCourse)) || !composeSubject.trim() || !composeBody.trim()}>{composeLoading ? 'Sending...' : 'Send'}</button>
+                  <div className="flex gap-3 sm:gap-2">
+                    <button type="button" className="min-h-[44px] px-4 sm:px-4 py-2.5 sm:py-2 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 text-sm sm:text-sm touch-manipulation active:scale-95 transition-transform" onClick={() => setShowCompose(false)} disabled={composeLoading}>Cancel</button>
+                    <button type="submit" className="min-h-[44px] px-4 sm:px-4 py-2.5 sm:py-2 rounded bg-red-600 dark:bg-red-500 text-white hover:bg-red-700 dark:hover:bg-red-600 text-sm sm:text-sm touch-manipulation active:scale-95 transition-transform" disabled={composeLoading || (!composeRecipients.length && (composeToGroup !== 'sections' || !composeCourse)) || !composeSubject.trim() || !composeBody.trim()}>{composeLoading ? 'Sending...' : 'Send'}</button>
                   </div>
                 </div>
                 {composeError && <div className="text-red-500 dark:text-red-400 mt-2">{composeError}</div>}
@@ -1018,7 +1046,7 @@ const Inbox: React.FC = () => {
                         handleSelectConversation(conv);
                       }}
                     >
-                      <div className="flex items-center min-h-[24px] gap-2">
+                      <div className="flex items-center min-h-[24px] gap-3 sm:gap-2">
                         <input
                           type="checkbox"
                           id={`select-conv-${conv._id}`}
@@ -1051,7 +1079,7 @@ const Inbox: React.FC = () => {
                           </div>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 sm:gap-2">
+                          <div className="flex items-center gap-2 sm:gap-2">
                             <span className={`truncate text-xs sm:text-sm font-medium ${unread ? 'font-bold text-blue-900 dark:text-blue-300' : 'text-gray-900 dark:text-gray-100'}`}>{participantNames || 'Unknown'}</span>
                             {unread && <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-blue-500 dark:bg-blue-400 rounded-full flex-shrink-0"></span>}
                           </div>
@@ -1118,7 +1146,7 @@ const Inbox: React.FC = () => {
             <div className="flex flex-col h-full">
               {/* Sticky Subject Header */}
               <div className="mb-3 sm:mb-4 border-b border-gray-200 dark:border-gray-700 pb-2 flex items-center justify-between sticky top-0 z-10 bg-white dark:bg-gray-800 rounded-t-2xl shadow-sm px-3 sm:px-4 lg:px-6 pt-3 sm:pt-4 lg:pt-6">
-                <div className="flex items-center gap-2 flex-1 min-w-0">
+                <div className="flex items-center gap-3 sm:gap-2 flex-1 min-w-0">
                   <button
                     onClick={() => setSelectedConversation(null)}
                     className="lg:hidden text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 mr-1 sm:mr-2 p-1 touch-manipulation"
@@ -1196,6 +1224,7 @@ const Inbox: React.FC = () => {
                 <form className="flex flex-col gap-2 mt-2 px-3 sm:px-4 lg:px-6 pb-3 sm:pb-4 lg:pb-6" onSubmit={handleSendReply}>
                   <label htmlFor="reply-message" className="sr-only">Reply</label>
                   <RichTextEditor
+                    id="reply-message"
                     content={reply}
                     onChange={setReply}
                     placeholder="Type your reply..."
@@ -1236,7 +1265,37 @@ const Inbox: React.FC = () => {
           )}
         </div>
       </div>
-    </div>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmDelete}
+        title={isPermanentDelete ? "Permanently Delete Conversations" : "Delete Conversations"}
+        message={isPermanentDelete 
+          ? `Are you sure you want to permanently delete ${selectedConversations.length} conversation${selectedConversations.length !== 1 ? 's' : ''}? This cannot be undone.`
+          : `Are you sure you want to delete ${selectedConversations.length} conversation${selectedConversations.length !== 1 ? 's' : ''}?`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={bulkActionLoading}
+      />
+
+      {/* Delete Forever Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteForeverConfirm}
+        onClose={() => setShowDeleteForeverConfirm(false)}
+        onConfirm={confirmDeleteForever}
+        title="Permanently Delete Conversations"
+        message={`Are you sure you want to permanently delete ${selectedConversations.length} conversation${selectedConversations.length !== 1 ? 's' : ''}? This cannot be undone.`}
+        confirmText="Delete Forever"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={bulkActionLoading}
+      />
+        </div>
+      </PullToRefresh>
+    </SwipeableContainer>
   );
 };
 

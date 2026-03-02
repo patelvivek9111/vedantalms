@@ -3,6 +3,7 @@ import { quizwaveService, Quiz } from '../../services/quizwaveService';
 import { Plus, Play, Edit, Trash2, List, Clock } from 'lucide-react';
 import QuizBuilder from './QuizBuilder';
 import QuizSessionControl from './QuizSessionControl';
+import { QuizCardSkeleton } from '../common/SkeletonLoader';
 
 interface QuizWaveDashboardProps {
   courseId: string;
@@ -16,6 +17,11 @@ const QuizWaveDashboard: React.FC<QuizWaveDashboardProps> = ({ courseId }) => {
   const [activeSession, setActiveSession] = useState<string | null>(null);
   const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
   const [retryingQuiz, setRetryingQuiz] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showRetryConfirm, setShowRetryConfirm] = useState(false);
+  const [quizToDelete, setQuizToDelete] = useState<string | null>(null);
+  const [retryError, setRetryError] = useState<string | null>(null);
+  const [quizForRetry, setQuizForRetry] = useState<Quiz | null>(null);
 
   useEffect(() => {
     // Only load if courseId is valid
@@ -93,14 +99,18 @@ const QuizWaveDashboard: React.FC<QuizWaveDashboardProps> = ({ courseId }) => {
     setShowBuilder(true);
   };
 
-  const handleDeleteQuiz = async (quizId: string) => {
-    if (!window.confirm('Are you sure you want to delete this quiz?')) {
-      return;
-    }
+  const handleDeleteQuiz = (quizId: string) => {
+    setQuizToDelete(quizId);
+    setShowDeleteConfirm(true);
+  };
 
+  const confirmDeleteQuiz = async () => {
+    if (!quizToDelete) return;
+    setShowDeleteConfirm(false);
     try {
-      await quizwaveService.deleteQuiz(quizId);
+      await quizwaveService.deleteQuiz(quizToDelete);
       loadQuizzes();
+      setQuizToDelete(null);
     } catch (error: any) {
       alert(error.response?.data?.message || 'Error deleting quiz');
     }
@@ -131,14 +141,9 @@ const QuizWaveDashboard: React.FC<QuizWaveDashboardProps> = ({ courseId }) => {
                         errorMessage.toLowerCase().includes('unique');
       
       if (isPinError && !isRetry) {
-        const shouldRetry = window.confirm(
-          `${errorMessage}\n\nWould you like to try again with a new PIN?`
-        );
-        if (shouldRetry) {
-          // Retry immediately
-          setTimeout(() => handleStartSession(quiz, true), 100);
-          return;
-        }
+        setRetryError(errorMessage);
+        setQuizForRetry(quiz);
+        setShowRetryConfirm(true);
       } else {
         alert(errorMessage);
       }
@@ -182,9 +187,8 @@ const QuizWaveDashboard: React.FC<QuizWaveDashboardProps> = ({ courseId }) => {
     return (
       <div className="p-4 sm:p-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600 dark:text-gray-400">Loading course...</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            <QuizCardSkeleton count={6} />
           </div>
         </div>
       </div>
@@ -213,9 +217,8 @@ const QuizWaveDashboard: React.FC<QuizWaveDashboardProps> = ({ courseId }) => {
         </div>
 
         {loading ? (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600 dark:text-gray-400">Loading quizzes...</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            <QuizCardSkeleton count={6} />
           </div>
         ) : quizzes.length === 0 ? (
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-12 text-center">
@@ -295,6 +298,44 @@ const QuizWaveDashboard: React.FC<QuizWaveDashboardProps> = ({ courseId }) => {
             ))}
           </div>
         )}
+
+        {/* Delete Quiz Confirmation Modal */}
+        <ConfirmationModal
+          isOpen={showDeleteConfirm}
+          onClose={() => {
+            setShowDeleteConfirm(false);
+            setQuizToDelete(null);
+          }}
+          onConfirm={confirmDeleteQuiz}
+          title="Delete Quiz"
+          message="Are you sure you want to delete this quiz? This action cannot be undone."
+          confirmText="Delete"
+          cancelText="Cancel"
+          variant="danger"
+        />
+
+        {/* Retry Session Confirmation Modal */}
+        <ConfirmationModal
+          isOpen={showRetryConfirm}
+          onClose={() => {
+            setShowRetryConfirm(false);
+            setRetryError(null);
+            setQuizForRetry(null);
+          }}
+          onConfirm={() => {
+            setShowRetryConfirm(false);
+            if (quizForRetry) {
+              setTimeout(() => handleStartSession(quizForRetry, true), 100);
+            }
+            setRetryError(null);
+            setQuizForRetry(null);
+          }}
+          title="Retry Session Creation"
+          message={retryError ? `${retryError}\n\nWould you like to try again with a new PIN?` : 'Would you like to try again with a new PIN?'}
+          confirmText="Retry"
+          cancelText="Cancel"
+          variant="info"
+        />
       </div>
     </div>
   );

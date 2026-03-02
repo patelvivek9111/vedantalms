@@ -140,6 +140,10 @@ const AnnouncementDetailModal: React.FC<AnnouncementDetailModalProps> = ({
   };
 
   const renderComments = (comments: Comment[], level = 0) => {
+    if (!comments || !Array.isArray(comments)) {
+      return null;
+    }
+    
     let visibleComments = comments;
     const shouldHideOthers =
       level === 0 &&

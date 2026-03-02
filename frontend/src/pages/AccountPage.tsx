@@ -4,7 +4,12 @@ import { useSearchParams } from 'react-router-dom';
 import { updateUserProfile, uploadProfilePicture, getUserPreferences, updateUserPreferences, getLoginActivity, getImageUrl } from '../services/api';
 import api from '../services/api';
 import { useTheme } from '../context/ThemeContext';
-import { Sun, Moon } from 'lucide-react';
+import { Sun, Moon, Save, RefreshCw } from 'lucide-react';
+import FloatingLabelInput from '../components/common/FloatingLabelInput';
+import FloatingLabelTextarea from '../components/common/FloatingLabelTextarea';
+import FormFieldGroup from '../components/common/FormFieldGroup';
+import { useDraftManager } from '../hooks/useDraftManager';
+import ConfirmationModal from '../components/common/ConfirmationModal';
 
 const sections = [
   { key: 'profile', label: 'Profile' },
@@ -22,6 +27,94 @@ function ProfileSection() {
   const [bio, setBio] = React.useState(user?.bio || '');
   const [saving, setSaving] = React.useState(false);
   const [uploading, setUploading] = React.useState(false);
+  const [fieldErrors, setFieldErrors] = React.useState<{ [key: string]: string }>({});
+  const [showResetConfirm, setShowResetConfirm] = React.useState(false);
+
+  // Draft manager for bio
+  const formId = 'account-profile';
+  const { draft, isDraftSaved, saveDraft, autoSave, clearDraft } = useDraftManager<{
+    firstName: string;
+    lastName: string;
+    bio: string;
+  }>({
+    formId,
+    autoSaveDelay: 2000,
+    enabled: editMode
+  });
+
+  // Load draft on mount
+  React.useEffect(() => {
+    if (draft && editMode) {
+      setFirstName(draft.firstName || user?.firstName || '');
+      setLastName(draft.lastName || user?.lastName || '');
+      setBio(draft.bio || user?.bio || '');
+    }
+  }, [draft, editMode, user]);
+
+  // Auto-save draft on form changes
+  React.useEffect(() => {
+    if (editMode && (firstName || lastName || bio)) {
+      autoSave({
+        firstName,
+        lastName,
+        bio
+      });
+    }
+  }, [firstName, lastName, bio, editMode, autoSave]);
+
+  // Reset form function
+  const handleResetForm = () => {
+    setShowResetConfirm(true);
+  };
+
+  const confirmResetForm = () => {
+    setShowResetConfirm(false);
+      clearDraft();
+      setFirstName(user?.firstName || '');
+      setLastName(user?.lastName || '');
+      setBio(user?.bio || '');
+      setFieldErrors({});
+  };
+
+  // Validation
+  const validateFirstName = (value: string) => {
+    if (!value.trim()) {
+      setFieldErrors(prev => ({ ...prev, firstName: 'First name is required' }));
+      return false;
+    }
+    setFieldErrors(prev => {
+      const newErrors = { ...prev };
+      delete newErrors.firstName;
+      return newErrors;
+    });
+    return true;
+  };
+
+  const validateLastName = (value: string) => {
+    if (!value.trim()) {
+      setFieldErrors(prev => ({ ...prev, lastName: 'Last name is required' }));
+      return false;
+    }
+    setFieldErrors(prev => {
+      const newErrors = { ...prev };
+      delete newErrors.lastName;
+      return newErrors;
+    });
+    return true;
+  };
+
+  const validateBio = (value: string) => {
+    if (value.length > 500) {
+      setFieldErrors(prev => ({ ...prev, bio: 'Bio must be 500 characters or less' }));
+      return false;
+    }
+    setFieldErrors(prev => {
+      const newErrors = { ...prev };
+      delete newErrors.bio;
+      return newErrors;
+    });
+    return true;
+  };
 
 
 
@@ -33,6 +126,17 @@ function ProfileSection() {
   }, [user]);
 
   const handleSave = async () => {
+    const isFirstNameValid = validateFirstName(firstName);
+    const isLastNameValid = validateLastName(lastName);
+    const isBioValid = validateBio(bio);
+    
+    if (!isFirstNameValid || !isLastNameValid || !isBioValid) {
+      return;
+    }
+
+    // Clear draft on successful save
+    clearDraft();
+
     setSaving(true);
     try {
       const res = await updateUserProfile({ firstName, lastName, bio });
@@ -40,6 +144,7 @@ function ProfileSection() {
         setUser(res.data.user);
       }
       setEditMode(false);
+      setFieldErrors({});
     } catch (err: any) {
       // Show detailed error message if available
       if (err.response && err.response.data && err.response.data.message) {
@@ -128,24 +233,102 @@ function ProfileSection() {
       </div>
       {editMode ? (
         <form className="flex flex-col gap-3 sm:gap-4" onSubmit={e => { e.preventDefault(); handleSave(); }}>
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-            <div className="flex-1">
-              <label htmlFor="firstName" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">First Name</label>
-              <input id="firstName" name="firstName" type="text" autoComplete="given-name" className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 sm:px-3 py-1.5 sm:py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" value={firstName} onChange={e => setFirstName(e.target.value)} />
+          {/* Draft saved indicator and reset button */}
+          <div className="flex items-center justify-between bg-green-50 dark:bg-green-900/20 px-4 py-2 rounded-md">
+            {isDraftSaved ? (
+              <div className="flex items-center text-sm text-green-600 dark:text-green-400">
+                <Save className="w-4 h-4 mr-2" />
+                Draft saved automatically
+              </div>
+            ) : (
+              <div></div>
+            )}
+            <button
+              type="button"
+              onClick={handleResetForm}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-white dark:hover:bg-gray-800 rounded-md transition-colors"
+              title="Clear form and start fresh"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Reset
+            </button>
+          </div>
+
+          <FormFieldGroup
+            title="Profile Information"
+            description="Update your personal information"
+          >
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+              <div className="flex-1">
+                <FloatingLabelInput
+                  id="firstName"
+                  name="firstName"
+                  type="text"
+                  label="First Name"
+                  required
+                  autoComplete="given-name"
+                  value={firstName}
+                  onChange={e => {
+                    setFirstName(e.target.value);
+                    if (fieldErrors.firstName) {
+                      validateFirstName(e.target.value);
+                    }
+                  }}
+                  onBlur={(e) => validateFirstName(e.target.value)}
+                  error={fieldErrors.firstName}
+                />
+              </div>
+              <div className="flex-1">
+                <FloatingLabelInput
+                  id="lastName"
+                  name="lastName"
+                  type="text"
+                  label="Last Name"
+                  required
+                  autoComplete="family-name"
+                  value={lastName}
+                  onChange={e => {
+                    setLastName(e.target.value);
+                    if (fieldErrors.lastName) {
+                      validateLastName(e.target.value);
+                    }
+                  }}
+                  onBlur={(e) => validateLastName(e.target.value)}
+                  error={fieldErrors.lastName}
+                />
+              </div>
             </div>
-            <div className="flex-1">
-              <label htmlFor="lastName" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Last Name</label>
-              <input id="lastName" name="lastName" type="text" autoComplete="family-name" className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 sm:px-3 py-1.5 sm:py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" value={lastName} onChange={e => setLastName(e.target.value)} />
-            </div>
-          </div>
-          <div>
-            <label htmlFor="email" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
-            <input id="email" name="email" type="email" autoComplete="email" className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 sm:px-3 py-1.5 sm:py-2 text-sm bg-gray-50 dark:bg-gray-900 text-gray-500 dark:text-gray-400 cursor-not-allowed" value={email} onChange={e => setEmail(e.target.value)} disabled />
-          </div>
-          <div>
-            <label htmlFor="bio" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Bio</label>
-            <textarea id="bio" name="bio" autoComplete="off" rows={4} className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 sm:px-3 py-1.5 sm:py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none" value={bio} onChange={e => setBio(e.target.value)} placeholder="Tell us about yourself..." />
-          </div>
+            <FloatingLabelInput
+              id="email"
+              name="email"
+              type="email"
+              label="Email"
+              autoComplete="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              disabled
+              className="bg-gray-50 dark:bg-gray-900"
+            />
+            <FloatingLabelTextarea
+              id="bio"
+              name="bio"
+              label="Bio"
+              autoComplete="off"
+              rows={4}
+              value={bio}
+              onChange={e => {
+                setBio(e.target.value);
+                if (fieldErrors.bio) {
+                  validateBio(e.target.value);
+                }
+              }}
+              onBlur={(e) => validateBio(e.target.value)}
+              error={fieldErrors.bio}
+              placeholder="Tell us about yourself..."
+              maxLength={500}
+              helperText={fieldErrors.bio ? undefined : `${bio.length}/500 characters`}
+            />
+          </FormFieldGroup>
           <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-2">
             <button type="button" className="w-full sm:w-auto px-3 sm:px-4 py-2 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm touch-manipulation" onClick={handleCancel} disabled={saving}>Cancel</button>
             <button type="submit" className="w-full sm:w-auto px-3 sm:px-4 py-2 rounded bg-blue-600 dark:bg-blue-500 text-white hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors disabled:opacity-50 text-sm touch-manipulation" disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
@@ -165,6 +348,18 @@ function ProfileSection() {
           <button className="w-full sm:w-auto mt-2 sm:mt-4 px-3 sm:px-4 py-2 rounded bg-blue-600 dark:bg-blue-500 text-white hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors text-sm sm:text-base touch-manipulation" onClick={() => setEditMode(true)}>Edit Profile</button>
         </div>
       )}
+
+      {/* Reset Form Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showResetConfirm}
+        onClose={() => setShowResetConfirm(false)}
+        onConfirm={confirmResetForm}
+        title="Clear Form"
+        message="Are you sure you want to clear all fields and start fresh? This will delete your saved draft."
+        confirmText="Clear"
+        cancelText="Cancel"
+        variant="warning"
+      />
     </div>
   );
 }

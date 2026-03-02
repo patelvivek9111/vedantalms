@@ -92,7 +92,9 @@ describe('CreateThreadModal', () => {
       />
     );
 
-    expect(screen.getByPlaceholderText(/enter thread title/i)).toBeInTheDocument();
+    // FloatingLabelInput uses labels, not placeholders
+    expect(screen.getByLabelText(/thread title/i)).toBeInTheDocument();
+    expect(screen.getByTestId('rich-text-editor')).toBeInTheDocument();
   });
 
   it('should create thread successfully', async () => {
@@ -122,7 +124,8 @@ describe('CreateThreadModal', () => {
       />
     );
 
-    const titleInput = screen.getByPlaceholderText(/enter thread title/i);
+    // FloatingLabelInput uses labels, not placeholders
+    const titleInput = screen.getByLabelText(/thread title/i);
     fireEvent.change(titleInput, { target: { value: 'New Thread' } });
 
     // Fill content field using the mocked RichTextEditor
@@ -224,7 +227,8 @@ describe('CreateThreadModal', () => {
       />
     );
 
-    const titleInput = screen.getByPlaceholderText(/enter thread title/i);
+    // FloatingLabelInput uses labels, not placeholders
+    const titleInput = screen.getByLabelText(/thread title/i);
     fireEvent.change(titleInput, { target: { value: 'Test Thread' } });
 
     // Fill content field

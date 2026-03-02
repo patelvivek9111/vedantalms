@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
 import { API_URL } from '../../config';
 import ViewAssignment from './ViewAssignment';
+import Breadcrumb from '../common/Breadcrumb';
 import { 
   ClipboardList, 
   BookOpen, 
@@ -41,6 +42,7 @@ const navigationItems = [
 const AssignmentViewWrapper: React.FC = () => {
   const { id: assignmentId } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const [course, setCourse] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -239,6 +241,29 @@ const AssignmentViewWrapper: React.FC = () => {
       {/* Main Content Area */}
       <div className="flex-1 overflow-auto lg:ml-0">
         <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6">
+          {/* Breadcrumb Navigation - Desktop Only */}
+          {course && (
+            <div className="hidden lg:block mb-4">
+              <Breadcrumb
+                items={[
+                  { label: 'Dashboard', path: '/dashboard' },
+                  { label: 'Courses', path: '/courses' },
+                  { 
+                    label: course.catalog?.courseCode || course.title || 'Course', 
+                    path: `/courses/${course._id}` 
+                  },
+                  { 
+                    label: 'Assignments', 
+                    path: `/courses/${course._id}/assignments` 
+                  },
+                  { 
+                    label: 'View Assignment', 
+                    path: location.pathname 
+                  }
+                ]}
+              />
+            </div>
+          )}
           <ViewAssignment />
         </div>
       </div>

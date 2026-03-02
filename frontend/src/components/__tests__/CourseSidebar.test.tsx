@@ -28,7 +28,7 @@ describe('CourseSidebar', () => {
     render(
       <BrowserRouter>
         <CourseSidebar
-          navigationItems={mockNavigationItems}
+          filteredNavigationItems={mockNavigationItems}
           activeSection="overview"
           courseId="course1"
           isMobileDevice={false}
@@ -46,7 +46,7 @@ describe('CourseSidebar', () => {
     render(
       <BrowserRouter>
         <CourseSidebar
-          navigationItems={mockNavigationItems}
+          filteredNavigationItems={mockNavigationItems}
           activeSection="overview"
           courseId="course1"
           isMobileDevice={false}
@@ -64,7 +64,7 @@ describe('CourseSidebar', () => {
     render(
       <BrowserRouter>
         <CourseSidebar
-          navigationItems={mockNavigationItems}
+          filteredNavigationItems={mockNavigationItems}
           activeSection="overview"
           courseId="course1"
           isMobileDevice={false}
@@ -85,7 +85,7 @@ describe('CourseSidebar', () => {
     render(
       <BrowserRouter>
         <CourseSidebar
-          navigationItems={mockNavigationItems}
+          filteredNavigationItems={mockNavigationItems}
           activeSection="overview"
           courseId="course1"
           isMobileDevice={true}
@@ -102,7 +102,7 @@ describe('CourseSidebar', () => {
     render(
       <BrowserRouter>
         <CourseSidebar
-          navigationItems={mockNavigationItems}
+          filteredNavigationItems={mockNavigationItems}
           activeSection="overview"
           courseId="course1"
           isMobileDevice={true}
@@ -122,7 +122,7 @@ describe('CourseSidebar', () => {
     render(
       <BrowserRouter>
         <CourseSidebar
-          navigationItems={mockNavigationItems}
+          filteredNavigationItems={mockNavigationItems}
           activeSection="overview"
           courseId="course1"
           isMobileDevice={true}
@@ -142,7 +142,7 @@ describe('CourseSidebar', () => {
     const { container } = render(
       <BrowserRouter>
         <CourseSidebar
-          navigationItems={mockNavigationItems}
+          filteredNavigationItems={mockNavigationItems}
           activeSection="overview"
           courseId="course1"
           isMobileDevice={true}
@@ -160,7 +160,7 @@ describe('CourseSidebar', () => {
     const { container } = render(
       <BrowserRouter>
         <CourseSidebar
-          navigationItems={mockNavigationItems}
+          filteredNavigationItems={mockNavigationItems}
           activeSection="overview"
           courseId="course1"
           isMobileDevice={false}

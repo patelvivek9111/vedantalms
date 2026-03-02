@@ -25,11 +25,9 @@ const StudentGameScreen: React.FC = () => {
   const [currentColorIndex, setCurrentColorIndex] = useState(0);
   const [timeUp, setTimeUp] = useState(false);
   const [showResultMessage, setShowResultMessage] = useState(false);
-  const [showFullLeaderboard, setShowFullLeaderboard] = useState(false);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const colorAnimationRef = useRef<NodeJS.Timeout | null>(null);
-  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const token = localStorage.getItem('token') || '';
 
   const colors = ['bg-red-500', 'bg-blue-500', 'bg-yellow-500', 'bg-green-500'];
@@ -114,25 +112,15 @@ const StudentGameScreen: React.FC = () => {
           console.log('Question started:', data);
           // Ensure questionIndex is set correctly
           if (data && typeof data.questionIndex === 'number') {
-            // Reset ALL answer-related state when new question starts
             setCurrentQuestion(data);
-            // Use the question's own timeLimit - each question has its own time
             setTimeRemaining(data.timeLimit || 30);
-            setSelectedAnswer([]); // Clear any previous selection
-            setAnswered(false); // Reset answered flag
-            setAnswerResult(null); // Clear previous result
+            setSelectedAnswer([]);
+            setAnswered(false);
+            setAnswerResult(null);
             setShowColorAnimation(false);
             setTimeUp(false);
             setShowResultMessage(false);
             setStatus('active');
-            
-            // Clear any existing timers
-            if (timerRef.current) {
-              clearInterval(timerRef.current);
-              timerRef.current = null;
-            }
-            
-            console.log('Question state reset - ready for new answer');
           } else {
             console.error('Invalid question data received:', data);
           }
@@ -148,42 +136,10 @@ const StudentGameScreen: React.FC = () => {
           // Just store the result for later display
         });
 
-        // Listen for when teacher shows answer distribution - show student their points
-        sock.on('quizwave:show-results', (data: any) => {
-          console.log('Teacher showing results:', data);
-          // Find this student's result from the broadcast
-          if (data.results && data.questionIndex === currentQuestion?.questionIndex) {
-            const myResult = data.results.find((r: any) => r.nickname === nickname);
-            if (myResult) {
-              setAnswerResult({
-                isCorrect: myResult.isCorrect,
-                points: myResult.points
-              });
-              setShowResultMessage(true);
-            }
-          }
-        });
-
         sock.on('quizwave:quiz-ended', (data: any) => {
           console.log('Quiz ended:', data);
-          // Update leaderboard from socket data
-          if (data.leaderboard && Array.isArray(data.leaderboard)) {
-            setLeaderboard(data.leaderboard);
-          }
+          setLeaderboard(data.leaderboard);
           setStatus('ended');
-          // Also reload session to get final state
-          loadSession().then((sessionData) => {
-            if (sessionData && sessionData.status === 'ended' && sessionData.participants) {
-              const lb = sessionData.participants
-                .map((p: any) => ({
-                  nickname: p.nickname,
-                  totalScore: p.totalScore || 0,
-                  answers: p.answers?.length || 0
-                }))
-                .sort((a: any, b: any) => b.totalScore - a.totalScore);
-              setLeaderboard(lb);
-            }
-          });
         });
 
         sock.on('quizwave:error', (data: any) => {
@@ -203,18 +159,6 @@ const StudentGameScreen: React.FC = () => {
           // If it's a critical error, redirect back to join
           if (errorMessage.includes('Session not found') || errorMessage.includes('ended')) {
             setTimeout(() => navigate('/quizwave/join'), 2000);
-          }
-        });
-
-        // Handle socket reconnection
-        sock.on('disconnect', () => {
-          console.log('Socket disconnected, attempting to reconnect...');
-        });
-
-        sock.on('reconnect', () => {
-          console.log('Socket reconnected, rejoining session...');
-          if (sock.connected) {
-            sock.emit('quizwave:join', { gamePin: pin, nickname });
           }
         });
 
@@ -238,68 +182,15 @@ const StudentGameScreen: React.FC = () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current);
-      }
       if (sock) {
         sock.off('quizwave:joined');
         sock.off('quizwave:question-started');
         sock.off('quizwave:answer-received');
         sock.off('quizwave:quiz-ended');
-        sock.off('quizwave:show-results');
         sock.off('quizwave:error');
       }
     };
   }, [pin, nickname, token, navigate]);
-
-  // Background refresh to keep student screen in sync
-  useEffect(() => {
-    if (status !== 'ended' && pin) {
-      // Refresh session every 3 seconds to stay in sync
-      refreshIntervalRef.current = setInterval(() => {
-        loadSession().then((sessionData) => {
-          if (sessionData) {
-            // Update status if it changed
-            if (sessionData.status !== status) {
-              setStatus(sessionData.status);
-            }
-            
-            // Update leaderboard if quiz ended
-            if (sessionData.status === 'ended' && sessionData.participants) {
-              const lb = sessionData.participants
-                .map((p: any) => ({
-                  nickname: p.nickname,
-                  totalScore: p.totalScore,
-                  answers: p.answers.length
-                }))
-                .sort((a: any, b: any) => b.totalScore - a.totalScore);
-              setLeaderboard(lb);
-            }
-            
-            // Update current question if quiz is active
-            if (sessionData.status === 'active' && sessionData.currentQuestionIndex >= 0) {
-              if (sessionData.quiz && typeof sessionData.quiz === 'object' && 'questions' in sessionData.quiz) {
-                const question = sessionData.quiz.questions[sessionData.currentQuestionIndex];
-                if (question && (!currentQuestion || currentQuestion.questionIndex !== sessionData.currentQuestionIndex)) {
-                  setCurrentQuestion({ ...question, questionIndex: sessionData.currentQuestionIndex });
-                  setTimeRemaining(question.timeLimit || 30);
-                }
-              }
-            }
-          }
-        }).catch(err => {
-          console.error('Background refresh error:', err);
-        });
-      }, 3000); // Refresh every 3 seconds
-    }
-
-    return () => {
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current);
-        refreshIntervalRef.current = null;
-      }
-    };
-  }, [status, pin, currentQuestion]);
 
   // Color animation effect when student has answered early
   useEffect(() => {
@@ -325,17 +216,11 @@ const StudentGameScreen: React.FC = () => {
             // Time's up
             setTimeUp(true);
             setShowColorAnimation(false);
+            setShowResultMessage(true);
             
-            // Only auto-submit if user has actually selected an answer AND hasn't already submitted
+            // Auto-submit if not answered yet
             if (!answered && selectedAnswer.length > 0) {
-              console.log('Time ran out - auto-submitting selected answer:', selectedAnswer);
               handleSubmitAnswer();
-            } else if (!answered && selectedAnswer.length === 0) {
-              // No answer selected - don't submit anything, just show that time ran out
-              console.log('Time ran out - no answer selected, not submitting');
-              setShowResultMessage(true);
-              // Set a null result to indicate no answer was submitted
-              setAnswerResult({ isCorrect: false, points: 0 });
             } else if (answered && answerResult) {
               // Already answered - just show the result
               setShowResultMessage(true);
@@ -355,32 +240,21 @@ const StudentGameScreen: React.FC = () => {
   }, [currentQuestion, timeRemaining, timeUp, answered, selectedAnswer, answerResult]);
 
   const handleSelectAnswer = (index: number) => {
-    if (answered || timeRemaining === 0) {
-      console.log('Cannot select answer:', { answered, timeRemaining });
-      return;
-    }
+    if (answered || timeRemaining === 0) return;
 
-    // Prevent double submission
-    if (answered) {
-      return;
-    }
-
-    console.log('Answer selected by user click:', index);
     const newSelected = [index];
     setSelectedAnswer(newSelected);
     
-    // Submit immediately with the new selection
-    handleSubmitAnswerWithSelection(newSelected);
+    // Auto-submit immediately when answer is selected
+    setTimeout(() => {
+      if (!answered) {
+        handleSubmitAnswerWithSelection(newSelected);
+      }
+    }, 100);
   };
 
   const handleSubmitAnswerWithSelection = (selection: number[]) => {
-    // Prevent double submission - check answered state first
-    if (answered) {
-      console.log('Already answered, ignoring duplicate submission');
-      return;
-    }
-
-    if (selection.length === 0 || !socket || !currentQuestion) {
+    if (answered || selection.length === 0 || !socket || !currentQuestion) {
       console.log('Cannot submit answer:', { answered, selection, socket: !!socket, currentQuestion: !!currentQuestion });
       return;
     }
@@ -397,9 +271,6 @@ const StudentGameScreen: React.FC = () => {
       alert('Connection lost. Please refresh the page.');
       return;
     }
-
-    // Set answered immediately to prevent double submission
-    setAnswered(true);
 
     const startTime = currentQuestion.timeLimit;
     const timeTaken = (startTime - timeRemaining) * 1000; // Convert to milliseconds
@@ -418,6 +289,7 @@ const StudentGameScreen: React.FC = () => {
       timeTaken
     });
 
+    setAnswered(true);
     // Start colorful animation if time hasn't run out yet
     if (timeRemaining > 0) {
       setShowColorAnimation(true);
@@ -517,20 +389,20 @@ const StudentGameScreen: React.FC = () => {
                 <div className="flex flex-col items-center">
                   <div className="relative mb-4">
                     {/* Character/Avatar with emote */}
-                    <div className={`${myPodium.avatarSize} bg-yellow-400 rounded-full flex items-center justify-center text-5xl font-bold shadow-2xl`}>
+                    <div className={`${myPodium.avatarSize} bg-yellow-400 rounded-full flex items-center justify-center text-5xl font-bold animate-bounce shadow-2xl`}>
                       {myEntry.nickname.charAt(0).toUpperCase()}
                     </div>
                     {myRank === 1 && (
                       <>
-                        <div className="absolute -top-4 -right-4 text-5xl">👑</div>
-                        <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 text-4xl">🏆</div>
+                        <div className="absolute -top-4 -right-4 text-5xl animate-pulse">👑</div>
+                        <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 text-4xl animate-bounce">🏆</div>
                       </>
                     )}
                     {myRank === 2 && (
-                      <div className="absolute -top-2 -right-2 text-3xl">🎉</div>
+                      <div className="absolute -top-2 -right-2 text-3xl animate-pulse">🎉</div>
                     )}
                     {myRank === 3 && (
-                      <div className="absolute -top-2 -right-2 text-3xl">🎊</div>
+                      <div className="absolute -top-2 -right-2 text-3xl animate-pulse">🎊</div>
                     )}
                   </div>
                   <div className={`${myPodium.color} rounded-t-lg px-8 py-6 text-center min-w-[180px] ring-4 ring-yellow-300 ring-offset-2`} style={{ height: myPodium.height }}>
@@ -541,66 +413,12 @@ const StudentGameScreen: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3 mt-6">
-                <button
-                  onClick={() => setShowFullLeaderboard(!showFullLeaderboard)}
-                  className="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg font-semibold transition-colors"
-                >
-                  {showFullLeaderboard ? 'Hide Leaderboard' : 'View Full Leaderboard'}
-                </button>
-                <button
-                  onClick={() => navigate('/quizwave/join')}
-                  className="flex-1 bg-white/20 hover:bg-white/30 text-white py-3 rounded-lg font-semibold transition-colors"
-                >
-                  Join Another Game
-                </button>
-              </div>
-
-              {/* Full Leaderboard */}
-              {showFullLeaderboard && leaderboard.length > 0 && (
-                <div className="mt-6 bg-white/10 backdrop-blur-sm rounded-lg p-4 sm:p-6 max-h-96 overflow-y-auto">
-                  <h3 className="text-xl font-bold text-white mb-4 text-center">Full Leaderboard</h3>
-                  <div className="space-y-2">
-                    {leaderboard.map((entry: any, index: number) => {
-                      const rank = index + 1;
-                      const isMe = entry.nickname === nickname;
-                      return (
-                        <div
-                          key={index}
-                          className={`flex items-center justify-between p-3 rounded-lg ${
-                            isMe 
-                              ? 'bg-yellow-500/30 border-2 border-yellow-400' 
-                              : 'bg-white/5'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                              rank === 1 ? 'bg-yellow-400 text-gray-900' :
-                              rank === 2 ? 'bg-gray-300 text-gray-900' :
-                              rank === 3 ? 'bg-orange-400 text-white' :
-                              'bg-white/20 text-white'
-                            }`}>
-                              {rank}
-                            </div>
-                            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-lg font-bold text-white">
-                              {entry.nickname.charAt(0).toUpperCase()}
-                            </div>
-                            <span className={`font-semibold ${isMe ? 'text-yellow-300' : 'text-white'}`}>
-                              {entry.nickname}
-                              {isMe && ' (You)'}
-                            </span>
-                          </div>
-                          <div className="text-right">
-                            <div className={`font-bold ${isMe ? 'text-yellow-300' : 'text-white'}`}>
-                              {entry.totalScore} pts
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+              <button
+                onClick={() => navigate('/quizwave/join')}
+                className="w-full mt-6 bg-white/20 hover:bg-white/30 text-white py-3 rounded-lg font-semibold transition-colors"
+              >
+                Join Another Game
+              </button>
             </div>
           </div>
         </div>
@@ -638,66 +456,12 @@ const StudentGameScreen: React.FC = () => {
                 <p className="text-white/80 text-xs sm:text-sm mt-2">points</p>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3">
-                <button
-                  onClick={() => setShowFullLeaderboard(!showFullLeaderboard)}
-                  className="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 sm:py-3 rounded-lg font-semibold transition-colors text-sm sm:text-base"
-                >
-                  {showFullLeaderboard ? 'Hide Leaderboard' : 'View Full Leaderboard'}
-                </button>
-                <button
-                  onClick={() => navigate('/quizwave/join')}
-                  className="flex-1 bg-white/20 hover:bg-white/30 text-white py-2 sm:py-3 rounded-lg font-semibold transition-colors text-sm sm:text-base"
-                >
-                  Join Another Game
-                </button>
-              </div>
-
-              {/* Full Leaderboard */}
-              {showFullLeaderboard && leaderboard.length > 0 && (
-                <div className="mt-6 bg-white/10 backdrop-blur-sm rounded-lg p-4 sm:p-6 max-h-96 overflow-y-auto">
-                  <h3 className="text-xl font-bold text-white mb-4 text-center">Full Leaderboard</h3>
-                  <div className="space-y-2">
-                    {leaderboard.map((entry: any, index: number) => {
-                      const rank = index + 1;
-                      const isMe = entry.nickname === nickname;
-                      return (
-                        <div
-                          key={index}
-                          className={`flex items-center justify-between p-3 rounded-lg ${
-                            isMe 
-                              ? 'bg-yellow-500/30 border-2 border-yellow-400' 
-                              : 'bg-white/5'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                              rank === 1 ? 'bg-yellow-400 text-gray-900' :
-                              rank === 2 ? 'bg-gray-300 text-gray-900' :
-                              rank === 3 ? 'bg-orange-400 text-white' :
-                              'bg-white/20 text-white'
-                            }`}>
-                              {rank}
-                            </div>
-                            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-lg font-bold text-white">
-                              {entry.nickname.charAt(0).toUpperCase()}
-                            </div>
-                            <span className={`font-semibold ${isMe ? 'text-yellow-300' : 'text-white'}`}>
-                              {entry.nickname}
-                              {isMe && ' (You)'}
-                            </span>
-                          </div>
-                          <div className="text-right">
-                            <div className={`font-bold ${isMe ? 'text-yellow-300' : 'text-white'}`}>
-                              {entry.totalScore} pts
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+              <button
+                onClick={() => navigate('/quizwave/join')}
+                className="w-full bg-white/20 hover:bg-white/30 text-white py-2 sm:py-3 rounded-lg font-semibold transition-colors text-sm sm:text-base"
+              >
+                Join Another Game
+              </button>
             </div>
           </div>
         </div>
@@ -749,16 +513,7 @@ const StudentGameScreen: React.FC = () => {
               return (
                 <button
                   key={index}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    console.log('Button clicked for option:', index);
-                    handleSelectAnswer(index);
-                  }}
-                  onTouchStart={(e) => {
-                    // Prevent accidental touches on mobile
-                    e.preventDefault();
-                  }}
+                  onClick={() => handleSelectAnswer(index)}
                   disabled={answered || timeRemaining === 0}
                   className={`${colorClass} rounded-2xl p-8 sm:p-10 lg:p-12 shadow-2xl transition-all transform ${
                     isSelected && !showColorAnimation

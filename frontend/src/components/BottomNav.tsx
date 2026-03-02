@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Gauge, ClipboardList, Inbox, User, Calendar, Search, Users, BookOpen } from 'lucide-react';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import { useAuth } from '../context/AuthContext';
 import { NavItem, ALL_NAV_OPTIONS, DEFAULT_NAV_ITEMS } from './NavCustomizationModal';
+import { hapticNavigation } from '../utils/hapticFeedback';
+import SwipeableContainer from './common/SwipeableContainer';
 
 const BottomNav: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { unreadCount } = useUnreadMessages();
   const { user } = useAuth();
   const [navItems, setNavItems] = useState<NavItem[]>([]);
@@ -111,6 +114,26 @@ const BottomNav: React.FC = () => {
     });
   };
 
+  // Find current active tab index
+  const activeIndex = navItems.findIndex(item => isActive(item));
+  
+  // Swipe navigation handlers
+  const handleSwipeLeft = () => {
+    if (activeIndex < navItems.length - 1) {
+      const nextItem = navItems[activeIndex + 1];
+      hapticNavigation();
+      navigate(nextItem.to);
+    }
+  };
+
+  const handleSwipeRight = () => {
+    if (activeIndex > 0) {
+      const prevItem = navItems[activeIndex - 1];
+      hapticNavigation();
+      navigate(prevItem.to);
+    }
+  };
+
   if (navItems.length === 0) {
     return null;
   }
@@ -128,13 +151,14 @@ const BottomNav: React.FC = () => {
             <Link
               key={item.id}
               to={item.to}
-              className={`flex flex-col items-center justify-center flex-1 h-full relative transition-colors ${
+              onClick={() => hapticNavigation()}
+              className={`flex flex-col items-center justify-center flex-1 h-full relative transition-colors min-h-[44px] min-w-[44px] px-2 py-2 touch-manipulation ${
                 active
                   ? 'text-red-600 dark:text-red-400'
                   : 'text-gray-500 dark:text-gray-400'
               }`}
             >
-              <div className="relative">
+              <div className="relative flex items-center justify-center">
                 <Icon className="h-5 w-5 mb-1" />
                 {showBadge && (
                   <span className={`absolute -top-1 -right-1 ${

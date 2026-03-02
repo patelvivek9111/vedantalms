@@ -3,12 +3,17 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useCourse } from '../contexts/CourseContext';
 import { useAuth } from '../context/AuthContext';
 import { ToDoPanel } from '../components/ToDoPanel';
-import { MoreVertical, Megaphone, FileText, MessageSquare, Palette, BookOpen, File, Settings, Bell, Menu, Folder, HelpCircle, User as UserIcon, LogOut, CheckSquare, ClipboardList, ArrowLeft, Sun, Moon } from 'lucide-react';
+import { MoreVertical, Megaphone, FileText, MessageSquare, Palette, BookOpen, File, Settings, Bell, Menu, Folder, HelpCircle, User as UserIcon, LogOut, CheckSquare, ClipboardList, ArrowLeft, Sun, Moon, GripVertical, Search } from 'lucide-react';
 import api, { getUserPreferences, updateUserPreferences, getImageUrl, updateUserProfile, uploadProfilePicture, getLoginActivity } from '../services/api';
 import NotificationCenter from '../components/NotificationCenter';
 import { NavCustomizationModal, NavItem, ALL_NAV_OPTIONS, DEFAULT_NAV_ITEMS } from '../components/NavCustomizationModal';
 import { ChangeUserModal } from '../components/ChangeUserModal';
 import { useTheme } from '../context/ThemeContext';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
+import { CourseCardSkeleton } from '../components/common/SkeletonLoader';
+import PullToRefresh from '../components/common/PullToRefresh';
+import SwipeableContainer from '../components/common/SwipeableContainer';
+import { useBottomNavSwipe } from '../hooks/useBottomNavSwipe';
 
 // Earthy tone color palette
 const earthyColors = [
@@ -440,13 +445,26 @@ export function Dashboard() {
   // Safety check - ensure context is available
   if (!courseContext) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-8">
+        <div className="mb-6 sm:mb-8">
+          <div className="h-7 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-48 mb-4"></div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            <CourseCardSkeleton count={6} />
+          </div>
+        </div>
       </div>
     );
   }
   
   const { courses, loading, error, updateCourse, getCourses } = courseContext;
+
+  // Refresh function for pull-to-refresh
+  const handleRefresh = async () => {
+    await getCourses();
+  };
+
+  // Swipe navigation for bottom nav
+  const { handleSwipeLeft, handleSwipeRight, enabled: swipeEnabled } = useBottomNavSwipe();
   
   // State to track user's personal course colors (for students) or course default colors (for teachers)
   const [userCourseColors, setUserCourseColors] = useState<{ [key: string]: string }>({});
@@ -482,6 +500,12 @@ export function Dashboard() {
   // Refs for dropdown containers
   const colorPickerRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const iconPickerRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+
+  // Course order state for drag and drop (must be before early returns)
+  const [courseOrder, setCourseOrder] = useState<string[]>(() => {
+    const saved = localStorage.getItem('courseOrder');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   const isTeacherOrAdmin = user?.role === 'teacher' || user?.role === 'admin';
 
@@ -522,13 +546,25 @@ export function Dashboard() {
           setNotificationCount(response.data.count || 0);
         }
       } catch (error) {
-        }
+        // Silent fail - notification count is not critical
+      }
     };
 
     fetchNotificationCount();
-    // Poll for new notifications every 30 seconds
-    const interval = setInterval(fetchNotificationCount, 30000);
-    return () => clearInterval(interval);
+    
+    // Poll for new notifications every 5 seconds (reduced for testing)
+    const interval = setInterval(fetchNotificationCount, 5000);
+    
+    // Listen for custom events to refresh immediately (though this won't work across browsers)
+    const handleNotificationCreated = () => {
+      fetchNotificationCount();
+    };
+    window.addEventListener('notificationCreated', handleNotificationCreated);
+    
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('notificationCreated', handleNotificationCreated);
+    };
   }, []);
 
   // Fetch course grades when showGrades is enabled
@@ -688,10 +724,50 @@ export function Dashboard() {
     };
   }, []);
 
+  // Split courses into published and unpublished, then apply custom order
+  // Must be computed before early returns to avoid hooks violation
+  // Apply custom order to published courses
+  const { publishedCourses, unpublishedCourses } = React.useMemo(() => {
+    const publishedCoursesRaw = (courses || []).filter(course => course.published);
+    const unpublishedCoursesList = (courses || []).filter(course => !course.published);
+    
+    // Apply custom order to published courses
+    if (courseOrder.length === 0 || publishedCoursesRaw.length === 0) {
+      return { publishedCourses: publishedCoursesRaw, unpublishedCourses: unpublishedCoursesList };
+    }
+    
+    // Create a map for quick lookup
+    const courseMap = new Map(publishedCoursesRaw.map(c => [c._id, c]));
+    // Order by saved order, then append any new courses
+    const ordered: typeof publishedCoursesRaw = [];
+    const used = new Set<string>();
+    
+    for (const id of courseOrder) {
+      if (courseMap.has(id)) {
+        ordered.push(courseMap.get(id)!);
+        used.add(id);
+      }
+    }
+    
+    // Add any courses not in the saved order
+    for (const course of publishedCoursesRaw) {
+      if (!used.has(course._id)) {
+        ordered.push(course);
+      }
+    }
+    
+    return { publishedCourses: ordered, unpublishedCourses: unpublishedCoursesList };
+  }, [courses, courseOrder]);
+
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-8">
+        <div className="mb-6 sm:mb-8">
+          <div className="h-7 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-48 mb-4"></div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            <CourseCardSkeleton count={6} />
+          </div>
+        </div>
       </div>
     );
   }
@@ -704,12 +780,22 @@ export function Dashboard() {
     );
   }
 
-  // Split courses into published and unpublished
-  const publishedCourses = courses.filter(course => course.published);
-  const unpublishedCourses = courses.filter(course => !course.published);
-
   const handleCardClick = (courseId: string) => {
     navigate(`/courses/${courseId}`);
+  };
+
+  // Handle drag end for course reordering
+  const handleDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
+    
+    const items = Array.from(publishedCourses);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
+    
+    // Save new order to localStorage
+    const newOrder = items.map(c => c._id);
+    setCourseOrder(newOrder);
+    localStorage.setItem('courseOrder', JSON.stringify(newOrder));
   };
 
   const handleColorChange = async (courseId: string, color: string) => {
@@ -788,6 +874,7 @@ export function Dashboard() {
       <button 
         key={iconId}
         className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+        aria-label={`Go to ${iconConfig.name} for this course`}
         onClick={(e) => {
           e.stopPropagation();
           // Navigate to specific course section based on icon type
@@ -809,7 +896,7 @@ export function Dashboard() {
           }
         }}
       >
-        <IconComponent className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+        <IconComponent className="h-5 w-5 text-gray-600 dark:text-gray-400" aria-hidden="true" />
       </button>
     );
   };
@@ -817,7 +904,7 @@ export function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Top Navigation Bar (Mobile Only) */}
-      <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+      <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm safe-area-inset-top">
         <div className="relative flex items-center justify-between px-4 py-3">
           <button
             onClick={() => setShowBurgerMenu(!showBurgerMenu)}
@@ -1078,9 +1165,17 @@ export function Dashboard() {
         </div>
       </nav>
 
-      <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-8 flex flex-col lg:flex-row gap-4 lg:gap-8 lg:pt-8 pt-20">
-        {/* Main dashboard content */}
-        <div className="flex-1">
+      <SwipeableContainer
+        onSwipeLeft={swipeEnabled ? handleSwipeLeft : undefined}
+        onSwipeRight={swipeEnabled ? handleSwipeRight : undefined}
+        enabled={swipeEnabled}
+        preventScrollInterference={true}
+        className="min-h-screen"
+      >
+        <PullToRefresh onRefresh={handleRefresh} className="min-h-screen">
+          <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-8 flex flex-col lg:flex-row gap-4 lg:gap-8 lg:pt-8 pt-20">
+          {/* Main dashboard content */}
+          <div className="flex-1">
           <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row justify-between items-start gap-4">
             <div className="lg:ml-0">
               <h1 className="hidden lg:block text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-800 dark:text-gray-100 mb-2">Dashboard</h1>
@@ -1125,13 +1220,57 @@ export function Dashboard() {
             )}
           </div>
           {publishedCourses.length === 0 ? (
-            <div className="text-center text-gray-500 dark:text-gray-400 py-8 text-sm sm:text-base">No published courses</div>
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-8 sm:p-12">
+              <div className="text-center">
+                <div className="mx-auto w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mb-4">
+                  <BookOpen className="w-8 h-8 text-gray-400 dark:text-gray-500" />
+                </div>
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                  {isTeacherOrAdmin ? 'No Published Courses Yet' : 'No Courses Enrolled'}
+                </h3>
+                <p className="text-gray-600 dark:text-gray-400 mb-6 text-sm sm:text-base">
+                  {isTeacherOrAdmin 
+                    ? 'Get started by creating your first course or publishing an existing one.'
+                    : 'Browse the catalog to find and enroll in courses that interest you.'}
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  {isTeacherOrAdmin ? (
+                    <Link
+                      to="/courses/create"
+                      className="inline-flex items-center justify-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors text-sm sm:text-base"
+                    >
+                      Create Your First Course
+                    </Link>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {publishedCourses.map((course) => (
-                <div 
-                  key={course._id} 
-                  className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-visible cursor-pointer hover:shadow-xl transition-all duration-300 sm:ml-4 border border-gray-100 dark:border-gray-700 group"
+                    <Link
+                      to="/catalog"
+                      className="inline-flex items-center justify-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors text-sm sm:text-base"
+                    >
+                      <Search className="w-4 h-4 mr-2" />
+                      Browse Course Catalog
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <DragDropContext onDragEnd={handleDragEnd}>
+              <Droppable droppableId="published-courses" direction="grid">
+                {(provided) => (
+                  <div 
+                    {...provided.droppableProps}
+                    ref={provided.innerRef}
+                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"
+                  >
+                    {publishedCourses.map((course, index) => (
+                      <Draggable key={course._id} draggableId={course._id} index={index}>
+                        {(provided, snapshot) => (
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            className={`bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-visible cursor-pointer hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 sm:ml-4 border border-gray-100 dark:border-gray-700 group ${
+                              snapshot.isDragging ? 'opacity-75 shadow-2xl' : ''
+                            }`}
                   onClick={() => handleCardClick(course._id)}
                   data-course-card
                 >
@@ -1140,6 +1279,16 @@ export function Dashboard() {
                     className="h-32 sm:h-48 relative"
                     style={{ backgroundColor: getCourseColor(course._id) }}
                   >
+                    {/* Drag Handle - Bottom Left (visible on hover) */}
+                    <div 
+                      {...provided.dragHandleProps}
+                      className="absolute bottom-3 left-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm p-1.5 rounded-md shadow-md">
+                        <GripVertical className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                      </div>
+                    </div>
                     {/* Grade Display - Top Left */}
                     {showGrades && (
                       <div className="absolute top-3 left-3 z-10">
@@ -1160,6 +1309,18 @@ export function Dashboard() {
                             </div>
                           </div>
                         ) : null}
+                      </div>
+                    )}
+                    {/* Drag Handle - Top Left (only when not showing grades) */}
+                    {!showGrades && (
+                      <div 
+                        {...provided.dragHandleProps}
+                        className="absolute top-3 left-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm p-1.5 rounded-md shadow-md">
+                          <GripVertical className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                        </div>
                       </div>
                     )}
                     <div className="absolute top-3 right-3">
@@ -1301,8 +1462,14 @@ export function Dashboard() {
                     </div>
                   </div>
                 </div>
+                      )}
+                    </Draggable>
               ))}
+                    {provided.placeholder}
             </div>
+                )}
+              </Droppable>
+            </DragDropContext>
           )}
         </div>
         {/* Unpublished Courses Section (hide for students) */}
@@ -1310,13 +1477,31 @@ export function Dashboard() {
           <div>
             <h2 className="text-lg sm:text-xl font-semibold text-gray-700 dark:text-gray-300 mb-4 sm:mb-6">Unpublished Courses ({unpublishedCourses.length})</h2>
             {unpublishedCourses.length === 0 ? (
-              <div className="text-center text-gray-500 dark:text-gray-400 py-8 text-sm sm:text-base">No unpublished courses</div>
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-8 sm:p-12">
+                <div className="text-center">
+                  <div className="mx-auto w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mb-4">
+                    <Folder className="w-8 h-8 text-gray-400 dark:text-gray-500" />
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                    No Unpublished Courses
+                  </h3>
+                  <p className="text-gray-600 dark:text-gray-400 mb-6 text-sm sm:text-base">
+                    All your courses are published and visible to students.
+                  </p>
+                  <Link
+                    to="/courses/create"
+                    className="inline-flex items-center justify-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors text-sm sm:text-base"
+                  >
+                    Create New Course
+                  </Link>
+                </div>
+              </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                 {unpublishedCourses.map((course) => (
                   <div 
                     key={course._id} 
-                    className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border border-gray-100 dark:border-gray-700"
+                    className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-100 dark:border-gray-700"
                     onClick={() => handleCardClick(course._id)}
                   >
                     {/* Top section - Dynamic color */}
@@ -1493,12 +1678,14 @@ export function Dashboard() {
             )}
           </div>
         )}
-      </div>
-      {/* To-Do Panel: Hidden on mobile, visible on desktop */}
-      <aside className="hidden lg:block w-full lg:w-96 flex-shrink-0 order-first lg:order-last">
-        <ToDoPanel />
-      </aside>
-    </div>
+          </div>
+          {/* To-Do Panel: Hidden on mobile, visible on desktop, hidden when notification center is open */}
+          <aside className={`hidden lg:block w-full lg:w-96 flex-shrink-0 order-first lg:order-last ${showNotificationCenter ? 'invisible' : 'visible'}`}>
+            <ToDoPanel />
+          </aside>
+        </div>
+        </PullToRefresh>
+      </SwipeableContainer>
 
     {/* Navigation Customization Modal */}
     <NavCustomizationModal

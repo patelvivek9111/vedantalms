@@ -1,19 +1,34 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCourse } from '../contexts/CourseContext';
 import { useAuth } from '../context/AuthContext';
+import ConfirmationModal from '../components/common/ConfirmationModal';
+import PullToRefresh from './common/PullToRefresh';
 
 const CourseList: React.FC = () => {
-  const { courses, loading, error, deleteCourse } = useCourse();
+  const { courses, loading, error, deleteCourse, getCourses } = useCourse();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [courseToDelete, setCourseToDelete] = useState<string | null>(null);
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this course?')) {
+  // Refresh function for pull-to-refresh
+  const handleRefresh = async () => {
+    await getCourses();
+  };
+
+  const handleDelete = (id: string) => {
+    setCourseToDelete(id);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!courseToDelete) return;
+    setShowDeleteConfirm(false);
       try {
-        await deleteCourse(id);
+      await deleteCourse(courseToDelete);
+      setCourseToDelete(null);
       } catch (err) {
-        }
     }
   };
 
@@ -57,38 +72,57 @@ const CourseList: React.FC = () => {
 
   if (availableCourses.length === 0) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">Courses</h1>
+      <PullToRefresh onRefresh={handleRefresh} className="min-h-screen">
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">Courses</h1>
+          </div>
+          <div className="text-center py-12">
+            <h2 className="text-xl text-gray-600 dark:text-gray-400 mb-4">
+              {isTeacherOrAdmin ? 'No courses available' : 'No published courses available'}
+            </h2>
+            {isTeacherOrAdmin && (
+              <Link
+                to="/courses/create"
+                className="bg-blue-500 dark:bg-blue-600 hover:bg-blue-600 dark:hover:bg-blue-700 text-white px-6 py-3 rounded-md transition-colors"
+              >
+                Create Your First Course
+              </Link>
+            )}
+          </div>
         </div>
-        <div className="text-center py-12">
-          <h2 className="text-xl text-gray-600 dark:text-gray-400 mb-4">
-            {isTeacherOrAdmin ? 'No courses available' : 'No published courses available'}
-          </h2>
-          {isTeacherOrAdmin && (
-            <Link
-              to="/courses/create"
-              className="bg-blue-500 dark:bg-blue-600 hover:bg-blue-600 dark:hover:bg-blue-700 text-white px-6 py-3 rounded-md transition-colors"
-            >
-              Create Your First Course
-            </Link>
-          )}
-        </div>
-      </div>
+      </PullToRefresh>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
-      <div className="flex justify-between items-center mb-4 sm:mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-gray-100">Courses</h1>
+    <PullToRefresh onRefresh={handleRefresh} className="min-h-screen">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+        <div className="flex justify-between items-center mb-4 sm:mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-gray-100">Courses</h1>
+        </div>
+        {/* Auto-redirecting to first course... */}
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 dark:border-blue-400 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Redirecting to your course...</p>
+        </div>
+
+      {/* Delete Course Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setCourseToDelete(null);
+        }}
+        onConfirm={confirmDelete}
+        title="Delete Course"
+        message="Are you sure you want to delete this course? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
       </div>
-      {/* Auto-redirecting to first course... */}
-      <div className="text-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 dark:border-blue-400 mx-auto mb-4"></div>
-        <p className="text-gray-600 dark:text-gray-400">Redirecting to your course...</p>
-      </div>
-    </div>
+    </PullToRefresh>
   );
 };
 

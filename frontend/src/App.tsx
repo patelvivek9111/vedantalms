@@ -35,6 +35,7 @@ import AssignmentDetailsWrapper from './components/assignments/AssignmentDetails
 import AssignmentGradingWrapper from './components/assignments/AssignmentGradingWrapper';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { AppLoadingSkeleton } from './components/common/SkeletonLoader';
 import ThreadView from './components/ThreadView';
 import ThreadViewWrapper from './components/ThreadViewWrapper';
 import Transcript from './pages/Transcript';
@@ -44,6 +45,7 @@ import GroupDashboard from './components/groups/GroupDashboard';
 import GroupDiscussion from './components/groups/GroupDiscussion';
 import GroupPeopleWrapper from './components/groups/GroupPeopleWrapper';
 import GroupHome from './components/groups/GroupHome';
+import GroupPageView from './components/groups/GroupPageView';
 import Announcements from './pages/Announcements';
 import GlobalSidebar from './components/GlobalSidebar';
 import BottomNav from './components/BottomNav';
@@ -118,18 +120,14 @@ function AppContent() {
   const isAuthenticated = !!user;
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-100 dark:bg-gray-900 dark:text-white flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-      </div>
-    );
+    return <AppLoadingSkeleton />;
   }
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 dark:text-white">
       {isAuthenticated && <GlobalSidebar />}
       {isAuthenticated && <BottomNav />}
-      <main className={isAuthenticated ? "pb-20 lg:pb-10 lg:pl-20" : "pb-10"}>
+      <main className={isAuthenticated ? "pb-20 lg:pb-10 lg:pl-20 transition-all duration-300" : "pb-10"}>
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
@@ -308,6 +306,11 @@ function AppContent() {
             <Route path="discussion" element={<GroupDiscussion />} />
             <Route path="discussion/:threadId" element={<ThreadView />} />
             <Route path="people" element={<GroupPeopleWrapper />} />
+            <Route path="pages/:pageId" element={
+              <ModuleProvider>
+                <GroupPageView />
+              </ModuleProvider>
+            } />
             <Route index element={<GroupHome />} />
           </Route>
           <Route

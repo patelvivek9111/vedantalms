@@ -1,6 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useCourse } from '../contexts/CourseContext';
+import FloatingLabelInput from './common/FloatingLabelInput';
+import FloatingLabelTextarea from './common/FloatingLabelTextarea';
+import FloatingLabelSelect from './common/FloatingLabelSelect';
+import DatePicker from './common/DatePicker';
+import FormFieldGroup from './common/FormFieldGroup';
+import { useDraftManager } from '../hooks/useDraftManager';
+import { Save, RefreshCw } from 'lucide-react';
 
 interface CourseFormProps {
   mode: 'create' | 'edit';
@@ -50,6 +57,27 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
     allowTeacherEnrollment: ''
   });
 
+  // Draft manager
+  const formId = mode === 'create' ? 'course-create' : `course-edit-${id}`;
+  const { draft, isDraftSaved, saveDraft, autoSave, clearDraft } = useDraftManager<typeof formData>({
+    formId,
+    autoSaveDelay: 2000
+  });
+
+  // Load draft on mount (only for create mode)
+  useEffect(() => {
+    if (mode === 'create' && draft) {
+      setFormData(draft);
+    }
+  }, [mode, draft]);
+
+  // Auto-save draft on form changes
+  useEffect(() => {
+    if (mode === 'create' && formData.title) {
+      autoSave(formData);
+    }
+  }, [formData, mode, autoSave]);
+
   useEffect(() => {
     if (mode === 'edit' && id) {
       const fetchCourse = async () => {
@@ -73,45 +101,66 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
           semesterYear: course.semester?.year?.toString() || new Date().getFullYear().toString()
         });
         } catch (err) {
+          // Error handling
           }
       };
       fetchCourse();
     }
   }, [mode, id]);
 
-  const validateForm = () => {
-    const errors = {
-      title: '',
-      description: '',
-      subject: '',
-      catalogDescription: '',
-      maxStudents: '',
-      creditHours: '',
-      enrollmentDeadline: '',
-      startDate: '',
-      endDate: '',
-      allowTeacherEnrollment: ''
-    };
+  // Validation functions
+  const validateTitle = (value: string) => {
+    if (!value.trim()) {
+      setFormErrors(prev => ({ ...prev, title: 'Title is required' }));
+      return false;
+    }
+    if (value.trim().length < 3) {
+      setFormErrors(prev => ({ ...prev, title: 'Title must be at least 3 characters long' }));
+      return false;
+    }
+    setFormErrors(prev => ({ ...prev, title: '' }));
+    return true;
+  };
+
+  const validateDescription = (value: string) => {
+    if (!value.trim()) {
+      setFormErrors(prev => ({ ...prev, description: 'Description is required' }));
+      return false;
+    }
+    if (value.trim().length < 10) {
+      setFormErrors(prev => ({ ...prev, description: 'Description must be at least 10 characters long' }));
+      return false;
+    }
+    setFormErrors(prev => ({ ...prev, description: '' }));
+    return true;
+  };
+
+  const validateDates = () => {
     let isValid = true;
-
-    if (!formData.title.trim()) {
-      errors.title = 'Title is required';
+    if (formData.startDate && formData.endDate) {
+      if (new Date(formData.startDate) > new Date(formData.endDate)) {
+        setFormErrors(prev => ({ ...prev, endDate: 'End date must be after start date' }));
       isValid = false;
-    } else if (formData.title.length < 3) {
-      errors.title = 'Title must be at least 3 characters long';
-      isValid = false;
+      } else {
+        setFormErrors(prev => ({ ...prev, endDate: '' }));
+      }
     }
-
-    if (!formData.description.trim()) {
-      errors.description = 'Description is required';
+    if (formData.enrollmentDeadline && formData.startDate) {
+      if (new Date(formData.enrollmentDeadline) > new Date(formData.startDate)) {
+        setFormErrors(prev => ({ ...prev, enrollmentDeadline: 'Enrollment deadline must be before start date' }));
       isValid = false;
-    } else if (formData.description.length < 10) {
-      errors.description = 'Description must be at least 10 characters long';
-      isValid = false;
+      } else {
+        setFormErrors(prev => ({ ...prev, enrollmentDeadline: '' }));
+      }
     }
-
-    setFormErrors(errors);
     return isValid;
+  };
+
+  const validateForm = () => {
+    const isTitleValid = validateTitle(formData.title);
+    const isDescriptionValid = validateDescription(formData.description);
+    const areDatesValid = validateDates();
+    return isTitleValid && isDescriptionValid && areDatesValid;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -119,6 +168,11 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
 
     if (!validateForm()) {
       return;
+    }
+
+    // Clear draft on successful submit
+    if (mode === 'create') {
+      clearDraft();
     }
 
     try {
@@ -150,6 +204,7 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
        }
        navigate('/dashboard');
     } catch (err) {
+      // Error handling
       }
   };
 
@@ -168,12 +223,68 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
     }));
   };
 
+  const handleResetForm = () => {
+    setFormData({
+      title: '',
+      description: '',
+      courseCode: '',
+      subject: '',
+      catalogDescription: '',
+      prerequisites: [],
+      maxStudents: '',
+      creditHours: '3',
+      enrollmentDeadline: '',
+      startDate: '',
+      endDate: '',
+      isPublic: false,
+      allowTeacherEnrollment: false,
+      semesterTerm: 'Fall',
+      semesterYear: new Date().getFullYear().toString()
+    });
+    setFormErrors({
+      title: '',
+      description: '',
+      subject: '',
+      catalogDescription: '',
+      maxStudents: '',
+      creditHours: '',
+      enrollmentDeadline: '',
+      startDate: '',
+      endDate: '',
+      allowTeacherEnrollment: ''
+    });
+    if (mode === 'create') {
+      clearDraft();
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-gray-100 mb-4 sm:mb-6">
+        <div className="flex items-center justify-between mb-4 sm:mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-gray-100">
           {mode === 'create' ? 'Create Course' : 'Edit Course'}
         </h1>
+          <div className="flex items-center gap-3">
+            {mode === 'create' && isDraftSaved && (
+              <div className="flex items-center text-sm text-green-600 dark:text-green-400">
+                <Save className="w-4 h-4 mr-1" />
+                Draft saved
+              </div>
+            )}
+            {mode === 'create' && (
+              <button
+                type="button"
+                onClick={handleResetForm}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
+                title="Clear form and start fresh"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Reset
+              </button>
+            )}
+          </div>
+        </div>
 
         {error && (
           <div className="bg-red-100 dark:bg-red-900/20 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded mb-4">
@@ -182,286 +293,182 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label
-              htmlFor="title"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+          {/* Basic Information Group */}
+          <FormFieldGroup
+            title="Basic Information"
+            description="Enter the basic details for your course"
             >
-              Title
-            </label>
-            <input
-              type="text"
+            <FloatingLabelInput
               id="title"
               name="title"
+              type="text"
+              label="Course Title"
+              required
               value={formData.title}
               onChange={handleChange}
-              className={`w-full px-3 py-2 border rounded-md shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 ${
-                formErrors.title ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-700'
-              }`}
-              placeholder="Enter course title"
+              onBlur={(e) => validateTitle(e.target.value)}
+              error={formErrors.title}
+              showCharacterCount
+              maxLength={100}
             />
-            {formErrors.title && (
-              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.title}</p>
-            )}
-          </div>
-
-          <div>
-            <label
-              htmlFor="description"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-            >
-              Description
-            </label>
-            <textarea
+            <FloatingLabelTextarea
               id="description"
               name="description"
+              label="Description"
+              required
+              rows={4}
               value={formData.description}
               onChange={handleChange}
-              rows={4}
-              className={`w-full px-3 py-2 border rounded-md shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 ${
-                formErrors.description ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-700'
-              }`}
-              placeholder="Enter course description"
+              onBlur={(e) => validateDescription(e.target.value)}
+              error={formErrors.description}
+              showCharacterCount
+              maxLength={500}
             />
-            {formErrors.description && (
-              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.description}</p>
-            )}
-          </div>
-
-          <div>
-            <label
-              htmlFor="courseCode"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-            >
-              Course Code
-            </label>
-            <input
-              type="text"
+            <FloatingLabelInput
               id="courseCode"
               name="courseCode"
+              type="text"
+              label="Course Code"
               value={formData.courseCode}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
               placeholder="e.g., CS101, MATH201"
+              helperText="Optional: Course code for catalog"
             />
-          </div>
+          </FormFieldGroup>
 
-                     {/* Catalog Section */}
-           <div className="border-t dark:border-gray-700 pt-6">
-             <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Catalog Information</h3>
-             
+          {/* Catalog Information Group */}
+          <FormFieldGroup
+            title="Catalog Information"
+            description="Details that will appear in the course catalog"
+          >
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-               <div>
-                 <label
-                   htmlFor="subject"
-                   className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                 >
-                   Subject
-                 </label>
-                 <input
-                   type="text"
+              <FloatingLabelInput
                    id="subject"
                    name="subject"
+                type="text"
+                label="Subject"
                    value={formData.subject}
                    onChange={handleChange}
-                   className={`w-full px-3 py-2 border rounded-md shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 ${
-                     formErrors.subject ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-700'
-                   }`}
+                error={formErrors.subject}
                    placeholder="e.g., Computer Science, Mathematics"
                  />
-                 {formErrors.subject && (
-                   <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.subject}</p>
-                 )}
-               </div>
-
-               <div>
-                 <label
-                   htmlFor="catalogDescription"
-                   className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                 >
-                   Catalog Description
-                 </label>
-                 <textarea
+              <FloatingLabelTextarea
                    id="catalogDescription"
                    name="catalogDescription"
+                label="Catalog Description"
+                rows={3}
                    value={formData.catalogDescription}
                    onChange={handleChange}
-                   rows={3}
-                   className={`w-full px-3 py-2 border rounded-md shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 ${
-                     formErrors.catalogDescription ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-700'
-                   }`}
+                error={formErrors.catalogDescription}
+                showCharacterCount
+                maxLength={300}
                    placeholder="Brief description for the course catalog"
                  />
-                 {formErrors.catalogDescription && (
-                   <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.catalogDescription}</p>
-                 )}
-               </div>
-
-              <div>
-                <label
-                  htmlFor="maxStudents"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                >
-                  Maximum Students
-                </label>
-                <input
-                  type="number"
+              <FloatingLabelInput
                   id="maxStudents"
                   name="maxStudents"
+                type="number"
+                label="Maximum Students"
                   value={formData.maxStudents}
                   onChange={handleChange}
-                  className={`w-full px-3 py-2 border rounded-md shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 ${
-                    formErrors.maxStudents ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-700'
-                  }`}
+                error={formErrors.maxStudents}
                   placeholder="Leave empty for unlimited"
-                />
-                {formErrors.maxStudents && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.maxStudents}</p>
-                )}
-              </div>
-
-              <div>
-                <label
-                  htmlFor="creditHours"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                >
-                  Credit Hours
-                </label>
-                <input
-                  type="number"
+                helperText="Optional: Maximum number of students"
+              />
+              <FloatingLabelInput
                   id="creditHours"
                   name="creditHours"
+                type="number"
+                label="Credit Hours"
+                required
+                min="1"
+                max="10"
                   value={formData.creditHours}
                   onChange={handleChange}
-                  min="1"
-                  max="10"
-                  className={`w-full px-3 py-2 border rounded-md shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 ${
-                    formErrors.creditHours ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-700'
-                  }`}
-                  placeholder="3"
-                />
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Number of credit hours for this course</p>
-                {formErrors.creditHours && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.creditHours}</p>
-                )}
+                error={formErrors.creditHours}
+                helperText="Number of credit hours for this course"
+              />
               </div>
+          </FormFieldGroup>
 
-              <div>
-                <label
-                  htmlFor="startDate"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                >
-                  Start Date
-                </label>
-                <input
-                  type="date"
+          {/* Schedule Group */}
+          <FormFieldGroup
+            title="Schedule"
+            description="Course dates and enrollment deadline"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <DatePicker
                   id="startDate"
                   name="startDate"
+                label="Start Date"
                   value={formData.startDate}
                   onChange={handleChange}
-                  className={`w-full px-3 py-2 border rounded-md shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 ${
-                    formErrors.startDate ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-700'
-                  }`}
-                />
-                {formErrors.startDate && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.startDate}</p>
-                )}
-              </div>
-
-              <div>
-                <label
-                  htmlFor="endDate"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                >
-                  End Date
-                </label>
-                <input
-                  type="date"
+                error={formErrors.startDate}
+                onBlur={validateDates}
+              />
+              <DatePicker
                   id="endDate"
                   name="endDate"
+                label="End Date"
                   value={formData.endDate}
                   onChange={handleChange}
-                  className={`w-full px-3 py-2 border rounded-md shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 ${
-                    formErrors.endDate ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-700'
-                  }`}
-                />
-                {formErrors.endDate && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.endDate}</p>
-                )}
-              </div>
-
-              <div>
-                <label
-                  htmlFor="enrollmentDeadline"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                >
-                  Enrollment Deadline
-                </label>
-                <input
-                  type="date"
+                error={formErrors.endDate}
+                onBlur={validateDates}
+                helperText={formData.startDate ? `Must be after ${new Date(formData.startDate).toLocaleDateString()}` : ''}
+              />
+              <DatePicker
                   id="enrollmentDeadline"
                   name="enrollmentDeadline"
+                label="Enrollment Deadline"
                   value={formData.enrollmentDeadline}
                   onChange={handleChange}
-                  className={`w-full px-3 py-2 border rounded-md shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 ${
-                    formErrors.enrollmentDeadline ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-700'
-                  }`}
-                />
-                {formErrors.enrollmentDeadline && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.enrollmentDeadline}</p>
-                )}
-              </div>
+                error={formErrors.enrollmentDeadline}
+                onBlur={validateDates}
+                helperText={formData.startDate ? `Must be before ${new Date(formData.startDate).toLocaleDateString()}` : ''}
+              />
             </div>
-
-            {/* Semester Section */}
-            <div className="border-t dark:border-gray-700 pt-6 mt-6">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Semester Information</h3>
+          </FormFieldGroup>
               
+          {/* Semester Information Group */}
+          <FormFieldGroup
+            title="Semester Information"
+            description="Term and year for this course"
+          >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label
-                    htmlFor="semesterTerm"
-                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                  >
-                    Term
-                  </label>
-                  <select
+              <FloatingLabelSelect
                     id="semesterTerm"
                     name="semesterTerm"
+                label="Term"
                     value={formData.semesterTerm}
                     onChange={(e) => setFormData(prev => ({ ...prev, semesterTerm: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                  >
-                    <option value="Fall">Fall</option>
-                    <option value="Spring">Spring</option>
-                    <option value="Summer">Summer</option>
-                    <option value="Winter">Winter</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="semesterYear"
-                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                  >
-                    Year
-                  </label>
-                  <input
-                    type="number"
+                options={[
+                  { value: 'Fall', label: 'Fall' },
+                  { value: 'Spring', label: 'Spring' },
+                  { value: 'Summer', label: 'Summer' },
+                  { value: 'Winter', label: 'Winter' }
+                ]}
+              />
+              <FloatingLabelInput
                     id="semesterYear"
                     name="semesterYear"
+                type="number"
+                label="Year"
+                required
+                min="2020"
+                max="2100"
                     value={formData.semesterYear}
                     onChange={handleChange}
-                    min="2020"
-                    max="2100"
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                     placeholder="2025"
                   />
-                </div>
-              </div>
             </div>
+          </FormFieldGroup>
 
-            <div className="mt-6">
+          {/* Options Group */}
+          <FormFieldGroup
+            title="Course Options"
+            description="Additional settings for your course"
+          >
+            <div className="space-y-4">
               <label htmlFor="isPublic" className="flex items-center">
                 <input
                   type="checkbox"
@@ -475,9 +482,6 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
                   Make this course public in the catalog
                 </span>
               </label>
-            </div>
-            
-            <div className="mt-4">
               <label htmlFor="allowTeacherEnrollment" className="flex items-center">
                 <input
                   type="checkbox"
@@ -492,20 +496,20 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
                 </span>
               </label>
             </div>
-          </div>
+          </FormFieldGroup>
 
                      <div className="flex justify-end space-x-4">
              <button
                type="button"
                onClick={() => navigate('/dashboard')}
-               className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+               className="min-h-[44px] px-4 py-2.5 border border-gray-300 dark:border-gray-700 rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400 touch-manipulation active:scale-95 transition-transform"
              >
                Cancel
              </button>
              <button
                type="submit"
                disabled={loading}
-               className="px-4 py-2 bg-blue-500 dark:bg-blue-600 text-white rounded-md hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50"
+               className="min-h-[44px] px-4 py-2.5 bg-blue-500 dark:bg-blue-600 text-white rounded-md hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 touch-manipulation active:scale-95 transition-transform"
              >
                {loading ? (
                  <span className="flex items-center">

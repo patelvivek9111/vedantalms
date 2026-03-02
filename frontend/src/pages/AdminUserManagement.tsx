@@ -50,6 +50,8 @@ export function AdminUserManagement() {
   });
   const [createUserLoading, setCreateUserLoading] = useState(false);
   const [createUserError, setCreateUserError] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -139,9 +141,8 @@ export function AdminUserManagement() {
         setShowUserModal(true);
         break;
       case 'delete':
-        if (confirm(`Are you sure you want to delete ${user.firstName} ${user.lastName}?`)) {
-          setUsers(users.filter(u => u._id !== user._id));
-        }
+        setUserToDelete(user);
+        setShowDeleteConfirm(true);
         break;
       case 'suspend':
         setUsers(users.map(u => 
@@ -585,6 +586,27 @@ export function AdminUserManagement() {
           </div>
         </div>
       )}
+
+      {/* Delete User Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setUserToDelete(null);
+        }}
+        onConfirm={() => {
+          if (userToDelete) {
+            setUsers(users.filter(u => u._id !== userToDelete._id));
+            setShowDeleteConfirm(false);
+            setUserToDelete(null);
+          }
+        }}
+        title="Delete User"
+        message={`Are you sure you want to delete ${userToDelete?.firstName} ${userToDelete?.lastName}? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </div>
   );
 } 

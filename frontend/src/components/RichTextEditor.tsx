@@ -7,14 +7,16 @@ interface RichTextEditorProps {
   placeholder?: string;
   className?: string;
   height?: number;
+  id?: string;
 }
 
-const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, placeholder, className, height }) => {
+const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, placeholder, className, height, id }) => {
   return (
     <Editor
       apiKey="gdng5aigkhrb5lsxhh4j8u2s4elts687j9k2uzu63l6zd4gw"
       value={content}
       onEditorChange={onChange}
+      id={id}
       init={{
         height: height || 200,
         menubar: false,

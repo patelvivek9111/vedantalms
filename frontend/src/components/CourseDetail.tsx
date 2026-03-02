@@ -80,6 +80,8 @@ import { useGradeScaleManagement } from '../hooks/useGradeScaleManagement';
 import { useAssignmentGroupsManagement } from '../hooks/useAssignmentGroupsManagement';
 import { useSyllabusManagement } from '../hooks/useSyllabusManagement';
 import { useSidebarConfig } from '../hooks/useSidebarConfig';
+import Breadcrumb from './common/Breadcrumb';
+import { useCourseSectionSwipe } from '../hooks/useCourseSectionSwipe';
 
 
 
@@ -301,6 +303,14 @@ const CourseDetail: React.FC = () => {
   const { filteredNavigationItems, sidebarConfig } = useSidebarConfig({
     course,
     user,
+  });
+
+  // Swipe navigation between course sections (mobile only)
+  const sectionSwipeHandlers = useCourseSectionSwipe({
+    sections: filteredNavigationItems,
+    activeSection,
+    courseId: id || '',
+    enabled: isMobileDevice && !isMobileMenuOpen // Only enable when mobile menu is closed
   });
 
   // Update ref when getCourse changes
@@ -992,8 +1002,32 @@ const CourseDetail: React.FC = () => {
       />
 
       {/* Main Content Area */}
-      <div className={`flex-1 overflow-auto w-full ${isMobileMenuOpen ? 'lg:overflow-auto overflow-hidden' : ''}`}>
+      <div 
+        className={`flex-1 overflow-auto w-full ${isMobileMenuOpen ? 'lg:overflow-auto overflow-hidden' : ''}`}
+        {...(sectionSwipeHandlers.enabled ? {
+          onTouchStart: sectionSwipeHandlers.onTouchStart,
+          onTouchMove: sectionSwipeHandlers.onTouchMove,
+          onTouchEnd: sectionSwipeHandlers.onTouchEnd
+        } : {})}
+      >
         <div className="container mx-auto px-4 py-6">
+          {/* Breadcrumb Navigation - Desktop Only */}
+          <div className="hidden lg:block mb-4">
+            <Breadcrumb
+              items={[
+                { label: 'Dashboard', path: '/dashboard' },
+                { label: 'Courses', path: '/courses' },
+                { 
+                  label: course?.catalog?.courseCode || course?.title || 'Course', 
+                  path: `/courses/${id}` 
+                },
+                ...(section && section !== 'overview' ? [{ 
+                  label: section.charAt(0).toUpperCase() + section.slice(1), 
+                  path: `/courses/${id}/${section}` 
+                }] : [])
+              ]}
+            />
+          </div>
           {renderContent()}
         </div>
       </div>

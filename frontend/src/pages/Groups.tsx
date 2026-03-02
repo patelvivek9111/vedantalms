@@ -22,6 +22,8 @@ import {
   User
 } from 'lucide-react';
 import { BurgerMenu } from '../components/BurgerMenu';
+import SwipeableContainer from '../components/common/SwipeableContainer';
+import { useBottomNavSwipe } from '../hooks/useBottomNavSwipe';
 
 interface Group {
   _id: string;
@@ -352,10 +354,20 @@ const Groups: React.FC = () => {
 
   const stats = getStats();
 
+  // Swipe navigation for bottom nav
+  const { handleSwipeLeft, handleSwipeRight, enabled: swipeEnabled } = useBottomNavSwipe();
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Top Navigation Bar (Mobile Only) */}
-      <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+    <SwipeableContainer
+      onSwipeLeft={swipeEnabled ? handleSwipeLeft : undefined}
+      onSwipeRight={swipeEnabled ? handleSwipeRight : undefined}
+      enabled={swipeEnabled}
+      preventScrollInterference={true}
+      className="min-h-screen bg-gray-50 dark:bg-gray-900"
+    >
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        {/* Top Navigation Bar (Mobile Only) */}
+        <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
         <div className="relative flex items-center justify-between px-4 py-3">
           <button
             onClick={() => setShowBurgerMenu(!showBurgerMenu)}
@@ -878,7 +890,8 @@ const Groups: React.FC = () => {
         </div>
       )}
       </div>
-    </div>
+      </div>
+    </SwipeableContainer>
   );
 };
 

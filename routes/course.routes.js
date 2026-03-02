@@ -704,6 +704,23 @@ router.post('/:courseId/enrollment/:studentId/approve', protect, authorize('teac
     // Update consolidated waitlist notification for instructor
     await createOrUpdateWaitlistNotification(updatedCourse, Todo);
     
+    // Notify student about enrollment approval
+    try {
+      const { createNotification } = require('./notification.routes');
+      await createNotification(studentId, {
+        type: 'enrollment',
+        title: 'Enrollment Approved',
+        message: `Your enrollment request for "${updatedCourse.title}" has been approved.`,
+        link: `/courses/${courseId}`,
+        relatedId: courseId,
+        relatedType: 'course',
+        priority: 'high'
+      });
+    } catch (notifError) {
+      console.error('Error creating enrollment approval notification:', notifError);
+      // Don't fail the approval if notification fails
+    }
+    
     res.json({ success: true, message: 'Enrollment approved and student added to course' });
   } catch (err) {
     console.error('Enrollment approval error:', err);
@@ -764,6 +781,23 @@ router.post('/:courseId/enrollment/:studentId/deny', protect, authorize('teacher
     
     // Update consolidated waitlist notification for instructor
     await createOrUpdateWaitlistNotification(updatedCourse, Todo);
+    
+    // Notify student about enrollment denial
+    try {
+      const { createNotification } = require('./notification.routes');
+      await createNotification(studentId, {
+        type: 'enrollment',
+        title: 'Enrollment Denied',
+        message: `Your enrollment request for "${updatedCourse.title}" has been denied.`,
+        link: `/courses`,
+        relatedId: courseId,
+        relatedType: 'course',
+        priority: 'medium'
+      });
+    } catch (notifError) {
+      console.error('Error creating enrollment denial notification:', notifError);
+      // Don't fail the denial if notification fails
+    }
     
     res.json({ success: true, message: 'Enrollment denied' });
   } catch (err) {

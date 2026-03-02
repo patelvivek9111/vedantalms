@@ -11,6 +11,11 @@ import { ToDoPanel } from './ToDoPanel';
 import { useNavigate } from 'react-router-dom';
 import { FileText, User, Plus, ChevronDown, Calendar as CalendarIcon } from 'lucide-react';
 import { BurgerMenu } from './BurgerMenu';
+import DatePicker from './common/DatePicker';
+import SwipeableContainer from './common/SwipeableContainer';
+import { useBottomNavSwipe } from '../hooks/useBottomNavSwipe';
+import { useSwipeGesture } from '../hooks/useSwipeGesture';
+import { hapticNavigation } from '../utils/hapticFeedback';
 
 const locales = {
   'en-US': enUS,
@@ -341,9 +346,26 @@ const CalendarPage: React.FC = () => {
   const navigate = useNavigate();
   // Mobile view state
   const [showBurgerMenu, setShowBurgerMenu] = useState(false);
+
+  // Swipe navigation for bottom nav
+  const { handleSwipeLeft, handleSwipeRight, enabled: swipeEnabled } = useBottomNavSwipe();
   const [mobileViewMode, setMobileViewMode] = useState<'week' | 'month'>('month');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showCalendarsModal, setShowCalendarsModal] = useState(false);
+
+  // Swipe to dismiss calendars modal
+  const handleDismissModal = () => {
+    hapticNavigation();
+    setShowCalendarsModal(false);
+  };
+
+  const calendarModalSwipe = useSwipeGesture({
+    onSwipeDown: handleDismissModal,
+    threshold: 80,
+    velocityThreshold: 0.4,
+    preventDefault: false,
+    enabled: showCalendarsModal
+  });
 
   // Only show for teachers/admins
   const isTeacherOrAdmin = user && (user.role === 'teacher' || user.role === 'admin');
@@ -754,9 +776,9 @@ const CalendarPage: React.FC = () => {
   const CustomToolbar = (toolbarProps: any) => (
     <div className="rbc-toolbar flex items-center justify-between mb-2">
       <div className="flex gap-2">
-        <button type="button" className="rbc-btn px-3 py-1 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-blue-100 dark:hover:bg-blue-900/50 active:bg-blue-200 dark:active:bg-blue-800 text-gray-700 dark:text-gray-300 transition" onClick={() => toolbarProps.onNavigate('TODAY')}>Today</button>
-        <button type="button" className="rbc-btn px-3 py-1 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-blue-100 dark:hover:bg-blue-900/50 active:bg-blue-200 dark:active:bg-blue-800 text-gray-700 dark:text-gray-300 transition" onClick={() => toolbarProps.onNavigate('PREV')}>Back</button>
-        <button type="button" className="rbc-btn px-3 py-1 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-blue-100 dark:hover:bg-blue-900/50 active:bg-blue-200 dark:active:bg-blue-800 text-gray-700 dark:text-gray-300 transition" onClick={() => toolbarProps.onNavigate('NEXT')}>Next</button>
+        <button type="button" className="rbc-btn min-h-[44px] px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-blue-100 dark:hover:bg-blue-900/50 active:bg-blue-200 dark:active:bg-blue-800 text-gray-700 dark:text-gray-300 transition touch-manipulation active:scale-95" onClick={() => toolbarProps.onNavigate('TODAY')}>Today</button>
+        <button type="button" className="rbc-btn min-h-[44px] px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-blue-100 dark:hover:bg-blue-900/50 active:bg-blue-200 dark:active:bg-blue-800 text-gray-700 dark:text-gray-300 transition touch-manipulation active:scale-95" onClick={() => toolbarProps.onNavigate('PREV')}>Back</button>
+        <button type="button" className="rbc-btn min-h-[44px] px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-blue-100 dark:hover:bg-blue-900/50 active:bg-blue-200 dark:active:bg-blue-800 text-gray-700 dark:text-gray-300 transition touch-manipulation active:scale-95" onClick={() => toolbarProps.onNavigate('NEXT')}>Next</button>
       </div>
       <span className="rbc-toolbar-label text-lg font-semibold text-gray-900 dark:text-gray-100">{toolbarProps.label}</span>
       <div className="flex gap-2 items-center">
@@ -974,17 +996,13 @@ const CalendarPage: React.FC = () => {
 
             {/* Date Field */}
             <div className="mb-4">
-              <label htmlFor="event-date" className="block text-xs font-semibold mb-1.5 text-gray-700 dark:text-gray-300 lg:text-sm lg:mb-1">
-                Date <span className="text-red-500">*</span>
-              </label>
-              <input
+              <DatePicker
                 id="event-date"
                 name="date"
-                className="border-2 border-gray-200 dark:border-gray-700 p-2.5 w-full rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm lg:p-2 lg:text-sm"
-                type="date"
+                label="Date"
+                required
                 value={localDate}
                 onChange={e => setLocalDate(e.target.value)}
-                required
               />
             </div>
 
@@ -1182,9 +1200,16 @@ const CalendarPage: React.FC = () => {
   const calendarGrid = generateMobileCalendarGrid();
   
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Mobile Top Navigation */}
-      <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+    <SwipeableContainer
+      onSwipeLeft={swipeEnabled ? handleSwipeLeft : undefined}
+      onSwipeRight={swipeEnabled ? handleSwipeRight : undefined}
+      enabled={swipeEnabled}
+      preventScrollInterference={true}
+      className="min-h-screen bg-gray-50 dark:bg-gray-900"
+    >
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        {/* Mobile Top Navigation */}
+        <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
         <div className="relative flex items-center justify-between px-4 py-3">
           <button
             onClick={() => setShowBurgerMenu(!showBurgerMenu)}
@@ -1556,32 +1581,51 @@ const CalendarPage: React.FC = () => {
 
       {/* Calendars Modal (Mobile Only) */}
       {showCalendarsModal && (
-        <div className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50" style={{ bottom: '64px' }}>
-          <div className="absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-800 w-full rounded-t-3xl shadow-2xl flex flex-col border-t border-gray-200 dark:border-gray-700" style={{ maxHeight: 'calc(100vh - 64px)' }}>
-            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-5 py-4 flex items-center justify-between z-10 flex-shrink-0">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Calendars</h2>
+        <div className="lg:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50" style={{ bottom: '64px' }} onClick={() => setShowCalendarsModal(false)}>
+          <div 
+            className="absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-800 rounded-t-2xl shadow-2xl flex flex-col border-t border-gray-200 dark:border-gray-700 mx-2 mb-2"
+            style={{ maxHeight: '60vh' }}
+            onClick={(e) => e.stopPropagation()}
+            {...(showCalendarsModal ? {
+              onTouchStart: calendarModalSwipe.onTouchStart,
+              onTouchMove: calendarModalSwipe.onTouchMove,
+              onTouchEnd: calendarModalSwipe.onTouchEnd
+            } : {})}
+          >
+            {/* Compact Header */}
+            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between z-10 flex-shrink-0">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Calendars</h2>
               <button
                 onClick={() => setShowCalendarsModal(false)}
-                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 text-xl w-9 h-9 flex items-center justify-center rounded-full transition-all active:scale-95 touch-manipulation"
+                className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all active:scale-95 touch-manipulation"
+                aria-label="Close"
               >
-                ✕
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
             </div>
+            {/* Compact Content */}
             <div className="overflow-y-auto flex-1">
-              <div className="p-5 space-y-3">
+              <div className="px-4 py-3 space-y-2">
                 {calendarOptions.map((opt, idx) => (
-                  <div className="flex items-center gap-4 min-h-[3rem] p-3 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors touch-manipulation" key={opt.value}>
-                    <input
-                      type="checkbox"
-                      id={`mobile-calendar-${opt.value}`}
-                      checked={selectedCalendars.includes(opt.value)}
-                      onChange={() => handleCalendarToggle(opt.value)}
-                      className="w-5 h-5 rounded-md border-2 border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 cursor-pointer"
-                    />
+                  <div className="flex items-center gap-3 py-2.5 px-2 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/50 active:bg-gray-100 dark:active:bg-gray-700 transition-colors touch-manipulation min-h-[44px]" key={opt.value}>
+                    <label
+                      htmlFor={`mobile-calendar-${opt.value}`}
+                      className="min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer p-2 -ml-2"
+                    >
+                      <input
+                        type="checkbox"
+                        id={`mobile-calendar-${opt.value}`}
+                        checked={selectedCalendars.includes(opt.value)}
+                        onChange={() => handleCalendarToggle(opt.value)}
+                        className="w-4 h-4 rounded border-2 border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 cursor-pointer flex-shrink-0"
+                      />
+                    </label>
                     <button
                       type="button"
                       ref={el => { colorDotRefs.current[opt.value] = el; }}
-                      className="w-5 h-5 rounded-full border-2 border-white dark:border-gray-800 shadow-md flex-shrink-0 ring-2 ring-gray-200 dark:ring-gray-700 hover:ring-gray-300 dark:hover:ring-gray-600 transition-all active:scale-95"
+                      className="min-h-[44px] min-w-[44px] flex items-center justify-center w-6 h-6 rounded-full border border-white dark:border-gray-800 shadow-sm flex-shrink-0 hover:scale-110 transition-transform active:scale-95"
                       style={{ background: getCalendarColor(opt.value, idx) }}
                       onClick={(e) => {
                         e.preventDefault();
@@ -1590,25 +1634,26 @@ const CalendarPage: React.FC = () => {
                       }}
                       aria-label={`Pick color for ${opt.label}`}
                     />
-                    <label
-                      htmlFor={`mobile-calendar-${opt.value}`}
-                      className="flex-1 text-gray-900 dark:text-gray-100 cursor-pointer font-medium text-base"
+                    <span
+                      className="flex-1 text-gray-900 dark:text-gray-100 text-sm font-medium"
                     >
                       {opt.label}
-                    </label>
+                    </span>
                   </div>
                 ))}
                 {colorWheelOpen && (
-                  <ColorWheelPicker
-                    colors={colorPalette}
-                    onSelect={color => {
-                      handleCalendarColorChange(colorWheelOpen, color);
-                      setColorWheelOpen(null);
-                    }}
-                    onClose={() => setColorWheelOpen(null)}
-                    anchorRef={{ current: colorDotRefs.current[colorWheelOpen] ?? null }}
-                    positionRight={true}
-                  />
+                  <div className="pt-2 pb-1">
+                    <ColorWheelPicker
+                      colors={colorPalette}
+                      onSelect={color => {
+                        handleCalendarColorChange(colorWheelOpen, color);
+                        setColorWheelOpen(null);
+                      }}
+                      onClose={() => setColorWheelOpen(null)}
+                      anchorRef={{ current: colorDotRefs.current[colorWheelOpen] ?? null }}
+                      positionRight={true}
+                    />
+                  </div>
                 )}
               </div>
             </div>
@@ -1617,7 +1662,8 @@ const CalendarPage: React.FC = () => {
       )}
 
       {/* Change User Modal */}
-    </div>
+      </div>
+    </SwipeableContainer>
   );
 };
 
