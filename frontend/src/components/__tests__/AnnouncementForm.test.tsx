@@ -46,7 +46,8 @@ describe('AnnouncementForm', () => {
       <AnnouncementForm onSubmit={mockOnSubmit} />
     );
 
-    expect(screen.getByPlaceholderText('Topic Title')).toBeInTheDocument();
+    // FloatingLabelInput uses label text, not placeholder
+    expect(screen.getByLabelText(/topic title/i)).toBeInTheDocument();
     expect(screen.getByTestId('rich-text-editor')).toBeInTheDocument();
   });
 
@@ -55,7 +56,7 @@ describe('AnnouncementForm', () => {
       <AnnouncementForm onSubmit={mockOnSubmit} />
     );
 
-    const titleInput = screen.getByPlaceholderText('Topic Title');
+    const titleInput = screen.getByLabelText(/topic title/i);
     const editor = screen.getByTestId('rich-text-editor');
     const submitButton = screen.getByRole('button', { name: /save/i });
 
@@ -82,7 +83,7 @@ describe('AnnouncementForm', () => {
     });
   });
 
-  it('should load initial values', () => {
+  it('should load initial values', async () => {
     const initialValues = {
       title: 'Initial Title',
       body: 'Initial Body',
@@ -96,8 +97,11 @@ describe('AnnouncementForm', () => {
       />
     );
 
-    const titleInput = screen.getByPlaceholderText('Topic Title') as HTMLInputElement;
-    expect(titleInput.value).toBe('Initial Title');
+    // Wait for useEffect to set initial values
+    await waitFor(() => {
+      const titleInput = screen.getByLabelText(/topic title/i) as HTMLInputElement;
+      expect(titleInput.value).toBe('Initial Title');
+    });
   });
 
   it('should handle cancel', () => {
@@ -131,9 +135,11 @@ describe('AnnouncementForm', () => {
       <AnnouncementForm onSubmit={mockOnSubmit} />
     );
 
-    // Now that the label has htmlFor, we can use getByLabelText
-    const fileInput = screen.getByLabelText(/^attachments$/i) as HTMLInputElement;
+    // File input has id="announcement-attachments" and name="attachments"
+    // Find it by id since label doesn't have htmlFor
+    const fileInput = document.getElementById('announcement-attachments') as HTMLInputElement;
     expect(fileInput).toBeInTheDocument();
+    expect(fileInput.type).toBe('file');
     
     const file = new File(['content'], 'test.pdf', { type: 'application/pdf' });
     fireEvent.change(fileInput, { target: { files: [file] } });

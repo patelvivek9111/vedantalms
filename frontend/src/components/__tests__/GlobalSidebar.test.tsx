@@ -142,14 +142,17 @@ describe('GlobalSidebar', () => {
 
   it('should highlight active route', () => {
     render(
-      <MemoryRouter initialEntries={['/dashboard']}>
+      <MemoryRouter initialEntries={['/']}>
         <GlobalSidebar />
       </MemoryRouter>
     );
 
-    // Active route should be highlighted
+    // Active route should be highlighted - Dashboard links to '/'
     const dashboardLink = screen.getByText('Dashboard');
-    expect(dashboardLink.closest('a')).toHaveAttribute('href', '/dashboard');
+    const linkElement = dashboardLink.closest('a');
+    expect(linkElement).toHaveAttribute('href', '/');
+    // Check if active styling is applied (has bg-blue-800 class)
+    expect(linkElement).toHaveClass('bg-blue-800');
   });
 
   it('should show course dropdown on hover', () => {

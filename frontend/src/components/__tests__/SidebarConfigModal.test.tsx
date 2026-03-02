@@ -61,7 +61,7 @@ describe('SidebarConfigModal', () => {
       />
     );
 
-    expect(screen.getByText(/sidebar configuration/i)).toBeInTheDocument();
+    expect(screen.getByText(/customize course sidebar/i)).toBeInTheDocument();
   });
 
   it('should display current sidebar items', () => {
@@ -75,11 +75,15 @@ describe('SidebarConfigModal', () => {
       />
     );
 
-    expect(screen.getByText('Overview')).toBeInTheDocument();
-    expect(screen.getByText('Assignments')).toBeInTheDocument();
+    // Items appear in both "Sidebar Items" and "Student Visibility" sections
+    const overviewItems = screen.getAllByText('Overview');
+    expect(overviewItems.length).toBeGreaterThan(0);
+    
+    const assignmentItems = screen.getAllByText('Assignments');
+    expect(assignmentItems.length).toBeGreaterThan(0);
   });
 
-  it('should toggle item visibility', () => {
+  it('should toggle item visibility', async () => {
     render(
       <SidebarConfigModal
         isOpen={true}
@@ -90,13 +94,22 @@ describe('SidebarConfigModal', () => {
       />
     );
 
-    // Find visibility toggle for an item
-    const toggles = screen.getAllByRole('checkbox');
-    if (toggles.length > 0) {
-      const toggle = toggles[0];
-      const wasChecked = toggle.checked;
+    // Find visibility toggle buttons (Eye/EyeOff icons)
+    const toggleButtons = screen.getAllByTitle(/hide item|show item/i);
+    if (toggleButtons.length > 0) {
+      const toggle = toggleButtons[0];
+      // Get the parent item to check visibility state
+      const itemContainer = toggle.closest('.flex.items-center');
+      const wasVisible = itemContainer?.classList.contains('bg-white') || itemContainer?.classList.contains('dark:bg-gray-800');
+      
       fireEvent.click(toggle);
-      expect(toggle.checked).toBe(!wasChecked);
+      
+      // Wait for state update
+      await waitFor(() => {
+        const updatedContainer = toggle.closest('.flex.items-center');
+        const isNowVisible = updatedContainer?.classList.contains('bg-white') || updatedContainer?.classList.contains('dark:bg-gray-800');
+        expect(isNowVisible).toBe(!wasVisible);
+      });
     }
   });
 
@@ -175,7 +188,7 @@ describe('SidebarConfigModal', () => {
     expect(mockedApi.put).not.toHaveBeenCalled();
   });
 
-  it('should reset to defaults', () => {
+  it('should reset to defaults', async () => {
     render(
       <SidebarConfigModal
         isOpen={true}
@@ -186,11 +199,18 @@ describe('SidebarConfigModal', () => {
       />
     );
 
-    const resetButton = screen.getByText(/reset/i);
-    if (resetButton) {
-      fireEvent.click(resetButton);
-      // Should reset configuration
-    }
+    const resetButton = screen.getByText(/reset to default/i);
+    fireEvent.click(resetButton);
+    
+    // Wait for reset to apply - should show all default items
+    // Items appear in both sections, so use getAllByText
+    await waitFor(() => {
+      const syllabusItems = screen.getAllByText('Syllabus');
+      expect(syllabusItems.length).toBeGreaterThan(0);
+      
+      const modulesItems = screen.getAllByText('Modules');
+      expect(modulesItems.length).toBeGreaterThan(0);
+    });
   });
 });
 

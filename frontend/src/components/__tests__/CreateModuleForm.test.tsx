@@ -58,7 +58,8 @@ describe('CreateModuleForm', () => {
     fireEvent.click(submitButton);
 
     await waitFor(() => {
-      expect(mockCreateModule).toHaveBeenCalledWith('course1', { title: 'New Module' });
+      // Component passes description: '' as well
+      expect(mockCreateModule).toHaveBeenCalledWith('course1', { title: 'New Module', description: '' });
     });
 
     await waitFor(() => {

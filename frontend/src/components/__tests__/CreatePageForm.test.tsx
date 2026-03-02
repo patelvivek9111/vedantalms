@@ -67,7 +67,8 @@ describe('CreatePageForm', () => {
       />
     );
 
-    expect(screen.getByPlaceholderText(/page title/i)).toBeInTheDocument();
+    // FloatingLabelInput uses label text, not placeholder
+    expect(screen.getByLabelText(/page title/i)).toBeInTheDocument();
   });
 
   it('should create page', async () => {
@@ -82,7 +83,7 @@ describe('CreatePageForm', () => {
       />
     );
 
-    const titleInput = screen.getByPlaceholderText(/page title/i);
+    const titleInput = screen.getByLabelText(/page title/i);
     fireEvent.change(titleInput, { target: { value: 'New Page' } });
 
     const moduleSelect = screen.getByLabelText(/module/i);
