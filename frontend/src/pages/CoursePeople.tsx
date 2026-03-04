@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { getImageUrl } from '../services/api';
+import ConfirmationModal from '../components/common/ConfirmationModal';
 
 interface Student {
   _id: string;

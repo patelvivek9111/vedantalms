@@ -18,6 +18,7 @@ import {
 import { getImageUrl } from '../services/api';
 import axios from 'axios';
 import { API_URL } from '../config';
+import ConfirmationModal from '../components/common/ConfirmationModal';
 
 interface User {
   _id: string;

@@ -4,6 +4,7 @@ interface UseDraftManagerOptions {
   formId: string;
   autoSaveDelay?: number; // milliseconds
   storageKey?: string;
+  enabled?: boolean; // Enable/disable draft saving
 }
 
 export const useDraftManager = <T extends Record<string, any>>(
