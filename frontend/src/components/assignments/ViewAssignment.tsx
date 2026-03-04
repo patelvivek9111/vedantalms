@@ -859,13 +859,12 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
     
   const confirmDelete = async () => {
     setShowDeleteConfirm(false);
-      try {
-        const token = localStorage.getItem('token');
-        await api.delete(`/assignments/${id}`);
-        navigate(-1);
-      } catch (err: any) {
-        setError(err.response?.data?.message || 'Error deleting assignment');
-      }
+    try {
+      const token = localStorage.getItem('token');
+      await api.delete(`/assignments/${id}`);
+      navigate(-1);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Error deleting assignment');
     }
   };
 
