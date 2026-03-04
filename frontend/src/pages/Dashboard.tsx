@@ -1255,7 +1255,7 @@ export function Dashboard() {
             </div>
           ) : (
             <DragDropContext onDragEnd={handleDragEnd}>
-              <Droppable droppableId="published-courses" direction="vertical">
+              <Droppable droppableId="published-courses" direction="grid">
                 {(provided) => (
                   <div 
                     {...provided.droppableProps}

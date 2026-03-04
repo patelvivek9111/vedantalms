@@ -859,11 +859,13 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
     
   const confirmDelete = async () => {
     setShowDeleteConfirm(false);
-    try {
-      await api.delete(`/assignments/${id}`);
-      navigate(-1);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Error deleting assignment');
+      try {
+        const token = localStorage.getItem('token');
+        await api.delete(`/assignments/${id}`);
+        navigate(-1);
+      } catch (err: any) {
+        setError(err.response?.data?.message || 'Error deleting assignment');
+      }
     }
   };
 
@@ -1570,18 +1572,12 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
           return (
             <div className="mt-8">
               {/* Show questions for students, but not in teacher preview */}
-              {(() => {
-                const canShowQuestions =
-                  !isTeacherPreview &&
-                  (!assignment.isTimedQuiz || quizStarted || !isStudent || submission || isPastDue) &&
-                  shouldShowQuestions;
-
-                if (!canShowQuestions) return null;
-
-                if (assignment.displayMode === 'single' && isStudent && !submission && !isPastDue) {
-                  // Student answering view with sidebar (single question mode)
-                  return (
-                    <div className="flex gap-6">
+              {(
+                !isTeacherPreview && (!assignment.isTimedQuiz || quizStarted || !isStudent || submission || isPastDue) && shouldShowQuestions
+              ) ? (
+              assignment.displayMode === 'single' && isStudent && !submission && !isPastDue ? (
+                // Student answering view with sidebar (single question mode)
+                <div className="flex gap-6">
                   {/* Main content area */}
                   <div className="flex-1">
                     {!showUploadSection ? (
@@ -2081,11 +2077,8 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                       )}
                   </div>
                 </div>
-                  );
-                }
-
+              ) : (
                 // Teacher/Admin view, submitted view, or scrollable mode - show all questions
-                return (
                 <div className="flex gap-6 items-start">
                   {/* Main content area */}
                   <div className="flex-1">
@@ -2839,8 +2832,8 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                     </div>
                   )}
                 </div>
-                );
-              })()}
+              )
+            ) : null}
             </div>
           );
         })()}

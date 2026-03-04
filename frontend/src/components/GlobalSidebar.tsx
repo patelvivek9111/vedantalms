@@ -9,9 +9,6 @@ import {
   Share2, 
   MoreHorizontal, 
   Users, 
-  ChevronDown, 
-  ChevronLeft,
-  ChevronRight,
   LogOut,
   Settings,
   BarChart3,
@@ -67,10 +64,6 @@ export default function GlobalSidebar() {
   const { courses } = useCourse();
   const { unreadCount } = useUnreadMessages();
   const [showCourseDropdown, setShowCourseDropdown] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(() => {
-    const saved = localStorage.getItem('sidebarCollapsed');
-    return saved ? JSON.parse(saved) : false;
-  });
   const dropdownRef = useRef<HTMLDivElement>(null);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -126,11 +119,6 @@ export default function GlobalSidebar() {
     ? courses 
     : courses.filter(course => course.published);
 
-  // Save collapsed state to localStorage
-  useEffect(() => {
-    localStorage.setItem('sidebarCollapsed', JSON.stringify(isCollapsed));
-  }, [isCollapsed]);
-
 
   return (
     <>
@@ -139,30 +127,10 @@ export default function GlobalSidebar() {
 
       {/* Sidebar - Hidden on mobile, visible on desktop */}
       <nav 
-        className={`hidden lg:flex fixed top-0 left-0 h-full bg-blue-900 dark:bg-gray-900 flex-col items-center py-4 z-50 shadow-lg border-r-2 border-blue-700 dark:border-gray-700 transition-all duration-300 ${
-          isCollapsed ? 'w-16' : 'w-20'
-        }`}
-      data-testid="global-sidebar"
-    >
+        className="hidden lg:flex fixed top-0 left-0 h-full bg-blue-900 dark:bg-gray-900 flex-col items-center py-4 z-50 shadow-lg border-r-2 border-blue-700 dark:border-gray-700 transition-all duration-300 w-20"
+        data-testid="global-sidebar"
+      >
       <div className="mb-6 flex flex-col items-center w-full px-2">
-        {/* Collapse/Expand Button */}
-        <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="mb-4 p-1.5 hover:bg-blue-800 dark:hover:bg-gray-800 rounded-lg transition-colors group relative"
-          aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          {isCollapsed ? (
-            <ChevronRight className="h-4 w-4 text-white dark:text-gray-300 transition-transform group-hover:scale-110" />
-          ) : (
-            <ChevronLeft className="h-4 w-4 text-white dark:text-gray-300 transition-transform group-hover:scale-110" />
-          )}
-          {isCollapsed && (
-            <div className="absolute left-full ml-2 bg-gray-900 dark:bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-              {isCollapsed ? 'Expand' : 'Collapse'}
-            </div>
-          )}
-        </button>
-        
         {/* Logo placeholder */}
         <div className="w-12 h-12 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center mb-2 border border-blue-700 dark:border-gray-600">
           <span className="text-blue-800 dark:text-blue-300 text-lg font-bold">LMS</span>
@@ -218,12 +186,6 @@ export default function GlobalSidebar() {
                 <span className={`text-xs font-medium transition-all ${isActive ? 'font-semibold' : ''}`}>
                   {label}
                 </span>
-                {/* Tooltip when collapsed */}
-                {isCollapsed && (
-                  <div className="absolute left-full ml-2 bg-gray-900 dark:bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                    {label}
-                  </div>
-                )}
               </Link>
             );
           }
@@ -255,12 +217,6 @@ export default function GlobalSidebar() {
                   <span className={`text-xs font-medium transition-all ${isAdminCoursesActive ? 'font-semibold' : ''}`}>
                     {label}
                   </span>
-                  {/* Tooltip when collapsed */}
-                  {isCollapsed && (
-                    <div className="absolute left-full ml-2 bg-gray-900 dark:bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                      {label}
-                    </div>
-                  )}
                 </Link>
               );
             }
@@ -300,12 +256,6 @@ export default function GlobalSidebar() {
                   <span className={`text-xs font-medium transition-all ${isActive ? 'font-semibold' : ''}`}>
                     {label}
                   </span>
-                  {/* Tooltip when collapsed */}
-                  {isCollapsed && (
-                    <div className="absolute left-full ml-2 bg-gray-900 dark:bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                      {label}
-                    </div>
-                  )}
                 </button>
                 
                 {/* Course Dropdown */}
@@ -406,12 +356,6 @@ export default function GlobalSidebar() {
                 <span className={`text-xs font-medium transition-all ${isActive ? 'font-semibold' : ''}`}>
                   {label}
                 </span>
-                {/* Tooltip when collapsed */}
-                {isCollapsed && (
-                  <div className="absolute left-full ml-2 bg-gray-900 dark:bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                    {label} {unreadCount > 0 && `(${unreadCount})`}
-                  </div>
-                )}
               </Link>
             );
           }
@@ -438,12 +382,6 @@ export default function GlobalSidebar() {
               <span className={`text-xs font-medium transition-all ${isActive ? 'font-semibold' : ''}`}>
                 {label}
               </span>
-              {/* Tooltip when collapsed */}
-              {isCollapsed && (
-                <div className="absolute left-full ml-2 bg-gray-900 dark:bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                  {label}
-                </div>
-              )}
             </Link>
           );
         })}
@@ -456,13 +394,7 @@ export default function GlobalSidebar() {
           className="flex flex-col items-center w-full py-2 px-2 rounded-lg transition-all duration-200 ease-in-out hover:bg-blue-800 dark:hover:bg-gray-800 hover:scale-105 text-white dark:text-gray-300 group"
         >
           <LogOut className="h-5 w-5 mb-1 transition-transform group-hover:scale-110" />
-          <span className="text-xs font-medium">{isCollapsed ? '' : 'Logout'}</span>
-          {/* Tooltip when collapsed */}
-          {isCollapsed && (
-            <div className="absolute left-full ml-2 bg-gray-900 dark:bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-              Logout
-            </div>
-          )}
+          <span className="text-xs font-medium">Logout</span>
         </button>
       </div>
     </nav>

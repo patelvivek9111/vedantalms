@@ -49,8 +49,6 @@ const Catalog: React.FC = () => {
   const [selectedSubject, setSelectedSubject] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [showBurgerMenu, setShowBurgerMenu] = useState(false);
-  const [showUnenrollConfirm, setShowUnenrollConfirm] = useState(false);
-  const [courseToUnenroll, setCourseToUnenroll] = useState<string | null>(null);
 
   // Swipe navigation for bottom nav
   const { handleSwipeLeft, handleSwipeRight, enabled: swipeEnabled } = useBottomNavSwipe();
@@ -102,6 +100,11 @@ const Catalog: React.FC = () => {
   };
 
   const filteredCourses = courses.filter(course => {
+    // Only show courses if there's a search term or subject filter applied
+    if (!searchTerm && !selectedSubject) {
+      return false;
+    }
+    
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch = !searchTerm || 
                          course.title.toLowerCase().includes(searchLower) ||
@@ -131,25 +134,16 @@ const Catalog: React.FC = () => {
     }
   };
 
-  const handleUnenrollment = (courseId: string) => {
-    setCourseToUnenroll(courseId);
-    setShowUnenrollConfirm(true);
-  };
-
-  const confirmUnenrollment = async () => {
-    if (!courseToUnenroll) return;
-    setShowUnenrollConfirm(false);
-    
+  const handleUnenrollment = async (courseId: string) => {
     try {
       const token = localStorage.getItem('token');
-      await axios.post(`${API_URL}/api/courses/${courseToUnenroll}/unenroll-self`, {}, {
+      await axios.post(`${API_URL}/api/courses/${courseId}/unenroll-self`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
       alert('Successfully unenrolled from the course!');
       // Refresh the catalog to update enrollment counts and status
       await fetchCatalog();
-      setCourseToUnenroll(null);
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to unenroll from the course');
     }
@@ -264,48 +258,41 @@ const Catalog: React.FC = () => {
         </div>
 
         {/* Results Count */}
-        <div className="mb-6">
-          <p className="text-gray-600 dark:text-gray-400">
-            Showing {filteredCourses.length} of {courses.length} courses
-          </p>
-        </div>
+        {(searchTerm || selectedSubject) && (
+          <div className="mb-6">
+            <p className="text-gray-600 dark:text-gray-400">
+              Showing {filteredCourses.length} of {courses.length} courses
+            </p>
+          </div>
+        )}
 
-                            {/* Course List */}
-                    {filteredCourses.length === 0 ? (
-                      <div className="text-center py-12">
-                        <BookOpen className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500 mb-4" />
-                        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No courses found</h3>
-                        <p className="text-gray-500 dark:text-gray-400">Try adjusting your search criteria or filters</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {filteredCourses.map(course => (
-                          <CourseListItem
-                            key={course._id}
-                            course={course}
-                            onEnroll={handleEnrollment}
-                            onUnenroll={handleUnenrollment}
-                          />
-                        ))}
-                      </div>
-                    )}
+        {/* Course List */}
+        {!searchTerm && !selectedSubject ? (
+          <div className="text-center py-12">
+            <BookOpen className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500 mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Search for courses</h3>
+            <p className="text-gray-500 dark:text-gray-400">Enter a search term or select a filter to browse available courses</p>
+          </div>
+        ) : filteredCourses.length === 0 ? (
+          <div className="text-center py-12">
+            <BookOpen className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500 mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No courses found</h3>
+            <p className="text-gray-500 dark:text-gray-400">Try adjusting your search criteria or filters</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {filteredCourses.map(course => (
+              <CourseListItem
+                key={course._id}
+                course={course}
+                onEnroll={handleEnrollment}
+                onUnenroll={handleUnenrollment}
+              />
+            ))}
+          </div>
+        )}
         </div>
       </div>
-      
-      {/* Unenroll Confirmation Modal */}
-      <ConfirmationModal
-        isOpen={showUnenrollConfirm}
-        onClose={() => {
-          setShowUnenrollConfirm(false);
-          setCourseToUnenroll(null);
-        }}
-        onConfirm={confirmUnenrollment}
-        title="Unenroll from Course"
-        message="Are you sure you want to unenroll from this course? This action cannot be undone."
-        confirmText="Unenroll"
-        cancelText="Cancel"
-        variant="warning"
-      />
       </div>
     </SwipeableContainer>
   );
@@ -322,6 +309,7 @@ const CourseListItem: React.FC<CourseListItemProps> = ({ course, onEnroll, onUne
   const { user } = useAuth();
   const [isEnrolling, setIsEnrolling] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showUnenrollConfirm, setShowUnenrollConfirm] = useState(false);
 
   const handleEnroll = async () => {
     setIsEnrolling(true);
@@ -543,7 +531,7 @@ const CourseListItem: React.FC<CourseListItemProps> = ({ course, onEnroll, onUne
               <div className="flex items-center space-x-3">
                 <span className="text-green-600 dark:text-green-400 font-medium">✓ Enrolled</span>
                 <button
-                  onClick={() => onUnenroll(course._id)}
+                  onClick={() => setShowUnenrollConfirm(true)}
                   className="px-6 py-2 bg-red-600 dark:bg-red-500 text-white rounded-lg hover:bg-red-700 dark:hover:bg-red-600 transition-colors font-medium"
                 >
                   Unenroll
@@ -578,6 +566,20 @@ const CourseListItem: React.FC<CourseListItemProps> = ({ course, onEnroll, onUne
         </div>
       )}
 
+      {/* Unenroll Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showUnenrollConfirm}
+        onClose={() => setShowUnenrollConfirm(false)}
+        onConfirm={() => {
+          setShowUnenrollConfirm(false);
+          onUnenroll(course._id);
+        }}
+        title="Unenroll from Course"
+        message="Are you sure you want to unenroll from this course? This action cannot be undone."
+        confirmText="Unenroll"
+        cancelText="Cancel"
+        variant="warning"
+      />
     </div>
   );
 };

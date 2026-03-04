@@ -29,6 +29,7 @@ function ProfileSection() {
   const [uploading, setUploading] = React.useState(false);
   const [fieldErrors, setFieldErrors] = React.useState<{ [key: string]: string }>({});
   const [showResetConfirm, setShowResetConfirm] = React.useState(false);
+  const [loadingUser, setLoadingUser] = React.useState(false);
 
   // Draft manager for bio
   const formId = 'account-profile';
@@ -118,12 +119,49 @@ function ProfileSection() {
 
 
 
+  // Fetch latest user data when component mounts
   React.useEffect(() => {
-    setFirstName(user?.firstName || '');
-    setLastName(user?.lastName || '');
-    setEmail(user?.email || '');
-    setBio(user?.bio || '');
-  }, [user]);
+    const fetchCurrentUser = async () => {
+      try {
+        setLoadingUser(true);
+        const response = await api.get('/auth/me');
+        if (response.data.success) {
+          const userData = response.data.user;
+          const updatedUser = {
+            _id: userData.id || userData._id,
+            firstName: userData.firstName,
+            lastName: userData.lastName,
+            email: userData.email,
+            role: userData.role,
+            bio: userData.bio || '',
+            profilePicture: userData.profilePicture || ''
+          };
+          setUser(updatedUser);
+          // Update form fields with fresh data
+          setFirstName(updatedUser.firstName || '');
+          setLastName(updatedUser.lastName || '');
+          setEmail(updatedUser.email || '');
+          setBio(updatedUser.bio || '');
+        }
+      } catch (error) {
+        console.error('Failed to fetch current user:', error);
+      } finally {
+        setLoadingUser(false);
+      }
+    };
+
+    fetchCurrentUser();
+  }, []); // Only run on mount
+
+  // Update form fields when user changes
+  React.useEffect(() => {
+    if (user && !loadingUser) {
+      setFirstName(user.firstName || '');
+      setLastName(user.lastName || '');
+      setEmail(user.email || '');
+      setBio(user.bio || '');
+    }
+  }, [user, loadingUser]);
 
   const handleSave = async () => {
     const isFirstNameValid = validateFirstName(firstName);
@@ -139,7 +177,8 @@ function ProfileSection() {
 
     setSaving(true);
     try {
-      const res = await updateUserProfile({ firstName, lastName, bio });
+      // Always send bio field, even if empty string, so user can clear their bio
+      const res = await updateUserProfile({ firstName, lastName, bio: bio || '' });
       if (res.data && res.data.user) {
         setUser(res.data.user);
       }

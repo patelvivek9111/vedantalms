@@ -34,7 +34,8 @@ const userSchema = new mongoose.Schema({
   },
   bio: {
     type: String,
-    default: ''
+    default: '',
+    trim: true
   },
   profilePicture: {
     type: String,
@@ -66,6 +67,18 @@ userSchema.pre('save', async function(next) {
   }
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
+});
+
+// Ensure bio is properly handled - allow empty strings and trim whitespace
+userSchema.pre('save', function(next) {
+  // If bio is undefined or null, set it to empty string
+  if (this.bio === undefined || this.bio === null) {
+    this.bio = '';
+  } else {
+    // Trim whitespace (this will also handle empty strings correctly)
+    this.bio = this.bio.trim();
+  }
+  next();
 });
 
 // Sign JWT and return

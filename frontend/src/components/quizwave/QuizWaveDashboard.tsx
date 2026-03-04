@@ -4,7 +4,6 @@ import { Plus, Play, Edit, Trash2, List, Clock } from 'lucide-react';
 import QuizBuilder from './QuizBuilder';
 import QuizSessionControl from './QuizSessionControl';
 import { QuizCardSkeleton } from '../common/SkeletonLoader';
-import ConfirmationModal from '../common/ConfirmationModal';
 
 interface QuizWaveDashboardProps {
   courseId: string;

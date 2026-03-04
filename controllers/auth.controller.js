@@ -39,7 +39,8 @@ exports.register = async (req, res) => {
       lastName,
       email,
       password,
-      role: role || 'student'
+      role: role || 'student',
+      bio: '' // Explicitly set bio to empty string for new users
     });
 
     
@@ -56,8 +57,8 @@ exports.register = async (req, res) => {
         lastName: user.lastName,
         email: user.email,
         role: user.role,
-        bio: user.bio,
-        profilePicture: user.profilePicture
+        bio: user.bio || '',
+        profilePicture: user.profilePicture || ''
       }
     });
   } catch (err) {
@@ -134,8 +135,8 @@ exports.login = async (req, res) => {
         lastName: user.lastName,
         email: user.email,
         role: user.role,
-        bio: user.bio,
-        profilePicture: user.profilePicture
+        bio: user.bio || '',
+        profilePicture: user.profilePicture || ''
       }
     });
   } catch (err) {
@@ -150,6 +151,9 @@ exports.login = async (req, res) => {
 exports.getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
     res.json({
       success: true,
       user: {
@@ -158,8 +162,8 @@ exports.getMe = async (req, res) => {
         lastName: user.lastName,
         email: user.email,
         role: user.role,
-        bio: user.bio,
-        profilePicture: user.profilePicture
+        bio: user.bio || '',
+        profilePicture: user.profilePicture || ''
       }
     });
   } catch (err) {

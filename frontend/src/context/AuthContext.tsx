@@ -43,8 +43,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               lastName: userData.lastName,
               email: userData.email,
               role: userData.role,
-              bio: userData.bio,
-              profilePicture: userData.profilePicture
+              bio: userData.bio || '',
+              profilePicture: userData.profilePicture || ''
             });
           } else {
             // Invalid response, clear auth
@@ -80,8 +80,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       lastName: userData.lastName,
       email: userData.email,
       role: userData.role,
-      bio: userData.bio,
-      profilePicture: userData.profilePicture
+      bio: userData.bio || '',
+      profilePicture: userData.profilePicture || ''
     };
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(user));
@@ -133,8 +133,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         lastName: userData.lastName,
         email: userData.email,
         role: userData.role,
-        bio: userData.bio,
-        profilePicture: userData.profilePicture
+        bio: userData.bio || '',
+        profilePicture: userData.profilePicture || ''
       };
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));

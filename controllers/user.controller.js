@@ -112,7 +112,7 @@ exports.updateMe = async (req, res) => {
     const updateFields = {};
     if (firstName !== undefined) updateFields.firstName = firstName.trim();
     if (lastName !== undefined) updateFields.lastName = lastName.trim();
-    if (bio !== undefined) updateFields.bio = bio;
+    if (bio !== undefined) updateFields.bio = bio.trim(); // Allow empty string, just trim whitespace
     if (profilePicture !== undefined) updateFields.profilePicture = profilePicture;
     const updatedUser = await User.findByIdAndUpdate(userId, updateFields, { new: true, runValidators: true }).select('-password');
     res.json({ success: true, user: updatedUser });
