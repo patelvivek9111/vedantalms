@@ -2832,7 +2832,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                     </div>
                   )}
                 </div>
-                )
+              )
               ) : null}
             </div>
           );
