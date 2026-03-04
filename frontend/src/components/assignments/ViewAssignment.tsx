@@ -1575,7 +1575,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
               {(
                 !isTeacherPreview && (!assignment.isTimedQuiz || quizStarted || !isStudent || submission || isPastDue) && shouldShowQuestions
               ) ? (
-              assignment.displayMode === 'single' && isStudent && !submission && !isPastDue ? (
+                assignment.displayMode === 'single' && isStudent && !submission && !isPastDue ? (
                 // Student answering view with sidebar (single question mode)
                 <div className="flex gap-6">
                   {/* Main content area */}
