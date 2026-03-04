@@ -125,8 +125,6 @@ This document outlines specific UI/UX improvements for both desktop and mobile v
   - Implement swipe navigation between submissions
   - Add floating action button for quick actions
   - Use bottom sheet for feedback input
-  - Add voice-to-text for feedback entry
-  - Implement quick grade buttons (common scores)
   - Add offline capability with sync indicator
   - Show submission preview in modal overlay
 
@@ -134,10 +132,9 @@ This document outlines specific UI/UX improvements for both desktop and mobile v
 - **Improvements**:
   - Add pull-to-refresh
   - Implement infinite scroll with loading indicators
-  - Add swipe actions (delete, archive, etc.)
   - Improve card layouts for better readability
   - Add skeleton loaders for better perceived performance
-  - Implement sticky headers for long lists
+
 
 ### 6. **Modals & Bottom Sheets**
 - **Improvements**:
