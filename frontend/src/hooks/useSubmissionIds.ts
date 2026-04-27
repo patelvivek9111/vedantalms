@@ -65,7 +65,9 @@ export const useSubmissionIds = ({
               headers: { Authorization: `Bearer ${token}` }
             });
             // Map student submissions and grades
-            const submissionsData = Array.isArray(res.data) ? res.data : [];
+            const submissionsData = Array.isArray(res.data?.data)
+              ? res.data.data
+              : Array.isArray(res.data) ? res.data : [];
             submissionsData.forEach((submission: any) => {
               if (assignment.isGroupAssignment && submission.group && submission.group.members) {
                 // For group assignments, create entries for all group members

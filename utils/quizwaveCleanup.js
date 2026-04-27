@@ -1,4 +1,13 @@
 const { QuizSession, QuizResponse } = require('../models/quizwave.model');
+const Redis = require('ioredis');
+
+let cleanupRedis = null;
+if (process.env.REDIS_URL) {
+  cleanupRedis = new Redis(process.env.REDIS_URL, { lazyConnect: true, maxRetriesPerRequest: null });
+  cleanupRedis.connect().catch(() => {
+    cleanupRedis = null;
+  });
+}
 
 // Cleanup old quiz sessions (older than 1 day - keep data for 1 day)
 const cleanupOldSessions = async () => {
@@ -43,12 +52,32 @@ const cleanupOldSessions = async () => {
 
 // Run cleanup on server start and then every 24 hours
 const startCleanupScheduler = () => {
+  const runWithLock = async () => {
+    if (!cleanupRedis) {
+      return cleanupOldSessions();
+    }
+    const lockKey = 'quizwave:cleanup:lock';
+    const lockId = `${process.pid}:${Date.now()}`;
+    const acquired = await cleanupRedis.set(lockKey, lockId, 'EX', 60 * 10, 'NX');
+    if (!acquired) {
+      return { skipped: true };
+    }
+    try {
+      return await cleanupOldSessions();
+    } finally {
+      const existing = await cleanupRedis.get(lockKey);
+      if (existing === lockId) {
+        await cleanupRedis.del(lockKey);
+      }
+    }
+  };
+
   // Run immediately on start
-  cleanupOldSessions().catch(console.error);
+  runWithLock().catch(console.error);
 
   // Then run every 24 hours
   setInterval(() => {
-    cleanupOldSessions().catch(console.error);
+    runWithLock().catch(console.error);
   }, 24 * 60 * 60 * 1000); // 24 hours
 
   console.log('✅ QuizWave: Auto-cleanup scheduler started (runs every 24 hours)');

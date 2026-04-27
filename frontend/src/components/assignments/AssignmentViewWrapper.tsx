@@ -264,7 +264,7 @@ const AssignmentViewWrapper: React.FC = () => {
               />
             </div>
           )}
-          <ViewAssignment />
+          <ViewAssignment courseId={course?._id} />
         </div>
       </div>
     </div>

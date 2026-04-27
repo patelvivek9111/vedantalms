@@ -77,7 +77,9 @@ export const useInstructorGradebookData = ({
             headers: { Authorization: `Bearer ${token}` }
           });
           // Map: { studentId: grade }
-          const submissions = Array.isArray(res.data) ? res.data : [];
+          const submissions = Array.isArray(res.data?.data)
+            ? res.data.data
+            : Array.isArray(res.data) ? res.data : [];
           for (const submission of submissions) {
             if (assignment.isGroupAssignment && submission.group && submission.group.members) {
               // For group assignments, create grades for all group members

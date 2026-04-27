@@ -130,12 +130,9 @@ submissionSchema.index(
   { assignment: 1, student: 1, group: 1 },
   { 
     unique: true,
-    partialFilterExpression: {
-      $or: [
-        { group: { $exists: false } },
-        { group: null }
-      ]
-    }
+    // Use `group: null` so this works across Mongo-compatible providers that
+    // do not support `$exists: false` in partial index expressions.
+    partialFilterExpression: { group: null }
   }
 );
 
@@ -143,11 +140,12 @@ submissionSchema.index(
 submissionSchema.index(
   { assignment: 1, group: 1 },
   { 
-    unique: true,
-    partialFilterExpression: {
-      group: { $exists: true, $ne: null }
-    }
+    sparse: true
   }
 );
+
+submissionSchema.index({ assignment: 1, submittedAt: -1 });
+submissionSchema.index({ student: 1, submittedAt: -1 });
+submissionSchema.index({ group: 1, submittedAt: -1 });
 
 module.exports = mongoose.model('Submission', submissionSchema); 

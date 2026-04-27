@@ -1,13 +1,13 @@
 import api from './api';
 
-export const fetchConversations = async () => {
-  const res = await api.get('/inbox/conversations');
+export const fetchConversations = async (folder?: string) => {
+  const res = await api.get('/inbox/conversations', { params: folder ? { folder } : undefined });
   return res.data;
 };
 
 export const fetchMessages = async (conversationId: string) => {
   const res = await api.get(`/inbox/conversations/${conversationId}/messages`);
-  return res.data;
+  return Array.isArray(res.data?.data) ? res.data.data : [];
 };
 
 export const sendMessage = async (conversationId: string, body: string) => {

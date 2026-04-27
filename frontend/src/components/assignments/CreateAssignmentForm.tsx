@@ -267,8 +267,11 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
           const response = await axios.get(`${API_URL}/api/submissions/assignment/${assignmentData._id}`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
-          setSubmissionCount(response.data.length);
-          setHasSubmissions(response.data.length > 0);
+          const submissions = Array.isArray(response.data?.data)
+            ? response.data.data
+            : Array.isArray(response.data) ? response.data : [];
+          setSubmissionCount(submissions.length);
+          setHasSubmissions(submissions.length > 0);
         } catch (err) {
           setSubmissionCount(0);
           setHasSubmissions(false);

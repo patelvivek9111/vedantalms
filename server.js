@@ -6,6 +6,12 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 const { Server } = require('socket.io');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const pinoHttp = require('pino-http');
+const pino = require('pino');
+const { createAdapter } = require('@socket.io/redis-adapter');
+const Redis = require('ioredis');
 
 // Load environment variables
 dotenv.config();
@@ -48,8 +54,68 @@ const corsOptions = {
 
 // Middleware
 app.use(cors(corsOptions));
+app.use(helmet({
+  crossOriginResourcePolicy: false
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+const logger = pino({
+  level: process.env.LOG_LEVEL || 'info',
+  base: undefined
+});
+
+app.use(pinoHttp({
+  logger,
+  serializers: {
+    req(req) {
+      return {
+        id: req.id,
+        method: req.method,
+        url: req.url
+      };
+    }
+  }
+}));
+
+app.use((req, res, next) => {
+  const start = process.hrtime.bigint();
+  res.on('finish', () => {
+    const durationMs = Number(process.hrtime.bigint() - start) / 1e6;
+    req.log.info({
+      statusCode: res.statusCode,
+      durationMs: Number(durationMs.toFixed(2))
+    }, 'request.completed');
+  });
+  next();
+});
+
+const generalLimiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || `${60 * 1000}`, 10),
+  max: parseInt(process.env.RATE_LIMIT_MAX || '300', 10),
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+const authLimiter = rateLimit({
+  windowMs: parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS || `${15 * 60 * 1000}`, 10),
+  max: parseInt(process.env.AUTH_RATE_LIMIT_MAX || '30', 10),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many authentication requests, try again later.' }
+});
+
+const writeLimiter = rateLimit({
+  windowMs: parseInt(process.env.WRITE_RATE_LIMIT_WINDOW_MS || `${60 * 1000}`, 10),
+  max: parseInt(process.env.WRITE_RATE_LIMIT_MAX || '120', 10),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many write requests, please slow down.' }
+});
+
+app.use('/api', generalLimiter);
+app.use('/api/auth', authLimiter);
+app.use(['/api/submissions', '/api/inbox', '/api/grades', '/api/upload'], writeLimiter);
 
 
 // Set default JWT secret if not in environment
@@ -65,9 +131,10 @@ if (!fs.existsSync(uploadsDir)) {
 // MongoDB connection options
 const mongoOptions = {
   dbName: 'lms',
-  maxPoolSize: 10,
-  serverSelectionTimeoutMS: 5000,
-  socketTimeoutMS: 45000,
+  maxPoolSize: parseInt(process.env.MONGO_MAX_POOL_SIZE || '80', 10),
+  minPoolSize: parseInt(process.env.MONGO_MIN_POOL_SIZE || '10', 10),
+  serverSelectionTimeoutMS: parseInt(process.env.MONGO_SERVER_SELECTION_TIMEOUT_MS || '5000', 10),
+  socketTimeoutMS: parseInt(process.env.MONGO_SOCKET_TIMEOUT_MS || '45000', 10),
 };
 
 // Connect to MongoDB
@@ -113,22 +180,19 @@ mongoose.connect(MONGODB_URI, mongoOptions)
     // Connected to MongoDB
     // Initialize email service
     const { initializeEmailService } = require('./utils/emailService');
+    const { ensureCriticalIndexes } = require('./utils/ensureIndexes');
+    await ensureCriticalIndexes(logger);
     await initializeEmailService();
   })
   .catch((err) => {
-    console.error('❌ MongoDB connection error:', err.message);
-    console.error('Please check your MONGODB_URI environment variable in Render dashboard.');
+    console.error('❌ MongoDB startup error:', err.message);
+    if (String(err.message || '').toLowerCase().includes('index')) {
+      console.error('Index sync failed. Check model index definitions and your MongoDB provider index feature support.');
+    } else {
+      console.error('Please check your MONGODB_URI environment variable in Render dashboard.');
+    }
     process.exit(1); // Exit if cannot connect to database
   });
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
-  });
-});
 
 // Serve uploads directory for profile pictures and other files
 // IMPORTANT: This must be BEFORE frontend static files and catch-all route
@@ -204,8 +268,10 @@ app.post('/api/upload', protect, upload.array('files', 10), async (req, res) => 
           cloudinary: true
         }));
       } catch (cloudinaryError) {
-        // Cloudinary upload failed, falling back to local storage
-        // Fallback to local storage
+        if (req.files.some(file => !file.path || !file.filename)) {
+          return res.status(503).json({ message: 'File storage unavailable. Please retry later.' });
+        }
+        // Cloudinary upload failed, falling back to local storage when available
         files = req.files.map(file => ({
           originalname: file.originalname,
           filename: file.filename,
@@ -310,6 +376,24 @@ const io = new Server(server, {
     methods: ['GET', 'POST']
   }
 });
+
+const configureSocketRedisAdapter = async () => {
+  const redisUrl = process.env.REDIS_URL;
+  if (!redisUrl) {
+    logger.warn('REDIS_URL not set; socket.io running without redis adapter');
+    return;
+  }
+  try {
+    const pubClient = new Redis(redisUrl, { lazyConnect: true, maxRetriesPerRequest: null });
+    const subClient = pubClient.duplicate();
+    await Promise.all([pubClient.connect(), subClient.connect()]);
+    io.adapter(createAdapter(pubClient, subClient));
+    logger.info('socket.io redis adapter enabled');
+  } catch (error) {
+    logger.error({ err: error }, 'failed to enable socket.io redis adapter');
+  }
+};
+configureSocketRedisAdapter();
 
 // Initialize QuizWave socket handlers
 const { initializeQuizWaveSocket } = require('./socket/quizwave.socket');

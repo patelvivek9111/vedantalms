@@ -27,14 +27,25 @@ const uploadToCloudinary = async (file, options = {}) => {
       ...options
     };
 
-    // Upload file
-    const result = await cloudinary.uploader.upload(file.path, uploadOptions);
-    
-    // Delete local file after successful upload
-    try {
-      await fs.unlink(file.path);
-    } catch (err) {
-      console.error('Error deleting local file:', err);
+    let result;
+    if (file.path) {
+      result = await cloudinary.uploader.upload(file.path, uploadOptions);
+      // Delete local file after successful upload
+      try {
+        await fs.unlink(file.path);
+      } catch (err) {
+        console.error('Error deleting local file:', err);
+      }
+    } else if (file.buffer) {
+      result = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(uploadOptions, (err, uploadResult) => {
+          if (err) return reject(err);
+          resolve(uploadResult);
+        });
+        stream.end(file.buffer);
+      });
+    } else {
+      throw new Error('Unsupported upload file payload');
     }
 
     return {

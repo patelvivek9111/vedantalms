@@ -1,8 +1,9 @@
 const { QuizSession, QuizWave } = require('../models/quizwave.model');
 const jwt = require('jsonwebtoken');
+const { setSession, deleteSession } = require('../utils/quizwaveSessionStore');
 
-// Store active sessions in memory (for quick access)
-const activeSessions = new Map(); // gamePin -> session data
+// Store active sessions through redis-backed store when available
+const activeSessions = new Map(); // Legacy export for backward compatibility
 
 // Authenticate socket connection
 const authenticateSocket = (socket, next) => {
@@ -83,12 +84,14 @@ const initializeQuizWaveSocket = (io) => {
         socket.gamePin = gamePin;
 
         // Update active sessions map
-        activeSessions.set(gamePin, {
+        const sessionState = {
           sessionId: session._id.toString(),
           status: session.status,
           currentQuestionIndex: session.currentQuestionIndex,
           participantCount: session.participants.length
-        });
+        };
+        activeSessions.set(gamePin, sessionState);
+        await setSession(gamePin, sessionState);
 
         // Notify all in room (including teacher)
         io.to(`quizwave:${gamePin}`).emit('quizwave:participant-joined', {
@@ -161,12 +164,14 @@ const initializeQuizWaveSocket = (io) => {
         await session.save();
 
         // Update active sessions
-        activeSessions.set(session.gamePin, {
+        const sessionState = {
           sessionId: session._id.toString(),
           status: 'active',
           currentQuestionIndex: 0,
           participantCount: session.participants.length
-        });
+        };
+        activeSessions.set(session.gamePin, sessionState);
+        await setSession(session.gamePin, sessionState);
         
         // For students - hide correct answers
         const studentQuestionData = {
@@ -394,6 +399,7 @@ const initializeQuizWaveSocket = (io) => {
           await session.save();
 
           activeSessions.delete(session.gamePin);
+          await deleteSession(session.gamePin);
 
           // Get leaderboard
           const leaderboard = session.participants
@@ -427,12 +433,14 @@ const initializeQuizWaveSocket = (io) => {
         };
 
         // Update active sessions
-        activeSessions.set(session.gamePin, {
+        const sessionState = {
           sessionId: session._id.toString(),
           status: 'active',
           currentQuestionIndex: nextIndex,
           participantCount: session.participants.length
-        });
+        };
+        activeSessions.set(session.gamePin, sessionState);
+        await setSession(session.gamePin, sessionState);
 
         // Broadcast to all participants (students)
         io.to(`quizwave:${session.gamePin}`).emit('quizwave:question-started', questionData);
@@ -482,6 +490,7 @@ const initializeQuizWaveSocket = (io) => {
         console.log(`   Total answers recorded: ${session.participants.reduce((sum, p) => sum + p.answers.length, 0)}`);
 
         activeSessions.delete(session.gamePin);
+        await deleteSession(session.gamePin);
 
         // Get leaderboard
         const leaderboard = session.participants

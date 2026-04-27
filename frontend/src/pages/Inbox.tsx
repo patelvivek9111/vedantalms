@@ -126,7 +126,7 @@ const Inbox: React.FC = () => {
     try {
       await bulkMoveConversations(selectedConversations, 'archived');
       // Refresh conversations
-      const data = await fetchConversations();
+      const data = await fetchConversations(selectedFolder);
       setConversations(data);
       setSelectedConversations([]);
     } catch (err) {
@@ -160,7 +160,7 @@ const Inbox: React.FC = () => {
         await bulkMoveConversations(selectedConversations, 'deleted');
       }
       // Refresh conversations
-      const data = await fetchConversations();
+      const data = await fetchConversations(selectedFolder);
       setConversations(data);
       setSelectedConversations([]);
     } catch (err: any) {
@@ -188,7 +188,7 @@ const Inbox: React.FC = () => {
     try {
       await bulkDeleteForever(selectedConversations);
       // Refresh conversations
-      const data = await fetchConversations();
+      const data = await fetchConversations(selectedFolder);
       setConversations(data);
       setSelectedConversations([]);
     } catch (err) {
@@ -202,7 +202,7 @@ const Inbox: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchConversations();
+      const data = await fetchConversations(selectedFolder);
       setConversations(data || []);
     } catch (err: any) {
       setError('Failed to load conversations');
@@ -216,7 +216,7 @@ const Inbox: React.FC = () => {
     if (currentUserId) {
       loadConversations();
     }
-  }, [currentUserId]);
+  }, [currentUserId, selectedFolder]);
 
   // Refresh function for pull-to-refresh
   const handleRefresh = async () => {
@@ -552,7 +552,7 @@ const Inbox: React.FC = () => {
     try {
       await toggleStar(conv._id);
       // Refresh conversations
-      const data = await fetchConversations();
+      const data = await fetchConversations(selectedFolder);
       setConversations(data);
     } catch (err) {
       // Optionally show error

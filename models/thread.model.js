@@ -147,6 +147,9 @@ const threadSchema = new mongoose.Schema({
   timestamps: true
 });
 
+threadSchema.index({ course: 1, isGraded: 1, published: 1, dueDate: 1 });
+threadSchema.index({ module: 1, published: 1, lastActivity: -1 });
+
 // Virtual for reply count
 threadSchema.virtual('replyCount').get(function() {
   return this.replies.length;

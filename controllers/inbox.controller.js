@@ -15,23 +15,81 @@ const validateObjectId = (id, paramName = 'ID') => {
 exports.getConversations = async (req, res) => {
   try {
     const userId = req.user._id;
+    const folder = req.query.folder;
+    const participantFilter = { userId };
+    if (folder && ['inbox', 'sent', 'archived', 'deleted'].includes(folder)) {
+      participantFilter.folder = folder;
+    }
+
     // Find all conversations where user is a participant
-    const participants = await ConversationParticipant.find({ userId });
+    const participants = await ConversationParticipant.find(participantFilter).lean();
     const conversationIds = participants.map(p => p.conversationId);
-    // Get conversations and populate last message and participants
+    if (conversationIds.length === 0) {
+      return res.json([]);
+    }
+
+    const lastReadByConversation = new Map(
+      participants.map(p => [String(p.conversationId), p.lastReadAt || new Date(0)])
+    );
+
+    // Get conversations and aggregate participant/message metadata in batches
     const conversations = await Conversation.find({ _id: { $in: conversationIds } })
       .sort({ updatedAt: -1 });
-    const results = await Promise.all(conversations.map(async (conv) => {
-      const convParticipants = await ConversationParticipant.find({ conversationId: conv._id }).populate('userId', 'firstName lastName email profilePicture');
-      const lastMessage = await Message.findOne({ conversationId: conv._id }).sort({ createdAt: -1 });
-      const participant = participants.find(p => String(p.conversationId) === String(conv._id));
-      const unreadCount = await Message.countDocuments({
-        conversationId: conv._id,
-        createdAt: { $gt: participant.lastReadAt || new Date(0) },
-        senderId: { $ne: userId }
-      });
-      // New: check if user has sent any message in this conversation
-      const hasSentMessage = await Message.exists({ conversationId: conv._id, senderId: userId });
+
+    const [conversationParticipants, latestMessages, sentMessageConversationIds, unreadAgg] = await Promise.all([
+      ConversationParticipant.find({ conversationId: { $in: conversationIds } })
+        .populate('userId', 'firstName lastName email profilePicture')
+        .lean(),
+      Message.aggregate([
+        { $match: { conversationId: { $in: conversationIds } } },
+        { $sort: { createdAt: -1 } },
+        { $group: { _id: '$conversationId', message: { $first: '$$ROOT' } } }
+      ]),
+      Message.distinct('conversationId', { conversationId: { $in: conversationIds }, senderId: userId }),
+      Message.aggregate([
+        {
+          $match: {
+            conversationId: { $in: conversationIds },
+            senderId: { $ne: userId }
+          }
+        },
+        {
+          $group: {
+            _id: '$conversationId',
+            count: { $sum: 1 },
+            createdAtList: { $push: '$createdAt' }
+          }
+        }
+      ])
+    ]);
+
+    const participantByConversation = conversationParticipants.reduce((acc, p) => {
+      const key = String(p.conversationId);
+      if (!acc[key]) {
+        acc[key] = [];
+      }
+      acc[key].push(p);
+      return acc;
+    }, {});
+
+    const lastMessageByConversation = new Map(
+      latestMessages.map(item => [String(item._id), item.message])
+    );
+    const sentMessageConversationSet = new Set(
+      sentMessageConversationIds.map(id => String(id))
+    );
+
+    const unreadByConversation = new Map(
+      unreadAgg.map(item => {
+        const lastReadAt = lastReadByConversation.get(String(item._id)) || new Date(0);
+        const unreadCount = item.createdAtList.filter(ts => ts > lastReadAt).length;
+        return [String(item._id), unreadCount];
+      })
+    );
+
+    const results = conversations.map((conv) => {
+      const key = String(conv._id);
+      const convParticipants = participantByConversation[key] || [];
       return {
         _id: conv._id,
         subject: conv.subject,
@@ -39,20 +97,21 @@ exports.getConversations = async (req, res) => {
         createdBy: conv.createdBy,
         updatedAt: conv.updatedAt,
         participants: convParticipants.map(p => ({
-          _id: p.userId._id,
-          firstName: p.userId.firstName,
-          lastName: p.userId.lastName,
-          email: p.userId.email,
-          profilePicture: p.userId.profilePicture,
+          _id: p.userId?._id,
+          firstName: p.userId?.firstName,
+          lastName: p.userId?.lastName,
+          email: p.userId?.email,
+          profilePicture: p.userId?.profilePicture,
           folder: p.folder,
           starred: p.starred,
           lastReadAt: p.lastReadAt,
         })),
-        lastMessage,
-        unreadCount,
-        hasSentMessage: !!hasSentMessage // boolean
+        lastMessage: lastMessageByConversation.get(key) || null,
+        unreadCount: unreadByConversation.get(key) || 0,
+        hasSentMessage: sentMessageConversationSet.has(key)
       };
-    }));
+    });
+
     res.json(results);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -156,6 +215,8 @@ exports.createConversation = async (req, res) => {
 exports.getMessages = async (req, res) => {
   try {
     const { conversationId } = req.params;
+    const limit = Math.min(parseInt(req.query.limit || '50', 10), 200);
+    const cursor = req.query.cursor;
     const validation = validateObjectId(conversationId, 'conversation ID');
     if (!validation.valid) {
       return res.status(400).json({ error: validation.error });
@@ -163,8 +224,24 @@ exports.getMessages = async (req, res) => {
     // Check if user is a participant
     const participant = await ConversationParticipant.findOne({ conversationId, userId: req.user._id });
     if (!participant) return res.status(403).json({ error: 'Not a participant' });
-    const messages = await Message.find({ conversationId }).sort({ createdAt: 1 }).populate('senderId', 'firstName lastName email profilePicture');
-    res.json(messages);
+
+    const filter = { conversationId };
+    if (cursor) {
+      filter.createdAt = { $lt: new Date(cursor) };
+    }
+
+    const messages = await Message.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(limit + 1)
+      .populate('senderId', 'firstName lastName email profilePicture')
+      .lean();
+
+    const hasMore = messages.length > limit;
+    const pageItems = hasMore ? messages.slice(0, limit) : messages;
+    const orderedItems = pageItems.reverse();
+    const nextCursor = hasMore ? pageItems[pageItems.length - 1]?.createdAt?.toISOString() : null;
+
+    res.json({ data: orderedItems, nextCursor, hasMore });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

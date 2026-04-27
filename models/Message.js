@@ -7,4 +7,7 @@ const MessageSchema = new mongoose.Schema({
   attachments: [{ type: String }], // URLs or file references
 }, { timestamps: { createdAt: true, updatedAt: false } });
 
+MessageSchema.index({ conversationId: 1, createdAt: -1 });
+MessageSchema.index({ senderId: 1, createdAt: -1 });
+
 module.exports = mongoose.model('Message', MessageSchema); 

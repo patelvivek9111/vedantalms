@@ -7,6 +7,8 @@ import { format } from 'date-fns';
 import { safeFormatDate } from '../../utils/dateUtils';
 import { Lock, Unlock, HelpCircle, CheckCircle, Circle, Bookmark, BarChart3, Edit, Eye, X, Download } from 'lucide-react';
 import FilePreview from './FilePreview';
+import AssignmentFileUploadSection from './AssignmentFileUploadSection';
+import ScrollableQuizSidebar from './ScrollableQuizSidebar';
 import logger from '../../utils/logger';
 import ConfirmationModal from '../common/ConfirmationModal';
 import BackButton from '../common/BackButton';
@@ -202,10 +204,52 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
     }
   });
   const [loadingStats, setLoadingStats] = useState(false);
+  const draftSaveTimeoutRef = useRef<number | null>(null);
+  const SUBMISSIONS_PAGE_SIZE = 100;
 
   // Define instructor and student checks early
   const isInstructor = user?.role === 'teacher' || user?.role === 'admin';
   const isStudent = user?.role === 'student';
+
+  const queueDraftSave = (draftAnswers: Answers, draftUploadedFiles: UploadedFile[]) => {
+    if (!user?._id || !id || user.role !== 'student' || submission) return;
+    if (draftSaveTimeoutRef.current) {
+      window.clearTimeout(draftSaveTimeoutRef.current);
+    }
+    draftSaveTimeoutRef.current = window.setTimeout(() => {
+      const draftKey = `assignment_draft_${id}_${user._id}`;
+      try {
+        const existingDraft = localStorage.getItem(draftKey);
+        const draft = existingDraft ? JSON.parse(existingDraft) : {};
+        draft.answers = draftAnswers;
+        draft.uploadedFiles = draftUploadedFiles;
+        localStorage.setItem(draftKey, JSON.stringify(draft));
+      } catch (e) {
+        logger.error('Error saving draft', e instanceof Error ? e : new Error(String(e)));
+      }
+    }, 600);
+  };
+
+  const fetchSubmissionPages = async (assignmentId: string) => {
+    let nextCursor: string | null = null;
+    let hasMore = true;
+    const all: Submission[] = [];
+
+    while (hasMore) {
+      const params: Record<string, string | number> = { limit: SUBMISSIONS_PAGE_SIZE };
+      if (nextCursor) params.cursor = nextCursor;
+      const page = await api.get(`/submissions/assignment/${assignmentId}`, { params });
+      const items = Array.isArray(page.data?.data) ? page.data.data : [];
+      all.push(...items);
+      hasMore = Boolean(page.data?.hasMore);
+      nextCursor = page.data?.nextCursor || null;
+      if (!nextCursor) {
+        hasMore = false;
+      }
+    }
+
+    return all;
+  };
 
   useEffect(() => {
     let storedUser = null;
@@ -229,6 +273,14 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
   }, []);
 
   useEffect(() => {
+    return () => {
+      if (draftSaveTimeoutRef.current) {
+        window.clearTimeout(draftSaveTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     setSubmission(null); // Clear submission state when user changes
   }, [user, id]);
 
@@ -247,9 +299,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
       logger.error('Error fetching submission stats', error instanceof Error ? error : new Error(String(error)));
       // Fallback: calculate basic stats from submissions
       try {
-        const submissionsResponse = await api.get(`/submissions/assignment/${assignment._id}`);
-        
-        const submissions = submissionsResponse.data || [];
+        const submissions = await fetchSubmissionPages(assignment._id);
         const questionStats = assignment.questions?.map((q: Question, index: number) => ({
           questionIndex: index,
           correctCount: 0,
@@ -446,7 +496,10 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
         } else if (user?.role === 'teacher' || user?.role === 'admin') {
           try {
             const submissionRes = await api.get(`/submissions/assignment/${id}`);
-            setSubmission(submissionRes.data[0] || null);
+            const submissionList = Array.isArray(submissionRes.data?.data)
+              ? submissionRes.data.data
+              : Array.isArray(submissionRes.data) ? submissionRes.data : [];
+            setSubmission(submissionList[0] || null);
           } catch (err) {
             setSubmission(null);
           }
@@ -640,20 +693,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
 
       setUploadedFiles(prev => {
         const updated = [...prev, ...newFiles];
-        
-        // Auto-save to localStorage if student and no submission exists
-        if (user?.role === 'student' && !submission && id) {
-          const draftKey = `assignment_draft_${id}_${user._id}`;
-          try {
-            const existingDraft = localStorage.getItem(draftKey);
-            const draft = existingDraft ? JSON.parse(existingDraft) : {};
-            draft.answers = answers;
-            draft.uploadedFiles = updated;
-            localStorage.setItem(draftKey, JSON.stringify(draft));
-          } catch (e) {
-            logger.error('Error saving draft', e);
-          }
-        }
+        queueDraftSave(answers, updated);
         
         return updated;
       });
@@ -668,20 +708,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
   const removeFile = (index: number) => {
     setUploadedFiles(prev => {
       const updated = prev.filter((_, i) => i !== index);
-      
-      // Auto-save to localStorage if student and no submission exists
-      if (user?.role === 'student' && !submission && id) {
-        const draftKey = `assignment_draft_${id}_${user._id}`;
-        try {
-          const existingDraft = localStorage.getItem(draftKey);
-          const draft = existingDraft ? JSON.parse(existingDraft) : {};
-          draft.answers = answers;
-          draft.uploadedFiles = updated;
-          localStorage.setItem(draftKey, JSON.stringify(draft));
-        } catch (e) {
-          logger.error('Error saving draft', e);
-        }
-      }
+      queueDraftSave(answers, updated);
       
       return updated;
     });
@@ -704,19 +731,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
         [questionIndex]: value
       };
       
-      // Auto-save to localStorage if student and no submission exists
-      if (user?.role === 'student' && !submission && id) {
-        const draftKey = `assignment_draft_${id}_${user._id}`;
-        try {
-          const existingDraft = localStorage.getItem(draftKey);
-          const draft = existingDraft ? JSON.parse(existingDraft) : {};
-          draft.answers = newAnswers;
-          draft.uploadedFiles = uploadedFiles;
-          localStorage.setItem(draftKey, JSON.stringify(draft));
-        } catch (e) {
-          logger.error('Error saving draft', e);
-        }
-      }
+      queueDraftSave(newAnswers, uploadedFiles);
       
       return newAnswers;
     });
@@ -2621,99 +2636,15 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                     
                     {/* File Upload Section for Students - at the bottom of scrollable mode */}
                     {isStudent && !submission && !isPastDue && (
-                      <div className="mt-6 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Upload Files</h3>
-                        <div className="space-y-4">
-                          {/* Upload Button */}
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Upload File</label>
-                            <div className="flex items-center space-x-4">
-                              <input
-                                type="file"
-                                multiple
-                                onChange={handleFileUpload}
-                                disabled={isUploading}
-                                className="hidden"
-                                id="file-upload-scrollable"
-                              />
-                              <label
-                                htmlFor="file-upload-scrollable"
-                                className={`inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:bg-gray-700 cursor-pointer ${
-                                  isUploading ? 'opacity-50 cursor-not-allowed' : ''
-                                }`}
-                              >
-                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                </svg>
-                                {isUploading ? 'Uploading...' : 'Upload File'}
-                              </label>
-                              {uploadedFiles.length > 0 && (
-                                <button
-                                  onClick={() => document.getElementById('file-upload-scrollable')?.click()}
-                                  className="inline-flex items-center px-4 py-2 border border-pink-500 rounded-md shadow-sm text-sm font-medium text-pink-600 bg-white dark:bg-gray-800 hover:bg-pink-50"
-                                >
-                                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                  </svg>
-                                  Add Another File
-                                </button>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Uploaded Files List */}
-                          {uploadedFiles.length > 0 && (
-                            <div className="mt-4">
-                              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Uploaded Files:</h4>
-                              <div className="space-y-2">
-                                {uploadedFiles.map((file, index) => (
-                                  <div key={index} className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md">
-                                    <div className="flex items-center space-x-3 flex-1 min-w-0">
-                                      <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                      </svg>
-                                      <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{file.name}</p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">{file.size ? `${((file.size || 0) / 1024 / 1024).toFixed(2)} MB` : 'Size unknown'}</p>
-                                      </div>
-                                    </div>
-                                    <div className="flex items-center space-x-2 ml-2">
-                                      <button
-                                        onClick={() => setPreviewFile({ url: file.url, name: file.name })}
-                                        className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 p-1"
-                                        title="Preview file"
-                                      >
-                                        <Eye className="w-4 h-4" />
-                                      </button>
-                                      <button
-                                        onClick={() => removeFile(index)}
-                                        className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 p-1"
-                                        title="Remove file"
-                                      >
-                                        <X className="w-4 h-4" />
-                                      </button>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                              
-                              {/* File Preview Modal */}
-                              {previewFile && previewFile.url && (
-                                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setPreviewFile(null)}>
-                                  <div className="relative max-w-4xl w-full max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
-                                    <FilePreview
-                                      fileUrl={previewFile.url || ''}
-                                      fileName={previewFile.name || ''}
-                                      onClose={() => setPreviewFile(null)}
-                                      showCloseButton={true}
-                                    />
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                      <AssignmentFileUploadSection
+                        uploadedFiles={uploadedFiles}
+                        isUploading={isUploading}
+                        onFileInputChange={handleFileUpload}
+                        onRemoveFile={removeFile}
+                        previewFile={previewFile}
+                        onPreviewFile={(file) => setPreviewFile(file)}
+                        onClosePreview={() => setPreviewFile(null)}
+                      />
                     )}
 
                     {/* Submit button for scrollable mode */}
@@ -2735,100 +2666,21 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                   
                   {/* Sidebar for scrollable mode - only show for students answering */}
                   {isStudent && !submission && !isPastDue && (
-                    <div className="w-80 bg-gray-50 dark:bg-gray-700 rounded-lg p-4 self-start">
-                      <div className="mb-4">
-                        <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Questions</h4>
-                        <div className="space-y-2 max-h-64 overflow-y-auto">
-                          {assignment.questions.map((question, index) => (
-                            <button
-                              key={index}
-                              onClick={() => {
-                                // Scroll to the question
-                                const questionElement = document.getElementById(`question-${index}-answer`) || 
-                                                     document.querySelector(`[name="question-${index}"]`);
-                                if (questionElement) {
-                                  questionElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                }
-                              }}
-                              className={`w-full flex items-center justify-between p-2 rounded-md text-sm hover:bg-gray-100 dark:bg-gray-700`}
-                            >
-                              <div className="flex items-center space-x-2">
-                                {answeredQuestions.has(index) && markedQuestions.has(index) ? (
-                                  <div className="relative">
-                                    <Circle className="h-4 w-4 text-green-600 dark:text-green-400 fill-current" />
-                                    <Bookmark className="h-3 w-3 text-yellow-500 absolute -top-1 -right-1" />
-                                  </div>
-                                ) : answeredQuestions.has(index) ? (
-                                  <Circle className="h-4 w-4 text-green-600 dark:text-green-400 fill-current" />
-                                ) : markedQuestions.has(index) ? (
-                                  <Bookmark className="h-4 w-4 text-yellow-600" />
-                                ) : (
-                                  <Circle className="h-4 w-4 text-gray-400" />
-                                )}
-                                <span>Question {index + 1}</span>
-                              </div>
-                              <span className="text-xs text-gray-500 dark:text-gray-400">{question.points} pts</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      
-                      <div className="border-t pt-4">
-                        <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                          <div className="flex items-center justify-between">
-                            <span>Progress</span>
-                            <span>{answeredQuestions.size} of {assignment.questions.length} answered</span>
-                          </div>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-indigo-600 dark:bg-indigo-500 h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${(answeredQuestions.size / assignment.questions.length) * 100}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                      
-                      {/* Timer Display for timed quizzes - now under the progress bar */}
-                      {assignment.isTimedQuiz && (
-                        <div className="mt-4 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
-                          <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                            <div className="flex items-center justify-between">
-                              <span>Time Remaining:</span>
-                              <button 
-                                onClick={() => setShowTimer(!showTimer)}
-                                className="text-blue-600 hover:text-blue-800 underline text-xs"
-                              >
-                                {showTimer ? 'Hide' : 'Show'}
-                              </button>
-                            </div>
-                          </div>
-                          {showTimer && (
-                            <div className="space-y-1">
-                              <div className="text-xs text-gray-500 dark:text-gray-400">
-                                Attempt due: {safeFormatDate(assignment.dueDate, 'MMM d \'at\' h:mm a')}
-                              </div>
-                              {quizStarted && timeLeft !== null ? (
-                                <div className={`text-sm font-medium ${timeLeft <= 300 ? 'text-red-600' : 'text-gray-700 dark:text-gray-300'}`}>
-                                  {formatTime(timeLeft)}
-                                </div>
-                              ) : (
-                                <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                  {assignment.quizTimeLimit} minutes
-                                </div>
-                              )}
-                              {!quizStarted && (
-                                <button
-                                  onClick={startQuiz}
-                                  className="mt-2 w-full bg-indigo-600 dark:bg-indigo-500 text-white text-sm py-2 px-3 rounded hover:bg-indigo-700 dark:hover:bg-indigo-600"
-                                >
-                                  Start Quiz
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                    <ScrollableQuizSidebar
+                      totalQuestions={assignment.questions.length}
+                      questions={assignment.questions}
+                      answeredQuestions={answeredQuestions}
+                      markedQuestions={markedQuestions}
+                      isTimedQuiz={!!assignment.isTimedQuiz}
+                      showTimer={showTimer}
+                      onToggleTimer={() => setShowTimer(!showTimer)}
+                      dueDate={assignment.dueDate}
+                      quizStarted={quizStarted}
+                      timeLeft={timeLeft}
+                      formatTime={formatTime}
+                      quizTimeLimit={assignment.quizTimeLimit}
+                      onStartQuiz={startQuiz}
+                    />
                   )}
                 </div>
               )

@@ -1,16 +1,21 @@
 const multer = require('multer');
 const path = require('path');
+const { isCloudinaryConfigured } = require('../utils/cloudinary');
+
+const useObjectStorage = isCloudinaryConfigured() && process.env.FORCE_OBJECT_STORAGE !== 'false';
 
 // Configure storage
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/');
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
+const storage = useObjectStorage
+  ? multer.memoryStorage()
+  : multer.diskStorage({
+      destination: function (req, file, cb) {
+        cb(null, 'uploads/');
+      },
+      filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+      }
+    });
 
 // File filter
 const fileFilter = (req, file, cb) => {

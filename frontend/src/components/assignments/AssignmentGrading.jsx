@@ -48,6 +48,7 @@ const AssignmentGrading = () => {
   const lastSavedGradesRef = useRef({});
   const [swipeProgress, setSwipeProgress] = useState(0); // -1 to 1, negative = left swipe, positive = right swipe
   const [isSwiping, setIsSwiping] = useState(false);
+  const SUBMISSIONS_PAGE_SIZE = 100;
 
   // Offline sync hook
   const {
@@ -422,6 +423,31 @@ const AssignmentGrading = () => {
   }, [hasUnsavedChanges]);
 
   // Fetch data with retry mechanism
+  const fetchAllSubmissions = useCallback(async (assignmentId) => {
+    let nextCursor = null;
+    let hasMore = true;
+    const merged = [];
+
+    while (hasMore) {
+      const params = { limit: SUBMISSIONS_PAGE_SIZE };
+      if (nextCursor) {
+        params.cursor = nextCursor;
+      }
+      const pageResponse = await api.get(`/submissions/assignment/${assignmentId}`, { params });
+      const payload = pageResponse.data?.data || [];
+      if (Array.isArray(payload)) {
+        merged.push(...payload);
+      }
+      hasMore = Boolean(pageResponse.data?.hasMore);
+      nextCursor = pageResponse.data?.nextCursor || null;
+      if (!nextCursor) {
+        hasMore = false;
+      }
+    }
+
+    return merged;
+  }, []);
+
   const fetchData = useCallback(async (retryAttempt = 0) => {
     try {
       setLoading(true);
@@ -464,16 +490,8 @@ const AssignmentGrading = () => {
         }
       }
 
-      const submissionsRes = await api.get(`/submissions/assignment/${id}`);
-      
-      if (typeof submissionsRes.data === 'string' && submissionsRes.data.trim().startsWith('<!DOCTYPE')) {
-        setSubmissions([]);
-        toast.warn('Unable to load submissions. Please refresh the page.');
-      } else {
-        const submissionsDataRaw = submissionsRes.data?.data || submissionsRes.data;
-        const submissionsData = Array.isArray(submissionsDataRaw) ? submissionsDataRaw : [];
-        setSubmissions(submissionsData);
-      }
+      const submissionsData = await fetchAllSubmissions(id);
+      setSubmissions(submissionsData);
       
       setLoading(false);
       setRetryCount(0);
@@ -491,7 +509,7 @@ const AssignmentGrading = () => {
         toast.error(errorMessage);
       }
     }
-  }, [id]);
+  }, [id, fetchAllSubmissions]);
 
   useEffect(() => {
     fetchData();
@@ -825,9 +843,7 @@ const AssignmentGrading = () => {
       }
 
       // Refresh submissions
-      const submissionsRes = await api.get(`/submissions/assignment/${id}`);
-      const submissionsDataRaw = submissionsRes.data?.data || submissionsRes.data;
-      const submissionsData = Array.isArray(submissionsDataRaw) ? submissionsDataRaw : [];
+      const submissionsData = await fetchAllSubmissions(id);
       setSubmissions(submissionsData);
 
       setSelectedSubmissions(new Set());
@@ -884,9 +900,7 @@ const AssignmentGrading = () => {
       }
 
       // Refresh submissions
-      const submissionsRes = await api.get(`/submissions/assignment/${id}`);
-      const submissionsDataRaw = submissionsRes.data?.data || submissionsRes.data;
-      const submissionsData = Array.isArray(submissionsDataRaw) ? submissionsDataRaw : [];
+      const submissionsData = await fetchAllSubmissions(id);
       setSubmissions(submissionsData);
 
       setSelectedSubmissions(new Set());

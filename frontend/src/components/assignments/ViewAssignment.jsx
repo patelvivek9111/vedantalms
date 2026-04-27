@@ -101,7 +101,9 @@ const ViewAssignment = () => {
       try {
         const submissionsResponse = await api.get(`/submissions/assignment/${assignment._id}`);
         
-        const submissions = submissionsResponse.data || [];
+        const submissions = Array.isArray(submissionsResponse.data?.data)
+          ? submissionsResponse.data.data
+          : Array.isArray(submissionsResponse.data) ? submissionsResponse.data : [];
         const stats = {
           totalStudents: submissions.length,
           submittedCount: submissions.filter(s => s.submittedAt).length,
@@ -261,7 +263,10 @@ const ViewAssignment = () => {
         } else if (user?.role === 'teacher' || user?.role === 'admin') {
           try {
             const submissionRes = await api.get(`/submissions/assignment/${id}`);
-            setSubmission(submissionRes.data[0] || null);
+            const submissionList = Array.isArray(submissionRes.data?.data)
+              ? submissionRes.data.data
+              : Array.isArray(submissionRes.data) ? submissionRes.data : [];
+            setSubmission(submissionList[0] || null);
           } catch (err) {
             setSubmission(null);
           }

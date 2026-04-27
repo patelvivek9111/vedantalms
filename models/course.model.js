@@ -242,4 +242,8 @@ const courseSchema = new mongoose.Schema({
   timestamps: true // This will add createdAt and updatedAt fields
 });
 
+courseSchema.index({ instructor: 1, updatedAt: -1 });
+courseSchema.index({ students: 1 });
+courseSchema.index({ 'catalog.courseCode': 1 });
+
 module.exports = mongoose.model('Course', courseSchema); 

@@ -126,4 +126,7 @@ const assignmentSchema = new mongoose.Schema({
   timestamps: true
 });
 
+assignmentSchema.index({ module: 1, published: 1, dueDate: 1 });
+assignmentSchema.index({ isGroupAssignment: 1, groupSet: 1, dueDate: 1 });
+
 module.exports = mongoose.model('Assignment', assignmentSchema); 

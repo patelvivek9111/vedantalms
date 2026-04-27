@@ -389,7 +389,16 @@ exports.getAssignmentSubmissions = async (req, res) => {
       return res.status(404).json({ message: 'Assignment not found' });
     }
 
-    const submissions = await Submission.find({ assignment: req.params.assignmentId })
+    const limit = Math.min(parseInt(req.query.limit || '50', 10), 200);
+    const cursor = req.query.cursor;
+    const query = { assignment: req.params.assignmentId };
+    if (cursor) {
+      query.submittedAt = { $lt: new Date(cursor) };
+    }
+
+    const submissions = await Submission.find(query)
+      .sort({ submittedAt: -1, _id: -1 })
+      .limit(limit + 1)
       .populate('student', 'firstName lastName email')
       .populate('submittedBy', 'firstName lastName email')
       .populate({
@@ -402,7 +411,15 @@ exports.getAssignmentSubmissions = async (req, res) => {
       .populate('memberGrades.student', 'firstName lastName email')
       .populate('memberGrades.gradedBy', 'firstName lastName');
 
-    res.json(submissions);
+    const hasMore = submissions.length > limit;
+    const pageItems = hasMore ? submissions.slice(0, limit) : submissions;
+    const nextCursor = hasMore ? pageItems[pageItems.length - 1]?.submittedAt?.toISOString() : null;
+
+    res.json({
+      data: pageItems,
+      nextCursor,
+      hasMore
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

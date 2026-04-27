@@ -8,4 +8,7 @@ const ConversationParticipantSchema = new mongoose.Schema({
   starred: { type: Boolean, default: false },
 });
 
+ConversationParticipantSchema.index({ userId: 1, folder: 1, updatedAt: -1 });
+ConversationParticipantSchema.index({ conversationId: 1, userId: 1 }, { unique: true });
+
 module.exports = mongoose.model('ConversationParticipant', ConversationParticipantSchema); 
