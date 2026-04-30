@@ -13,10 +13,18 @@ export default defineConfig({
     chunkSizeWarningLimit: 900,
     rollupOptions: {
       output: {
-        manualChunks: {
-          reactVendor: ['react', 'react-dom', 'react-router-dom'],
-          editorVendor: ['@tiptap/react', '@tiptap/starter-kit', '@tinymce/tinymce-react'],
-          uiVendor: ['lucide-react', 'react-toastify', 'react-big-calendar'],
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return;
+          if (id.includes('react-big-calendar') || id.includes('date-fns')) return 'calendarVendor';
+          if (id.includes('@tiptap') || id.includes('tinymce')) return 'editorVendor';
+          if (
+            id.includes('/node_modules/react/') ||
+            id.includes('/node_modules/react-dom/') ||
+            id.includes('/node_modules/react-router-dom/')
+          ) {
+            return 'reactVendor';
+          }
+          if (id.includes('lucide-react') || id.includes('react-toastify')) return 'uiVendor';
         },
       },
     },
