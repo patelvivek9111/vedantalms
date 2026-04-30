@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { updateUserProfile, uploadProfilePicture, getUserPreferences, updateUserPreferences, getLoginActivity, getImageUrl } from '../services/api';
 import api from '../services/api';
 import { useTheme } from '../context/ThemeContext';
-import { Sun, Moon, Save, RefreshCw } from 'lucide-react';
+import { Sun, Moon, Save, RefreshCw, Check } from 'lucide-react';
 import FloatingLabelInput from '../components/common/FloatingLabelInput';
 import FloatingLabelTextarea from '../components/common/FloatingLabelTextarea';
 import FormFieldGroup from '../components/common/FormFieldGroup';
@@ -489,33 +489,29 @@ function SettingsSection() {
         </form>
       </div>
 
-      {/* Theme Selection - Improved UI with Icons */}
-      <div className="w-full max-w-md bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 p-4 sm:p-6 rounded-lg shadow-sm">
-        <h3 className="text-sm sm:text-base font-semibold mb-4 text-gray-900 dark:text-gray-100">Theme</h3>
-        <div className="grid grid-cols-2 gap-4">
+      {/* Theme Selection */}
+      <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-4 text-gray-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-gray-100 sm:p-6">
+        <h3 className="mb-1 text-sm font-semibold text-slate-900 dark:text-slate-100 sm:text-base">Theme</h3>
+        <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">Choose how the app appears.</p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <button
             type="button"
             onClick={() => handleThemeChange('light')}
             disabled={saving || loading}
-            className={`relative p-4 rounded-lg border-2 transition-all touch-manipulation ${
+            className={`group flex items-center justify-between rounded-lg border px-4 py-3 text-left transition-colors ${
               prefs.theme === 'light'
-                ? 'border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20'
-                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/20'
+                : 'border-slate-300 bg-white hover:border-slate-400 dark:border-slate-600 dark:bg-slate-800 dark:hover:border-slate-500'
             } ${saving || loading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
           >
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-12 h-12 rounded-lg bg-white border-2 border-gray-200 shadow-sm flex items-center justify-center">
-                <Sun className="w-6 h-6 text-yellow-500" />
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 bg-slate-50 dark:border-slate-600 dark:bg-slate-700">
+                <Sun className="h-4 w-4 text-amber-500" />
               </div>
+              <span className="text-sm font-medium text-slate-800 dark:text-slate-100">Light</span>
             </div>
             {prefs.theme === 'light' && (
-              <div className="absolute top-2 right-2">
-                <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
-                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-              </div>
+              <Check className="h-4 w-4 text-blue-600 dark:text-blue-300" />
             )}
           </button>
           
@@ -523,25 +519,20 @@ function SettingsSection() {
             type="button"
             onClick={() => handleThemeChange('dark')}
             disabled={saving || loading}
-            className={`relative p-4 rounded-lg border-2 transition-all touch-manipulation ${
+            className={`group flex items-center justify-between rounded-lg border px-4 py-3 text-left transition-colors ${
               prefs.theme === 'dark'
-                ? 'border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20'
-                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/20'
+                : 'border-slate-300 bg-white hover:border-slate-400 dark:border-slate-600 dark:bg-slate-800 dark:hover:border-slate-500'
             } ${saving || loading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
           >
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-12 h-12 rounded-lg bg-gray-800 border-2 border-gray-700 shadow-sm flex items-center justify-center">
-                <Moon className="w-6 h-6 text-blue-300" />
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-slate-900 dark:border-slate-500 dark:bg-slate-900">
+                <Moon className="h-4 w-4 text-blue-200" />
               </div>
+              <span className="text-sm font-medium text-slate-800 dark:text-slate-100">Dark</span>
             </div>
             {prefs.theme === 'dark' && (
-              <div className="absolute top-2 right-2">
-                <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
-                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-              </div>
+              <Check className="h-4 w-4 text-blue-600 dark:text-blue-300" />
             )}
           </button>
         </div>

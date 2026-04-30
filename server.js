@@ -64,6 +64,97 @@ const logger = pino({
   level: process.env.LOG_LEVEL || 'info',
   base: undefined
 });
+let redisAdapterEnabled = false;
+let redisAdapterError = null;
+let socketEngineConnectionErrors = 0;
+const requestMetrics = {
+  startedAt: Date.now(),
+  total: 0,
+  status2xx: 0,
+  status4xx: 0,
+  status5xx: 0,
+  latencyMs: []
+};
+
+const summarizeLatency = (samples) => {
+  if (!samples.length) {
+    return { p50: 0, p95: 0, p99: 0 };
+  }
+  const sorted = [...samples].sort((a, b) => a - b);
+  const percentile = (p) => sorted[Math.min(sorted.length - 1, Math.floor((p / 100) * sorted.length))];
+  return {
+    p50: Number(percentile(50).toFixed(2)),
+    p95: Number(percentile(95).toFixed(2)),
+    p99: Number(percentile(99).toFixed(2))
+  };
+};
+
+const { getSocketMetrics, initializeQuizWaveSocket } = require('./socket/quizwave.socket');
+
+const buildHealthOpsPayload = () => {
+  const uptimeSeconds = Math.floor((Date.now() - requestMetrics.startedAt) / 1000);
+  const latency = summarizeLatency(requestMetrics.latencyMs);
+  const errorRate = requestMetrics.total > 0
+    ? Number((((requestMetrics.status4xx + requestMetrics.status5xx) / requestMetrics.total) * 100).toFixed(2))
+    : 0;
+  return {
+    status: 'ok',
+    uptimeSeconds,
+    requestMetrics: {
+      total: requestMetrics.total,
+      status2xx: requestMetrics.status2xx,
+      status4xx: requestMetrics.status4xx,
+      status5xx: requestMetrics.status5xx,
+      errorRatePercent: errorRate,
+      latencyMs: latency
+    },
+    dependencies: {
+      mongoConnected: mongoose.connection.readyState === 1,
+      redisAdapterEnabled,
+      redisAdapterError
+    },
+    socketEngine: {
+      connectionErrors: socketEngineConnectionErrors
+    },
+    socketMetrics: getSocketMetrics()
+  };
+};
+
+const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+
+const renderPrometheusMetrics = (payload) => {
+  const m = payload.requestMetrics;
+  const lat = m.latencyMs || {};
+  const d = payload.dependencies;
+  const s = payload.socketMetrics || {};
+  const eng = payload.socketEngine || {};
+  const lines = [];
+  const emit = (name, type, help, value) => {
+    lines.push(`# HELP ${name} ${help}`);
+    lines.push(`# TYPE ${name} ${type}`);
+    lines.push(`${name} ${num(value)}`);
+  };
+  emit('lms_process_uptime_seconds', 'gauge', 'Application uptime in seconds.', payload.uptimeSeconds);
+  emit('lms_http_requests_recorded_total', 'gauge', 'HTTP requests counted in rolling window.', m.total);
+  emit('lms_http_responses_2xx_total', 'gauge', '2xx responses in rolling window.', m.status2xx);
+  emit('lms_http_responses_4xx_total', 'gauge', '4xx responses in rolling window.', m.status4xx);
+  emit('lms_http_responses_5xx_total', 'gauge', '5xx responses in rolling window.', m.status5xx);
+  emit('lms_http_error_rate_percent', 'gauge', '4xx+5xx divided by total times 100.', m.errorRatePercent);
+  emit('lms_http_request_latency_p50_ms', 'gauge', 'Rolling p50 HTTP latency ms.', lat.p50);
+  emit('lms_http_request_latency_p95_ms', 'gauge', 'Rolling p95 HTTP latency ms.', lat.p95);
+  emit('lms_http_request_latency_p99_ms', 'gauge', 'Rolling p99 HTTP latency ms.', lat.p99);
+  emit('lms_dependency_mongo_up', 'gauge', '1 if mongoose connected.', d.mongoConnected ? 1 : 0);
+  emit('lms_dependency_redis_adapter_up', 'gauge', '1 if Socket.IO Redis adapter enabled.', d.redisAdapterEnabled ? 1 : 0);
+  emit('lms_socket_engine_connection_errors_total', 'gauge', 'Socket.IO engine connection_error count.', eng.connectionErrors);
+  emit('lms_socket_connected_total', 'gauge', 'QuizWave socket connected count.', s.connected);
+  emit('lms_socket_disconnected_total', 'gauge', 'QuizWave socket disconnected count.', s.disconnected);
+  emit('lms_socket_auth_errors_total', 'gauge', 'QuizWave socket auth errors.', s.authErrors);
+  emit('lms_socket_event_errors_total', 'gauge', 'QuizWave socket handler errors.', s.eventErrors);
+  emit('lms_socket_throttled_total', 'gauge', 'QuizWave inbound events rate-limited.', s.throttled ?? 0);
+  emit('lms_socket_currently_connected', 'gauge', 'Estimated current QuizWave connections.', s.currentlyConnected ?? 0);
+  emit('lms_quizwave_active_sessions', 'gauge', 'QuizWave active session map size.', s.activeSessionCount ?? 0);
+  return lines.join('\n');
+};
 
 app.use(pinoHttp({
   logger,
@@ -82,6 +173,18 @@ app.use((req, res, next) => {
   const start = process.hrtime.bigint();
   res.on('finish', () => {
     const durationMs = Number(process.hrtime.bigint() - start) / 1e6;
+    requestMetrics.total += 1;
+    if (res.statusCode >= 500) {
+      requestMetrics.status5xx += 1;
+    } else if (res.statusCode >= 400) {
+      requestMetrics.status4xx += 1;
+    } else if (res.statusCode >= 200) {
+      requestMetrics.status2xx += 1;
+    }
+    requestMetrics.latencyMs.push(durationMs);
+    if (requestMetrics.latencyMs.length > 1000) {
+      requestMetrics.latencyMs.shift();
+    }
     req.log.info({
       statusCode: res.statusCode,
       durationMs: Number(durationMs.toFixed(2))
@@ -113,14 +216,46 @@ const writeLimiter = rateLimit({
   message: { message: 'Too many write requests, please slow down.' }
 });
 
+/** GET/HEAD/OPTIONS stay on the general `/api` limiter only; mutations keep the stricter write cap. */
+const writeLimiterUnlessRead = (req, res, next) => {
+  const m = req.method;
+  if (m === 'GET' || m === 'HEAD' || m === 'OPTIONS') {
+    return next();
+  }
+  return writeLimiter(req, res, next);
+};
+
 app.use('/api', generalLimiter);
 app.use('/api/auth', authLimiter);
-app.use(['/api/submissions', '/api/inbox', '/api/grades', '/api/upload'], writeLimiter);
+app.use(['/api/submissions', '/api/inbox', '/api/grades', '/api/upload'], writeLimiterUnlessRead);
 
 
 // Set default JWT secret if not in environment
-process.env.JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-123';
+if (!process.env.JWT_SECRET && process.env.NODE_ENV !== 'production') {
+  process.env.JWT_SECRET = 'your-super-secret-jwt-key-123';
+}
 process.env.JWT_EXPIRE = process.env.JWT_EXPIRE || '30d';
+const { isCloudinaryConfigured } = require('./utils/cloudinary');
+
+const validateProductionSetup = () => {
+  if (process.env.NODE_ENV !== 'production') return;
+
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'your-super-secret-jwt-key-123') {
+    console.error('❌ Production startup blocked: JWT_SECRET must be a strong secret');
+    process.exit(1);
+  }
+
+  if (process.env.REQUIRE_REDIS === 'true' && !process.env.REDIS_URL) {
+    console.error('❌ Production startup blocked: REQUIRE_REDIS=true but REDIS_URL is not set');
+    process.exit(1);
+  }
+
+  if (process.env.FORCE_OBJECT_STORAGE === 'true' && !isCloudinaryConfigured()) {
+    console.error('❌ Production startup blocked: FORCE_OBJECT_STORAGE=true but Cloudinary credentials are missing');
+    process.exit(1);
+  }
+};
+validateProductionSetup();
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, 'uploads');
@@ -177,8 +312,11 @@ if (!MONGODB_URI.startsWith('mongodb://') && !MONGODB_URI.startsWith('mongodb+sr
 
 mongoose.connect(MONGODB_URI, mongoOptions)
   .then(async () => {
-    // Connected to MongoDB
-    // Initialize email service
+    if (process.env.NODE_ENV === 'test') {
+      return;
+    }
+
+    // Connected to MongoDB (non-test)
     const { initializeEmailService } = require('./utils/emailService');
     const { ensureCriticalIndexes } = require('./utils/ensureIndexes');
     await ensureCriticalIndexes(logger);
@@ -190,6 +328,9 @@ mongoose.connect(MONGODB_URI, mongoOptions)
       console.error('Index sync failed. Check model index definitions and your MongoDB provider index feature support.');
     } else {
       console.error('Please check your MONGODB_URI environment variable in Render dashboard.');
+    }
+    if (process.env.NODE_ENV === 'test') {
+      return;
     }
     process.exit(1); // Exit if cannot connect to database
   });
@@ -239,11 +380,12 @@ app.use('/api/reports', require('./routes/reports.routes'));
 app.use('/api/admin', require('./routes/admin.routes'));
 app.use('/api/notifications', require('./routes/notification.routes').router);
 app.use('/api/quizwave', require('./routes/quizwave.routes'));
+app.use('/api/integrations/zoho-meeting', require('./routes/zohoMeeting.routes'));
 
 // Upload route for file uploads
 const upload = require('./middleware/upload');
 const { protect } = require('./middleware/auth');
-const { uploadMultipleToCloudinary, isCloudinaryConfigured } = require('./utils/cloudinary');
+const { uploadMultipleToCloudinary } = require('./utils/cloudinary');
 
 app.post('/api/upload', protect, upload.array('files', 10), async (req, res) => {
   try {
@@ -268,6 +410,9 @@ app.post('/api/upload', protect, upload.array('files', 10), async (req, res) => 
           cloudinary: true
         }));
       } catch (cloudinaryError) {
+        if (process.env.NODE_ENV === 'production') {
+          return res.status(503).json({ message: 'Object storage upload failed. Please retry later.' });
+        }
         if (req.files.some(file => !file.path || !file.filename)) {
           return res.status(503).json({ message: 'File storage unavailable. Please retry later.' });
         }
@@ -281,6 +426,9 @@ app.post('/api/upload', protect, upload.array('files', 10), async (req, res) => 
         }));
       }
     } else {
+      if (process.env.NODE_ENV === 'production' && process.env.FORCE_OBJECT_STORAGE === 'true') {
+        return res.status(503).json({ message: 'Object storage is required in production but not configured.' });
+      }
       // Local storage
       files = req.files.map(file => ({
       originalname: file.originalname,
@@ -334,6 +482,43 @@ app.get('/health', (req, res) => {
   });
 });
 
+app.get('/health/ready', async (req, res) => {
+  const mongoConnected = mongoose.connection.readyState === 1;
+  const objectStorageReady = isCloudinaryConfigured();
+  const objectStorageMode = objectStorageReady ? 'cloudinary' : 'local';
+  const redisRequired = process.env.REQUIRE_REDIS === 'true';
+  const objectStorageRequired = process.env.FORCE_OBJECT_STORAGE === 'true';
+  const redisReady = redisAdapterEnabled || !redisRequired;
+  const storageReady = objectStorageReady || !objectStorageRequired;
+  const healthy = mongoConnected && redisReady && storageReady;
+
+  const payload = {
+    status: healthy ? 'ready' : 'degraded',
+    timestamp: new Date().toISOString(),
+    checks: {
+      mongoConnected,
+      redisAdapterEnabled,
+      redisRequired,
+      objectStorageReady,
+      objectStorageMode,
+      objectStorageRequired
+    },
+    redisAdapterError
+  };
+
+  res.status(healthy ? 200 : 503).json(payload);
+});
+
+app.get('/health/ops', (req, res) => {
+  res.json(buildHealthOpsPayload());
+});
+
+// Prometheus text exposition (same signals as /health/ops) for Grafana / Alertmanager
+app.get('/metrics', (req, res) => {
+  res.set('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+  res.send(renderPrometheusMetrics(buildHealthOpsPayload()));
+});
+
 // Test POST endpoint to verify POST requests work
 app.post('/api/test-post', (req, res) => {
   res.json({ 
@@ -366,6 +551,11 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
+const socketPingTimeoutMs = parseInt(process.env.SOCKET_PING_TIMEOUT_MS || '20000', 10);
+const socketPingIntervalMs = parseInt(process.env.SOCKET_PING_INTERVAL_MS || '25000', 10);
+const socketConnectTimeoutMs = parseInt(process.env.SOCKET_CONNECT_TIMEOUT_MS || '45000', 10);
+const socketMaxHttpBufferBytes = parseInt(process.env.SOCKET_MAX_HTTP_BUFFER_BYTES || '1048576', 10);
+
 // Initialize Socket.io
 const io = new Server(server, {
   cors: {
@@ -374,7 +564,17 @@ const io = new Server(server, {
       : ['http://localhost:3000', 'http://localhost:5173'],
     credentials: true,
     methods: ['GET', 'POST']
-  }
+  },
+  connectTimeout: socketConnectTimeoutMs,
+  pingTimeout: socketPingTimeoutMs,
+  pingInterval: socketPingIntervalMs,
+  maxHttpBufferSize: socketMaxHttpBufferBytes,
+  transports: ['websocket', 'polling']
+});
+
+io.engine.on('connection_error', (err) => {
+  socketEngineConnectionErrors += 1;
+  logger.warn({ err: err?.message || String(err) }, 'socket.io engine connection_error');
 });
 
 const configureSocketRedisAdapter = async () => {
@@ -384,19 +584,35 @@ const configureSocketRedisAdapter = async () => {
     return;
   }
   try {
-    const pubClient = new Redis(redisUrl, { lazyConnect: true, maxRetriesPerRequest: null });
+    const pubClient = new Redis(redisUrl, {
+      lazyConnect: true,
+      maxRetriesPerRequest: 1,
+      connectTimeout: 1000,
+      commandTimeout: 1000,
+      enableOfflineQueue: false,
+      retryStrategy: () => null
+    });
     const subClient = pubClient.duplicate();
+    pubClient.on('error', (error) => {
+      redisAdapterError = error?.message || 'redis pub client error';
+    });
+    subClient.on('error', (error) => {
+      redisAdapterError = error?.message || 'redis sub client error';
+    });
     await Promise.all([pubClient.connect(), subClient.connect()]);
     io.adapter(createAdapter(pubClient, subClient));
+    redisAdapterEnabled = true;
+    redisAdapterError = null;
     logger.info('socket.io redis adapter enabled');
   } catch (error) {
+    redisAdapterEnabled = false;
+    redisAdapterError = error?.message || 'unknown redis adapter error';
     logger.error({ err: error }, 'failed to enable socket.io redis adapter');
   }
 };
 configureSocketRedisAdapter();
 
 // Initialize QuizWave socket handlers
-const { initializeQuizWaveSocket } = require('./socket/quizwave.socket');
 initializeQuizWaveSocket(io);
 
 // Socket.io initialized for QuizWave

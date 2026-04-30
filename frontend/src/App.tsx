@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate, useParams, useOutletContext, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CourseProvider } from './contexts/CourseContext';
@@ -8,15 +8,7 @@ import Navigation from './components/Navigation';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
 import { Dashboard } from './pages/Dashboard';
-import { AdminDashboard } from './pages/AdminDashboard';
-import { AdminUserManagement } from './pages/AdminUserManagement';
-import { AdminAnalytics } from './pages/AdminAnalytics';
-import { AdminSystemSettings } from './pages/AdminSystemSettings';
-import { AdminCourseOversight } from './pages/AdminCourseOversight';
-import { AdminSecurity } from './pages/AdminSecurity';
-import { TeacherCourseOversight } from './pages/TeacherCourseOversight';
 import CourseList from './components/CourseList';
-import CourseDetail from './components/CourseDetail';
 import CourseForm from './components/CourseForm';
 import PageView from './components/PageView';
 import PageViewWrapper from './components/PageViewWrapper';
@@ -25,10 +17,6 @@ import AssignmentDetails from './components/assignments/AssignmentDetails';
 import CreateAssignmentForm from './components/assignments/CreateAssignmentForm';
 import CreateAssignmentWrapper from './components/assignments/CreateAssignmentWrapper';
 import GradeSubmissions from './components/assignments/GradeSubmissions';
-import ViewAssignment from './components/assignments/ViewAssignment';
-import ModuleEditPage from './pages/ModuleEditPage';
-import PageEditPage from './pages/PageEditPage';
-import AssignmentEditPage from './pages/AssignmentEditPage';
 import AssignmentGrading from './components/assignments/AssignmentGrading';
 import AssignmentViewWrapper from './components/assignments/AssignmentViewWrapper';
 import AssignmentDetailsWrapper from './components/assignments/AssignmentDetailsWrapper';
@@ -38,31 +26,43 @@ import 'react-toastify/dist/ReactToastify.css';
 import { AppLoadingSkeleton } from './components/common/SkeletonLoader';
 import ThreadView from './components/ThreadView';
 import ThreadViewWrapper from './components/ThreadViewWrapper';
-import Transcript from './pages/Transcript';
 import { Provider } from 'react-redux';
 import { store } from './store/store';
-import GroupDashboard from './components/groups/GroupDashboard';
 import GroupDiscussion from './components/groups/GroupDiscussion';
 import GroupPeopleWrapper from './components/groups/GroupPeopleWrapper';
 import GroupHome from './components/groups/GroupHome';
 import GroupPageView from './components/groups/GroupPageView';
-import Announcements from './pages/Announcements';
+import GroupMeetings from './components/groups/GroupMeetings';
+import CalendarPage from './components/Calendar';
 import GlobalSidebar from './components/GlobalSidebar';
 import BottomNav from './components/BottomNav';
-import CalendarPage from './components/Calendar';
-import Inbox from './pages/Inbox';
-import ToDoPage from './pages/ToDoPage';
-import AccountPage from './pages/AccountPage';
-import Groups from './pages/Groups';
-import GroupSetView from './components/groups/GroupSetView';
-import Catalog from './pages/Catalog';
-import CoursePeople from './pages/CoursePeople';
 import LandingPage from './pages/LandingPage';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ThemeProvider } from './context/ThemeContext';
-import QuizWaveDashboard from './components/quizwave/QuizWaveDashboard';
-import StudentJoinScreen from './components/quizwave/StudentJoinScreen';
-import StudentGameScreen from './components/quizwave/StudentGameScreen';
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
+const AdminUserManagement = lazy(() => import('./pages/AdminUserManagement').then(m => ({ default: m.AdminUserManagement })));
+const AdminAnalytics = lazy(() => import('./pages/AdminAnalytics').then(m => ({ default: m.AdminAnalytics })));
+const AdminSystemSettings = lazy(() => import('./pages/AdminSystemSettings').then(m => ({ default: m.AdminSystemSettings })));
+const AdminCourseOversight = lazy(() => import('./pages/AdminCourseOversight').then(m => ({ default: m.AdminCourseOversight })));
+const AdminSecurity = lazy(() => import('./pages/AdminSecurity').then(m => ({ default: m.AdminSecurity })));
+const TeacherCourseOversight = lazy(() => import('./pages/TeacherCourseOversight').then(m => ({ default: m.TeacherCourseOversight })));
+const ModuleEditPage = lazy(() => import('./pages/ModuleEditPage'));
+const PageEditPage = lazy(() => import('./pages/PageEditPage'));
+const AssignmentEditPage = lazy(() => import('./pages/AssignmentEditPage'));
+const Transcript = lazy(() => import('./pages/Transcript'));
+const GroupDashboard = lazy(() => import('./components/groups/GroupDashboard'));
+const Announcements = lazy(() => import('./pages/Announcements'));
+const Inbox = lazy(() => import('./pages/Inbox'));
+const ToDoPage = lazy(() => import('./pages/ToDoPage'));
+const AccountPage = lazy(() => import('./pages/AccountPage'));
+const Groups = lazy(() => import('./pages/Groups'));
+const GroupSetView = lazy(() => import('./components/groups/GroupSetView'));
+const Catalog = lazy(() => import('./pages/Catalog'));
+const CoursePeople = lazy(() => import('./pages/CoursePeople'));
+const CourseDetail = lazy(() => import('./components/CourseDetail'));
+const QuizWaveDashboard = lazy(() => import('./components/quizwave/QuizWaveDashboard'));
+const StudentJoinScreen = lazy(() => import('./components/quizwave/StudentJoinScreen'));
+const StudentGameScreen = lazy(() => import('./components/quizwave/StudentGameScreen'));
 
 // Wrapper to get courseId from URL params
 const QuizWaveDashboardWrapper: React.FC = () => {
@@ -70,7 +70,7 @@ const QuizWaveDashboardWrapper: React.FC = () => {
   if (!courseId) {
     return <div>Course ID is required</div>;
   }
-  return <QuizWaveDashboard courseId={courseId} />;
+  return withRouteLoader(<QuizWaveDashboard courseId={courseId} />);
 };
 
 
@@ -100,7 +100,7 @@ function Unauthorized() {
 function AnnouncementsWrapper() {
   const { courseId } = useParams<{ courseId: string }>();
   if (!courseId) return null;
-  return <Announcements courseId={courseId} />;
+  return withRouteLoader(<Announcements courseId={courseId} />);
 }
 
 function DashboardWrapper() {
@@ -108,12 +108,16 @@ function DashboardWrapper() {
   
   // Render admin dashboard for admin users
   if (user?.role === 'admin') {
-    return <AdminDashboard />;
+    return withRouteLoader(<AdminDashboard />);
   }
   
   // Render regular dashboard for other users
   return <Dashboard />;
 }
+
+const withRouteLoader = (node: React.ReactNode) => (
+  <Suspense fallback={<AppLoadingSkeleton />}>{node}</Suspense>
+);
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -164,7 +168,7 @@ function AppContent() {
             path="/courses/:id"
             element={
               <PrivateRoute>
-                <CourseDetail />
+                {withRouteLoader(<CourseDetail />)}
               </PrivateRoute>
             }
           />
@@ -172,7 +176,7 @@ function AppContent() {
             path="/courses/:id/:section"
             element={
               <PrivateRoute>
-                <CourseDetail />
+                {withRouteLoader(<CourseDetail />)}
               </PrivateRoute>
             }
           />
@@ -180,7 +184,7 @@ function AppContent() {
             path="/courses/:courseId/people"
             element={
               <PrivateRoute>
-                <CoursePeople />
+                {withRouteLoader(<CoursePeople />)}
               </PrivateRoute>
             }
           />
@@ -250,7 +254,7 @@ function AppContent() {
             path="/assignments/:id/edit"
             element={
               <PrivateRoute>
-                <AssignmentEditPage />
+                {withRouteLoader(<AssignmentEditPage />)}
               </PrivateRoute>
             }
           />
@@ -267,7 +271,7 @@ function AppContent() {
             element={
               <PrivateRoute>
                 <ModuleProvider>
-                  <ModuleEditPage />
+                  {withRouteLoader(<ModuleEditPage />)}
                 </ModuleProvider>
               </PrivateRoute>
             }
@@ -277,7 +281,7 @@ function AppContent() {
             element={
               <PrivateRoute>
                 <ModuleProvider>
-                  <PageEditPage />
+                  {withRouteLoader(<PageEditPage />)}
                 </ModuleProvider>
               </PrivateRoute>
             }
@@ -293,17 +297,18 @@ function AppContent() {
           />
           <Route path="/groups" element={
             <PrivateRoute>
-              <Groups />
+              {withRouteLoader(<Groups />)}
             </PrivateRoute>
           } />
           <Route path="/groupsets/:groupSetId" element={
             <PrivateRoute>
-              <GroupSetView />
+              {withRouteLoader(<GroupSetView />)}
             </PrivateRoute>
           } />
-          <Route path="/groups/:groupId/*" element={<GroupDashboard />}>
+          <Route path="/groups/:groupId/*" element={withRouteLoader(<GroupDashboard />)}>
             <Route path="home" element={<GroupHome />} />
             <Route path="discussion" element={<GroupDiscussion />} />
+            <Route path="meetings" element={<GroupMeetings />} />
             <Route path="discussion/:threadId" element={<ThreadView />} />
             <Route path="people" element={<GroupPeopleWrapper />} />
             <Route path="pages/:pageId" element={
@@ -317,16 +322,16 @@ function AppContent() {
             path="/calendar"
             element={
               <PrivateRoute>
-                <CalendarPage />
+                {withRouteLoader(<CalendarPage />)}
               </PrivateRoute>
             }
           />
-          <Route path="/inbox" element={<PrivateRoute><Inbox /></PrivateRoute>} />
+          <Route path="/inbox" element={<PrivateRoute>{withRouteLoader(<Inbox />)}</PrivateRoute>} />
           <Route
             path="/todo"
             element={
               <PrivateRoute>
-                <ToDoPage />
+                {withRouteLoader(<ToDoPage />)}
               </PrivateRoute>
             }
           />
@@ -334,7 +339,7 @@ function AppContent() {
             path="/catalog"
             element={
               <PrivateRoute>
-                <Catalog />
+                {withRouteLoader(<Catalog />)}
               </PrivateRoute>
             }
           />
@@ -342,7 +347,7 @@ function AppContent() {
             path="/account"
             element={
               <PrivateRoute>
-                <AccountPage />
+                {withRouteLoader(<AccountPage />)}
               </PrivateRoute>
             }
           />
@@ -362,7 +367,7 @@ function AppContent() {
             path="/admin/users"
             element={
               <PrivateRoute>
-                <AdminUserManagement />
+                {withRouteLoader(<AdminUserManagement />)}
               </PrivateRoute>
             }
           />
@@ -370,7 +375,7 @@ function AppContent() {
             path="/admin/courses"
             element={
               <PrivateRoute>
-                <AdminCourseOversight />
+                {withRouteLoader(<AdminCourseOversight />)}
               </PrivateRoute>
             }
           />
@@ -378,7 +383,7 @@ function AppContent() {
             path="/teacher/courses"
             element={
               <PrivateRoute allowedRoles={['teacher']}>
-                <TeacherCourseOversight />
+                {withRouteLoader(<TeacherCourseOversight />)}
               </PrivateRoute>
             }
           />
@@ -386,7 +391,7 @@ function AppContent() {
             path="/admin/analytics"
             element={
               <PrivateRoute>
-                <AdminAnalytics />
+                {withRouteLoader(<AdminAnalytics />)}
               </PrivateRoute>
             }
           />
@@ -394,7 +399,7 @@ function AppContent() {
             path="/admin/settings"
             element={
               <PrivateRoute>
-                <AdminSystemSettings />
+                {withRouteLoader(<AdminSystemSettings />)}
               </PrivateRoute>
             }
           />
@@ -402,7 +407,7 @@ function AppContent() {
             path="/admin/security"
             element={
               <PrivateRoute>
-                <AdminSecurity />
+                {withRouteLoader(<AdminSecurity />)}
               </PrivateRoute>
             }
           />
@@ -422,7 +427,7 @@ function AppContent() {
             path="/reports/transcript"
             element={
               <PrivateRoute allowedRoles={['student']}>
-                <Transcript />
+                {withRouteLoader(<Transcript />)}
               </PrivateRoute>
             }
           />
@@ -440,7 +445,7 @@ function AppContent() {
             path="/quizwave/join"
             element={
               <PrivateRoute>
-                <StudentJoinScreen />
+                {withRouteLoader(<StudentJoinScreen />)}
               </PrivateRoute>
             }
           />
@@ -448,7 +453,7 @@ function AppContent() {
             path="/quizwave/play/:pin"
             element={
               <PrivateRoute>
-                <StudentGameScreen />
+                {withRouteLoader(<StudentGameScreen />)}
               </PrivateRoute>
             }
           />

@@ -53,6 +53,13 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
     }
   };
 
+  const metricCardClassName =
+    'rounded-xl border border-slate-200 bg-white p-4 text-center shadow-sm transition-shadow hover:shadow-md dark:border-slate-700 dark:bg-slate-900/80';
+  const quickActionClassName =
+    'min-h-[44px] rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 sm:px-4 sm:text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700';
+  const primaryActionClassName =
+    'min-h-[44px] rounded-lg border border-blue-600 bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700 sm:px-4 sm:text-sm';
+
   return (
     <div className="space-y-3 sm:space-y-6">
       {(isInstructor || isAdmin) && publishError && (
@@ -61,22 +68,26 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
         </div>
       )}
       {/* Course Header */}
-      <div className="bg-white dark:bg-gray-900 rounded-lg sm:rounded-xl shadow p-3 sm:p-6 flex flex-col md:flex-row justify-between items-start md:items-center mb-3 sm:mb-6 border border-gray-200 dark:border-gray-700">
+      <div className="mb-3 flex flex-col items-start justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:mb-6 sm:p-6 md:flex-row md:items-center dark:border-slate-700 dark:bg-slate-900">
         <div className="flex-1 min-w-0">
-          <h1 className="text-xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-1">
+          <h1 className="mb-1 text-xl font-semibold tracking-tight text-slate-900 sm:text-3xl dark:text-slate-100">
             {course.catalog?.courseCode || course.title}
           </h1>
-          <div className="text-xs sm:text-base text-gray-600 dark:text-gray-400">
+          <div className="text-xs text-slate-600 sm:text-sm dark:text-slate-300">
             Instructor: {course.instructor?.firstName || ''} {course.instructor?.lastName || ''}
           </div>
         </div>
         {(isInstructor || isAdmin) && (
-          <div className="flex flex-col w-full sm:w-auto items-stretch sm:items-end mt-3 md:mt-0 gap-2">
+          <div className="mt-3 flex w-full flex-col items-stretch gap-2 sm:w-auto sm:items-end md:mt-0">
             {/* Publish/Unpublish toggle for teachers/admins only */}
             <button
               onClick={handleToggleCoursePublish}
               disabled={publishingCourse}
-              className={`min-h-[44px] inline-flex items-center justify-center px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-opacity-50 touch-manipulation active:scale-95 ${course.published ? 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/70' : 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/70'} ${publishingCourse ? 'opacity-60 cursor-not-allowed' : ''}`}
+              className={`min-h-[42px] inline-flex items-center justify-center rounded-lg border px-4 py-2 text-xs font-medium transition-colors sm:text-sm ${
+                course.published
+                  ? 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-900/30 dark:text-rose-200 dark:hover:bg-rose-900/50'
+                  : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200 dark:hover:bg-emerald-900/50'
+              } ${publishingCourse ? 'cursor-not-allowed opacity-60' : ''}`}
             >
               {course.published ? (
                 <Unlock className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
@@ -89,17 +100,17 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
                 ? 'Unpublish'
                 : 'Publish'}
             </button>
-            <div className="flex flex-col sm:flex-row gap-2 sm:space-x-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
               <button
                 onClick={() => navigate(`/courses/${course._id}/edit`)}
-                className="min-h-[44px] w-full sm:w-auto px-3 sm:px-4 py-2 bg-yellow-500 text-white rounded-lg sm:rounded-md hover:bg-yellow-600 transition-all touch-manipulation active:scale-95 text-xs sm:text-sm font-medium"
+                className="min-h-[42px] w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 sm:w-auto sm:text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
               >
                 Edit Course
               </button>
               {isAdmin && (
                 <button
                   onClick={() => setShowDeleteConfirm(true)}
-                  className="min-h-[44px] w-full sm:w-auto px-3 sm:px-4 py-2 bg-red-500 text-white rounded-lg sm:rounded-md hover:bg-red-600 transition-all touch-manipulation active:scale-95 text-xs sm:text-sm font-medium"
+                  className="min-h-[44px] w-full rounded-lg border border-red-600 bg-red-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-red-700 sm:w-auto sm:px-4 sm:text-sm"
                 >
                   Delete Course
                 </button>
@@ -112,21 +123,21 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
       {/* Course Overview Cards */}
       {(isInstructor || isAdmin) && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-3 sm:mb-6">
-          <div className="flex-1 bg-blue-50 dark:bg-blue-900/20 rounded-lg sm:rounded-xl p-3 sm:p-6 text-center shadow hover:shadow-md transition-shadow">
-            <div className="text-sm sm:text-lg font-semibold text-blue-800 dark:text-blue-300 mb-1 sm:mb-3">Students</div>
-            <div className="text-3xl sm:text-3xl font-bold text-blue-900 dark:text-blue-200">
+          <div className={metricCardClassName}>
+            <div className="mb-1 text-sm font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Students</div>
+            <div className="text-3xl font-semibold text-slate-900 dark:text-slate-100">
               {course.students?.length || 0}
             </div>
           </div>
-          <div className="flex-1 bg-green-50 dark:bg-green-900/20 rounded-lg sm:rounded-xl p-3 sm:p-6 text-center shadow hover:shadow-md transition-shadow">
-            <div className="text-sm sm:text-lg font-semibold text-green-800 dark:text-green-300 mb-1 sm:mb-3">Modules</div>
-            <div className="text-3xl sm:text-3xl font-bold text-green-900 dark:text-green-200">
+          <div className={metricCardClassName}>
+            <div className="mb-1 text-sm font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Modules</div>
+            <div className="text-3xl font-semibold text-slate-900 dark:text-slate-100">
               {modules.length}
             </div>
           </div>
-          <div className="flex-1 bg-purple-50 dark:bg-purple-900/20 rounded-lg sm:rounded-xl p-3 sm:p-6 text-center shadow hover:shadow-md transition-shadow">
-            <div className="text-sm sm:text-lg font-semibold text-purple-800 dark:text-purple-300 mb-1 sm:mb-3">Assignments</div>
-            <div className="text-3xl sm:text-3xl font-bold text-purple-900 dark:text-purple-200">
+          <div className={metricCardClassName}>
+            <div className="mb-1 text-sm font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Assignments</div>
+            <div className="text-3xl font-semibold text-slate-900 dark:text-slate-100">
               {modules.reduce((acc, m) => acc + (m.assignments?.length || 0), 0)}
             </div>
           </div>
@@ -135,43 +146,43 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
 
       {/* Quick Actions (teachers/admins only) */}
       {(isInstructor || isAdmin) && (
-        <div className="bg-white dark:bg-gray-900 rounded-lg sm:rounded-xl shadow p-3 sm:p-6 border border-gray-200 dark:border-gray-700">
-          <div className="text-base sm:text-xl font-semibold mb-3 sm:mb-5 text-gray-900 dark:text-gray-100">Quick Actions</div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 dark:border-slate-700 dark:bg-slate-900">
+          <div className="mb-4 text-base font-semibold text-slate-900 sm:text-lg dark:text-slate-100">Quick Actions</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4">
             <button
-              className="min-h-[44px] bg-blue-600 text-white px-3 sm:px-4 py-2 rounded-lg sm:rounded-md hover:bg-blue-700 transition-all touch-manipulation active:scale-95 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 sm:gap-2"
+              className={primaryActionClassName}
               onClick={() => navigate(`/courses/${courseId}/modules`)}
             >
               Create Module
             </button>
             <button
-              className="min-h-[44px] bg-green-600 text-white px-3 sm:px-4 py-2 rounded-lg sm:rounded-md hover:bg-green-700 transition-all touch-manipulation active:scale-95 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 sm:gap-2"
+              className={quickActionClassName}
               onClick={() => navigate(`/courses/${courseId}/students`)}
             >
               Manage Students
             </button>
             <button
-              className="min-h-[44px] bg-purple-600 text-white px-3 sm:px-4 py-2 rounded-lg sm:rounded-md hover:bg-purple-700 transition-all touch-manipulation active:scale-95 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 sm:gap-2"
+              className={quickActionClassName}
               onClick={() => navigate(`/courses/${courseId}/gradebook`)}
             >
               View Gradebook
             </button>
             <button
-              className="min-h-[44px] bg-indigo-600 text-white px-3 sm:px-4 py-2 rounded-lg sm:rounded-md hover:bg-indigo-700 transition-all touch-manipulation active:scale-95 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 sm:gap-2"
+              className={`${quickActionClassName} flex items-center justify-center gap-2`}
               onClick={() => setShowOverviewConfigModal(true)}
             >
               <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               Configure Overview
             </button>
             <button
-              className="min-h-[44px] bg-orange-600 text-white px-3 sm:px-4 py-2 rounded-lg sm:rounded-md hover:bg-orange-700 transition-all touch-manipulation active:scale-95 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 sm:gap-2"
+              className={`${quickActionClassName} flex items-center justify-center gap-2`}
               onClick={() => setShowSidebarConfigModal(true)}
             >
               <Layout className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               Customize Sidebar
             </button>
             <button
-              className="min-h-[44px] bg-gradient-to-r from-blue-600 to-purple-600 text-white px-3 sm:px-4 py-2 rounded-lg sm:rounded-md hover:from-blue-700 hover:to-purple-700 transition-all touch-manipulation active:scale-95 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 sm:gap-2"
+              className={`${quickActionClassName} flex items-center justify-center gap-2`}
               onClick={() => setActiveSection('quizwave')}
             >
               <Gamepad2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -183,11 +194,11 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
 
       {/* Student Quick Actions */}
       {!isInstructor && !isAdmin && (
-        <div className="bg-white dark:bg-gray-900 rounded-lg sm:rounded-xl shadow p-3 sm:p-6 border border-gray-200 dark:border-gray-700">
-          <div className="text-base sm:text-xl font-semibold mb-3 sm:mb-5 text-gray-900 dark:text-gray-100">Quick Actions</div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 dark:border-slate-700 dark:bg-slate-900">
+          <div className="mb-4 text-base font-semibold text-slate-900 sm:text-lg dark:text-slate-100">Quick Actions</div>
           <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-4">
             <button
-              className="min-h-[44px] bg-gradient-to-r from-blue-600 to-purple-600 text-white px-3 sm:px-4 py-2 rounded-lg sm:rounded-md hover:from-blue-700 hover:to-purple-700 transition-all touch-manipulation active:scale-95 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 sm:gap-2"
+              className={`${primaryActionClassName} flex items-center justify-center gap-2`}
               onClick={() => setActiveSection('quizwave')}
             >
               <Gamepad2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />

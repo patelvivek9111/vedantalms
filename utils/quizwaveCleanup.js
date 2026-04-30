@@ -3,7 +3,17 @@ const Redis = require('ioredis');
 
 let cleanupRedis = null;
 if (process.env.REDIS_URL) {
-  cleanupRedis = new Redis(process.env.REDIS_URL, { lazyConnect: true, maxRetriesPerRequest: null });
+  cleanupRedis = new Redis(process.env.REDIS_URL, {
+    lazyConnect: true,
+    maxRetriesPerRequest: 1,
+    connectTimeout: 1000,
+    commandTimeout: 1000,
+    enableOfflineQueue: false,
+    retryStrategy: () => null
+  });
+  cleanupRedis.on('error', () => {
+    cleanupRedis = null;
+  });
   cleanupRedis.connect().catch(() => {
     cleanupRedis = null;
   });
@@ -53,22 +63,27 @@ const cleanupOldSessions = async () => {
 // Run cleanup on server start and then every 24 hours
 const startCleanupScheduler = () => {
   const runWithLock = async () => {
-    if (!cleanupRedis) {
+    if (!cleanupRedis || cleanupRedis.status !== 'ready') {
       return cleanupOldSessions();
     }
-    const lockKey = 'quizwave:cleanup:lock';
-    const lockId = `${process.pid}:${Date.now()}`;
-    const acquired = await cleanupRedis.set(lockKey, lockId, 'EX', 60 * 10, 'NX');
-    if (!acquired) {
-      return { skipped: true };
-    }
     try {
-      return await cleanupOldSessions();
-    } finally {
-      const existing = await cleanupRedis.get(lockKey);
-      if (existing === lockId) {
-        await cleanupRedis.del(lockKey);
+      const lockKey = 'quizwave:cleanup:lock';
+      const lockId = `${process.pid}:${Date.now()}`;
+      const acquired = await cleanupRedis.set(lockKey, lockId, 'EX', 60 * 10, 'NX');
+      if (!acquired) {
+        return { skipped: true };
       }
+      try {
+        return await cleanupOldSessions();
+      } finally {
+        const existing = await cleanupRedis.get(lockKey);
+        if (existing === lockId) {
+          await cleanupRedis.del(lockKey);
+        }
+      }
+    } catch (error) {
+      cleanupRedis = null;
+      return cleanupOldSessions();
     }
   };
 
