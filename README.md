@@ -241,15 +241,16 @@ lms/
 │   │   │   │   ├── AssignmentGradingWrapper.tsx
 │   │   │   │   ├── AssignmentList.tsx
 │   │   │   │   ├── AssignmentViewWrapper.tsx
+│   │   │   │   ├── AssignmentFileUploadSection.tsx
 │   │   │   │   ├── CreateAssignmentForm.tsx
 │   │   │   │   ├── CreateAssignmentWrapper.tsx
 │   │   │   │   ├── FilePreview.tsx
 │   │   │   │   ├── GradeSubmissions.jsx
-│   │   │   │   ├── ViewAssignment.jsx
-│   │   │   │   └── ViewAssignment.tsx
+│   │   │   │   └── ScrollableQuizSidebar.tsx
 │   │   │   ├── course/                 # Course-related components
 │   │   │   │   ├── AssignmentsSection.tsx
 │   │   │   │   ├── CourseAssignments.tsx
+│   │   │   │   ├── CourseMeetingsSection.tsx
 │   │   │   │   ├── CourseOverview.tsx
 │   │   │   │   ├── CourseQuizzes.tsx
 │   │   │   │   ├── CourseSidebar.tsx
@@ -272,6 +273,7 @@ lms/
 │   │   │   │   ├── GroupDiscussion.tsx
 │   │   │   │   ├── GroupHome.tsx
 │   │   │   │   ├── GroupManagement.tsx
+│   │   │   │   ├── GroupMeetings.tsx
 │   │   │   │   ├── GroupPages.tsx
 │   │   │   │   ├── GroupPeople.tsx
 │   │   │   │   ├── GroupPeopleWrapper.tsx
@@ -369,7 +371,7 @@ lms/
 │   │   │   ├── useStudentGradeData.ts
 │   │   │   ├── useStudentSubmissions.ts
 │   │   │   ├── useSubmissionIds.ts
-│   │   │   └── useSyllabusManagement.ts
+│   │   │   ├── useSyllabusManagement.ts
 │   │   │   └── useUnreadMessages.ts
 │   │   ├── utils/                      # Utility functions
 │   │   │   ├── gradebookExport.ts
@@ -412,6 +414,7 @@ lms/
 │   ├── event.controller.js             # Event operations controller
 │   ├── grades.controller.js            # Grade operations controller
 │   ├── group.controller.js             # Group operations controller
+│   ├── groupMeeting.controller.js      # Group meeting operations controller
 │   ├── inbox.controller.js             # Messaging/inbox controller
 │   ├── module.controller.js            # Module operations controller
 │   ├── page.controller.js              # Page operations controller
@@ -420,7 +423,8 @@ lms/
 │   ├── reports.controller.js           # Reports controller
 │   ├── submission.controller.js        # Submission operations controller
 │   ├── todo.controller.js              # Todo operations controller
-│   └── user.controller.js              # User operations controller
+│   ├── user.controller.js              # User operations controller
+│   └── zohoMeeting.controller.js       # Zoho meeting integration controller
 │
 ├── models/                             # Mongoose data models
 │   ├── announcement.model.js           # Announcement model
@@ -432,6 +436,7 @@ lms/
 │   ├── event.model.js                  # Event model
 │   ├── Group.js                        # Group model
 │   ├── GroupSet.js                     # Group set model
+│   ├── groupMeeting.model.js           # Group meeting model
 │   ├── loginActivity.model.js         # Login activity tracking model
 │   ├── Message.js                      # Message model (messaging)
 │   ├── module.model.js                 # Module model
@@ -444,7 +449,8 @@ lms/
 │   ├── systemSettings.model.js         # System settings model
 │   ├── thread.model.js                 # Discussion thread model
 │   ├── todo.model.js                   # Todo model
-│   └── user.model.js                   # User model
+│   ├── user.model.js                   # User model
+│   └── zohoMeetingConnection.model.js  # Zoho meeting connection model
 │
 ├── routes/                             # Express route definitions
 │   ├── admin.routes.js                 # Admin routes
@@ -467,7 +473,8 @@ lms/
 │   ├── submission.routes.js            # Submission routes
 │   ├── thread.routes.js                # Discussion thread routes
 │   ├── todo.routes.js                  # Todo routes
-│   └── user.routes.js                  # User routes
+│   ├── user.routes.js                  # User routes
+│   └── zohoMeeting.routes.js           # Zoho meeting integration routes
 │
 ├── middleware/                         # Express middleware
 │   ├── auth.js                         # Authentication middleware
@@ -488,8 +495,20 @@ lms/
 ├── scripts/                            # Utility scripts
 │   ├── checkQuizWaveStatus.js          # QuizWave status checking script
 │   ├── cleanupOldSessions.js           # Session cleanup script
+│   ├── day1BaselineCheck.js            # Local baseline health checks
+│   ├── day2CaptureBaseline.js          # Capture baseline metrics
+│   ├── day2SyntheticProbe.js           # Synthetic probe validation
+│   ├── day3EndpointBenchmark.js        # Endpoint benchmarking script
+│   ├── day4SocketValidation.js         # Socket behavior validation
+│   ├── day5LoadRamp.js                 # Progressive load ramp test
 │   ├── fixDuplicatePins.js             # Fix duplicate pins script
 │   └── fixPinIndex.js                  # Fix pin index script
+│
+├── monitoring/                         # Observability and local monitoring
+│   ├── docker-compose.observability.yml    # Prometheus + Grafana + Alertmanager stack
+│   ├── alertmanager/                   # Alertmanager configuration
+│   ├── prometheus/                     # Prometheus scrape/rule configuration
+│   └── grafana/                        # Dashboards and provisioning
 │
 ├── uploads/                            # File upload directory
 │
@@ -509,7 +528,7 @@ lms/
 - MongoDB (local or MongoDB Atlas)
 - npm or yarn
 
-### Installation
+### Quick Start (Local Development)
 
 1. **Clone the repository**
    ```bash
@@ -517,7 +536,7 @@ lms/
    cd lms
    ```
 
-2. **Install backend dependencies**
+2. **Install backend dependencies (root)**
    ```bash
    npm install
    ```
@@ -529,8 +548,8 @@ lms/
    cd ..
    ```
 
-4. **Set up environment variables**
-   Create a `.env` file in the root directory:
+4. **Set up local environment variables**
+   Copy `.env.example` to `.env` (or create one) in the root directory:
    ```env
    MONGODB_URI=mongodb://localhost:27017/lms
    JWT_SECRET=your-super-secret-jwt-key-123
@@ -539,7 +558,7 @@ lms/
    NODE_ENV=development
    ```
 
-5. **Start the development servers**
+5. **Start development servers**
    
    Backend (from root):
    ```bash
@@ -552,9 +571,14 @@ lms/
    npm run dev
    ```
 
-6. **Access the application**
+6. **Access the app**
    - Frontend: http://localhost:5173
    - Backend API: http://localhost:5000
+
+### Advanced / Production Path
+- Use `docs/production-checklist.md` for release readiness and production rollout steps.
+- Use the deployment section below for hosting options and required production environment variables.
+- Optional observability stack is available at `monitoring/docker-compose.observability.yml`.
 
 ---
 
@@ -664,7 +688,12 @@ The application is configured for deployment on:
 - **Vercel** (frontend) + **Render** (backend) - free option
 - **Render** (all-in-one)
 
-See deployment configuration in `railway.json` and environment variable setup in `env.example`.
+Current repository deployment configuration:
+- Frontend deployment config: `vercel.json`
+- Environment variable template: `.env.example`
+- Optional container baseline: `Dockerfile` and `.dockerignore`
+- Release process checklist: `docs/production-checklist.md`
+- Optional monitoring stack: `monitoring/docker-compose.observability.yml`
 
 ### Environment Variables for Production
 ```env
@@ -672,8 +701,11 @@ NODE_ENV=production
 MONGODB_URI=mongodb+srv://...
 JWT_SECRET=your-very-long-random-secret
 FRONTEND_URL=https://vedantaed.com
-VITE_API_URL=https://vedantaed.com/api
+VITE_API_URL=https://your-backend-domain.com
 ```
+
+`VITE_API_URL` should be set explicitly in each frontend environment (production/staging/dev).  
+If it is not set in production, frontend requests fall back to same-origin `/api`.
 
 ---
 
@@ -686,6 +718,8 @@ VITE_API_URL=https://vedantaed.com/api
 - `npm run dev` - Start development server with nodemon
 - `npm run build` - Build frontend
 - `npm run build:frontend` - Build frontend only
+- `npm run smoke:predeploy` - Run Mongo/Redis predeploy smoke checks
+- `npm run audit:duplicates` - Detect duplicate `.jsx/.tsx` or `.js/.ts` basenames before migration
 
 **Frontend directory:**
 - `npm run dev` - Start Vite dev server
@@ -755,8 +789,9 @@ VITE_API_URL=https://vedantaed.com/api
 ## 🔄 Future Enhancements
 
 Potential features for future releases:
-- Video conferencing integration
-- Advanced quiz builder
+- Deepen meeting integrations (provider abstraction, recording metadata, attendance sync)
+- AI-assisted course help expansion (context-aware tutoring and study plans)
+- Advanced quiz builder enhancements (adaptive flows and richer analytics)
 - Plagiarism detection
 - Mobile app (React Native)
 - Email notifications
@@ -793,5 +828,5 @@ Built with modern web technologies to provide an exceptional learning management
 ---
 
 **Version**: 1.0.0  
-**Last Updated**: 2025
+**Last Updated**: 2026-04-29
 

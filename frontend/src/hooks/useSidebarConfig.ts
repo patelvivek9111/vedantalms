@@ -50,6 +50,7 @@ export const useSidebarConfig = ({
         announcements: true,
         polls: true,
         groups: true,
+        meetings: true,
         attendance: true,
         grades: true,
         gradebook: false,

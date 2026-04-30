@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { Suspense, lazy, useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useCourse } from '../contexts/CourseContext';
 import { useAuth } from '../context/AuthContext';
@@ -44,7 +44,6 @@ import { getWeightedGradeForStudent, getLetterGrade, calculateFinalGradeWithWeig
 import { exportGradebookCSV } from '../utils/gradebookExport';
 import { navigationItems } from '../constants/courseNavigation';
 import CoursePages from './CoursePages';
-import Announcements from '../pages/Announcements';
 import AnnouncementForm from './announcements/AnnouncementForm';
 import { createAnnouncement } from '../services/announcementService';
 import AssignmentList from './assignments/AssignmentList';
@@ -53,7 +52,6 @@ import SidebarConfigModal from './SidebarConfigModal';
 import LatestAnnouncements from './LatestAnnouncements';
 import Attendance from './Attendance';
 import RichTextEditor from './RichTextEditor';
-import QuizWaveDashboard from './quizwave/QuizWaveDashboard';
 import StudentQuizWaveView from './quizwave/StudentQuizWaveView';
 import { ChangeUserModal } from './ChangeUserModal';
 import EnrollmentRequestsHandler from './enrollment/EnrollmentRequestsHandler';
@@ -69,6 +67,7 @@ import AssignmentsSection from './course/AssignmentsSection';
 import QuizzesSection from './course/QuizzesSection';
 import ModulesSection from './course/ModulesSection';
 import PollsSection from './course/PollsSection';
+import CourseMeetingsSection from './course/CourseMeetingsSection';
 import { useGradebookData } from '../hooks/useGradebookData';
 import { useStudentSubmissions } from '../hooks/useStudentSubmissions';
 import { useGradeManagement } from '../hooks/useGradeManagement';
@@ -82,6 +81,9 @@ import { useSyllabusManagement } from '../hooks/useSyllabusManagement';
 import { useSidebarConfig } from '../hooks/useSidebarConfig';
 import Breadcrumb from './common/Breadcrumb';
 import { useCourseSectionSwipe } from '../hooks/useCourseSectionSwipe';
+
+const Announcements = lazy(() => import('../pages/Announcements'));
+const QuizWaveDashboard = lazy(() => import('./quizwave/QuizWaveDashboard'));
 
 
 
@@ -807,7 +809,9 @@ const CourseDetail: React.FC = () => {
         if (isInstructor || isAdmin) {
           return (
             <div className="space-y-6">
-              <QuizWaveDashboard courseId={course._id.toString()} />
+              <Suspense fallback={<div className="text-sm text-gray-500 dark:text-gray-400">Loading QuizWave...</div>}>
+                <QuizWaveDashboard courseId={course._id.toString()} />
+              </Suspense>
             </div>
           );
         } else {
@@ -913,6 +917,9 @@ const CourseDetail: React.FC = () => {
           return <StudentGroupView courseId={course?._id || ''} userId={user?._id || ''} />;
         }
 
+      case 'meetings':
+        return <CourseMeetingsSection courseId={course?._id || ''} canManage={Boolean(isInstructor || isAdmin)} />;
+
       case 'attendance':
         return <Attendance />;
 
@@ -934,7 +941,9 @@ const CourseDetail: React.FC = () => {
               </div>
             ) : (
               <>
-                <Announcements courseId={course._id} />
+                <Suspense fallback={<div className="text-sm text-gray-500 dark:text-gray-400">Loading announcements...</div>}>
+                  <Announcements courseId={course._id} />
+                </Suspense>
                 {(isInstructor || isAdmin) && (
                   <button
                     className="fixed bottom-4 right-4 sm:bottom-8 sm:right-8 z-50 bg-blue-600 text-white px-4 py-2.5 sm:px-6 sm:py-3 rounded-full shadow-lg hover:bg-blue-700 text-sm sm:text-lg font-bold flex items-center gap-1.5 sm:gap-2"

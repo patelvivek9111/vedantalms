@@ -1,0 +1,61 @@
+# Example Prometheus alerting rules for LMS (scrape GET /metrics from each app instance).
+# Copy into your Prometheus rules directory and adjust job/instance labels.
+groups:
+  - name: lms_http
+    interval: 30s
+    rules:
+      - alert: LMS_HighLatencyP95
+        expr: lms_http_request_latency_p95_ms > 400
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LMS HTTP p95 high"
+          description: "p95 latency above 400ms for 10m (instance {{ $labels.instance }})"
+
+      - alert: LMS_HighLatencyP99
+        expr: lms_http_request_latency_p99_ms > 1200
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LMS HTTP p99 high"
+
+      - alert: LMS_High5xxRate
+        expr: |
+          (lms_http_responses_5xx_total / clamp_min(lms_http_requests_recorded_total, 1)) * 100 > 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "LMS 5xx rate above 1%"
+
+  - name: lms_dependencies
+    interval: 30s
+    rules:
+      - alert: LMS_MongoDown
+        expr: lms_dependency_mongo_up == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "LMS MongoDB not connected"
+
+      - alert: LMS_RedisAdapterDown
+        expr: lms_dependency_redis_adapter_up == 0
+        for: 2m
+        labels:
+          severity: high
+        annotations:
+          summary: "LMS Socket.IO Redis adapter disabled (multi-instance realtime at risk)"
+
+  - name: lms_realtime
+    interval: 30s
+    rules:
+      - alert: LMS_SocketEventErrorsHigh
+        expr: lms_socket_event_errors_total > 200
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "QuizWave socket handler errors elevated (tune threshold for your traffic)"

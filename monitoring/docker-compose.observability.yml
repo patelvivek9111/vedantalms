@@ -1,0 +1,49 @@
+# Local observability stack (Prometheus + Grafana + Alertmanager).
+# From repo root: npm run obs:up
+# Prerequisites: LMS running on host port 5000 (npm run dev), Docker Desktop.
+# URLs: Prometheus http://localhost:9090 | Grafana http://localhost:3100 | Alertmanager http://localhost:9093
+# Grafana uses 3100 on the host so port 3000 stays free for your frontend (e.g. Vite).
+# Grafana data is persisted so contact points / alert rules you create in the UI survive obs:down/up.
+
+volumes:
+  grafana-data:
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.48.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.dev.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/lms-alert-rules.example.yml:/etc/prometheus/rules/lms.yml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./alertmanager/alertmanager.dev.yml:/etc/alertmanager/alertmanager.yml:ro
+
+  grafana:
+    image: grafana/grafana:10.2.3
+    ports:
+      - "3100:3000"
+    environment:
+      GF_SERVER_ROOT_URL: http://localhost:3100/
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+    depends_on:
+      - prometheus

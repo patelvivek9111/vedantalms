@@ -42,7 +42,11 @@ exports.createPage = async (req, res) => {
       }
       // Check if user is authorized (instructor or admin)
       const course = moduleDoc.course;
-      if (req.user.role !== 'admin' && course.instructor.toString() !== req.user.id) {
+      const instructorId = course?.instructor?.toString?.();
+      const requestUserId = req.user?._id?.toString?.() || req.user?.id;
+
+      // Treat missing instructor linkage as unauthorized instead of throwing.
+      if (req.user.role !== 'admin' && (!instructorId || instructorId !== requestUserId)) {
         return res.status(403).json({
           success: false,
           message: 'Not authorized to create pages in this module'

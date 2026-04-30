@@ -1,0 +1,90 @@
+{
+  "title": "LMS — health overview",
+  "uid": "lms-health-overview",
+  "schemaVersion": 39,
+  "version": 1,
+  "tags": ["lms", "day2"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "HTTP p95 (ms)",
+      "id": 1,
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "lms_http_request_latency_p95_ms" }]
+    },
+    {
+      "type": "stat",
+      "title": "HTTP p99 (ms)",
+      "id": 2,
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "lms_http_request_latency_p99_ms" }]
+    },
+    {
+      "type": "stat",
+      "title": "5xx total (window)",
+      "id": 3,
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "lms_http_responses_5xx_total" }]
+    },
+    {
+      "type": "stat",
+      "title": "Error rate %",
+      "id": 4,
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "lms_http_error_rate_percent" }]
+    },
+    {
+      "type": "stat",
+      "title": "Mongo up",
+      "id": 5,
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "lms_dependency_mongo_up" }]
+    },
+    {
+      "type": "stat",
+      "title": "Redis adapter up",
+      "id": 6,
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 4 },
+      "datasource": { "type": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "lms_dependency_redis_adapter_up" }]
+    },
+    {
+      "type": "stat",
+      "title": "Socket engine conn errors",
+      "id": 7,
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 4 },
+      "datasource": { "type": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "lms_socket_engine_connection_errors_total" }]
+    },
+    {
+      "type": "stat",
+      "title": "QuizWave throttled",
+      "id": 8,
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 4 },
+      "datasource": { "type": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "lms_socket_throttled_total" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP latency p50 / p95 / p99 (ms)",
+      "id": 9,
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "lms_http_request_latency_p50_ms", "legendFormat": "p50" },
+        { "refId": "B", "expr": "lms_http_request_latency_p95_ms", "legendFormat": "p95" },
+        { "refId": "C", "expr": "lms_http_request_latency_p99_ms", "legendFormat": "p99" }
+      ]
+    }
+  ],
+  "templating": { "list": [] },
+  "annotations": { "list": [] }
+}

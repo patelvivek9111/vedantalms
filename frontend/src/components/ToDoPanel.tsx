@@ -13,7 +13,8 @@ import {
   Calendar, 
   ChevronRight,
   ClipboardList,
-  CheckSquare
+  CheckSquare,
+  CircleCheckBig
 } from 'lucide-react';
 import { useMobileDevice } from '../hooks/useMobileDevice';
 
@@ -298,7 +299,7 @@ export const ToDoPanel: React.FC = () => {
     } else if (task.link) {
       navigate(task.link);
     } else if (task.isPersonal) {
-      // Handle personal task click
+      handleMarkDone(task._id);
     }
   };
 
@@ -330,6 +331,11 @@ export const ToDoPanel: React.FC = () => {
                   {/* Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
+                      <span
+                        className="w-2 h-2 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: task.color }}
+                        aria-hidden="true"
+                      />
                       <span 
                         className="text-xs font-semibold"
                         style={{ color: task.color }}
@@ -345,8 +351,23 @@ export const ToDoPanel: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Arrow */}
-                  <ChevronRight className="w-5 h-5 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                  {/* Right action */}
+                  {task.isPersonal ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleMarkDone(task._id);
+                      }}
+                      className="p-1 text-gray-400 dark:text-gray-500 hover:text-green-600 dark:hover:text-green-400 transition-colors"
+                      title="Mark as done"
+                      aria-label="Mark as done"
+                    >
+                      <CircleCheckBig className="w-5 h-5 flex-shrink-0" />
+                    </button>
+                  ) : (
+                    <ChevronRight className="w-5 h-5 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                  )}
                 </div>
               );
             })}
@@ -386,6 +407,11 @@ export const ToDoPanel: React.FC = () => {
                 {/* Content */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
+                    <span
+                      className="w-2 h-2 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: task.color }}
+                      aria-hidden="true"
+                    />
                     <span 
                       className="text-xs font-semibold"
                       style={{ color: task.color }}
@@ -401,8 +427,23 @@ export const ToDoPanel: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Arrow */}
-                <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                {/* Right action */}
+                {task.isPersonal ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleMarkDone(task._id);
+                    }}
+                    className="p-1 text-gray-400 dark:text-gray-500 hover:text-green-600 dark:hover:text-green-400 transition-colors"
+                    title="Mark as done"
+                    aria-label="Mark as done"
+                  >
+                    <CircleCheckBig className="w-4 h-4 flex-shrink-0" />
+                  </button>
+                ) : (
+                  <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                )}
               </div>
             );
           })}

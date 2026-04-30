@@ -7,12 +7,18 @@ const Thread = require('../models/thread.model.js');
 const Course = require('../models/course.model.js');
 const Submission = require('../models/Submission.js');
 const groupController = require('../controllers/group.controller');
+const groupMeetingController = require('../controllers/groupMeeting.controller');
 
 // Add this route for getting all groups for the current user (must be before any parameterized routes)
 router.get('/my', protect, groupController.getMyGroups);
 
 // Add this route for getting all groupsets for courses the teacher teaches
 router.get('/sets/my', protect, authorize('teacher', 'admin'), groupController.getMyGroupSets);
+
+// Course-scoped meetings (display in course sidebar Meetings section)
+router.get('/course/:courseId/meetings', protect, groupMeetingController.listCourseMeetings);
+router.post('/course/:courseId/meetings', protect, authorize('teacher', 'admin'), groupMeetingController.createCourseMeeting);
+router.patch('/course/:courseId/meetings/:meetingId', protect, authorize('teacher', 'admin'), groupMeetingController.updateCourseMeeting);
 
 // Group Set Routes
 router.post('/sets', protect, authorize('teacher', 'admin'), async (req, res) => {
@@ -355,6 +361,12 @@ router.get('/sets/id/:setId', protect, async (req, res) => {
 
 // Get all members of a group
 router.get('/:groupId/members', groupController.getGroupMembers);
+
+// Group meetings (Zoho link-based MVP)
+router.get('/:groupId/meetings', protect, groupMeetingController.listGroupMeetings);
+router.post('/:groupId/meetings', protect, groupMeetingController.createGroupMeeting);
+router.patch('/:groupId/meetings/:meetingId', protect, groupMeetingController.updateGroupMeeting);
+router.delete('/:groupId/meetings/:meetingId', protect, groupMeetingController.deleteGroupMeeting);
 
 // Remove a member from a group
 router.delete('/:groupId/members/:userId', groupController.removeGroupMember);

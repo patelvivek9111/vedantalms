@@ -4,6 +4,23 @@ import react from '@vitejs/plugin-react'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    // Prefer TypeScript source files when both TSX/JSX exist.
+    extensions: ['.mjs', '.js', '.mts', '.ts', '.tsx', '.jsx', '.json'],
+  },
+  build: {
+    sourcemap: false,
+    chunkSizeWarningLimit: 900,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          reactVendor: ['react', 'react-dom', 'react-router-dom'],
+          editorVendor: ['@tiptap/react', '@tiptap/starter-kit', '@tinymce/tinymce-react'],
+          uiVendor: ['lucide-react', 'react-toastify', 'react-big-calendar'],
+        },
+      },
+    },
+  },
   server: {
     port: 3000,
     proxy: {

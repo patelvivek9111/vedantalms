@@ -20,6 +20,28 @@ interface NotificationCenterProps {
   onClose: () => void;
 }
 
+const normalizeNotificationMessage = (message: string) => {
+  if (!message) return '';
+
+  if (typeof window !== 'undefined' && typeof window.DOMParser !== 'undefined') {
+    const parser = new window.DOMParser();
+    const doc = parser.parseFromString(message, 'text/html');
+    const text = doc.body.textContent || '';
+    return text.replace(/\s+/g, ' ').trim();
+  }
+
+  return message
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&#39;/gi, "'")
+    .replace(/&quot;/gi, '"')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
 const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -227,7 +249,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose
                             {notification.title}
                           </p>
                           <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 line-clamp-2">
-                            {notification.message}
+                            {normalizeNotificationMessage(notification.message)}
                           </p>
                           <p className="text-[10px] text-gray-500 dark:text-gray-500 mt-0.5">
                             {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}

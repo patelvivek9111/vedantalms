@@ -1,9 +1,25 @@
-const { QuizSession, QuizWave } = require('../models/quizwave.model');
+const { QuizSession } = require('../models/quizwave.model');
 const jwt = require('jsonwebtoken');
 const { setSession, deleteSession } = require('../utils/quizwaveSessionStore');
+const { allowQuizWaveEvent } = require('../utils/quizwaveSocketThrottle');
 
 // Store active sessions through redis-backed store when available
 const activeSessions = new Map(); // Legacy export for backward compatibility
+const socketMetrics = {
+  connected: 0,
+  disconnected: 0,
+  authErrors: 0,
+  eventErrors: 0,
+  throttled: 0
+};
+
+const emitRateLimited = (socket) => {
+  socketMetrics.throttled += 1;
+  socket.emit('quizwave:error', {
+    message: 'Too many requests. Please slow down.',
+    code: 'rate_limited'
+  });
+};
 
 // Authenticate socket connection
 const authenticateSocket = (socket, next) => {
@@ -19,6 +35,7 @@ const authenticateSocket = (socket, next) => {
     socket.userRole = decoded.role;
     next();
   } catch (error) {
+    socketMetrics.authErrors += 1;
     next(new Error('Authentication error: Invalid token'));
   }
 };
@@ -29,10 +46,14 @@ const initializeQuizWaveSocket = (io) => {
   io.use(authenticateSocket);
 
   io.on('connection', (socket) => {
+    socketMetrics.connected += 1;
     console.log(`✅ QuizWave: User connected - ${socket.userId}`);
 
     // Join a game session (student)
     socket.on('quizwave:join', async (data) => {
+      if (!allowQuizWaveEvent(socket, 'quizwave:join')) {
+        return emitRateLimited(socket);
+      }
       try {
         const { gamePin, nickname } = data;
 
@@ -123,6 +144,7 @@ const initializeQuizWaveSocket = (io) => {
           participantCount: session.participants.length
         });
       } catch (error) {
+        socketMetrics.eventErrors += 1;
         console.error('Join error:', error);
         socket.emit('quizwave:error', { message: 'Error joining session' });
       }
@@ -130,6 +152,9 @@ const initializeQuizWaveSocket = (io) => {
 
     // Start game (teacher)
     socket.on('quizwave:start', async (data) => {
+      if (!allowQuizWaveEvent(socket, 'quizwave:start')) {
+        return emitRateLimited(socket);
+      }
       try {
         const { sessionId } = data;
 
@@ -204,6 +229,7 @@ const initializeQuizWaveSocket = (io) => {
           participantCount: session.participants.length
         });
       } catch (error) {
+        socketMetrics.eventErrors += 1;
         console.error('Start error:', error);
         socket.emit('quizwave:error', { message: 'Error starting session' });
       }
@@ -211,6 +237,9 @@ const initializeQuizWaveSocket = (io) => {
 
     // Submit answer (student)
     socket.on('quizwave:answer', async (data) => {
+      if (!allowQuizWaveEvent(socket, 'quizwave:answer')) {
+        return emitRateLimited(socket);
+      }
       try {
         console.log(`📝 Answer received from ${socket.userId}:`, data);
         const { sessionId, questionIndex, selectedOptions, timeTaken } = data;
@@ -367,6 +396,7 @@ const initializeQuizWaveSocket = (io) => {
         
         console.log(`✅ Answer saved for ${participant.nickname}: ${isCorrect ? 'Correct' : 'Incorrect'}, ${points} points`);
       } catch (error) {
+        socketMetrics.eventErrors += 1;
         console.error('❌ Answer error:', error);
         socket.emit('quizwave:error', { message: 'Error submitting answer: ' + error.message });
       }
@@ -374,6 +404,9 @@ const initializeQuizWaveSocket = (io) => {
 
     // Next question (teacher)
     socket.on('quizwave:next-question', async (data) => {
+      if (!allowQuizWaveEvent(socket, 'quizwave:next-question')) {
+        return emitRateLimited(socket);
+      }
       try {
         const { sessionId } = data;
 
@@ -459,6 +492,7 @@ const initializeQuizWaveSocket = (io) => {
         
         socket.emit('quizwave:question-advanced', teacherQuestionData);
       } catch (error) {
+        socketMetrics.eventErrors += 1;
         console.error('Next question error:', error);
         socket.emit('quizwave:error', { message: 'Error advancing to next question' });
       }
@@ -466,6 +500,9 @@ const initializeQuizWaveSocket = (io) => {
 
     // End session (teacher)
     socket.on('quizwave:end', async (data) => {
+      if (!allowQuizWaveEvent(socket, 'quizwave:end')) {
+        return emitRateLimited(socket);
+      }
       try {
         const { sessionId } = data;
 
@@ -508,6 +545,7 @@ const initializeQuizWaveSocket = (io) => {
 
         socket.emit('quizwave:ended', { leaderboard });
       } catch (error) {
+        socketMetrics.eventErrors += 1;
         console.error('End error:', error);
         socket.emit('quizwave:error', { message: 'Error ending session' });
       }
@@ -515,6 +553,9 @@ const initializeQuizWaveSocket = (io) => {
 
     // Teacher joins session room
     socket.on('quizwave:teacher-join', async (data) => {
+      if (!allowQuizWaveEvent(socket, 'quizwave:teacher-join')) {
+        return emitRateLimited(socket);
+      }
       try {
         const { gamePin } = data;
 
@@ -549,6 +590,7 @@ const initializeQuizWaveSocket = (io) => {
           }))
         });
       } catch (error) {
+        socketMetrics.eventErrors += 1;
         console.error('Teacher join error:', error);
         socket.emit('quizwave:error', { message: 'Error joining as teacher' });
       }
@@ -556,6 +598,9 @@ const initializeQuizWaveSocket = (io) => {
 
     // Get leaderboard (teacher)
     socket.on('quizwave:get-leaderboard', async (data) => {
+      if (!allowQuizWaveEvent(socket, 'quizwave:get-leaderboard')) {
+        return emitRateLimited(socket);
+      }
       try {
         const { sessionId } = data;
 
@@ -582,6 +627,7 @@ const initializeQuizWaveSocket = (io) => {
 
         socket.emit('quizwave:leaderboard', { leaderboard });
       } catch (error) {
+        socketMetrics.eventErrors += 1;
         console.error('Leaderboard error:', error);
         socket.emit('quizwave:error', { message: 'Error fetching leaderboard' });
       }
@@ -589,11 +635,18 @@ const initializeQuizWaveSocket = (io) => {
 
     // Disconnect
     socket.on('disconnect', () => {
+      socketMetrics.disconnected += 1;
       console.log(`❌ QuizWave: User disconnected - ${socket.userId}`);
       // Cleanup handled by session management
     });
   });
 };
 
-module.exports = { initializeQuizWaveSocket, activeSessions };
+const getSocketMetrics = () => ({
+  ...socketMetrics,
+  currentlyConnected: Math.max(0, socketMetrics.connected - socketMetrics.disconnected),
+  activeSessionCount: activeSessions.size
+});
+
+module.exports = { initializeQuizWaveSocket, activeSessions, getSocketMetrics };
 
