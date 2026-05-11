@@ -37,6 +37,8 @@ export interface DataTableProps<T> {
   // Bulk actions props
   bulkActions?: React.ReactNode;
   bulkActionsClassName?: string;
+  /** When set, replaces default classes on the scrollable table container (keep overflow in your string if needed) */
+  tableContainerClassName?: string;
   // Virtual scrolling props
   virtualScrolling?: boolean;
   virtualScrollingThreshold?: number; // Enable virtual scrolling when data exceeds this count
@@ -64,6 +66,7 @@ function DataTable<T extends Record<string, any>>({
   renderCheckbox,
   bulkActions,
   bulkActionsClassName = '',
+  tableContainerClassName,
   virtualScrolling = false,
   virtualScrollingThreshold = 100,
   virtualScrollingHeight = 600,
@@ -341,9 +344,12 @@ function DataTable<T extends Record<string, any>>({
       {/* Table */}
       <div 
         ref={scrollContainerRef}
-        className={`bg-white dark:bg-gray-900 shadow rounded-lg border border-gray-200 dark:border-gray-700 ${
-          useVirtualScrolling ? 'overflow-auto' : 'overflow-x-auto'
-        }`}
+        className={
+          tableContainerClassName ??
+          `bg-white dark:bg-gray-900 shadow rounded-lg border border-gray-200 dark:border-gray-700 ${
+            useVirtualScrolling ? 'overflow-auto' : 'overflow-x-auto'
+          }`
+        }
         style={useVirtualScrolling ? { maxHeight: `${virtualScrollingHeight}px` } : {}}
         onScroll={handleScroll}
       >
@@ -574,12 +580,7 @@ function DataTable<T extends Record<string, any>>({
           </p>
         </div>
       ) : (
-        // Show entry count even if no pagination needed
-        <div className="mt-4 px-2">
-          <p className="text-sm text-gray-700 dark:text-gray-300">
-            Showing all {sortedData.length} entries
-          </p>
-        </div>
+        null
       )}
     </div>
   );

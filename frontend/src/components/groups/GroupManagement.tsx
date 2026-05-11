@@ -408,35 +408,35 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-6 sm:mb-8">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Group Management</h2>
-        <button
-          onClick={() => setShowCreateSetModal(true)}
-          className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
-        >
-          <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-          Create Group Set
-        </button>
-      </div>
-
-      {error && (
-        <div className="mb-4 bg-red-100 dark:bg-red-900/20 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 px-3 sm:px-4 py-2 sm:py-3 rounded text-sm sm:text-base">
-          {error}
+    <div className="space-y-6">
+      <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-md dark:border-gray-700 dark:bg-gray-900">
+        <div className="mb-5 flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50/80 p-3 dark:border-gray-700 dark:bg-gray-800/70">
+          <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Create and manage group sets for this course</p>
+          <button
+            onClick={() => setShowCreateSetModal(true)}
+            className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Create Group Set
+          </button>
         </div>
-      )}
 
-      {/* Group Sets List */}
-      <div className="mb-6 sm:mb-8">
-        <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 mb-3 sm:mb-4">Group Sets</h3>
+        {error && (
+          <div className="mb-4 rounded-lg border border-red-400 bg-red-100 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400 sm:px-4 sm:py-3 sm:text-base">
+            {error}
+          </div>
+        )}
+
+        {/* Group Sets List */}
+        <div className="mb-6 sm:mb-8">
         <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {groupSets.map(set => (
             <div
               key={set._id}
-              className={`p-3 sm:p-4 border rounded-lg cursor-pointer ${
+              className={`cursor-pointer rounded-xl border p-4 transition-colors ${
                 selectedSet?._id === set._id
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                  : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600'
+                  ? 'border-blue-500 bg-blue-50/80 shadow-sm dark:border-blue-400 dark:bg-blue-900/20'
+                  : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600 dark:hover:bg-gray-800'
               }`}
               onClick={() => setSelectedSet(set)}
             >
@@ -451,16 +451,16 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
             </div>
           ))}
         </div>
-      </div>
+        </div>
 
-      {/* Groups List */}
-      {selectedSet && (
+        {/* Groups List */}
+        {selectedSet && (
         <DragDropContext onDragEnd={onDragEnd}>
-          <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
+          <div className="flex flex-col gap-6 lg:flex-row">
             {/* Sidebar: Student List (only for manual group sets) */}
             {selectedSet.groupStructure === 'manual' && (
-              <div className="w-full lg:w-64 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 sm:p-4 h-fit">
-                <h4 className="font-medium text-gray-900 mb-2">Students</h4>
+              <div className="h-fit w-full rounded-xl border border-gray-200 bg-gray-50/70 p-4 dark:border-gray-700 dark:bg-gray-800/70 lg:w-72">
+                <h4 className="mb-3 text-base font-semibold text-gray-900 dark:text-gray-100">Students</h4>
                 <Droppable droppableId="students-list">
                   {(provided) => (
                     <ul ref={provided.innerRef} {...provided.droppableProps} className="space-y-2 min-h-[40px]">
@@ -471,7 +471,7 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
                               ref={provided.innerRef}
                               {...provided.draggableProps}
                               {...provided.dragHandleProps}
-                              className="p-2 bg-white border rounded flex items-center gap-2 shadow-sm cursor-move"
+                              className="flex cursor-move items-center gap-2 rounded-lg border border-gray-200 bg-white p-2.5 text-sm text-gray-800 shadow-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200"
                             >
                               <Users className="h-4 w-4 text-gray-400" />
                               {student.firstName} {student.lastName}
@@ -488,12 +488,12 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
 
             {/* Main: Groups List */}
             <div className="flex-1">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-gray-900">Groups in {selectedSet.name}</h3>
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Groups in {selectedSet.name}</h3>
                 {selectedSet.groupStructure === 'manual' && (
                   <button
                     onClick={() => setShowCreateGroupModal(true)}
-                    className="inline-flex items-center px-3 py-1 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                    className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
                   >
                     <Plus className="h-4 w-4 mr-1" />
                     Group
@@ -506,7 +506,7 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
                     {(provided) => (
                       <div
                         key={group._id}
-                        className="p-4 border border-gray-200 rounded-lg min-h-[80px] cursor-pointer"
+                        className="cursor-pointer rounded-xl border border-gray-200 bg-white p-3 shadow-sm transition-colors hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600 dark:hover:bg-gray-800"
                         onClick={e => {
                           // Prevent navigation if clicking the expand/collapse button
                           if ((e.target as HTMLElement).closest('button')) return;
@@ -515,11 +515,11 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
                         ref={provided.innerRef}
                         {...provided.droppableProps}
                       >
-                        <div className="flex justify-between items-start mb-2">
+                        <div className="flex items-start justify-between">
                           <div className="flex items-center space-x-2">
                             <button
                               onClick={() => toggleGroupExpand(group._id)}
-                              className="text-gray-400 hover:text-gray-500"
+                              className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
                             >
                               {expandedGroups.has(group._id) ? (
                                 <ChevronUp className="h-5 w-5" />
@@ -527,20 +527,20 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
                                 <ChevronDown className="h-5 w-5" />
                               )}
                             </button>
-                            <h4 className="font-medium text-gray-900">{group.name}</h4>
+                            <h4 className="font-semibold text-gray-900 dark:text-gray-100">{group.name}</h4>
                           </div>
                         </div>
                         {expandedGroups.has(group._id) && (
                           <div className="space-y-2 mt-2">
-                            <p className="text-sm font-medium text-gray-700">Members:</p>
-                            <ul className="text-sm text-gray-600">
+                            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Members</p>
+                            <ul className="max-h-[9rem] space-y-1 overflow-y-auto overscroll-y-contain pr-0.5 text-sm text-gray-600 dark:text-gray-300">
                               {group.members.map((member, idx) => (
                                 <Draggable key={member._id} draggableId={member._id} index={idx}>
                                   {(provided) => (
                                     <li
                                       ref={provided.innerRef}
                                       {...provided.draggableProps}
-                                      className="flex items-center p-2 bg-white border rounded mb-1 gap-2 shadow-sm"
+                                      className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-600 dark:bg-gray-800"
                                     >
                                       {/* 6-dot drag handle */}
                                       <span
@@ -576,99 +576,108 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
             </div>
           </div>
         </DragDropContext>
-      )}
+        )}
+      </div>
 
       {/* Create Group Set Modal */}
       {showCreateSetModal && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 max-w-md w-full max-h-[95vh] overflow-y-auto">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Create Group Set</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+          <div className="max-h-[95vh] w-full max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
+            <div className="border-b border-gray-200 px-6 py-4 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Create Group Set</h3>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Name your set and choose how groups are formed.</p>
+            </div>
             <form onSubmit={handleCreateSet}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700">Name</label>
-                <input
-                  type="text"
-                  id="new-set-name"
-                  name="newSetName"
-                  value={newSetName}
-                  onChange={(e) => setNewSetName(e.target.value)}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label className="flex items-center">
+              <div className="space-y-5 px-6 py-5">
+                <div>
+                  <label htmlFor="new-set-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Name</label>
                   <input
-                    type="checkbox"
-                    id="allow-self-signup"
-                    name="allowSelfSignup"
-                    checked={allowSelfSignup}
-                    onChange={(e) => setAllowSelfSignup(e.target.checked)}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="ml-2 text-sm text-gray-700">Allow self-signup</span>
-                </label>
-              </div>
-              <div className="mb-4">
-                <label htmlFor="groupStructure" className="block text-sm font-medium text-gray-700">Group Structure</label>
-                <select
-                  id="groupStructure"
-                  name="groupStructure"
-                  value={groupStructure}
-                  onChange={e => setGroupStructure(e.target.value)}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                >
-                  <option value="manual">Create groups later</option>
-                  <option value="byGroupCount">Split students by number of groups</option>
-                  <option value="byStudentsPerGroup">Split number of students per group</option>
-                </select>
-              </div>
-              {groupStructure === 'byGroupCount' && (
-                <div className="mb-4">
-                  <label htmlFor="groupCount" className="block text-sm font-medium text-gray-700">Number of Groups</label>
-                  <input
-                    id="groupCount"
-                    name="groupCount"
-                    type="number"
-                    min={2}
-                    value={groupCount}
-                    onChange={e => setGroupCount(Number(e.target.value))}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    type="text"
+                    id="new-set-name"
+                    name="newSetName"
+                    value={newSetName}
+                    onChange={(e) => setNewSetName(e.target.value)}
+                    className="mt-1.5 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm transition-colors placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500"
                     required
                   />
                 </div>
-              )}
-              {groupStructure === 'byStudentsPerGroup' && (
-                <div className="mb-4">
-                  <label htmlFor="studentsPerGroup" className="block text-sm font-medium text-gray-700">
-                    Number of Students per Group
+                <div className="rounded-xl border border-gray-200 bg-gray-50/90 px-4 py-3 dark:border-gray-600 dark:bg-gray-800/60">
+                  <label htmlFor="allow-self-signup" className="flex cursor-pointer items-start gap-3">
+                    <input
+                      type="checkbox"
+                      id="allow-self-signup"
+                      name="allowSelfSignup"
+                      checked={allowSelfSignup}
+                      onChange={(e) => setAllowSelfSignup(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800"
+                    />
+                    <span>
+                      <span className="block text-sm font-medium text-gray-900 dark:text-gray-100">Allow self-signup</span>
+                      <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">Students can join a group in this set on their own when enabled.</span>
+                    </span>
                   </label>
-                  <input
-                    id="studentsPerGroup"
-                    name="studentsPerGroup"
-                    type="number"
-                    min={2}
-                    value={studentsPerGroup}
-                    onChange={e => setStudentsPerGroup(Number(e.target.value))}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                    required
-                  />
-                  <p className="mt-1 text-xs text-gray-500">
-                    Enter the number of students you want in each group. Minimum is 2.
-                  </p>
                 </div>
-              )}
-              <div className="flex justify-end space-x-3">
+                <div>
+                  <label htmlFor="groupStructure" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Group structure</label>
+                  <select
+                    id="groupStructure"
+                    name="groupStructure"
+                    value={groupStructure}
+                    onChange={e => setGroupStructure(e.target.value)}
+                    className="mt-1.5 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                  >
+                    <option value="manual">Create groups later</option>
+                    <option value="byGroupCount">Split students by number of groups</option>
+                    <option value="byStudentsPerGroup">Split number of students per group</option>
+                  </select>
+                </div>
+                {groupStructure === 'byGroupCount' && (
+                  <div>
+                    <label htmlFor="groupCount" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Number of groups</label>
+                    <input
+                      id="groupCount"
+                      name="groupCount"
+                      type="number"
+                      min={2}
+                      value={groupCount}
+                      onChange={e => setGroupCount(Number(e.target.value))}
+                      className="mt-1.5 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                      required
+                    />
+                  </div>
+                )}
+                {groupStructure === 'byStudentsPerGroup' && (
+                  <div>
+                    <label htmlFor="studentsPerGroup" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Students per group
+                    </label>
+                    <input
+                      id="studentsPerGroup"
+                      name="studentsPerGroup"
+                      type="number"
+                      min={2}
+                      value={studentsPerGroup}
+                      onChange={e => setStudentsPerGroup(Number(e.target.value))}
+                      className="mt-1.5 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                      required
+                    />
+                    <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                      Minimum 2 students per group.
+                    </p>
+                  </div>
+                )}
+              </div>
+              <div className="flex justify-end gap-3 border-t border-gray-200 bg-gray-50/90 px-6 py-4 dark:border-gray-700 dark:bg-gray-800/50">
                 <button
                   type="button"
                   onClick={() => setShowCreateSetModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                  className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
+                  className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
                 >
                   Create
                 </button>
@@ -680,59 +689,63 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
 
       {/* Create Group Modal */}
       {showCreateGroupModal && selectedSet && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 max-w-md w-full max-h-[95vh] overflow-y-auto">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Create Group</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+          <div className="max-h-[95vh] w-full max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
+            <div className="border-b border-gray-200 px-6 py-4 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Create group</h3>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Add a group to &ldquo;{selectedSet.name}&rdquo;.</p>
+            </div>
             <form onSubmit={handleCreateGroup}>
-              <div className="mb-4">
-                <label htmlFor="groupName" className="block text-sm font-medium text-gray-700">Group Name</label>
-                <input
-                  id="groupName"
-                  name="groupName"
-                  type="text"
-                  value={newGroupName}
-                  onChange={(e) => setNewGroupName(e.target.value)}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  required
-                />
-              </div>
-              {/* Only show member selection for non-manual group sets */}
-              {selectedSet.groupStructure !== 'manual' && (
-                <div className="mb-4">
-                  <label htmlFor="groupMembers" className="block text-sm font-medium text-gray-700">Select Members</label>
-                  <select
-                    id="groupMembers"
-                    name="groupMembers"
-                    multiple
-                    value={selectedStudents}
-                    onChange={(e) => setSelectedStudents(
-                      Array.from(e.target.selectedOptions, option => option.value)
-                    )}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                    size={5}
-                  >
-                    {students.map(student => (
-                      <option key={student._id} value={student._id}>
-                        {student.firstName} {student.lastName}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Hold Ctrl/Cmd to select multiple students
-                  </p>
+              <div className="space-y-5 px-6 py-5">
+                <div>
+                  <label htmlFor="groupName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Group name</label>
+                  <input
+                    id="groupName"
+                    name="groupName"
+                    type="text"
+                    value={newGroupName}
+                    onChange={(e) => setNewGroupName(e.target.value)}
+                    className="mt-1.5 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                    required
+                  />
                 </div>
-              )}
-              <div className="flex justify-end space-x-3">
+                {selectedSet.groupStructure !== 'manual' && (
+                  <div>
+                    <label htmlFor="groupMembers" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Select members</label>
+                    <select
+                      id="groupMembers"
+                      name="groupMembers"
+                      multiple
+                      value={selectedStudents}
+                      onChange={(e) => setSelectedStudents(
+                        Array.from(e.target.selectedOptions, option => option.value)
+                      )}
+                      className="mt-1.5 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                      size={5}
+                    >
+                      {students.map(student => (
+                        <option key={student._id} value={student._id}>
+                          {student.firstName} {student.lastName}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                      Hold Ctrl/Cmd to select multiple students.
+                    </p>
+                  </div>
+                )}
+              </div>
+              <div className="flex justify-end gap-3 border-t border-gray-200 bg-gray-50/90 px-6 py-4 dark:border-gray-700 dark:bg-gray-800/50">
                 <button
                   type="button"
                   onClick={() => setShowCreateGroupModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                  className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
+                  className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
                 >
                   Create
                 </button>
@@ -744,12 +757,15 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
 
       {/* Auto-split Modal */}
       {showAutoSplitModal && selectedSet && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 max-w-md w-full max-h-[95vh] overflow-y-auto">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Auto-split Students</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+          <div className="max-h-[95vh] w-full max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
+            <div className="border-b border-gray-200 px-6 py-4 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Auto-split students</h3>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Randomly assign enrolled students into groups of a fixed size.</p>
+            </div>
             <form onSubmit={handleAutoSplit}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700">Group Size</label>
+              <div className="px-6 py-5">
+                <label htmlFor="auto-split-group-size" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Group size</label>
                 <input
                   type="number"
                   id="auto-split-group-size"
@@ -758,24 +774,24 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
                   max={students.length}
                   value={groupSize}
                   onChange={(e) => setGroupSize(parseInt(e.target.value))}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="mt-1.5 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                   required
                 />
-                <p className="mt-1 text-sm text-gray-500">
-                  Students will be randomly assigned to groups of this size
+                <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  Students will be randomly assigned to groups of this size.
                 </p>
               </div>
-              <div className="flex justify-end space-x-3">
+              <div className="flex justify-end gap-3 border-t border-gray-200 bg-gray-50/90 px-6 py-4 dark:border-gray-700 dark:bg-gray-800/50">
                 <button
                   type="button"
                   onClick={() => setShowAutoSplitModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                  className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
+                  className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
                 >
                   Auto-split
                 </button>
@@ -787,61 +803,66 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
 
       {/* Edit Group Modal */}
       {showEditGroupModal && selectedGroup && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 max-w-md w-full max-h-[95vh] overflow-y-auto">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Edit Group</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+          <div className="max-h-[95vh] w-full max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
+            <div className="border-b border-gray-200 px-6 py-4 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Edit group</h3>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Update the name and roster for this group.</p>
+            </div>
             <form onSubmit={handleEditGroup}>
-              <div className="mb-4">
-                <label htmlFor="editGroupName" className="block text-sm font-medium text-gray-700">Group Name</label>
-                <input
-                  id="editGroupName"
-                  name="editGroupName"
-                  type="text"
-                  value={newGroupName}
-                  onChange={(e) => setNewGroupName(e.target.value)}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  required
-                />
+              <div className="space-y-5 px-6 py-5">
+                <div>
+                  <label htmlFor="editGroupName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Group name</label>
+                  <input
+                    id="editGroupName"
+                    name="editGroupName"
+                    type="text"
+                    value={newGroupName}
+                    onChange={(e) => setNewGroupName(e.target.value)}
+                    className="mt-1.5 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                    required
+                  />
+                </div>
+                <div>
+                  <label htmlFor="editGroupMembers" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Select members</label>
+                  <select
+                    id="editGroupMembers"
+                    name="editGroupMembers"
+                    multiple
+                    value={selectedStudents}
+                    onChange={(e) => setSelectedStudents(
+                      Array.from(e.target.selectedOptions, option => option.value)
+                    )}
+                    className="mt-1.5 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                    size={5}
+                  >
+                    {students.map(student => (
+                      <option key={student._id} value={student._id}>
+                        {student.firstName} {student.lastName}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                    First selected student is the group leader.
+                  </p>
+                </div>
               </div>
-              <div className="mb-4">
-                <label htmlFor="editGroupMembers" className="block text-sm font-medium text-gray-700">Select Members</label>
-                <select
-                  id="editGroupMembers"
-                  name="editGroupMembers"
-                  multiple
-                  value={selectedStudents}
-                  onChange={(e) => setSelectedStudents(
-                    Array.from(e.target.selectedOptions, option => option.value)
-                  )}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  size={5}
-                >
-                  {students.map(student => (
-                    <option key={student._id} value={student._id}>
-                      {student.firstName} {student.lastName}
-                    </option>
-                  ))}
-                </select>
-                <p className="mt-1 text-sm text-gray-500">
-                  First selected student will be the group leader
-                </p>
-              </div>
-              <div className="flex justify-end space-x-3">
+              <div className="flex justify-end gap-3 border-t border-gray-200 bg-gray-50/90 px-6 py-4 dark:border-gray-700 dark:bg-gray-800/50">
                 <button
                   type="button"
                   onClick={() => {
                     setShowEditGroupModal(false);
                     setSelectedGroup(null);
                   }}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                  className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
+                  className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
                 >
-                  Save Changes
+                  Save changes
                 </button>
               </div>
             </form>
@@ -851,46 +872,53 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
 
       {/* Message Group Modal */}
       {showMessageModal && selectedGroup && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 max-w-md w-full max-h-[95vh] overflow-y-auto">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Message Group: {selectedGroup.name}</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+          <div className="max-h-[95vh] w-full max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
+            <div className="border-b border-gray-200 px-6 py-4 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Message group</h3>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{selectedGroup.name}</p>
+            </div>
             <form onSubmit={handleSendMessage}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700">Subject</label>
-                <input
-                  type="text"
-                  value={messageSubject}
-                  onChange={(e) => setMessageSubject(e.target.value)}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  required
-                />
+              <div className="space-y-5 px-6 py-5">
+                <div>
+                  <label htmlFor="message-subject" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Subject</label>
+                  <input
+                    id="message-subject"
+                    type="text"
+                    value={messageSubject}
+                    onChange={(e) => setMessageSubject(e.target.value)}
+                    className="mt-1.5 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                    required
+                  />
+                </div>
+                <div>
+                  <label htmlFor="message-content" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Message</label>
+                  <textarea
+                    id="message-content"
+                    value={messageContent}
+                    onChange={(e) => setMessageContent(e.target.value)}
+                    rows={4}
+                    className="mt-1.5 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                    required
+                  />
+                </div>
               </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700">Message</label>
-                <textarea
-                  value={messageContent}
-                  onChange={(e) => setMessageContent(e.target.value)}
-                  rows={4}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  required
-                />
-              </div>
-              <div className="flex justify-end space-x-3">
+              <div className="flex justify-end gap-3 border-t border-gray-200 bg-gray-50/90 px-6 py-4 dark:border-gray-700 dark:bg-gray-800/50">
                 <button
                   type="button"
                   onClick={() => {
                     setShowMessageModal(false);
                     setSelectedGroup(null);
                   }}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                  className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
+                  className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
                 >
-                  Send Message
+                  Send message
                 </button>
               </div>
             </form>
@@ -900,62 +928,66 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
 
       {/* Group Activity Modal */}
       {showActivityModal && groupActivity && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 max-w-2xl w-full max-h-[95vh] sm:max-h-[80vh] overflow-y-auto">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Group Activity</h3>
-            
-            <div className="mb-6">
-              <h4 className="text-md font-medium text-gray-900 mb-2">Submissions</h4>
-              {groupActivity.submissions.length > 0 ? (
-                <div className="space-y-2">
-                  {groupActivity.submissions.map(submission => (
-                    <div key={submission._id} className="p-3 bg-gray-50 rounded-lg">
-                      <p className="font-medium">{submission.assignment.title}</p>
-                      <p className="text-sm text-gray-600">
-                        Submitted: {new Date(submission.submittedAt).toLocaleString()}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        Status: <span className={`font-medium ${
-                          submission.status === 'graded' ? 'text-green-600' :
-                          submission.status === 'submitted' ? 'text-blue-600' :
-                          'text-yellow-600'
-                        }`}>{submission.status}</span>
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-gray-500">No submissions yet</p>
-              )}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+          <div className="max-h-[95vh] w-full max-w-2xl overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900 sm:max-h-[80vh]">
+            <div className="border-b border-gray-200 px-6 py-4 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Group activity</h3>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Recent submissions and discussions.</p>
+            </div>
+            <div className="max-h-[calc(80vh-8rem)] overflow-y-auto px-6 py-5">
+              <div className="mb-6">
+                <h4 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Submissions</h4>
+                {groupActivity.submissions.length > 0 ? (
+                  <div className="space-y-2">
+                    {groupActivity.submissions.map(submission => (
+                      <div key={submission._id} className="rounded-xl border border-gray-200 bg-gray-50/80 p-3 dark:border-gray-600 dark:bg-gray-800/60">
+                        <p className="font-medium text-gray-900 dark:text-gray-100">{submission.assignment.title}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          Submitted: {new Date(submission.submittedAt).toLocaleString()}
+                        </p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          Status: <span className={`font-medium ${
+                            submission.status === 'graded' ? 'text-green-600 dark:text-green-400' :
+                            submission.status === 'submitted' ? 'text-blue-600 dark:text-blue-400' :
+                            'text-yellow-600 dark:text-yellow-400'
+                          }`}>{submission.status}</span>
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">No submissions yet.</p>
+                )}
+              </div>
+
+              <div>
+                <h4 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Discussions</h4>
+                {groupActivity.discussions.length > 0 ? (
+                  <div className="space-y-2">
+                    {groupActivity.discussions.map(discussion => (
+                      <div key={discussion._id} className="rounded-xl border border-gray-200 bg-gray-50/80 p-3 dark:border-gray-600 dark:bg-gray-800/60">
+                        <p className="font-medium text-gray-900 dark:text-gray-100">{discussion.title}</p>
+                        <p className="mb-1 text-sm text-gray-600 dark:text-gray-400">{discussion.content}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-500">
+                          By {discussion.author.firstName} {discussion.author.lastName} on{' '}
+                          {new Date(discussion.createdAt).toLocaleString()}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">No discussions yet.</p>
+                )}
+              </div>
             </div>
 
-            <div>
-              <h4 className="text-md font-medium text-gray-900 mb-2">Discussions</h4>
-              {groupActivity.discussions.length > 0 ? (
-                <div className="space-y-2">
-                  {groupActivity.discussions.map(discussion => (
-                    <div key={discussion._id} className="p-3 bg-gray-50 rounded-lg">
-                      <p className="font-medium">{discussion.title}</p>
-                      <p className="text-sm text-gray-600 mb-1">{discussion.content}</p>
-                      <p className="text-xs text-gray-500">
-                        By {discussion.author.firstName} {discussion.author.lastName} on{' '}
-                        {new Date(discussion.createdAt).toLocaleString()}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-gray-500">No discussions yet</p>
-              )}
-            </div>
-
-            <div className="mt-6 flex justify-end">
+            <div className="flex justify-end border-t border-gray-200 bg-gray-50/90 px-6 py-4 dark:border-gray-700 dark:bg-gray-800/50">
               <button
                 onClick={() => {
                   setShowActivityModal(false);
                   setGroupActivity(null);
                 }}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
               >
                 Close
               </button>

@@ -30,8 +30,8 @@ vi.mock('../../services/api', () => ({
 }));
 
 vi.mock('react-big-calendar', () => ({
-  Calendar: ({ events, onSelectSlot, onSelectEvent, ...props }: any) => (
-    <div data-testid="calendar" {...props}>
+  Calendar: ({ events, onSelectEvent }: any) => (
+    <div data-testid="calendar">
       {events.map((event: any, idx: number) => (
         <div key={idx} data-testid={`event-${idx}`} onClick={() => onSelectEvent?.(event)}>
           {event.title}

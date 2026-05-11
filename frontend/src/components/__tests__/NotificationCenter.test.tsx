@@ -3,7 +3,6 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import NotificationCenter from '../NotificationCenter';
 import api from '../../services/api';
-import { requestCache } from '../../utils/requestCache';
 
 // Mock dependencies
 vi.mock('../../services/api', () => ({
@@ -27,15 +26,6 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
-vi.mock('../../utils/requestCache', () => ({
-  requestCache: {
-    get: vi.fn(),
-  },
-  CACHE_KEYS: {
-    NOTIFICATIONS: 'notifications:list',
-  },
-}));
-
 vi.mock('../../utils/logger', () => ({
   default: {
     error: vi.fn(),
@@ -47,7 +37,6 @@ vi.mock('date-fns', () => ({
 }));
 
 const mockedApi = api as any;
-const mockedRequestCache = requestCache as any;
 
 describe('NotificationCenter', () => {
   const mockOnClose = vi.fn();
@@ -91,9 +80,8 @@ describe('NotificationCenter', () => {
   });
 
   it('should render when open', async () => {
-    mockedRequestCache.get.mockResolvedValue({
-      notifications: [],
-      unreadCount: 0,
+    mockedApi.get.mockResolvedValue({
+      data: { success: true, data: [], unreadCount: 0 },
     });
 
     render(
@@ -109,9 +97,8 @@ describe('NotificationCenter', () => {
   });
 
   it('should fetch and display notifications', async () => {
-    mockedRequestCache.get.mockResolvedValue({
-      notifications: mockNotifications,
-      unreadCount: 1,
+    mockedApi.get.mockResolvedValue({
+      data: { success: true, data: mockNotifications, unreadCount: 1 },
     });
 
     render(
@@ -127,9 +114,8 @@ describe('NotificationCenter', () => {
   });
 
   it('should mark notification as read', async () => {
-    mockedRequestCache.get.mockResolvedValue({
-      notifications: mockNotifications,
-      unreadCount: 1,
+    mockedApi.get.mockResolvedValue({
+      data: { success: true, data: mockNotifications, unreadCount: 1 },
     });
     mockedApi.patch.mockResolvedValue({ data: { success: true } });
 
@@ -158,9 +144,8 @@ describe('NotificationCenter', () => {
   });
 
   it('should mark all as read', async () => {
-    mockedRequestCache.get.mockResolvedValue({
-      notifications: mockNotifications,
-      unreadCount: 1,
+    mockedApi.get.mockResolvedValue({
+      data: { success: true, data: mockNotifications, unreadCount: 1 },
     });
     mockedApi.patch.mockResolvedValue({ data: { success: true } });
 
@@ -183,9 +168,8 @@ describe('NotificationCenter', () => {
   });
 
   it('should delete notification', async () => {
-    mockedRequestCache.get.mockResolvedValue({
-      notifications: mockNotifications,
-      unreadCount: 1,
+    mockedApi.get.mockResolvedValue({
+      data: { success: true, data: mockNotifications, unreadCount: 1 },
     });
     mockedApi.delete.mockResolvedValue({ data: { success: true } });
 
@@ -214,9 +198,8 @@ describe('NotificationCenter', () => {
   });
 
   it('should close on outside click', () => {
-    mockedRequestCache.get.mockResolvedValue({
-      notifications: [],
-      unreadCount: 0,
+    mockedApi.get.mockResolvedValue({
+      data: { success: true, data: [], unreadCount: 0 },
     });
 
     render(
@@ -232,9 +215,8 @@ describe('NotificationCenter', () => {
   });
 
   it('should close when close button is clicked', () => {
-    mockedRequestCache.get.mockResolvedValue({
-      notifications: [],
-      unreadCount: 0,
+    mockedApi.get.mockResolvedValue({
+      data: { success: true, data: [], unreadCount: 0 },
     });
 
     render(
@@ -257,9 +239,8 @@ describe('NotificationCenter', () => {
       link: '/courses/123',
     };
 
-    mockedRequestCache.get.mockResolvedValue({
-      notifications: [notificationWithLink],
-      unreadCount: 1,
+    mockedApi.get.mockResolvedValue({
+      data: { success: true, data: [notificationWithLink], unreadCount: 1 },
     });
     mockedApi.patch.mockResolvedValue({ data: { success: true } });
 
@@ -283,9 +264,8 @@ describe('NotificationCenter', () => {
   });
 
   it('should show empty state when no notifications', async () => {
-    mockedRequestCache.get.mockResolvedValue({
-      notifications: [],
-      unreadCount: 0,
+    mockedApi.get.mockResolvedValue({
+      data: { success: true, data: [], unreadCount: 0 },
     });
 
     render(

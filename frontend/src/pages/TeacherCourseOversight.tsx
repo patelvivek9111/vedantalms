@@ -8,16 +8,15 @@ import { getImageUrl } from '../services/api';
 import { 
   BookOpen, 
   Search, 
-  Filter, 
   Edit, 
   Trash2, 
   Eye,
   EyeOff,
   Users,
-  CheckCircle,
-  XCircle,
   TrendingUp,
-  User
+  User,
+  Plus,
+  ChevronDown
 } from 'lucide-react';
 import { BurgerMenu } from '../components/BurgerMenu';
 import DataTable, { Column } from '../components/common/DataTable';
@@ -167,32 +166,33 @@ export function TeacherCourseOversight() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300';
-      case 'draft': return 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-300';
-      case 'archived': return 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300';
-      default: return 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300';
+      case 'active':
+        return 'border border-emerald-200/90 bg-emerald-50/90 text-emerald-900 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-200';
+      case 'draft':
+        return 'border border-amber-200/90 bg-amber-50/90 text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-200';
+      case 'archived':
+        return 'border border-gray-200 bg-gray-100 text-gray-800 dark:border-gray-600 dark:bg-gray-800/80 dark:text-gray-300';
+      default:
+        return 'border border-gray-200 bg-gray-100 text-gray-800 dark:border-gray-600 dark:bg-gray-800/80 dark:text-gray-300';
     }
   };
 
   const getPublishedColor = (published: boolean) => {
-    return published ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300' : 'bg-orange-100 dark:bg-orange-900/50 text-orange-800 dark:text-orange-300';
+    return published
+      ? 'border border-sky-200/90 bg-sky-50/90 text-sky-900 dark:border-sky-800/60 dark:bg-sky-950/40 dark:text-sky-200'
+      : 'border border-orange-200/90 bg-orange-50/90 text-orange-900 dark:border-orange-800/60 dark:bg-orange-950/40 dark:text-orange-200';
   };
 
+  /** Grade band colors: informative, not “alarm red” for normal ranges */
   const getAverageColor = (average: number | undefined | null) => {
     if (average === undefined || average === null) {
-      return 'text-gray-500 dark:text-gray-400';
+      return 'text-gray-400 dark:text-gray-500';
     }
-    if (average >= 90) {
-      return 'text-green-600 dark:text-green-400 font-semibold';
-    } else if (average >= 80) {
-      return 'text-blue-600 dark:text-blue-400 font-semibold';
-    } else if (average >= 70) {
-      return 'text-yellow-600 dark:text-yellow-400 font-semibold';
-    } else if (average >= 60) {
-      return 'text-orange-600 dark:text-orange-400 font-semibold';
-    } else {
-      return 'text-red-600 dark:text-red-400 font-semibold';
-    }
+    if (average >= 90) return 'text-emerald-700 dark:text-emerald-300';
+    if (average >= 80) return 'text-teal-700 dark:text-teal-300';
+    if (average >= 70) return 'text-slate-700 dark:text-slate-300';
+    if (average >= 60) return 'text-amber-700 dark:text-amber-300';
+    return 'text-slate-600 dark:text-slate-400';
   };
 
   const formatDate = (dateString: string) => {
@@ -452,11 +452,12 @@ export function TeacherCourseOversight() {
       sortable: true,
       render: (course) => (
         <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             navigate(`/courses/${course._id}`);
           }}
-          className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium text-left"
+          className="text-left text-sm font-semibold text-gray-900 underline decoration-transparent underline-offset-2 transition-colors hover:text-blue-600 hover:decoration-blue-600/40 dark:text-gray-100 dark:hover:text-blue-400 dark:hover:decoration-blue-400/40"
         >
           {course.catalog?.courseCode || course.title}
         </button>
@@ -473,7 +474,7 @@ export function TeacherCourseOversight() {
       label: 'Status',
       sortable: true,
       render: (course) => (
-        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(course.status)}`}>
+        <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium capitalize ${getStatusColor(course.status)}`}>
           {course.status}
         </span>
       ),
@@ -488,7 +489,7 @@ export function TeacherCourseOversight() {
       label: 'Published',
       sortable: true,
       render: (course) => (
-        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getPublishedColor(course.published)}`}>
+        <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${getPublishedColor(course.published)}`}>
           {course.published ? 'Published' : 'Unpublished'}
         </span>
       ),
@@ -500,9 +501,9 @@ export function TeacherCourseOversight() {
       label: 'Enrollment',
       sortable: true,
       render: (course) => (
-        <div className="flex items-center gap-2">
-          <Users className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-          <span className="text-sm text-gray-900 dark:text-gray-100">{course.enrollmentCount || 0}</span>
+        <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+          <Users className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden />
+          <span className="text-sm tabular-nums font-medium">{course.enrollmentCount || 0}</span>
         </div>
       ),
       className: 'whitespace-nowrap',
@@ -514,11 +515,11 @@ export function TeacherCourseOversight() {
       sortable: true,
       render: (course) => (
         <div className="flex items-center gap-2">
-          <TrendingUp className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-          <span className={`text-sm font-medium ${getAverageColor(course.classAverage)}`}>
+          <TrendingUp className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden />
+          <span className={`text-sm tabular-nums font-medium ${getAverageColor(course.classAverage)}`}>
             {course.classAverage !== undefined && course.classAverage !== null 
               ? `${course.classAverage.toFixed(1)}%` 
-              : 'N/A'}
+              : '—'}
           </span>
         </div>
       ),
@@ -544,25 +545,33 @@ export function TeacherCourseOversight() {
       label: 'Actions',
       sortable: false,
       render: (course) => (
-        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="inline-flex items-center gap-0.5 rounded-lg border border-gray-200/90 bg-gray-50/80 p-0.5 dark:border-gray-600 dark:bg-gray-800/50"
+          onClick={(e) => e.stopPropagation()}
+          role="group"
+          aria-label="Course actions"
+        >
           <button
+            type="button"
             onClick={() => handleCourseAction('edit', course)}
-            className="text-yellow-600 dark:text-yellow-400 hover:text-yellow-900 dark:hover:text-yellow-300"
-            title="Edit Course"
+            className="rounded-md p-1.5 text-gray-600 transition-colors hover:bg-white hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-100"
+            title="Edit course"
           >
             <Edit className="h-4 w-4" />
           </button>
           <button
+            type="button"
             onClick={() => handleCourseAction('view', course)}
-            className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300"
-            title="View Course"
+            className="rounded-md p-1.5 text-gray-600 transition-colors hover:bg-white hover:text-blue-600 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-blue-400"
+            title="Open course"
           >
             <Eye className="h-4 w-4" />
           </button>
           <button
+            type="button"
             onClick={() => handleCourseAction('delete', course)}
-            className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
-            title="Delete Course"
+            className="rounded-md p-1.5 text-gray-600 transition-colors hover:bg-red-50 hover:text-red-600 dark:text-gray-400 dark:hover:bg-red-950/50 dark:hover:text-red-400"
+            title="Delete course"
           >
             <Trash2 className="h-4 w-4" />
           </button>
@@ -574,11 +583,14 @@ export function TeacherCourseOversight() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 dark:border-blue-400"></div>
+      <div className="flex min-h-[40vh] items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="h-9 w-9 animate-spin rounded-full border-2 border-gray-200 border-t-blue-600 dark:border-gray-700 dark:border-t-blue-400" />
       </div>
     );
   }
+
+  const tableShellClass =
+    'overflow-auto max-h-[600px] rounded-2xl border border-gray-200/90 bg-white shadow-sm ring-1 ring-black/[0.03] dark:border-gray-700 dark:bg-gray-950/50 dark:shadow-none dark:ring-white/[0.04]';
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -592,7 +604,7 @@ export function TeacherCourseOversight() {
           >
             <User className="w-6 h-6" />
           </button>
-          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">My Course</h1>
+          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">My Courses</h1>
           <div className="w-10"></div> {/* Spacer for centering */}
           
           {/* Burger Menu */}
@@ -604,60 +616,100 @@ export function TeacherCourseOversight() {
       </nav>
       
       
-      <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 pt-20 lg:pt-3">
+      <div className="mx-auto max-w-7xl space-y-5 p-3 pt-20 sm:space-y-6 sm:p-4 lg:p-6 lg:pt-4">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="hidden lg:block text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">My Courses</h1>
-            <p className="hidden lg:block text-sm sm:text-base text-gray-600 dark:text-gray-400">Manage and monitor your courses</p>
-            <p className="lg:hidden text-sm text-gray-600 dark:text-gray-400 mt-2">Manage and monitor your courses</p>
+            <h1 className="hidden text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100 lg:block sm:text-3xl">
+              My Courses
+            </h1>
+            <p className="mt-1 hidden max-w-xl text-sm leading-relaxed text-gray-500 dark:text-gray-400 lg:block">
+              Manage and monitor your courses
+            </p>
+            <p className="mt-1 text-sm leading-relaxed text-gray-500 dark:text-gray-400 lg:hidden">
+              Manage and monitor your courses
+            </p>
           </div>
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
-          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-            <BookOpen className="h-4 w-4 sm:h-5 sm:w-5" />
-            <span className="text-xs sm:text-sm font-medium">{courses.length} course{courses.length !== 1 ? 's' : ''}</span>
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-stretch">
+            <div className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200/90 bg-white px-4 py-2.5 text-sm shadow-sm dark:border-gray-700 dark:bg-gray-900/40 sm:w-auto sm:justify-center">
+              <BookOpen className="h-4 w-4 shrink-0 text-gray-500 dark:text-gray-400" aria-hidden />
+              <span className="text-sm leading-none">
+                <span className="tabular-nums font-semibold text-gray-900 dark:text-gray-100">{courses.length}</span>
+                <span className="font-medium text-gray-500 dark:text-gray-400"> courses</span>
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/courses/create')}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold leading-none text-white shadow-sm transition-colors hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 sm:w-auto"
+            >
+              <Plus className="h-4 w-4 shrink-0" aria-hidden />
+              Create course
+            </button>
           </div>
-          <button
-            onClick={() => navigate('/courses/create')}
-            className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors font-medium flex items-center justify-center gap-2 text-sm sm:text-base"
-          >
-            <BookOpen className="h-4 w-4" />
-            Create Course
-          </button>
         </div>
-      </div>
 
       {/* Filters */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-3 sm:p-4">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
-          <div className="flex-1 relative">
-            <Search className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" />
-            <input
-              type="text"
-              placeholder="Search courses..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 text-sm focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
-            />
+      <div className="overflow-hidden rounded-2xl border border-gray-200/90 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900/50 dark:shadow-none">
+        <div className="border-b border-gray-100 px-3 py-2 dark:border-gray-800 sm:px-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Search & filters</h2>
+            <p className="text-[11px] text-gray-500 dark:text-gray-400">Title, code, or description</p>
           </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="border border-gray-300 dark:border-gray-700 rounded-md px-3 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
-          >
-            <option value="all">All Status</option>
-            <option value="active">Active</option>
-            <option value="draft">Draft</option>
-          </select>
-          <select
-            value={publishedFilter}
-            onChange={(e) => setPublishedFilter(e.target.value)}
-            className="border border-gray-300 dark:border-gray-700 rounded-md px-3 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
-          >
-            <option value="all">All</option>
-            <option value="published">Published</option>
-            <option value="unpublished">Unpublished</option>
-          </select>
+        </div>
+        <div className="grid grid-cols-1 gap-2 p-3 sm:grid-cols-12 sm:gap-3 sm:p-3 md:p-4">
+          <div className="min-w-0 sm:col-span-6">
+            <label htmlFor="teacher-courses-search" className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              Search
+            </label>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+              <input
+                id="teacher-courses-search"
+                type="text"
+                placeholder="Search…"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="h-9 w-full rounded-lg border border-gray-200 bg-white pl-9 pr-2.5 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-blue-400 dark:focus:ring-blue-400/20"
+              />
+            </div>
+          </div>
+          <div className="min-w-0 sm:col-span-3">
+            <label htmlFor="teacher-courses-status" className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              Status
+            </label>
+            <div className="relative">
+              <select
+                id="teacher-courses-status"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="h-9 w-full min-w-0 cursor-pointer appearance-none rounded-lg border border-gray-200 bg-white px-2.5 pr-9 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:focus:border-blue-400 dark:focus:ring-blue-400/20"
+              >
+                <option value="all">All status</option>
+                <option value="active">Active</option>
+                <option value="draft">Draft</option>
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" aria-hidden />
+            </div>
+          </div>
+          <div className="min-w-0 sm:col-span-3">
+            <label htmlFor="teacher-courses-published" className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              Visibility
+            </label>
+            <div className="relative">
+              <select
+                id="teacher-courses-published"
+                value={publishedFilter}
+                onChange={(e) => setPublishedFilter(e.target.value)}
+                className="h-9 w-full min-w-0 cursor-pointer appearance-none rounded-lg border border-gray-200 bg-white px-2.5 pr-9 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:focus:border-blue-400 dark:focus:ring-blue-400/20"
+              >
+                <option value="all">All</option>
+                <option value="published">Published</option>
+                <option value="unpublished">Unpublished</option>
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" aria-hidden />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -665,6 +717,7 @@ export function TeacherCourseOversight() {
       <DataTable<Course>
         data={filteredCourses}
         columns={teacherCourseColumns}
+        tableClassName="[&_th]:py-3 [&_th]:text-[11px] [&_th]:font-semibold [&_th]:tracking-wider [&_td]:py-3.5"
         keyExtractor={(course) => course._id}
         emptyMessage={
           searchTerm || statusFilter !== 'all' || publishedFilter !== 'all'
@@ -678,25 +731,29 @@ export function TeacherCourseOversight() {
         virtualScrolling={true}
         virtualScrollingThreshold={100}
         virtualScrollingHeight={600}
-        estimatedRowHeight={60}
+        estimatedRowHeight={56}
+        tableContainerClassName={tableShellClass}
+        bulkActionsClassName="rounded-xl border border-blue-200/80 bg-blue-50/90 dark:border-blue-800/50 dark:bg-blue-950/30"
         bulkActions={
           <>
-                      <button
+            <button
+              type="button"
               onClick={handleBulkPublish}
               disabled={bulkActionLoading}
-              className="px-3 py-1.5 text-xs sm:text-sm bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 rounded hover:bg-green-200 dark:hover:bg-green-900/70 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200/90 bg-white px-3 py-2 text-xs font-medium text-emerald-800 shadow-sm transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-800/60 dark:bg-gray-900 dark:text-emerald-200 dark:hover:bg-emerald-950/40 sm:text-sm"
             >
-              <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
+              <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden />
               Publish
-                        </button>
-                        <button
+            </button>
+            <button
+              type="button"
               onClick={handleBulkUnpublish}
               disabled={bulkActionLoading}
-              className="px-3 py-1.5 text-xs sm:text-sm bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-300 rounded hover:bg-yellow-200 dark:hover:bg-yellow-900/70 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-                        >
-              <EyeOff className="w-3 h-3 sm:w-4 sm:h-4" />
+              className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200/90 bg-white px-3 py-2 text-xs font-medium text-amber-900 shadow-sm transition-colors hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-amber-800/60 dark:bg-gray-900 dark:text-amber-200 dark:hover:bg-amber-950/40 sm:text-sm"
+            >
+              <EyeOff className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden />
               Unpublish
-                        </button>
+            </button>
           </>
         }
         onRowClick={(course, e) => {

@@ -197,9 +197,19 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const unenrollStudent = async (courseId: string, studentId: string) => {
     try {
       const response = await api.post(`/courses/${courseId}/unenroll`, { studentId });
-      if (response.data.success) {
-        // Refresh the course data
-        await getCourse(courseId);
+      if (response.data.success && response.data.data) {
+        setCourses((prev) =>
+          prev.some((c) => String(c._id) === String(courseId))
+            ? prev.map((c) => (String(c._id) === String(courseId) ? response.data.data : c))
+            : prev
+        );
+      } else if (response.data.success) {
+        const refreshed = await getCourse(courseId);
+        setCourses((prev) =>
+          prev.some((c) => String(c._id) === String(courseId))
+            ? prev.map((c) => (String(c._id) === String(courseId) ? refreshed : c))
+            : prev
+        );
       }
     } catch (err) {
       throw err;

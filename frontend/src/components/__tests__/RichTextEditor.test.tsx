@@ -4,8 +4,8 @@ import RichTextEditor from '../RichTextEditor';
 
 // Mock TinyMCE Editor
 vi.mock('@tinymce/tinymce-react', () => ({
-  Editor: ({ value, onEditorChange, init, ...props }: any) => (
-    <div data-testid="tinymce-editor" {...props}>
+  Editor: ({ value, onEditorChange, init, className, id }: any) => (
+    <div data-testid="tinymce-editor" className={className} id={id}>
       <textarea
         data-testid="editor-textarea"
         value={value}

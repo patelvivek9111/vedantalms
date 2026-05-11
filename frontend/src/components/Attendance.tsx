@@ -927,25 +927,25 @@ const Attendance: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <CheckSquare className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Attendance</h1>
+      {/* Top Controls */}
+      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900 sm:p-5">
+        <div className="mb-4 flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-3">
+            <CheckSquare className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Attendance</h2>
+          </div>
           {user?.role === 'teacher' && !isInstructor && (
             <button
               onClick={assignInstructor}
-              className="px-4 py-2 bg-orange-600 dark:bg-orange-500 text-white rounded-lg hover:bg-orange-700 dark:hover:bg-orange-600 transition-colors font-medium flex items-center gap-2"
+              className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-700 dark:bg-amber-500 dark:hover:bg-amber-600"
             >
               Assign as Instructor
             </button>
           )}
         </div>
-      </div>
 
-      {/* View Mode Toggle and Export Buttons */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1 w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div className="flex rounded-lg border border-gray-200 bg-gray-50 p-1 dark:border-gray-700 dark:bg-gray-800 w-full sm:w-auto">
           <button
             onClick={() => setViewMode('daily')}
             className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors ${
@@ -966,27 +966,32 @@ const Attendance: React.FC = () => {
           >
             Calendar View
           </button>
-        </div>
-        {(isInstructor || user?.role === 'admin') && (
-          <div className="flex gap-2 w-full sm:w-auto">
-            <button
-              onClick={exportAttendance}
-              className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-green-600 dark:bg-green-500 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600 transition-colors font-medium flex items-center justify-center gap-2 text-xs sm:text-sm"
-            >
-              <Download className="h-4 w-4" />
-              <span className="hidden sm:inline">Export Daily CSV</span>
-              <span className="sm:hidden">Export CSV</span>
-            </button>
-            <button
-              onClick={() => setShowExportModal(true)}
-              className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors font-medium flex items-center justify-center gap-2 text-xs sm:text-sm"
-            >
-              <Settings className="h-4 w-4" />
-              <span className="hidden sm:inline">Custom Export</span>
-              <span className="sm:hidden">Custom</span>
-            </button>
           </div>
-        )}
+          {(isInstructor || user?.role === 'admin') && (
+            <div className="flex gap-2 w-full sm:w-auto">
+              <button
+                onClick={exportAttendance}
+                className="flex-1 sm:flex-none rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 dark:hover:bg-emerald-900/50 sm:px-4 sm:text-sm"
+              >
+                <span className="inline-flex items-center justify-center gap-2">
+                  <Download className="h-4 w-4" />
+                  <span className="hidden sm:inline">Export Daily CSV</span>
+                  <span className="sm:hidden">Export CSV</span>
+                </span>
+              </button>
+              <button
+                onClick={() => setShowExportModal(true)}
+                className="flex-1 sm:flex-none rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 sm:px-4 sm:text-sm"
+              >
+                <span className="inline-flex items-center justify-center gap-2">
+                  <Settings className="h-4 w-4" />
+                  <span className="hidden sm:inline">Custom Export</span>
+                  <span className="sm:hidden">Custom</span>
+                </span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Date Selector and Controls */}
@@ -1066,11 +1071,11 @@ const Attendance: React.FC = () => {
         <>
           {/* Status Summary - Only show for teachers/admins */}
           {(isInstructor || user?.role === 'admin') && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6 sm:gap-4">
               {Object.entries(STATUS_CONFIG).map(([status, config]) => {
                 const Icon = config.icon;
                 return (
-                  <div key={status} className="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4 shadow-sm border dark:border-gray-700 text-center">
+                  <div key={status} className="rounded-xl border border-gray-200 bg-white p-3 text-center shadow-sm dark:border-gray-700 dark:bg-gray-900 sm:p-4">
                     <div className="flex items-center justify-center mb-1 sm:mb-2">
                       <Icon className={`h-5 w-5 sm:h-6 sm:w-6 ${config.color.split(' ')[1]}`} />
                     </div>
@@ -1081,7 +1086,7 @@ const Attendance: React.FC = () => {
               })}
               
               {/* Overall Attendance Percentage Card */}
-              <div className="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4 shadow-sm border border-green-200 dark:border-green-800 text-center">
+              <div className="rounded-xl border border-green-200 bg-white p-3 text-center shadow-sm dark:border-green-800 dark:bg-gray-900 sm:p-4">
                 <div className="flex items-center justify-center mb-1 sm:mb-2">
                   <span className="text-xl sm:text-2xl">📊</span>
                 </div>

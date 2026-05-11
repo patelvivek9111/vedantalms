@@ -27,7 +27,9 @@ const BottomNav: React.FC = () => {
             if (option) {
               return {
                 ...option,
-                ...item
+                ...item,
+                // Keep icon from canonical nav option; localStorage stores plain JSON.
+                icon: option.icon,
               };
             }
             return null;
@@ -74,7 +76,9 @@ const BottomNav: React.FC = () => {
             if (option) {
               return {
                 ...option,
-                ...item
+                ...item,
+                // Keep icon from canonical nav option; localStorage stores plain JSON.
+                icon: option.icon,
               };
             }
             return null;

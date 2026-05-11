@@ -151,8 +151,8 @@ describe('GlobalSidebar', () => {
     const dashboardLink = screen.getByText('Dashboard');
     const linkElement = dashboardLink.closest('a');
     expect(linkElement).toHaveAttribute('href', '/');
-    // Check if active styling is applied (has bg-blue-800 class)
-    expect(linkElement).toHaveClass('bg-blue-800');
+    // Active style now uses modern glass background
+    expect(linkElement).toHaveClass('bg-white/[0.12]');
   });
 
   it('should show course dropdown on hover', () => {

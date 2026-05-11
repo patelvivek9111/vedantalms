@@ -13,6 +13,7 @@ import ConfirmationModal from '../components/common/ConfirmationModal';
 import PullToRefresh from '../components/common/PullToRefresh';
 import SwipeableContainer from '../components/common/SwipeableContainer';
 import { useBottomNavSwipe } from '../hooks/useBottomNavSwipe';
+import { matchesInboxFilters } from '../utils/inboxFilters';
 
 function capitalizeFirst(str: string) {
   return str.charAt(0).toUpperCase() + str.slice(1);
@@ -126,7 +127,7 @@ const Inbox: React.FC = () => {
     try {
       await bulkMoveConversations(selectedConversations, 'archived');
       // Refresh conversations
-      const data = await fetchConversations(selectedFolder);
+      const data = await fetchConversations();
       setConversations(data);
       setSelectedConversations([]);
     } catch (err) {
@@ -160,7 +161,7 @@ const Inbox: React.FC = () => {
         await bulkMoveConversations(selectedConversations, 'deleted');
       }
       // Refresh conversations
-      const data = await fetchConversations(selectedFolder);
+      const data = await fetchConversations();
       setConversations(data);
       setSelectedConversations([]);
     } catch (err: any) {
@@ -188,7 +189,7 @@ const Inbox: React.FC = () => {
     try {
       await bulkDeleteForever(selectedConversations);
       // Refresh conversations
-      const data = await fetchConversations(selectedFolder);
+      const data = await fetchConversations();
       setConversations(data);
       setSelectedConversations([]);
     } catch (err) {
@@ -202,7 +203,7 @@ const Inbox: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchConversations(selectedFolder);
+      const data = await fetchConversations();
       setConversations(data || []);
     } catch (err: any) {
       setError('Failed to load conversations');
@@ -483,58 +484,16 @@ const Inbox: React.FC = () => {
 
   // Memoize filteredConversations to prevent infinite loops
   const filteredConversations = useMemo(() => {
-    return conversations.filter(conv => {
-      // Course filter - Skip for admins
-      if (user?.role !== 'admin' && selectedCourse !== 'all' && conv.course !== selectedCourse) return false;
-      // Folder filter (find participant for current user)
-      // Convert both to strings for comparison to handle ObjectId vs string mismatch
-      const participant = conv.participants.find((p: any) => String(p._id) === String(currentUserId));
-      const folder = participant?.folder || conv.folder || 'inbox';
-      
-      // Search filter - if searching, search across all folders (inbox, sent, archived, favorite)
-      const searchLower = search.toLowerCase();
-      if (searchLower) {
-        // When searching, check if conversation matches search query
-        const subject = conv.subject?.toLowerCase() || '';
-        const snippet = conv.lastMessage?.body?.toLowerCase() || '';
-        const senders = conv.participants.map((p: any) => (p.name || `${p.firstName || ''} ${p.lastName || ''}`)).join(', ').toLowerCase();
-        const matchesSearch = subject.includes(searchLower) || snippet.includes(searchLower) || senders.includes(searchLower);
-        
-        if (!matchesSearch) return false;
-        
-        // If search matches, check if conversation is in one of the searchable folders
-        // Searchable folders: inbox, sent, archived, favorite (but not deleted)
-        const isInInbox = folder === 'inbox';
-        const isSent = String(conv.createdBy) === String(currentUserId);
-        const isArchived = folder === 'archived';
-        const isFavorite = participant?.starred === true;
-        const isDeleted = folder === 'deleted';
-        
-        // When searching, include conversations from inbox, sent, archived, and favorite (but exclude deleted)
-        if (isDeleted) return false;
-        if (isInInbox || isSent || isArchived || isFavorite) return true;
-        return false;
-      }
-      
-      // No search query - apply normal folder filter
-      // Show conversations based on selected folder
-      
-      // Always exclude deleted conversations unless viewing the deleted folder
-      if (selectedFolder !== 'deleted' && folder === 'deleted') return false;
-      
-      if (selectedFolder === 'inbox' && folder !== 'inbox') return false;
-      if (selectedFolder === 'sent') {
-        // Convert to strings for comparison
-        if (String(conv.createdBy) !== String(currentUserId)) return false;
-        // Exclude deleted conversations from sent folder
-        if (folder === 'deleted') return false;
-      }
-      if (selectedFolder === 'archived' && folder !== 'archived') return false;
-      if (selectedFolder === 'favorite' && !participant?.starred) return false;
-      if (selectedFolder === 'deleted' && folder !== 'deleted') return false;
-      
-      return true;
-    });
+    return conversations.filter(conv =>
+      matchesInboxFilters({
+        conversation: conv,
+        currentUserId,
+        selectedCourse,
+        selectedFolder,
+        search,
+        userRole: user?.role,
+      })
+    );
   }, [conversations, selectedCourse, selectedFolder, search, currentUserId, user]);
 
   useEffect(() => {
@@ -552,7 +511,7 @@ const Inbox: React.FC = () => {
     try {
       await toggleStar(conv._id);
       // Refresh conversations
-      const data = await fetchConversations(selectedFolder);
+      const data = await fetchConversations();
       setConversations(data);
     } catch (err) {
       // Optionally show error
@@ -592,16 +551,16 @@ const Inbox: React.FC = () => {
       
       
       {/* Top Bar */}
-      <div className="flex flex-col gap-2 px-3 sm:px-4 lg:px-6 py-2 sm:py-3 border-b bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-sm sticky top-0 lg:sticky z-20 pt-20 lg:pt-2">
+      <div className="flex flex-col gap-3 px-3 sm:px-4 lg:px-6 py-3 border-b bg-white/95 dark:bg-gray-800/95 backdrop-blur border-gray-200 dark:border-gray-700 shadow-sm sticky top-0 lg:sticky z-20 pt-20 lg:pt-3">
         {/* First Row: Dropdowns */}
-        <div className="flex items-center gap-3 sm:gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* Course Dropdown - Hide for admins */}
           {user?.role !== 'admin' && (
             <div className="relative flex-1 min-w-[120px]">
               <select
                 id="topbar-course-dropdown"
                 name="topbarCourseDropdown"
-                className="appearance-none border border-gray-200 dark:border-gray-700 rounded px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm bg-white dark:bg-gray-900 pr-7 sm:pr-8 focus:outline-none focus:ring-2 focus:ring-blue-200 w-full"
+                className="appearance-none h-10 border border-gray-200 dark:border-gray-700 rounded-lg px-3 text-sm bg-white dark:bg-gray-900 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 w-full shadow-sm text-gray-700 dark:text-gray-200"
                 value={selectedCourse}
                 onChange={e => setSelectedCourse(e.target.value)}
               >
@@ -609,7 +568,7 @@ const Inbox: React.FC = () => {
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
-              <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-[10px]">
                 ▼
               </span>
             </div>
@@ -619,7 +578,7 @@ const Inbox: React.FC = () => {
             <select
               id="topbar-folder-dropdown"
               name="topbarFolderDropdown"
-              className="appearance-none border border-gray-200 dark:border-gray-700 rounded px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm bg-white dark:bg-gray-900 pr-7 sm:pr-8 focus:outline-none focus:ring-2 focus:ring-blue-200 w-full"
+              className="appearance-none h-10 border border-gray-200 dark:border-gray-700 rounded-lg px-3 text-sm bg-white dark:bg-gray-900 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 w-full shadow-sm text-gray-700 dark:text-gray-200"
               value={selectedFolder}
               onChange={e => setSelectedFolder(e.target.value)}
             >
@@ -627,53 +586,53 @@ const Inbox: React.FC = () => {
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
-            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-[10px]">
               ▼
             </span>
           </div>
         </div>
         {/* Second Row: Action Icons and Search */}
-        <div className="flex items-center gap-3 sm:gap-2">
+        <div className="flex items-center gap-2">
           {/* Icon Row */}
-          <div className="flex items-center gap-2 sm:gap-2">
+          <div className="flex items-center gap-1 p-1 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 shadow-sm">
             {/* Compose (modern icon) */}
             <button
-              className="p-1.5 sm:p-2 rounded hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400 touch-manipulation"
+              className="h-9 w-9 inline-flex items-center justify-center rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400 touch-manipulation transition-colors"
               title="Compose"
               aria-label="Compose new message"
               onClick={() => setShowCompose(true)}
             >
-              <Edit size={18} className="sm:w-[22px] sm:h-[22px]" aria-hidden="true" />
+              <Edit size={18} aria-hidden="true" />
             </button>
             {/* Reply */}
             <button 
-              className={`p-1.5 sm:p-2 rounded touch-manipulation ${selectedConversations.length > 0 ? 'hover:bg-blue-200 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500'}`} 
+              className={`h-9 w-9 inline-flex items-center justify-center rounded-lg touch-manipulation transition-colors ${selectedConversations.length > 0 ? 'hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500'}`} 
               title="Reply" 
               aria-label={`Reply to ${selectedConversations.length} selected conversation${selectedConversations.length !== 1 ? 's' : ''}`}
               onClick={handleReply}
               disabled={selectedConversations.length === 0 || bulkActionLoading}
             >
-              <Reply size={18} className="sm:w-[22px] sm:h-[22px]" aria-hidden="true" />
+              <Reply size={18} aria-hidden="true" />
             </button>
             {/* Archive */}
             <button 
-              className={`p-1.5 sm:p-2 rounded touch-manipulation ${selectedConversations.length > 0 ? 'hover:bg-yellow-200 dark:hover:bg-yellow-900/50 text-yellow-600 dark:text-yellow-400' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500'}`} 
+              className={`h-9 w-9 inline-flex items-center justify-center rounded-lg touch-manipulation transition-colors ${selectedConversations.length > 0 ? 'hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-600 dark:text-amber-400' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500'}`} 
               title="Archive" 
               aria-label={`Archive ${selectedConversations.length} selected conversation${selectedConversations.length !== 1 ? 's' : ''}`}
               onClick={handleArchive}
               disabled={selectedConversations.length === 0 || bulkActionLoading}
             >
-              <Archive size={18} className="sm:w-[22px] sm:h-[22px]" aria-hidden="true" />
+              <Archive size={18} aria-hidden="true" />
             </button>
             {/* Delete */}
             <button 
-              className={`p-1.5 sm:p-2 rounded touch-manipulation ${selectedConversations.length > 0 ? 'hover:bg-red-200 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500'}`} 
+              className={`h-9 w-9 inline-flex items-center justify-center rounded-lg touch-manipulation transition-colors ${selectedConversations.length > 0 ? 'hover:bg-red-100 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500'}`} 
               title="Delete" 
               aria-label={`Delete ${selectedConversations.length} selected conversation${selectedConversations.length !== 1 ? 's' : ''}`}
               onClick={handleDelete}
               disabled={selectedConversations.length === 0 || bulkActionLoading}
             >
-              <Trash2 size={18} className="sm:w-[22px] sm:h-[22px]" aria-hidden="true" />
+              <Trash2 size={18} aria-hidden="true" />
             </button>
           </div>
           {/* Search Bar */}
@@ -683,14 +642,14 @@ const Inbox: React.FC = () => {
               id="inbox-search"
               name="search"
               ref={searchInputRef}
-              className="border border-gray-200 dark:border-gray-700 rounded-full pl-8 sm:pl-10 pr-3 sm:pr-4 py-1.5 sm:py-2 text-xs sm:text-sm bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 w-full shadow-sm"
+              className="h-10 border border-gray-200 dark:border-gray-700 rounded-xl pl-10 pr-4 text-sm bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 w-full shadow-sm"
               type="text"
               placeholder="Search..."
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
-            <span className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 text-gray-400">
-              <Search size={16} className="sm:w-[18px] sm:h-[18px]" />
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+              <Search size={16} />
             </span>
           </div>
         </div>

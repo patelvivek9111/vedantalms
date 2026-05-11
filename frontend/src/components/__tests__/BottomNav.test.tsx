@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { BrowserRouter, MemoryRouter } from 'react-router-dom';
+import { Gauge, BookOpen } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useUnreadMessages } from '../../hooks/useUnreadMessages';
 
@@ -135,8 +136,8 @@ describe('BottomNav', () => {
     });
 
     const customItems = [
-      { id: 'dashboard', label: 'Dashboard', to: '/dashboard', icon: 'Gauge' },
-      { id: 'my-course', label: 'My Courses', to: '/teacher/courses', icon: 'BookOpen' },
+      { id: 'dashboard', label: 'Dashboard', to: '/dashboard', icon: Gauge },
+      { id: 'my-course', label: 'My Courses', to: '/teacher/courses', icon: BookOpen },
     ];
 
     localStorage.setItem('bottomNavItems', JSON.stringify(customItems));
@@ -157,7 +158,7 @@ describe('BottomNav', () => {
     });
 
     const customItems = [
-      { id: 'my-course', label: 'My Courses', to: '/teacher/courses', icon: 'BookOpen' },
+      { id: 'my-course', label: 'My Courses', to: '/teacher/courses', icon: BookOpen },
     ];
 
     localStorage.setItem('bottomNavItems', JSON.stringify(customItems));
@@ -180,7 +181,7 @@ describe('BottomNav', () => {
     );
 
     const newItems = [
-      { id: 'dashboard', label: 'Dashboard', to: '/dashboard', icon: 'Gauge' },
+      { id: 'dashboard', label: 'Dashboard', to: '/dashboard', icon: Gauge },
     ];
 
     localStorage.setItem('bottomNavItems', JSON.stringify(newItems));

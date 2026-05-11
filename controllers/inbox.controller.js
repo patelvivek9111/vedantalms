@@ -32,8 +32,10 @@ exports.getConversations = async (req, res) => {
       return res.json(cached);
     }
     const participantFilter = { userId };
-    if (folder && ['inbox', 'sent', 'archived', 'deleted'].includes(folder)) {
-      participantFilter.folder = folder;
+    // Gmail-like behavior: conversation "views" (Inbox/Sent/Favorite) are derived
+    // from metadata and can overlap. Only hard-filter deleted at query time.
+    if (folder === 'deleted') {
+      participantFilter.folder = 'deleted';
     }
 
     // Find all conversations where user is a participant
@@ -50,7 +52,7 @@ exports.getConversations = async (req, res) => {
 
     const participantColl = ConversationParticipant.collection.collectionName;
 
-    const [conversationParticipants, latestMessages, sentMessageConversationIds, unreadAgg] = await Promise.all([
+    const [conversationParticipants, latestMessages, sentMessageConversationIds, receivedMessageConversationIds, unreadAgg] = await Promise.all([
       ConversationParticipant.find({ conversationId: { $in: conversationIds } })
         .populate('userId', 'firstName lastName email profilePicture')
         .lean(),
@@ -60,6 +62,7 @@ exports.getConversations = async (req, res) => {
         { $group: { _id: '$conversationId', message: { $first: '$$ROOT' } } }
       ]),
       Message.distinct('conversationId', { conversationId: { $in: conversationIds }, senderId: userId }),
+      Message.distinct('conversationId', { conversationId: { $in: conversationIds }, senderId: { $ne: userId } }),
       Message.aggregate([
         {
           $match: {
@@ -121,6 +124,9 @@ exports.getConversations = async (req, res) => {
     const sentMessageConversationSet = new Set(
       sentMessageConversationIds.map(id => String(id))
     );
+    const receivedMessageConversationSet = new Set(
+      receivedMessageConversationIds.map(id => String(id))
+    );
 
     const unreadByConversation = new Map(
       unreadAgg.map((item) => [String(item._id), item.count])
@@ -147,7 +153,8 @@ exports.getConversations = async (req, res) => {
         })),
         lastMessage: lastMessageByConversation.get(key) || null,
         unreadCount: unreadByConversation.get(key) || 0,
-        hasSentMessage: sentMessageConversationSet.has(key)
+        hasSentMessage: sentMessageConversationSet.has(key),
+        hasReceivedMessage: receivedMessageConversationSet.has(key)
       };
     });
 
@@ -327,10 +334,16 @@ exports.sendMessage = async (req, res) => {
     });
     // Update conversation updatedAt
     await Conversation.findByIdAndUpdate(conversationId, { updatedAt: new Date() });
-    // Update sender's lastReadAt
-    await ConversationParticipant.updateOne({ conversationId, userId }, { lastReadAt: new Date(), folder: 'sent' });
-    // Mark as unread for other participants (do not update their lastReadAt)
-    await ConversationParticipant.updateMany({ conversationId, userId: { $ne: userId }, folder: { $ne: 'archived' } }, { folder: 'inbox' });
+    // Update sender's lastReadAt only. Do not force folder to "sent":
+    // Gmail-style behavior keeps a thread in Inbox unless explicitly archived/deleted.
+    await ConversationParticipant.updateOne({ conversationId, userId }, { lastReadAt: new Date() });
+    // Gmail-like behavior: a new incoming message should return the thread to Inbox
+    // for all other participants (even if they had archived it).
+    // Keep lastReadAt unchanged so unread count still reflects unread state.
+    await ConversationParticipant.updateMany(
+      { conversationId, userId: { $ne: userId } },
+      { folder: 'inbox' }
+    );
     
     // Notify other participants about new message
     try {

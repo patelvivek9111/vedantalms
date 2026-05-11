@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import LatestAnnouncements from '../LatestAnnouncements';
-import { getAnnouncements } from '../services/announcementService';
+import { getAnnouncements } from '../../services/announcementService';
 
 // Mock dependencies
-vi.mock('../services/announcementService', () => ({
+vi.mock('../../services/announcementService', () => ({
   getAnnouncements: vi.fn(),
 }));
 

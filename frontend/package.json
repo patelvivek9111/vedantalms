@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "test:run:stable": "node --max-old-space-size=8192 ./node_modules/vitest/vitest.mjs run --maxWorkers=1"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",

@@ -56,46 +56,42 @@ const QuizzesSection: React.FC<QuizzesSectionProps> = ({
 
   return (
     <div className="space-y-6">
-      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 sm:mb-8">
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100">Quizzes</h2>
-            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">View and manage course quizzes</p>
-          </div>
+      <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-md dark:border-gray-700 dark:bg-gray-900">
+        <div className="space-y-5">
           {(isInstructor || isAdmin) && (
-            <>
+            <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50/80 p-3 dark:border-gray-700 dark:bg-gray-800/70">
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Create and manage quizzes for this course</p>
               {modules.length > 0 ? (
                 <button
                   onClick={() => navigate(`/modules/${modules[0]._id}/assignments/create?isGradedQuiz=true`)}
-                  className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center gap-1.5 sm:gap-2 shadow-sm text-sm sm:text-base"
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
                 >
-                  <span className="text-base sm:text-lg">+</span>
-                  <span>Create Quiz</span>
+                  + Create Quiz
                 </button>
               ) : (
-                <div className="w-full sm:w-auto text-xs sm:text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 px-3 sm:px-4 py-2 rounded-md text-center sm:text-left">
+                <div className="rounded-lg bg-gray-100 px-3 py-2 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-300">
                   Create a module first to add quizzes
                 </div>
               )}
-            </>
+            </div>
+          )}
+          {/* Render quizzes using AssignmentList */}
+          {discussionsLoading ? (
+            <div className="py-8 text-center text-gray-500 dark:text-gray-400">Loading quizzes...</div>
+          ) : modules.length > 0 ? (
+            <AssignmentList
+              assignments={deduplicatedQuizzes}
+              userRole={user?.role}
+              studentSubmissions={user?.role === 'student' ? studentSubmissions : undefined}
+              studentId={user?._id}
+              submissionMap={user?.role === 'student' ? submissionMap : undefined}
+              courseId={course?._id}
+              isQuizzesView={true}
+            />
+          ) : (
+            <div className="py-8 text-center text-gray-500 dark:text-gray-400">No modules available. Please create a module to add quizzes.</div>
           )}
         </div>
-        {/* Render quizzes using AssignmentList */}
-        {discussionsLoading ? (
-          <div className="text-center text-gray-500 py-8">Loading quizzes...</div>
-        ) : modules.length > 0 ? (
-          <AssignmentList 
-            assignments={deduplicatedQuizzes} 
-            userRole={user?.role} 
-            studentSubmissions={user?.role === 'student' ? studentSubmissions : undefined} 
-            studentId={user?._id} 
-            submissionMap={user?.role === 'student' ? submissionMap : undefined} 
-            courseId={course?._id}
-            isQuizzesView={true}
-          />
-        ) : (
-          <div className="text-center text-gray-500 py-8">No modules available. Please create a module to add quizzes.</div>
-        )}
       </div>
     </div>
   );

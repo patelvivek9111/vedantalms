@@ -114,7 +114,8 @@ const CoursePeople: React.FC = () => {
     setShowRemoveConfirm(false);
     try {
       await api.post(`/courses/${courseId}/unenroll`, { studentId: studentToRemove });
-      setStudents(prev => prev.filter(student => student._id !== studentToRemove));
+      const studentsRes = await api.get(`/courses/${courseId}/students`);
+      setStudents(studentsRes.data);
       setStudentToRemove(null);
     } catch (err: any) {
       alert('Failed to remove student');

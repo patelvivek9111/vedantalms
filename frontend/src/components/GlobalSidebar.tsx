@@ -57,6 +57,26 @@ const getNavItems = (userRole: string) => {
   return [...baseItems, { label: 'Groups', icon: Users, to: '/groups' }, { label: 'Catalog', icon: Search, to: '/catalog' }, ...studentItems];
 };
 
+/** Shared nav tile + active rail for a calmer, modern sidebar selection state */
+const sidebarNavBase =
+  'flex flex-col items-center w-full py-1.5 px-1 rounded-xl relative transition-[color,background-color,box-shadow,transform] duration-200 ease-out group outline-none focus-visible:ring-2 focus-visible:ring-sky-400/40 focus-visible:ring-offset-2 focus-visible:ring-offset-blue-900 dark:focus-visible:ring-offset-gray-900';
+
+const sidebarNavInactive =
+  'text-blue-100/85 dark:text-gray-400 hover:bg-white/[0.08] dark:hover:bg-white/[0.06] hover:text-white dark:hover:text-gray-100';
+
+const sidebarNavActive =
+  'text-white dark:text-gray-50 bg-white/[0.12] dark:bg-white/[0.08] ring-1 ring-inset ring-white/15 dark:ring-white/10 shadow-sm';
+
+function SidebarActiveRail({ show }: { show: boolean }) {
+  if (!show) return null;
+  return (
+    <span
+      className="pointer-events-none absolute left-0.5 top-2 bottom-2 w-[3px] rounded-full bg-gradient-to-b from-sky-200 to-sky-400 shadow-[0_0_14px_rgba(56,189,248,0.45)] dark:from-sky-300 dark:to-sky-500 dark:shadow-[0_0_12px_rgba(56,189,248,0.35)]"
+      aria-hidden
+    />
+  );
+}
+
 export default function GlobalSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -127,16 +147,16 @@ export default function GlobalSidebar() {
 
       {/* Sidebar - Hidden on mobile, visible on desktop */}
       <nav 
-        className="hidden lg:flex fixed top-0 left-0 h-full bg-blue-900 dark:bg-gray-900 flex-col items-center py-4 z-50 shadow-lg border-r-2 border-blue-700 dark:border-gray-700 transition-all duration-300 w-20"
+        className="hidden lg:flex fixed top-0 left-0 h-[100dvh] bg-blue-900 dark:bg-gray-900 flex-col items-center py-2 z-50 shadow-lg border-r-2 border-blue-700 dark:border-gray-700 transition-all duration-300 w-20 overflow-visible"
         data-testid="global-sidebar"
       >
-      <div className="mb-6 flex flex-col items-center w-full px-2">
+      <div className="mb-3 flex flex-col items-center w-full px-2 shrink-0">
         {/* Logo placeholder */}
-        <div className="w-12 h-12 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center mb-2 border border-blue-700 dark:border-gray-600">
+        <div className="w-12 h-12 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center border border-blue-700 dark:border-gray-600">
           <span className="text-blue-800 dark:text-blue-300 text-lg font-bold">LMS</span>
         </div>
       </div>
-      <div className="flex-1 flex flex-col gap-2 items-center w-full px-2">
+      <div className="flex-1 min-h-0 overflow-visible flex flex-col gap-1 items-center w-full px-2">
         {getNavItems(user?.role || '').map(({ label, icon: Icon, to }) => {
           // Highlight 'Courses' for any /courses* route (but not /teacher/courses or /admin/courses)
           const isActive =
@@ -149,21 +169,10 @@ export default function GlobalSidebar() {
               <Link
                 key={label}
                 to={to}
-                className={`flex flex-col items-center w-full py-2 px-2 rounded-lg relative transition-all duration-200 ease-in-out group ${
-                  isActive 
-                    ? 'bg-blue-800 dark:bg-gray-800 scale-105' 
-                    : 'hover:bg-blue-800/70 dark:hover:bg-gray-800/70 hover:scale-105'
-                } ${isActive ? 'text-blue-300 dark:text-blue-400' : 'text-white dark:text-gray-300'}`}
+                className={`${sidebarNavBase} ${isActive ? sidebarNavActive : sidebarNavInactive}`}
               >
-                {/* Active indicator bar */}
-                {isActive && (
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-300 dark:bg-blue-400 rounded-r-full" />
-                )}
-                {/* Active glow effect */}
-                {isActive && (
-                  <div className="absolute inset-0 bg-blue-400/20 rounded-lg" />
-                )}
-                <div className="h-8 w-8 mb-1 rounded-full bg-blue-700 dark:bg-gray-700 flex items-center justify-center overflow-hidden border-2 border-blue-600 dark:border-gray-600 relative transition-transform group-hover:scale-110">
+                <SidebarActiveRail show={isActive} />
+                <div className="relative mb-1 flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-white/20 bg-blue-800/80 dark:border-gray-600 dark:bg-gray-700 transition-transform duration-200 group-hover:border-white/30">
                   {/* Fallback initials - always present as background */}
                   <span className="text-white dark:text-gray-200 text-sm font-bold absolute inset-0 flex items-center justify-center">
                     {user?.firstName?.charAt(0) || ''}{user?.lastName?.charAt(0) || 'U'}
@@ -183,7 +192,7 @@ export default function GlobalSidebar() {
                     />
                   )}
                 </div>
-                <span className={`text-xs font-medium transition-all ${isActive ? 'font-semibold' : ''}`}>
+                <span className={`text-[11px] font-medium leading-tight tracking-tight ${isActive ? 'font-semibold' : ''}`}>
                   {label}
                 </span>
               </Link>
@@ -199,22 +208,11 @@ export default function GlobalSidebar() {
                 <Link
                   key={label}
                   to="/admin/courses"
-                  className={`flex flex-col items-center w-full py-2 px-2 rounded-lg relative transition-all duration-200 ease-in-out group ${
-                    isAdminCoursesActive 
-                      ? 'bg-blue-800 dark:bg-gray-800 scale-105' 
-                      : 'hover:bg-blue-800/70 dark:hover:bg-gray-800/70 hover:scale-105'
-                  } ${isAdminCoursesActive ? 'text-blue-300 dark:text-blue-400' : 'text-white dark:text-gray-300'}`}
+                  className={`${sidebarNavBase} ${isAdminCoursesActive ? sidebarNavActive : sidebarNavInactive}`}
                 >
-                  {/* Active indicator bar */}
-                  {isAdminCoursesActive && (
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-300 dark:bg-blue-400 rounded-r-full" />
-                  )}
-                  {/* Active glow effect */}
-                  {isAdminCoursesActive && (
-                    <div className="absolute inset-0 bg-blue-400/20 rounded-lg" />
-                  )}
-                  <BookOpen className={`h-5 w-5 mb-1 transition-transform ${isAdminCoursesActive ? 'scale-110' : 'group-hover:scale-110'}`} />
-                  <span className={`text-xs font-medium transition-all ${isAdminCoursesActive ? 'font-semibold' : ''}`}>
+                  <SidebarActiveRail show={isAdminCoursesActive} />
+                  <BookOpen className={`mb-1 h-5 w-5 transition-opacity duration-200 ${isAdminCoursesActive ? 'opacity-100' : 'opacity-90 group-hover:opacity-100'}`} />
+                  <span className={`text-[11px] font-medium leading-tight tracking-tight ${isAdminCoursesActive ? 'font-semibold' : ''}`}>
                     {label}
                   </span>
                 </Link>
@@ -231,6 +229,7 @@ export default function GlobalSidebar() {
                 onMouseLeave={handleMouseLeave}
               >
                 <button
+                  type="button"
                   onClick={() => {
                     if (hideTimeoutRef.current) {
                       clearTimeout(hideTimeoutRef.current);
@@ -238,22 +237,11 @@ export default function GlobalSidebar() {
                     }
                     setShowCourseDropdown(!showCourseDropdown);
                   }}
-                  className={`flex flex-col items-center w-full py-2 px-2 rounded-lg relative transition-all duration-200 ease-in-out group ${
-                    isActive 
-                      ? 'bg-blue-800 dark:bg-gray-800 scale-105' 
-                      : 'hover:bg-blue-800/70 dark:hover:bg-gray-800/70 hover:scale-105'
-                  } ${isActive ? 'text-blue-300 dark:text-blue-400' : 'text-white dark:text-gray-300'}`}
+                  className={`${sidebarNavBase} ${isActive ? sidebarNavActive : sidebarNavInactive}`}
                 >
-                  {/* Active indicator bar */}
-                  {isActive && (
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-300 dark:bg-blue-400 rounded-r-full" />
-                  )}
-                  {/* Active glow effect */}
-                  {isActive && (
-                    <div className="absolute inset-0 bg-blue-400/20 rounded-lg" />
-                  )}
-                  <BookOpen className={`h-5 w-5 mb-1 transition-transform ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} />
-                  <span className={`text-xs font-medium transition-all ${isActive ? 'font-semibold' : ''}`}>
+                  <SidebarActiveRail show={isActive} />
+                  <BookOpen className={`mb-1 h-5 w-5 transition-opacity duration-200 ${isActive ? 'opacity-100' : 'opacity-90 group-hover:opacity-100'}`} />
+                  <span className={`text-[11px] font-medium leading-tight tracking-tight ${isActive ? 'font-semibold' : ''}`}>
                     {label}
                   </span>
                 </button>
@@ -331,29 +319,18 @@ export default function GlobalSidebar() {
               <Link
                 key={label}
                 to={to}
-                className={`flex flex-col items-center w-full py-2 px-2 rounded-lg relative transition-all duration-200 ease-in-out group ${
-                  isActive 
-                    ? 'bg-blue-800 dark:bg-gray-800 scale-105' 
-                    : 'hover:bg-blue-800/70 dark:hover:bg-gray-800/70 hover:scale-105'
-                } ${isActive ? 'text-blue-300 dark:text-blue-400' : 'text-white dark:text-gray-300'}`}
+                className={`${sidebarNavBase} ${isActive ? sidebarNavActive : sidebarNavInactive}`}
               >
-                {/* Active indicator bar */}
-                {isActive && (
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-300 dark:bg-blue-400 rounded-r-full" />
-                )}
-                {/* Active glow effect */}
-                {isActive && (
-                  <div className="absolute inset-0 bg-blue-400/20 rounded-lg" />
-                )}
+                <SidebarActiveRail show={isActive} />
                 <div className="relative">
-                  <Icon className={`h-5 w-5 mb-1 transition-transform ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} />
+                  <Icon className={`mb-1 h-5 w-5 transition-opacity duration-200 ${isActive ? 'opacity-100' : 'opacity-90 group-hover:opacity-100'}`} />
                   {unreadCount > 0 && (
                     <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center font-bold">
                       {unreadCount > 9 ? '9+' : unreadCount}
                     </div>
                   )}
                 </div>
-                <span className={`text-xs font-medium transition-all ${isActive ? 'font-semibold' : ''}`}>
+                <span className={`text-[11px] font-medium leading-tight tracking-tight ${isActive ? 'font-semibold' : ''}`}>
                   {label}
                 </span>
               </Link>
@@ -364,22 +341,11 @@ export default function GlobalSidebar() {
             <Link
               key={label}
               to={to}
-              className={`flex flex-col items-center w-full py-2 px-2 rounded-lg relative transition-all duration-200 ease-in-out group ${
-                isActive 
-                  ? 'bg-blue-800 dark:bg-gray-800 scale-105' 
-                  : 'hover:bg-blue-800/70 dark:hover:bg-gray-800/70 hover:scale-105'
-              } ${isActive ? 'text-blue-300 dark:text-blue-400' : 'text-white dark:text-gray-300'}`}
+              className={`${sidebarNavBase} ${isActive ? sidebarNavActive : sidebarNavInactive}`}
             >
-              {/* Active indicator bar */}
-              {isActive && (
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-300 dark:bg-blue-400 rounded-r-full" />
-              )}
-              {/* Active glow effect */}
-              {isActive && (
-                <div className="absolute inset-0 bg-blue-400/20 rounded-lg" />
-              )}
-              <Icon className={`h-5 w-5 mb-1 transition-transform ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} />
-              <span className={`text-xs font-medium transition-all ${isActive ? 'font-semibold' : ''}`}>
+              <SidebarActiveRail show={isActive} />
+              <Icon className={`mb-1 h-5 w-5 transition-opacity duration-200 ${isActive ? 'opacity-100' : 'opacity-90 group-hover:opacity-100'}`} />
+              <span className={`text-[11px] font-medium leading-tight tracking-tight ${isActive ? 'font-semibold' : ''}`}>
                 {label}
               </span>
             </Link>
@@ -388,13 +354,14 @@ export default function GlobalSidebar() {
       </div>
       
       {/* Logout Button - Always visible at bottom */}
-      <div className="mt-2 w-full px-2">
+      <div className="mt-1 w-full px-2 shrink-0">
         <button
+          type="button"
           onClick={handleLogout}
-          className="flex flex-col items-center w-full py-2 px-2 rounded-lg transition-all duration-200 ease-in-out hover:bg-blue-800 dark:hover:bg-gray-800 hover:scale-105 text-white dark:text-gray-300 group"
+          className="group flex w-full flex-col items-center rounded-xl px-1 py-2 text-blue-100/85 transition-colors duration-200 hover:bg-white/[0.08] hover:text-white dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-gray-100"
         >
-          <LogOut className="h-5 w-5 mb-1 transition-transform group-hover:scale-110" />
-          <span className="text-xs font-medium">Logout</span>
+          <LogOut className="mb-1 h-5 w-5 opacity-90 transition-opacity group-hover:opacity-100" />
+          <span className="text-[11px] font-medium leading-tight tracking-tight">Logout</span>
         </button>
       </div>
     </nav>

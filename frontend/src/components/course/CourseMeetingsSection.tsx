@@ -239,28 +239,28 @@ const CourseMeetingsSection: React.FC<CourseMeetingsSectionProps> = ({ courseId,
 
   return (
     <div className="w-full h-full overflow-y-auto pb-20 lg:pb-0">
-      <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur p-5 border-b border-gray-200 dark:border-gray-700 rounded-2xl">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Meetings</h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Course meetings for everyone enrolled in this course.</p>
+      <div className="space-y-4">
+        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900 sm:p-5">
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50/80 p-3 dark:border-gray-700 dark:bg-gray-800/70">
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Create and manage meetings for this course</p>
+            {canManage ? (
+              <button
+                onClick={() => setShowForm((v) => !v)}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+              >
+                <Plus className="h-4 w-4" /> Schedule
+              </button>
+            ) : null}
           </div>
-          {canManage ? (
-            <button onClick={() => setShowForm((v) => !v)} className="px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm inline-flex items-center gap-1.5 transition-colors shadow-sm">
-              <Plus className="h-4 w-4" /> Schedule
-            </button>
-          ) : null}
         </div>
-      </div>
 
-      <div className="p-4 space-y-4">
         {error ? (
           <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2">
             {error}
           </p>
         ) : null}
         {showForm && canManage ? (
-          <form onSubmit={submitCreate} className="bg-white/80 dark:bg-gray-800/80 backdrop-blur rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 space-y-3">
+          <form onSubmit={submitCreate} className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900 space-y-3">
             <input className="w-full border rounded-lg p-2.5 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 outline-none transition" placeholder="Meeting title" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} required />
             <textarea className="w-full border rounded-lg p-2.5 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 outline-none transition" placeholder="Description (optional)" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} rows={3} />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -283,14 +283,14 @@ const CourseMeetingsSection: React.FC<CourseMeetingsSectionProps> = ({ courseId,
         {loading ? <p className="text-sm text-gray-500 dark:text-gray-400">Loading meetings...</p> : null}
         {!loading ? (
           <div className="space-y-4">
-            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur rounded-xl border border-gray-200 dark:border-gray-700 p-1 inline-flex gap-1">
+            <div className="inline-flex gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1 dark:border-gray-700 dark:bg-gray-800">
               <button
                 type="button"
                 onClick={() => setActiveTab('upcoming')}
                 className={`px-3 py-2 text-sm rounded-lg font-medium transition-colors ${
                   activeTab === 'upcoming'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    ? 'bg-white text-blue-700 shadow-sm dark:bg-gray-900 dark:text-blue-300'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700'
                 }`}
               >
                 Upcoming Meetings
@@ -300,8 +300,8 @@ const CourseMeetingsSection: React.FC<CourseMeetingsSectionProps> = ({ courseId,
                 onClick={() => setActiveTab('previous')}
                 className={`px-3 py-2 text-sm rounded-lg font-medium transition-colors ${
                   activeTab === 'previous'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    ? 'bg-white text-blue-700 shadow-sm dark:bg-gray-900 dark:text-blue-300'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700'
                 }`}
               >
                 Previous Meetings
@@ -311,8 +311,8 @@ const CourseMeetingsSection: React.FC<CourseMeetingsSectionProps> = ({ courseId,
                 onClick={() => setActiveTab('recordings')}
                 className={`px-3 py-2 text-sm rounded-lg font-medium transition-colors ${
                   activeTab === 'recordings'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    ? 'bg-white text-blue-700 shadow-sm dark:bg-gray-900 dark:text-blue-300'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700'
                 }`}
               >
                 Cloud Recordings

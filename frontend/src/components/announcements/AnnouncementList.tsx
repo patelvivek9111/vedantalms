@@ -28,11 +28,11 @@ const AnnouncementList: React.FC<AnnouncementListProps> = ({ announcements, onSe
   const { user } = useAuth();
   if (!announcements.length) {
     return (
-      <div className="text-center py-16">
+      <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50/70 py-14 text-center dark:border-gray-600 dark:bg-gray-800/50">
         <div className="flex flex-col items-center">
-          <Megaphone className="h-16 w-16 text-gray-300 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No announcements yet</h3>
-          <p className="text-sm text-gray-500">Check back later for group announcements.</p>
+          <Megaphone className="mb-4 h-14 w-14 text-gray-300 dark:text-gray-600" />
+          <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">No announcements yet</h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Check back later for course announcements.</p>
         </div>
       </div>
     );
@@ -42,7 +42,7 @@ const AnnouncementList: React.FC<AnnouncementListProps> = ({ announcements, onSe
       {announcements.map(a => (
         <li
           key={a._id}
-          className="bg-white dark:bg-gray-900 rounded-lg shadow p-3 sm:p-4 hover:shadow-md transition cursor-pointer border border-gray-100 dark:border-gray-700"
+          className="cursor-pointer rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition hover:border-gray-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600"
           onClick={() => onSelect?.(a)}
         >
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-2">

@@ -284,17 +284,35 @@ const Announcements: React.FC<AnnouncementsProps> = ({ courseId }) => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto py-4 sm:py-6 lg:py-8 px-2 sm:px-4 space-y-4 sm:space-y-6 lg:space-y-8">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">Announcements</h2>
-          <p className="text-gray-600 dark:text-gray-400">Stay updated with the latest course information</p>
-        </div>
-        {/* Top "New Announcement" button removed; creation is available via the bottom "+ Announcement" button */}
-      </div>
-      
-      {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6">
+    <div className="space-y-6">
+      <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-md dark:border-gray-700 dark:bg-gray-900">
+        {(user?.role === 'teacher' || user?.role === 'admin') && !selectedAnnouncement && !showCreate && (
+          <div className="mb-5 flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50/80 p-3 dark:border-gray-700 dark:bg-gray-800/70">
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Create and manage announcements for this course</p>
+            <button
+              onClick={() => setShowCreate(true)}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+            >
+              + Create Announcement
+            </button>
+          </div>
+        )}
+
+        {showCreate && (
+          <div className="mb-5 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900 sm:p-5">
+            <AnnouncementForm
+              onSubmit={async (formData) => {
+                await handleCreate(formData);
+                setShowCreate(false);
+              }}
+              loading={formLoading}
+              onCancel={() => setShowCreate(false)}
+            />
+          </div>
+        )}
+
+        {error && (
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
           <div className="flex items-center">
             <svg className="w-5 h-5 text-red-400 dark:text-red-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -302,10 +320,10 @@ const Announcements: React.FC<AnnouncementsProps> = ({ courseId }) => {
             <span className="text-red-700 dark:text-red-400 font-medium">{error}</span>
           </div>
         </div>
-      )}
-      
-      {selectedAnnouncement ? (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 max-w-4xl mx-auto overflow-hidden">
+        )}
+
+        {selectedAnnouncement ? (
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 max-w-4xl mx-auto overflow-hidden">
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 px-3 sm:px-4 lg:px-6 py-3 sm:py-4 border-b border-gray-200 dark:border-gray-700">
             <button
               className="mb-4 px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium border border-gray-200 dark:border-gray-700 flex items-center gap-2 shadow-sm"
@@ -418,13 +436,14 @@ const Announcements: React.FC<AnnouncementsProps> = ({ courseId }) => {
             )}
           </div>
         </div>
-      ) : (
-        loading ? (
-          <div className="text-gray-600 dark:text-gray-400">Loading announcements...</div>
         ) : (
-          <AnnouncementList announcements={announcements} onSelect={setSelectedAnnouncement} />
-        )
-      )}
+          loading ? (
+            <div className="text-gray-600 dark:text-gray-400">Loading announcements...</div>
+          ) : (
+            <AnnouncementList announcements={announcements} onSelect={setSelectedAnnouncement} />
+          )
+        )}
+      </div>
 
       {/* Delete Announcement Confirmation Modal */}
       <ConfirmationModal

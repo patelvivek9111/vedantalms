@@ -57,7 +57,7 @@ describe('CourseSidebar', () => {
     );
 
     const overviewButton = screen.getByText('Overview');
-    expect(overviewButton.closest('button')).toHaveClass('bg-blue-100');
+    expect(overviewButton.closest('button')).toHaveClass('text-blue-700');
   });
 
   it('should navigate when item is clicked', () => {

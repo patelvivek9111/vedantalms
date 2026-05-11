@@ -82,13 +82,16 @@ describe('PollForm', () => {
     const titleInput = screen.getByPlaceholderText(/e.g., what type of content/i);
     fireEvent.change(titleInput, { target: { value: 'Test Question' } });
 
-    // Set end date - find the date input by id
-    const dateInput = document.querySelector('input[type="date"]#dateInput') as HTMLInputElement;
-    if (dateInput) {
-      const futureDate = new Date();
-      futureDate.setDate(futureDate.getDate() + 7);
-      fireEvent.change(dateInput, { target: { value: futureDate.toISOString().split('T')[0] } });
-    }
+    // Set required end date (datetime-local)
+    const endDateInput = screen.getByLabelText(/end date/i) as HTMLInputElement;
+    const future = new Date();
+    future.setDate(future.getDate() + 7);
+    const yyyy = future.getFullYear();
+    const mm = String(future.getMonth() + 1).padStart(2, '0');
+    const dd = String(future.getDate()).padStart(2, '0');
+    const endDateValue = `${yyyy}-${mm}-${dd}T12:00`;
+    fireEvent.change(endDateInput, { target: { value: endDateValue } });
+    fireEvent.blur(endDateInput);
 
     // Fill in at least 2 options
     const optionInputs = screen.getAllByPlaceholderText(/option/i);

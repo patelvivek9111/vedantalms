@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import ModuleList from '../ModuleList';
-import { useModule } from '../contexts/ModuleContext';
-import { useAuth } from '../context/AuthContext';
+import { useModule } from '../../contexts/ModuleContext';
+import { useAuth } from '../../context/AuthContext';
 
 // Mock dependencies
-vi.mock('../contexts/ModuleContext', () => ({
+vi.mock('../../contexts/ModuleContext', () => ({
   useModule: vi.fn(),
 }));
 
-vi.mock('../context/AuthContext', () => ({
+vi.mock('../../context/AuthContext', () => ({
   useAuth: vi.fn(),
 }));
 

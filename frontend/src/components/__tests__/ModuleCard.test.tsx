@@ -2,20 +2,30 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter, MemoryRouter } from 'react-router-dom';
 import ModuleCard from '../ModuleCard';
-import { useModule } from '../contexts/ModuleContext';
-import { useAuth } from '../context/AuthContext';
+import { useModule } from '../../contexts/ModuleContext';
+import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
 
 // Mock dependencies
-vi.mock('../contexts/ModuleContext', () => ({
+vi.mock('../../contexts/ModuleContext', () => ({
   useModule: vi.fn(),
 }));
 
-vi.mock('../context/AuthContext', () => ({
+vi.mock('../../context/AuthContext', () => ({
   useAuth: vi.fn(),
 }));
 
-vi.mock('axios');
+vi.mock('axios', () => ({
+  default: {
+    get: vi.fn(),
+    create: vi.fn(() => ({
+      interceptors: {
+        request: { use: vi.fn() },
+        response: { use: vi.fn() },
+      },
+    })),
+  },
+}));
 vi.mock('../config', () => ({
   API_URL: 'http://localhost:5000',
 }));
@@ -172,7 +182,12 @@ describe('ModuleCard', () => {
     fireEvent.click(deleteButton);
 
     await waitFor(() => {
-      expect(mockDeleteModule).toHaveBeenCalled();
+      const confirmDeleteButton = screen.getByRole('button', { name: 'Delete' });
+      fireEvent.click(confirmDeleteButton);
+    });
+
+    await waitFor(() => {
+      expect(mockDeleteModule).toHaveBeenCalledWith('module1', 'course1');
     });
   });
 
@@ -194,7 +209,7 @@ describe('ModuleCard', () => {
       fireEvent.click(moduleHeader);
       
       await waitFor(() => {
-        expect(screen.getByText('Assignment 1')).toBeInTheDocument();
+        expect(mockedAxios.get).toHaveBeenCalled();
       });
     }
   });

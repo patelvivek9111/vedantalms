@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { BrowserRouter, MemoryRouter } from 'react-router-dom';
+import { BrowserRouter, MemoryRouter, Routes, Route } from 'react-router-dom';
 import { PrivateRoute } from '../PrivateRoute';
-import { AuthProvider, useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 
 // Mock AuthContext
 vi.mock('../../context/AuthContext', async () => {
@@ -65,13 +65,21 @@ describe('PrivateRoute', () => {
 
     render(
       <MemoryRouter initialEntries={['/protected']}>
-        <PrivateRoute>
-          <TestComponent />
-        </PrivateRoute>
+        <Routes>
+          <Route
+            path="/protected"
+            element={(
+              <PrivateRoute>
+                <TestComponent />
+              </PrivateRoute>
+            )}
+          />
+          <Route path="/login" element={<div>Login Page</div>} />
+        </Routes>
       </MemoryRouter>
     );
 
-    // Should redirect to login
+    expect(screen.getByText('Login Page')).toBeInTheDocument();
     expect(screen.queryByText('Protected Content')).not.toBeInTheDocument();
   });
 
@@ -100,13 +108,21 @@ describe('PrivateRoute', () => {
 
     render(
       <MemoryRouter initialEntries={['/protected']}>
-        <PrivateRoute allowedRoles={['admin', 'teacher']}>
-          <TestComponent />
-        </PrivateRoute>
+        <Routes>
+          <Route
+            path="/protected"
+            element={(
+              <PrivateRoute allowedRoles={['admin', 'teacher']}>
+                <TestComponent />
+              </PrivateRoute>
+            )}
+          />
+          <Route path="/unauthorized" element={<div>Unauthorized Page</div>} />
+        </Routes>
       </MemoryRouter>
     );
 
-    // Should redirect to unauthorized
+    expect(screen.getByText('Unauthorized Page')).toBeInTheDocument();
     expect(screen.queryByText('Protected Content')).not.toBeInTheDocument();
   });
 

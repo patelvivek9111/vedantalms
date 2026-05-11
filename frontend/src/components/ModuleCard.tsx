@@ -208,22 +208,25 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
     }
   };
 
+  const actionButtonClassName =
+    'rounded-md border border-transparent p-1.5 transition-colors touch-manipulation';
+
   return (
-    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden mb-3 sm:mb-4">
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900 mb-3 sm:mb-4">
       <div 
-        className="p-3 sm:p-4 bg-white dark:bg-gray-900 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center justify-between gap-2 sm:gap-3"
+        className="flex cursor-pointer items-center justify-between gap-2 border-b border-transparent px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 sm:gap-3 sm:px-5"
         onClick={handleModuleClick}
       >
         <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
           {isExpanded ? <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-gray-900 dark:text-gray-100 flex-shrink-0" /> : <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5 text-gray-900 dark:text-gray-100 flex-shrink-0" />}
           <h3 className="text-sm sm:text-base md:text-lg font-medium text-gray-900 dark:text-gray-100 truncate">{module.title}</h3>
         </div>
-        <div className="flex items-center gap-1 sm:gap-1.5 md:gap-2 flex-shrink-0">
+        <div className="flex flex-shrink-0 items-center gap-1 rounded-lg bg-gray-50 px-1.5 py-1 dark:bg-gray-800">
           {(user?.role === 'teacher' || user?.role === 'admin') && (
             <>
               <button
                 onClick={handleTogglePublish}
-                className={`p-1.5 sm:p-1 rounded touch-manipulation ${module.published ? 'text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/50 active:bg-green-200 dark:active:bg-green-900/70' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 active:bg-gray-200 dark:active:bg-gray-700'}`}
+                className={`${actionButtonClassName} ${module.published ? 'text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/50' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
                 title={module.published ? 'Unpublish Module (lock)' : 'Publish Module (unlock)'}
                 disabled={isPublishing}
               >
@@ -231,7 +234,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
               </button>
               <button
                 onClick={handleAddPageClick}
-                className="p-1.5 sm:p-1 hover:bg-gray-100 dark:hover:bg-gray-800 active:bg-gray-200 dark:active:bg-gray-700 rounded text-gray-900 dark:text-gray-100 touch-manipulation"
+                className={`${actionButtonClassName} text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700`}
                 title="Add Content"
               >
                 <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -241,7 +244,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
                   e.stopPropagation();
                   navigate(`/modules/${module._id}/edit`);
                 }}
-                className="p-1.5 sm:p-1 hover:bg-yellow-100 dark:hover:bg-yellow-900/50 active:bg-yellow-200 dark:active:bg-yellow-900/70 rounded text-yellow-600 dark:text-yellow-400 touch-manipulation"
+                className={`${actionButtonClassName} text-amber-600 hover:bg-amber-100 dark:text-amber-400 dark:hover:bg-amber-900/40`}
                 title="Edit Module"
               >
                 <Pencil className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -252,7 +255,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
                   setItemToDelete({ type: 'module', id: module._id });
                   setShowDeleteModuleConfirm(true);
                 }}
-                className="p-1.5 sm:p-1 hover:bg-red-100 dark:hover:bg-red-900/50 active:bg-red-200 dark:active:bg-red-900/70 rounded text-red-600 dark:text-red-400 touch-manipulation"
+                className={`${actionButtonClassName} text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/40`}
                 title="Delete Module"
               >
                 <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -369,7 +372,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
                     const a = item as any;
                     return (
                       <div
-                        key={a._id}
+                        key={`assignment-${a._id}`}
                         className="p-3 sm:p-4 hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-700 flex justify-between items-center group gap-2 sm:gap-3"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -438,7 +441,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
                     const d = item as any;
                     return (
                       <div
-                        key={d._id}
+                        key={`discussion-${d._id}`}
                         className="p-3 sm:p-4 hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-700 flex justify-between items-center group gap-2 sm:gap-3"
                         onClick={e => {
                           e.stopPropagation();
@@ -463,6 +466,21 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
               </div>
             );
           })()}
+
+          {/* Empty expanded module state */}
+          {!isLoadingPages &&
+            !error &&
+            pages.length === 0 &&
+            !isLoadingAssignments &&
+            !isLoadingDiscussions &&
+            !assignmentsError &&
+            !discussionsError &&
+            assignments.length === 0 &&
+            discussions.length === 0 && (
+              <div className={`p-3 sm:p-4 text-center text-xs sm:text-sm text-gray-500 dark:text-gray-400 ${showCreatePageForm ? 'border-t border-gray-200 dark:border-gray-700' : ''}`}>
+                This module is empty. Add a page, assignment, or discussion to get started.
+              </div>
+            )}
         </div>
       )}
 

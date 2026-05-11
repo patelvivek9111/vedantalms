@@ -33,6 +33,18 @@ interface User {
   bio?: string;
 }
 
+/** Exclude accounts that have never logged in (no valid lastLogin). */
+function hasRecordedLogin(user: User): boolean {
+  const raw = user.lastLogin;
+  if (raw == null || String(raw).trim() === '') return false;
+  const t = new Date(raw).getTime();
+  return !Number.isNaN(t);
+}
+
+function filterUsersWithLogin(data: User[]): User[] {
+  return Array.isArray(data) ? data.filter(hasRecordedLogin) : [];
+}
+
 export function AdminUserManagement() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,7 +80,7 @@ export function AdminUserManagement() {
         const response = await axios.get(`${API_URL}/api/admin/users?${params.toString()}`, { headers });
         
         if (response.data.success) {
-          setUsers(response.data.data);
+          setUsers(filterUsersWithLogin(response.data.data));
         }
       } catch (error) {
         } finally {
@@ -195,7 +207,7 @@ export function AdminUserManagement() {
         
         const usersResponse = await axios.get(`${API_URL}/api/admin/users?${params.toString()}`, { headers });
         if (usersResponse.data.success) {
-          setUsers(usersResponse.data.data);
+          setUsers(filterUsersWithLogin(usersResponse.data.data));
         }
       }
     } catch (error: any) {

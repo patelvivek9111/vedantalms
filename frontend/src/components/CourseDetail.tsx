@@ -44,8 +44,6 @@ import { getWeightedGradeForStudent, getLetterGrade, calculateFinalGradeWithWeig
 import { exportGradebookCSV } from '../utils/gradebookExport';
 import { navigationItems } from '../constants/courseNavigation';
 import CoursePages from './CoursePages';
-import AnnouncementForm from './announcements/AnnouncementForm';
-import { createAnnouncement } from '../services/announcementService';
 import AssignmentList from './assignments/AssignmentList';
 import OverviewConfigModal from './OverviewConfigModal';
 import SidebarConfigModal from './SidebarConfigModal';
@@ -120,7 +118,6 @@ const CourseDetail: React.FC = () => {
   const [studentDiscussions, setStudentDiscussions] = useState<any[]>([]);
   // Add state for group assignments for student view
   const [studentGroupAssignments, setStudentGroupAssignments] = useState<any[]>([]);
-  const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
   // Add state for publishing course
   const [publishingCourse, setPublishingCourse] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
@@ -449,6 +446,8 @@ const CourseDetail: React.FC = () => {
     if (!id) return;
     try {
       await unenrollStudent(id, studentId);
+      const updatedCourse = await getCourseRef.current(id);
+      setCourse(updatedCourse);
     } catch (err) {
       }
   };
@@ -925,37 +924,9 @@ const CourseDetail: React.FC = () => {
 
       case 'announcements':
         return (
-          <div className="relative">
-            {showAnnouncementModal ? (
-              <div className="max-w-4xl mx-auto py-8">
-                <h2 className="text-2xl font-bold mb-4">New Announcement</h2>
-                <AnnouncementForm
-                  onSubmit={async (formData) => {
-                    await createAnnouncement(course._id, formData);
-                    setShowAnnouncementModal(false);
-                    setActiveSection('announcements'); // Refresh
-                  }}
-                  loading={false}
-                  onCancel={() => setShowAnnouncementModal(false)}
-                />
-              </div>
-            ) : (
-              <>
-                <Suspense fallback={<div className="text-sm text-gray-500 dark:text-gray-400">Loading announcements...</div>}>
-                  <Announcements courseId={course._id} />
-                </Suspense>
-                {(isInstructor || isAdmin) && (
-                  <button
-                    className="fixed bottom-4 right-4 sm:bottom-8 sm:right-8 z-50 bg-blue-600 text-white px-4 py-2.5 sm:px-6 sm:py-3 rounded-full shadow-lg hover:bg-blue-700 text-sm sm:text-lg font-bold flex items-center gap-1.5 sm:gap-2"
-                    onClick={() => setShowAnnouncementModal(true)}
-                  >
-                    <span className="text-lg sm:text-xl">+</span>
-                    <span className="hidden sm:inline">Announcement</span>
-                  </button>
-                )}
-              </>
-            )}
-          </div>
+          <Suspense fallback={<div className="text-sm text-gray-500 dark:text-gray-400">Loading announcements...</div>}>
+            <Announcements courseId={course._id} />
+          </Suspense>
         );
 
       case 'sidebar':
@@ -989,6 +960,31 @@ const CourseDetail: React.FC = () => {
         setIsMobileMenuOpen={setIsMobileMenuOpen}
       />
 
+      {/* Breadcrumb + divider: equal space above/below the line */}
+      <div className="mx-auto hidden w-full max-w-7xl px-4 pt-2 lg:block">
+        <div className="flex flex-col">
+          <div className="pb-3">
+            <Breadcrumb
+              className="mb-0"
+              items={[
+                { label: 'Dashboard', path: '/dashboard' },
+                { label: 'Courses', path: '/courses' },
+                {
+                  label: course?.catalog?.courseCode || course?.title || 'Course',
+                  path: `/courses/${id}`
+                },
+                ...(section && section !== 'overview' ? [{
+                  label: section.charAt(0).toUpperCase() + section.slice(1),
+                  path: `/courses/${id}/${section}`
+                }] : [])
+              ]}
+            />
+          </div>
+          <div className="h-px w-full shrink-0 bg-gray-200 dark:bg-gray-700" aria-hidden />
+          <div className="h-3 shrink-0" aria-hidden />
+        </div>
+      </div>
+
       <div className={`flex ${isMobileDevice ? 'flex-col pt-16' : 'flex-row pt-0'} w-full max-w-7xl mx-auto`}>
 
       {/* Mobile Overlay */}
@@ -1019,24 +1015,7 @@ const CourseDetail: React.FC = () => {
           onTouchEnd: sectionSwipeHandlers.onTouchEnd
         } : {})}
       >
-        <div className="container mx-auto px-4 py-6">
-          {/* Breadcrumb Navigation - Desktop Only */}
-          <div className="hidden lg:block mb-4">
-            <Breadcrumb
-              items={[
-                { label: 'Dashboard', path: '/dashboard' },
-                { label: 'Courses', path: '/courses' },
-                { 
-                  label: course?.catalog?.courseCode || course?.title || 'Course', 
-                  path: `/courses/${id}` 
-                },
-                ...(section && section !== 'overview' ? [{ 
-                  label: section.charAt(0).toUpperCase() + section.slice(1), 
-                  path: `/courses/${id}/${section}` 
-                }] : [])
-              ]}
-            />
-          </div>
+        <div className="container mx-auto px-4 pb-6 pt-2 lg:pt-3">
           {renderContent()}
         </div>
       </div>

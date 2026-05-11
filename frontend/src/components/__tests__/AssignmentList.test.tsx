@@ -2,10 +2,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import AssignmentList from '../assignments/AssignmentList';
-import axios from 'axios';
+import api from '../../services/api';
 
 // Mock dependencies
-vi.mock('axios');
+vi.mock('../../services/api', () => ({
+  default: {
+    interceptors: {
+      request: { use: vi.fn() },
+      response: { use: vi.fn() },
+    },
+    get: vi.fn(),
+    delete: vi.fn(),
+  },
+}));
 vi.mock('../../config', () => ({
   API_URL: 'http://localhost:5000',
 }));
@@ -19,7 +28,7 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
-const mockedAxios = axios as any;
+const mockedApi = api as any;
 
 describe('AssignmentList', () => {
   const mockAssignments = [
@@ -63,7 +72,7 @@ describe('AssignmentList', () => {
   });
 
   it('should fetch assignments when moduleId is provided', async () => {
-    mockedAxios.get.mockResolvedValue({
+    mockedApi.get.mockResolvedValue({
       data: mockAssignments,
     });
 
@@ -74,7 +83,7 @@ describe('AssignmentList', () => {
     );
 
     await waitFor(() => {
-      expect(mockedAxios.get).toHaveBeenCalled();
+      expect(mockedApi.get).toHaveBeenCalled();
     });
   });
 

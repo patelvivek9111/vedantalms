@@ -51,9 +51,9 @@ const ModuleList: React.FC<ModuleListProps> = ({ courseId }) => {
   }
 
   return (
-    <div>
+    <div className="space-y-5">
       {(user?.role === 'teacher' || user?.role === 'admin') && (
-        <div className="mb-6">
+        <div className="mb-2">
           {showCreateModuleForm ? (
             <CreateModuleForm
               courseId={courseId}
@@ -61,12 +61,15 @@ const ModuleList: React.FC<ModuleListProps> = ({ courseId }) => {
               onCancel={() => setShowCreateModuleForm(false)}
             />
           ) : (
-            <button
-              onClick={() => setShowCreateModuleForm(true)}
-              className="w-full p-3 sm:p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-gray-600 dark:text-gray-400 hover:border-gray-400 dark:hover:border-gray-500 hover:text-gray-700 dark:hover:text-gray-300 active:bg-gray-50 dark:active:bg-gray-800 transition-colors text-sm sm:text-base font-medium touch-manipulation"
-            >
-              + Add Module
-            </button>
+            <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50/80 p-3 dark:border-gray-700 dark:bg-gray-800/70">
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Create and organize course content by week or topic</p>
+              <button
+                onClick={() => setShowCreateModuleForm(true)}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+              >
+                + Add Module
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -77,7 +80,7 @@ const ModuleList: React.FC<ModuleListProps> = ({ courseId }) => {
           <p className="text-sm mt-2">Modules will appear here once they are created.</p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {modules.map((module) => (
             <ModuleCard
               key={module._id}

@@ -9,7 +9,7 @@ import { useCourse } from '../contexts/CourseContext';
 import api, { getImageUrl } from '../services/api';
 import { ToDoPanel } from './ToDoPanel';
 import { useNavigate } from 'react-router-dom';
-import { FileText, User, Plus, ChevronDown, Calendar as CalendarIcon } from 'lucide-react';
+import { FileText, User, Plus, ChevronDown, Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { BurgerMenu } from './BurgerMenu';
 import DatePicker from './common/DatePicker';
 import SwipeableContainer from './common/SwipeableContainer';
@@ -774,44 +774,56 @@ const CalendarPage: React.FC = () => {
 
   // Custom toolbar to add + button
   const CustomToolbar = (toolbarProps: any) => (
-    <div className="rbc-toolbar flex items-center justify-between mb-2">
-      <div className="flex gap-2">
-        <button type="button" className="rbc-btn min-h-[44px] px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-blue-100 dark:hover:bg-blue-900/50 active:bg-blue-200 dark:active:bg-blue-800 text-gray-700 dark:text-gray-300 transition touch-manipulation active:scale-95" onClick={() => toolbarProps.onNavigate('TODAY')}>Today</button>
-        <button type="button" className="rbc-btn min-h-[44px] px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-blue-100 dark:hover:bg-blue-900/50 active:bg-blue-200 dark:active:bg-blue-800 text-gray-700 dark:text-gray-300 transition touch-manipulation active:scale-95" onClick={() => toolbarProps.onNavigate('PREV')}>Back</button>
-        <button type="button" className="rbc-btn min-h-[44px] px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-blue-100 dark:hover:bg-blue-900/50 active:bg-blue-200 dark:active:bg-blue-800 text-gray-700 dark:text-gray-300 transition touch-manipulation active:scale-95" onClick={() => toolbarProps.onNavigate('NEXT')}>Next</button>
-      </div>
-      <span className="rbc-toolbar-label text-lg font-semibold text-gray-900 dark:text-gray-100">{toolbarProps.label}</span>
-      <div className="flex gap-2 items-center">
-        {['month', 'week', 'day', 'agenda'].map(view => (
-          <button
-            key={view}
-            type="button"
-            className={`px-3 py-1 rounded-lg transition font-medium capitalize ${toolbarProps.view === view ? 'bg-blue-600 dark:bg-blue-500 text-white shadow' : 'bg-gray-100 dark:bg-gray-700 hover:bg-blue-100 dark:hover:bg-blue-900/50 active:bg-blue-200 dark:active:bg-blue-800 text-gray-700 dark:text-gray-300'}`}
-            onClick={() => toolbarProps.onView(view)}
-          >
-            {view.charAt(0).toUpperCase() + view.slice(1)}
-          </button>
-        ))}
-        {!showCalendarsModal && (
-          <button
-            type="button"
-            className="px-3 py-1 bg-blue-600 dark:bg-blue-500 text-white rounded-lg text-xl ml-2 shadow hover:bg-blue-700 dark:hover:bg-blue-600 transition"
-            onClick={() => {
-              const now = new Date();
-              const type = activeTab;
-              setEditingEvent({
-                ...defaultEvent,
-                start: now,
-                end: new Date(now.getTime() + 60 * 60 * 1000), // +1 hour
-                type,
-                color: lightColors[type] || lightColors.Default,
-                calendar: user ? user._id : '',
-              });
-              setActiveTab('Event');
-              setModalOpen(true);
-            }}
-          >+</button>
-        )}
+    <div className="rbc-toolbar mb-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 shadow-sm">
+      <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
+        <div className="flex items-center gap-1.5">
+          <button type="button" className="rbc-btn inline-flex items-center justify-center h-8 px-3 rounded-md border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-100 transition text-sm font-medium leading-none" onClick={() => toolbarProps.onNavigate('TODAY')}>Today</button>
+          <button type="button" className="rbc-btn inline-flex items-center justify-center h-8 w-8 rounded-md border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-100 transition text-base leading-none" onClick={() => toolbarProps.onNavigate('PREV')}>‹</button>
+          <button type="button" className="rbc-btn inline-flex items-center justify-center h-8 w-8 rounded-md border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-100 transition text-base leading-none" onClick={() => toolbarProps.onNavigate('NEXT')}>›</button>
+        </div>
+
+        <span className="rbc-toolbar-label text-center text-lg sm:text-2xl font-semibold text-gray-900 dark:text-gray-100 tracking-tight leading-none">{toolbarProps.label}</span>
+
+        <div className="flex items-center gap-1.5 justify-end">
+          <div className="inline-flex items-center rounded-md border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/70 overflow-hidden">
+            {['month', 'week', 'day', 'agenda'].map(view => (
+              <button
+                key={view}
+                type="button"
+                className={`inline-flex items-center justify-center px-3 h-8 text-sm font-medium capitalize leading-none transition ${
+                  toolbarProps.view === view
+                    ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-white/70 dark:hover:bg-gray-600/60'
+                }`}
+                onClick={() => toolbarProps.onView(view)}
+              >
+                {view.charAt(0).toUpperCase() + view.slice(1)}
+              </button>
+            ))}
+          </div>
+          {!showCalendarsModal && (
+            <button
+              type="button"
+              className="inline-flex items-center justify-center h-8 w-8 rounded-md border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-100 text-lg leading-none hover:bg-gray-50 dark:hover:bg-gray-600 transition"
+              onClick={() => {
+                const now = new Date();
+                const type = activeTab;
+                setEditingEvent({
+                  ...defaultEvent,
+                  start: now,
+                  end: new Date(now.getTime() + 60 * 60 * 1000), // +1 hour
+                  type,
+                  color: lightColors[type] || lightColors.Default,
+                  calendar: user ? user._id : '',
+                });
+                setActiveTab('Event');
+                setModalOpen(true);
+              }}
+            >
+              +
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -1396,10 +1408,10 @@ const CalendarPage: React.FC = () => {
       </div>
 
       {/* Desktop View */}
-      <div className="hidden lg:flex p-8 gap-8">
+      <div className="hidden lg:flex p-8 gap-6 calendar-modern">
       {/* Main Calendar */}
       <div className="flex-1">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
         <Calendar
           localizer={localizer}
           events={events}
@@ -1426,13 +1438,25 @@ const CalendarPage: React.FC = () => {
         </div>
       </div>
       {/* Right Panel */}
-      <div className="w-80 flex flex-col gap-4">
+      <div className="w-80 flex flex-col gap-3">
         {/* Mini Month Picker */}
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-md p-4 mb-2">
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-sm p-4">
           <div className="flex items-center justify-between mb-2">
-            <button onClick={() => setMiniSelectedDate(prev => subMonths(prev, 1))} className="px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-lg font-bold transition text-gray-700 dark:text-gray-300">{'<'}</button>
+            <button
+              onClick={() => setMiniSelectedDate(prev => subMonths(prev, 1))}
+              className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 active:scale-95 transition-all text-gray-700 dark:text-gray-300"
+              aria-label="Previous month"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
             <div className="text-center font-semibold text-lg text-gray-900 dark:text-gray-100">{format(miniSelectedDate, 'MMMM yyyy')}</div>
-            <button onClick={() => setMiniSelectedDate(prev => addMonths(prev, 1))} className="px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-lg font-bold transition text-gray-700 dark:text-gray-300">{'>'}</button>
+            <button
+              onClick={() => setMiniSelectedDate(prev => addMonths(prev, 1))}
+              className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 active:scale-95 transition-all text-gray-700 dark:text-gray-300"
+              aria-label="Next month"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
           <table className="w-full text-xs select-none">
             <thead>
@@ -1487,7 +1511,7 @@ const CalendarPage: React.FC = () => {
           </table>
         </div>
         {/* Calendar List */}
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded p-4 relative">
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-sm p-4 relative">
           <div className="max-h-44 overflow-y-auto pr-1">
             <div className="font-semibold mb-2 text-gray-900 dark:text-gray-100">CALENDARS</div>
             {calendarOptions.map((opt, idx) => (
@@ -1533,8 +1557,8 @@ const CalendarPage: React.FC = () => {
           </div>
         </div>
         {/* To-Do Panel below calendar list */}
-        <div className="max-h-64 overflow-y-auto pr-1">
-          <ToDoPanel />
+        <div className="max-h-64 overflow-y-auto pr-1 rounded-2xl">
+          <ToDoPanel showSupplementarySections={false} />
         </div>
       </div>
       </div>

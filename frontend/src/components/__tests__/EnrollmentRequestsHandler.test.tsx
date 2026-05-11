@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import EnrollmentRequestsHandler from '../course/EnrollmentRequestsHandler';
+import EnrollmentRequestsHandler from '../enrollment/EnrollmentRequestsHandler';
 import api from '../../services/api';
 
 // Mock dependencies

@@ -20,6 +20,77 @@
   display: none !important;
 }
 
+/* Modern calendar skin (desktop calendar page only) */
+.calendar-modern .rbc-calendar {
+  background: transparent;
+}
+
+.calendar-modern .rbc-month-view,
+.calendar-modern .rbc-time-view,
+.calendar-modern .rbc-agenda-view {
+  border: 1px solid #e5e7eb !important;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.calendar-modern .rbc-header {
+  background: #f8fafc;
+  color: #334155;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  border-bottom: 1px solid #e5e7eb !important;
+  padding: 8px 4px;
+}
+
+.calendar-modern .rbc-day-bg {
+  background: #ffffff;
+  border-left: 1px solid #eef2f7 !important;
+}
+
+.calendar-modern .rbc-month-row + .rbc-month-row {
+  border-top: 1px solid #eef2f7 !important;
+}
+
+.calendar-modern .rbc-today {
+  background: #eff6ff !important;
+}
+
+.calendar-modern .rbc-date-cell {
+  padding: 6px 8px 0 0;
+}
+
+.calendar-modern .rbc-date-cell > a {
+  font-weight: 600;
+  color: #334155;
+}
+
+.calendar-modern .rbc-off-range-bg {
+  background: #f8fafc !important;
+}
+
+.calendar-modern .rbc-off-range {
+  color: #94a3b8 !important;
+}
+
+.calendar-modern .rbc-time-content,
+.calendar-modern .rbc-time-header-content,
+.calendar-modern .rbc-time-gutter,
+.calendar-modern .rbc-timeslot-group {
+  border-color: #eef2f7 !important;
+}
+
+/* Force perfect centering for custom toolbar controls */
+.calendar-modern .rbc-toolbar button,
+.calendar-modern .rbc-toolbar .rbc-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  vertical-align: middle !important;
+  line-height: 1 !important;
+}
+
 /* Dark mode overrides for react-big-calendar */
 .dark .rbc-calendar {
   background-color: #1e293b !important;

@@ -22,11 +22,13 @@ import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { API_URL } from '../config';
 
+/** How often to refresh stats & activity while the dashboard is open */
+const DASHBOARD_POLL_MS = 15_000;
+
 interface SystemStats {
   totalUsers: number;
   totalCourses: number;
   activeUsers: number;
-  totalAssignments: number;
   systemHealth: 'excellent' | 'good' | 'warning' | 'critical';
   storageUsed: number;
   storageTotal: number;
@@ -46,7 +48,6 @@ export function AdminDashboard() {
     totalUsers: 0,
     totalCourses: 0,
     activeUsers: 0,
-    totalAssignments: 0,
     systemHealth: 'good',
     storageUsed: 0,
     storageTotal: 1000
@@ -55,38 +56,66 @@ export function AdminDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchData = async () => {
+    let cancelled = false;
+
+    const load = async (isInitial: boolean) => {
       try {
         const token = localStorage.getItem('token');
+        if (!token) return;
         const headers = { Authorization: `Bearer ${token}` };
 
-        // Fetch system stats
         const statsResponse = await axios.get(`${API_URL}/api/admin/stats`, { headers });
-        if (statsResponse.data.success) {
+        const statsPayload = statsResponse.data;
+        const stats = statsPayload?.data ?? statsPayload;
+        if (
+          !cancelled &&
+          statsPayload?.success === true &&
+          stats &&
+          typeof stats === 'object'
+        ) {
           setSystemStats({
-            totalUsers: statsResponse.data.data.totalUsers || 0,
-            totalCourses: statsResponse.data.data.totalCourses || 0,
-            activeUsers: statsResponse.data.data.activeUsers || 0,
-            totalAssignments: statsResponse.data.data.totalAssignments || 0,
-            systemHealth: statsResponse.data.data.systemHealth || 'good',
-            storageUsed: statsResponse.data.data.storageUsed || 0,
-            storageTotal: statsResponse.data.data.storageTotal || 1000
+            totalUsers: Number(stats.totalUsers) || 0,
+            totalCourses: Number(stats.totalCourses) || 0,
+            activeUsers: Number(stats.activeUsers) || 0,
+            systemHealth: (['excellent', 'good', 'warning', 'critical'] as const).includes(
+              stats.systemHealth
+            )
+              ? stats.systemHealth
+              : 'good',
+            storageUsed: Number(stats.storageUsed) || 0,
+            storageTotal: Number(stats.storageTotal) > 0 ? Number(stats.storageTotal) : 1000
           });
         }
 
-        // Fetch recent activity
         const activityResponse = await axios.get(`${API_URL}/api/admin/activity?limit=10`, { headers });
-        if (activityResponse.data.success) {
-          setRecentActivity(activityResponse.data.data || []);
+        const actPayload = activityResponse.data;
+        const activities = actPayload?.data ?? actPayload;
+        if (!cancelled && actPayload?.success === true && Array.isArray(activities)) {
+          setRecentActivity(activities);
         }
-      } catch (error) {
-        // Keep default values on error
+      } catch {
+        // Keep previous values on error
       } finally {
-        setLoading(false);
+        if (!cancelled && isInitial) setLoading(false);
       }
     };
 
-    fetchData();
+    void load(true);
+
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void load(false);
+    }, DASHBOARD_POLL_MS);
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible' && !cancelled) void load(false);
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, []);
 
   const getHealthColor = (health: string) => {
@@ -144,7 +173,7 @@ export function AdminDashboard() {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 border-l-4 border-blue-500 dark:border-blue-400">
           <div className="flex items-center">
             <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
@@ -181,17 +210,6 @@ export function AdminDashboard() {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 border-l-4 border-orange-500 dark:border-orange-400">
-          <div className="flex items-center">
-            <div className="p-2 bg-orange-100 dark:bg-orange-900/50 rounded-lg">
-              <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600 dark:text-orange-400" />
-            </div>
-            <div className="ml-3 sm:ml-4">
-              <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Total Assignments</p>
-              <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">{systemStats.totalAssignments}</p>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Storage Usage */}
@@ -199,12 +217,18 @@ export function AdminDashboard() {
         <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Storage Usage</h3>
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Used: {systemStats.storageUsed}GB / {systemStats.storageTotal}GB</span>
-          <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">{Math.round((systemStats.storageUsed / systemStats.storageTotal) * 100)}%</span>
+          <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+            {systemStats.storageTotal > 0
+              ? `${Math.round((systemStats.storageUsed / systemStats.storageTotal) * 100)}%`
+              : '0%'}
+          </span>
         </div>
         <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
           <div 
-            className="bg-blue-600 dark:bg-blue-500 h-2 rounded-full transition-all duration-300"
-            style={{ width: `${(systemStats.storageUsed / systemStats.storageTotal) * 100}%` }}
+            className="bg-blue-600 dark:bg-blue-500 h-2 rounded-full transition-all duration-500 ease-out"
+            style={{
+              width: `${systemStats.storageTotal > 0 ? Math.min(100, (systemStats.storageUsed / systemStats.storageTotal) * 100) : 0}%`
+            }}
           ></div>
         </div>
       </div>
@@ -285,20 +309,24 @@ export function AdminDashboard() {
       </div>
 
       {/* Recent Activity */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Recent Activity</h3>
-        <div className="space-y-3">
-          {recentActivity.map((activity) => (
-            <div key={activity.id} className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-              <div className={`p-2 rounded-lg ${getSeverityColor(activity.severity)}`}>
-                {getActivityIcon(activity.type)}
+      <div className="flex flex-col overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
+        <div className="shrink-0 border-b border-gray-100 px-6 py-4 dark:border-gray-700">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Recent Activity</h3>
+        </div>
+        <div className="max-h-[min(22rem,42vh)] overflow-y-auto overscroll-y-contain px-6 py-4 sm:max-h-[min(26rem,45vh)]">
+          <div className="space-y-3">
+            {recentActivity.map((activity) => (
+              <div key={activity.id} className="flex items-center space-x-3 rounded-lg p-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700">
+                <div className={`shrink-0 rounded-lg p-2 ${getSeverityColor(activity.severity)}`}>
+                  {getActivityIcon(activity.type)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{activity.description}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{activity.timestamp}</p>
+                </div>
               </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{activity.description}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">{activity.timestamp}</p>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </div>

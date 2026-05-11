@@ -6,7 +6,6 @@ import { useCourse } from '../contexts/CourseContext';
 import { getUserPreferences, getImageUrl } from '../services/api';
 import { 
   Users, 
-  Plus, 
   Search, 
   Filter, 
   Calendar, 
@@ -19,7 +18,10 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  User
+  User,
+  LayoutGrid,
+  List,
+  ChevronDown
 } from 'lucide-react';
 import { BurgerMenu } from '../components/BurgerMenu';
 import SwipeableContainer from '../components/common/SwipeableContainer';
@@ -389,79 +391,107 @@ const Groups: React.FC = () => {
       
       
       <div className="max-w-6xl mx-auto py-4 sm:py-6 lg:py-8 px-4 sm:px-6 pt-20 lg:pt-4">
-        <div className="mb-6 sm:mb-8">
-          <h1 className="hidden lg:block text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">{title}</h1>
-          <p className="hidden lg:block text-sm sm:text-base text-gray-600 dark:text-gray-400">{subtitle}</p>
-          <p className="lg:hidden text-sm text-gray-600 dark:text-gray-400 mt-2">{subtitle}</p>
+        <div className="mb-5 sm:mb-6">
+          <h1 className="hidden lg:block text-2xl sm:text-3xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+            {title}
+          </h1>
+          <p className="hidden lg:block mt-1.5 text-sm text-gray-500 dark:text-gray-400 max-w-2xl leading-relaxed">
+            {subtitle}
+          </p>
+          <p className="lg:hidden text-sm text-gray-500 dark:text-gray-400 mt-2 leading-relaxed">{subtitle}</p>
         </div>
 
       {/* Statistics Cards - Only for Teachers */}
       {isTeacher && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4 mb-5 sm:mb-6">
           <div 
-            className={`bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 border-l-4 border-blue-500 dark:border-blue-400 cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 ${
-              selectedMetric === 'groupSets' ? 'ring-2 ring-blue-300 dark:ring-blue-600 shadow-lg' : ''
+            className={`group relative cursor-pointer rounded-2xl border border-gray-200/90 bg-white p-4 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md dark:border-gray-700/80 dark:bg-gray-900/40 dark:hover:border-gray-600 ${
+              selectedMetric === 'groupSets'
+                ? 'border-blue-300 ring-2 ring-blue-500/15 dark:border-blue-500/40 dark:ring-blue-400/20'
+                : 'border-l-[3px] border-l-blue-500 dark:border-l-blue-400'
             }`}
             onClick={() => setSelectedMetric(selectedMetric === 'groupSets' ? null : 'groupSets')}
           >
-            <div className="flex items-center">
-              <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
-                <Users className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 dark:text-blue-400" />
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-950/50">
+                <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               </div>
-              <div className="ml-3 sm:ml-4">
-                <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Total Group Sets</p>
-                <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.totalGroupSets}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  Total group sets
+                </p>
+                <p className="mt-0.5 text-2xl font-semibold tabular-nums tracking-tight text-gray-900 dark:text-gray-50">
+                  {stats.totalGroupSets}
+                </p>
               </div>
             </div>
           </div>
 
           <div 
-            className={`bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 border-l-4 border-green-500 dark:border-green-400 cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 ${
-              selectedMetric === 'groups' ? 'ring-2 ring-green-300 dark:ring-green-600 shadow-lg' : ''
+            className={`group relative cursor-pointer rounded-2xl border border-gray-200/90 bg-white p-4 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md dark:border-gray-700/80 dark:bg-gray-900/40 dark:hover:border-gray-600 ${
+              selectedMetric === 'groups'
+                ? 'border-emerald-300 ring-2 ring-emerald-500/15 dark:border-emerald-500/40 dark:ring-emerald-400/20'
+                : 'border-l-[3px] border-l-emerald-500 dark:border-l-emerald-400'
             }`}
             onClick={() => setSelectedMetric(selectedMetric === 'groups' ? null : 'groups')}
           >
-            <div className="flex items-center">
-              <div className="p-2 bg-green-100 dark:bg-green-900/50 rounded-lg">
-                <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-green-600 dark:text-green-400" />
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950/50">
+                <BarChart3 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
               </div>
-              <div className="ml-3 sm:ml-4">
-                <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Total Groups</p>
-                <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.totalGroups}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  Total groups
+                </p>
+                <p className="mt-0.5 text-2xl font-semibold tabular-nums tracking-tight text-gray-900 dark:text-gray-50">
+                  {stats.totalGroups}
+                </p>
               </div>
             </div>
           </div>
 
           <div 
-            className={`bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 border-l-4 border-purple-500 dark:border-purple-400 cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 ${
-              selectedMetric === 'members' ? 'ring-2 ring-purple-300 dark:ring-purple-600 shadow-lg' : ''
+            className={`group relative cursor-pointer rounded-2xl border border-gray-200/90 bg-white p-4 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md dark:border-gray-700/80 dark:bg-gray-900/40 dark:hover:border-gray-600 ${
+              selectedMetric === 'members'
+                ? 'border-violet-300 ring-2 ring-violet-500/15 dark:border-violet-500/40 dark:ring-violet-400/20'
+                : 'border-l-[3px] border-l-violet-500 dark:border-l-violet-400'
             }`}
             onClick={() => setSelectedMetric(selectedMetric === 'members' ? null : 'members')}
           >
-            <div className="flex items-center">
-              <div className="p-2 bg-purple-100 dark:bg-purple-900/50 rounded-lg">
-                <UserPlus className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600 dark:text-purple-400" />
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50 dark:bg-violet-950/50">
+                <UserPlus className="h-5 w-5 text-violet-600 dark:text-violet-400" />
               </div>
-              <div className="ml-3 sm:ml-4">
-                <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Total Members</p>
-                <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.totalMembers}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  Total members
+                </p>
+                <p className="mt-0.5 text-2xl font-semibold tabular-nums tracking-tight text-gray-900 dark:text-gray-50">
+                  {stats.totalMembers}
+                </p>
               </div>
             </div>
           </div>
 
           <div 
-            className={`bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 border-l-4 border-orange-500 dark:border-orange-400 cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 ${
-              selectedMetric === 'active' ? 'ring-2 ring-orange-300 dark:ring-orange-600 shadow-lg' : ''
+            className={`group relative cursor-pointer rounded-2xl border border-gray-200/90 bg-white p-4 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md dark:border-gray-700/80 dark:bg-gray-900/40 dark:hover:border-gray-600 ${
+              selectedMetric === 'active'
+                ? 'border-amber-300 ring-2 ring-amber-500/15 dark:border-amber-500/40 dark:ring-amber-400/20'
+                : 'border-l-[3px] border-l-amber-500 dark:border-l-amber-400'
             }`}
             onClick={() => setSelectedMetric(selectedMetric === 'active' ? null : 'active')}
           >
-            <div className="flex items-center">
-              <div className="p-2 bg-orange-100 dark:bg-orange-900/50 rounded-lg">
-                <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600 dark:text-orange-400" />
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 dark:bg-amber-950/50">
+                <CheckCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
               </div>
-              <div className="ml-3 sm:ml-4">
-                <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Active Sets</p>
-                <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.activeGroupSets}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  Active sets
+                </p>
+                <p className="mt-0.5 text-2xl font-semibold tabular-nums tracking-tight text-gray-900 dark:text-gray-50">
+                  {stats.activeGroupSets}
+                </p>
               </div>
             </div>
           </div>
@@ -469,150 +499,153 @@ const Groups: React.FC = () => {
       )}
 
       {/* Filters and Search */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 sm:p-6 mb-6 sm:mb-8">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-6 gap-4">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-blue-50 dark:bg-blue-900/50 rounded-lg">
-              <Filter className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+      <div className="mb-6 sm:mb-8 rounded-2xl border border-gray-200/90 bg-white shadow-sm dark:border-gray-700/80 dark:bg-gray-900/50 dark:shadow-none">
+        <div className="flex flex-col gap-3 border-b border-gray-100 px-4 py-3 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-800">
+              <Filter className="h-4 w-4 text-gray-600 dark:text-gray-400" />
             </div>
-            <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100">Filters & Search</h2>
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Search & filters</h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Refine {isTeacher ? 'group sets' : 'groups'} by name or course</p>
+            </div>
           </div>
-          {isTeacher && (
-            <button 
-              onClick={() => navigate('/groups/create')}
-              className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-500 dark:to-blue-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-xl hover:from-blue-700 hover:to-blue-800 dark:hover:from-blue-600 dark:hover:to-blue-700 transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-            >
-              <Plus className="w-4 h-4" />
-              <span className="font-medium text-sm sm:text-base">Create Group Set</span>
-            </button>
-          )}
         </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-          <div className="space-y-2">
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Search Groups</label>
+
+        <div className="grid grid-cols-1 gap-4 p-4 sm:gap-5 sm:p-5 lg:grid-cols-12 lg:items-end">
+          <div className="lg:col-span-5">
+            <label htmlFor="groups-search" className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              Search
+            </label>
             <div className="relative">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
               <input
+                id="groups-search"
                 type="text"
-                placeholder="Search by name or course..."
+                placeholder="Name or course…"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 transition-all duration-200 hover:bg-white dark:hover:bg-gray-800"
+                className="h-10 w-full rounded-lg border border-gray-200 bg-white pl-10 pr-3 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-blue-400 dark:focus:ring-blue-400/20"
               />
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Filter by Course</label>
-            <select
-              value={courseFilter}
-              onChange={(e) => setCourseFilter(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 transition-all duration-200 hover:bg-white dark:hover:bg-gray-800 appearance-none cursor-pointer"
-            >
-              <option value="all">All Courses ({isTeacher ? groupSets.length : groups.length})</option>
-              {uniqueCourses.map(course => {
-                const count = isTeacher 
-                  ? groupSets.filter(gs => gs.course?.title === course).length
-                  : groups.filter(g => g.course?.title === course).length;
-                return (
-                  <option key={course} value={course}>
-                    {course} ({count})
-                  </option>
-                );
-              })}
-            </select>
+          <div className="lg:col-span-4">
+            <label htmlFor="groups-course-filter" className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              Course
+            </label>
+            <div className="relative">
+              <select
+                id="groups-course-filter"
+                value={courseFilter}
+                onChange={(e) => setCourseFilter(e.target.value)}
+                className="h-10 w-full cursor-pointer appearance-none rounded-lg border border-gray-200 bg-white px-3 pr-10 text-sm text-gray-900 shadow-sm transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:focus:border-blue-400 dark:focus:ring-blue-400/20"
+              >
+                <option value="all">All courses ({isTeacher ? groupSets.length : groups.length})</option>
+                {uniqueCourses.map(course => {
+                  const count = isTeacher 
+                    ? groupSets.filter(gs => gs.course?.title === course).length
+                    : groups.filter(g => g.course?.title === course).length;
+                  return (
+                    <option key={course} value={course}>
+                      {course} ({count})
+                    </option>
+                  );
+                })}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" aria-hidden />
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">View Mode</label>
-            <div className="flex bg-gray-100 dark:bg-gray-700 rounded-xl p-1">
+          <div className="lg:col-span-3">
+            <span className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              Layout
+            </span>
+            <div className="flex h-10 rounded-lg border border-gray-200 bg-gray-50/90 p-0.5 dark:border-gray-700 dark:bg-gray-900/80">
               <button
+                type="button"
                 onClick={() => setViewMode('grid')}
-                className={`flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  viewMode === 'grid' 
-                    ? 'bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-md transform scale-105' 
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600'
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-colors ${
+                  viewMode === 'grid'
+                    ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-gray-50'
+                    : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
                 }`}
               >
-                <div className="flex items-center justify-center space-x-2">
-                  <div className="grid grid-cols-2 gap-0.5">
-                    <div className="w-1 h-1 bg-current rounded-sm"></div>
-                    <div className="w-1 h-1 bg-current rounded-sm"></div>
-                    <div className="w-1 h-1 bg-current rounded-sm"></div>
-                    <div className="w-1 h-1 bg-current rounded-sm"></div>
-                  </div>
-                  <span>Grid</span>
-                </div>
+                <LayoutGrid className="h-4 w-4 shrink-0 opacity-70" aria-hidden />
+                Grid
               </button>
               <button
+                type="button"
                 onClick={() => setViewMode('list')}
-                className={`flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  viewMode === 'list' 
-                    ? 'bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-md transform scale-105' 
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600'
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-colors ${
+                  viewMode === 'list'
+                    ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-gray-50'
+                    : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
                 }`}
               >
-                <div className="flex items-center justify-center space-x-2">
-                  <div className="flex flex-col space-y-0.5">
-                    <div className="w-3 h-0.5 bg-current rounded-sm"></div>
-                    <div className="w-3 h-0.5 bg-current rounded-sm"></div>
-                    <div className="w-3 h-0.5 bg-current rounded-sm"></div>
-                  </div>
-                  <span>List</span>
-                </div>
+                <List className="h-4 w-4 shrink-0 opacity-70" aria-hidden />
+                List
               </button>
             </div>
           </div>
         </div>
         
         {(searchTerm || courseFilter !== 'all' || selectedMetric) && (
-          <div className="mt-6 flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-500 dark:text-gray-400">Active filters:</span>
+          <div className="flex flex-col gap-3 border-t border-gray-100 px-4 py-3 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+              <span className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                Active
+              </span>
               {searchTerm && (
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200">
-                  Search: "{searchTerm}"
-                  <button 
+                <span className="inline-flex max-w-full items-center gap-1 rounded-md border border-blue-200/80 bg-blue-50/90 px-2 py-1 text-xs font-medium text-blue-900 dark:border-blue-800/60 dark:bg-blue-950/40 dark:text-blue-100">
+                  <span className="truncate">“{searchTerm}”</span>
+                  <button
+                    type="button"
                     onClick={() => setSearchTerm('')}
-                    className="ml-2 hover:text-blue-600 dark:hover:text-blue-400"
+                    className="shrink-0 rounded p-0.5 hover:bg-blue-100/80 dark:hover:bg-blue-900/40"
+                    aria-label="Remove search filter"
                   >
-                    <XCircle className="w-3 h-3" />
+                    <XCircle className="h-3.5 w-3.5 text-blue-700/70 dark:text-blue-300/80" />
                   </button>
                 </span>
               )}
               {courseFilter !== 'all' && (
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200">
-                  Course: {courseFilter}
-                  <button 
+                <span className="inline-flex max-w-full items-center gap-1 rounded-md border border-emerald-200/80 bg-emerald-50/90 px-2 py-1 text-xs font-medium text-emerald-900 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-100">
+                  <span className="truncate">{courseFilter}</span>
+                  <button
+                    type="button"
                     onClick={() => setCourseFilter('all')}
-                    className="ml-2 hover:text-green-600 dark:hover:text-green-400"
+                    className="shrink-0 rounded p-0.5 hover:bg-emerald-100/80 dark:hover:bg-emerald-900/40"
+                    aria-label="Remove course filter"
                   >
-                    <XCircle className="w-3 h-3" />
+                    <XCircle className="h-3.5 w-3.5 text-emerald-700/70 dark:text-emerald-300/80" />
                   </button>
                 </span>
               )}
               {selectedMetric && (
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-200">
-                  Metric: {selectedMetric}
-                  <button 
+                <span className="inline-flex items-center gap-1 rounded-md border border-violet-200/80 bg-violet-50/90 px-2 py-1 text-xs font-medium text-violet-900 dark:border-violet-800/60 dark:bg-violet-950/40 dark:text-violet-100">
+                  {selectedMetric}
+                  <button
+                    type="button"
                     onClick={() => setSelectedMetric(null)}
-                    className="ml-2 hover:text-purple-600 dark:hover:text-purple-400"
+                    className="shrink-0 rounded p-0.5 hover:bg-violet-100/80 dark:hover:bg-violet-900/40"
+                    aria-label="Remove metric filter"
                   >
-                    <XCircle className="w-3 h-3" />
+                    <XCircle className="h-3.5 w-3.5 text-violet-700/70 dark:text-violet-300/80" />
                   </button>
                 </span>
               )}
             </div>
             <button
+              type="button"
               onClick={() => {
                 setSearchTerm('');
                 setCourseFilter('all');
                 setSelectedMetric(null);
               }}
-              className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+              className="shrink-0 text-sm font-medium text-gray-600 underline-offset-2 transition-colors hover:text-gray-900 hover:underline dark:text-gray-400 dark:hover:text-gray-200"
             >
-              Clear all filters
+              Clear all
             </button>
           </div>
         )}
@@ -626,26 +659,16 @@ const Groups: React.FC = () => {
 
       {!loading && isTeacher && filteredData.length > 0 && (
         <>
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Showing {filteredData.length} of {isTeacher ? groupSets.length : groups.length} {isTeacher ? 'group sets' : 'groups'}
-              {(searchTerm || courseFilter !== 'all') && (
-                <span className="ml-2 text-gray-400 dark:text-gray-500">
-                  (filtered)
-                </span>
-              )}
-            </p>
-          </div>
           <div className={viewMode === 'grid' 
-            ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
-            : "space-y-4"
+            ? "grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+            : "space-y-3"
           }>
           {filteredData.map((item) => {
             const groupSet = item as GroupSet;
             return (
             <div 
               key={groupSet._id} 
-                className={`bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-700 ${
+                className={`cursor-pointer overflow-hidden rounded-xl border border-gray-200/90 bg-white shadow-sm transition-shadow duration-200 hover:border-gray-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-900/40 dark:hover:border-gray-600 ${
                   viewMode === 'list' ? 'flex items-center' : ''
                 }`}
               onClick={() => navigate(`/groupsets/${groupSet._id}`)}
@@ -719,26 +742,16 @@ const Groups: React.FC = () => {
       
       {!loading && !isTeacher && filteredData.length > 0 && (
         <>
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Showing {filteredData.length} of {isTeacher ? groupSets.length : groups.length} {isTeacher ? 'group sets' : 'groups'}
-              {(searchTerm || courseFilter !== 'all') && (
-                <span className="ml-2 text-gray-400 dark:text-gray-500">
-                  (filtered)
-                </span>
-              )}
-            </p>
-          </div>
           <div className={viewMode === 'grid' 
-            ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
-            : "space-y-4"
+            ? "grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+            : "space-y-3"
           }>
           {filteredData.map((item) => {
             const group = item as Group;
             return (
             <div 
               key={group._id} 
-                className={`bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border border-gray-100 dark:border-gray-700 ${
+                className={`cursor-pointer overflow-hidden rounded-xl border border-gray-200/90 bg-white shadow-sm transition-shadow duration-200 hover:border-gray-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-900/40 dark:hover:border-gray-600 ${
                   viewMode === 'list' ? 'flex items-center' : ''
                 }`}
               onClick={() => navigate(`/groups/${group._id}`)}

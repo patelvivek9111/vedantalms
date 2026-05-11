@@ -25,35 +25,35 @@ const StudentCard: React.FC<StudentCardProps> = ({
   const [imgError, setImgError] = useState(false);
   
   return (
-    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 flex items-center gap-3 sm:gap-4">
+    <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-colors hover:border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-gray-600 sm:gap-4">
       {student.profilePicture && !imgError ? (
         <img
           src={student.profilePicture.startsWith('http')
             ? student.profilePicture
             : getImageUrl(student.profilePicture)}
           alt={student.firstName}
-          className="w-10 h-10 sm:w-12 sm:h-12 object-cover rounded-full border flex-shrink-0"
+          className="h-10 w-10 flex-shrink-0 rounded-full border border-gray-200 object-cover sm:h-12 sm:w-12 dark:border-gray-600"
           onError={() => setImgError(true)}
         />
       ) : (
-        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-base sm:text-xl font-bold text-gray-600 dark:text-gray-300 border flex-shrink-0">
+        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-gray-200 bg-gray-100 text-base font-bold text-gray-600 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 sm:h-12 sm:w-12 sm:text-xl">
           {student.firstName && student.lastName
             ? `${student.firstName[0]}${student.lastName[0]}`.toUpperCase()
             : ''}
         </div>
       )}
       <div className="flex-1 min-w-0">
-        <div className="font-semibold text-base sm:text-lg text-gray-800 dark:text-gray-200 truncate">
+        <div className="truncate text-base font-semibold text-gray-800 dark:text-gray-200 sm:text-lg">
           {student.firstName} {student.lastName}
         </div>
-        <div className="text-gray-500 dark:text-gray-400 text-xs sm:text-sm truncate">
+        <div className="truncate text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
           {student.email}
         </div>
       </div>
       {/* Only show Remove button for students, not instructor */}
       {!isInstructorCard && (isInstructor || isAdmin) && handleUnenroll && (
         <button
-          className="ml-auto flex-shrink-0 p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          className="ml-auto flex-shrink-0 rounded-lg border border-rose-200 bg-rose-50 p-2 text-rose-700 transition-colors hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-900/30 dark:text-rose-300 dark:hover:bg-rose-900/50"
           onClick={() => handleUnenroll(student._id)}
           title="Remove student"
         >

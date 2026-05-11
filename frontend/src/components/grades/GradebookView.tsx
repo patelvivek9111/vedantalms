@@ -159,27 +159,20 @@ const GradebookView: React.FC<GradebookViewProps> = ({
   return (
     <div className="space-y-6">
       {/* Header Section */}
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center space-x-3 sm:space-x-4">
-            <div className="bg-gray-100 dark:bg-gray-800 rounded-full p-2 sm:p-3">
-              <svg className="w-6 h-6 sm:w-8 sm:h-8 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            </div>
-            <div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">Gradebook</h2>
-              <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm mt-1">Track student performance and manage grades</p>
-            </div>
+      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900 sm:p-5">
+        <div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">Gradebook</h2>
+            <p className="mt-1 text-xs text-gray-600 dark:text-gray-400 sm:text-sm">Track student performance and manage grades</p>
           </div>
           <div className="flex items-center space-x-2 sm:space-x-3 w-full sm:w-auto">
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-3 sm:px-4 py-2 border border-gray-200 dark:border-gray-700 text-center flex-1 sm:flex-none">
-              <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Students</div>
-              <div className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">{students.length}</div>
+            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-center dark:border-gray-700 dark:bg-gray-800 flex-1 sm:flex-none">
+              <div className="text-xs text-gray-600 dark:text-gray-400 sm:text-sm">Students</div>
+              <div className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{students.length}</div>
             </div>
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-3 sm:px-4 py-2 border border-gray-200 dark:border-gray-700 text-center flex-1 sm:flex-none">
-              <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Assignments</div>
-              <div className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">{assignments.length}</div>
+            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-center dark:border-gray-700 dark:bg-gray-800 flex-1 sm:flex-none">
+              <div className="text-xs text-gray-600 dark:text-gray-400 sm:text-sm">Assignments</div>
+              <div className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{assignments.length}</div>
             </div>
           </div>
         </div>
@@ -324,14 +317,14 @@ const GradebookView: React.FC<GradebookViewProps> = ({
       </div>
 
       {/* Desktop Gradebook Table */}
-      <div className="hidden lg:block bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className="hidden lg:block overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
         <div className="relative w-full">
           <div className="overflow-x-auto w-full relative">
             <table className="min-w-max w-full">
-              <thead className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 sticky top-0 z-10">
+              <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-800">
                 <tr>
                   {/* Sticky first column header */}
-                  <th className="px-6 py-4 border-b border-gray-200 dark:border-gray-600 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 text-left text-gray-700 dark:text-gray-300 sticky left-0 z-50 font-semibold text-sm uppercase tracking-wider" style={{left: 0, zIndex: 50, boxShadow: '2px 0 8px -4px rgba(0,0,0,0.1)'}}>
+                  <th className="px-6 py-4 border-b border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-left text-gray-700 dark:text-gray-300 sticky left-0 z-50 font-semibold text-sm uppercase tracking-wider" style={{left: 0, zIndex: 50, boxShadow: '2px 0 8px -4px rgba(0,0,0,0.1)'}}>
                     <div className="flex items-center space-x-2">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -353,7 +346,7 @@ const GradebookView: React.FC<GradebookViewProps> = ({
                     return (
                       <th
                         key={`assignment-${assignment._id}-${idx}`}
-                        className="px-4 py-4 border-b border-gray-200 dark:border-gray-600 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 text-center text-gray-700 dark:text-gray-300 min-w-[140px]"
+                        className="px-4 py-4 border-b border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-center text-gray-700 dark:text-gray-300 min-w-[140px]"
                       >
                         <div 
                           className="font-semibold text-blue-700 dark:text-blue-300 cursor-pointer hover:underline text-center text-sm"
@@ -371,7 +364,7 @@ const GradebookView: React.FC<GradebookViewProps> = ({
                     );
                   })}
                   {/* Sticky last column header */}
-                  <th className="px-6 py-4 border-b border-gray-200 dark:border-gray-600 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 text-center text-gray-700 dark:text-gray-300 sticky right-0 z-50 font-semibold text-sm uppercase tracking-wider" style={{right: 0, zIndex: 50, boxShadow: '-2px 0 8px -4px rgba(0,0,0,0.1)'}}>
+                  <th className="px-6 py-4 border-b border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-center text-gray-700 dark:text-gray-300 sticky right-0 z-50 font-semibold text-sm uppercase tracking-wider" style={{right: 0, zIndex: 50, boxShadow: '-2px 0 8px -4px rgba(0,0,0,0.1)'}}>
                     <div className="flex items-center justify-center space-x-2">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -641,7 +634,7 @@ const GradebookView: React.FC<GradebookViewProps> = ({
         <div className="flex justify-end space-x-4">
           <div className="flex space-x-3">
             <button
-              className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+              className="inline-flex items-center rounded-lg border border-emerald-200 bg-emerald-50 px-5 py-2.5 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 dark:hover:bg-emerald-900/50"
               onClick={handleExportGradebookCSV}
             >
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -650,7 +643,7 @@ const GradebookView: React.FC<GradebookViewProps> = ({
               Export CSV
             </button>
             <button
-              className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+              className="inline-flex items-center rounded-lg border border-blue-200 bg-blue-50 px-5 py-2.5 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
               onClick={handleOpenGradeScaleModal}
             >
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -662,8 +655,8 @@ const GradebookView: React.FC<GradebookViewProps> = ({
         </div>
       )}
       {/* Assignment Group Weights Display & Edit Button */}
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden mt-6">
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700 px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-600">
+      <div className="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+        <div className="border-b border-gray-200 bg-gray-50 px-4 py-4 dark:border-gray-600 dark:bg-gray-800 sm:px-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center space-x-3">
               <div className="bg-blue-100 dark:bg-blue-900 rounded-lg p-2 flex-shrink-0">

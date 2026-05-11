@@ -31,7 +31,7 @@ const CourseSidebar: React.FC<CourseSidebarProps> = ({
     <aside 
       className={`${isMobileDevice 
         ? 'w-full fixed left-0 top-20 bottom-16 z-[95]' 
-        : 'w-64 relative mr-8 mt-4 self-start sticky top-4 z-auto'
+        : 'w-64 relative mr-8 mt-0 self-start sticky top-4 z-auto'
       } transition-transform duration-300 ease-in-out ${
         isMobileMenuOpen && isMobileDevice ? 'translate-x-0' : isMobileDevice ? '-translate-x-full' : 'translate-x-0'
       } bg-transparent`}
@@ -70,17 +70,26 @@ const CourseSidebar: React.FC<CourseSidebarProps> = ({
           }}
         >
           {filteredNavigationItems.map((item: NavigationItem) => (
-            <button
-              key={item.id}
-              className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors font-medium text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 ${activeSection === item.id ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-semibold shadow' : ''}`}
-              onClick={() => {
-                navigate(`/courses/${courseId}/${item.id}`);
-                setIsMobileMenuOpen(false);
-              }}
-            >
-              <item.icon className="w-5 h-5" />
-              <span className="text-base">{item.label}</span>
-            </button>
+            (() => {
+              const isActive = activeSection === item.id;
+              return (
+                <button
+                  key={item.id}
+                  className={`flex items-center gap-3 rounded-lg px-4 py-2 font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 dark:focus-visible:ring-slate-600 ${
+                    isActive
+                      ? 'text-blue-700 dark:text-blue-300'
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-gray-700 hover:text-slate-900 dark:hover:text-slate-100'
+                  }`}
+                  onClick={() => {
+                    navigate(`/courses/${courseId}/${item.id}`);
+                    setIsMobileMenuOpen(false);
+                  }}
+                >
+                  <item.icon className="w-5 h-5" />
+                  <span className="text-base">{item.label}</span>
+                </button>
+              );
+            })()
           ))}
         </div>
       </nav>

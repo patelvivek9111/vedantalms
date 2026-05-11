@@ -327,7 +327,10 @@ mongoose.connect(MONGODB_URI, mongoOptions)
     if (String(err.message || '').toLowerCase().includes('index')) {
       console.error('Index sync failed. Check model index definitions and your MongoDB provider index feature support.');
     } else {
-      console.error('Please check your MONGODB_URI environment variable in Render dashboard.');
+      const envHint = process.env.RENDER
+        ? 'On Render: Environment → set MONGODB_URI, and in Atlas Network Access allow 0.0.0.0/0 (or Render outbound IPs).'
+        : 'Locally: set MONGODB_URI in .env (or your shell). In Atlas → Network Access, add your current public IP or 0.0.0.0/0 for development only.';
+      console.error(envHint);
     }
     if (process.env.NODE_ENV === 'test') {
       return;
@@ -556,28 +559,7 @@ const socketPingIntervalMs = parseInt(process.env.SOCKET_PING_INTERVAL_MS || '25
 const socketConnectTimeoutMs = parseInt(process.env.SOCKET_CONNECT_TIMEOUT_MS || '45000', 10);
 const socketMaxHttpBufferBytes = parseInt(process.env.SOCKET_MAX_HTTP_BUFFER_BYTES || '1048576', 10);
 
-// Initialize Socket.io
-const io = new Server(server, {
-  cors: {
-    origin: process.env.NODE_ENV === 'production' 
-      ? [process.env.FRONTEND_URL || 'https://vedantaed.com', 'https://www.vedantaed.com']
-      : ['http://localhost:3000', 'http://localhost:5173'],
-    credentials: true,
-    methods: ['GET', 'POST']
-  },
-  connectTimeout: socketConnectTimeoutMs,
-  pingTimeout: socketPingTimeoutMs,
-  pingInterval: socketPingIntervalMs,
-  maxHttpBufferSize: socketMaxHttpBufferBytes,
-  transports: ['websocket', 'polling']
-});
-
-io.engine.on('connection_error', (err) => {
-  socketEngineConnectionErrors += 1;
-  logger.warn({ err: err?.message || String(err) }, 'socket.io engine connection_error');
-});
-
-const configureSocketRedisAdapter = async () => {
+const configureSocketRedisAdapter = async (socketIo) => {
   const redisUrl = process.env.REDIS_URL;
   if (!redisUrl) {
     logger.warn('REDIS_URL not set; socket.io running without redis adapter');
@@ -600,7 +582,7 @@ const configureSocketRedisAdapter = async () => {
       redisAdapterError = error?.message || 'redis sub client error';
     });
     await Promise.all([pubClient.connect(), subClient.connect()]);
-    io.adapter(createAdapter(pubClient, subClient));
+    socketIo.adapter(createAdapter(pubClient, subClient));
     redisAdapterEnabled = true;
     redisAdapterError = null;
     logger.info('socket.io redis adapter enabled');
@@ -610,16 +592,39 @@ const configureSocketRedisAdapter = async () => {
     logger.error({ err: error }, 'failed to enable socket.io redis adapter');
   }
 };
-configureSocketRedisAdapter();
 
-// Initialize QuizWave socket handlers
-initializeQuizWaveSocket(io);
+// Socket.IO + Redis are omitted under NODE_ENV=test so Jest workers can exit cleanly (HTTP routes still tested via supertest).
+let io = null;
+if (process.env.NODE_ENV !== 'test') {
+  io = new Server(server, {
+    cors: {
+      origin: process.env.NODE_ENV === 'production'
+        ? [process.env.FRONTEND_URL || 'https://vedantaed.com', 'https://www.vedantaed.com']
+        : ['http://localhost:3000', 'http://localhost:5173'],
+      credentials: true,
+      methods: ['GET', 'POST']
+    },
+    connectTimeout: socketConnectTimeoutMs,
+    pingTimeout: socketPingTimeoutMs,
+    pingInterval: socketPingIntervalMs,
+    maxHttpBufferSize: socketMaxHttpBufferBytes,
+    transports: ['websocket', 'polling']
+  });
 
-// Socket.io initialized for QuizWave
+  io.engine.on('connection_error', (err) => {
+    socketEngineConnectionErrors += 1;
+    logger.warn({ err: err?.message || String(err) }, 'socket.io engine connection_error');
+  });
 
-// Start QuizWave auto-cleanup scheduler
+  configureSocketRedisAdapter(io);
+  initializeQuizWaveSocket(io);
+}
+
+// Start QuizWave auto-cleanup scheduler (skip in tests — avoids open timers + async logs after Jest teardown)
 const { startCleanupScheduler } = require('./utils/quizwaveCleanup');
-startCleanupScheduler();
+if (process.env.NODE_ENV !== 'test') {
+  startCleanupScheduler();
+}
 
 // Only start server if not in test mode
 if (process.env.NODE_ENV !== 'test') {

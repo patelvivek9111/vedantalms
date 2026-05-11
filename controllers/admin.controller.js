@@ -18,17 +18,27 @@ exports.getSystemStats = async (req, res) => {
     const totalTeachers = await User.countDocuments({ role: 'teacher' });
     const totalAdmins = await User.countDocuments({ role: 'admin' });
 
-    // Count active users (logged in within last 7 days)
+    // Active users = distinct users with a successful login in the last 7 days
+    // (merge LoginActivity with User.lastLogin so counts stay correct if one source lags)
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    
-    // If user model has lastLogin field, use it. Otherwise, use createdAt as approximation
-    const activeUsers = await User.countDocuments({
-      $or: [
-        { lastLogin: { $gte: sevenDaysAgo } },
-        { createdAt: { $gte: sevenDaysAgo } }
-      ]
+
+    const recentLoginUserIds = await LoginActivity.distinct('userId', {
+      timestamp: { $gte: sevenDaysAgo },
+      success: true
     });
+    const activeFromActivity = recentLoginUserIds
+      .filter((id) => id != null)
+      .map((id) => id.toString());
+
+    const usersWithRecentFieldLogin = await User.find({
+      lastLogin: { $ne: null, $gte: sevenDaysAgo }
+    })
+      .select('_id')
+      .lean();
+    const activeFromUserDoc = usersWithRecentFieldLogin.map((u) => u._id.toString());
+
+    const activeUsers = new Set([...activeFromActivity, ...activeFromUserDoc]).size;
 
     // Count courses
     const totalCourses = await Course.countDocuments();

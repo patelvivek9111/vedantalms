@@ -10,9 +10,11 @@ interface BreadcrumbItem {
 interface BreadcrumbProps {
   items?: BreadcrumbItem[];
   showHome?: boolean;
+  /** Merged onto the root nav; default keeps bottom spacing for standalone use */
+  className?: string;
 }
 
-const Breadcrumb: React.FC<BreadcrumbProps> = ({ items, showHome = true }) => {
+const Breadcrumb: React.FC<BreadcrumbProps> = ({ items, showHome = true, className }) => {
   const location = useLocation();
 
   // Auto-generate breadcrumbs from pathname if items not provided
@@ -60,7 +62,7 @@ const Breadcrumb: React.FC<BreadcrumbProps> = ({ items, showHome = true }) => {
 
   return (
     <nav 
-      className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400 mb-4"
+      className={`inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-slate-100 to-white px-2.5 py-1.5 text-sm text-slate-600 dark:from-slate-800 dark:to-slate-900 dark:text-slate-300 ${className ?? 'mb-4'}`}
       aria-label="Breadcrumb"
     >
       {breadcrumbItems.map((item, index) => {
@@ -71,22 +73,22 @@ const Breadcrumb: React.FC<BreadcrumbProps> = ({ items, showHome = true }) => {
             {index === 0 && showHome ? (
               <Link
                 to={item.path}
-                className="flex items-center hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm transition-colors hover:text-blue-600 dark:bg-slate-700 dark:text-slate-300 dark:hover:text-blue-300"
                 aria-label="Home"
               >
                 <Home className="h-4 w-4" />
               </Link>
             ) : (
               <>
-                <ChevronRight className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                <ChevronRight className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
                 {isLast ? (
-                  <span className="text-gray-900 dark:text-gray-100 font-medium">
+                  <span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white shadow-sm dark:bg-blue-500">
                     {item.label}
                   </span>
                 ) : (
                   <Link
                     to={item.path}
-                    className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                    className="rounded-full px-2 py-1 text-slate-600 transition-colors hover:bg-white hover:text-blue-600 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-blue-300"
                   >
                     {item.label}
                   </Link>

@@ -391,7 +391,7 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
             {item.type === 'assignment' && (
               <Link
                 to={`/assignments/${item._id}/edit`}
-                className="inline-flex items-center justify-center min-h-[44px] px-3 py-2 border border-transparent text-xs font-medium rounded text-blue-700 dark:text-blue-200 bg-blue-100 dark:bg-blue-900 hover:bg-blue-200 dark:hover:bg-blue-800 touch-manipulation active:scale-95 transition-transform"
+                className="inline-flex min-h-[38px] items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                 style={{ textDecoration: 'none' }}
               >
                 Edit
@@ -650,11 +650,11 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
       <div className="space-y-3 sm:space-y-4">
       {/* Tabs */}
       {isTeacherOrAdmin && (
-        <div className="flex flex-wrap gap-2 sm:gap-2 border-b border-gray-200 dark:border-gray-700 mb-3 sm:mb-4 overflow-x-auto pb-1">
+        <div className="mb-4 flex flex-wrap gap-2 overflow-x-auto rounded-lg border border-gray-200 bg-gray-50 p-1.5 dark:border-gray-700 dark:bg-gray-800">
           {(isQuizzesView ? TABS.filter(tab => tab.value !== 'assignment' && tab.value !== 'discussion') : TABS).map(tab => (
             <button
               key={tab.value}
-              className={`min-h-[44px] px-3 sm:px-3 md:px-4 py-2 sm:py-2 -mb-px border-b-2 font-medium text-xs sm:text-sm focus:outline-none whitespace-nowrap transition-colors touch-manipulation active:scale-95 ${selectedTab === tab.value ? 'border-indigo-600 dark:border-indigo-400 text-indigo-700 dark:text-indigo-300' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400'}`}
+              className={`min-h-[40px] whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none touch-manipulation active:scale-95 ${selectedTab === tab.value ? 'bg-white text-indigo-700 shadow-sm dark:bg-gray-900 dark:text-indigo-300' : 'text-gray-600 dark:text-gray-400 hover:bg-white/70 hover:text-indigo-600 dark:hover:bg-gray-700 dark:hover:text-indigo-300'}`}
               onClick={() => setSelectedTab(tab.value)}
             >
               {tab.label}

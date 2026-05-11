@@ -20,13 +20,22 @@ const ThrowError = ({ shouldThrow }: { shouldThrow: boolean }) => {
 };
 
 describe('ErrorBoundary', () => {
+  const suppressExpectedErrorEvent = (event: Event) => {
+    const maybeError = event as ErrorEvent;
+    if (maybeError?.error instanceof Error && maybeError.error.message === 'Test error') {
+      event.preventDefault();
+    }
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     // Suppress console.error for error boundary tests
     vi.spyOn(console, 'error').mockImplementation(() => {});
+    window.addEventListener('error', suppressExpectedErrorEvent);
   });
 
   afterEach(() => {
+    window.removeEventListener('error', suppressExpectedErrorEvent);
     vi.restoreAllMocks();
   });
 
