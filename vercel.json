@@ -3,6 +3,18 @@
   "outputDirectory": "frontend/dist",
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://vedantalms-backend.onrender.com/api/:path*"
+    },
+    {
+      "source": "/uploads/:path*",
+      "destination": "https://vedantalms-backend.onrender.com/uploads/:path*"
+    },
+    {
+      "source": "/health",
+      "destination": "https://vedantalms-backend.onrender.com/health"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

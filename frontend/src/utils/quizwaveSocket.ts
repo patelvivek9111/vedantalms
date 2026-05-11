@@ -1,11 +1,10 @@
 import { io, Socket } from 'socket.io-client';
-import { API_URL } from '../config';
+import { getBackendOrigin } from '../config';
 
 let socket: Socket | null = null;
 
 export const getQuizWaveSocket = (token: string): Socket => {
-  // Extract base URL from API_URL
-  const baseURL = API_URL.replace('/api', '');
+  const baseURL = getBackendOrigin();
 
   // If socket exists and is connected, return it
   if (socket && socket.connected) {

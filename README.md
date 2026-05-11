@@ -838,6 +838,8 @@ VITE_API_URL=https://your-backend-domain.com
 `VITE_API_URL` should be set explicitly in each frontend environment (production/staging/dev).  
 If it is not set in production, frontend requests fall back to same-origin `/api`.
 
+For **Vercel + Render** in this repo, `vercel.json` rewrites `/api/*`, `/uploads/*`, and `/health` to `https://vedantalms-backend.onrender.com`, so you can leave **`VITE_API_URL` empty** (or unset) and avoid CORS for REST calls. **`placeholder.onrender.com`** and similar template hosts are ignored in `frontend/src/config.ts` so a bad env value does not break login. **QuizWave** still needs a real Socket.IO host when `VITE_API_URL` is empty: the client uses **`VITE_SOCKET_ORIGIN`** if set, otherwise the same default Render origin as in `getBackendOrigin()`.
+
 ---
 
 ## 🧪 Development

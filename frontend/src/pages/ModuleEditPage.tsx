@@ -3,8 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useModule } from '../contexts/ModuleContext';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
-
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000';
+import { API_URL } from '../config';
 
 const ModuleEditPage: React.FC = () => {
   const { moduleId } = useParams<{ moduleId: string }>();

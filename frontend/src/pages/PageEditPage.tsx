@@ -6,7 +6,7 @@ import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
 import BackButton from '../components/common/BackButton';
 
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000';
+import { API_URL } from '../config';
 
 const PageEditPage: React.FC = () => {
   const { pageId } = useParams<{ pageId: string }>();
