@@ -61,6 +61,18 @@ const getApiUrl = (): string => {
 
 export const API_URL = getApiUrl();
 
+/** Browser app origin for QR deep links (join-course). Prefer VITE_APP_PUBLIC_URL in deployed envs. */
+export const getAppPublicOrigin = (): string => {
+  const fromEnv = (import.meta as any).env?.VITE_APP_PUBLIC_URL as string | undefined;
+  if (fromEnv?.trim()) {
+    return fromEnv.replace(/\/$/, '');
+  }
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin;
+  }
+  return '';
+};
+
 /**
  * Origin for Socket.IO (QuizWave). When API_URL is empty (browser → same-origin /api proxy),
  * sockets cannot terminate on the static CDN — connect to the real Node host instead.

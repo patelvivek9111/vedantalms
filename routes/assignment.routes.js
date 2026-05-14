@@ -11,6 +11,9 @@ router.post('/', protect, authorize(['teacher', 'admin']), upload.array('attachm
 // Get all assignments for a module
 router.get('/module/:moduleId', protect, assignmentController.getModuleAssignments);
 
+// All module assignments for a course in one round-trip (must stay above /:id)
+router.get('/course/:courseId/module-assignments', protect, assignmentController.getCourseModuleAssignmentsBulk);
+
 // Get a single assignment
 router.get('/:id', protect, assignmentController.getAssignment);
 

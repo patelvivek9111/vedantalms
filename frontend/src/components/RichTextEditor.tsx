@@ -10,6 +10,9 @@ interface RichTextEditorProps {
   id?: string;
 }
 
+const base = import.meta.env.BASE_URL ?? '/';
+const courseHtmlSharedCss = `${base.endsWith('/') ? base : `${base}/`}course-html-shared.css`;
+
 const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, placeholder, className, height, id }) => {
   return (
     <Editor
@@ -29,7 +32,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, plac
           alignleft aligncenter alignright alignjustify | \
           bullist numlist outdent indent | removeformat | help',
         placeholder: placeholder || 'Write something...',
-        content_style: 'body { font-family:Helvetica,Arial,sans-serif; font-size:14px }'
+        content_css: [courseHtmlSharedCss],
+        content_style: 'body { margin: 8px; }'
       }}
       textareaName="content"
       className={className}

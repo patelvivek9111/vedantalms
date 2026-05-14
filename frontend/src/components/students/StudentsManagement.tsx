@@ -100,6 +100,76 @@ const StudentsManagement: React.FC<StudentsManagementProps> = ({
           </div>
         )}
         
+        {/* Pending join requests (QR / join link — not on roster until you approve) */}
+        {(isInstructor || isAdmin) &&
+          course.enrollmentRequests?.filter((req: any) => req.status === 'pending').length > 0 && (
+            <div className="mb-8 rounded-xl border border-blue-200 bg-blue-50/60 p-4 dark:border-blue-800 dark:bg-blue-900/15">
+              <h3 className="mb-2 text-base font-semibold text-blue-950 dark:text-blue-100">
+                Pending approval (
+                {course.enrollmentRequests?.filter((req: any) => req.status === 'pending').length || 0})
+              </h3>
+              <p className="mb-3 text-sm text-blue-900/85 dark:text-blue-200/90">
+                Students who joined via QR or a join link are waiting for you to approve or deny their request.
+              </p>
+              <div className="space-y-3">
+                {course.enrollmentRequests
+                  .filter((req: any) => req.status === 'pending')
+                  .map((request: any, idx: number) => (
+                    <div
+                      key={`pending-${request._id ?? request.student?._id ?? idx}-${idx}`}
+                      className="flex flex-col gap-3 rounded-lg border border-blue-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between dark:border-blue-800 dark:bg-slate-900/40"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/50">
+                          {request.student?.profilePicture ? (
+                            <img
+                              src={
+                                request.student.profilePicture.startsWith('http')
+                                  ? request.student.profilePicture
+                                  : getImageUrl(request.student.profilePicture)
+                              }
+                              alt={`${request.student.firstName ?? ''} ${request.student.lastName ?? ''}`}
+                              className="h-10 w-10 rounded-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-sm font-semibold text-blue-800 dark:text-blue-200">
+                              {request.student?.firstName?.charAt(0) ?? '?'}
+                              {request.student?.lastName?.charAt(0) ?? ''}
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900 dark:text-gray-100">
+                            {request.student?.firstName} {request.student?.lastName}
+                          </p>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                            Requested {request.requestDate ? new Date(request.requestDate).toLocaleDateString() : '—'}
+                            {request.student?.email ? ` · ${request.student.email}` : ''}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex w-full gap-2 sm:w-auto sm:shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleApproveEnrollment(request.student._id)}
+                          className="flex-1 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800 transition-colors hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200 dark:hover:bg-emerald-900/50 sm:flex-none"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDenyEnrollment(request.student._id)}
+                          className="flex-1 rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-800 transition-colors hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-900/30 dark:text-rose-200 dark:hover:bg-rose-900/50 sm:flex-none"
+                        >
+                          Deny
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
         {/* Waitlisted Students - NEW SECTION */}
         {(isInstructor || isAdmin) &&
           course.enrollmentRequests?.filter((req: any) => req.status === 'waitlisted').length > 0 && (

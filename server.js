@@ -193,11 +193,21 @@ app.use((req, res, next) => {
   next();
 });
 
+// Course pages fan out many parallel GETs; a low RATE_LIMIT_MAX in .env or a tight default
+// causes 429 after a single navigation. Dev/test skip limits unless ENFORCE_RATE_LIMIT_IN_DEV.
+const applyApiRateLimits =
+  process.env.NODE_ENV === 'production'
+    ? process.env.DISABLE_RATE_LIMIT !== 'true'
+    : process.env.ENFORCE_RATE_LIMIT_IN_DEV === 'true';
+
+const skipApiRateLimit = () => !applyApiRateLimits;
+
 const generalLimiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || `${60 * 1000}`, 10),
-  max: parseInt(process.env.RATE_LIMIT_MAX || '300', 10),
+  max: parseInt(process.env.RATE_LIMIT_MAX || '900', 10),
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  skip: skipApiRateLimit
 });
 
 const authLimiter = rateLimit({
@@ -205,15 +215,26 @@ const authLimiter = rateLimit({
   max: parseInt(process.env.AUTH_RATE_LIMIT_MAX || '30', 10),
   standardHeaders: true,
   legacyHeaders: false,
-  message: { message: 'Too many authentication requests, try again later.' }
+  message: { message: 'Too many authentication requests, try again later.' },
+  skip: skipApiRateLimit
+});
+
+const contactInquiryLimiter = rateLimit({
+  windowMs: parseInt(process.env.CONTACT_INQUIRY_WINDOW_MS || `${15 * 60 * 1000}`, 10),
+  max: parseInt(process.env.CONTACT_INQUIRY_MAX || '8', 10),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many contact requests. Please try again later.' },
+  skip: skipApiRateLimit
 });
 
 const writeLimiter = rateLimit({
   windowMs: parseInt(process.env.WRITE_RATE_LIMIT_WINDOW_MS || `${60 * 1000}`, 10),
-  max: parseInt(process.env.WRITE_RATE_LIMIT_MAX || '120', 10),
+  max: parseInt(process.env.WRITE_RATE_LIMIT_MAX || '240', 10),
   standardHeaders: true,
   legacyHeaders: false,
-  message: { message: 'Too many write requests, please slow down.' }
+  message: { message: 'Too many write requests, please slow down.' },
+  skip: skipApiRateLimit
 });
 
 /** GET/HEAD/OPTIONS stay on the general `/api` limiter only; mutations keep the stricter write cap. */
@@ -362,6 +383,7 @@ app.use('/uploads', (req, res, next) => {
 });
 
 // Routes
+app.use('/api/contact', contactInquiryLimiter, require('./routes/contact.routes'));
 app.use('/api/auth', require('./routes/auth.routes'));
 app.use('/api/catalog', require('./routes/catalog.routes'));
 app.use('/api/courses', require('./routes/course.routes'));

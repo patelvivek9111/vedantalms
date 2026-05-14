@@ -1,9 +1,25 @@
 const Assignment = require('../models/Assignment');
 const Submission = require('../models/Submission');
+const Module = require('../models/module.model');
 const fs = require('fs').promises;
 const path = require('path');
 const mongoose = require('mongoose');
 const { startOfWeek, endOfWeek } = require('date-fns');
+
+/** Plain object or Mongoose doc → assignment JSON with computed totalPoints (matches getModuleAssignments). */
+const enrichAssignmentTotalPoints = (a) => {
+  const obj = typeof a.toObject === 'function' ? a.toObject() : { ...a };
+  let totalPoints = 0;
+  if (obj.isOfflineAssignment && obj.totalPoints) {
+    totalPoints = obj.totalPoints;
+  } else if (Array.isArray(obj.questions) && obj.questions.length > 0) {
+    totalPoints = obj.questions.reduce((sum, q) => sum + (q.points || 0), 0);
+  } else if (obj.totalPoints) {
+    totalPoints = obj.totalPoints;
+  }
+  obj.totalPoints = totalPoints;
+  return obj;
+};
 
 // Create a new assignment
 exports.createAssignment = async (req, res) => {
@@ -65,23 +81,50 @@ exports.getModuleAssignments = async (req, res) => {
     })
       .populate('createdBy', 'firstName lastName profilePicture')
       .sort({ createdAt: -1 });
-    // Add totalPoints to each assignment
-    const assignmentsWithPoints = assignments.map(a => {
-      // For offline assignments, use the stored totalPoints field
-      // For regular assignments, calculate from questions
-      let totalPoints = 0;
-      if (a.isOfflineAssignment && a.totalPoints) {
-        totalPoints = a.totalPoints;
-      } else if (Array.isArray(a.questions) && a.questions.length > 0) {
-        totalPoints = a.questions.reduce((sum, q) => sum + (q.points || 0), 0);
-      } else if (a.totalPoints) {
-        totalPoints = a.totalPoints;
-      }
-      const obj = a.toObject();
-      obj.totalPoints = totalPoints;
-      return obj;
+    res.json(assignments.map(enrichAssignmentTotalPoints));
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * One request for all module-linked assignments in a course (replaces N× GET /module/:id).
+ * Response: { success, byModuleId: { [moduleId]: Assignment[] } } — same shape per module as getModuleAssignments.
+ */
+exports.getCourseModuleAssignmentsBulk = async (req, res) => {
+  try {
+    const courseId = req.params.courseId;
+    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      return res.status(400).json({ message: 'Invalid course ID' });
+    }
+    const modules = await Module.find({ course: courseId }).select('_id').lean();
+    const moduleIds = modules.map((m) => m._id);
+    const byModuleId = {};
+    moduleIds.forEach((id) => {
+      byModuleId[id.toString()] = [];
     });
-    res.json(assignmentsWithPoints);
+    if (moduleIds.length === 0) {
+      return res.json({ success: true, byModuleId });
+    }
+    const isStudent = req.user.role === 'student';
+    const query = {
+      module: { $in: moduleIds },
+      ...(isStudent ? { published: true } : {})
+    };
+    const assignments = await Assignment.find(query)
+      .populate('createdBy', 'firstName lastName profilePicture')
+      .sort({ createdAt: -1 })
+      .lean();
+    const withPoints = assignments.map(enrichAssignmentTotalPoints);
+    for (const a of withPoints) {
+      const mid = (a.module && a.module.toString) ? a.module.toString() : String(a.module || '');
+      if (mid && Object.prototype.hasOwnProperty.call(byModuleId, mid)) {
+        byModuleId[mid].push(a);
+      } else if (mid) {
+        byModuleId[mid] = [a];
+      }
+    }
+    res.json({ success: true, byModuleId });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

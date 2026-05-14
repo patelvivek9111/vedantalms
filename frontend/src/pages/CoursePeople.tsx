@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { getImageUrl } from '../services/api';
 import ConfirmationModal from '../components/common/ConfirmationModal';
+import { toast } from 'react-toastify';
 
 interface Student {
   _id: string;
@@ -85,9 +86,9 @@ const CoursePeople: React.FC = () => {
       const studentsRes = await api.get(`/courses/${courseId}/students`);
       setStudents(studentsRes.data);
       
-      alert('Enrollment approved successfully!');
+      toast.success('The student has been added to the course.');
     } catch (err: any) {
-      alert('Failed to approve enrollment');
+      toast.error(err.response?.data?.message || 'Could not approve enrollment.');
     }
   };
 
@@ -98,9 +99,9 @@ const CoursePeople: React.FC = () => {
       // Remove from enrollment requests
       setEnrollmentRequests(prev => prev.filter(req => req.student._id !== studentId));
       
-      alert('Enrollment denied successfully!');
+      toast.success('The enrollment request was declined.');
     } catch (err: any) {
-      alert('Failed to deny enrollment');
+      toast.error(err.response?.data?.message || 'Could not decline the request.');
     }
   };
 
@@ -117,8 +118,9 @@ const CoursePeople: React.FC = () => {
       const studentsRes = await api.get(`/courses/${courseId}/students`);
       setStudents(studentsRes.data);
       setStudentToRemove(null);
+      toast.success('The student has been removed from the course.');
     } catch (err: any) {
-      alert('Failed to remove student');
+      toast.error(err.response?.data?.message || 'Could not remove the student.');
     }
   };
 

@@ -316,15 +316,15 @@ const GradebookView: React.FC<GradebookViewProps> = ({
         })}
       </div>
 
-      {/* Desktop Gradebook Table */}
-      <div className="hidden lg:block overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+      {/* Desktop Gradebook Table — scroll inside card so header row stays visible */}
+      <div className="hidden lg:block rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
         <div className="relative w-full">
-          <div className="overflow-x-auto w-full relative">
-            <table className="min-w-max w-full">
-              <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-800">
+          <div className="max-h-[min(75vh,900px)] w-full overflow-auto">
+            <table className="min-w-max w-full border-collapse">
+              <thead className="sticky top-0 z-10 bg-gray-50 shadow-sm dark:bg-gray-800 dark:shadow-none">
                 <tr>
                   {/* Sticky first column header */}
-                  <th className="px-6 py-4 border-b border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-left text-gray-700 dark:text-gray-300 sticky left-0 z-50 font-semibold text-sm uppercase tracking-wider" style={{left: 0, zIndex: 50, boxShadow: '2px 0 8px -4px rgba(0,0,0,0.1)'}}>
+                  <th className="px-6 py-4 border-b border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-left text-gray-700 dark:text-gray-300 sticky left-0 top-0 z-20 font-semibold text-sm uppercase tracking-wider" style={{ boxShadow: '2px 0 8px -4px rgba(0,0,0,0.1)' }}>
                     <div className="flex items-center space-x-2">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -364,7 +364,7 @@ const GradebookView: React.FC<GradebookViewProps> = ({
                     );
                   })}
                   {/* Sticky last column header */}
-                  <th className="px-6 py-4 border-b border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-center text-gray-700 dark:text-gray-300 sticky right-0 z-50 font-semibold text-sm uppercase tracking-wider" style={{right: 0, zIndex: 50, boxShadow: '-2px 0 8px -4px rgba(0,0,0,0.1)'}}>
+                  <th className="px-6 py-4 border-b border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-center text-gray-700 dark:text-gray-300 sticky right-0 top-0 z-20 font-semibold text-sm uppercase tracking-wider" style={{ boxShadow: '-2px 0 8px -4px rgba(0,0,0,0.1)' }}>
                     <div className="flex items-center justify-center space-x-2">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -396,7 +396,7 @@ const GradebookView: React.FC<GradebookViewProps> = ({
                       className={`${rowBg} hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-150`}
                     >
                       {/* Sticky first column body */}
-                      <td className={`px-6 py-4 border-r border-gray-200 dark:border-gray-600 text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer font-medium whitespace-nowrap sticky left-0 z-40 ${stickyBg} transition-colors duration-150`} style={{left: 0, zIndex: 40, boxShadow: '2px 0 8px -4px rgba(0,0,0,0.1)'}}>
+                      <td className={`px-6 py-4 border-r border-gray-200 dark:border-gray-600 text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer font-medium whitespace-nowrap sticky left-0 z-[5] ${stickyBg} transition-colors duration-150`} style={{ boxShadow: '2px 0 8px -4px rgba(0,0,0,0.1)' }}>
                         <div className="flex items-center space-x-3">
                           <div className="relative">
                             {student.profilePicture ? (
@@ -602,7 +602,7 @@ const GradebookView: React.FC<GradebookViewProps> = ({
                         );
                       })}
                       {/* Sticky last column body */}
-                      <td className={`px-6 py-4 border-l border-gray-200 dark:border-gray-600 text-center font-semibold whitespace-nowrap sticky right-0 z-40 ${rowBg} transition-colors duration-150`} style={{right: 0, zIndex: 40, boxShadow: '-2px 0 8px -4px rgba(0,0,0,0.1)'}}>
+                      <td className={`px-6 py-4 border-l border-gray-200 dark:border-gray-600 text-center font-semibold whitespace-nowrap sticky right-0 z-[5] ${rowBg} transition-colors duration-150`} style={{ boxShadow: '-2px 0 8px -4px rgba(0,0,0,0.1)' }}>
                         {(course.groups && course.groups.length > 0) ? (
                           <div className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-bold ${gradeColor} bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-600`}>
                             {Number(weightedPercent).toFixed(2)}% ({letter})
@@ -615,8 +615,8 @@ const GradebookView: React.FC<GradebookViewProps> = ({
               </tbody>
             </table>
           </div>
-          {/* Right edge gradient for scroll cue */}
-          <div className="pointer-events-none absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-gray-50 dark:from-gray-800 to-transparent" style={{zIndex: 10}} />
+          {/* Right edge gradient for horizontal scroll cue */}
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-[12] w-12 bg-gradient-to-l from-white to-transparent dark:from-gray-900" />
         </div>
         {(!students.length || !assignments.length) && (
           <div className="text-center py-12">

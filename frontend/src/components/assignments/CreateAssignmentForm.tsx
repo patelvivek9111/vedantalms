@@ -17,6 +17,8 @@ interface CreateAssignmentFormProps {
   moduleId: string;
   editMode?: boolean;
   assignmentData?: any;
+  /** When set, skips outer card + duplicate title (parent provides page chrome). */
+  layout?: 'page' | 'embedded';
 }
 
 interface Module {
@@ -73,7 +75,12 @@ interface GroupSet {
   allowSelfSignup: boolean;
 }
 
-const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, editMode = false, assignmentData = null }) => {
+const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
+  moduleId,
+  editMode = false,
+  assignmentData = null,
+  layout = 'page',
+}) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [modules, setModules] = useState<Module[]>([]);
@@ -636,42 +643,77 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
     }
   };
 
-  return (
-    <div className="w-full px-2 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8 overflow-x-hidden">
-      <div className="max-w-4xl mx-auto bg-white dark:bg-gray-800 rounded-lg shadow-lg p-2 sm:p-4 lg:p-6 overflow-x-hidden">
-      <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 text-gray-800 dark:text-gray-100">
-        {editMode 
-          ? (formData.isGradedQuiz ? 'Edit Quiz' : 'Edit Assignment')
-          : (formData.isGradedQuiz ? 'Create New Quiz' : 'Create New Assignment')
-        }
-      </h2>
-      
-      {/* Step Indicator */}
-      <div className="mb-6 sm:mb-8">
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4">
-          <div className={`flex items-center ${currentStep >= 1 ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400 dark:text-gray-500 dark:text-gray-400'}`}>
-            <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center border-2 text-xs sm:text-sm ${currentStep >= 1 ? 'bg-indigo-600 dark:bg-indigo-500 border-indigo-600 dark:border-indigo-500 text-white' : 'border-gray-300 dark:border-gray-700 dark:border-gray-600'}`}>
-              1
+  const embedded = layout === 'embedded';
+
+  const formInner = (
+    <>
+      {!embedded && (
+        <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 text-gray-800 dark:text-gray-100">
+          {editMode
+            ? formData.isGradedQuiz
+              ? 'Edit Quiz'
+              : 'Edit Assignment'
+            : formData.isGradedQuiz
+              ? 'Create New Quiz'
+              : 'Create New Assignment'}
+        </h2>
+      )}
+
+      <div className="mb-8">
+        <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-4 dark:border-gray-700 dark:bg-gray-900/50 sm:px-5">
+          <div className="flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-2">
+            <div
+              className={`flex items-center ${currentStep >= 1 ? 'text-blue-700 dark:text-blue-300' : 'text-gray-400 dark:text-gray-500'}`}
+            >
+              <div
+                className={`flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-semibold sm:h-9 sm:w-9 sm:text-sm ${
+                  currentStep >= 1
+                    ? 'border-blue-600 bg-blue-600 text-white dark:border-blue-500 dark:bg-blue-500'
+                    : 'border-gray-300 dark:border-gray-600 dark:bg-gray-700'
+                }`}
+              >
+                1
+              </div>
+              <span className="ml-2 text-xs font-medium sm:text-sm">Basic details</span>
             </div>
-            <span className="ml-2 text-xs sm:text-sm font-medium">Basic Details</span>
-          </div>
-          <div className={`hidden sm:block w-12 h-0.5 ${currentStep >= 2 ? 'bg-indigo-600 dark:bg-indigo-500' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
-          <div className={`flex items-center ${currentStep >= 2 ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400 dark:text-gray-500 dark:text-gray-400'}`}>
-            <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center border-2 text-xs sm:text-sm ${currentStep >= 2 ? 'bg-indigo-600 dark:bg-indigo-500 border-indigo-600 dark:border-indigo-500 text-white' : 'border-gray-300 dark:border-gray-700 dark:border-gray-600'}`}>
-              2
+            <div
+              className={`hidden h-0.5 w-10 sm:block ${currentStep >= 2 ? 'bg-blue-600 dark:bg-blue-500' : 'bg-gray-200 dark:bg-gray-600'}`}
+            />
+            <div
+              className={`flex items-center ${currentStep >= 2 ? 'text-blue-700 dark:text-blue-300' : 'text-gray-400 dark:text-gray-500'}`}
+            >
+              <div
+                className={`flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-semibold sm:h-9 sm:w-9 sm:text-sm ${
+                  currentStep >= 2
+                    ? 'border-blue-600 bg-blue-600 text-white dark:border-blue-500 dark:bg-blue-500'
+                    : 'border-gray-300 dark:border-gray-600 dark:bg-gray-700'
+                }`}
+              >
+                2
+              </div>
+              <span className="ml-2 text-xs font-medium sm:text-sm">Description</span>
             </div>
-            <span className="ml-2 text-xs sm:text-sm font-medium">Description</span>
-          </div>
-          <div className={`hidden sm:block w-12 h-0.5 ${currentStep >= 3 ? 'bg-indigo-600 dark:bg-indigo-500' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
-          <div className={`flex items-center ${currentStep >= 3 ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400 dark:text-gray-500 dark:text-gray-400'}`}>
-            <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center border-2 text-xs sm:text-sm ${currentStep >= 3 ? 'bg-indigo-600 dark:bg-indigo-500 border-indigo-600 dark:border-indigo-500 text-white' : 'border-gray-300 dark:border-gray-700 dark:border-gray-600'}`}>
-              3
+            <div
+              className={`hidden h-0.5 w-10 sm:block ${currentStep >= 3 ? 'bg-blue-600 dark:bg-blue-500' : 'bg-gray-200 dark:bg-gray-600'}`}
+            />
+            <div
+              className={`flex items-center ${currentStep >= 3 ? 'text-blue-700 dark:text-blue-300' : 'text-gray-400 dark:text-gray-500'}`}
+            >
+              <div
+                className={`flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-semibold sm:h-9 sm:w-9 sm:text-sm ${
+                  currentStep >= 3
+                    ? 'border-blue-600 bg-blue-600 text-white dark:border-blue-500 dark:bg-blue-500'
+                    : 'border-gray-300 dark:border-gray-600 dark:bg-gray-700'
+                }`}
+              >
+                3
+              </div>
+              <span className="ml-2 text-xs font-medium sm:text-sm">Questions & files</span>
             </div>
-            <span className="ml-2 text-xs sm:text-sm font-medium">Questions & Files</span>
           </div>
         </div>
       </div>
-      
+
       {error && (
         <div className="bg-red-100 dark:bg-red-900/20 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded mb-4">
           {error}
@@ -680,26 +722,28 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
 
       {/* Warning for assignments with submissions */}
       {editMode && hasSubmissions && (
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 text-yellow-800 dark:text-yellow-300 px-4 py-3 rounded mb-4">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-yellow-400 dark:text-yellow-500" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+        <div
+          role="status"
+          className="mb-6 rounded-xl border border-amber-200/90 bg-amber-50/95 px-4 py-4 text-amber-950 shadow-sm dark:border-amber-800/60 dark:bg-amber-950/25 dark:text-amber-100 sm:px-5"
+        >
+          <div className="flex gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/50">
+              <svg className="h-5 w-5 text-amber-600 dark:text-amber-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                <path
+                  fillRule="evenodd"
+                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                  clipRule="evenodd"
+                />
               </svg>
             </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                Assignment has {submissionCount} submission{submissionCount !== 1 ? 's' : ''}
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                This assignment has {submissionCount} submission{submissionCount !== 1 ? 's' : ''}
               </h3>
-              <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-300">
-                <p>This assignment has been submitted by {submissionCount} student{submissionCount !== 1 ? 's' : ''}. Some changes are restricted:</p>
-                <ul className="list-disc list-inside mt-1 space-y-1">
-                  <li>Cannot add or remove questions</li>
-                  <li>Cannot change question types (e.g., from multiple-choice to text)</li>
-                  <li>Can modify question text, options, and points</li>
-                  <li>Can change assignment settings (title, description, dates, etc.)</li>
-                </ul>
-              </div>
+              <p className="mt-2 text-sm leading-relaxed text-amber-900/90 dark:text-amber-100/90">
+                Some edits are limited while submissions exist. You can still update titles, dates, descriptions, and
+                adjust question text, options, and points. You cannot add or remove questions or change question types.
+              </p>
             </div>
           </div>
         </div>
@@ -1657,8 +1701,21 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({ moduleId, e
         cancelText="Cancel"
         variant="warning"
       />
-      </div>
-    </div>
+    </>
+  );
+
+  return (
+    <>
+      {embedded ? (
+        <div className="w-full overflow-x-hidden">{formInner}</div>
+      ) : (
+        <div className="w-full px-2 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8 overflow-x-hidden">
+          <div className="max-w-4xl mx-auto bg-white dark:bg-gray-800 rounded-lg shadow-lg p-2 sm:p-4 lg:p-6 overflow-x-hidden">
+            {formInner}
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 

@@ -21,8 +21,17 @@ vi.mock('../../utils/logger', () => ({
   },
 }));
 
-// Mock window.alert
-window.alert = vi.fn();
+const { toastError, toastSuccess } = vi.hoisted(() => ({
+  toastError: vi.fn(),
+  toastSuccess: vi.fn(),
+}));
+
+vi.mock('react-toastify', () => ({
+  toast: {
+    success: (...args: unknown[]) => toastSuccess(...args),
+    error: (...args: unknown[]) => toastError(...args),
+  },
+}));
 
 const mockedApi = api as any;
 
@@ -41,6 +50,8 @@ describe('EnrollmentRequestsHandler', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    toastError.mockClear();
+    toastSuccess.mockClear();
   });
 
   it('should show loading state', () => {
@@ -139,7 +150,7 @@ describe('EnrollmentRequestsHandler', () => {
     fireEvent.click(approveButton);
 
     await waitFor(() => {
-      expect(window.alert).toHaveBeenCalledWith('Failed to approve enrollment');
+      expect(toastError).toHaveBeenCalledWith('Could not approve enrollment.');
     });
   });
 

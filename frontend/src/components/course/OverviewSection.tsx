@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Lock, Unlock, Settings, Layout, Gamepad2 } from 'lucide-react';
 import LatestAnnouncements from '../LatestAnnouncements';
 import ConfirmationModal from '../common/ConfirmationModal';
+import CourseEnrollmentQrCard from './CourseEnrollmentQrCard';
 import { useCourse } from '../../contexts/CourseContext';
 import { toast } from 'react-toastify';
 
@@ -190,6 +191,10 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
             </button>
           </div>
         </div>
+      )}
+
+      {(isInstructor || isAdmin) && (
+        <CourseEnrollmentQrCard courseId={courseId} />
       )}
 
       {/* Student Quick Actions */}

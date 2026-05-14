@@ -843,7 +843,7 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
   return (
     <div
       ref={containerRef}
-      className="flex justify-center items-center mb-6 relative"
+      className="relative flex items-center justify-center"
       style={{ height: '80px' }}
     >
       <svg

@@ -7,6 +7,7 @@ import api from '../services/api';
 import { API_URL } from '../config';
 import { getImageUrl } from '../services/api';
 import axios from 'axios';
+import { toast } from 'react-toastify';
 import { 
   Lock, 
   Unlock, 
@@ -66,7 +67,6 @@ import QuizzesSection from './course/QuizzesSection';
 import ModulesSection from './course/ModulesSection';
 import PollsSection from './course/PollsSection';
 import CourseMeetingsSection from './course/CourseMeetingsSection';
-import { useGradebookData } from '../hooks/useGradebookData';
 import { useStudentSubmissions } from '../hooks/useStudentSubmissions';
 import { useGradeManagement } from '../hooks/useGradeManagement';
 import { useSubmissionIds } from '../hooks/useSubmissionIds';
@@ -114,6 +114,7 @@ const CourseDetail: React.FC = () => {
   // Add state for backend-calculated student grade
   const [studentTotalGrade, setStudentTotalGrade] = useState<number | null>(null);
   const [studentLetterGrade, setStudentLetterGrade] = useState<string | null>(null);
+  const [studentGradeSummaryReady, setStudentGradeSummaryReady] = useState(false);
   // Add state for graded discussions for student view
   const [studentDiscussions, setStudentDiscussions] = useState<any[]>([]);
   // Add state for group assignments for student view
@@ -174,6 +175,20 @@ const CourseDetail: React.FC = () => {
     setIsMobileMenuOpen(false); // Close mobile menu on route change
   }, [location.pathname]);
 
+  // Role-specific nav: students must not open Gradebook; teachers/admins must not open Grades (direct URL).
+  useEffect(() => {
+    if (!id || !user?.role) return;
+    const urlSection = location.pathname.split('/')[3] || 'overview';
+    const r = user.role;
+    if (urlSection === 'grades' && r !== 'student') {
+      navigate(`/courses/${id}/gradebook`, { replace: true });
+      return;
+    }
+    if (urlSection === 'gradebook' && r === 'student') {
+      navigate(`/courses/${id}/grades`, { replace: true });
+    }
+  }, [id, user?.role, location.pathname, navigate]);
+
   // Prevent body scroll when mobile sidebar is open, but allow sidebar to scroll
   useEffect(() => {
     if (isMobileMenuOpen) {
@@ -213,19 +228,17 @@ const CourseDetail: React.FC = () => {
 
         if (modulesResponse.data.success) {
           const modulesRaw = modulesResponse.data.data;
-          // For each module, fetch its assignments
-          const modulesWithAssignments = await Promise.all(
-            modulesRaw.map(async (module: any) => {
-              try {
-                const assignmentsRes = await axios.get(`${API_URL}/api/assignments/module/${module._id}`, {
-                  headers: { 'Authorization': `Bearer ${token}` }
-                });
-                return { ...module, assignments: assignmentsRes.data };
-              } catch (err) {
-                return { ...module, assignments: [] };
-              }
-            })
-          );
+          let byModuleId: Record<string, any[]> = {};
+          try {
+            const bulk = await api.get(`/assignments/course/${id}/module-assignments`);
+            byModuleId = bulk.data?.byModuleId || {};
+          } catch {
+            byModuleId = {};
+          }
+          const modulesWithAssignments = modulesRaw.map((module: any) => ({
+            ...module,
+            assignments: byModuleId[module._id] || byModuleId[String(module._id)] || []
+          }));
           setModules(modulesWithAssignments);
         }
       } catch (err) {
@@ -293,7 +306,6 @@ const CourseDetail: React.FC = () => {
   // Fetch graded discussions
   useDiscussions({
     course,
-    modules,
     setDiscussions,
     setDiscussionsLoading,
   });
@@ -316,45 +328,6 @@ const CourseDetail: React.FC = () => {
   useEffect(() => {
     getCourseRef.current = getCourse;
   }, [getCourse]);
-
-  useEffect(() => {
-    const fetchCourseAndModulesWithAssignments = async () => {
-      if (id) {
-        try {
-          const courseData = await getCourseRef.current(id);
-          setCourse(courseData);
-
-          // Fetch modules for the course
-          const token = localStorage.getItem('token');
-          const modulesResponse = await api.get(`/modules/${id}`, {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          });
-
-          if (modulesResponse.data.success) {
-            const modulesRaw = modulesResponse.data.data;
-            // For each module, fetch its assignments
-            const modulesWithAssignments = await Promise.all(
-              modulesRaw.map(async (module: any) => {
-                try {
-                  const assignmentsRes = await axios.get(`${API_URL}/api/assignments/module/${module._id}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                  });
-                  return { ...module, assignments: assignmentsRes.data };
-                } catch (err) {
-                  return { ...module, assignments: [] };
-                }
-              })
-            );
-            setModules(modulesWithAssignments);
-          }
-        } catch (err) {
-          }
-      }
-    };
-    fetchCourseAndModulesWithAssignments();
-  }, [id]);
 
   // Fetch group assignments when course changes
   useEffect(() => {
@@ -468,9 +441,9 @@ const CourseDetail: React.FC = () => {
         setCourse(updatedCourse);
       }
       
-      alert('Enrollment approved successfully!');
+      toast.success('The student has been added to the course.');
     } catch (err: any) {
-      alert('Failed to approve enrollment: ' + (err.response?.data?.message || err.message));
+      toast.error(err.response?.data?.message || err.message || 'Could not approve enrollment.');
     }
   };
 
@@ -490,9 +463,9 @@ const CourseDetail: React.FC = () => {
         setCourse(updatedCourse);
       }
       
-      alert('Enrollment denied successfully!');
+      toast.success('The enrollment request was declined.');
     } catch (err: any) {
-      alert('Failed to deny enrollment: ' + (err.response?.data?.message || err.message));
+      toast.error(err.response?.data?.message || err.message || 'Could not decline the request.');
     }
   };
 
@@ -514,19 +487,6 @@ const CourseDetail: React.FC = () => {
     }
   };
 
-  // Fetch gradebook data when gradebook section is active
-  useGradebookData({
-    activeSection,
-    isInstructor,
-    isAdmin,
-    course,
-    modules,
-    user,
-    gradebookRefresh,
-    setGradebookData,
-  });
-
-  // Fetch submission IDs when gradebook data changes
   useSubmissionIds({
     gradebookData,
     isInstructor,
@@ -578,14 +538,17 @@ const CourseDetail: React.FC = () => {
     setStudentLetterGrade,
     setStudentDiscussions,
     setStudentGroupAssignments,
+    setStudentGradeSummaryReady,
   });
 
   // Fetch gradebook data for instructors/admins
   useInstructorGradebookData({
     activeSection,
     isInstructor,
+    isAdmin,
     course,
     modules,
+    gradebookRefresh,
     setGradebookData,
   });
 
@@ -737,7 +700,7 @@ const CourseDetail: React.FC = () => {
 
       case 'modules':
         return (
-          <ModulesSection courseId={course._id} />
+          <ModulesSection courseId={course._id} prefetchedModules={modules} />
         );
 
       case 'pages':
@@ -823,11 +786,9 @@ const CourseDetail: React.FC = () => {
         }
 
       case 'grades':
-        if (isInstructor || isAdmin) {
-          // ... existing instructor view code ...
+        if (user?.role !== 'student') {
+          return null;
         }
-
-        // Student view:
         return (
           <StudentGradesView
             course={course}
@@ -840,12 +801,13 @@ const CourseDetail: React.FC = () => {
             studentSubmissions={studentSubmissions}
             studentTotalGrade={studentTotalGrade}
             studentLetterGrade={studentLetterGrade}
+            studentGradeSummaryReady={studentGradeSummaryReady}
           />
         );
 
       case 'gradebook':
-        if (!isInstructor && !isAdmin) {
-          return <div className="text-center py-8 text-gray-500">Access denied</div>;
+        if (user?.role === 'student') {
+          return null;
         }
         return (
           <GradebookView
@@ -960,8 +922,8 @@ const CourseDetail: React.FC = () => {
         setIsMobileMenuOpen={setIsMobileMenuOpen}
       />
 
-      {/* Breadcrumb + divider: equal space above/below the line */}
-      <div className="mx-auto hidden w-full max-w-7xl px-4 pt-2 lg:block">
+      {/* Breadcrumb + divider: sticky on desktop so it stays visible while the page scrolls */}
+      <div className="sticky top-0 z-[35] mx-auto hidden w-full max-w-7xl bg-gray-50 px-4 pt-2 dark:bg-gray-900 lg:block">
         <div className="flex flex-col">
           <div className="pb-3">
             <Breadcrumb

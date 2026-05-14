@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { ChevronDown, BookOpen } from 'lucide-react';
 
 interface MobileNavigationProps {
+  className?: string;
   isMobileDevice: boolean;
   course: any;
   showCourseDropdown: boolean;
@@ -15,6 +16,7 @@ interface MobileNavigationProps {
 }
 
 const MobileNavigation: React.FC<MobileNavigationProps> = ({
+  className,
   isMobileDevice,
   course,
   showCourseDropdown,
@@ -33,7 +35,9 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({
   }
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm safe-area-inset-top">
+    <nav
+      className={`fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm safe-area-inset-top ${className ?? ''}`}
+    >
       <div className="relative flex items-center justify-between px-4 py-3 gap-2">
         {/* Course Dropdown */}
         <div className="relative flex-1 max-w-[60%] min-w-0">

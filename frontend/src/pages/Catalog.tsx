@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
+import { toast } from 'react-toastify';
 import { API_URL } from '../config';
 import { Search, Filter, BookOpen, User, Users } from 'lucide-react';
 import { BurgerMenu } from '../components/BurgerMenu';
@@ -123,14 +124,22 @@ const Catalog: React.FC = () => {
   const handleEnrollment = async (courseId: string) => {
     try {
       const token = localStorage.getItem('token');
-      await axios.post(`${API_URL}/api/courses/${courseId}/enroll`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      alert('Enrollment request submitted successfully! Waiting for teacher approval.');
-      // Refresh the catalog to update enrollment counts and status
+      const res = await axios.post(
+        `${API_URL}/api/courses/${courseId}/enroll`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const d = res.data || {};
+      if (d.waitlisted) {
+        toast.success(d.message || 'You have been added to the waitlist. Your instructor will review your request.');
+      } else if (d.capacityOverridden) {
+        toast.success(d.message || 'You are enrolled in this course.');
+      } else {
+        toast.success(d.message || 'You are now enrolled in this course.');
+      }
       await fetchCatalog();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to submit enrollment request');
+      toast.error(err.response?.data?.message || 'Could not complete enrollment. Please try again.');
     }
   };
 
@@ -140,12 +149,10 @@ const Catalog: React.FC = () => {
       await axios.post(`${API_URL}/api/courses/${courseId}/unenroll-self`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
-      alert('Successfully unenrolled from the course!');
-      // Refresh the catalog to update enrollment counts and status
+      toast.success('You have been removed from this course.');
       await fetchCatalog();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to unenroll from the course');
+      toast.error(err.response?.data?.message || 'Could not unenroll. Please try again.');
     }
   };
 

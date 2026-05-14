@@ -20,12 +20,16 @@ export interface Module {
   pages: Page[];
   createdAt: string;
   updatedAt: string;
+  /** When set by course shell bulk load, ModuleCard skips per-module assignment GETs */
+  assignments?: unknown[];
 }
 
 interface ModuleContextType {
   modules: Module[];
   loading: boolean;
   error: string | null;
+  /** Replace module list without refetching (e.g. parent already loaded assignments). */
+  seedModules: (list: Module[]) => void;
   getModules: (courseId: string) => Promise<void>;
   createModule: (courseId: string, data: { title: string; description: string }) => Promise<void>;
   updateModule: (moduleId: string, data: { title: string; description: string }, courseId: string) => Promise<void>;
@@ -43,6 +47,12 @@ export const ModuleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { token } = useAuth();
+
+  const seedModules = useCallback((list: Module[]) => {
+    setModules(list);
+    setLoading(false);
+    setError(null);
+  }, []);
 
   const getModules = useCallback(async (courseId: string) => {
     if (!courseId) return;
@@ -205,6 +215,7 @@ export const ModuleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       modules, 
       loading, 
       error, 
+      seedModules,
       getModules: getModulesRef.current, 
       createModule, 
       updateModule,

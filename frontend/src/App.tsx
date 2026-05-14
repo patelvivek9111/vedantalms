@@ -53,6 +53,7 @@ const AccountPage = lazy(() => import('./pages/AccountPage'));
 const Groups = lazy(() => import('./pages/Groups'));
 const GroupSetView = lazy(() => import('./components/groups/GroupSetView'));
 const Catalog = lazy(() => import('./pages/Catalog'));
+const JoinCoursePage = lazy(() => import('./pages/JoinCoursePage'));
 const CoursePeople = lazy(() => import('./pages/CoursePeople'));
 const CourseDetail = lazy(() => import('./components/CourseDetail'));
 const QuizWaveDashboard = lazy(() => import('./components/quizwave/QuizWaveDashboard'));
@@ -123,10 +124,22 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 dark:text-white">
+    <div
+      className={
+        isAuthenticated
+          ? 'min-h-dvh bg-gray-100 dark:bg-gray-900 dark:text-white'
+          : 'flex min-h-dvh flex-col bg-slate-50 dark:bg-slate-950 dark:text-slate-100'
+      }
+    >
       {isAuthenticated && <GlobalSidebar />}
       {isAuthenticated && <BottomNav />}
-      <main className={isAuthenticated ? "pb-20 lg:pb-10 lg:pl-20 transition-all duration-300" : "pb-10"}>
+      <main
+        className={
+          isAuthenticated
+            ? 'pb-20 lg:pb-10 lg:pl-20 print:pb-0 print:pl-0 transition-all duration-300'
+            : 'flex min-h-0 flex-1 flex-col print:pb-0'
+        }
+      >
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
@@ -335,6 +348,14 @@ function AppContent() {
             element={
               <PrivateRoute>
                 {withRouteLoader(<Catalog />)}
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/join-course"
+            element={
+              <PrivateRoute>
+                {withRouteLoader(<JoinCoursePage />)}
               </PrivateRoute>
             }
           />

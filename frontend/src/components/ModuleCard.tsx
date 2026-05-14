@@ -76,6 +76,11 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
   }, [isExpanded, module._id, getPages]);
 
   useEffect(() => {
+    if (Array.isArray((module as any).assignments)) {
+      setAssignments((module as any).assignments);
+      setIsLoadingAssignments(false);
+      return;
+    }
     const fetchAssignments = async () => {
       if (isExpanded) {
         setIsLoadingAssignments(true);
@@ -94,7 +99,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
       }
     };
     fetchAssignments();
-  }, [isExpanded, module._id]);
+  }, [isExpanded, module._id, (module as any).assignments]);
 
   useEffect(() => {
     const fetchDiscussions = async () => {
@@ -328,7 +333,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
             </div>
           )}
 
-          {/* Assignments and Discussions Section - Sorted by Due Date */}
+          {/* Assignments and discussions: latest due date first (then earlier / past) */}
           {isLoadingAssignments || isLoadingDiscussions ? (
             <div className={`p-3 sm:p-4 text-center text-xs sm:text-sm text-gray-500 dark:text-gray-400 ${pages.length > 0 ? 'border-t border-gray-200 dark:border-gray-700' : ''}`}>
               {isLoadingAssignments && isLoadingDiscussions ? 'Loading assignments and discussions...' : isLoadingAssignments ? 'Loading assignments...' : 'Loading discussions...'}
@@ -352,16 +357,13 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
               }))
             ];
 
-            // Sort by due date (closest first), items without due dates go to the end
+            // Sort by due date descending (latest first); items without due dates last
             combinedItems.sort((a, b) => {
-              // Items with due dates come first
               if (a.dueDateValue && !b.dueDateValue) return -1;
               if (!a.dueDateValue && b.dueDateValue) return 1;
-              // Both have due dates - sort ascending (closest first)
               if (a.dueDateValue && b.dueDateValue) {
-                return a.dueDateValue - b.dueDateValue;
+                return b.dueDateValue - a.dueDateValue;
               }
-              // Both don't have due dates - maintain original order
               return 0;
             });
 
@@ -373,7 +375,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
                     return (
                       <div
                         key={`assignment-${a._id}`}
-                        className="p-3 sm:p-4 hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-700 flex justify-between items-center group gap-2 sm:gap-3"
+                        className="group flex min-h-[3.25rem] items-center justify-between gap-2 p-3 hover:bg-gray-50 active:bg-gray-100 dark:hover:bg-gray-800 dark:active:bg-gray-700 sm:min-h-[3.5rem] sm:gap-3 sm:p-4"
                         onClick={(e) => {
                           e.stopPropagation();
                           navigate(`/assignments/${a._id}/view`);
@@ -442,7 +444,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
                     return (
                       <div
                         key={`discussion-${d._id}`}
-                        className="p-3 sm:p-4 hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-700 flex justify-between items-center group gap-2 sm:gap-3"
+                        className="group flex min-h-[3.25rem] items-center justify-between gap-2 p-3 hover:bg-gray-50 active:bg-gray-100 dark:hover:bg-gray-800 dark:active:bg-gray-700 sm:min-h-[3.5rem] sm:gap-3 sm:p-4"
                         onClick={e => {
                           e.stopPropagation();
                           navigate(`/courses/${d.course}/threads/${d._id}`);
@@ -459,6 +461,16 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
                             ) : null}
                           </div>
                         </div>
+                        {(user?.role === 'teacher' || user?.role === 'admin') && (
+                          <div
+                            className="pointer-events-none flex flex-shrink-0 select-none items-center gap-1 opacity-0 sm:gap-2"
+                            aria-hidden
+                          >
+                            <span className="h-9 w-9 rounded sm:h-8 sm:w-8" />
+                            <span className="h-9 w-9 rounded sm:h-8 sm:w-8" />
+                            <span className="h-9 w-9 rounded sm:h-8 sm:w-8" />
+                          </div>
+                        )}
                       </div>
                     );
                   }

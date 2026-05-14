@@ -1,7 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import SidebarConfigModal from '../SidebarConfigModal';
 import api from '../../services/api';
+import { normalizeSidebarItemsForModal } from '../../constants/sidebarConfigDefaults';
+
+const mockAuthUser = { role: 'teacher' as string, _id: 't1' };
+vi.mock('../../context/AuthContext', () => ({
+  useAuth: () => ({ user: mockAuthUser }),
+}));
 
 // Mock dependencies
 vi.mock('../../services/api', () => ({
@@ -34,6 +40,8 @@ describe('SidebarConfigModal', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockAuthUser.role = 'teacher';
+    mockAuthUser._id = 't1';
   });
 
   it('should not render when closed', () => {
@@ -207,10 +215,65 @@ describe('SidebarConfigModal', () => {
     await waitFor(() => {
       const syllabusItems = screen.getAllByText('Syllabus');
       expect(syllabusItems.length).toBeGreaterThan(0);
-      
+
       const modulesItems = screen.getAllByText('Modules');
       expect(modulesItems.length).toBeGreaterThan(0);
+
+      const meetingsItems = screen.getAllByText('Meetings');
+      expect(meetingsItems.length).toBeGreaterThan(0);
     });
+  });
+
+  it('teacher: Grades only under Student Visibility; Gradebook not in Student Visibility', async () => {
+    const fullItems = normalizeSidebarItemsForModal(undefined);
+    expect(fullItems.some((i) => i.id === 'grades')).toBe(true);
+
+    render(
+      <SidebarConfigModal
+        isOpen={true}
+        onClose={mockOnClose}
+        courseId={mockCourseId}
+        currentConfig={{ items: fullItems, studentVisibility: {} }}
+        onConfigUpdated={mockOnConfigUpdated}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Customize Course Sidebar')).toBeInTheDocument();
+    });
+
+    const sidebarBlock = screen.getByRole('heading', { name: 'Sidebar Items' }).parentElement!;
+    const studentBlock = screen.getByRole('heading', { name: 'Student Visibility' }).parentElement!;
+
+    expect(within(sidebarBlock).queryByText('Grades')).not.toBeInTheDocument();
+    expect(within(studentBlock).getByText('Grades')).toBeInTheDocument();
+
+    expect(within(sidebarBlock).getByText('Gradebook')).toBeInTheDocument();
+    expect(within(studentBlock).queryByText('Gradebook')).not.toBeInTheDocument();
+  });
+
+  it('does not show Gradebook row for students (cannot toggle teacher-only link)', async () => {
+    mockAuthUser.role = 'student';
+    mockAuthUser._id = 's1';
+
+    const fullItems = normalizeSidebarItemsForModal(undefined);
+    expect(fullItems.some((i) => i.id === 'gradebook')).toBe(true);
+
+    render(
+      <SidebarConfigModal
+        isOpen={true}
+        onClose={mockOnClose}
+        courseId={mockCourseId}
+        currentConfig={{ items: fullItems, studentVisibility: {} }}
+        onConfigUpdated={mockOnConfigUpdated}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Customize Course Sidebar')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText('Gradebook')).not.toBeInTheDocument();
   });
 });
 

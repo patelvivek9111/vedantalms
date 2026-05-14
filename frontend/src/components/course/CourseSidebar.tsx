@@ -15,6 +15,8 @@ interface CourseSidebarProps {
   filteredNavigationItems: NavigationItem[];
   activeSection: string;
   courseId: string;
+  /** Merged onto the root `<aside>` (e.g. `print:hidden`). */
+  className?: string;
 }
 
 const CourseSidebar: React.FC<CourseSidebarProps> = ({
@@ -24,6 +26,7 @@ const CourseSidebar: React.FC<CourseSidebarProps> = ({
   filteredNavigationItems,
   activeSection,
   courseId,
+  className,
 }) => {
   const navigate = useNavigate();
 
@@ -34,19 +37,19 @@ const CourseSidebar: React.FC<CourseSidebarProps> = ({
         : 'w-64 relative mr-8 mt-0 self-start sticky top-4 z-auto'
       } transition-transform duration-300 ease-in-out ${
         isMobileMenuOpen && isMobileDevice ? 'translate-x-0' : isMobileDevice ? '-translate-x-full' : 'translate-x-0'
-      } bg-transparent`}
+      } bg-transparent ${className ?? ''}`}
       style={{ 
         height: isMobileDevice ? 'calc(100vh - 80px - 64px)' : undefined // Only apply height on actual mobile devices
       }}
       onClick={(e) => e.stopPropagation()}
     >
-      <nav 
-        className={`bg-white/80 dark:bg-gray-900/80 backdrop-blur ${isMobileDevice ? 'rounded-t-2xl' : 'rounded-2xl'} shadow-lg p-4 flex flex-col gap-1 border border-gray-100 dark:border-gray-700 ${isMobileDevice ? '' : 'm-0 h-auto pb-4'}`} 
-        style={{ 
-          height: '100%',
-          maxHeight: '100%',
-          overflow: 'hidden'
-        }}
+      <nav
+        className={`flex flex-col gap-1 border border-gray-100 bg-white/80 p-4 shadow-lg backdrop-blur dark:border-gray-700 dark:bg-gray-900/80 ${isMobileDevice ? 'rounded-t-2xl' : 'm-0 rounded-2xl pb-4'}`}
+        style={
+          isMobileDevice
+            ? { height: '100%', maxHeight: '100%', overflow: 'hidden' }
+            : { height: 'auto', overflow: 'visible' }
+        }
         onClick={(e) => e.stopPropagation()}
       >
         {isMobileDevice && (
@@ -61,13 +64,17 @@ const CourseSidebar: React.FC<CourseSidebarProps> = ({
             </button>
           </div>
         )}
-        <div 
-          className={`flex-1 min-h-0 ${isMobileDevice ? 'overflow-y-auto' : 'overflow-visible'}`}
-          style={{
-            WebkitOverflowScrolling: 'touch',
-            touchAction: 'pan-y',
-            overscrollBehavior: 'contain'
-          }}
+        <div
+          className={isMobileDevice ? 'min-h-0 flex-1 overflow-y-auto' : undefined}
+          style={
+            isMobileDevice
+              ? {
+                  WebkitOverflowScrolling: 'touch',
+                  touchAction: 'pan-y',
+                  overscrollBehavior: 'contain',
+                }
+              : undefined
+          }
         >
           {filteredNavigationItems.map((item: NavigationItem) => (
             (() => {

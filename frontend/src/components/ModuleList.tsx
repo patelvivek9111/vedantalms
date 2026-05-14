@@ -6,10 +6,12 @@ import CreateModuleForm from './CreateModuleForm';
 
 interface ModuleListProps {
   courseId: string;
+  /** Parent already loaded modules + assignments (avoids duplicate /modules + N assignment calls). */
+  prefetchedModules?: any[] | null;
 }
 
-const ModuleList: React.FC<ModuleListProps> = ({ courseId }) => {
-  const { modules, loading, error, getModules } = useModule();
+const ModuleList: React.FC<ModuleListProps> = ({ courseId, prefetchedModules }) => {
+  const { modules, loading, error, getModules, seedModules } = useModule();
   const { user } = useAuth();
   const [showCreateModuleForm, setShowCreateModuleForm] = useState(false);
   const getModulesRef = useRef(getModules);
@@ -19,12 +21,19 @@ const ModuleList: React.FC<ModuleListProps> = ({ courseId }) => {
     getModulesRef.current = getModules;
   }, [getModules]);
 
+  const prefetchedKey =
+    prefetchedModules && prefetchedModules.length > 0
+      ? `${courseId}:${prefetchedModules.map((m: any) => m._id).join(',')}`
+      : '';
+
   useEffect(() => {
-    if (courseId) {
-      getModulesRef.current(courseId).catch(err => {
-        });
+    if (!courseId) return;
+    if (prefetchedKey) {
+      seedModules(prefetchedModules as any);
+      return;
     }
-  }, [courseId]);
+    getModulesRef.current(courseId).catch(() => {});
+  }, [courseId, prefetchedKey, prefetchedModules, seedModules]);
 
   const handleModuleCreated = async () => {
     setShowCreateModuleForm(false);

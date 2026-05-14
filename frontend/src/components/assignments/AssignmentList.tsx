@@ -52,6 +52,27 @@ const TABS = [
   { label: 'Discussions', value: 'discussion' },
 ];
 
+/** Single chronological list: latest due first, then earlier dates; items without a due date last. */
+function sortItemsByDueDateDesc<T extends { dueDate?: string | null; title?: string; _id?: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) => {
+    const at = a.dueDate ? new Date(a.dueDate).getTime() : NaN;
+    const bt = b.dueDate ? new Date(b.dueDate).getTime() : NaN;
+    const hasA = !Number.isNaN(at);
+    const hasB = !Number.isNaN(bt);
+    if (hasA && hasB) {
+      const byDate = bt - at;
+      if (byDate !== 0) return byDate;
+    } else if (hasA && !hasB) {
+      return -1;
+    } else if (!hasA && hasB) {
+      return 1;
+    }
+    const byTitle = (a.title || '').localeCompare(b.title || '');
+    if (byTitle !== 0) return byTitle;
+    return (a._id || '').localeCompare(b._id || '');
+  });
+}
+
 const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: propAssignments, userRole, studentSubmissions, studentId, submissionMap, courseId, isQuizzesView = false }) => {
   const navigate = useNavigate();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -211,50 +232,8 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
       if (selectedTab === 'discussion') return item.type === 'discussion';
       return true;
     });
-    filteredList.sort((a, b) => {
-      if (a.dueDate && b.dueDate) {
-        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
-      } else if (a.dueDate) {
-        return -1;
-      } else if (b.dueDate) {
-        return 1;
-      } else {
-        return a.title.localeCompare(b.title);
-      }
-    });
-    const now = new Date();
-    const isSubmittedFn = (item: any) => {
-      if (item.type === 'discussion') {
-        const hasGrade = Array.isArray(item.studentGrades) && item.studentGrades.some((g: any) => g.student && (g.student._id === studentId || g.student === studentId));
-        const hasReply = Array.isArray(item.replies) && item.replies.some((r: any) => r.author && (r.author._id === studentId || r.author === studentId));
-        return hasGrade || hasReply;
-      }
-      if (submissionMap) {
-        return !!submissionMap[`${studentId}_${item._id}`];
-      } else if (studentSubmissions) {
-        return new Set(studentSubmissions.map(s => String(s.assignment && (s.assignment._id || s.assignment)))).has(String(item._id));
-      }
-      return false;
-    };
-    const submitted: any[] = [];
-    const upcoming: any[] = [];
-    const missing: any[] = [];
-    filteredList.forEach(item => {
-      const isSubmitted = isSubmittedFn(item);
-      const dueDate = item.dueDate ? new Date(item.dueDate) : null;
-      if (isSubmitted) {
-        submitted.push(item);
-      } else if (dueDate && dueDate < now) {
-        missing.push(item);
-      } else {
-        upcoming.push(item);
-      }
-    });
-    const groups: { label: string; items: any[] }[] = [];
-    if (upcoming.length > 0) groups.push({ label: 'Upcoming', items: upcoming });
-    if (missing.length > 0) groups.push({ label: 'Missing', items: missing });
-    if (submitted.length > 0) groups.push({ label: 'Submitted', items: submitted });
-    setGroupedAssignments(groups);
+    const chronological = sortItemsByDueDateDesc(filteredList);
+    setGroupedAssignments([{ label: '', items: chronological }]);
   }, [propAssignments, assignments, discussions, studentSubmissions, submissionMap, studentId, userRole, selectedTab]);
 
   // Define columns for teacher/admin table view (must be before early returns)
@@ -353,7 +332,7 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
         if (!a.dueDate && !b.dueDate) return 0;
         if (!a.dueDate) return 1;
         if (!b.dueDate) return -1;
-        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+        return new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime();
       }
     });
 
@@ -621,20 +600,22 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
   const assignmentsList = propAssignments 
     ? (Array.isArray(propAssignments) ? propAssignments : [])
     : (Array.isArray(assignments) ? assignments : []);
-  const flatList = filterList(
-    assignmentsList.map(item => ({
-      _id: item._id,
-      title: item.title,
-      dueDate: item.dueDate || (item as any).due_date || (item as any).discussionDueDate || null,
-      attachments: item.attachments || [],
-      createdBy: item.createdBy || (item as any).author || { firstName: '', lastName: '' },
-      type: ((item as any).type === 'discussion' || (item as any).group === 'Discussions') ? 'discussion' : 'assignment',
-      group: (item as any).group || 'Assignments',
-      totalPoints: (item as any).totalPoints || (item as any).points || 0,
-      published: (item as any).published !== undefined ? (item as any).published : true,
-      replies: (item as any).replies || [],
-      studentGrades: (item as any).studentGrades || [],
-    }))
+  const flatList = sortItemsByDueDateDesc(
+    filterList(
+      assignmentsList.map(item => ({
+        _id: item._id,
+        title: item.title,
+        dueDate: item.dueDate || (item as any).due_date || (item as any).discussionDueDate || null,
+        attachments: item.attachments || [],
+        createdBy: item.createdBy || (item as any).author || { firstName: '', lastName: '' },
+        type: ((item as any).type === 'discussion' || (item as any).group === 'Discussions') ? 'discussion' : 'assignment',
+        group: (item as any).group || 'Assignments',
+        totalPoints: (item as any).totalPoints || (item as any).points || 0,
+        published: (item as any).published !== undefined ? (item as any).published : true,
+        replies: (item as any).replies || [],
+        studentGrades: (item as any).studentGrades || [],
+      }))
+    )
   );
 
   // For students, filter grouped assignments as before
@@ -668,8 +649,10 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
       <div className="md:hidden space-y-3">
         {userRole === 'student' && filteredGroupedAssignments.length > 0 ? (
           filteredGroupedAssignments.map(group => (
-            <div key={group.label}>
-              <div className="bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-semibold py-2 px-3 text-xs sm:text-sm rounded-t-lg">{group.label}</div>
+            <div key={group.label || 'by-due-date'}>
+              {group.label ? (
+                <div className="bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-semibold py-2 px-3 text-xs sm:text-sm rounded-t-lg">{group.label}</div>
+              ) : null}
               {group.items.map(item => {
                 const dueDate = item.dueDate ? new Date(item.dueDate) : null;
                 return (
@@ -790,10 +773,14 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                {filteredGroupedAssignments.map(group => [
-                <tr key={group.label}>
-                  <td colSpan={isQuizzesView ? 3 : 4} className="bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-semibold py-2 pl-2 text-xs sm:text-sm">{group.label}</td>
-                </tr>,
+                {filteredGroupedAssignments.flatMap(group => [
+                ...(group.label
+                  ? [
+                      <tr key={`hdr-${group.label}`}>
+                        <td colSpan={isQuizzesView ? 3 : 4} className="bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-semibold py-2 pl-2 text-xs sm:text-sm">{group.label}</td>
+                      </tr>,
+                    ]
+                  : []),
                 ...group.items.map(item => {
                   const dueDate = item.dueDate ? new Date(item.dueDate) : null;
                   return (

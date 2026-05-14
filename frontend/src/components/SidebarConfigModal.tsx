@@ -1,220 +1,142 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  X, 
-  GripVertical, 
-  Eye, 
-  EyeOff, 
-  Save, 
-  RotateCcw,
-  ClipboardList,
-  BookOpen,
-  FileText,
-  PenTool,
-  MessageSquare,
-  Megaphone,
-  BarChart3,
-  Users,
-  CheckSquare,
-  BookOpenCheck,
-  UserPlus,
-  GraduationCap,
-  ClipboardCheck
-} from 'lucide-react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { X, GripVertical, Eye, EyeOff, Save, RotateCcw } from 'lucide-react';
 import api from '../services/api';
+import { navigationItems } from '../constants/courseNavigation';
+import {
+  ALLOWED_STUDENT_VISIBILITY_KEYS,
+  DEFAULT_SIDEBAR_STUDENT_VISIBILITY,
+  buildStudentVisibilityForSave,
+  getDefaultSidebarConfigItems,
+  normalizeSidebarItemsForModal,
+  shouldHideFromSidebarItemsColumn,
+  shouldHideFromStudentVisibilityColumn,
+  type DefaultSidebarConfigItem,
+} from '../constants/sidebarConfigDefaults';
+import { useAuth } from '../context/AuthContext';
 
-interface SidebarItem {
-  id: string;
-  label: string;
-  visible: boolean;
-  order: number;
-  fixed?: boolean;
-}
+export type SidebarConfigStudentVisibility = Record<string, boolean>;
 
-interface StudentVisibility {
-  overview: boolean;
-  syllabus: boolean;
-  modules: boolean;
-  pages: boolean;
-  assignments: boolean;
-  quizzes: boolean;
-  discussions: boolean;
-  announcements: boolean;
-  polls: boolean;
-  groups: boolean;
-  attendance: boolean;
-  grades: boolean;
-  gradebook: boolean;
-  students: boolean;
-}
+interface SidebarItem extends DefaultSidebarConfigItem {}
 
 interface SidebarConfigModalProps {
   isOpen: boolean;
   onClose: () => void;
   courseId: string;
   currentConfig: {
-    items: SidebarItem[];
-    studentVisibility: StudentVisibility;
+    items?: SidebarItem[];
+    studentVisibility?: SidebarConfigStudentVisibility;
   };
   onConfigUpdated: (updatedCourse: any) => void;
 }
 
-const iconMap: { [key: string]: React.ComponentType<any> } = {
-  overview: ClipboardList,
-  syllabus: GraduationCap,
-  modules: BookOpen,
-  pages: FileText,
-  assignments: PenTool,
-  quizzes: ClipboardCheck,
-  discussions: MessageSquare,
-  announcements: Megaphone,
-  polls: BarChart3,
-  groups: Users,
-  attendance: CheckSquare,
-  grades: BarChart3,
-  gradebook: BookOpenCheck,
-  students: UserPlus
-};
+function navIconForId(id: string) {
+  return navigationItems.find((n) => n.id === id)?.icon;
+}
+
+function defaultStudentVisible(itemId: string): boolean {
+  const v = DEFAULT_SIDEBAR_STUDENT_VISIBILITY[itemId];
+  return v !== undefined ? v : true;
+}
 
 const SidebarConfigModal: React.FC<SidebarConfigModalProps> = ({
   isOpen,
   onClose,
   courseId,
   currentConfig,
-  onConfigUpdated
+  onConfigUpdated,
 }) => {
+  const { user } = useAuth();
   const [items, setItems] = useState<SidebarItem[]>(currentConfig.items || []);
-  const [studentVisibility, setStudentVisibility] = useState<StudentVisibility>(currentConfig.studentVisibility || {});
+  const [studentVisibility, setStudentVisibility] = useState<SidebarConfigStudentVisibility>(
+    currentConfig.studentVisibility || {}
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>('');
 
+  const sidebarItemsColumnItems = useMemo(
+    () => items.filter((i) => !shouldHideFromSidebarItemsColumn(user?.role, i.id)),
+    [items, user?.role]
+  );
+
+  const studentVisibilityColumnItems = useMemo(
+    () => items.filter((i) => !shouldHideFromStudentVisibilityColumn(user?.role, i.id)),
+    [items, user?.role]
+  );
+
   useEffect(() => {
     if (isOpen) {
-      // Clean the items array to remove any MongoDB _id fields
-      const cleanItems = (currentConfig.items || []).map(item => ({
-        id: item.id,
-        label: item.label,
-        visible: item.visible,
-        order: item.order,
-        fixed: item.fixed
-      }));
-      
-      setItems(cleanItems);
-      
-      // Clean studentVisibility to ensure it only contains valid keys
-      const cleanStudentVisibility = currentConfig.studentVisibility || {};
-      const validKeys = [
-        'overview', 'syllabus', 'modules', 'pages', 'assignments', 'quizzes', 'discussions',
-        'announcements', 'polls', 'groups', 'attendance', 'grades',
-        'gradebook', 'students'
-      ];
-      
-      const filteredStudentVisibility = Object.keys(cleanStudentVisibility)
-        .filter(key => validKeys.includes(key))
-        .reduce((obj, key) => {
-          obj[key as keyof StudentVisibility] = cleanStudentVisibility[key as keyof StudentVisibility];
-          return obj;
-        }, {} as StudentVisibility);
-      
-      setStudentVisibility(filteredStudentVisibility);
+      setItems(normalizeSidebarItemsForModal(currentConfig.items));
+
+      const fromServer = Object.fromEntries(
+        Object.entries(currentConfig.studentVisibility || {}).filter(([key]) =>
+          ALLOWED_STUDENT_VISIBILITY_KEYS.has(key)
+        )
+      ) as SidebarConfigStudentVisibility;
+
+      setStudentVisibility({ ...DEFAULT_SIDEBAR_STUDENT_VISIBILITY, ...fromServer });
       setError('');
     }
   }, [isOpen, currentConfig]);
 
-  const handleDragStart = (e: React.DragEvent, index: number) => {
-    // Prevent dragging if the item is fixed (like Overview)
-    if (items[index]?.fixed) {
+  const handleDragStart = (e: React.DragEvent, dragId: string) => {
+    const dragIndex = items.findIndex((i) => i.id === dragId);
+    if (dragIndex < 0 || items[dragIndex]?.fixed) {
       e.preventDefault();
       return;
     }
-    e.dataTransfer.setData('text/plain', index.toString());
+    e.dataTransfer.setData('text/plain', dragId);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
   };
 
-  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+  const handleDrop = (e: React.DragEvent, targetItemId: string) => {
     e.preventDefault();
-    const dragIndex = parseInt(e.dataTransfer.getData('text/plain'));
-    
-    if (dragIndex === dropIndex) return;
+    const dragId = e.dataTransfer.getData('text/plain');
+    if (!dragId || dragId === targetItemId) return;
 
-    // Prevent dropping on fixed items (like Overview)
+    const dragIndex = items.findIndex((i) => i.id === dragId);
+    const dropIndex = items.findIndex((i) => i.id === targetItemId);
+    if (dragIndex === -1 || dropIndex === -1) return;
     if (items[dropIndex]?.fixed) return;
 
     const newItems = [...items];
     const draggedItem = newItems[dragIndex];
-    
-    // Remove the dragged item
+
     newItems.splice(dragIndex, 1);
-    
-    // Insert at new position
     newItems.splice(dropIndex, 0, draggedItem);
-    
-    // Update order numbers, but keep fixed items at their original position
+
     const updatedItems = newItems.map((item, index) => {
       if (item.fixed) {
-        return item; // Keep fixed items unchanged
+        return item;
       }
       return {
         ...item,
-        order: index
+        order: index,
       };
     });
-    
+
     setItems(updatedItems);
   };
 
   const toggleItemVisibility = (itemId: string) => {
-    setItems(prev => prev.map(item => 
-      item.id === itemId ? { ...item, visible: !item.visible } : item
-    ));
+    setItems((prev) =>
+      prev.map((item) => (item.id === itemId ? { ...item, visible: !item.visible } : item))
+    );
   };
 
   const toggleStudentVisibility = (itemId: string) => {
-    setStudentVisibility(prev => ({
+    const current = studentVisibility[itemId] ?? defaultStudentVisible(itemId);
+    setStudentVisibility((prev) => ({
       ...prev,
-      [itemId]: !prev[itemId as keyof StudentVisibility]
+      [itemId]: !current,
     }));
   };
 
   const resetToDefault = () => {
-    const defaultItems: SidebarItem[] = [
-      { id: 'overview', label: 'Overview', visible: true, order: 0, fixed: true },
-      { id: 'syllabus', label: 'Syllabus', visible: true, order: 1 },
-      { id: 'modules', label: 'Modules', visible: true, order: 2 },
-      { id: 'pages', label: 'Pages', visible: true, order: 3 },
-      { id: 'assignments', label: 'Assignments', visible: true, order: 4 },
-      { id: 'quizzes', label: 'Quizzes', visible: true, order: 5 },
-      { id: 'discussions', label: 'Discussions', visible: true, order: 6 },
-      { id: 'announcements', label: 'Announcements', visible: true, order: 7 },
-      { id: 'polls', label: 'Polls', visible: true, order: 8 },
-      { id: 'groups', label: 'Groups', visible: true, order: 9 },
-      { id: 'attendance', label: 'Attendance', visible: true, order: 10 },
-      { id: 'grades', label: 'Grades', visible: true, order: 11 },
-      { id: 'gradebook', label: 'Gradebook', visible: true, order: 12 },
-      { id: 'students', label: 'People', visible: true, order: 13 }
-    ];
-
-    const defaultStudentVisibility: StudentVisibility = {
-      overview: true,
-      syllabus: true,
-      modules: true,
-      pages: true,
-      assignments: true,
-      quizzes: true,
-      discussions: true,
-      announcements: true,
-      polls: true,
-      groups: true,
-      attendance: true,
-      grades: true,
-      gradebook: false,
-      students: true
-    };
-
-    setItems(defaultItems);
-    setStudentVisibility(defaultStudentVisibility);
+    setItems(getDefaultSidebarConfigItems());
+    setStudentVisibility({ ...DEFAULT_SIDEBAR_STUDENT_VISIBILITY });
   };
 
   const handleSave = async () => {
@@ -222,19 +144,18 @@ const SidebarConfigModal: React.FC<SidebarConfigModalProps> = ({
     setError('');
 
     try {
-      // Clean the items array to remove any MongoDB _id fields
-      const cleanItems = items.map(item => ({
+      const cleanItems = items.map((item) => ({
         id: item.id,
         label: item.label,
-        visible: item.visible,
-        order: item.order,
-        fixed: item.fixed
+        visible: Boolean(item.visible),
+        order: Number(item.order),
       }));
 
-      
+      const visibilityPayload = buildStudentVisibilityForSave(studentVisibility);
+
       const response = await api.put(`/courses/${courseId}/sidebar-config`, {
         items: cleanItems,
-        studentVisibility
+        studentVisibility: visibilityPayload,
       });
 
       if (response.data.success) {
@@ -253,76 +174,82 @@ const SidebarConfigModal: React.FC<SidebarConfigModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden border dark:border-gray-700 flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
-          <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100">Customize Course Sidebar</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-2 sm:p-4">
+      <div className="flex max-h-[95vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg border bg-white shadow-xl dark:border-gray-700 dark:bg-gray-800 sm:max-h-[90vh]">
+        <div className="flex flex-shrink-0 items-center justify-between border-b border-gray-200 p-4 dark:border-gray-700 sm:p-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 sm:text-xl">
+            Customize Course Sidebar
+          </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-1"
+            className="p-1 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
           >
-            <X className="w-5 h-5 sm:w-6 sm:h-6" />
+            <X className="h-5 w-5 sm:h-6 sm:w-6" />
           </button>
         </div>
 
-        {/* Content */}
-        <div className="p-4 sm:p-6 overflow-y-auto flex-1">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           {error && (
-            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm sm:text-base text-red-700 dark:text-red-400">
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400 sm:text-base">
               {error}
             </div>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-            {/* Item Ordering and Visibility */}
+          <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2">
             <div>
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Sidebar Items</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              <h3 className="mb-4 text-lg font-medium text-gray-900 dark:text-gray-100">Sidebar Items</h3>
+              <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
                 Drag items to reorder them. Use the eye icons to control visibility for all users.
               </p>
-              
+
               <div className="space-y-2">
-                {items.map((item, index) => {
-                  const Icon = iconMap[item.id];
+                {sidebarItemsColumnItems.map((item) => {
+                  const Icon = navIconForId(item.id);
                   return (
-                                         <div
-                       key={item.id}
-                       draggable={!item.fixed}
-                       onDragStart={(e) => handleDragStart(e, index)}
-                       onDragOver={handleDragOver}
-                       onDrop={(e) => handleDrop(e, index)}
-                       className={`flex items-center gap-3 p-3 border rounded-lg transition-colors ${
-                         item.fixed 
-                           ? 'cursor-default bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700' 
-                           : 'cursor-move'
-                       } ${
-                         item.visible 
-                           ? 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600' 
-                           : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700'
-                       }`}
-                     >
-                       {item.fixed ? (
-                         <div className="w-4 h-4 flex-shrink-0 flex items-center justify-center">
-                           <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
-                         </div>
-                       ) : (
-                         <GripVertical className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
-                       )}
-                      {Icon && <Icon className="w-5 h-5 text-gray-600 dark:text-gray-400 flex-shrink-0" />}
-                      <span className={`flex-1 ${item.visible ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>
+                    <div
+                      key={item.id}
+                      draggable={!item.fixed}
+                      onDragStart={(e) => handleDragStart(e, item.id)}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDrop(e, item.id)}
+                      className={`flex items-center gap-3 rounded-lg border p-3 transition-colors ${
+                        item.fixed
+                          ? 'cursor-default border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900'
+                          : 'cursor-move'
+                      } ${
+                        item.visible
+                          ? 'border-gray-200 bg-white hover:border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-gray-600'
+                          : 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900'
+                      }`}
+                    >
+                      {item.fixed ? (
+                        <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center">
+                          <div className="h-2 w-2 rounded-full bg-gray-400 dark:bg-gray-500" />
+                        </div>
+                      ) : (
+                        <GripVertical className="h-4 w-4 flex-shrink-0 text-gray-400 dark:text-gray-500" />
+                      )}
+                      {Icon && <Icon className="h-5 w-5 flex-shrink-0 text-gray-600 dark:text-gray-400" />}
+                      <span
+                        className={`flex-1 ${
+                          item.visible
+                            ? 'text-gray-900 dark:text-gray-100'
+                            : 'text-gray-500 dark:text-gray-400'
+                        }`}
+                      >
                         {item.label}
                       </span>
                       <button
+                        type="button"
                         onClick={() => toggleItemVisibility(item.id)}
-                        className={`p-1 rounded transition-colors ${
-                          item.visible 
-                            ? 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200' 
-                            : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
+                        className={`rounded p-1 transition-colors ${
+                          item.visible
+                            ? 'text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'
+                            : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'
                         }`}
                         title={item.visible ? 'Hide item' : 'Show item'}
                       >
-                        {item.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                        {item.visible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                       </button>
                     </div>
                   );
@@ -330,41 +257,47 @@ const SidebarConfigModal: React.FC<SidebarConfigModalProps> = ({
               </div>
             </div>
 
-            {/* Student Visibility Controls */}
             <div>
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Student Visibility</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              <h3 className="mb-4 text-lg font-medium text-gray-900 dark:text-gray-100">Student Visibility</h3>
+              <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
                 Control which items are visible to students. Teachers and admins can always see all items.
               </p>
-              
+
               <div className="space-y-2">
-                {items.map((item) => {
-                  const Icon = iconMap[item.id];
-                  const isVisibleToStudents = studentVisibility[item.id as keyof StudentVisibility];
-                  
+                {studentVisibilityColumnItems.map((item) => {
+                  const Icon = navIconForId(item.id);
+                  const isVisibleToStudents = studentVisibility[item.id] ?? defaultStudentVisible(item.id);
+
                   return (
                     <div
                       key={item.id}
-                      className={`flex items-center gap-3 p-3 border rounded-lg transition-colors ${
-                        isVisibleToStudents 
-                          ? 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700' 
-                          : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700'
+                      className={`flex items-center gap-3 rounded-lg border p-3 transition-colors ${
+                        isVisibleToStudents
+                          ? 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800'
+                          : 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900'
                       }`}
                     >
-                      {Icon && <Icon className="w-5 h-5 text-gray-600 dark:text-gray-400 flex-shrink-0" />}
-                      <span className={`flex-1 ${isVisibleToStudents ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>
+                      {Icon && <Icon className="h-5 w-5 flex-shrink-0 text-gray-600 dark:text-gray-400" />}
+                      <span
+                        className={`flex-1 ${
+                          isVisibleToStudents
+                            ? 'text-gray-900 dark:text-gray-100'
+                            : 'text-gray-500 dark:text-gray-400'
+                        }`}
+                      >
                         {item.label}
                       </span>
                       <button
+                        type="button"
                         onClick={() => toggleStudentVisibility(item.id)}
-                        className={`p-1 rounded transition-colors ${
-                          isVisibleToStudents 
-                            ? 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200' 
-                            : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
+                        className={`rounded p-1 transition-colors ${
+                          isVisibleToStudents
+                            ? 'text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'
+                            : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'
                         }`}
                         title={isVisibleToStudents ? 'Hide from students' : 'Show to students'}
                       >
-                        {isVisibleToStudents ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                        {isVisibleToStudents ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                       </button>
                     </div>
                   );
@@ -374,30 +307,32 @@ const SidebarConfigModal: React.FC<SidebarConfigModalProps> = ({
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-4 sm:p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex-shrink-0">
+        <div className="flex flex-shrink-0 flex-col items-stretch justify-between gap-3 border-t border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900 sm:flex-row sm:items-center sm:p-6">
           <button
+            type="button"
             onClick={resetToDefault}
-            className="flex items-center justify-center gap-2 px-4 py-2 text-sm sm:text-base text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+            className="flex items-center justify-center gap-2 px-4 py-2 text-sm text-gray-600 transition-colors hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 sm:text-base"
           >
-            <RotateCcw className="w-4 h-4" />
+            <RotateCcw className="h-4 w-4" />
             <span className="hidden sm:inline">Reset to Default</span>
             <span className="sm:hidden">Reset</span>
           </button>
-          
+
           <div className="flex gap-2 sm:gap-3">
             <button
+              type="button"
               onClick={onClose}
-              className="flex-1 sm:flex-none px-4 py-2 text-sm sm:text-base text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+              className="flex-1 px-4 py-2 text-sm text-gray-600 transition-colors hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 sm:flex-none sm:text-base"
             >
               Cancel
             </button>
             <button
+              type="button"
               onClick={handleSave}
               disabled={saving}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm sm:text-base bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600 sm:flex-none sm:text-base"
             >
-              <Save className="w-4 h-4" />
+              <Save className="h-4 w-4" />
               {saving ? 'Saving...' : 'Save'}
             </button>
           </div>
@@ -407,4 +342,4 @@ const SidebarConfigModal: React.FC<SidebarConfigModalProps> = ({
   );
 };
 
-export default SidebarConfigModal; 
+export default SidebarConfigModal;

@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { navigationItems } from '../constants/courseNavigation';
+import { DEFAULT_SIDEBAR_STUDENT_VISIBILITY } from '../constants/sidebarConfigDefaults';
 import { ClipboardList } from 'lucide-react';
 
 interface UseSidebarConfigProps {
@@ -39,24 +40,9 @@ export const useSidebarConfig = ({
     return {
       items: mergedItems,
       studentVisibility: {
-        overview: true,
-        syllabus: true,
-        modules: true,
-        pages: true,
-        assignments: true,
-        quizzes: true,
-        quizwave: true,
-        discussions: true,
-        announcements: true,
-        polls: true,
-        groups: true,
-        meetings: true,
-        attendance: true,
-        grades: true,
-        gradebook: false,
-        students: true,
-        ...(course?.sidebarConfig?.studentVisibility || {})
-      }
+        ...DEFAULT_SIDEBAR_STUDENT_VISIBILITY,
+        ...(course?.sidebarConfig?.studentVisibility || {}),
+      },
     };
   }, [course?.sidebarConfig]);
 
@@ -66,32 +52,42 @@ export const useSidebarConfig = ({
       .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
       .filter((item: any) => item.visible !== false)
       .map((item: any) => {
-        const originalItem = navigationItems.find(nav => nav.id === item.id);
-        return originalItem ? {
+        const originalItem = navigationItems.find((nav) => nav.id === item.id);
+        if (!originalItem) {
+          return {
+            id: item.id,
+            label: item.label,
+            icon: ClipboardList,
+            visible: item.visible !== false,
+            order: item.order || 0,
+          };
+        }
+        // Second spread can overwrite `roles`/`icon` with `undefined` from stored config — keep canonical gates.
+        return {
           ...originalItem,
-          ...item
-        } : {
-          id: item.id,
-          label: item.label,
-          icon: ClipboardList, // Default icon fallback
-          visible: item.visible !== false,
-          order: item.order || 0
+          ...item,
+          roles: originalItem.roles,
+          icon: originalItem.icon,
+          label: originalItem.label,
         };
       });
 
-    // Filter navigation items based on user role and student visibility
+    const role = String(user?.role || '').toLowerCase();
     return customNavigationItems.filter((item: any) => {
-      // Check role-based filtering
-      if (item.roles && !item.roles.includes(user?.role || '')) {
-        return false;
+      if (item.roles?.length) {
+        const allowed = item.roles.map((r: string) => String(r).toLowerCase());
+        if (!allowed.includes(role)) {
+          return false;
+        }
       }
-      
-      // For students, check both general visibility and student visibility settings
-      if (user?.role === 'student') {
-        return item.visible && sidebarConfig.studentVisibility[item.id as keyof typeof sidebarConfig.studentVisibility];
+
+      if (role === 'student') {
+        return (
+          item.visible &&
+          sidebarConfig.studentVisibility[item.id as keyof typeof sidebarConfig.studentVisibility]
+        );
       }
-      
-      // Teachers and admins can see all items (they can see everything)
+
       return true;
     });
   }, [sidebarConfig, user?.role]);

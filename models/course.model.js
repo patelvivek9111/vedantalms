@@ -108,6 +108,23 @@ const courseSchema = new mongoose.Schema({
     term: { type: String, enum: ['Fall', 'Spring', 'Summer', 'Winter'], default: 'Fall' },
     year: { type: Number, default: new Date().getFullYear() }
   },
+  /** Opaque token embedded in join QR / deep links; not the Mongo _id. */
+  enrollmentQrToken: {
+    type: String,
+    trim: true,
+    sparse: true,
+    unique: true,
+  },
+  /** Human-readable 8-character join code (same enrollment as QR). */
+  enrollmentJoinCode: {
+    type: String,
+    trim: true,
+    uppercase: true,
+    sparse: true,
+    unique: true,
+    minlength: 8,
+    maxlength: 8,
+  },
   enrollmentRequests: [{
     student: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     status: { 
@@ -162,10 +179,11 @@ const courseSchema = new mongoose.Schema({
           { id: 'announcements', label: 'Announcements', visible: true, order: 7 },
           { id: 'polls', label: 'Polls', visible: true, order: 8 },
           { id: 'groups', label: 'Groups', visible: true, order: 9 },
-          { id: 'attendance', label: 'Attendance', visible: true, order: 10 },
-          { id: 'grades', label: 'Grades', visible: true, order: 11 },
-          { id: 'gradebook', label: 'Gradebook', visible: true, order: 12 },
-          { id: 'students', label: 'People', visible: true, order: 13 }
+          { id: 'meetings', label: 'Meetings', visible: true, order: 10 },
+          { id: 'attendance', label: 'Attendance', visible: true, order: 11 },
+          { id: 'grades', label: 'Grades', visible: true, order: 12 },
+          { id: 'gradebook', label: 'Gradebook', visible: true, order: 13 },
+          { id: 'students', label: 'People', visible: true, order: 14 }
         ]
       },
       studentVisibility: {
@@ -176,10 +194,12 @@ const courseSchema = new mongoose.Schema({
           pages: { type: Boolean, default: true },
           assignments: { type: Boolean, default: true },
           quizzes: { type: Boolean, default: true },
+          quizwave: { type: Boolean, default: true },
           discussions: { type: Boolean, default: true },
           announcements: { type: Boolean, default: true },
           polls: { type: Boolean, default: true },
           groups: { type: Boolean, default: true },
+          meetings: { type: Boolean, default: true },
           attendance: { type: Boolean, default: true },
           grades: { type: Boolean, default: true },
           gradebook: { type: Boolean, default: false },
@@ -192,10 +212,12 @@ const courseSchema = new mongoose.Schema({
           pages: true,
           assignments: true,
           quizzes: true,
+          quizwave: true,
           discussions: true,
           announcements: true,
           polls: true,
           groups: true,
+          meetings: true,
           attendance: true,
           grades: true,
           gradebook: false,
@@ -215,10 +237,11 @@ const courseSchema = new mongoose.Schema({
         { id: 'announcements', label: 'Announcements', visible: true, order: 7 },
         { id: 'polls', label: 'Polls', visible: true, order: 8 },
         { id: 'groups', label: 'Groups', visible: true, order: 9 },
-        { id: 'attendance', label: 'Attendance', visible: true, order: 10 },
-        { id: 'grades', label: 'Grades', visible: true, order: 11 },
-        { id: 'gradebook', label: 'Gradebook', visible: true, order: 12 },
-        { id: 'students', label: 'People', visible: true, order: 13 }
+        { id: 'meetings', label: 'Meetings', visible: true, order: 10 },
+        { id: 'attendance', label: 'Attendance', visible: true, order: 11 },
+        { id: 'grades', label: 'Grades', visible: true, order: 12 },
+        { id: 'gradebook', label: 'Gradebook', visible: true, order: 13 },
+        { id: 'students', label: 'People', visible: true, order: 14 }
       ],
       studentVisibility: {
         overview: true,
@@ -227,10 +250,12 @@ const courseSchema = new mongoose.Schema({
         pages: true,
         assignments: true,
         quizzes: true,
+        quizwave: true,
         discussions: true,
         announcements: true,
         polls: true,
         groups: true,
+        meetings: true,
         attendance: true,
         grades: true,
         gradebook: false,
@@ -240,6 +265,30 @@ const courseSchema = new mongoose.Schema({
   }
 }, {
   timestamps: true // This will add createdAt and updatedAt fields
+});
+
+const crypto = require('crypto');
+
+courseSchema.pre('save', async function assignEnrollmentQrToken(next) {
+  if (this.enrollmentQrToken) return next();
+  try {
+    const CourseModel = this.constructor;
+    for (let i = 0; i < 8; i++) {
+      const token = crypto.randomBytes(18).toString('base64url');
+      // eslint-disable-next-line no-await-in-loop
+      const exists = await CourseModel.exists({
+        enrollmentQrToken: token,
+        _id: { $ne: this._id },
+      });
+      if (!exists) {
+        this.set('enrollmentQrToken', token);
+        break;
+      }
+    }
+    return next();
+  } catch (err) {
+    return next(err);
+  }
 });
 
 courseSchema.index({ instructor: 1, updatedAt: -1 });

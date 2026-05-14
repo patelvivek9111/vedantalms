@@ -37,7 +37,7 @@ describe('Hooks coverage', () => {
     expect(result.current.unreadCount).toBe(2);
   });
 
-  it('useGradebookData sets data when gradebook section is active', async () => {
+  it('useGradebookData sets data when gradebook section is active for a non-instructor viewer', async () => {
     const setGradebookData = vi.fn();
     mockedAxios.get
       .mockResolvedValueOnce({ data: [] })
@@ -47,7 +47,7 @@ describe('Hooks coverage', () => {
     renderHook(() =>
       useGradebookData({
         activeSection: 'gradebook',
-        isInstructor: true,
+        isInstructor: false,
         isAdmin: false,
         course: { _id: 'c1', students: [{ _id: 'student-1' }] },
         modules: [{ title: 'M1', assignments: [{ _id: 'a1', title: 'A1', totalPoints: 10 }] }],

@@ -486,91 +486,66 @@ function DataTable<T extends Record<string, any>>({
         </table>
       </div>
 
-      {/* Pagination - Hide when using virtual scrolling */}
+      {/* Pagination — one row: First · Previous · Page x of y · Next · Last (matches compact LMS control) */}
       {!useVirtualScrolling && (totalPages > 1 || itemsPerPage < sortedData.length) ? (
-        <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4 px-2">
-          {/* Page size selector */}
-          <div className="flex items-center space-x-2">
-            <label htmlFor="page-size-select" className="text-sm text-gray-700 dark:text-gray-300">
-              Show:
-            </label>
-            <select
-              id="page-size-select"
-              value={itemsPerPage}
-              onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-              className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md 
-                       bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 
-                       text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 
-                       dark:focus:ring-blue-400"
-              aria-label="Items per page"
-            >
-              {pageSizeOptions.map((size) => (
-                <option key={size} value={size}>
-                  {size}
-                </option>
-              ))}
-            </select>
-            <span className="text-sm text-gray-700 dark:text-gray-300">
-              of {sortedData.length} entries
-            </span>
-          </div>
-
-          {/* Page navigation */}
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => handlePageChange(1)}
-              disabled={currentPage === 1}
-              className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 
-                       bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 
-                       rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 
-                       disabled:opacity-50 disabled:cursor-not-allowed 
-                       focus:outline-none focus:ring-2 focus:ring-blue-500"
-              aria-label="Go to first page"
-            >
-              First
-            </button>
-            <button
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-              className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 
-                       bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 
-                       rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 
-                       disabled:opacity-50 disabled:cursor-not-allowed 
-                       focus:outline-none focus:ring-2 focus:ring-blue-500"
-              aria-label="Go to previous page"
-            >
-              Previous
-            </button>
-            
-            <span className="px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300">
-              Page {currentPage} of {totalPages}
-            </span>
-            
-            <button
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 
-                       bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 
-                       rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 
-                       disabled:opacity-50 disabled:cursor-not-allowed 
-                       focus:outline-none focus:ring-2 focus:ring-blue-500"
-              aria-label="Go to next page"
-            >
-              Next
-            </button>
-            <button
-              onClick={() => handlePageChange(totalPages)}
-              disabled={currentPage === totalPages}
-              className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 
-                       bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 
-                       rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 
-                       disabled:opacity-50 disabled:cursor-not-allowed 
-                       focus:outline-none focus:ring-2 focus:ring-blue-500"
-              aria-label="Go to last page"
-            >
-              Last
-            </button>
-          </div>
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-2 px-2">
+          <button
+            type="button"
+            onClick={() => handlePageChange(1)}
+            disabled={currentPage === 1}
+            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:text-gray-400 disabled:hover:bg-white dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 dark:disabled:text-gray-500 dark:disabled:hover:bg-gray-800"
+            aria-label="Go to first page"
+          >
+            First
+          </button>
+          <button
+            type="button"
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:text-gray-400 disabled:hover:bg-white dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 dark:disabled:text-gray-500 dark:disabled:hover:bg-gray-800"
+            aria-label="Go to previous page"
+          >
+            Previous
+          </button>
+          <span className="min-w-[6.5rem] px-2 py-1.5 text-center text-sm text-gray-700 dark:text-gray-300">
+            Page {currentPage} of {totalPages}
+          </span>
+          <button
+            type="button"
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:text-gray-400 disabled:hover:bg-white dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 dark:disabled:text-gray-500 dark:disabled:hover:bg-gray-800"
+            aria-label="Go to next page"
+          >
+            Next
+          </button>
+          <button
+            type="button"
+            onClick={() => handlePageChange(totalPages)}
+            disabled={currentPage === totalPages}
+            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:text-gray-400 disabled:hover:bg-white dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 dark:disabled:text-gray-500 dark:disabled:hover:bg-gray-800"
+            aria-label="Go to last page"
+          >
+            Last
+          </button>
+          <span className="hidden h-6 w-px bg-gray-300 sm:inline dark:bg-gray-600" aria-hidden />
+          <label htmlFor="page-size-select" className="sr-only">
+            Rows per page
+          </label>
+          <select
+            id="page-size-select"
+            value={itemsPerPage}
+            onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+            className="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+            title={`${sortedData.length} entries`}
+            aria-label="Items per page"
+          >
+            {pageSizeOptions.map((size) => (
+              <option key={size} value={size}>
+                {size}
+              </option>
+            ))}
+          </select>
         </div>
       ) : useVirtualScrolling ? (
         // Show entry count for virtual scrolling

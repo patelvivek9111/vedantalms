@@ -1,73 +1,53 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useCourse } from '../contexts/CourseContext';
 import axios from 'axios';
 import { API_URL } from '../config';
 import ThreadView from './ThreadView';
 import Breadcrumb from './common/Breadcrumb';
-import { 
-  ArrowLeft,
-  ClipboardList, 
-  BookOpen, 
-  FileText, 
-  PenTool, 
-  MessageSquare, 
-  Megaphone, 
-  Users, 
-  BarChart3, 
-  UserPlus,
-  CheckSquare,
-  ClipboardCheck,
-  GraduationCap,
-  Menu,
-  X
-} from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { hapticNavigation } from '../utils/hapticFeedback';
-
-// Navigation items for the course sidebar
-const navigationItems = [
-  { id: 'overview', label: 'Overview', icon: ClipboardList },
-  { id: 'syllabus', label: 'Syllabus', icon: GraduationCap },
-  { id: 'modules', label: 'Modules', icon: BookOpen },
-  { id: 'pages', label: 'Pages', icon: FileText },
-  { id: 'assignments', label: 'Assignments', icon: PenTool },
-  { id: 'quizzes', label: 'Quizzes', icon: ClipboardCheck },
-  { id: 'discussions', label: 'Discussions', icon: MessageSquare },
-  { id: 'announcements', label: 'Announcements', icon: Megaphone },
-  { id: 'groups', label: 'Groups', icon: Users },
-  { id: 'attendance', label: 'Attendance', icon: CheckSquare },
-  { id: 'grades', label: 'Grades', icon: BarChart3, roles: ['student'] },
-  { id: 'gradebook', label: 'Gradebook', icon: BookOpen, roles: ['teacher', 'admin'] },
-  { id: 'students', label: 'People', icon: UserPlus },
-];
+import { useSidebarConfig } from '../hooks/useSidebarConfig';
+import { useCourseShellMobile } from '../hooks/useCourseShellMobile';
+import MobileNavigation from './course/MobileNavigation';
+import CourseSidebar from './course/CourseSidebar';
 
 const ThreadViewWrapper: React.FC = () => {
-  const { courseId, threadId, groupId } = useParams<{ courseId?: string; threadId: string; groupId?: string }>();
+  const { courseId, groupId } = useParams<{
+    courseId?: string;
+    threadId: string;
+    groupId?: string;
+  }>();
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const { courses } = useCourse();
   const [course, setCourse] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showCourseDropdown, setShowCourseDropdown] = useState(false);
+  const isMobileDevice = useCourseShellMobile();
 
+  const { filteredNavigationItems } = useSidebarConfig({ course, user });
 
   useEffect(() => {
     const fetchCourse = async () => {
       if (!courseId || courseId === 'undefined' || courseId === 'null') {
         return;
       }
-      
+
       try {
         setLoading(true);
         const token = localStorage.getItem('token');
         if (!token) {
           throw new Error('No authentication token found');
         }
-        
+
         const response = await axios.get(`${API_URL}/api/courses/${courseId}`, {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         });
-        
+
         if (response.data.success) {
           setCourse(response.data.data);
         } else {
@@ -75,7 +55,8 @@ const ThreadViewWrapper: React.FC = () => {
         }
       } catch (err: any) {
         if (err.response?.status === 400) {
-          }
+          /* ignore */
+        }
       } finally {
         setLoading(false);
       }
@@ -84,98 +65,10 @@ const ThreadViewWrapper: React.FC = () => {
     fetchCourse();
   }, [courseId]);
 
-  // Merge existing config with default navigationItems to ensure all items are included
-  const existingItems = course?.sidebarConfig?.items || [];
-  const existingItemsMap = new Map(existingItems.map((item: any) => [item.id, item]));
-  
-  // Build merged items: start with all navigationItems, use existing config if available
-  const mergedItems = navigationItems.map((navItem, index) => {
-    const existing = existingItemsMap.get(navItem.id);
-    if (existing) {
-      // Use existing config, but ensure we have the icon and other properties from navigationItems
-      return {
-        ...existing,
-        label: navItem.label, // Always use the current label from navigationItems
-        fixed: navItem.id === 'overview'
-      };
-    }
-    // Item doesn't exist in config, add it with defaults
-    return {
-      id: navItem.id,
-      label: navItem.label,
-      visible: true,
-      order: index,
-      fixed: navItem.id === 'overview'
-    };
-  });
-
-    // Get custom sidebar configuration or use default
-  const sidebarConfig = {
-    items: mergedItems,
-    studentVisibility: {
-      overview: true,
-      syllabus: true,
-      modules: true,
-      pages: true,
-      assignments: true,
-      quizzes: true,
-      discussions: true,
-      announcements: true,
-      polls: true,
-      groups: true,
-      attendance: true,
-      grades: true,
-      gradebook: false,
-      students: true,
-      ...(course?.sidebarConfig?.studentVisibility || {})
-    }
-  };
-
-  // Create navigation items from custom configuration
-  const customNavigationItems = sidebarConfig.items
-    .filter((item: any): item is { id: string; label: string; visible: boolean; order: number } => 
-      typeof item === 'object' && 
-      item !== null && 
-      typeof item.id === 'string' && 
-      typeof item.visible === 'boolean' && 
-      typeof item.order === 'number'
-    )
-    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-    .filter((item) => item.visible)
-    .map((item) => {
-      const originalItem = navigationItems.find(nav => nav.id === item.id);
-      return originalItem ? {
-        ...originalItem,
-        ...item
-      } : {
-        id: item.id,
-        label: item.label,
-        icon: ClipboardList, // Default icon fallback
-        visible: item.visible,
-        order: item.order
-      };
-    });
-
-  // Filter navigation items based on user role and student visibility
-  const filteredNavigationItems = customNavigationItems.filter((item: any) => {
-    // Check role-based filtering
-    if (item.roles && !item.roles.includes(user?.role || '')) {
-      return false;
-    }
-    
-    // For students, check both general visibility and student visibility settings
-    if (user?.role === 'student') {
-      return item.visible && sidebarConfig.studentVisibility[item.id as keyof typeof sidebarConfig.studentVisibility];
-    }
-    
-    // Teachers and admins can see all items (they can see everything)
-    return true;
-  });
-
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-32">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+      <div className="flex h-32 items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-indigo-600"></div>
       </div>
     );
   }
@@ -184,96 +77,94 @@ const ThreadViewWrapper: React.FC = () => {
     return <div>Course not found or invalid course data</div>;
   }
 
+  const cid = course._id;
+  const courseLabel = course.catalog?.courseCode || course.title || 'Course';
+  const showCourseBreadcrumb = Boolean(courseId);
+
   return (
-    <div className="flex flex-col lg:flex-row w-full max-w-7xl mx-auto">
-      {/* Top Navigation Bar (Mobile Only) */}
-      <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm safe-area-inset-top">
-        <div className="relative flex items-center justify-between px-4 py-3 gap-2">
-          <button
-            onClick={() => {
-              hapticNavigation();
-              navigate(
-                groupId 
-                  ? `/groups/${groupId}/discussion`
-                  : courseId 
-                    ? `/courses/${courseId}/discussions`
-                    : '/dashboard'
-              );
-            }}
-            className="text-gray-700 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
-            aria-label="Go back to discussions"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100 flex-1 text-center">Discussion</h1>
-          <div className="w-10 flex-shrink-0"></div> {/* Spacer for centering */}
-        </div>
-      </nav>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <MobileNavigation
+        className="print:hidden"
+        isMobileDevice={isMobileDevice}
+        course={course}
+        showCourseDropdown={showCourseDropdown}
+        setShowCourseDropdown={setShowCourseDropdown}
+        user={user}
+        courses={courses}
+        courseId={courseId || cid}
+        isMobileMenuOpen={isMobileMenuOpen}
+        setIsMobileMenuOpen={setIsMobileMenuOpen}
+      />
 
-      {/* Mobile Menu Button (removed - now using back button) */}
-
-      {/* Mobile Overlay */}
-      {isMobileMenuOpen && (
-        <div
-          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-[90]"
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
-      )}
-
-      {/* Course Sidebar */}
-      <aside
-        className={`fixed lg:relative top-0 left-0 h-[calc(100vh-4rem)] lg:h-auto w-64 bg-white/95 dark:bg-gray-900/95 backdrop-blur lg:bg-white/80 dark:lg:bg-gray-900/80 z-[95] lg:z-auto transform ${
-          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-        } transition-transform duration-300 ease-in-out lg:mr-8 lg:mt-4`}
-      >
-        <nav className="rounded-2xl shadow-lg p-3 sm:p-4 flex flex-col gap-1 border border-gray-100 dark:border-gray-700 h-full lg:h-auto overflow-y-auto pb-20 lg:pb-4">
-          {filteredNavigationItems.map((item: any) => (
-            <button
-              key={item.id}
-              className={`flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 rounded-lg transition-colors font-medium text-sm sm:text-base text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-700 dark:hover:text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 ${item.id === 'discussions' ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-semibold shadow' : ''}`}
-              onClick={() => {
-                navigate(`/courses/${course._id}/${item.id}`);
-                setIsMobileMenuOpen(false);
-              }}
-            >
-              <item.icon className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
-              <span>{item.label}</span>
-            </button>
-          ))}
-        </nav>
-      </aside>
-
-      {/* Main Content Area */}
-      <div className="flex-1 overflow-auto lg:ml-0 pt-16 lg:pt-0">
-        <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6">
-          {/* Breadcrumb Navigation - Desktop Only */}
-          {course && courseId && (
-            <div className="hidden lg:block mb-4">
+      {showCourseBreadcrumb && (
+        <div className="sticky top-0 z-[35] mx-auto hidden w-full max-w-7xl bg-gray-50 px-4 pt-2 dark:bg-gray-900 lg:block print:hidden">
+          <div className="flex flex-col">
+            <div className="pb-3">
               <Breadcrumb
+                className="mb-0"
                 items={[
                   { label: 'Dashboard', path: '/dashboard' },
                   { label: 'Courses', path: '/courses' },
-                  { 
-                    label: course.catalog?.courseCode || course.title || 'Course', 
-                    path: `/courses/${courseId}` 
-                  },
-                  { 
-                    label: 'Discussions', 
-                    path: `/courses/${courseId}/discussions` 
-                  },
-                  { 
-                    label: 'Discussion Thread', 
-                    path: location.pathname 
-                  }
+                  { label: courseLabel, path: `/courses/${courseId}` },
+                  { label: 'Discussions', path: `/courses/${courseId}/discussions` },
+                  { label: 'Discussion Thread', path: location.pathname },
                 ]}
               />
             </div>
-          )}
-          <ThreadView />
+            <div className="h-px w-full shrink-0 bg-gray-200 dark:bg-gray-700" aria-hidden />
+            <div className="h-3 shrink-0" aria-hidden />
+          </div>
+        </div>
+      )}
+
+      <div className={`mx-auto flex w-full max-w-7xl print:block ${isMobileDevice ? 'flex-col pt-16' : 'flex-row'}`}>
+        {isMobileMenuOpen && isMobileDevice && (
+          <div
+            className="print:hidden fixed inset-0 z-[90] bg-black bg-opacity-50 lg:hidden"
+            onClick={() => setIsMobileMenuOpen(false)}
+            style={{ touchAction: 'none', pointerEvents: 'auto' }}
+          />
+        )}
+
+        <CourseSidebar
+          className="print:hidden"
+          isMobileDevice={isMobileDevice}
+          isMobileMenuOpen={isMobileMenuOpen}
+          setIsMobileMenuOpen={setIsMobileMenuOpen}
+          filteredNavigationItems={filteredNavigationItems}
+          activeSection="discussions"
+          courseId={cid}
+        />
+
+        <div
+          className={`w-full flex-1 overflow-auto print:pt-0 ${isMobileMenuOpen && isMobileDevice ? 'overflow-hidden lg:overflow-auto' : ''}`}
+        >
+          <div className="container mx-auto px-4 pb-6 pt-2 print:px-0 print:py-0 lg:pt-3">
+            <div className="mb-3 lg:hidden">
+              <button
+                type="button"
+                onClick={() => {
+                  hapticNavigation();
+                  navigate(
+                    groupId
+                      ? `/groups/${groupId}/discussion`
+                      : courseId
+                        ? `/courses/${courseId}/discussions`
+                        : '/dashboard'
+                  );
+                }}
+                className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                aria-label="Go back to discussions"
+              >
+                <ArrowLeft className="h-6 w-6" />
+              </button>
+            </div>
+            <ThreadView />
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-export default ThreadViewWrapper; 
+export default ThreadViewWrapper;

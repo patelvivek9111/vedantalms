@@ -12,9 +12,19 @@ interface BreadcrumbProps {
   showHome?: boolean;
   /** Merged onto the root nav; default keeps bottom spacing for standalone use */
   className?: string;
+  /** Merged onto the final segment pill (e.g. long page titles). */
+  lastItemClassName?: string;
+  /** Optional native tooltip on the final segment (e.g. full title when truncated). */
+  lastItemTitle?: string;
 }
 
-const Breadcrumb: React.FC<BreadcrumbProps> = ({ items, showHome = true, className }) => {
+const Breadcrumb: React.FC<BreadcrumbProps> = ({
+  items,
+  showHome = true,
+  className,
+  lastItemClassName,
+  lastItemTitle,
+}) => {
   const location = useLocation();
 
   // Auto-generate breadcrumbs from pathname if items not provided
@@ -82,7 +92,10 @@ const Breadcrumb: React.FC<BreadcrumbProps> = ({ items, showHome = true, classNa
               <>
                 <ChevronRight className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
                 {isLast ? (
-                  <span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white shadow-sm dark:bg-blue-500">
+                  <span
+                    title={lastItemTitle}
+                    className={`rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white shadow-sm dark:bg-blue-500 ${lastItemClassName ?? ''}`}
+                  >
                     {item.label}
                   </span>
                 ) : (

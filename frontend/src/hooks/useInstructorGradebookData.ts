@@ -5,8 +5,10 @@ import { API_URL } from '../config';
 interface UseInstructorGradebookDataProps {
   activeSection: string;
   isInstructor: boolean;
+  isAdmin: boolean;
   course: any;
   modules: any[];
+  gradebookRefresh: number;
   setGradebookData: React.Dispatch<React.SetStateAction<{
     students: any[];
     assignments: any[];
@@ -17,13 +19,15 @@ interface UseInstructorGradebookDataProps {
 export const useInstructorGradebookData = ({
   activeSection,
   isInstructor,
+  isAdmin,
   course,
   modules,
+  gradebookRefresh,
   setGradebookData,
 }: UseInstructorGradebookDataProps) => {
   useEffect(() => {
     const fetchInstructorGradebookData = async () => {
-      if (activeSection !== 'gradebook' || !isInstructor) return;
+      if (activeSection !== 'gradebook' || (!isInstructor && !isAdmin)) return;
       try {
         const token = localStorage.getItem('token');
         // 1. Get all students
@@ -172,7 +176,7 @@ export const useInstructorGradebookData = ({
       }
     };
     fetchInstructorGradebookData();
-  }, [activeSection, isInstructor, course, modules, setGradebookData]);
+  }, [activeSection, isInstructor, isAdmin, course, modules, gradebookRefresh, setGradebookData]);
 };
 
 

@@ -83,6 +83,12 @@ const FloatingLabelInput = forwardRef<HTMLInputElement, FloatingLabelInputProps>
 
   const isFloating = isFocused || hasValue;
   const currentLength = value ? String(value).length : 0;
+
+  const autofillReset =
+    '[&:-webkit-autofill]:[-webkit-text-fill-color:rgb(15,23,42)] [&:-webkit-autofill]:[caret-color:rgb(15,23,42)] [&:-webkit-autofill]:!shadow-[inset_0_0_0_1000px_rgb(255,255,255)] dark:[&:-webkit-autofill]:[-webkit-text-fill-color:rgb(241,245,249)] dark:[&:-webkit-autofill]:[caret-color:rgb(241,245,249)] dark:[&:-webkit-autofill]:!shadow-[inset_0_0_0_1000px_rgb(15,23,42)]';
+
+  const autofillError =
+    '[&:-webkit-autofill]:[-webkit-text-fill-color:rgb(136,19,55)] [&:-webkit-autofill]:[caret-color:rgb(136,19,55)] [&:-webkit-autofill]:!shadow-[inset_0_0_0_1000px_rgb(255,241,242)] dark:[&:-webkit-autofill]:[-webkit-text-fill-color:rgb(254,205,211)] dark:[&:-webkit-autofill]:[caret-color:rgb(254,205,211)] dark:[&:-webkit-autofill]:!shadow-[inset_0_0_0_1000px_rgb(69,10,26)]';
   
   // Generate unique IDs for accessibility
   const inputId = props.id || `floating-input-${Math.random().toString(36).substr(2, 9)}`;
@@ -142,15 +148,18 @@ const FloatingLabelInput = forwardRef<HTMLInputElement, FloatingLabelInputProps>
           aria-invalid={error ? 'true' : 'false'}
           aria-required={props.required ? 'true' : undefined}
           className={`
-            w-full min-h-[48px] px-4 sm:px-3 ${isFloating ? 'pt-8 pb-3 sm:pb-2' : 'pt-4 pb-4'} border rounded-md 
-            bg-white dark:bg-gray-900 
-            text-gray-900 dark:text-gray-100 text-base
-            placeholder-transparent
-            focus:outline-none focus:ring-2 
-            transition-all duration-200
-            ${error 
-              ? 'border-red-500 dark:border-red-500 focus:ring-red-500 dark:focus:ring-red-500' 
-              : 'border-gray-300 dark:border-gray-700 focus:ring-blue-500 dark:focus:ring-blue-400'
+            w-full rounded-xl border px-3.5 text-sm font-normal leading-normal text-slate-900
+            shadow-sm placeholder-transparent
+            transition-[border-color,box-shadow,background-color] duration-150
+            focus:outline-none focus:ring-2 focus:ring-offset-0 dark:focus:ring-offset-0
+            h-12
+            bg-white dark:bg-slate-900/90 dark:text-slate-100
+            ${error ? autofillError : autofillReset}
+            ${isFloating ? 'pt-[1.375rem] pb-2' : 'py-3'}
+            ${
+              error
+                ? 'border-rose-300 bg-rose-50/50 focus:border-rose-400 focus:ring-rose-500/20 dark:border-rose-500/45 dark:bg-rose-950/30 dark:focus:border-rose-400 dark:focus:ring-rose-500/25'
+                : 'border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20 dark:border-slate-600 dark:focus:border-indigo-400 dark:focus:ring-indigo-400/25'
             }
             ${className}
           `}
@@ -159,15 +168,23 @@ const FloatingLabelInput = forwardRef<HTMLInputElement, FloatingLabelInputProps>
           id={labelId}
           htmlFor={inputId}
           className={`
-            absolute left-3 transition-all duration-200 pointer-events-none z-20
+            absolute left-3.5 z-20 pointer-events-none transition-all duration-150 ease-out
             ${isFloating
-              ? 'top-2.5 text-xs text-blue-600 dark:text-blue-400 font-medium bg-white dark:bg-gray-900 px-1.5 -mx-1.5 rounded backdrop-blur-sm'
-              : 'top-1/2 -translate-y-1/2 text-base text-gray-500 dark:text-gray-400'
+              ? `top-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400 px-0.5 ${
+                  error
+                    ? 'bg-rose-50/50 dark:bg-rose-950/30'
+                    : 'bg-white dark:bg-slate-900/90'
+                }`
+              : 'top-1/2 -translate-y-1/2 text-sm font-medium text-slate-500 dark:text-slate-400'
             }
           `}
         >
           {label}
-          {props.required && <span className="text-red-500 ml-1" aria-label="required">*</span>}
+          {props.required && (
+            <span className="ml-0.5 text-rose-500/90 dark:text-rose-400/90" aria-label="required">
+              *
+            </span>
+          )}
         </label>
       </div>
       
@@ -175,18 +192,18 @@ const FloatingLabelInput = forwardRef<HTMLInputElement, FloatingLabelInputProps>
       <div className="mt-1 flex items-center justify-between">
         <div className="flex-1">
           {error && (
-            <p id={errorId} className="text-sm text-red-600 dark:text-red-400" role="alert">
+            <p id={errorId} className="text-xs font-medium text-rose-700 dark:text-rose-300" role="alert">
               {error}
             </p>
           )}
           {!error && helperText && (
-            <p id={helperId} className="text-xs text-gray-500 dark:text-gray-400">
+            <p id={helperId} className="text-xs text-slate-500 dark:text-slate-400">
               {helperText}
             </p>
           )}
         </div>
         {showCharacterCount && maxLength && (
-          <span id={`${inputId}-count`} className={`text-xs ml-2 ${currentLength > maxLength * 0.9 ? 'text-orange-500' : 'text-gray-500 dark:text-gray-400'}`} aria-live="polite">
+          <span id={`${inputId}-count`} className={`text-xs ml-2 ${currentLength > maxLength * 0.9 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'}`} aria-live="polite">
             {currentLength}/{maxLength}
           </span>
         )}

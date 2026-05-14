@@ -29,7 +29,11 @@ export const useGradebookData = ({
 }: UseGradebookDataProps) => {
   useEffect(() => {
     const fetchGradebookData = async () => {
-      if ((activeSection !== 'gradebook') || (!isInstructor && !isAdmin)) return;
+      if (activeSection !== 'gradebook') return;
+      // Teacher/admin full gradebook is loaded by useInstructorGradebookData. This hook uses the
+      // student-submissions endpoint (mostly filling the current user) and must not overwrite
+      // instructor data when both could run.
+      if (isInstructor || isAdmin) return;
       try {
         const token = localStorage.getItem('token');
         // 1. Get students

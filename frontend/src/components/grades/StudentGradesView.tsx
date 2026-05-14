@@ -15,6 +15,8 @@ interface StudentGradesViewProps {
   studentSubmissions: any[];
   studentTotalGrade: number | null;
   studentLetterGrade: string | null;
+  /** After the course total API finishes (success or failure); avoids showing a client-only total that disagrees with the server. */
+  studentGradeSummaryReady: boolean;
 }
 
 const StudentGradesView: React.FC<StudentGradesViewProps> = ({
@@ -28,6 +30,7 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
   studentSubmissions,
   studentTotalGrade,
   studentLetterGrade,
+  studentGradeSummaryReady,
 }) => {
   const navigate = useNavigate();
 
@@ -541,6 +544,7 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
         studentSubmissions={studentSubmissions}
         backendTotalGrade={studentTotalGrade}
         backendLetterGrade={studentLetterGrade}
+        summaryReady={studentGradeSummaryReady}
       />
     </div>
   );

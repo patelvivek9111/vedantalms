@@ -6,6 +6,10 @@
   html {
     font-size: 14px;
   }
+
+  #root {
+    min-height: 100dvh;
+  }
   
   /* Improve touch targets on mobile for interactive elements */
   @media (max-width: 1024px) {
@@ -450,4 +454,87 @@ input[type="datetime-local"]::-webkit-outer-spin-button {
   select {
     font-size: 16px !important; /* Prevents iOS zoom on focus */
   }
-} 
+}
+
+/* Course page print: only article content (see .course-page-print-region in PageView) */
+@media print {
+  /* No @page margin so Chromium/Edge do not reserve space for default print headers/footers */
+  @page {
+    margin: 0;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  /* Toasts / overlays should not appear on paper */
+  .Toastify,
+  [class^="Toastify"] {
+    display: none !important;
+  }
+
+  .course-page-print-region {
+    max-width: 100% !important;
+    padding: 6mm 10mm 10mm 10mm;
+    box-sizing: border-box;
+  }
+
+  /* Dark UI → readable black-on-white for embedded HTML */
+  .course-page-print-region .course-page-body,
+  .course-page-print-region .course-page-body * {
+    print-color-adjust: exact;
+    color: #0f172a !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  .course-page-print-region .course-page-body a {
+    color: #1d4ed8 !important;
+    text-decoration: underline !important;
+  }
+
+  .course-page-print-region .course-page-body code {
+    background: #f1f5f9 !important;
+    border: 1px solid #cbd5e1 !important;
+    color: #0f172a !important;
+  }
+
+  .course-page-print-region .course-page-body pre {
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    color: #0f172a !important;
+  }
+
+  .course-page-print-region .course-page-body th {
+    background: #f1f5f9 !important;
+  }
+
+  .course-page-print-region .page-resource-banner {
+    background: #152c48 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .course-page-print-region .page-resource-banner,
+  .course-page-print-region .page-resource-banner * {
+    color: #fff !important;
+  }
+
+  .course-page-print-region .page-resource-banner a {
+    color: #fff !important;
+    text-decoration: underline !important;
+  }
+
+  .course-page-print-region .course-page-body th,
+  .course-page-print-region .course-page-body td {
+    border-color: #94a3b8 !important;
+  }
+
+  .course-page-print-region .course-page-body blockquote {
+    background: #f8fafc !important;
+    border-left-color: #64748b !important;
+    color: #334155 !important;
+  }
+}

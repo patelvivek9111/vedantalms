@@ -12,6 +12,8 @@ interface UseStudentGradeDataProps {
   setStudentLetterGrade: React.Dispatch<React.SetStateAction<string | null>>;
   setStudentDiscussions: React.Dispatch<React.SetStateAction<any[]>>;
   setStudentGroupAssignments: React.Dispatch<React.SetStateAction<any[]>>;
+  /** False while the course total API is in flight so the UI can avoid a misleading client-only total. */
+  setStudentGradeSummaryReady?: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export const useStudentGradeData = ({
@@ -24,11 +26,18 @@ export const useStudentGradeData = ({
   setStudentLetterGrade,
   setStudentDiscussions,
   setStudentGroupAssignments,
+  setStudentGradeSummaryReady,
 }: UseStudentGradeDataProps) => {
   // Fetch backend-calculated student grade when grades section is active
   useEffect(() => {
-    if (activeSection !== 'grades' || isInstructor || isAdmin || !course?._id) return;
+    if (activeSection !== 'grades' || isInstructor || isAdmin || !course?._id) {
+      setStudentGradeSummaryReady?.(false);
+      return;
+    }
     const fetchStudentGrade = async () => {
+      setStudentGradeSummaryReady?.(false);
+      setStudentTotalGrade(null);
+      setStudentLetterGrade(null);
       try {
         const token = localStorage.getItem('token');
         const res = await axios.get(`${API_URL}/api/grades/student/course/${course._id}`, {
@@ -39,10 +48,12 @@ export const useStudentGradeData = ({
       } catch (err) {
         setStudentTotalGrade(null);
         setStudentLetterGrade(null);
+      } finally {
+        setStudentGradeSummaryReady?.(true);
       }
     };
     fetchStudentGrade();
-  }, [activeSection, isInstructor, isAdmin, course?._id, setStudentTotalGrade, setStudentLetterGrade]);
+  }, [activeSection, isInstructor, isAdmin, course?._id, setStudentTotalGrade, setStudentLetterGrade, setStudentGradeSummaryReady]);
 
   // Fetch graded discussions for the course for student view
   useEffect(() => {

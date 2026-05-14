@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import AssignmentList from '../assignments/AssignmentList';
 import api from '../../services/api';
@@ -134,22 +134,21 @@ describe('AssignmentList', () => {
       </BrowserRouter>
     );
 
-    // Find the table row (tr) element that has the onClick handler
-    // The desktop view has tr elements with onClick handlers
-    const tableRows = document.querySelectorAll('tr[class*="cursor-pointer"]');
-    
-    if (tableRows.length > 0) {
-      // Click on the first row (which should be for Assignment 1)
-      fireEvent.click(tableRows[0] as HTMLElement);
+    const table = screen.queryByRole('table');
+    if (table) {
+      const titleCell = within(table).getAllByText('Assignment 1')[0];
+      const row = titleCell.closest('tr');
+      expect(row).toBeTruthy();
+      fireEvent.click(row as HTMLElement);
       expect(mockNavigate).toHaveBeenCalledWith(`/assignments/${mockAssignments[0]._id}/view`);
-    } else {
-      // Fallback: try clicking on the h3 element in mobile view
-      const assignmentElements = screen.getAllByText('Assignment 1');
-      const h3Element = assignmentElements.find(el => el.tagName === 'H3');
-      if (h3Element) {
-        fireEvent.click(h3Element);
-        expect(mockNavigate).toHaveBeenCalledWith(`/assignments/${mockAssignments[0]._id}/view`);
-      }
+      return;
+    }
+
+    const assignmentElements = screen.getAllByText('Assignment 1');
+    const h3Element = assignmentElements.find(el => el.tagName === 'H3');
+    if (h3Element) {
+      fireEvent.click(h3Element);
+      expect(mockNavigate).toHaveBeenCalledWith(`/assignments/${mockAssignments[0]._id}/view`);
     }
   });
 

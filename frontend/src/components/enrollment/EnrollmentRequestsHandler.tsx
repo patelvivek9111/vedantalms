@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../services/api';
+import { toast } from 'react-toastify';
 
 interface EnrollmentRequestsHandlerProps {
   courseId: string;
@@ -36,8 +37,9 @@ const EnrollmentRequestsHandler: React.FC<EnrollmentRequestsHandlerProps> = ({ c
     try {
       await api.post(`/courses/${courseId}/enrollment/${studentId}/approve`);
       setEnrollmentRequests(prev => prev.filter(req => req.studentId !== studentId));
+      toast.success('The student has been added to the course.');
     } catch (err) {
-      alert('Failed to approve enrollment');
+      toast.error('Could not approve enrollment.');
     }
   };
 
@@ -45,8 +47,9 @@ const EnrollmentRequestsHandler: React.FC<EnrollmentRequestsHandlerProps> = ({ c
     try {
       await api.post(`/courses/${courseId}/enrollment/${studentId}/deny`);
       setEnrollmentRequests(prev => prev.filter(req => req.studentId !== studentId));
+      toast.success('The enrollment request was declined.');
     } catch (err) {
-      alert('Failed to deny enrollment');
+      toast.error('Could not decline the request.');
     }
   };
 

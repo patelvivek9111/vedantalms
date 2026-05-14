@@ -148,7 +148,16 @@ exports.getCourses = async (req, res) => {
     res.json({
       success: true,
       count: courses.length,
-      data: courses
+      data: courses.map((course) => {
+        const o = typeof course.toObject === 'function' ? course.toObject() : { ...course };
+        const showEnrollmentQr =
+          req.user.role === 'admin' ||
+          (req.user.role === 'teacher' && course.instructor.toString() === req.user.id);
+        if (!showEnrollmentQr) {
+          delete o.enrollmentQrToken;
+        }
+        return o;
+      }),
     });
   } catch (err) {
     console.error('Get courses error:', err);
@@ -206,9 +215,16 @@ exports.getCourse = async (req, res) => {
     // This allows students to see course information before enrolling
     // Teachers and admins can always view courses
 
+    const data = typeof course.toObject === 'function' ? course.toObject() : { ...course };
+    const isInstructorOrAdmin =
+      req.user.role === 'admin' || course.instructor.toString() === req.user.id;
+    if (!isInstructorOrAdmin) {
+      delete data.enrollmentQrToken;
+    }
+
     res.json({
       success: true,
-      data: course
+      data
     });
   } catch (err) {
     console.error('Get course error:', err);
@@ -910,9 +926,22 @@ exports.updateSidebarConfig = async (req, res) => {
     // Validate studentVisibility if provided
     if (studentVisibility) {
       const validKeys = [
-        'overview', 'modules', 'pages', 'assignments', 'quizzes', 'discussions',
-        'announcements', 'polls', 'groups', 'attendance', 'grades',
-        'gradebook', 'students'
+        'overview',
+        'syllabus',
+        'modules',
+        'pages',
+        'assignments',
+        'quizzes',
+        'quizwave',
+        'discussions',
+        'announcements',
+        'polls',
+        'groups',
+        'meetings',
+        'attendance',
+        'grades',
+        'gradebook',
+        'students',
       ];
 
       for (const key of Object.keys(studentVisibility)) {

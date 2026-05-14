@@ -369,9 +369,11 @@ export const ToDoPanel: React.FC<ToDoPanelProps> = ({ showSupplementarySections 
   });
 
   const enrollmentRequests = personalTodosThisWeek.filter(todo => todo.type === 'enrollment_request' && todo.action === 'pending');
-  const enrollmentSummaries = personalTodosThisWeek.filter(todo => todo.type === 'enrollment_summary');
   const waitlistPromotions = personalTodosThisWeek.filter(todo => todo.type === 'waitlist_promotion');
-  const regularTodos = personalTodosThisWeek.filter(todo => todo.type !== 'enrollment_request' && todo.type !== 'enrollment_summary' && todo.type !== 'waitlist_promotion');
+  const regularTodos = personalTodosThisWeek.filter(
+    todo =>
+      todo.type !== 'enrollment_request' && todo.type !== 'enrollment_summary' && todo.type !== 'waitlist_promotion'
+  );
 
   // Get course color
   const getCourseColor = (courseId: string) => {
@@ -508,18 +510,6 @@ export const ToDoPanel: React.FC<ToDoPanelProps> = ({ showSupplementarySections 
 
   // Combine personal todos
   const allPersonalTasks = [
-    ...enrollmentSummaries.map(todo => ({
-      ...todo,
-      courseId: todo.courseId,
-      courseName: todo.courseName || 'Course',
-      taskType: 'Enrollment Update',
-      icon: CheckSquare,
-      dueDate: todo.dueDate,
-      formattedDueDate: formatDueDate(todo.dueDate),
-      color: getCourseColor(todo.courseId),
-      link: `/courses/${todo.courseId}/students`,
-      onClick: () => handleEnrollmentNotificationClick(todo)
-    })),
     ...waitlistPromotions.map(todo => ({
       ...todo,
       courseId: todo.courseId,

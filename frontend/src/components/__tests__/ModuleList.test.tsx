@@ -37,6 +37,7 @@ const mockedUseAuth = useAuth as any;
 
 describe('ModuleList', () => {
   const mockGetModules = vi.fn();
+  const mockSeedModules = vi.fn();
   const mockModules = [
     { _id: 'module1', title: 'Module 1', course: 'course1' },
     { _id: 'module2', title: 'Module 2', course: 'course1' },
@@ -48,6 +49,7 @@ describe('ModuleList', () => {
       modules: [],
       loading: false,
       error: null,
+      seedModules: mockSeedModules,
       getModules: mockGetModules,
     });
     mockedUseAuth.mockReturnValue({
@@ -61,6 +63,7 @@ describe('ModuleList', () => {
       modules: mockModules,
       loading: false,
       error: null,
+      seedModules: mockSeedModules,
       getModules: mockGetModules,
     });
 
@@ -71,11 +74,34 @@ describe('ModuleList', () => {
     });
   });
 
+  it('should seed modules when prefetchedModules provided', async () => {
+    mockedUseModule.mockReturnValue({
+      modules: mockModules,
+      loading: false,
+      error: null,
+      seedModules: mockSeedModules,
+      getModules: mockGetModules,
+    });
+
+    render(
+      <ModuleList
+        courseId="course1"
+        prefetchedModules={[{ _id: 'm1', title: 'A', course: 'course1', assignments: [] }]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockSeedModules).toHaveBeenCalled();
+    });
+    expect(mockGetModules).not.toHaveBeenCalled();
+  });
+
   it('should show loading state', () => {
     mockedUseModule.mockReturnValue({
       modules: [],
       loading: true,
       error: null,
+      seedModules: mockSeedModules,
       getModules: mockGetModules,
     });
 
@@ -89,6 +115,7 @@ describe('ModuleList', () => {
       modules: [],
       loading: false,
       error: 'Failed to load modules',
+      seedModules: mockSeedModules,
       getModules: mockGetModules,
     });
 
@@ -117,6 +144,7 @@ describe('ModuleList', () => {
       modules: mockModules,
       loading: false,
       error: null,
+      seedModules: mockSeedModules,
       getModules: mockGetModules,
     });
 
@@ -138,6 +166,7 @@ describe('ModuleList', () => {
       modules: [],
       loading: false,
       error: null,
+      seedModules: mockSeedModules,
       getModules: mockGetModules,
     });
 

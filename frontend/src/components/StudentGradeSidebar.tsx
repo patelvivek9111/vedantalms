@@ -11,6 +11,8 @@ interface StudentGradeSidebarProps {
   studentSubmissions: any[];
   backendTotalGrade?: number | null;
   backendLetterGrade?: string | null;
+  /** When false, do not show a client-calculated total (avoids flash before the server total arrives). */
+  summaryReady?: boolean;
 }
 
 const StudentGradeSidebar: React.FC<StudentGradeSidebarProps> = ({
@@ -22,18 +24,44 @@ const StudentGradeSidebar: React.FC<StudentGradeSidebarProps> = ({
   studentSubmissions,
   backendTotalGrade,
   backendLetterGrade,
+  summaryReady = true,
 }) => {
   const [showWhatIfScores, setShowWhatIfScores] = useState(false);
 
-  // Use backend grade if available, otherwise fall back to frontend calculation
-  const weightedPercent = backendTotalGrade !== null ? backendTotalGrade : calculateFinalGradeWithWeightedGroups(studentId, course, assignments, grades, submissionMap);
-  const letter = backendLetterGrade || getLetterGrade(weightedPercent || 0, course?.gradeScale);
+  const clientWeighted = calculateFinalGradeWithWeightedGroups(
+    studentId,
+    course,
+    assignments,
+    grades,
+    submissionMap
+  );
+
+  let weightedPercent: number | null;
+  let letter: string;
+
+  if (!summaryReady) {
+    weightedPercent = null;
+    letter = '…';
+  } else if (backendTotalGrade != null) {
+    weightedPercent = backendTotalGrade;
+    letter = backendLetterGrade || getLetterGrade(weightedPercent, course?.gradeScale);
+  } else {
+    weightedPercent = clientWeighted;
+    letter = getLetterGrade(weightedPercent ?? 0, course?.gradeScale);
+  }
 
   return (
     <div className="w-full md:w-64 flex-shrink-0">
       <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-3 sm:p-4 mb-3 sm:mb-4 border border-gray-200 dark:border-gray-700">
         <div className="text-base sm:text-lg font-bold mb-2 sm:mb-3 text-gray-900 dark:text-gray-100">
-          Total: {(weightedPercent || 0).toFixed(2)}% [{letter}]
+          Total:{' '}
+          {!summaryReady ? (
+            <span className="text-gray-400 dark:text-gray-500 font-medium animate-pulse">Loading…</span>
+          ) : (
+            <>
+              {(weightedPercent ?? 0).toFixed(2)}% [{letter}]
+            </>
+          )}
         </div>
         <div className="space-y-2">
           <button 

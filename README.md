@@ -733,6 +733,7 @@ lms/
 - `POST /api/courses/:id/unenroll` - Unenroll student
 
 ### Assignments
+- `GET /api/assignments/course/:courseId/module-assignments` - All module-scoped assignments for a course in one response (`byModuleId` map; used by the course shell to avoid N+1 GETs)
 - `GET /api/assignments` - Get assignments
 - `POST /api/assignments` - Create assignment
 - `GET /api/assignments/:id` - Get assignment details

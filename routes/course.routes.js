@@ -20,6 +20,7 @@ const Course = require('../models/course.model');
 const announcementController = require('../controllers/announcement.controller');
 const upload = require('../middleware/upload');
 const mongoose = require('mongoose');
+const { courseSelfEnroll, ensureEnrollmentQrToken, ensureEnrollmentJoinCode } = require('../utils/courseSelfEnroll');
 
 // Validation middleware for creating courses (requires title and description)
 const createCourseValidation = [
@@ -91,6 +92,50 @@ router.get('/available/browse', protect, async (req, res) => {
       success: false,
       message: 'Server error while fetching available courses',
       error: err.message 
+    });
+  }
+});
+
+// Student joins via course QR / deep link (requires instructor approval when there is capacity; waitlist unchanged when full)
+router.post('/enroll-by-qr', protect, async (req, res) => {
+  try {
+    const tokenRaw = req.body?.token != null ? String(req.body.token).trim() : '';
+    const joinCodeRaw =
+      req.body?.joinCode != null
+        ? String(req.body.joinCode).toUpperCase().replace(/[^23456789ABCDEFGHJKLMNPQRSTUVWXYZ]/gi, '')
+        : '';
+    if (!tokenRaw && (!joinCodeRaw || joinCodeRaw.length !== 8)) {
+      return res.status(400).json({ success: false, message: 'Join token or 8-character join code is required' });
+    }
+    let course = null;
+    if (joinCodeRaw.length === 8) {
+      course = await Course.findOne({ enrollmentJoinCode: joinCodeRaw }).populate('instructor', 'firstName lastName');
+    }
+    if (!course && tokenRaw) {
+      course = await Course.findOne({ enrollmentQrToken: tokenRaw }).populate('instructor', 'firstName lastName');
+    }
+    if (!course) {
+      return res.status(404).json({ success: false, message: 'Invalid join code' });
+    }
+    const Todo = require('../models/todo.model');
+    const result = await courseSelfEnroll(
+      { userId: req.user.id, userRole: req.user.role, course, enrollmentSource: 'qr' },
+      Todo,
+      migrateExistingNotifications,
+      removeEnrollmentSummaryTodos,
+      syncEnrollmentAttentionTodo
+    );
+    return res.status(result.statusCode).json({
+      ...result.body,
+      courseId: course._id.toString(),
+      courseTitle: course.title,
+    });
+  } catch (err) {
+    console.error('Enroll by QR error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while joining course',
+      error: err.message,
     });
   }
 });
@@ -294,6 +339,44 @@ router.get('/:courseId/enrollment-status', protect, async (req, res) => {
   }
 });
 
+// Teacher/admin: join URL + token for course QR (token created lazily if missing)
+router.get('/:courseId/enrollment-join-info', protect, async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      return res.status(400).json({ success: false, message: 'Invalid course ID format' });
+    }
+    const course = await Course.findById(courseId);
+    if (!course) {
+      return res.status(404).json({ success: false, message: 'Course not found' });
+    }
+    const isInstructor = course.instructor.toString() === req.user.id;
+    const isAdmin = req.user.role === 'admin';
+    if (!isInstructor && !isAdmin) {
+      return res.status(403).json({ success: false, message: 'Not authorized' });
+    }
+    const token = await ensureEnrollmentQrToken(Course, course);
+    const joinCode = await ensureEnrollmentJoinCode(Course, course);
+    const joinPath = `/join-course?t=${encodeURIComponent(token)}`;
+    const envBase = (process.env.FRONTEND_URL || process.env.CLIENT_URL || '').replace(/\/$/, '');
+    const joinUrl = envBase ? `${envBase}${joinPath}` : joinPath;
+    res.json({
+      success: true,
+      joinUrl,
+      joinPath,
+      joinCode,
+      courseTitle: course.title,
+    });
+  } catch (err) {
+    console.error('enrollment-join-info error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while building join link',
+      error: err.message,
+    });
+  }
+});
+
 // Routes
 router
   .route('/')
@@ -393,12 +476,10 @@ router.post('/:courseId/unenroll-self', protect, async (req, res) => {
     
     await course.save();
 
-    // Update consolidated enrollment notification for instructor
+    // Refresh instructor enrollment to-dos (no roster-count card; one row for waitlist + pending joins)
     const Todo = require('../models/todo.model');
-    await createOrUpdateEnrollmentNotification(course, Todo);
-    
-    // Update consolidated waitlist notification for instructor
-    await createOrUpdateWaitlistNotification(course, Todo);
+    await removeEnrollmentSummaryTodos(course, Todo);
+    await syncEnrollmentAttentionTodo(course, Todo);
 
     res.json({
       success: true,
@@ -414,207 +495,109 @@ router.post('/:courseId/unenroll-self', protect, async (req, res) => {
   }
 });
 
-// Direct enrollment endpoint
+// Catalog / direct course id enrollment (immediate join when there is capacity; waitlist when full)
 router.post('/:id/enroll', protect, async (req, res) => {
   try {
     const course = await Course.findById(req.params.id).populate('instructor', 'firstName lastName');
     const Todo = require('../models/todo.model');
-    
+
     if (!course) {
       return res.status(404).json({ success: false, message: 'Course not found' });
     }
-    
-    // Migrate existing notifications for this course if needed
-    await migrateExistingNotifications();
-    
-    
-    // Check if already enrolled
-    if (course.students.includes(req.user.id)) {
-      return res.status(400).json({ success: false, message: 'Already enrolled in this course' });
-    }
-    
-    // Check if there's already a pending enrollment request
-    const existingRequest = course.enrollmentRequests.find(
-      request => request.student.toString() === req.user.id && request.status === 'pending'
+
+    const result = await courseSelfEnroll(
+      { userId: req.user.id, userRole: req.user.role, course, enrollmentSource: 'catalog' },
+      Todo,
+      migrateExistingNotifications,
+      removeEnrollmentSummaryTodos,
+      syncEnrollmentAttentionTodo
     );
-    
-    if (existingRequest) {
-      return res.status(400).json({ success: false, message: 'Enrollment request already pending' });
-    }
-    
-    // Check if course is full
-    const maxStudents = course.catalog?.maxStudents;
-    if (maxStudents && course.students.length >= maxStudents) {
-      // Course is full - check if user is a teacher who can override capacity
-      if (req.user.role === 'teacher') {
-        // Teacher can override capacity - enroll directly
-        course.students.push(req.user.id);
-        await course.save();
-        
-        // Create or update consolidated enrollment notification for instructor
-        await createOrUpdateEnrollmentNotification(course, Todo);
-        
-        
-        return res.json({ 
-          success: true, 
-          message: 'Successfully enrolled in the course! (Capacity overridden by teacher)',
-          capacityOverridden: true
-        });
-      } else {
-        // Regular student - add to waitlist
-        const waitlistPosition = course.waitlist.length + 1;
-        course.waitlist.push({
-          student: req.user.id,
-          position: waitlistPosition,
-          addedDate: new Date()
-        });
-        
-        // Add to enrollmentRequests with waitlisted status for teacher to see
-        course.enrollmentRequests.push({
-          student: req.user.id,
-          status: 'waitlisted',
-          requestDate: new Date()
-        });
-        
-        await course.save();
-        
-        // Create or update consolidated enrollment notification for instructor
-        await createOrUpdateEnrollmentNotification(course, Todo);
-        
-        // Create or update consolidated waitlist notification for instructor
-        await createOrUpdateWaitlistNotification(course, Todo);
-        
-        return res.json({ 
-          success: true, 
-          message: `Course is full. You have been added to the waitlist at position ${waitlistPosition}. Teacher approval required.`,
-          waitlisted: true,
-          position: waitlistPosition
-        });
-      }
-    }
-    
-    // Course has space - enroll student directly
-    course.students.push(req.user.id);
-    
-    await course.save();
-    
-    // Create or update consolidated enrollment notification for instructor
-    await createOrUpdateEnrollmentNotification(course, Todo);
-    
-    
-    res.json({ 
-      success: true, 
-      message: 'Successfully enrolled in the course!' 
-    });
+    return res.status(result.statusCode).json(result.body);
   } catch (err) {
     console.error('Enrollment error:', err);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: 'Server error while submitting enrollment request',
-      error: err.message 
+      error: err.message,
     });
   }
 });
 
-// Helper function to create or update consolidated enrollment notification
-async function createOrUpdateEnrollmentNotification(course, Todo) {
+function instructorIdFromCourse(course) {
+  if (!course || !course.instructor) return null;
+  return course.instructor._id || course.instructor;
+}
+
+/** Remove legacy "N students enrolled" to-do rows (no longer shown to instructors). */
+async function removeEnrollmentSummaryTodos(course, Todo) {
   try {
-    // Find existing enrollment summary notification for this course
-    let existingNotification = await Todo.findOne({
+    const userId = instructorIdFromCourse(course);
+    if (!userId) return;
+    await Todo.deleteMany({
       type: 'enrollment_summary',
       courseId: course._id,
-      user: course.instructor
+      user: userId,
     });
-
-    if (existingNotification) {
-      // Update existing notification with new count
-      existingNotification.enrollmentCount = course.students.length;
-      existingNotification.dueDate = new Date(); // Update timestamp
-      await existingNotification.save();
-    } else {
-      // Create new consolidated notification
-      const newNotification = new Todo({
-        title: `${course.students.length} student enrolled in ${course.title}`,
-        dueDate: new Date(),
-        user: course.instructor,
-        type: 'enrollment_summary',
-        courseId: course._id,
-        courseName: course.title,
-        enrollmentCount: course.students.length
-      });
-      await newNotification.save();
-    }
   } catch (err) {
-    console.error('Error creating/updating enrollment notification:', err);
+    console.error('Error removing enrollment summary todos:', err);
   }
 }
 
-// Helper function to create or update consolidated waitlist notification
-async function createOrUpdateWaitlistNotification(course, Todo) {
+/**
+ * One pending to-do per course: pending join approvals (QR) + waitlisted students.
+ * Title is short; course name is stored for the To Do panel header.
+ */
+async function syncEnrollmentAttentionTodo(course, Todo) {
   try {
-    
-    // Count waitlisted students
-    const waitlistedCount = course.waitlist.length;
-    
-    // First, clean up any old individual enrollment request notifications for this course
-    const deletedCount = await Todo.deleteMany({
+    const userId = instructorIdFromCourse(course);
+    if (!userId) return;
+
+    await Todo.deleteMany({
       type: 'enrollment_request',
       courseId: course._id,
-      user: course.instructor,
-      action: 'pending'
+      user: userId,
+      action: 'pending',
     });
-    
-          if (waitlistedCount > 0) {
-        // Create new consolidated notification
-        const newNotification = new Todo({
-          title: `${waitlistedCount} student${waitlistedCount !== 1 ? 's' : ''} have requested enrollment in ${course.title}`,
-          dueDate: new Date(),
-          user: course.instructor,
-          type: 'enrollment_request',
-          courseId: course._id,
-          action: 'pending'
-        });
-        await newNotification.save();
-      } else {
-      }
+
+    const pendingApproval = (course.enrollmentRequests || []).filter((r) => r.status === 'pending').length;
+    const waitlisted = (course.waitlist || []).length;
+    const n = pendingApproval + waitlisted;
+    if (n === 0) return;
+
+    const title =
+      n === 1 ? '1 student needs your review' : `${n} students need your review`;
+
+    await Todo.create({
+      title,
+      dueDate: new Date(),
+      user: userId,
+      type: 'enrollment_request',
+      courseId: course._id,
+      courseName: course.title,
+      action: 'pending',
+    });
   } catch (err) {
-    console.error('Error creating/updating waitlist notification:', err);
+    console.error('Error syncing enrollment attention todo:', err);
   }
 }
 
-// Function to migrate existing individual notifications to consolidated ones
+// Normalize instructor to-dos for courses with waitlist and/or pending join requests
 async function migrateExistingNotifications() {
   try {
     const Todo = require('../models/todo.model');
     const Course = require('../models/course.model');
-    
-    // Get all courses with waitlists
-    const courses = await Course.find({ 'waitlist.0': { $exists: true } });
-    
+
+    const courses = await Course.find({
+      $or: [
+        { 'waitlist.0': { $exists: true } },
+        { enrollmentRequests: { $elemMatch: { status: 'pending' } } },
+      ],
+    });
+
     for (const course of courses) {
-      if (course.waitlist && course.waitlist.length > 0) {
-        // Clean up old individual notifications
-        await Todo.deleteMany({
-          type: 'enrollment_request',
-          courseId: course._id,
-          user: course.instructor,
-          action: 'pending'
-        });
-        
-        // Create new consolidated notification
-        const waitlistedCount = course.waitlist.length;
-        const newNotification = new Todo({
-          title: `${waitlistedCount} student${waitlistedCount !== 1 ? 's' : ''} have requested enrollment in ${course.title}`,
-          dueDate: new Date(),
-          user: course.instructor,
-          type: 'enrollment_request',
-          courseId: course._id,
-          action: 'pending'
-        });
-        await newNotification.save();
-      }
+      await removeEnrollmentSummaryTodos(course, Todo);
+      await syncEnrollmentAttentionTodo(course, Todo);
     }
-    
   } catch (err) {
     console.error('Error migrating existing notifications:', err);
   }
@@ -623,6 +606,8 @@ async function migrateExistingNotifications() {
 // Route to migrate existing notifications (for testing - can be removed later)
 router.post('/migrate-notifications', protect, authorize('admin'), async (req, res) => {
   try {
+    const Todo = require('../models/todo.model');
+    await Todo.deleteMany({ type: 'enrollment_summary' });
     await migrateExistingNotifications();
     res.json({ success: true, message: 'Notifications migrated successfully' });
   } catch (err) {
@@ -698,19 +683,19 @@ router.post('/:courseId/enrollment/:studentId/approve', protect, authorize('teac
       }
     }
     
-    // Update consolidated enrollment notification for instructor
-    await createOrUpdateEnrollmentNotification(updatedCourse, Todo);
-    
-    // Update consolidated waitlist notification for instructor
-    await createOrUpdateWaitlistNotification(updatedCourse, Todo);
-    
-    // Notify student about enrollment approval
+    // Refresh instructor enrollment to-dos
+    const freshCourse = await Course.findById(courseId);
+    if (freshCourse) {
+      await removeEnrollmentSummaryTodos(freshCourse, Todo);
+      await syncEnrollmentAttentionTodo(freshCourse, Todo);
+    }
     try {
       const { createNotification } = require('./notification.routes');
+      const courseForMsg = freshCourse || updatedCourse;
       await createNotification(studentId, {
         type: 'enrollment',
         title: 'Enrollment Approved',
-        message: `Your enrollment request for "${updatedCourse.title}" has been approved.`,
+        message: `Your enrollment request for "${courseForMsg?.title || 'the course'}" has been approved.`,
         link: `/courses/${courseId}`,
         relatedId: courseId,
         relatedType: 'course',
@@ -776,19 +761,20 @@ router.post('/:courseId/enrollment/:studentId/deny', protect, authorize('teacher
       }
     }
     
-    // Update consolidated enrollment notification for instructor
-    await createOrUpdateEnrollmentNotification(updatedCourse, Todo);
-    
-    // Update consolidated waitlist notification for instructor
-    await createOrUpdateWaitlistNotification(updatedCourse, Todo);
-    
+    const freshCourse = await Course.findById(courseId);
+    if (freshCourse) {
+      await removeEnrollmentSummaryTodos(freshCourse, Todo);
+      await syncEnrollmentAttentionTodo(freshCourse, Todo);
+    }
+
     // Notify student about enrollment denial
     try {
       const { createNotification } = require('./notification.routes');
+      const courseForMsg = freshCourse || updatedCourse;
       await createNotification(studentId, {
         type: 'enrollment',
         title: 'Enrollment Denied',
-        message: `Your enrollment request for "${updatedCourse.title}" has been denied.`,
+        message: `Your enrollment request for "${courseForMsg?.title || 'the course'}" has been denied.`,
         link: `/courses`,
         relatedId: courseId,
         relatedType: 'course',

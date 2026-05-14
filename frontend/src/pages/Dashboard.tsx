@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCourse } from '../contexts/CourseContext';
 import { useAuth } from '../context/AuthContext';
 import { ToDoPanel } from '../components/ToDoPanel';
-import { MoreVertical, Megaphone, FileText, MessageSquare, Palette, BookOpen, File, Settings, Bell, Menu, Folder, HelpCircle, User as UserIcon, LogOut, CheckSquare, ClipboardList, ArrowLeft, Sun, Moon, GripVertical, Search } from 'lucide-react';
+import { MoreVertical, Megaphone, FileText, MessageSquare, Palette, BookOpen, File, Settings, Bell, Menu, Folder, HelpCircle, User as UserIcon, LogOut, CheckSquare, ClipboardList, ArrowLeft, Sun, Moon, GripVertical, Search, QrCode } from 'lucide-react';
 import api, { getUserPreferences, updateUserPreferences, getImageUrl, updateUserProfile, uploadProfilePicture, getLoginActivity } from '../services/api';
 import NotificationCenter from '../components/NotificationCenter';
 import { NavCustomizationModal, NavItem, ALL_NAV_OPTIONS, DEFAULT_NAV_ITEMS } from '../components/NavCustomizationModal';
@@ -14,6 +14,9 @@ import { CourseCardSkeleton } from '../components/common/SkeletonLoader';
 import PullToRefresh from '../components/common/PullToRefresh';
 import SwipeableContainer from '../components/common/SwipeableContainer';
 import { useBottomNavSwipe } from '../hooks/useBottomNavSwipe';
+import ScanCourseQrModal from '../components/course/ScanCourseQrModal';
+import { extractJoinTokenFromQrText } from '../utils/joinCourseToken';
+import { toast } from 'react-toastify';
 
 // Earthy tone color palette
 const earthyColors = [
@@ -506,8 +509,22 @@ export function Dashboard() {
     const saved = localStorage.getItem('courseOrder');
     return saved ? JSON.parse(saved) : [];
   });
+  const [showCourseQrScanner, setShowCourseQrScanner] = useState(false);
 
   const isTeacherOrAdmin = user?.role === 'teacher' || user?.role === 'admin';
+
+  const handleCourseQrScanSuccess = useCallback(
+    (text: string) => {
+      const token = extractJoinTokenFromQrText(text);
+      setShowCourseQrScanner(false);
+      if (token) {
+        navigate(`/join-course?t=${encodeURIComponent(token)}`);
+      } else {
+        toast.error('Could not read a course join code from that QR.');
+      }
+    },
+    [navigate]
+  );
 
   // Load user preferences on mount and when user changes
   useEffect(() => {
@@ -1210,14 +1227,31 @@ export function Dashboard() {
             ) : (
               <h2 className="text-lg sm:text-xl font-semibold text-gray-700 dark:text-gray-300">My Courses</h2>
             )}
-            {isTeacherOrAdmin && (
+            {isTeacherOrAdmin ? (
               <Link
                 to="/courses/create"
                 className="bg-blue-500 dark:bg-blue-600 hover:bg-blue-600 dark:hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors text-sm sm:text-base w-full sm:w-auto text-center"
               >
                 Create Course
               </Link>
-            )}
+            ) : user?.role === 'student' ? (
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowCourseQrScanner(true)}
+                  className="inline-flex items-center justify-center gap-2 rounded-md bg-violet-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-violet-700 sm:text-base"
+                >
+                  <QrCode className="h-4 w-4 shrink-0" />
+                  Join with QR
+                </button>
+                <Link
+                  to="/join-course"
+                  className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-center text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 sm:text-base"
+                >
+                  Enter join code
+                </Link>
+              </div>
+            ) : null}
           </div>
           {publishedCourses.length === 0 ? (
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-8 sm:p-12">
@@ -1233,7 +1267,7 @@ export function Dashboard() {
                     ? 'Get started by creating your first course or publishing an existing one.'
                     : 'Browse the catalog to find and enroll in courses that interest you.'}
                 </p>
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
                   {isTeacherOrAdmin ? (
                     <Link
                       to="/courses/create"
@@ -1241,14 +1275,30 @@ export function Dashboard() {
                     >
                       Create Your First Course
                     </Link>
-          ) : (
-                    <Link
-                      to="/catalog"
-                      className="inline-flex items-center justify-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors text-sm sm:text-base"
-                    >
-                      <Search className="w-4 h-4 mr-2" />
-                      Browse Course Catalog
-                    </Link>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setShowCourseQrScanner(true)}
+                        className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-violet-600 hover:bg-violet-700 text-white font-medium rounded-lg transition-colors text-sm sm:text-base"
+                      >
+                        <QrCode className="h-4 w-4 shrink-0" />
+                        Join with QR
+                      </button>
+                      <Link
+                        to="/catalog"
+                        className="inline-flex items-center justify-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors text-sm sm:text-base"
+                      >
+                        <Search className="w-4 h-4 mr-2" />
+                        Browse Course Catalog
+                      </Link>
+                      <Link
+                        to="/join-course"
+                        className="inline-flex items-center justify-center px-6 py-3 rounded-lg border border-slate-300 bg-white font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 text-sm sm:text-base"
+                      >
+                        Enter join code
+                      </Link>
+                    </>
                   )}
                 </div>
               </div>
@@ -1686,6 +1736,12 @@ export function Dashboard() {
         </div>
         </PullToRefresh>
       </SwipeableContainer>
+
+      <ScanCourseQrModal
+        isOpen={showCourseQrScanner}
+        onClose={() => setShowCourseQrScanner(false)}
+        onScanSuccess={handleCourseQrScanSuccess}
+      />
 
     {/* Navigation Customization Modal */}
     <NavCustomizationModal

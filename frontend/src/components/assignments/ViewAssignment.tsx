@@ -183,8 +183,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
   const [hasAutoSubmitted, setHasAutoSubmitted] = useState<boolean>(false);
   const handleSubmitRef = useRef<(() => Promise<void>) | null>(null);
   
-  // Course-level grade data
-  const [courseAverage, setCourseAverage] = useState<number | null>(null); // For teachers
+  // Course-level grade data (student header badge)
   const [studentCourseGrade, setStudentCourseGrade] = useState<number | null>(null); // For students
 
   // Teacher analytics state
@@ -535,24 +534,9 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
       if (!user) {
         return;
       }
-      
-      try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          return;
-        }
 
-        if (isInstructor) {
-          // Fetch course class average for teachers
-          try {
-            const response = await api.get(`/grades/course/${courseId}/average`);
-            if (response.data && response.data.average !== null && response.data.average !== undefined) {
-              setCourseAverage(response.data.average);
-            }
-          } catch (err: any) {
-            // Error fetching course average
-          }
-        } else if (isStudent) {
+      try {
+        if (isStudent) {
           // Fetch student's overall course grade
           try {
             const response = await api.get(`/grades/student/course/${courseId}`);
@@ -569,7 +553,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
     };
 
     fetchCourseGradeData();
-  }, [courseId, user, isInstructor, isStudent]);
+  }, [courseId, user, isStudent]);
 
   // Update answeredQuestions when answers are loaded or changed
   useEffect(() => {
@@ -936,27 +920,14 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
             ariaLabel="Go back"
           />
           <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100 truncate px-2 flex-1 text-center">{assignment.title}</h1>
-          {/* Grade Badge - Mobile - Shows Course-Level Data */}
-          {(() => {
-            if (isInstructor && courseAverage !== null) {
-              return (
-                <div className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 rounded-full">
-                  <span className="text-xs font-semibold text-blue-800 dark:text-blue-200">
-                    Avg: {courseAverage.toFixed(2)}%
-                  </span>
-                </div>
-              );
-            } else if (isStudent && studentCourseGrade !== null) {
-              return (
-                <div className="px-2 py-1 bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-full">
-                  <span className="text-xs font-semibold text-green-800 dark:text-green-200">
-                    {studentCourseGrade.toFixed(2)}%
-                  </span>
-                </div>
-              );
-            }
-            return null;
-          })()}
+          {/* Grade badge - mobile - student course grade only */}
+          {isStudent && studentCourseGrade !== null && (
+            <div className="px-2 py-1 bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-full">
+              <span className="text-xs font-semibold text-green-800 dark:text-green-200">
+                {studentCourseGrade.toFixed(2)}%
+              </span>
+            </div>
+          )}
           <div className="w-10"></div> {/* Spacer for centering */}
         </div>
       </nav>
@@ -967,29 +938,13 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
             <div className="flex-1 min-w-0 w-full max-w-full">
               <div className="flex items-center gap-3 flex-wrap">
                 <h1 className="hidden lg:block text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 dark:text-gray-100 break-words">{assignment.title}</h1>
-                {/* Grade Badge - Desktop - Shows Course-Level Data - Visible on all screen sizes */}
-                {(() => {
-                  if (isInstructor && courseAverage !== null) {
-                    // Show course class average for teachers
-                    return (
-                      <div className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 rounded-full">
-                        <span className="text-xs sm:text-sm font-semibold text-blue-800 dark:text-blue-200">
-                          Course Avg: {courseAverage.toFixed(2)}%
-                        </span>
-                      </div>
-                    );
-                  } else if (isStudent && studentCourseGrade !== null) {
-                    // Show student's overall course grade
-                    return (
-                      <div className="px-3 py-1 bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-full">
-                        <span className="text-xs sm:text-sm font-semibold text-green-800 dark:text-green-200">
-                          Grade: {studentCourseGrade.toFixed(2)}%
-                        </span>
-                      </div>
-                    );
-                  }
-                  return null;
-                })()}
+                {isStudent && studentCourseGrade !== null && (
+                  <div className="px-3 py-1 bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-full">
+                    <span className="text-xs sm:text-sm font-semibold text-green-800 dark:text-green-200">
+                      Grade: {studentCourseGrade.toFixed(2)}%
+                    </span>
+                  </div>
+                )}
               </div>
               {/* Show assignment title on mobile/tablet (hidden on desktop where it's in the flex above) */}
               <h1 className="lg:hidden text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 dark:text-gray-100 break-words mt-2">{assignment.title}</h1>
@@ -1415,9 +1370,9 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                     </div>
 
                     {/* Engagement Metrics */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                      <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-lg p-4 border border-blue-200 dark:border-blue-800 shadow-sm">
-                        <div className="flex items-center justify-between">
+                    <div className="mb-8 grid grid-cols-1 items-stretch gap-6 md:grid-cols-3">
+                      <div className="flex h-full min-h-0 flex-col rounded-lg border border-blue-200 bg-white p-4 shadow-sm dark:border-blue-800 dark:bg-gray-800">
+                        <div className="flex flex-1 items-center justify-between">
                           <div>
                             <p className="text-sm font-medium text-indigo-600 dark:text-indigo-400 dark:text-indigo-400">Avg. Time Spent</p>
                             <p className="text-2xl font-bold text-indigo-900 dark:text-indigo-100">
@@ -1436,8 +1391,8 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                         </div>
                       </div>
 
-                      <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-lg p-4 border border-blue-200 dark:border-blue-800 shadow-sm">
-                        <div className="flex items-center justify-between">
+                      <div className="flex h-full min-h-0 flex-col rounded-lg border border-blue-200 bg-white p-4 shadow-sm dark:border-blue-800 dark:bg-gray-800">
+                        <div className="flex flex-1 items-center justify-between">
                           <div>
                             <p className="text-sm font-medium text-teal-600 dark:text-teal-400">Avg. Attempts</p>
                             <p className="text-2xl font-bold text-teal-900 dark:text-teal-100">
@@ -1453,8 +1408,8 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                         </div>
                       </div>
 
-                      <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-lg p-4 border border-blue-200 dark:border-blue-800 shadow-sm">
-                        <div className="flex items-center justify-between">
+                      <div className="flex h-full min-h-0 flex-col rounded-lg border border-blue-200 bg-white p-4 shadow-sm dark:border-blue-800 dark:bg-gray-800">
+                        <div className="flex flex-1 items-center justify-between">
                           <div>
                             <p className="text-sm font-medium text-pink-600 dark:text-pink-400">Peak Activity</p>
                             <p className="text-2xl font-bold text-pink-900 dark:text-pink-100">
@@ -1471,11 +1426,11 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                       </div>
                     </div>
 
-                    {/* Assignment Details */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
-                        <h4 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-3">Assignment Info</h4>
-                        <div className="space-y-2 text-sm">
+                    {/* Assignment Details — flex row so all three cards share the same height */}
+                    <div className="flex flex-col gap-6 md:flex-row md:items-stretch">
+                      <div className="flex min-h-0 flex-1 basis-0 flex-col rounded-lg border border-blue-200 bg-white p-4 dark:border-blue-800 dark:bg-gray-800">
+                        <h4 className="mb-3 text-lg font-semibold text-blue-900 dark:text-blue-100">Assignment Info</h4>
+                        <div className="min-h-0 flex-1 space-y-2 text-sm">
                           {assignment.questions && assignment.questions.length > 0 && (
                             <>
                               <div className="flex justify-between">
@@ -1507,9 +1462,9 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                         </div>
                       </div>
 
-                      <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
-                        <h4 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-3">Submission Status</h4>
-                        <div className="space-y-2 text-sm">
+                      <div className="flex min-h-0 flex-1 basis-0 flex-col rounded-lg border border-blue-200 bg-white p-4 dark:border-blue-800 dark:bg-gray-800">
+                        <h4 className="mb-3 text-lg font-semibold text-blue-900 dark:text-blue-100">Submission Status</h4>
+                        <div className="min-h-0 flex-1 space-y-2 text-sm">
                           <div className="flex justify-between">
                             <span className="text-gray-600 dark:text-gray-400 dark:text-gray-400">Published:</span>
                             <span className={`font-medium ${assignment.published ? 'text-green-600 dark:text-green-400 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
@@ -1529,9 +1484,9 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                         </div>
                       </div>
 
-                      <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
-                        <h4 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-3">Quick Actions</h4>
-                        <div className="space-y-2">
+                      <div className="flex min-h-0 flex-1 basis-0 flex-col rounded-lg border border-blue-200 bg-white p-4 dark:border-blue-800 dark:bg-gray-800">
+                        <h4 className="mb-3 text-lg font-semibold text-blue-900 dark:text-blue-100">Quick Actions</h4>
+                        <div className="flex min-h-0 flex-1 flex-col gap-2">
                           <button
                             onClick={() => navigate(`/assignments/${id}/grade`)}
                             className="w-full text-left px-3 py-2 text-sm bg-blue-50 dark:bg-blue-900/50 hover:bg-blue-100 dark:hover:bg-blue-900/70 rounded-md transition-colors flex items-center space-x-2 text-gray-900 dark:text-gray-100 dark:text-gray-100"
@@ -1540,13 +1495,8 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                             <span>Grade Submissions</span>
                           </button>
                           <button
-                            onClick={() => {
-                              if (courseId) {
-                                navigate(`/courses/${courseId}/assignments/${id}/edit`);
-                              } else {
-                                navigate(`/assignments/${id}/edit`);
-                              }
-                            }}
+                            type="button"
+                            onClick={() => navigate(`/assignments/${id}/edit`)}
                             className="w-full text-left px-3 py-2 text-sm bg-green-50 dark:bg-green-900/50 hover:bg-green-100 dark:hover:bg-green-900/70 rounded-md transition-colors flex items-center space-x-2 text-gray-900 dark:text-gray-100 dark:text-gray-100"
                           >
                             <Edit className="h-4 w-4 text-green-600 dark:text-green-400 dark:text-green-400" />
