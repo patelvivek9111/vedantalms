@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from 'react';
-import { Html5QrcodeScanner } from 'html5-qrcode';
 import { X } from 'lucide-react';
 import { extractJoinTokenFromQrText } from '../../utils/joinCourseToken';
+
+type Html5QrcodeScanner = import('html5-qrcode').Html5QrcodeScanner;
 
 interface ScanCourseQrModalProps {
   isOpen: boolean;
@@ -18,32 +19,40 @@ const ScanCourseQrModal: React.FC<ScanCourseQrModalProps> = ({ isOpen, onClose, 
   useEffect(() => {
     if (!isOpen) return;
     settledRef.current = false;
+    let cancelled = false;
     const readerId = 'course-qr-reader';
-    const scanner = new Html5QrcodeScanner(
-      readerId,
-      { fps: 8, qrbox: { width: 260, height: 260 }, aspectRatio: 1 },
-      false
-    );
-    scannerRef.current = scanner;
 
-    scanner.render(
-      (decodedText) => {
-        if (settledRef.current) return;
-        const token = extractJoinTokenFromQrText(decodedText);
-        if (!token) return;
-        settledRef.current = true;
-        scanner
-          .clear()
-          .catch(() => {})
-          .finally(() => {
-            scannerRef.current = null;
-            onScanSuccessRef.current(decodedText);
-          });
-      },
-      () => {}
-    );
+    void (async () => {
+      const { Html5QrcodeScanner } = await import('html5-qrcode');
+      if (cancelled) return;
+
+      const scanner = new Html5QrcodeScanner(
+        readerId,
+        { fps: 8, qrbox: { width: 260, height: 260 }, aspectRatio: 1 },
+        false
+      );
+      scannerRef.current = scanner;
+
+      scanner.render(
+        (decodedText) => {
+          if (settledRef.current) return;
+          const token = extractJoinTokenFromQrText(decodedText);
+          if (!token) return;
+          settledRef.current = true;
+          scanner
+            .clear()
+            .catch(() => {})
+            .finally(() => {
+              scannerRef.current = null;
+              onScanSuccessRef.current(decodedText);
+            });
+        },
+        () => {}
+      );
+    })();
 
     return () => {
+      cancelled = true;
       settledRef.current = true;
       const s = scannerRef.current;
       scannerRef.current = null;

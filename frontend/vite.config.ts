@@ -14,13 +14,26 @@ export default defineConfig({
   },
   build: {
     sourcemap: false,
-    chunkSizeWarningLimit: 900,
+    // excelVendor (~940kb) loads only on gradebook export; main entry stays under this limit
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
         manualChunks(id) {
           if (!id.includes('node_modules')) return;
+          if (id.includes('exceljs') || id.includes('jszip') || id.includes('archiver')) {
+            return 'excelVendor';
+          }
           if (id.includes('react-big-calendar') || id.includes('date-fns')) return 'calendarVendor';
           if (id.includes('@tiptap') || id.includes('tinymce')) return 'editorVendor';
+          if (id.includes('@reduxjs') || id.includes('react-redux') || id.includes('/redux/')) {
+            return 'reduxVendor';
+          }
+          if (id.includes('socket.io')) return 'socketVendor';
+          if (id.includes('i18next')) return 'i18nVendor';
+          if (id.includes('axios')) return 'httpVendor';
+          if (id.includes('@hello-pangea') || id.includes('react-beautiful-dnd')) return 'dndVendor';
+          if (id.includes('html5-qrcode') || id.includes('qrcode')) return 'qrVendor';
+          if (id.includes('lottie-react') || id.includes('lottie-web')) return 'lottieVendor';
           if (
             id.includes('/node_modules/react/') ||
             id.includes('/node_modules/react-dom/') ||
