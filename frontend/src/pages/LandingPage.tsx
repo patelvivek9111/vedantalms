@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { ContactInquiryModal } from '../components/ContactInquiryModal';
+import { ContactInquiryModal } from '../components/modals/ContactInquiryModal';
 import {
   ArrowRight,
   BookOpen,

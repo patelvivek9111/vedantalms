@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchConversations } from '../services/inboxService';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 
 export const useUnreadMessages = () => {
   const [unreadCount, setUnreadCount] = useState(0);

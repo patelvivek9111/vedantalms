@@ -7,6 +7,8 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
+      '@': path.resolve(__dirname, './src'),
+      '@tests': path.resolve(__dirname, './tests'),
       '@lms-shared/grading': path.resolve(__dirname, '../shared/grading/index.browser.mjs'),
     },
     // Prefer TypeScript source files when both TSX/JSX exist.
@@ -62,7 +64,8 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
-    setupFiles: './src/test/setup.ts',
+    include: ['tests/**/*.test.{ts,tsx}'],
+    setupFiles: ['./tests/setup.ts'],
     testTimeout: 30000, // 30 seconds per test
     hookTimeout: 30000, // 30 seconds for hooks
     teardownTimeout: 10000, // 10 seconds for teardown

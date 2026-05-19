@@ -6,6 +6,8 @@
     "moduleResolution": "node",
     "baseUrl": ".",
     "paths": {
+      "@/*": ["src/*"],
+      "@tests/*": ["tests/*"],
       "@lms-shared/grading": ["../shared/grading/index.d.ts"]
     },
     "jsx": "react",
@@ -20,5 +22,5 @@
     "outDir": "dist"
   },
   "include": ["src"],
-  "exclude": ["node_modules", "dist", "**/__tests__/**", "**/*.test.ts", "**/*.test.tsx"]
+  "exclude": ["node_modules", "dist", "tests"]
 } 

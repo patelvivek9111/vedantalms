@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { User } from 'lucide-react';
-import { ToDoPanel } from '../components/ToDoPanel';
-import { BurgerMenu } from '../components/BurgerMenu';
+import { ToDoPanel } from '../components/common/ToDoPanel';
+import { BurgerMenu } from '../components/layout/BurgerMenu';
 import SwipeableContainer from '../components/common/SwipeableContainer';
 import { useBottomNavSwipe } from '../hooks/useBottomNavSwipe';
 

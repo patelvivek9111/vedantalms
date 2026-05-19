@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { ModuleProvider } from '../contexts/ModuleContext';
-import CreateModuleForm from '../components/CreateModuleForm';
-import ModuleList from '../components/ModuleList';
+import CreateModuleForm from '../components/modules/CreateModuleForm';
+import ModuleList from '../components/modules/ModuleList';
 
 const CourseDetail: React.FC = () => {
   const { id: courseId } = useParams<{ id: string }>();

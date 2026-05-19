@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import RichTextEditor from '../RichTextEditor';
-import { useAuth } from '../../context/AuthContext';
+import RichTextEditor from '../common/RichTextEditor';
+import { useAuth } from '../../contexts/AuthContext';
 import FloatingLabelInput from '../common/FloatingLabelInput';
 import FloatingLabelSelect from '../common/FloatingLabelSelect';
 import DatePicker from '../common/DatePicker';

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import StudentGradeSidebar from '../StudentGradeSidebar';
+import StudentGradeSidebar from '../common/StudentGradeSidebar';
 import { computeAssignmentGroupPercent } from '../../utils/gradebookCompute';
 import { isExcusedGrade, EXCUSED_GRADE } from '../../utils/gradeUtils';
 

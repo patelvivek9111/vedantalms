@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import AnnouncementList, { Announcement } from '../announcements/AnnouncementList';
 import { getGroupSetAnnouncements, getAnnouncementComments, postAnnouncementComment, postAnnouncementReply, likeAnnouncementComment, unlikeAnnouncementComment } from '../../services/announcementService';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { ThumbsUp } from 'lucide-react';
 
 // Detect mobile device

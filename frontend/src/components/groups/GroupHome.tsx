@@ -3,8 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Home, Users, MessageSquare, FileText, ClipboardList, Megaphone, Calendar, TrendingUp, Star, Award, Target, Zap, BookOpen, Clock, CheckCircle, AlertCircle, Plus, Settings, UserPlus, BarChart3 } from 'lucide-react';
 import axios from 'axios';
 import { API_URL } from '../../config';
-import { useAuth } from '../../context/AuthContext';
-import ProfileImage from '../ProfileImage';
+import { useAuth } from '../../contexts/AuthContext';
+import ProfileImage from '../common/ProfileImage';
 
 // Detect mobile device
 const useMobileDevice = () => {

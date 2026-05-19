@@ -7,7 +7,14 @@ describe('export manifest (Phase P3)', () => {
   test('build + validate roundtrip', () => {
     const manifest = buildExportManifest({
       institutionId: 'default',
-      sections: [{ name: 'courses', file: 'courses.json', recordCount: 1 }],
+      sections: [
+        {
+          name: 'courses',
+          file: 'courses.json',
+          recordCount: 1,
+          contentHash: 'a'.repeat(64),
+        },
+      ],
     });
     const result = validateExportManifest(manifest);
     expect(result.valid).toBe(true);

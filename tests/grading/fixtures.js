@@ -1,6 +1,6 @@
 /**
  * Deterministic grading policy fixtures (backend Jest).
- * Mirrors frontend/src/test/grading/fixtures.ts — keep scenario IDs and expectations aligned.
+ * Mirrors frontend/tests/fixtures/grading/fixtures.ts — keep scenario IDs and expectations aligned.
  */
 
 const { EXCUSED_GRADE } = require('../../shared/grading/constants.cjs');

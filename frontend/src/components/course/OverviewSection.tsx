@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Unlock, Settings, Layout, Gamepad2 } from 'lucide-react';
-import LatestAnnouncements from '../LatestAnnouncements';
+import LatestAnnouncements from '../announcements/LatestAnnouncements';
 import ConfirmationModal from '../common/ConfirmationModal';
 import CourseEnrollmentQrCard from './CourseEnrollmentQrCard';
 import { useCourse } from '../../contexts/CourseContext';

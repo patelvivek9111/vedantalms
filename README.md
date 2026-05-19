@@ -317,22 +317,19 @@ lms/
 │   │   │   ├── admin/                  # InstitutionGradingPolicyTab, OpsDashboardPanel
 │   │   │   ├── announcements/          # AnnouncementForm, AnnouncementList
 │   │   │   ├── assignments/            # Assignment CRUD, grading, file upload
-│   │   │   ├── common/                 # BaseModal, DataTable, PullToRefresh, AsyncJobBanner, …
-│   │   │   ├── course/                 # Course shell sections (modules, quizzes, meetings, …)
+│   │   │   ├── common/                 # Shared UI (ErrorBoundary, Calendar, RichTextEditor, …)
+│   │   │   ├── layout/                 # GlobalSidebar, BottomNav, Navigation, BurgerMenu
+│   │   │   ├── modals/                 # ChangeUserModal, SidebarConfigModal, …
+│   │   │   ├── course/                 # CourseDetail, CourseList, CourseForm, sections
+│   │   │   ├── modules/                # ModuleList, ModuleCard, CreateModuleForm
+│   │   │   ├── pages/                  # PageView, PageViewer, CreatePageForm
+│   │   │   ├── threads/                # ThreadView, CreateThreadModal
 │   │   │   ├── enrollment/             # EnrollmentRequestsHandler
 │   │   │   ├── grades/                 # Gradebook, lifecycle, policy modals, audit UI
-│   │   │   │   ├── GradebookView.tsx / StudentGradesView.tsx
-│   │   │   │   ├── GradingPolicyModal.tsx / PolicyAuditHistory.tsx / PolicyDiffViewer.tsx
-│   │   │   │   ├── EffectivePolicyPreview.tsx / PolicyProvenancePanel.tsx
-│   │   │   │   ├── CourseGradeLifecyclePanel.tsx / AmendmentTimeline.tsx
-│   │   │   │   └── AssignmentGroupsModal.tsx / GradeScaleModal.tsx
 │   │   │   ├── groups/                 # Group sets, meetings, discussions
 │   │   │   ├── polls/                  # PollForm, PollList, PollVote
 │   │   │   ├── quizwave/               # Live quiz builder + student join/game screens
-│   │   │   ├── students/               # StudentsManagement, StudentCard
-│   │   │   ├── CourseDetail.tsx        # Course hub (gradebook, lifecycle, exports)
-│   │   │   ├── WhatIfScores.tsx
-│   │   │   └── …                       # Navigation, inbox shell, calendar, etc.
+│   │   │   └── students/               # StudentsManagement, StudentCard
 │   │   ├── design-system/              # tokens, StatusBadge, ErrorBanner, ConfirmDialog, …
 │   │   ├── features/
 │   │   │   ├── gradebook/              # Toolbar, filters, keyboard nav, status utils
@@ -352,10 +349,11 @@ lms/
 │   │   │   ├── gradebookCompute.ts     # Client gradebook (uses shared/grading)
 │   │   │   ├── instructorGradebookGrades.ts / transcriptGpa.ts
 │   │   │   ├── gradebookExport.ts / gradeUtils.ts / gradeUtils.types.ts
-│   │   │   └── __tests__/              # Vitest policy parity (*.policy.test.ts)
-│   │   ├── context/ / contexts/ / store/ / constants/
+│   │   ├── contexts/                   # AuthContext, ThemeContext, CourseContext, ModuleContext
 │   │   ├── App.tsx / main.tsx / config.ts
-│   │   └── test/setup.ts               # Vitest bootstrap
+│   ├── tests/                          # Vitest (unit/components, unit/utils, fixtures)
+│   │   ├── setup.ts / helpers/mockApi.ts
+│   │   └── unit/                       # components/, hooks/, utils/, features/
 │   ├── public/assets/                  # Logos, favicons (dist/ and .vite/ are gitignored)
 │   ├── index.html / vite.config.ts / package.json
 │   └── tailwind.config.js / postcss.config.js
@@ -453,19 +451,18 @@ lms/
 │   ├── verifySharedGrading.js / checkDeprecatedGradingCalculator.js
 │   ├── validateMongoIndexes.js / perf/gradebookBench.js
 │   ├── predeploySmokeCheck.js
-│   ├── day1BaselineCheck.js … day5LoadRamp.js   # Hardening benchmarks → DAY_PROGRESS.md
-│   ├── demoData/ + seedGrade8*Demo.js + patchGrade8Math8DemoRealism.js
-│   └── fixDuplicatePins.js / fixPinIndex.js     # One-off DB maintenance
+│   ├── demoData/ + seedGrade8*Demo.js  # Optional demo course seeding
+│   └── archive/                        # Retired one-off scripts (QuizWave DB fixes, etc.)
 │
-├── tests/
+├── tests/                              # Backend Jest (see tests/README.md)
 │   ├── setup.js / helpers.js
-│   ├── *.test.js                       # API integration suites
-│   ├── grading/                        # Policy, lifecycle, FERPA, parity, e2e
-│   ├── portability/                    # Provider + export manifest tests
-│   └── migration/                      # institutionMigration.test.js
+│   ├── unit/api|controllers|middleware|services/
+│   ├── integration/
+│   ├── grading/ / portability/ / migration/
 │
 ├── docs/
 │   ├── production-checklist.md
+│   ├── archive/                        # Historical reports (predeploy hunts, phase notes)
 │   ├── production/                     # deployment, scaling, DR, readiness reports
 │   ├── operations/                     # backup, restore, cutover, incident runbooks
 │   ├── architecture/                   # export, backup, portability, migration
@@ -477,7 +474,6 @@ lms/
 ├── package.json / jest.config.js
 ├── Dockerfile / docker-compose.prod.yml / .dockerignore
 ├── vercel.json / generate-secret.js
-└── DAY_PROGRESS.md                     # Append-only hardening notes (day1–5 scripts)
 ```
 ---
 
@@ -762,8 +758,6 @@ For **Vercel + Render** in this repo, `vercel.json` rewrites `/api/*`, `/uploads
 - `npm run seed:demo:*` / `npm run patch:demo:math8-realism` - Demo course seeding
 - `npm run audit:duplicates` - Detect duplicate `.jsx/.tsx` basenames
 - `npm run obs:*` - Prometheus/Grafana docker compose helpers
-- `npm run check:day1` … `npm run check:day5` (+ variants) - Hardening benchmarks (append to `DAY_PROGRESS.md`)
-- `npm run dev:peer` - Auxiliary peer server for multi-node/socket validation
 
 **Frontend directory:**
 - `npm run dev` - Start Vite dev server
@@ -772,8 +766,9 @@ For **Vercel + Render** in this repo, `vercel.json` rewrites `/api/*`, `/uploads
 - `npm run lint` - Run ESLint
 - `npm run test` - Vitest in watch mode
 - `npm run test:run` / `npm run test:run:stable` - Single Vitest run (stable caps workers/memory)
-- `npm run test:grading` - Policy parity unit tests (`src/utils/__tests__/*.policy.test.ts`)
-- `npm run test:workflows` / `npm run test:fux` - Gradebook + hook workflow tests
+- `npm run test:grading` - Policy parity (`tests/unit/utils/*.policy.test.ts`)
+- `npm run test:components` / `npm run test:unit` - Component and unit tests
+- `npm run test:workflows` / `npm run test:fux` - Feature + hook workflow tests
 
 ---
 

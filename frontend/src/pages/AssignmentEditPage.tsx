@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import CreateAssignmentForm from '../components/assignments/CreateAssignmentForm';
 import { ArrowLeft } from 'lucide-react';
 import axios from 'axios';

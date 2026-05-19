@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { useSearchParams } from 'react-router-dom';
 import { updateUserProfile, uploadProfilePicture, getUserPreferences, updateUserPreferences, getLoginActivity, getImageUrl } from '../services/api';
 import api from '../services/api';
-import { useTheme } from '../context/ThemeContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { Sun, Moon, Save, RefreshCw, Check } from 'lucide-react';
 import FloatingLabelInput from '../components/common/FloatingLabelInput';
 import FloatingLabelTextarea from '../components/common/FloatingLabelTextarea';

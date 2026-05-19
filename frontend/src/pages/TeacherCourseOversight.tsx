@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { API_URL } from '../config';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { getImageUrl } from '../services/api';
 import { 
   BookOpen, 
@@ -18,7 +18,7 @@ import {
   Plus,
   ChevronDown
 } from 'lucide-react';
-import { BurgerMenu } from '../components/BurgerMenu';
+import { BurgerMenu } from '../components/layout/BurgerMenu';
 import DataTable, { Column } from '../components/common/DataTable';
 import ConfirmationModal from '../components/common/ConfirmationModal';
 

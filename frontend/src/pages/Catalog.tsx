@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { API_URL } from '../config';
 import { Search, Filter, BookOpen, User, Users } from 'lucide-react';
-import { BurgerMenu } from '../components/BurgerMenu';
+import { BurgerMenu } from '../components/layout/BurgerMenu';
 import ConfirmationModal from '../components/common/ConfirmationModal';
 import SwipeableContainer from '../components/common/SwipeableContainer';
 import { useBottomNavSwipe } from '../hooks/useBottomNavSwipe';

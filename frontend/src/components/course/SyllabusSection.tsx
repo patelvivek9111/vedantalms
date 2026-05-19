@@ -1,6 +1,6 @@
 import React from 'react';
 import { API_URL } from '../../config';
-import RichTextEditor from '../RichTextEditor';
+import RichTextEditor from '../common/RichTextEditor';
 
 interface SyllabusFields {
   courseTitle: string;

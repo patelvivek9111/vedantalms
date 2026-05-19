@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { NavItem, ALL_NAV_OPTIONS, DEFAULT_NAV_ITEMS } from '../components/NavCustomizationModal';
+import { useAuth } from '../contexts/AuthContext';
+import { NavItem, ALL_NAV_OPTIONS, DEFAULT_NAV_ITEMS } from '../components/layout/NavCustomizationModal';
 import { hapticNavigation } from '../utils/hapticFeedback';
 import { useState, useEffect } from 'react';
 

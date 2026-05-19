@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import AnnouncementList, { Announcement } from '../components/announcements/AnnouncementList';
 import AnnouncementForm from '../components/announcements/AnnouncementForm';
 import { getAnnouncements, createAnnouncement, getAnnouncementComments, postAnnouncementComment, postAnnouncementReply, likeAnnouncementComment, unlikeAnnouncementComment, updateAnnouncement, deleteAnnouncement } from '../services/announcementService';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { useState as useReactState } from 'react';
 import { ThumbsUp, Info, Lightbulb } from 'lucide-react';
 import ConfirmationModal from '../components/common/ConfirmationModal';

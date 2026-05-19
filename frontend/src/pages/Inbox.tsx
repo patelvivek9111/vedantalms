@@ -4,10 +4,10 @@ import { fetchConversations, fetchMessages, sendMessage, createConversation, sea
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import api from '../services/api';
 import { getImageUrl } from '../services/api';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { Edit, Reply, Archive, Trash2, Search, ChevronLeft, CheckSquare, Paperclip, CheckSquare2, User } from 'lucide-react';
-import RichTextEditor from '../components/RichTextEditor';
-import { BurgerMenu } from '../components/BurgerMenu';
+import RichTextEditor from '../components/common/RichTextEditor';
+import { BurgerMenu } from '../components/layout/BurgerMenu';
 import { useOnlineStatus, markUserOnline, markUserOffline } from '../hooks/useOnlineStatus';
 import ConfirmationModal from '../components/common/ConfirmationModal';
 import PullToRefresh from '../components/common/PullToRefresh';

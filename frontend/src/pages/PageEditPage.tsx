@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import BackButton from '../components/common/BackButton';
-import RichTextEditor from '../components/RichTextEditor';
-import { coursePageBodyHtmlClass, sanitizePageHtml } from '../components/PageView';
+import RichTextEditor from '../components/common/RichTextEditor';
+import { coursePageBodyHtmlClass, sanitizePageHtml } from '../components/pages/PageView';
 
 import { API_URL } from '../config';
 

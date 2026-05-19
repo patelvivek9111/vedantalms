@@ -4,7 +4,7 @@ import { toast } from 'react-toastify';
 import api from '../../services/api';
 import { format } from 'date-fns';
 import { API_URL } from '../../config';
-import ProfileImage from '../ProfileImage';
+import ProfileImage from '../common/ProfileImage';
 import DataTable, { Column } from '../common/DataTable';
 import ConfirmationModal from '../common/ConfirmationModal';
 import PullToRefresh from '../common/PullToRefresh';

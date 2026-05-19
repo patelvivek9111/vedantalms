@@ -1,6 +1,6 @@
 import React from 'react';
 import { ModuleProvider } from '../../contexts/ModuleContext';
-import ModuleList from '../ModuleList';
+import ModuleList from '../modules/ModuleList';
 
 interface ModulesSectionProps {
   courseId: string;

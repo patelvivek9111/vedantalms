@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { getQuizWaveSocket } from '../../utils/quizwaveSocket';
 import { quizwaveService } from '../../services/quizwaveService';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { CheckCircle, XCircle } from 'lucide-react';
 import { QuizWaveGameSnapshot, isRevealPhase } from '../../types/quizwaveGameState';
 import { useQuizWavePhaseTimer } from '../../hooks/useQuizWavePhaseTimer';

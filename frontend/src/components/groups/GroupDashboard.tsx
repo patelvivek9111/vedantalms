@@ -3,7 +3,7 @@ import { useParams, NavLink, useNavigate, Outlet, Link, useLocation } from 'reac
 import { Home, FileText, MessageSquare, ClipboardList, Megaphone, Users, ChevronDown, BookOpen, X } from 'lucide-react';
 import axios from 'axios';
 import { API_URL } from '../../config';
-import { AssignmentCard } from '../CourseDetail';
+import { AssignmentCard } from '../course/CourseDetail';
 import GroupPages from './GroupPages';
 import GroupAnnouncements from './GroupAnnouncements';
 import Breadcrumb from '../common/Breadcrumb';

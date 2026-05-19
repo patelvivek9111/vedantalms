@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import FloatingLabelInput from '../components/common/FloatingLabelInput';
 import FloatingLabelPasswordInput from '../components/common/FloatingLabelPasswordInput';
 import FloatingLabelSelect from '../components/common/FloatingLabelSelect';

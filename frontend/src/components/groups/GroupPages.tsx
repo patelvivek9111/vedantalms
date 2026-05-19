@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
-import CreatePageForm from '../CreatePageForm';
+import CreatePageForm from '../pages/CreatePageForm';
 import { ModuleProvider } from '../../contexts/ModuleContext';
 import { getGroupSetAnnouncements } from '../../services/announcementService';
 import AnnouncementList from '../announcements/AnnouncementList';

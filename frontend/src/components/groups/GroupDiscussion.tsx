@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useOutletContext } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import api, { getImageUrl } from '../../services/api';
 import { API_URL } from '../../config';
 import { formatDistanceToNow } from 'date-fns';
-import CreateThreadModal from '../CreateThreadModal';
+import CreateThreadModal from '../threads/CreateThreadModal';
 import axios from 'axios';
-import CreatePageForm from '../CreatePageForm';
+import CreatePageForm from '../pages/CreatePageForm';
 import { ModuleProvider } from '../../contexts/ModuleContext';
 import { BookOpen, ChevronDown } from 'lucide-react';
 

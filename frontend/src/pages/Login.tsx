@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { BookOpen, MessageCircle, Award, ArrowRight } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { InteractiveEyes } from '../components/InteractiveEyes';
+import { useAuth } from '../contexts/AuthContext';
+import { InteractiveEyes } from '../components/common/InteractiveEyes';
 import FloatingLabelInput from '../components/common/FloatingLabelInput';
 import FloatingLabelPasswordInput from '../components/common/FloatingLabelPasswordInput';
 

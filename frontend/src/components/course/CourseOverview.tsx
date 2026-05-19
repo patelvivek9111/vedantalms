@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import LatestAnnouncements from '../LatestAnnouncements';
+import LatestAnnouncements from '../announcements/LatestAnnouncements';
 import ConfirmationModal from '../common/ConfirmationModal';
 
 interface CourseOverviewProps {

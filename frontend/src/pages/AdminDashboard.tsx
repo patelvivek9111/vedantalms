@@ -18,7 +18,7 @@ import {
   Cpu,
   HardDrive
 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import { API_URL } from '../config';
 

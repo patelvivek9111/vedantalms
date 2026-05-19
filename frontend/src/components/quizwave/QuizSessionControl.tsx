@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { getQuizWaveSocket } from '../../utils/quizwaveSocket';
 import { quizwaveService, Quiz, QuizSession } from '../../services/quizwaveService';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { Play, SkipForward, Users, Trophy, Copy, Check, Clock } from 'lucide-react';
 import { Socket } from 'socket.io-client';
 import { QuizWaveGameSnapshot } from '../../types/quizwaveGameState';
