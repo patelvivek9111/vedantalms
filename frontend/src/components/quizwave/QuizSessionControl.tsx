@@ -5,7 +5,8 @@ import { useAuth } from '../../context/AuthContext';
 import { Play, SkipForward, Users, Trophy, Copy, Check, Clock } from 'lucide-react';
 import { Socket } from 'socket.io-client';
 import { QuizWaveGameSnapshot } from '../../types/quizwaveGameState';
-import { useQuizWavePhaseTimer, usePhaseElapsed } from '../../hooks/useQuizWavePhaseTimer';
+import { useQuizWavePhaseTimer } from '../../hooks/useQuizWavePhaseTimer';
+import TeacherHostRevealView from './TeacherHostRevealView';
 
 interface QuizSessionControlProps {
   sessionId: string;
@@ -70,11 +71,6 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
     gameSnapshot?.phaseEndsAt,
     phase === 'TRANSITION'
   );
-  const phaseElapsed = usePhaseElapsed(
-    gameSnapshot?.phaseStartedAt,
-    phase === 'ANSWER_REVEAL'
-  );
-
   const timeRemaining = phase === 'TRANSITION' ? transitionTimer : questionTimer;
   const countdown = phase === 'TRANSITION' ? transitionTimer : 0;
 
@@ -82,9 +78,8 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
   const isHostLiveQuestion = phase === 'QUESTION_ACTIVE' || phase === 'QUESTION_LOCKED';
   const isHostDistribution = phase === 'ANSWER_REVEAL' || phase === 'SCOREBOARD';
   const isHostTransition = phase === 'TRANSITION';
-  /** Highlight correct answers on the bar chart only after the live-count phase */
-  const hostRevealCorrectOnChart =
-    (phase === 'ANSWER_REVEAL' && phaseElapsed >= 3000) || phase === 'SCOREBOARD';
+  /** Show correct-answer checkmarks on chart + tiles during reveal (Kahoot-style) */
+  const hostRevealCorrectOnChart = phase === 'ANSWER_REVEAL' || phase === 'SCOREBOARD';
 
   const loadSession = async () => {
     try {
@@ -463,90 +458,23 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
           {/* Main Question Display */}
           <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8">
             <div className="max-w-4xl w-full">
-              {/* Question Text */}
-              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-4 sm:p-6 lg:p-8 mb-4 sm:mb-6 lg:mb-8 text-center">
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-100 mb-3 sm:mb-4 break-words">
-                  {currentQuestion.questionText}
-                </h1>
-              </div>
-
-              {/* Answer Distribution Chart */}
-              {isHostDistribution && (
-                <div className="mb-4 sm:mb-6 lg:mb-8 w-full">
-                  {phase === 'SCOREBOARD' && gameSnapshot?.leaderboard && gameSnapshot.leaderboard.length > 0 && (
-                    <div className="mb-6 flex flex-wrap justify-center gap-3">
-                      {gameSnapshot.leaderboard.slice(0, 3).map((entry, rank) => (
-                        <div
-                          key={entry.studentId}
-                          className="bg-gray-100 dark:bg-gray-800 rounded-lg px-4 py-2 text-center min-w-[100px]"
-                        >
-                          <p className="text-xs text-gray-500 dark:text-gray-400">#{rank + 1}</p>
-                          <p className="font-semibold text-gray-900 dark:text-white truncate">{entry.nickname}</p>
-                          <p className="text-sm text-purple-600 dark:text-purple-400">{entry.totalScore} pts</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:gap-6">
-                    {currentQuestion.options.map((opt: any, idx: number) => {
-                      const colorClass = getAnswerColor(idx);
-                      const shape = getAnswerShape(idx);
-                      const count = answerDistribution[idx] || 0;
-                      const maxCount = Math.max(...Object.values(answerDistribution), 1);
-                      const barHeight = maxCount > 0 ? Math.max((count / maxCount) * 200, count > 0 ? 40 : 0) : 0;
-                      const isCorrect = hostRevealCorrectOnChart && opt.isCorrect;
-                      
-                      return (
-                        <div key={idx} className="flex flex-col items-center">
-                          {/* Count above bar */}
-                          <div className="mb-2">
-                            <span className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100">{count}</span>
-                            {isCorrect && (
-                              <Check className="w-6 h-6 text-green-500 inline-block ml-2" />
-                            )}
-                          </div>
-                          {/* Bar Chart Container */}
-                          <div className="w-full flex items-end justify-center" style={{ height: '250px' }}>
-                            <div className="w-full relative">
-                              {/* Bar */}
-                              <div
-                                className={`${colorClass} rounded-t-lg transition-all duration-500 ease-out flex items-end justify-center relative`}
-                                style={{ 
-                                  height: `${barHeight}px`,
-                                  minHeight: count > 0 ? '40px' : '0px'
-                                }}
-                              >
-                                {/* Shape icon at the bottom of the bar */}
-                                {count > 0 && (
-                                  <div className="absolute bottom-2 w-12 h-12 bg-white/30 rounded-lg flex items-center justify-center">
-                                    {shape === 'triangle' && (
-                                      <div className="w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-b-[16px] border-b-white"></div>
-                                    )}
-                                    {shape === 'diamond' && (
-                                      <div className="w-5 h-5 bg-white rotate-45"></div>
-                                    )}
-                                    {shape === 'circle' && (
-                                      <div className="w-5 h-5 bg-white rounded-full"></div>
-                                    )}
-                                    {shape === 'square' && (
-                                      <div className="w-5 h-5 bg-white"></div>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          {/* Option text below */}
-                          <div className="mt-4 text-center">
-                            <div className={`${colorClass} rounded-lg px-4 py-2 inline-block`}>
-                              <span className="text-white text-lg font-semibold">{opt.text}</span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+              {!isHostDistribution && (
+                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-4 sm:p-6 lg:p-8 mb-4 sm:mb-6 text-center">
+                  <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-100 break-words">
+                    {currentQuestion.questionText}
+                  </h1>
                 </div>
+              )}
+
+              {isHostDistribution && (
+                <TeacherHostRevealView
+                  questionText={currentQuestion.questionText}
+                  options={currentQuestion.options}
+                  answerDistribution={answerDistribution}
+                  showCorrectMarks={hostRevealCorrectOnChart}
+                  leaderboard={gameSnapshot?.leaderboard}
+                  showLeaderboard={phase === 'SCOREBOARD'}
+                />
               )}
 
               {/* Answer Options - Kahoot Style */}
