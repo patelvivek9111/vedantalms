@@ -21,7 +21,8 @@ const maxForEvent = (eventName) => {
     'quizwave:start': parseIntEnv('QUIZWAVE_THROTTLE_TEACHER_ACTION_MAX', 20),
     'quizwave:next-question': parseIntEnv('QUIZWAVE_THROTTLE_TEACHER_ACTION_MAX', 20),
     'quizwave:end': parseIntEnv('QUIZWAVE_THROTTLE_TEACHER_ACTION_MAX', 20),
-    'quizwave:get-leaderboard': parseIntEnv('QUIZWAVE_THROTTLE_LEADERBOARD_MAX', 24)
+    'quizwave:get-leaderboard': parseIntEnv('QUIZWAVE_THROTTLE_LEADERBOARD_MAX', 24),
+    'quizwave:sync-game-state': parseIntEnv('QUIZWAVE_THROTTLE_LEADERBOARD_MAX', 30)
   };
   return limits[eventName] ?? parseIntEnv('QUIZWAVE_THROTTLE_DEFAULT_MAX', 40);
 };

@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { getQuizWaveSocket } from '../../utils/quizwaveSocket';
 import { quizwaveService, Quiz, QuizSession } from '../../services/quizwaveService';
 import { useAuth } from '../../context/AuthContext';
-import { Play, Pause, SkipForward, Users, Trophy, Copy, Check, Clock } from 'lucide-react';
+import { Play, SkipForward, Users, Trophy, Copy, Check, Clock } from 'lucide-react';
 import { Socket } from 'socket.io-client';
+import { QuizWaveGameSnapshot } from '../../types/quizwaveGameState';
+import { useQuizWavePhaseTimer, usePhaseElapsed } from '../../hooks/useQuizWavePhaseTimer';
 
 interface QuizSessionControlProps {
   sessionId: string;
@@ -21,23 +23,65 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
   const { user } = useAuth();
   const [session, setSession] = useState<QuizSession | null>(null);
   const [socket, setSocket] = useState<Socket | null>(null);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(-1);
-  const [currentQuestion, setCurrentQuestion] = useState<any>(null);
+  const [gameSnapshot, setGameSnapshot] = useState<QuizWaveGameSnapshot | null>(null);
   const [participantCount, setParticipantCount] = useState(0);
   const [participants, setParticipants] = useState<any[]>([]);
-  const [answerCount, setAnswerCount] = useState(0);
-  const [answerDistribution, setAnswerDistribution] = useState<{ [key: number]: number }>({});
-  const [showAnswerDistribution, setShowAnswerDistribution] = useState(false);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [copied, setCopied] = useState(false);
-  const [timeRemaining, setTimeRemaining] = useState(0);
-  const [showCorrectAnswer, setShowCorrectAnswer] = useState(false);
-  const [countdown, setCountdown] = useState(0);
   const [showFullLeaderboard, setShowFullLeaderboard] = useState(false);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const podiumTimerRef = useRef<NodeJS.Timeout | null>(null);
   const token = localStorage.getItem('token') || '';
+
+  const applySnapshot = useCallback((snap: QuizWaveGameSnapshot) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[CLIENT SYNC] teacher', snap.phase, 'Q', snap.currentQuestionIndex);
+    }
+    setGameSnapshot(snap);
+    setParticipantCount(snap.participantCount);
+    setSession((prev) =>
+      prev
+        ? {
+            ...prev,
+            status: snap.status,
+            currentQuestionIndex: snap.currentQuestionIndex
+          }
+        : prev
+    );
+    if (snap.leaderboard?.length) {
+      setLeaderboard(snap.leaderboard);
+    }
+    if (snap.phase === 'FINISHED') {
+      if (podiumTimerRef.current) clearTimeout(podiumTimerRef.current);
+      podiumTimerRef.current = setTimeout(() => setShowFullLeaderboard(true), 10000);
+    }
+  }, []);
+
+  const phase = gameSnapshot?.phase ?? (session?.status === 'waiting' ? 'LOBBY' : session?.status === 'ended' ? 'FINISHED' : 'LOBBY');
+  const currentQuestionIndex = gameSnapshot?.currentQuestionIndex ?? session?.currentQuestionIndex ?? -1;
+  const currentQuestion = gameSnapshot?.question ?? null;
+  const answerCount = gameSnapshot?.answerCount ?? 0;
+  const answerDistribution = gameSnapshot?.answerDistribution ?? {};
+
+  const questionTimer = useQuizWavePhaseTimer(
+    gameSnapshot?.phaseEndsAt,
+    phase === 'QUESTION_ACTIVE'
+  );
+  const transitionTimer = useQuizWavePhaseTimer(
+    gameSnapshot?.phaseEndsAt,
+    phase === 'TRANSITION'
+  );
+  const phaseElapsed = usePhaseElapsed(
+    gameSnapshot?.phaseStartedAt,
+    phase === 'ANSWER_REVEAL'
+  );
+
+  const timeRemaining = phase === 'TRANSITION' ? transitionTimer : questionTimer;
+  const showAnswerDistribution = phase === 'ANSWER_REVEAL' && phaseElapsed < 3000;
+  const showCorrectAnswer =
+    (phase === 'ANSWER_REVEAL' && phaseElapsed >= 3000) ||
+    phase === 'SCOREBOARD' ||
+    phase === 'TRANSITION';
+  const countdown = phase === 'TRANSITION' ? transitionTimer : 0;
 
   const loadSession = async () => {
     try {
@@ -45,7 +89,6 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
       setSession(data);
       setParticipantCount(data.participants.length);
       setParticipants(data.participants || []);
-      setCurrentQuestionIndex(data.currentQuestionIndex);
       
       // Only calculate leaderboard when quiz has ended
       if (data.status === 'ended') {
@@ -57,11 +100,6 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
           }))
           .sort((a: any, b: any) => b.totalScore - a.totalScore);
         setLeaderboard(lb);
-      }
-      
-      // Set current question if quiz has started
-      if (data.currentQuestionIndex >= 0 && quiz.questions[data.currentQuestionIndex]) {
-        setCurrentQuestion(quiz.questions[data.currentQuestionIndex]);
       }
       
       return data;
@@ -99,16 +137,16 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
       sock.off('quizwave:teacher-joined');
       sock.off('quizwave:participant-joined');
       sock.off('quizwave:answer-submitted');
-      sock.off('quizwave:started');
-      sock.off('quizwave:question-advanced');
+      sock.off('quizwave:game-state');
       sock.off('quizwave:ended');
+
+      sock.on('quizwave:game-state', (snap: QuizWaveGameSnapshot) => {
+        applySnapshot(snap);
+      });
 
       sock.on('quizwave:teacher-joined', (data) => {
         console.log('Teacher joined:', data);
         setParticipantCount(data.participantCount);
-        setCurrentQuestionIndex(data.currentQuestionIndex);
-        // Only set leaderboard if quiz has ended
-        // During active questions, we don't want to show leaderboard
         if (data.status === 'ended' && data.participants) {
           const lb = data.participants
             .map((p: any) => ({
@@ -118,6 +156,9 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
             }))
             .sort((a: any, b: any) => b.totalScore - a.totalScore);
           setLeaderboard(lb);
+        }
+        if (sock) {
+          sock.emit('quizwave:sync-game-state', { sessionId });
         }
       });
 
@@ -135,128 +176,14 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
 
       sock.on('quizwave:answer-submitted', (data) => {
         console.log('Answer submitted:', data);
-        setAnswerCount((prev) => prev + 1);
-        // Update answer distribution
-        if (data.selectedOptions && data.selectedOptions.length > 0) {
-          setAnswerDistribution((prev) => {
-            const newDist = { ...prev };
-            // For each selected option, increment the count
-            data.selectedOptions.forEach((optionIndex: number) => {
-              newDist[optionIndex] = (newDist[optionIndex] || 0) + 1;
-            });
-            return newDist;
-          });
-        }
-        // Don't reload session here - it's too expensive and causes lag
-        // The answer count and distribution are already updated above
+        // Answer count/distribution come from authoritative game-state broadcast
       });
-
-      sock.on('quizwave:started', (data) => {
-        // First question - ensure questionIndex is set correctly
-        const questionIndex = data.questionData?.questionIndex ?? 0;
-        setCurrentQuestionIndex(questionIndex);
-        setCurrentQuestion(data.questionData);
-        setAnswerCount(0);
-        setAnswerDistribution({});
-        setShowAnswerDistribution(false);
-        setShowCorrectAnswer(false);
-        setCountdown(0);
-        setTimeRemaining(data.questionData?.timeLimit || 30);
-        // Clear any existing timers
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
-          timerRef.current = null;
-        }
-        if (countdownRef.current) {
-          clearInterval(countdownRef.current);
-          countdownRef.current = null;
-        }
-        // Update session status to active
-        setSession((prev) => prev ? { ...prev, status: 'active' as const, currentQuestionIndex: questionIndex } : null);
-        // Also reload session to get latest state
-        loadSession();
-      });
-
-      sock.on('quizwave:question-advanced', (data) => {
-        // This is the teacher-specific event with correct answers
-        setCurrentQuestionIndex(data.questionIndex);
-        setCurrentQuestion(data);
-        setAnswerCount(0);
-        setAnswerDistribution({});
-        setShowAnswerDistribution(false);
-        setShowCorrectAnswer(false);
-        setCountdown(0);
-        setTimeRemaining(data.timeLimit || 30);
-        // Clear any existing timers
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
-          timerRef.current = null;
-        }
-        if (countdownRef.current) {
-          clearInterval(countdownRef.current);
-          countdownRef.current = null;
-        }
-        // Update session status to active
-        setSession((prev) => prev ? { ...prev, status: 'active' as const, currentQuestionIndex: data.questionIndex } : null);
-      });
-
-      // Note: We intentionally do NOT listen to 'quizwave:question-started' for subsequent questions
-      // because it's meant for students only (doesn't have isCorrect flags)
-      // The teacher should only use 'quizwave:question-advanced' which has the correct answer data
 
       sock.on('quizwave:ended', (data) => {
-        // Set leaderboard first
         setLeaderboard(data.leaderboard || []);
         setShowFullLeaderboard(false);
-        
-        // Clear any timers
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
-          timerRef.current = null;
-        }
-        if (countdownRef.current) {
-          clearInterval(countdownRef.current);
-          countdownRef.current = null;
-        }
-        
-        // Clear countdown and answer states
-        setCountdown(0);
-        setShowCorrectAnswer(false);
-        setShowAnswerDistribution(false);
-        setCurrentQuestion(null);
-        setTimeRemaining(0);
-        
-        // Update session status to ended so isEnded becomes true
-        setSession((prev) => {
-          if (prev) {
-            const updated: QuizSession = { ...prev, status: 'ended' as const };
-            return updated;
-          }
-          return null;
-        });
-        
-        // After 10 seconds, show full leaderboard
-        if (podiumTimerRef.current) {
-          clearTimeout(podiumTimerRef.current);
-        }
-        podiumTimerRef.current = setTimeout(() => {
-          setShowFullLeaderboard(true);
-        }, 10000);
-        
-        // Reload session to get final state with all saved data
-        loadSession().then((sessionData) => {
-          if (sessionData) {
-            // Recalculate leaderboard from session data
-            const lb = sessionData.participants
-              .map((p: any) => ({
-                nickname: p.nickname,
-                totalScore: p.totalScore,
-                answers: p.answers.length
-              }))
-              .sort((a: any, b: any) => b.totalScore - a.totalScore);
-            setLeaderboard(lb);
-          }
-        });
+        setSession((prev) => (prev ? { ...prev, status: 'ended' as const } : null));
+        loadSession();
       });
 
       // Join as teacher after session is loaded
@@ -280,19 +207,11 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
         sock.off('quizwave:teacher-joined');
         sock.off('quizwave:participant-joined');
         sock.off('quizwave:answer-submitted');
-        sock.off('quizwave:started');
-        sock.off('quizwave:question-advanced');
-        sock.off('quizwave:question-started');
+        sock.off('quizwave:game-state');
         sock.off('quizwave:ended');
       }
     };
-  }, [sessionId, token]);
-
-  useEffect(() => {
-    if (session?.gamePin && socket) {
-      socket.emit('quizwave:teacher-join', { gamePin: session.gamePin });
-    }
-  }, [session?.gamePin, socket]);
+  }, [sessionId, token, applySnapshot]);
 
   const handleStart = () => {
     if (socket && socket.connected) {
@@ -305,33 +224,14 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
   };
 
   const handleNextQuestion = () => {
-    // Reset state before advancing
-    setShowCorrectAnswer(false);
-    setShowAnswerDistribution(false);
-    setCountdown(0);
-    setAnswerDistribution({});
-    setAnswerCount(0);
-    
     if (socket && socket.connected) {
-      console.log('Next question:', sessionId);
       socket.emit('quizwave:next-question', { sessionId });
     } else {
-      console.error('Socket not connected');
       alert('Connection lost. Please refresh the page.');
     }
   };
 
   const handleEnd = () => {
-    // Clear any timers
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    if (countdownRef.current) {
-      clearInterval(countdownRef.current);
-      countdownRef.current = null;
-    }
-    
     if (socket) {
       socket.emit('quizwave:end', { sessionId });
       // Don't wait for response - the socket event will handle state update
@@ -341,147 +241,13 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
     }
   };
 
-  // Calculate status flags (before useEffects that use them)
-  // Only check session status for ended - don't use leaderboard as indicator
-  const isEnded = session?.status === 'ended';
-  const isWaiting = session?.status === 'waiting' && !currentQuestion;
-  const isActive = (session?.status === 'active' || currentQuestion) && !isEnded;
-
-  // Check if all participants have answered - auto-advance if so
-  useEffect(() => {
-    if (
-      isActive && 
-      currentQuestion && 
-      participantCount > 0 && 
-      answerCount >= participantCount && 
-      !showCorrectAnswer && 
-      !showAnswerDistribution && 
-      !countdown &&
-      timeRemaining > 0
-    ) {
-      // All students have answered - trigger the same flow as time's up
-      // Clear the timer first
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-      // Set timeRemaining to 0 to trigger the time's up flow
-      setTimeRemaining(0);
-    }
-  }, [isActive, currentQuestion, answerCount, participantCount, showCorrectAnswer, showAnswerDistribution, countdown, timeRemaining]);
-
-  // Handle time's up - separate effect to ensure it runs
-  useEffect(() => {
-    if (isActive && currentQuestion && timeRemaining === 0 && !showCorrectAnswer && !showAnswerDistribution && !countdown) {
-      // Time's up - load session to get final answer distribution
-      loadSession().then((sessionData) => {
-        // Calculate distribution from session data
-        if (sessionData?.participants) {
-          const dist: { [key: number]: number } = {};
-          sessionData.participants.forEach((p: any) => {
-            const answer = p.answers.find((a: any) => a.questionIndex === currentQuestionIndex);
-            if (answer && answer.selectedOptions) {
-              answer.selectedOptions.forEach((optIdx: number) => {
-                dist[optIdx] = (dist[optIdx] || 0) + 1;
-              });
-            }
-          });
-          setAnswerDistribution(dist);
-        }
-        // Show answer distribution first
-        setShowAnswerDistribution(true);
-        // After 3 seconds, show correct answer and start countdown
-        setTimeout(() => {
-          setShowCorrectAnswer(true);
-          setShowAnswerDistribution(false);
-          // Start countdown from 3
-          setCountdown(3);
-        }, 3000);
-      }).catch((error) => {
-        // Still show correct answer even if loading fails
-        setShowCorrectAnswer(true);
-        setCountdown(3);
-      });
-    }
-  }, [isActive, currentQuestion, timeRemaining, showCorrectAnswer, showAnswerDistribution, countdown, currentQuestionIndex]);
-
-  // Timer effect for teacher view
-  useEffect(() => {
-    if (isActive && currentQuestion && timeRemaining > 0 && !showCorrectAnswer && !showAnswerDistribution) {
-      timerRef.current = setInterval(() => {
-        setTimeRemaining((prev) => {
-          if (prev <= 1) {
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-    };
-  }, [isActive, currentQuestion, timeRemaining, showCorrectAnswer, showAnswerDistribution]);
-
-  // Countdown effect - separate to manage countdown independently
-  useEffect(() => {
-    // Only start countdown if showCorrectAnswer is true and countdown is greater than 0
-    // Don't re-run if countdown is already running
-    if (showCorrectAnswer && countdown > 0 && !countdownRef.current) {
-      countdownRef.current = setInterval(() => {
-        setCountdown((prev) => {
-          const newCount = prev - 1;
-          if (newCount <= 0) {
-            // Clear interval before advancing
-            if (countdownRef.current) {
-              clearInterval(countdownRef.current);
-              countdownRef.current = null;
-            }
-            
-            // Countdown finished - advance
-            // Check if there's a next question (currentQuestionIndex + 1)
-            const nextIndex = currentQuestionIndex + 1;
-            const totalQuestions = quiz.questions.length;
-            
-            if (nextIndex < totalQuestions) {
-              // Reset state before advancing
-              setShowCorrectAnswer(false);
-              setShowAnswerDistribution(false);
-              setAnswerDistribution({});
-              setAnswerCount(0);
-              setCountdown(0);
-              
-              if (socket) {
-                socket.emit('quizwave:next-question', { sessionId });
-              }
-            } else {
-              // End quiz - last question
-              setShowCorrectAnswer(false);
-              setShowAnswerDistribution(false);
-              setCountdown(0);
-              
-              if (socket) {
-                socket.emit('quizwave:end', { sessionId });
-              }
-            }
-            return 0;
-          }
-          return newCount;
-        });
-      }, 1000);
-    }
-
-    return () => {
-      // Don't clear the interval here - let it run until countdown reaches 0
-      // Only clear if showCorrectAnswer becomes false
-      if (!showCorrectAnswer && countdownRef.current) {
-        clearInterval(countdownRef.current);
-        countdownRef.current = null;
-      }
-    };
-  }, [showCorrectAnswer, countdown, currentQuestionIndex, quiz.questions.length, socket, sessionId]);
+  const isEnded = phase === 'FINISHED' || session?.status === 'ended';
+  const isWaiting = phase === 'LOBBY';
+  const isActive =
+    !isEnded &&
+    !isWaiting &&
+    !!currentQuestion &&
+    ['QUESTION_ACTIVE', 'QUESTION_LOCKED', 'ANSWER_REVEAL', 'SCOREBOARD', 'TRANSITION'].includes(phase);
 
   const copyGamePin = () => {
     if (session?.gamePin) {
@@ -492,7 +258,7 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
   };
 
   // Render full screen when quiz is active (waiting or active status)
-  const isQuizActive = session && (session.status === 'waiting' || session.status === 'active' || currentQuestion);
+  const isQuizActive = session && (phase !== 'FINISHED' || currentQuestion);
 
   if (!session) {
     return (
@@ -830,19 +596,19 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
             {currentQuestionIndex < quiz.questions.length - 1 ? (
               <button
                 onClick={handleNextQuestion}
-                disabled={timeRemaining > 0 && !showCorrectAnswer}
+                disabled={phase === 'QUESTION_ACTIVE'}
                 className="bg-blue-600 text-white px-4 sm:px-6 lg:px-8 py-2 sm:py-2.5 lg:py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm sm:text-base lg:text-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <SkipForward className="w-4 h-4 sm:w-5 sm:h-5" />
-                {timeRemaining > 0 && !showCorrectAnswer ? 'Wait for timer...' : 'Next Question'}
+                {phase === 'QUESTION_ACTIVE' ? 'Wait for timer...' : 'Next Question'}
               </button>
             ) : (
               <button
                 onClick={handleEnd}
-                disabled={timeRemaining > 0 && !showCorrectAnswer}
+                disabled={phase === 'QUESTION_ACTIVE'}
                 className="bg-red-600 text-white px-4 sm:px-6 lg:px-8 py-2 sm:py-2.5 lg:py-3 rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 text-sm sm:text-base lg:text-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {timeRemaining > 0 && !showCorrectAnswer ? 'Wait for timer...' : 'End Quiz'}
+                {phase === 'QUESTION_ACTIVE' ? 'Wait for timer...' : 'End Quiz'}
               </button>
             )}
           </div>

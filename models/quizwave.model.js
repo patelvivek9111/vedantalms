@@ -114,6 +114,18 @@ const quizSessionSchema = new mongoose.Schema({
     type: Number,
     default: -1
   },
+  /** Authoritative gameplay phase (server FSM) */
+  phase: {
+    type: String,
+    enum: ['LOBBY', 'QUESTION_ACTIVE', 'QUESTION_LOCKED', 'ANSWER_REVEAL', 'SCOREBOARD', 'TRANSITION', 'FINISHED'],
+    default: 'LOBBY'
+  },
+  phaseStartedAt: {
+    type: Date
+  },
+  phaseEndsAt: {
+    type: Date
+  },
   startedAt: {
     type: Date
   },

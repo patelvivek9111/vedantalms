@@ -1,7 +1,9 @@
 const { QuizSession } = require('../models/quizwave.model');
 const jwt = require('jsonwebtoken');
-const { setSession, deleteSession } = require('../utils/quizwaveSessionStore');
+const { setSession } = require('../utils/quizwaveSessionStore');
 const { allowQuizWaveEvent } = require('../utils/quizwaveSocketThrottle');
+const engine = require('../services/quizwaveSessionEngine');
+const { PHASES } = engine;
 
 // Store active sessions through redis-backed store when available
 const activeSessions = new Map(); // Legacy export for backward compatibility
@@ -86,8 +88,10 @@ const initializeQuizWaveSocket = (io) => {
             gamePin,
             status: session.status,
             currentQuestionIndex: session.currentQuestionIndex,
+            phase: session.phase || PHASES.LOBBY,
             participantCount: session.participants.length
           });
+          await engine.emitToSocket(socket, session, session.quiz);
           return;
         }
 
@@ -141,8 +145,10 @@ const initializeQuizWaveSocket = (io) => {
           gamePin,
           status: session.status,
           currentQuestionIndex: session.currentQuestionIndex,
+          phase: session.phase || PHASES.LOBBY,
           participantCount: session.participants.length
         });
+        await engine.emitToSocket(socket, session, session.quiz);
       } catch (error) {
         socketMetrics.eventErrors += 1;
         console.error('Join error:', error);
@@ -150,7 +156,21 @@ const initializeQuizWaveSocket = (io) => {
       }
     });
 
-    // Start game (teacher)
+    // Full authoritative snapshot (reconnect / resync)
+    socket.on('quizwave:sync-game-state', async (data) => {
+      if (!allowQuizWaveEvent(socket, 'quizwave:sync-game-state')) {
+        return emitRateLimited(socket);
+      }
+      try {
+        await engine.syncGameState(io, socket, data || {});
+      } catch (error) {
+        socketMetrics.eventErrors += 1;
+        console.error('Sync game state error:', error);
+        socket.emit('quizwave:error', { message: 'Error syncing game state' });
+      }
+    });
+
+    // Start game (teacher) — server FSM begins QUESTION_ACTIVE
     socket.on('quizwave:start', async (data) => {
       if (!allowQuizWaveEvent(socket, 'quizwave:start')) {
         return emitRateLimited(socket);
@@ -158,80 +178,41 @@ const initializeQuizWaveSocket = (io) => {
       try {
         const { sessionId } = data;
 
-        const session = await QuizSession.findById(sessionId)
-          .populate('quiz')
-          .populate('course');
-
+        const session = await QuizSession.findById(sessionId).populate('quiz');
         if (!session) {
           socket.emit('quizwave:error', { message: 'Session not found' });
           return;
         }
 
-        // Check if user is the creator
         if (session.createdBy.toString() !== socket.userId && socket.userRole !== 'admin') {
           socket.emit('quizwave:error', { message: 'Unauthorized' });
           return;
         }
 
-        if (session.status !== 'waiting') {
+        if (session.status !== 'waiting' && session.phase !== PHASES.LOBBY) {
           socket.emit('quizwave:error', { message: 'Session is not in waiting state' });
           return;
         }
 
-        // Get first question
-        const quiz = session.quiz;
-        const firstQuestion = quiz.questions[0];
-        
-        // Start session
-        session.status = 'active';
-        session.currentQuestionIndex = 0;
-        session.startedAt = new Date();
-        await session.save();
+        socket.join(`quizwave:${session.gamePin}`);
+        socket.join(`quizwave:teacher:${session.gamePin}`);
+        socket.gamePin = session.gamePin;
 
-        // Update active sessions
+        await engine.startGame(io, sessionId);
+
         const sessionState = {
           sessionId: session._id.toString(),
           status: 'active',
           currentQuestionIndex: 0,
+          phase: PHASES.QUESTION_ACTIVE,
           participantCount: session.participants.length
         };
         activeSessions.set(session.gamePin, sessionState);
         await setSession(session.gamePin, sessionState);
-        
-        // For students - hide correct answers
-        const studentQuestionData = {
-          questionIndex: 0,
-          questionText: firstQuestion.questionText,
-          questionType: firstQuestion.questionType,
-          options: firstQuestion.options.map(opt => ({ text: opt.text })),
-          timeLimit: firstQuestion.timeLimit
-        };
-        
-        // For teacher - include correct answers
-        const teacherQuestionData = {
-          questionIndex: 0,
-          questionText: firstQuestion.questionText,
-          questionType: firstQuestion.questionType,
-          options: firstQuestion.options.map(opt => ({ text: opt.text, isCorrect: opt.isCorrect })),
-          timeLimit: firstQuestion.timeLimit
-        };
-
-        // Broadcast to all participants (students) - this includes teacher if they're in the room
-        io.to(`quizwave:${session.gamePin}`).emit('quizwave:question-started', studentQuestionData);
-        
-        // Also broadcast to teacher room
-        io.to(`quizwave:teacher:${session.gamePin}`).emit('quizwave:question-started', studentQuestionData);
-
-        // Send to teacher with correct answers (separate event)
-        socket.emit('quizwave:started', {
-          sessionId: session._id,
-          questionData: teacherQuestionData,
-          participantCount: session.participants.length
-        });
       } catch (error) {
         socketMetrics.eventErrors += 1;
         console.error('Start error:', error);
-        socket.emit('quizwave:error', { message: 'Error starting session' });
+        socket.emit('quizwave:error', { message: error.message || 'Error starting session' });
       }
     });
 
@@ -267,6 +248,18 @@ const initializeQuizWaveSocket = (io) => {
         if (!session) {
           console.error('Session not found:', sessionId);
           socket.emit('quizwave:error', { message: 'Session not found' });
+          return;
+        }
+
+        if (session.phase !== PHASES.QUESTION_ACTIVE) {
+          socket.emit('quizwave:error', { message: 'Answers are closed for this question' });
+          return;
+        }
+
+        if (questionIndex !== session.currentQuestionIndex) {
+          socket.emit('quizwave:error', {
+            message: `Question index mismatch (server: ${session.currentQuestionIndex})`
+          });
           return;
         }
 
@@ -342,12 +335,20 @@ const initializeQuizWaveSocket = (io) => {
         }
         // If current answer is correct, it will be part of the streak for the next question
 
+        // Authoritative time taken (clamp client value to server phase window)
+        const phaseStart = session.phaseStartedAt ? session.phaseStartedAt.getTime() : Date.now();
+        const maxTime = question.timeLimit * 1000;
+        const serverElapsed = Math.min(maxTime, Math.max(0, Date.now() - phaseStart));
+        const authoritativeTimeTaken = Math.min(
+          maxTime,
+          Math.max(0, typeof timeTaken === 'number' ? timeTaken : serverElapsed)
+        );
+
         // Calculate points using new formula
         let points = 0;
         if (isCorrect) {
-          const maxTime = question.timeLimit * 1000; // Convert to milliseconds
           // points = 500 * (1 - (time_taken / max_time))
-          points = 500 * (1 - (timeTaken / maxTime));
+          points = 500 * (1 - (authoritativeTimeTaken / maxTime));
           // Ensure points is not negative
           if (points < 0) {
             points = 0;
@@ -367,12 +368,19 @@ const initializeQuizWaveSocket = (io) => {
           selectedOptions,
           isCorrect,
           points,
-          timeTaken,
+          timeTaken: authoritativeTimeTaken,
           answeredAt: new Date()
         });
 
         participant.totalScore += points;
         await session.save();
+
+        const sessionFresh = await QuizSession.findById(sessionId).populate('quiz');
+        if (sessionFresh?.quiz) {
+          engine.broadcastGameState(io, sessionFresh, sessionFresh.quiz);
+        }
+
+        await engine.checkAllAnswered(io, sessionId);
 
         // Emit answer received
         socket.emit('quizwave:answer-received', {
@@ -402,95 +410,23 @@ const initializeQuizWaveSocket = (io) => {
       }
     });
 
-    // Next question (teacher)
+    // Teacher skip / advance (server FSM only — no client-side index++)
     socket.on('quizwave:next-question', async (data) => {
       if (!allowQuizWaveEvent(socket, 'quizwave:next-question')) {
         return emitRateLimited(socket);
       }
       try {
         const { sessionId } = data;
-
-        const session = await QuizSession.findById(sessionId).populate('quiz');
+        const session = await QuizSession.findById(sessionId);
         if (!session) {
           socket.emit('quizwave:error', { message: 'Session not found' });
           return;
         }
-
-        // Check authorization
         if (session.createdBy.toString() !== socket.userId && socket.userRole !== 'admin') {
           socket.emit('quizwave:error', { message: 'Unauthorized' });
           return;
         }
-
-        const quiz = session.quiz;
-        const nextIndex = session.currentQuestionIndex + 1;
-
-        if (nextIndex >= quiz.questions.length) {
-          // End quiz
-          session.status = 'ended';
-          session.endedAt = new Date();
-          await session.save();
-
-          activeSessions.delete(session.gamePin);
-          await deleteSession(session.gamePin);
-
-          // Get leaderboard
-          const leaderboard = session.participants
-            .map(p => ({
-              studentId: p.student.toString(),
-              nickname: p.nickname,
-              totalScore: p.totalScore,
-              answers: p.answers.length
-            }))
-            .sort((a, b) => b.totalScore - a.totalScore);
-
-          io.to(`quizwave:${session.gamePin}`).emit('quizwave:quiz-ended', {
-            leaderboard
-          });
-
-          socket.emit('quizwave:ended', { leaderboard });
-          return;
-        }
-
-        // Move to next question
-        session.currentQuestionIndex = nextIndex;
-        await session.save();
-
-        const nextQuestion = quiz.questions[nextIndex];
-        const questionData = {
-          questionIndex: nextIndex,
-          questionText: nextQuestion.questionText,
-          questionType: nextQuestion.questionType,
-          options: nextQuestion.options.map(opt => ({ text: opt.text })),
-          timeLimit: nextQuestion.timeLimit
-        };
-
-        // Update active sessions
-        const sessionState = {
-          sessionId: session._id.toString(),
-          status: 'active',
-          currentQuestionIndex: nextIndex,
-          participantCount: session.participants.length
-        };
-        activeSessions.set(session.gamePin, sessionState);
-        await setSession(session.gamePin, sessionState);
-
-        // Broadcast to all participants (students)
-        io.to(`quizwave:${session.gamePin}`).emit('quizwave:question-started', questionData);
-        
-        // Also broadcast to teacher room
-        io.to(`quizwave:teacher:${session.gamePin}`).emit('quizwave:question-started', questionData);
-
-        // Send to teacher with correct answers (separate event)
-        const teacherQuestionData = {
-          questionIndex: nextIndex,
-          questionText: nextQuestion.questionText,
-          questionType: nextQuestion.questionType,
-          options: nextQuestion.options.map(opt => ({ text: opt.text, isCorrect: opt.isCorrect })),
-          timeLimit: nextQuestion.timeLimit
-        };
-        
-        socket.emit('quizwave:question-advanced', teacherQuestionData);
+        await engine.skipToNextQuestion(io, sessionId);
       } catch (error) {
         socketMetrics.eventErrors += 1;
         console.error('Next question error:', error);
@@ -505,45 +441,19 @@ const initializeQuizWaveSocket = (io) => {
       }
       try {
         const { sessionId } = data;
-
         const session = await QuizSession.findById(sessionId);
         if (!session) {
           socket.emit('quizwave:error', { message: 'Session not found' });
           return;
         }
-
-        // Check authorization
         if (session.createdBy.toString() !== socket.userId && socket.userRole !== 'admin') {
           socket.emit('quizwave:error', { message: 'Unauthorized' });
           return;
         }
 
-        session.status = 'ended';
-        session.endedAt = new Date();
-        
-        // Save session with all participant data and answers
-        await session.save();
-        console.log(`✅ Quiz session ${sessionId} ended and saved with ${session.participants.length} participants`);
-        console.log(`   Total answers recorded: ${session.participants.reduce((sum, p) => sum + p.answers.length, 0)}`);
-
+        await engine.forceEnd(io, sessionId);
         activeSessions.delete(session.gamePin);
-        await deleteSession(session.gamePin);
-
-        // Get leaderboard
-        const leaderboard = session.participants
-          .map(p => ({
-            studentId: p.student.toString(),
-            nickname: p.nickname,
-            totalScore: p.totalScore,
-            answers: p.answers.length
-          }))
-          .sort((a, b) => b.totalScore - a.totalScore);
-
-        io.to(`quizwave:${session.gamePin}`).emit('quizwave:quiz-ended', {
-          leaderboard
-        });
-
-        socket.emit('quizwave:ended', { leaderboard });
+        console.log(`✅ Quiz session ${sessionId} ended via engine`);
       } catch (error) {
         socketMetrics.eventErrors += 1;
         console.error('End error:', error);
@@ -559,7 +469,7 @@ const initializeQuizWaveSocket = (io) => {
       try {
         const { gamePin } = data;
 
-        const session = await QuizSession.findOne({ gamePin });
+        const session = await QuizSession.findOne({ gamePin }).populate('quiz');
         if (!session) {
           socket.emit('quizwave:error', { message: 'Session not found' });
           return;
@@ -581,6 +491,7 @@ const initializeQuizWaveSocket = (io) => {
           sessionId: session._id,
           gamePin,
           status: session.status,
+          phase: session.phase || PHASES.LOBBY,
           currentQuestionIndex: session.currentQuestionIndex,
           participantCount: session.participants.length,
           participants: session.participants.map(p => ({
@@ -589,6 +500,8 @@ const initializeQuizWaveSocket = (io) => {
             totalScore: p.totalScore
           }))
         });
+
+        await engine.emitToSocket(socket, session, session.quiz);
       } catch (error) {
         socketMetrics.eventErrors += 1;
         console.error('Teacher join error:', error);

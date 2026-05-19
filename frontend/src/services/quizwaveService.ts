@@ -37,6 +37,9 @@ export interface QuizSession {
   course: string;
   gamePin: string;
   status: 'waiting' | 'active' | 'paused' | 'ended';
+  phase?: 'LOBBY' | 'QUESTION_ACTIVE' | 'QUESTION_LOCKED' | 'ANSWER_REVEAL' | 'SCOREBOARD' | 'TRANSITION' | 'FINISHED';
+  phaseStartedAt?: string;
+  phaseEndsAt?: string;
   currentQuestionIndex: number;
   startedAt?: string;
   endedAt?: string;
