@@ -41,8 +41,10 @@ import StudentGradeSidebar from './StudentGradeSidebar';
 import CourseDiscussions from './CourseDiscussions';
 import GroupManagement from './groups/GroupManagement';
 import StudentGroupView from './groups/StudentGroupView';
-import { getWeightedGradeForStudent, getLetterGrade, calculateFinalGradeWithWeightedGroups } from '../utils/gradeUtils';
-import { exportGradebookCSV } from '../utils/gradebookExport';
+import { exportGradebookXlsx } from '../utils/gradebookExport';
+import { enqueueGradebookExport, openJobDownload } from '../services/jobsApi';
+import { useAsyncJob } from '../hooks/useAsyncJob';
+import AsyncJobBanner from './common/AsyncJobBanner';
 import { navigationItems } from '../constants/courseNavigation';
 import CoursePages from './CoursePages';
 import AssignmentList from './assignments/AssignmentList';
@@ -75,6 +77,7 @@ import { useDiscussions } from '../hooks/useDiscussions';
 import { useStudentGradeData } from '../hooks/useStudentGradeData';
 import { useGradeScaleManagement } from '../hooks/useGradeScaleManagement';
 import { useAssignmentGroupsManagement } from '../hooks/useAssignmentGroupsManagement';
+import { useGradingPolicy } from '../hooks/useGradingPolicy';
 import { useSyllabusManagement } from '../hooks/useSyllabusManagement';
 import { useSidebarConfig } from '../hooks/useSidebarConfig';
 import Breadcrumb from './common/Breadcrumb';
@@ -102,6 +105,7 @@ const CourseDetail: React.FC = () => {
   const [assignmentPublishing, setAssignmentPublishing] = useState<string | null>(null);
   const [assignmentPublished, setAssignmentPublished] = useState<{ [id: string]: boolean }>({});
   const [gradebookData, setGradebookData] = useState<any>({ students: [], assignments: [], grades: {} });
+  const [instructorGradebookLoading, setInstructorGradebookLoading] = useState(false);
   const isInstructor = user?.role === 'teacher' && course?.instructor?._id === user?._id;
   const isAdmin = user?.role === 'admin';
   const [editingGrade, setEditingGrade] = useState<{studentId: string, assignmentId: string} | null>(null);
@@ -254,6 +258,11 @@ const CourseDetail: React.FC = () => {
     fetchCourseAndModulesWithAssignments();
   }, [fetchCourseAndModulesWithAssignments]);
 
+  // Avoid showing another course's gradebook counts/columns while the new course loads
+  useEffect(() => {
+    setGradebookData({ students: [], assignments: [], grades: {} });
+  }, [id]);
+
   // Grade scale management
   const gradeScaleManagement = useGradeScaleManagement({
     course,
@@ -273,6 +282,8 @@ const CourseDetail: React.FC = () => {
     ...gradeScaleManagement,
     setGroupError: assignmentGroupsManagement.setGroupError,
   };
+
+  const gradingPolicyManagement = useGradingPolicy(id);
 
   // Syllabus management
   const syllabusManagement = useSyllabusManagement({
@@ -496,6 +507,7 @@ const CourseDetail: React.FC = () => {
     studentDiscussions,
     setSubmissionMap,
     setGradebookData,
+    setStudentSubmissions,
   });
 
   // Fetch student submissions and grades for the student as soon as course/modules are loaded (not just in grades tab)
@@ -550,6 +562,7 @@ const CourseDetail: React.FC = () => {
     modules,
     gradebookRefresh,
     setGradebookData,
+    setGradebookLoading: setInstructorGradebookLoading,
   });
 
 
@@ -569,8 +582,44 @@ const CourseDetail: React.FC = () => {
     setSubmissionMap,
   });
 
-  const handleExportGradebookCSV = () => {
-    exportGradebookCSV(gradebookData, course, submissionMap);
+  const exportJob = useAsyncJob();
+  const [exportDownloadUrl, setExportDownloadUrl] = useState<string | null>(null);
+
+  const handleExportGradebookCSV = async () => {
+    if (!id) return;
+    try {
+      const res = await enqueueGradebookExport(id);
+      if (res.success && res.data.jobId) {
+        if (res.data.downloadUrl) {
+          setExportDownloadUrl(res.data.downloadUrl);
+          openJobDownload(res.data.downloadUrl);
+          toast.success('Gradebook export ready.');
+        } else {
+          await exportJob.startFromEnqueue(res.data.jobId, {
+            onComplete: (job) => {
+              if (job.status === 'completed') {
+                toast.success('Gradebook export completed.');
+              }
+            },
+          });
+        }
+        return;
+      }
+    } catch {
+      /* fall through to client export */
+    }
+    try {
+      await exportGradebookXlsx(
+        gradebookData,
+        course,
+        submissionMap,
+        studentSubmissions,
+        gradingPolicyManagement.resolved
+      );
+      toast.success('Gradebook exported (this device).');
+    } catch {
+      toast.error('Failed to export gradebook.');
+    }
   };
 
 
@@ -810,14 +859,29 @@ const CourseDetail: React.FC = () => {
           return null;
         }
         return (
+          <>
+            <AsyncJobBanner
+              job={exportJob.job}
+              polling={exportJob.polling}
+              error={exportJob.error}
+              label="Gradebook export"
+              onDismiss={exportJob.reset}
+              onDownload={
+                exportDownloadUrl
+                  ? () => openJobDownload(exportDownloadUrl)
+                  : undefined
+              }
+            />
           <GradebookView
             course={course}
             courseId={id || ''}
+            isGradebookLoading={instructorGradebookLoading}
             gradebookData={gradebookData}
             submissionMap={submissionMap}
             studentSubmissions={studentSubmissions}
             isInstructor={isInstructor}
             isAdmin={isAdmin}
+            userRole={user?.role}
             expandedStudents={expandedStudents}
             setExpandedStudents={setExpandedStudents}
             editingGrade={editingGrade}
@@ -850,7 +914,23 @@ const CourseDetail: React.FC = () => {
             setShowGradeScaleModal={gradeScaleManagementWithGroupError.setShowGradeScaleModal}
             setGradeScaleError={gradeScaleManagementWithGroupError.setGradeScaleError}
             setEditGradeScale={gradeScaleManagementWithGroupError.setEditGradeScale}
+            resolvedGradingPolicy={gradingPolicyManagement.resolved}
+            gradingPolicyModal={{
+              show: gradingPolicyManagement.showModal,
+              setShow: gradingPolicyManagement.setShowModal,
+              editPolicy: gradingPolicyManagement.editPolicy,
+              setEditPolicy: gradingPolicyManagement.setEditPolicy,
+              onSave: gradingPolicyManagement.handleSave,
+              onPreview: gradingPolicyManagement.runPreview,
+              saving: gradingPolicyManagement.saving,
+              loading: gradingPolicyManagement.loading,
+              error: gradingPolicyManagement.error,
+              preview: gradingPolicyManagement.preview,
+              dirty: gradingPolicyManagement.dirty,
+            }}
+            handleGradeInputKeyDown={handleGradeInputKeyDown}
           />
+          </>
         );
 
       case 'students':

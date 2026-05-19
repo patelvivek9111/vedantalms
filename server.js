@@ -10,11 +10,14 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const pinoHttp = require('pino-http');
 const pino = require('pino');
+const { requestCorrelation } = require('./middleware/requestCorrelation');
+const { validateStartupEnv } = require('./config/startupValidation');
 const { createAdapter } = require('@socket.io/redis-adapter');
 const Redis = require('ioredis');
 
 // Load environment variables
 dotenv.config();
+validateStartupEnv();
 
 // Create Express app
 const app = express();
@@ -54,8 +57,10 @@ const corsOptions = {
 
 // Middleware
 app.use(cors(corsOptions));
+app.use(requestCorrelation);
 app.use(helmet({
-  crossOriginResourcePolicy: false
+  crossOriginResourcePolicy: false,
+  contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false,
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -158,10 +163,12 @@ const renderPrometheusMetrics = (payload) => {
 
 app.use(pinoHttp({
   logger,
+  genReqId: (req) => req.requestId,
   serializers: {
     req(req) {
       return {
-        id: req.id,
+        id: req.requestId || req.id,
+        auditCorrelationId: req.auditCorrelationId,
         method: req.method,
         url: req.url
       };
@@ -394,6 +401,7 @@ app.use('/api/assignments', require('./routes/assignment.routes'));
 app.use('/api/submissions', require('./routes/submission.routes'));
 app.use('/api/threads', require('./routes/thread.routes'));
 app.use('/api/grades', require('./routes/grades.routes'));
+app.use('/api/grading-policy', require('./routes/gradingPolicy.routes'));
 app.use('/api/groups', require('./routes/groupRoutes'));
 app.use('/api/announcements', require('./routes/announcement.routes'));
 app.use('/api/events', require('./routes/event.routes'));
@@ -402,6 +410,9 @@ app.use('/api/inbox', require('./routes/inbox.routes'));
 app.use('/api', require('./routes/attendance.routes'));
 app.use('/api/polls', require('./routes/poll.routes'));
 app.use('/api/reports', require('./routes/reports.routes'));
+app.use('/api/jobs', require('./routes/jobs.routes'));
+app.use('/api/registrar/reports', require('./routes/registrarReports.routes'));
+app.use('/api/ops', require('./routes/ops.routes'));
 app.use('/api/admin', require('./routes/admin.routes'));
 app.use('/api/notifications', require('./routes/notification.routes').router);
 app.use('/api/quizwave', require('./routes/quizwave.routes'));
@@ -507,6 +518,15 @@ app.get('/health', (req, res) => {
   });
 });
 
+app.get('/health/live', (req, res) => {
+  res.json({ status: 'live', timestamp: new Date().toISOString() });
+});
+
+app.get('/health/dependencies', async (req, res) => {
+  const opsController = require('./controllers/ops.controller');
+  return opsController.getDependenciesHealth(req, res);
+});
+
 app.get('/health/ready', async (req, res) => {
   const mongoConnected = mongoose.connection.readyState === 1;
   const objectStorageReady = isCloudinaryConfigured();
@@ -515,7 +535,11 @@ app.get('/health/ready', async (req, res) => {
   const objectStorageRequired = process.env.FORCE_OBJECT_STORAGE === 'true';
   const redisReady = redisAdapterEnabled || !redisRequired;
   const storageReady = objectStorageReady || !objectStorageRequired;
-  const healthy = mongoConnected && redisReady && storageReady;
+  const { isRedisConfigured } = require('./utils/bullmqConnection');
+  const jobQueueRedisConfigured = isRedisConfigured();
+  const jobQueueRequired = process.env.REQUIRE_JOB_QUEUE === 'true';
+  const jobQueueReady = jobQueueRedisConfigured || !jobQueueRequired;
+  const healthy = mongoConnected && redisReady && storageReady && jobQueueReady;
 
   const payload = {
     status: healthy ? 'ready' : 'degraded',
@@ -524,11 +548,20 @@ app.get('/health/ready', async (req, res) => {
       mongoConnected,
       redisAdapterEnabled,
       redisRequired,
+      jobQueueRedisConfigured,
+      jobQueueRequired,
+      jobQueueReady,
       objectStorageReady,
       objectStorageMode,
-      objectStorageRequired
+      objectStorageRequired,
     },
-    redisAdapterError
+    redisAdapterError,
+    notes: {
+      gradingWorker:
+        jobQueueRedisConfigured && process.env.NODE_ENV === 'production'
+          ? 'Run npm run worker:grading-jobs alongside the API'
+          : null,
+    },
   };
 
   res.status(healthy ? 200 : 503).json(payload);

@@ -14,8 +14,11 @@ import {
   CheckCircle,
   XCircle,
   Eye,
-  EyeOff
+  EyeOff,
+  GraduationCap
 } from 'lucide-react';
+import InstitutionGradingPolicyTab from '../components/admin/InstitutionGradingPolicyTab';
+import OpsDashboardPanel from '../components/admin/OpsDashboardPanel';
 
 interface SystemConfig {
   general: {
@@ -142,7 +145,9 @@ export function AdminSystemSettings() {
     { id: 'general', label: 'General', icon: Settings },
     { id: 'security', label: 'Security', icon: Shield },
     { id: 'email', label: 'Email', icon: Bell },
-    { id: 'storage', label: 'Storage', icon: Database }
+    { id: 'storage', label: 'Storage', icon: Database },
+    { id: 'grading', label: 'Grading', icon: GraduationCap },
+    { id: 'operations', label: 'Operations', icon: RefreshCw }
   ];
 
   if (loading) {
@@ -494,6 +499,9 @@ export function AdminSystemSettings() {
             </div>
           </div>
         )}
+
+        {activeTab === 'grading' && <InstitutionGradingPolicyTab />}
+        {activeTab === 'operations' && <OpsDashboardPanel />}
       </div>
     </div>
   );

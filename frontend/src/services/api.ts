@@ -35,8 +35,14 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      window.location.href = '/login';
+      const rel = String(error.config?.url || '').replace(/^\//, '');
+      const isUnauthenticatedAuthCall =
+        rel === 'auth/login' || rel.startsWith('auth/login?') || rel === 'auth/register' || rel.startsWith('auth/register?');
+      // Do not hard-redirect on failed login/register — that reloads the app and hides inline errors.
+      if (!isUnauthenticatedAuthCall) {
+        localStorage.removeItem('token');
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }

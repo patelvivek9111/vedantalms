@@ -7,6 +7,52 @@ const path = require('path');
 const Module = require('../models/module.model');
 const { deleteFromCloudinary, extractPublicId, isCloudinaryConfigured } = require('../utils/cloudinary');
 const { createNotification } = require('../routes/notification.routes');
+const gradingPolicySnapshotService = require('../services/gradingPolicySnapshot.service');
+const gradeLifecycleService = require('../services/gradeLifecycle.service');
+const { getSemesterFromCourse } = require('../utils/semesterUtils');
+
+async function saveGradedSubmission(submission, auditMeta = {}) {
+  const isGraded =
+    submission.excused === true ||
+    submission.gradedAt != null ||
+    submission.grade !== undefined ||
+    submission.finalGrade !== undefined;
+
+  if (isGraded && submission.assignment) {
+    const course = await gradingPolicySnapshotService.getCourseForAssignment(submission.assignment);
+    if (course) {
+      if (auditMeta.user) {
+        const { canEditRawSubmission, requiresAdminOverrideLog } = require('../middleware/academicPermissions');
+        const ferpaAudit = require('../services/ferpaAudit.service');
+        if (!canEditRawSubmission(auditMeta.user, course)) {
+          const err = new Error('Not authorized to edit submissions for this course');
+          err.statusCode = 403;
+          throw err;
+        }
+        if (requiresAdminOverrideLog(auditMeta.user)) {
+          await ferpaAudit.recordAdminOverride(
+            { user: auditMeta.user, ip: auditMeta.ip, path: '/submission/grade', requestId: auditMeta.requestId },
+            { entityType: 'submission', entityId: String(submission._id), action: 'grade_edit' }
+          ).catch(() => {});
+        }
+      }
+      const { term, year } = getSemesterFromCourse(course);
+      const courseId = course._id || course.id;
+      await gradeLifecycleService.assertCanEditGrades(courseId, term, year, {
+        auditContext: auditMeta.userId
+          ? {
+              actorId: auditMeta.userId,
+              ip: auditMeta.ip,
+              after: { submissionId: submission._id, grade: submission.grade },
+              metadata: auditMeta.metadata,
+            }
+          : undefined,
+      });
+    }
+    await gradingPolicySnapshotService.stampSubmissionPolicySnapshot(submission);
+  }
+  return submission.save();
+}
 
 // Submit an assignment
 exports.submitAssignment = async (req, res) => {
@@ -481,7 +527,7 @@ exports.getStudentSubmissionsForCourse = async (req, res) => {
 // Grade a submission
 exports.gradeSubmission = async (req, res) => {
   try {
-    const { grade, feedback, questionGrades, useIndividualGrades, memberGrades, approveGrade, showCorrectAnswers, showStudentAnswers, studentId } = req.body;
+    const { grade, feedback, questionGrades, useIndividualGrades, memberGrades, approveGrade, showCorrectAnswers, showStudentAnswers, studentId, excused } = req.body;
     let submission = await Submission.findById(req.params.id).populate('group');
 
     // If submission doesn't exist, check if this is for an offline assignment
@@ -518,6 +564,21 @@ exports.gradeSubmission = async (req, res) => {
     // Backwards compatibility: If submittedBy is missing, set it to the student
     if (!submission.submittedBy) {
       submission.submittedBy = submission.student;
+    }
+
+    if (excused === true) {
+      submission.excused = true;
+      submission.grade = undefined;
+      submission.finalGrade = undefined;
+      submission.teacherApproved = true;
+      submission.gradedBy = req.user._id;
+      submission.gradedAt = new Date();
+      submission.feedback = feedback ?? submission.feedback;
+      await saveGradedSubmission(submission, { user: req.user, userId: req.user._id, ip: req.ip, requestId: req.requestId });
+      return res.json(submission);
+    }
+    if (excused === false) {
+      submission.excused = false;
     }
 
     // Handle auto-graded submissions (allow re-grading even if approved)
@@ -826,7 +887,7 @@ exports.gradeSubmission = async (req, res) => {
       submission.showStudentAnswers = showStudentAnswers;
     }
     
-    await submission.save();
+    await saveGradedSubmission(submission, { user: req.user, userId: req.user._id, ip: req.ip, requestId: req.requestId });
     const populatedSubmission = await Submission.findById(submission._id)
       .populate('student', 'firstName lastName email')
       .populate('submittedBy', 'firstName lastName email')
@@ -972,9 +1033,9 @@ exports.gradeSubmission = async (req, res) => {
     }
   } catch (error) {
     console.error('Error grading submission:', error);
-    res.status(500).json({ 
+    res.status(error.statusCode || 500).json({
       message: error.message || 'Error grading submission',
-      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     });
   }
 };
@@ -1112,7 +1173,7 @@ exports.createOrUpdateManualGrade = async (req, res) => {
       submission.feedback = feedback;
     }
     
-    await submission.save();
+    await saveGradedSubmission(submission, { user: req.user, userId: req.user._id, ip: req.ip, requestId: req.requestId });
     
     const populatedSubmission = await Submission.findById(submission._id)
       .populate('student', 'firstName lastName email')

@@ -89,4 +89,7 @@ pollSchema.methods.getWinningOptions = function() {
     .filter(option => option.votes === maxVotes);
 };
 
+const { portabilityMetadataPlugin } = require('./plugins/portabilityMetadata.plugin');
+pollSchema.plugin(portabilityMetadataPlugin);
+
 module.exports = mongoose.model('Poll', pollSchema); 

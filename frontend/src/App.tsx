@@ -33,6 +33,9 @@ import BottomNav from './components/BottomNav';
 import LandingPage from './pages/LandingPage';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ThemeProvider } from './context/ThemeContext';
+import SkipToMain from './design-system/SkipToMain';
+import NetworkOfflineBanner from './design-system/NetworkOfflineBanner';
+import { useNetworkStatus } from './hooks/useNetworkStatus';
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 const AdminUserManagement = lazy(() => import('./pages/AdminUserManagement').then(m => ({ default: m.AdminUserManagement })));
 const AdminAnalytics = lazy(() => import('./pages/AdminAnalytics').then(m => ({ default: m.AdminAnalytics })));
@@ -117,6 +120,7 @@ const withRouteLoader = (node: React.ReactNode) => (
 
 function AppContent() {
   const { user, loading } = useAuth();
+  const { offline } = useNetworkStatus();
   const isAuthenticated = !!user;
 
   if (loading) {
@@ -131,12 +135,16 @@ function AppContent() {
           : 'flex min-h-dvh flex-col bg-slate-50 dark:bg-slate-950 dark:text-slate-100'
       }
     >
+      {isAuthenticated && <SkipToMain />}
+      {isAuthenticated && offline && <NetworkOfflineBanner />}
       {isAuthenticated && <GlobalSidebar />}
       {isAuthenticated && <BottomNav />}
       <main
+        id="main-content"
+        tabIndex={-1}
         className={
           isAuthenticated
-            ? 'pb-20 lg:pb-10 lg:pl-20 print:pb-0 print:pl-0 transition-all duration-300'
+            ? 'pb-20 lg:pb-10 lg:pl-20 print:pb-0 print:pl-0 transition-all duration-300 outline-none'
             : 'flex min-h-0 flex-1 flex-col print:pb-0'
         }
       >

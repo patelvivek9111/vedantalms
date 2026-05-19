@@ -1,6 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import StudentGradeSidebar from '../StudentGradeSidebar';
+import { computeAssignmentGroupPercent } from '../../utils/gradebookCompute';
+import { isExcusedGrade, EXCUSED_GRADE } from '../../utils/gradeUtils';
 
 interface StudentGradesViewProps {
   course: any;
@@ -17,6 +19,89 @@ interface StudentGradesViewProps {
   studentLetterGrade: string | null;
   /** After the course total API finishes (success or failure); avoids showing a client-only total that disagrees with the server. */
   studentGradeSummaryReady: boolean;
+}
+
+function normalizeAssignmentCategoryName(v: unknown): string {
+  return String(v ?? '').trim();
+}
+
+/** Per-group display stats; % uses shared grading (same contract as course total for that category). */
+function aggregateAssignmentGroupStats(
+  groupAssignments: any[],
+  studentId: string,
+  course: any,
+  groupName: string,
+  gradebookData: StudentGradesViewProps['gradebookData'],
+  submissionMap: { [key: string]: string },
+  studentSubmissions: any[] = []
+) {
+  let totalEarned = 0;
+  let totalPossible = 0;
+  let gradedAssignments = 0;
+
+  for (const assignment of groupAssignments) {
+    const maxPoints =
+      assignment.questions?.reduce((sum: number, q: any) => sum + (q.points || 0), 0) ||
+      assignment.totalPoints ||
+      0;
+    let grade = assignment.isDiscussion
+      ? assignment.grade
+      : gradebookData.grades[String(studentId)]?.[String(assignment._id)];
+
+    if (assignment.isDiscussion && (grade === null || grade === undefined)) {
+      const studentGradeObj = assignment.studentGrades?.find(
+        (g: any) => g.student && (g.student._id === String(studentId) || g.student === String(studentId))
+      );
+      if (studentGradeObj && typeof studentGradeObj.grade === 'number') {
+        grade = studentGradeObj.grade;
+      }
+    }
+
+    if (isExcusedGrade(grade) || grade === EXCUSED_GRADE) {
+      continue;
+    }
+    if (!assignment.isDiscussion && assignment.published === false) {
+      continue;
+    }
+
+    if (typeof grade === 'number') {
+      totalEarned += grade;
+      totalPossible += maxPoints;
+      gradedAssignments++;
+    } else {
+      const dueDate = assignment.dueDate ? new Date(assignment.dueDate) : null;
+      const now = new Date();
+      const submissionKey = `${String(studentId)}_${String(assignment._id)}`;
+      const hasSubmission = assignment.isDiscussion
+        ? assignment.hasSubmitted ||
+          (Array.isArray(assignment.replies) &&
+            assignment.replies.some(
+              (r: any) => r.author && (r.author._id === String(studentId) || r.author === String(studentId))
+            ))
+        : !!submissionMap[submissionKey];
+
+      if (dueDate && now > dueDate && !hasSubmission) {
+        totalEarned += 0;
+        totalPossible += maxPoints;
+        gradedAssignments++;
+      }
+    }
+  }
+
+  const percentage =
+    groupAssignments.length > 0
+      ? computeAssignmentGroupPercent(
+          studentId,
+          groupName,
+          groupAssignments,
+          course,
+          gradebookData.grades,
+          submissionMap,
+          studentSubmissions
+        )
+      : 0;
+
+  return { totalEarned, totalPossible, gradedAssignments, percentage };
 }
 
 const StudentGradesView: React.FC<StudentGradesViewProps> = ({
@@ -74,6 +159,47 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
 
   // Use the same structure as teacher gradebook
   const studentAssignments = [...studentModuleAssignments, ...studentGroupAssignmentsList, ...studentGradedDiscussions];
+
+  const courseGroupsList = course.groups || [];
+  const courseGroupNameSet = new Set(
+    courseGroupsList.map((g: any) => normalizeAssignmentCategoryName(g.name)).filter(Boolean)
+  );
+
+  const assignmentsForNamedGroup = (groupName: string) =>
+    studentAssignments.filter(
+      (a: any) => normalizeAssignmentCategoryName(a.group) === normalizeAssignmentCategoryName(groupName)
+    );
+
+  const uncategorizedAssignmentsForSummary = studentAssignments.filter((a: any) => {
+    const g = normalizeAssignmentCategoryName(a.group);
+    return !g || !courseGroupNameSet.has(g);
+  });
+
+  type AssignmentGroupSummaryRow = {
+    key: string;
+    displayName: string;
+    weightPercent: number | null;
+    assignments: any[];
+  };
+
+  const assignmentGroupSummaryRows: AssignmentGroupSummaryRow[] = [
+    ...courseGroupsList.map((g: any) => ({
+      key: `cat-${normalizeAssignmentCategoryName(g.name) || 'row'}`,
+      displayName: g.name,
+      weightPercent: typeof g.weight === 'number' ? g.weight : Number(g.weight),
+      assignments: assignmentsForNamedGroup(g.name),
+    })),
+    ...(uncategorizedAssignmentsForSummary.length > 0
+      ? [
+          {
+            key: 'other-uncategorized',
+            displayName: 'Other (uncategorized)',
+            weightPercent: null,
+            assignments: uncategorizedAssignmentsForSummary,
+          },
+        ]
+      : []),
+  ];
   
   const studentId = user?._id;
   if (!studentId) {
@@ -89,6 +215,9 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
             <div>
               <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-1">My Grades</h2>
               <p className="text-sm text-gray-600 dark:text-gray-400">Track your academic progress</p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">
+                Totals follow your course grading rules. Contact your instructor if a score looks incorrect.
+              </p>
             </div>
           </div>
           {/* Show calculated grade using backend API result */}
@@ -344,7 +473,7 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
         </div>
         
         {/* Assignment Group Performance Summary - Separate Card */}
-        {course.groups && course.groups.length > 0 && (
+        {assignmentGroupSummaryRows.length > 0 && (
           <div className="mt-6">
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
               <div className="flex items-center space-x-3 mb-4">
@@ -361,56 +490,30 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
               
               {/* Mobile Card View */}
               <div className="md:hidden space-y-3">
-                {(course.groups || []).map((group: any, idx: number) => {
-                  const groupAssignments = studentAssignments.filter((assignment: any) => assignment.group === group.name);
-                  let totalEarned = 0;
-                  let totalPossible = 0;
-                  let gradedAssignments = 0;
-                  
-                  groupAssignments.forEach((assignment: any) => {
-                    const maxPoints = assignment.questions?.reduce((sum: number, q: any) => sum + (q.points || 0), 0) || assignment.totalPoints || 0;
-                    let grade = assignment.isDiscussion
-                      ? assignment.grade
-                      : gradebookData.grades[String(studentId)]?.[String(assignment._id)];
-                    
-                    if (assignment.isDiscussion && (grade === null || grade === undefined)) {
-                      if (Array.isArray(assignment.studentGrades)) {
-                        const studentGradeObj = assignment.studentGrades.find((g: any) => g.student && (g.student._id === String(studentId) || g.student === String(studentId)));
-                        if (studentGradeObj && typeof studentGradeObj.grade === 'number') {
-                          grade = studentGradeObj.grade;
-                        }
-                      }
-                    }
-                    
-                    if (typeof grade === 'number') {
-                      totalEarned += grade;
-                      totalPossible += maxPoints;
-                      gradedAssignments++;
-                    } else {
-                      const dueDate = assignment.dueDate ? new Date(assignment.dueDate) : null;
-                      const now = new Date();
-                      const submissionKey = `${String(studentId)}_${String(assignment._id)}`;
-                      const hasSubmission = assignment.isDiscussion 
-                        ? assignment.hasSubmitted || (Array.isArray(assignment.replies) && assignment.replies.some((r: any) => r.author && (r.author._id === String(studentId) || r.author === String(studentId))))
-                        : !!submissionMap[submissionKey];
-                      
-                      if (dueDate && now > dueDate && !hasSubmission) {
-                        totalEarned += 0;
-                        totalPossible += maxPoints;
-                        gradedAssignments++;
-                      }
-                    }
-                  });
-                  
-                  const percentage = totalPossible > 0 ? (totalEarned / totalPossible) * 100 : 0;
-                  const percentageColor = percentage >= 90 ? 'text-green-600 dark:text-green-400' : 
-                                       percentage >= 80 ? 'text-blue-600 dark:text-blue-400' : 
-                                       percentage >= 70 ? 'text-yellow-600 dark:text-yellow-400' : 
-                                       'text-red-600 dark:text-red-400';
-                  
+                {assignmentGroupSummaryRows.map((row) => {
+                  const { totalEarned, totalPossible, gradedAssignments, percentage } =
+                    aggregateAssignmentGroupStats(
+                      row.assignments,
+                      studentId,
+                      course,
+                      row.displayName,
+                      gradebookData,
+                      submissionMap,
+                      studentSubmissions
+                    );
+                  const groupAssignments = row.assignments;
+                  const percentageColor =
+                    percentage >= 90
+                      ? 'text-green-600 dark:text-green-400'
+                      : percentage >= 80
+                        ? 'text-blue-600 dark:text-blue-400'
+                        : percentage >= 70
+                          ? 'text-yellow-600 dark:text-yellow-400'
+                          : 'text-red-600 dark:text-red-400';
+
                   return (
-                    <div key={idx} className="bg-white dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-                      <div className="font-semibold text-gray-900 dark:text-gray-100 mb-3">{group.name}</div>
+                    <div key={row.key} className="bg-white dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                      <div className="font-semibold text-gray-900 dark:text-gray-100 mb-3">{row.displayName}</div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Assignments</div>
@@ -418,7 +521,9 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
                         </div>
                         <div>
                           <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Weight</div>
-                          <div className="text-sm text-gray-900 dark:text-gray-100">{group.weight}%</div>
+                          <div className="text-sm text-gray-900 dark:text-gray-100">
+                            {row.weightPercent != null && !Number.isNaN(row.weightPercent) ? `${row.weightPercent}%` : '—'}
+                          </div>
                         </div>
                         <div>
                           <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Points Earned</div>
@@ -454,57 +559,31 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {(course.groups || []).map((group: any, idx: number) => {
-                      const groupAssignments = studentAssignments.filter((assignment: any) => assignment.group === group.name);
-                      let totalEarned = 0;
-                      let totalPossible = 0;
-                      let gradedAssignments = 0;
-                      
-                      groupAssignments.forEach((assignment: any) => {
-                        const maxPoints = assignment.questions?.reduce((sum: number, q: any) => sum + (q.points || 0), 0) || assignment.totalPoints || 0;
-                        let grade = assignment.isDiscussion
-                          ? assignment.grade
-                          : gradebookData.grades[String(studentId)]?.[String(assignment._id)];
-                        
-                        if (assignment.isDiscussion && (grade === null || grade === undefined)) {
-                          if (Array.isArray(assignment.studentGrades)) {
-                            const studentGradeObj = assignment.studentGrades.find((g: any) => g.student && (g.student._id === String(studentId) || g.student === String(studentId)));
-                            if (studentGradeObj && typeof studentGradeObj.grade === 'number') {
-                              grade = studentGradeObj.grade;
-                            }
-                          }
-                        }
-                        
-                        if (typeof grade === 'number') {
-                          totalEarned += grade;
-                          totalPossible += maxPoints;
-                          gradedAssignments++;
-                        } else {
-                          const dueDate = assignment.dueDate ? new Date(assignment.dueDate) : null;
-                          const now = new Date();
-                          const submissionKey = `${String(studentId)}_${String(assignment._id)}`;
-                          const hasSubmission = assignment.isDiscussion 
-                            ? assignment.hasSubmitted || (Array.isArray(assignment.replies) && assignment.replies.some((r: any) => r.author && (r.author._id === String(studentId) || r.author === String(studentId))))
-                            : !!submissionMap[submissionKey];
-                          
-                          if (dueDate && now > dueDate && !hasSubmission) {
-                            totalEarned += 0;
-                            totalPossible += maxPoints;
-                            gradedAssignments++;
-                          }
-                        }
-                      });
-                      
-                      const percentage = totalPossible > 0 ? (totalEarned / totalPossible) * 100 : 0;
-                      const percentageColor = percentage >= 90 ? 'text-green-600 dark:text-green-400' : 
-                                           percentage >= 80 ? 'text-blue-600 dark:text-blue-400' : 
-                                           percentage >= 70 ? 'text-yellow-600 dark:text-yellow-400' : 
-                                           'text-red-600 dark:text-red-400';
-                      
+                    {assignmentGroupSummaryRows.map((row) => {
+                      const { totalEarned, totalPossible, gradedAssignments, percentage } =
+                        aggregateAssignmentGroupStats(
+                      row.assignments,
+                      studentId,
+                      course,
+                      row.displayName,
+                      gradebookData,
+                      submissionMap,
+                      studentSubmissions
+                    );
+                      const groupAssignments = row.assignments;
+                      const percentageColor =
+                        percentage >= 90
+                          ? 'text-green-600 dark:text-green-400'
+                          : percentage >= 80
+                            ? 'text-blue-600 dark:text-blue-400'
+                            : percentage >= 70
+                              ? 'text-yellow-600 dark:text-yellow-400'
+                              : 'text-red-600 dark:text-red-400';
+
                       return (
-                        <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-150">
+                        <tr key={row.key} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-150">
                           <td className="px-4 py-3">
-                            <div className="font-medium text-gray-900 dark:text-gray-100">{group.name}</div>
+                            <div className="font-medium text-gray-900 dark:text-gray-100">{row.displayName}</div>
                           </td>
                           <td className="px-4 py-3 text-center text-sm text-gray-600 dark:text-gray-400">
                             {gradedAssignments}/{groupAssignments.length}
@@ -521,7 +600,7 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
                             </span>
                           </td>
                           <td className="px-4 py-3 text-center text-sm text-gray-600 dark:text-gray-400">
-                            {group.weight}%
+                            {row.weightPercent != null && !Number.isNaN(row.weightPercent) ? `${row.weightPercent}%` : '—'}
                           </td>
                         </tr>
                       );

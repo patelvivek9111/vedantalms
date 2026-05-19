@@ -114,6 +114,10 @@ const threadSchema = new mongoose.Schema({
       max: 100,
       default: null
     },
+    excused: {
+      type: Boolean,
+      default: false
+    },
     feedback: {
       type: String,
       default: null

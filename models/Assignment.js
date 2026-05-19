@@ -129,4 +129,7 @@ const assignmentSchema = new mongoose.Schema({
 assignmentSchema.index({ module: 1, published: 1, dueDate: 1 });
 assignmentSchema.index({ isGroupAssignment: 1, groupSet: 1, dueDate: 1 });
 
+const { portabilityMetadataPlugin } = require('./plugins/portabilityMetadata.plugin');
+assignmentSchema.plugin(portabilityMetadataPlugin);
+
 module.exports = mongoose.model('Assignment', assignmentSchema); 

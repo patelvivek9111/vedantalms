@@ -45,4 +45,7 @@ const attendanceSchema = new mongoose.Schema({
 // Temporarily removing unique constraint to fix the issue
 attendanceSchema.index({ course: 1, student: 1, date: 1 });
 
+const { portabilityMetadataPlugin } = require('./plugins/portabilityMetadata.plugin');
+attendanceSchema.plugin(portabilityMetadataPlugin);
+
 module.exports = mongoose.model('Attendance', attendanceSchema); 

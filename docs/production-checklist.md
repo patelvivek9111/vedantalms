@@ -17,9 +17,13 @@ Use this checklist before each production deployment.
 - [ ] Run backend install: `npm ci`
 - [ ] Run frontend install: `cd frontend && npm ci`
 - [ ] Run build: `npm run build`
+- [ ] Run `npm run verify:grading` and `npm run test:grading`
+- [ ] Run `npm run validate:indexes` (against staging DB)
+- [ ] Run `npm run migrate:dry-run` (against staging DB)
 - [ ] Run smoke check: `npm run smoke:predeploy`
 - [ ] Run duplicate audit: `npm run audit:duplicates`
 - [ ] Confirm no critical lints/typescript errors in changed files.
+- [ ] Review [docs/production/README.md](./production/README.md) for worker and Redis requirements
 
 ## 3) Runtime Health Checks
 
@@ -59,8 +63,9 @@ Quick behavior verification:
 
 - [ ] Previous stable version/tag is identified
 - [ ] Rollback command/process is documented for current host
-- [ ] Database migration compatibility checked (if schema changed)
+- [ ] Database migration compatibility checked (`npm run migrate:dry-run`; see `MigrationRun` collection)
 - [ ] Team knows who executes rollback if needed
+- [ ] Mongo backup taken before `npm run migrate` in production
 
 ## Notes
 

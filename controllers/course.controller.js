@@ -775,7 +775,7 @@ exports.getCourseModules = async (req, res) => {
       });
     }
 
-    const modules = await Module.find({ course: courseId });
+    const modules = await Module.find({ course: courseId }).sort({ createdAt: 1 });
     res.json({
       success: true,
       data: modules

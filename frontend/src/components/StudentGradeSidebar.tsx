@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import WhatIfScores from './WhatIfScores';
-import { getWeightedGradeForStudent, getLetterGrade, calculateFinalGradeWithWeightedGroups } from '../utils/gradeUtils';
+import { getLetterGrade, calculateFinalGradeWithWeightedGroups } from '../utils/gradeUtils';
 
 interface StudentGradeSidebarProps {
   course: any;

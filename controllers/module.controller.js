@@ -52,6 +52,7 @@ exports.getModulesByCourse = async (req, res) => {
       course: req.params.courseId,
       ...(isStudent ? { published: true } : {})
     })
+      .sort({ createdAt: 1 })
       .populate({
         path: 'pages',
         select: 'title content attachments createdAt updatedAt published'

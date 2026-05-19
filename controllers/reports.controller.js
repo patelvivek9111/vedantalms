@@ -1,10 +1,11 @@
 const Course = require('../models/course.model');
-const { getWeightedGradeForStudent, getLetterGrade } = require('../utils/gradeCalculation');
+const { resolveAssignmentGrade, buildGradesMapForStudent } = require('../utils/gradeCalculation');
 const Module = require('../models/module.model');
 const Assignment = require('../models/Assignment');
 const Submission = require('../models/Submission');
 const Thread = require('../models/thread.model');
 const Group = require('../models/Group');
+const { calculateCourseGradeForStudent } = require('../services/gradeCalculation.service');
 
 // GET /api/reports/semesters
 // Get all unique semesters that the student has courses in
@@ -103,6 +104,14 @@ exports.getStudentTranscript = async (req, res) => {
       });
     }
 
+    const ferpaAudit = require('../services/ferpaAudit.service');
+    await ferpaAudit.recordTranscriptAccess(req, {
+      studentId,
+      term,
+      year: yearNum,
+      mode: req.query.download === 'true' ? 'download' : 'view',
+    }).catch(() => {});
+
     // Helper function to get semester with defaults
     const getSemesterWithDefaults = (course) => {
       if (course.semester && course.semester.term && course.semester.year) {
@@ -149,12 +158,16 @@ exports.getStudentTranscript = async (req, res) => {
       // Fetch all assignments for these modules
       const assignments = await Assignment.find({ module: { $in: moduleIds } });
 
-      // Fetch all group assignments for the course
-      const groupAssignmentsRaw = await Assignment.find({
-        isGroupAssignment: true,
-        groupSet: { $ne: null }
-      }).populate({ path: 'groupSet', match: { course: course._id } });
-      const groupAssignments = groupAssignmentsRaw.filter(a => a.groupSet);
+      const GroupSet = require('../models/GroupSet');
+      const courseGroupSets = await GroupSet.find({ course: course._id }).select('_id').lean();
+      const courseGroupSetIds = courseGroupSets.map((gs) => gs._id);
+      const groupAssignments =
+        courseGroupSetIds.length > 0
+          ? await Assignment.find({
+              isGroupAssignment: true,
+              groupSet: { $in: courseGroupSetIds },
+            }).lean()
+          : [];
 
       // Fetch all submissions for this student for regular assignments
       const assignmentIds = assignments.map(a => a._id);
@@ -166,8 +179,9 @@ exports.getStudentTranscript = async (req, res) => {
       // For group assignments, find the student's group and get submissions
       let groupSubmissions = [];
       for (const groupAssignment of groupAssignments) {
+        const groupSetId = groupAssignment.groupSet?._id || groupAssignment.groupSet;
         const group = await Group.findOne({
-          groupSet: groupAssignment.groupSet._id,
+          groupSet: groupSetId,
           members: studentId
         });
         if (group) {
@@ -213,7 +227,7 @@ exports.getStudentTranscript = async (req, res) => {
           totalPoints: thread.totalPoints || 0,
           isDiscussion: true,
           published: thread.published !== false,
-          grade: studentGradeObj ? studentGradeObj.grade : null,
+          grade: resolveAssignmentGrade({ discussionGradeRow: studentGradeObj || null }),
           dueDate: thread.dueDate || null,
           hasSubmitted
         };
@@ -231,24 +245,15 @@ exports.getStudentTranscript = async (req, res) => {
           assignment: a,
           dueDate: a.dueDate,
           published: a.published,
-          grade: submissionMap[a._id.toString()] && typeof submissionMap[a._id.toString()].grade === 'number'
-            ? submissionMap[a._id.toString()].grade
-            : null
+          grade: resolveAssignmentGrade({ submission: submissionMap[a._id.toString()] || null })
         })),
         ...groupAssignments.map(a => {
           const submission = submissionMap[a._id.toString()];
-          let grade = null;
-          
-          if (submission) {
-            if (submission.useIndividualGrades && submission.memberGrades) {
-              const memberGrade = submission.memberGrades.find(
-                mg => mg.student && mg.student._id.toString() === studentId.toString()
-              );
-              grade = memberGrade ? memberGrade.grade : null;
-            } else {
-              grade = typeof submission.grade === 'number' ? submission.grade : null;
-            }
-          }
+          const grade = submission
+            ? resolveAssignmentGrade({
+                submission: { ...submission, _memberStudentId: studentId }
+              })
+            : null;
           
           return {
             _id: a._id,
@@ -266,19 +271,24 @@ exports.getStudentTranscript = async (req, res) => {
         ...discussionAssignments
       ];
 
-      // Create grades object
+      const sid = studentId.toString();
       const grades = {};
-      grades[studentId] = {};
-      allAssignments.forEach(assignment => {
-        if (assignment.grade !== null && assignment.grade !== undefined) {
-          grades[studentId][assignment._id.toString()] = assignment.grade;
-        }
-      });
+      buildGradesMapForStudent(grades, sid, allAssignments);
 
-      // Calculate final grade
-      const gradeScale = course.gradeScale || [];
-      const totalPercent = getWeightedGradeForStudent(studentId, course, allAssignments, grades, submissionMap);
-      const letterGrade = getLetterGrade(totalPercent, gradeScale);
+      const gradeResult = await calculateCourseGradeForStudent(
+        sid,
+        course,
+        allAssignments,
+        grades,
+        submissionMap,
+        {
+          useFrozenTranscriptSnapshot: true,
+          persistTranscriptSnapshot: true,
+          term,
+          year: yearNum,
+        }
+      );
+      const { totalPercent, letterGrade } = gradeResult;
 
       // Extract course code from catalog or title
       const courseCode = course.catalog?.subject || course.title.split(' ')[0] || 'N/A';
@@ -292,16 +302,41 @@ exports.getStudentTranscript = async (req, res) => {
         creditHours: creditHours,
         finalGrade: totalPercent,
         letterGrade: letterGrade,
-        semester: course.semester || { term, year: parseInt(year) }
+        semester: course.semester || { term, year: parseInt(year) },
+        gradingPolicyVersion: gradeResult.policyVersion,
+        gradingPolicyHash: gradeResult.policyHash,
+        gradingEngineVersion: gradeResult.gradingEngineVersion,
+        lifecycleStatus: gradeResult.lifecycleStatus,
+        fromFrozenSnapshot: !!gradeResult.fromFrozenSnapshot,
       });
     }
+
+    const payload = {
+      studentId: String(studentId),
+      term,
+      year: yearNum,
+      courses: courseGrades
+        .map((c) => ({
+          courseId: c.courseId,
+          finalPercent: c.finalGrade,
+          letterGrade: c.letterGrade,
+          gradingPolicyHash: c.gradingPolicyHash,
+          gradingPolicyVersion: c.gradingPolicyVersion,
+          gradingEngineVersion: c.gradingEngineVersion,
+          lifecycleStatus: c.lifecycleStatus,
+        }))
+        .sort((a, b) => a.courseId.localeCompare(b.courseId)),
+    };
+    const { hashTranscriptPayload } = require('../shared/grading/transcriptHash.cjs');
+    const transcriptHash = hashTranscriptPayload(payload);
 
     res.json({
       success: true,
       data: {
         courses: courseGrades,
-        totalCredits: courseGrades.reduce((sum, course) => sum + (course.creditHours || 0), 0)
-      }
+        totalCredits: courseGrades.reduce((sum, course) => sum + (course.creditHours || 0), 0),
+        transcriptHash,
+      },
     });
   } catch (error) {
     console.error('Error fetching transcript:', error);
@@ -310,5 +345,66 @@ exports.getStudentTranscript = async (req, res) => {
       message: 'Failed to fetch transcript',
       error: error.message
     });
+  }
+};
+
+/** POST /api/reports/transcript/issue — registrar official issuance log */
+exports.issueStudentTranscript = async (req, res) => {
+  try {
+    const { studentId, term, year, notes } = req.body;
+    if (!studentId || !term || !year) {
+      return res.status(400).json({
+        success: false,
+        message: 'studentId, term, and year are required',
+      });
+    }
+
+    const transcriptIssuanceService = require('../services/transcriptIssuance.service');
+    const result = await transcriptIssuanceService.issueOfficialTranscript({
+      studentId,
+      term,
+      year: Number(year),
+      issuedBy: req.user,
+      notes,
+      ip: req.ip,
+    });
+
+    res.status(201).json({
+      success: true,
+      data: {
+        issueLog: result.log,
+        transcriptHash: result.transcriptHash,
+        courseCount: result.payload.courses.length,
+      },
+    });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || 'Failed to issue transcript',
+    });
+  }
+};
+
+/** GET /api/reports/transcript/issue-history/:studentId */
+exports.getTranscriptIssuanceHistory = async (req, res) => {
+  try {
+    const { term, year } = req.query;
+    if (!term || !year) {
+      return res.status(400).json({
+        success: false,
+        message: 'term and year query params are required',
+      });
+    }
+
+    const transcriptIssuanceService = require('../services/transcriptIssuance.service');
+    const history = await transcriptIssuanceService.listIssuanceHistory(
+      req.params.studentId,
+      term,
+      Number(year)
+    );
+
+    res.json({ success: true, data: history });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };

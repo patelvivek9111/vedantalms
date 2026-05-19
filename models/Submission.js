@@ -91,6 +91,10 @@ const submissionSchema = new mongoose.Schema({
       min: 0,
       max: 100
     },
+    excused: {
+      type: Boolean,
+      default: false
+    },
     feedback: {
       type: String
     },
@@ -119,7 +123,23 @@ const submissionSchema = new mongoose.Schema({
   isManualGrade: {
     type: Boolean,
     default: false
-  }
+  },
+  excused: {
+    type: Boolean,
+    default: false
+  },
+  gradingPolicyVersion: {
+    type: Number,
+  },
+  gradingPolicyHash: {
+    type: String,
+  },
+  gradingPolicySnapshot: {
+    type: mongoose.Schema.Types.Mixed,
+  },
+  gradingEngineVersion: {
+    type: String,
+  },
 }, {
   timestamps: true
 });
@@ -147,5 +167,8 @@ submissionSchema.index(
 submissionSchema.index({ assignment: 1, submittedAt: -1 });
 submissionSchema.index({ student: 1, submittedAt: -1 });
 submissionSchema.index({ group: 1, submittedAt: -1 });
+
+const { portabilityMetadataPlugin } = require('./plugins/portabilityMetadata.plugin');
+submissionSchema.plugin(portabilityMetadataPlugin);
 
 module.exports = mongoose.model('Submission', submissionSchema); 

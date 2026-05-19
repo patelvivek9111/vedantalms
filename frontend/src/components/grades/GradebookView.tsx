@@ -1,14 +1,28 @@
-import React from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronDown } from 'lucide-react';
 import { getImageUrl } from '../../services/api';
-import { calculateFinalGradeWithWeightedGroups, getLetterGrade } from '../../utils/gradeUtils';
+import { TableRowSkeleton } from '../common/SkeletonLoader';
+import { useVirtualWindow } from '../../hooks/useVirtualWindow';
+import GradebookTableToolbar from '../../features/gradebook/GradebookTableToolbar';
+import { useGradebookFilters } from '../../features/gradebook/useGradebookFilters';
+import { useGradebookKeyboard } from '../../features/gradebook/useGradebookKeyboard';
+import {
+  getLetterGrade,
+  isExcusedGrade,
+  EXCUSED_GRADE,
+} from '../../utils/gradeUtils';
+import { computeStudentWeightedPercent } from '../../utils/gradebookCompute';
 import AssignmentGroupsModal from './AssignmentGroupsModal';
 import GradeScaleModal from './GradeScaleModal';
+import GradingPolicyModal from './GradingPolicyModal';
+import CourseGradeLifecyclePanel from './CourseGradeLifecyclePanel';
 
 interface GradebookViewProps {
   course: any;
   courseId: string;
+  /** Instructor gradebook is assembled asynchronously; when true, summary stats avoid stale numbers. */
+  isGradebookLoading?: boolean;
   gradebookData: {
     students: any[];
     assignments: any[];
@@ -18,6 +32,7 @@ interface GradebookViewProps {
   studentSubmissions: any[];
   isInstructor: boolean;
   isAdmin: boolean;
+  userRole?: string;
   expandedStudents: Set<string>;
   setExpandedStudents: React.Dispatch<React.SetStateAction<Set<string>>>;
   editingGrade: { studentId: string; assignmentId: string } | null;
@@ -27,6 +42,7 @@ interface GradebookViewProps {
   savingGrade: { studentId: string; assignmentId: string } | null;
   handleGradeCellClick: (studentId: string, assignmentId: string, currentGrade: string) => void;
   handleGradeUpdate: (studentId: string, assignmentId: string, newGrade: string) => Promise<void>;
+  handleGradeInputKeyDown?: (e: React.KeyboardEvent, studentId: string, assignmentId: string) => void;
   handleExportGradebookCSV: () => void;
   handleOpenGradeScaleModal: () => void;
   handleOpenGroupModal: () => void;
@@ -50,16 +66,32 @@ interface GradebookViewProps {
   setShowGradeScaleModal: React.Dispatch<React.SetStateAction<boolean>>;
   setGradeScaleError: React.Dispatch<React.SetStateAction<string>>;
   setEditGradeScale: React.Dispatch<React.SetStateAction<any[]>>;
+  resolvedGradingPolicy?: import('../../utils/gradeUtils').ResolvedGradingPolicy | null;
+  gradingPolicyModal?: {
+    show: boolean;
+    setShow: (v: boolean) => void;
+    editPolicy: import('../../utils/gradeUtils').GradingPolicyConfig;
+    setEditPolicy: React.Dispatch<React.SetStateAction<import('../../utils/gradeUtils').GradingPolicyConfig>>;
+    onSave: () => void;
+    onPreview: () => void;
+    saving: boolean;
+    loading: boolean;
+    error: string;
+    preview: { totalPercent: number; letterGrade: string } | null;
+    dirty?: boolean;
+  };
 }
 
 const GradebookView: React.FC<GradebookViewProps> = ({
   course,
   courseId,
+  isGradebookLoading = false,
   gradebookData,
   submissionMap,
   studentSubmissions,
   isInstructor,
   isAdmin,
+  userRole,
   expandedStudents,
   setExpandedStudents,
   editingGrade,
@@ -69,6 +101,7 @@ const GradebookView: React.FC<GradebookViewProps> = ({
   savingGrade,
   handleGradeCellClick,
   handleGradeUpdate,
+  handleGradeInputKeyDown,
   handleExportGradebookCSV,
   handleOpenGradeScaleModal,
   handleOpenGroupModal,
@@ -92,69 +125,86 @@ const GradebookView: React.FC<GradebookViewProps> = ({
   setShowGradeScaleModal,
   setGradeScaleError,
   setEditGradeScale,
+  resolvedGradingPolicy = null,
+  gradingPolicyModal,
 }) => {
   const navigate = useNavigate();
 
   const { students, assignments, grades } = gradebookData;
-  
-  // Group assignments by group name
-  const gradebookGroupMap = (course.groups || []).reduce((acc: any, group: any) => {
-    acc[group.name] = { ...group, assignments: [] };
-    return acc;
-  }, {});
-  assignments.forEach((assignment: any) => {
-    if (assignment.group && gradebookGroupMap[assignment.group]) {
-      gradebookGroupMap[assignment.group].assignments.push(assignment);
+
+  const gradebookGroupMap = useMemo(() => {
+    const map = (course.groups || []).reduce((acc: any, group: any) => {
+      acc[group.name] = { ...group, assignments: [] };
+      return acc;
+    }, {} as Record<string, any>);
+    assignments.forEach((assignment: any) => {
+      if (assignment.group && map[assignment.group]) {
+        map[assignment.group].assignments.push(assignment);
+      }
+    });
+    return map;
+  }, [course.groups, assignments]);
+
+  const weightedByStudent = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const student of students) {
+      map[student._id] = computeStudentWeightedPercent(
+        student._id,
+        course,
+        assignments,
+        grades,
+        submissionMap,
+        studentSubmissions,
+        resolvedGradingPolicy
+      );
     }
+    return map;
+  }, [students, course, assignments, grades, submissionMap, studentSubmissions, resolvedGradingPolicy]);
+
+  const getWeightedGrade = (student: any) => weightedByStudent[student._id] ?? 0;
+
+  const {
+    search,
+    setSearch,
+    filterMode,
+    setFilterMode,
+    filteredStudents,
+    needsGradingCount,
+  } = useGradebookFilters(courseId, students, assignments, grades, submissionMap, weightedByStudent);
+
+  const GRADE_ROW_HEIGHT = 56;
+  const scrollHeight = Math.min(900, Math.max(400, window.innerHeight * 0.75));
+  const { enabled: virtualEnabled, range: virtualRange, onScroll: onVirtualScroll } = useVirtualWindow({
+    itemCount: filteredStudents.length,
+    estimatedItemHeight: GRADE_ROW_HEIGHT,
+    containerHeight: scrollHeight,
+    threshold: 50,
   });
-  
-  // Helper to calculate weighted grade for a student
-  function getWeightedGrade(student: any) {
-    // Create a submission map for this specific student
-    const studentSubmissionMap: { [assignmentId: string]: any } = {};
-    
-    // Build submission map for this student
-    Object.keys(submissionMap).forEach(key => {
-      if (key.startsWith(`${student._id}_`)) {
-        const assignmentId = key.split('_')[1];
-        studentSubmissionMap[assignmentId] = submissionMap[key];
-      }
-    });
-    
-    // Augment assignments with per-student discussion submission flag
-    const augmentedAssignments = assignments.map((a: any) => {
-      if (a.isDiscussion) {
-        const hasSubmitted = Array.isArray(a.replies)
-          ? a.replies.some((r: any) => {
-              const authorId = r.author && r.author._id ? String(r.author._id) : String(r.author || '');
-              if (authorId === String(student._id)) return true;
-              if (Array.isArray(r.replies) && r.replies.length > 0) {
-                // Nested replies
-                const stack = [...r.replies];
-                while (stack.length) {
-                  const cur = stack.pop();
-                  const curAuthorId = cur.author && cur.author._id ? String(cur.author._id) : String(cur.author || '');
-                  if (curAuthorId === String(student._id)) return true;
-                  if (Array.isArray(cur.replies)) stack.push(...cur.replies);
-                }
-              }
-              return false;
-            })
-          : false;
-        return { ...a, hasSubmitted };
-      }
-      return a;
-    });
-    
-    // Use the function that ignores groups with no grades and now respects per-student discussion submission
-    return calculateFinalGradeWithWeightedGroups(
-      student._id,
-      course,
-      augmentedAssignments,
-      grades,
-      studentSubmissionMap
-    );
-  }
+
+  const displayStudents = virtualEnabled
+    ? filteredStudents.slice(virtualRange.start, virtualRange.end)
+    : filteredStudents;
+
+  const keyboardMatrix = useMemo(
+    () =>
+      displayStudents.map((student) =>
+        assignments.map((assignment) => ({
+          studentId: student._id,
+          assignmentId: assignment._id,
+        }))
+      ),
+    [displayStudents, assignments]
+  );
+
+  const activateCell = useCallback(
+    (cell: { studentId: string; assignmentId: string }) => {
+      const grade = grades[cell.studentId]?.[cell.assignmentId];
+      handleGradeCellClick(cell.studentId, cell.assignmentId, grade?.toString() || '');
+    },
+    [grades, handleGradeCellClick]
+  );
+
+  const { onKeyDown: onGradeCellKeyDown } = useGradebookKeyboard(keyboardMatrix, activateCell);
 
   return (
     <div className="space-y-6">
@@ -164,23 +214,69 @@ const GradebookView: React.FC<GradebookViewProps> = ({
           <div>
             <h2 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">Gradebook</h2>
             <p className="mt-1 text-xs text-gray-600 dark:text-gray-400 sm:text-sm">Track student performance and manage grades</p>
+            {resolvedGradingPolicy?.version != null && (isInstructor || isAdmin) && (
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-500" title="Policy snapshot used for weighted totals">
+                Policy v{resolvedGradingPolicy.version}
+                {resolvedGradingPolicy.source ? ` · ${resolvedGradingPolicy.source}` : ''}
+              </p>
+            )}
           </div>
           <div className="flex items-center space-x-2 sm:space-x-3 w-full sm:w-auto">
             <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-center dark:border-gray-700 dark:bg-gray-800 flex-1 sm:flex-none">
               <div className="text-xs text-gray-600 dark:text-gray-400 sm:text-sm">Students</div>
-              <div className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{students.length}</div>
+              <div className="text-2xl font-semibold text-gray-900 dark:text-gray-100 tabular-nums">
+                {isGradebookLoading ? (
+                  <span
+                    className="inline-block text-gray-400 animate-pulse dark:text-gray-500"
+                    aria-busy="true"
+                    aria-label="Loading student count"
+                  >
+                    …
+                  </span>
+                ) : (
+                  students.length
+                )}
+              </div>
             </div>
             <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-center dark:border-gray-700 dark:bg-gray-800 flex-1 sm:flex-none">
               <div className="text-xs text-gray-600 dark:text-gray-400 sm:text-sm">Assignments</div>
-              <div className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{assignments.length}</div>
+              <div className="text-2xl font-semibold text-gray-900 dark:text-gray-100 tabular-nums">
+                {isGradebookLoading ? (
+                  <span
+                    className="inline-block text-gray-400 animate-pulse dark:text-gray-500"
+                    aria-busy="true"
+                    aria-label="Loading assignment count"
+                  >
+                    …
+                  </span>
+                ) : (
+                  assignments.length
+                )}
+              </div>
             </div>
           </div>
         </div>
       </div>
 
+      {(isInstructor || isAdmin) && courseId && (
+        <CourseGradeLifecyclePanel courseId={courseId} userRole={userRole} />
+      )}
+
+      {(isInstructor || isAdmin) && students.length > 0 && (
+        <GradebookTableToolbar
+          search={search}
+          onSearchChange={setSearch}
+          filterMode={filterMode}
+          onFilterModeChange={setFilterMode}
+          needsGradingCount={needsGradingCount}
+          showingCount={filteredStudents.length}
+          totalCount={students.length}
+        />
+      )}
+
       {/* Mobile Card View for Gradebook */}
       <div className="lg:hidden space-y-4">
-        {students.map((student: any, rowIdx: number) => {
+        {filteredStudents.map((student: any) => {
           const weightedPercent = getWeightedGrade(student);
           const letter = getLetterGrade(weightedPercent, course?.gradeScale);
           let gradeColor = 'text-gray-700 dark:text-gray-300';
@@ -254,6 +350,12 @@ const GradebookView: React.FC<GradebookViewProps> = ({
                   let cellContent: React.ReactNode;
                   if (!assignment.isDiscussion && !assignment.published) {
                     cellContent = <span className="text-xs text-gray-500 dark:text-gray-400 italic">Not Published</span>;
+                  } else if (isExcusedGrade(grade) || grade === EXCUSED_GRADE) {
+                    cellContent = (
+                      <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
+                        Excused
+                      </span>
+                    );
                   } else if (typeof grade === 'number') {
                     const percentage = (grade / maxPoints) * 100;
                     let gradeBg = 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300';
@@ -319,8 +421,12 @@ const GradebookView: React.FC<GradebookViewProps> = ({
       {/* Desktop Gradebook Table — scroll inside card so header row stays visible */}
       <div className="hidden lg:block rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
         <div className="relative w-full">
-          <div className="max-h-[min(75vh,900px)] w-full overflow-auto">
-            <table className="min-w-max w-full border-collapse">
+          <div className="max-h-[min(75vh,900px)] w-full overflow-auto" onScroll={onVirtualScroll}>
+            <table
+              className="min-w-max w-full border-collapse"
+              role="table"
+              aria-label="Course gradebook"
+            >
               <thead className="sticky top-0 z-10 bg-gray-50 shadow-sm dark:bg-gray-800 dark:shadow-none">
                 <tr>
                   {/* Sticky first column header */}
@@ -375,7 +481,17 @@ const GradebookView: React.FC<GradebookViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {students.map((student: any, rowIdx: number) => {
+                {isGradebookLoading && (
+                  <TableRowSkeleton columns={assignments.length + 2} rows={8} />
+                )}
+                {!isGradebookLoading && virtualEnabled && virtualRange.paddingTop > 0 && (
+                  <tr aria-hidden style={{ height: virtualRange.paddingTop }}>
+                    <td colSpan={assignments.length + 2} />
+                  </tr>
+                )}
+                {!isGradebookLoading &&
+                displayStudents.map((student: any, localIdx: number) => {
+                  const rowIdx = virtualEnabled ? virtualRange.start + localIdx : localIdx;
                   // Calculate weighted grade
                   const weightedPercent = getWeightedGrade(student);
                   const letter = getLetterGrade(weightedPercent, course?.gradeScale);
@@ -463,6 +579,13 @@ const GradebookView: React.FC<GradebookViewProps> = ({
                         if (!assignment.isDiscussion && !assignment.published) {
                           // Not published
                           cellContent = <span className="text-gray-500 dark:text-gray-400 italic">Not Published</span>;
+                          cellBg = 'bg-gray-100 dark:bg-gray-800';
+                        } else if (isExcusedGrade(grade) || grade === EXCUSED_GRADE) {
+                          cellContent = (
+                            <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
+                              Excused
+                            </div>
+                          );
                           cellBg = 'bg-gray-100 dark:bg-gray-800';
                         } else if (typeof grade === 'number') {
                           // If graded, show the grade
@@ -556,8 +679,16 @@ const GradebookView: React.FC<GradebookViewProps> = ({
                         return (
                           <td
                             key={`${student._id}-${assignment._id}-${assIdx}`}
+                            data-grade-cell={`${student._id}-${assignment._id}`}
+                            tabIndex={hasSubmission || assignment.published || assignment.isOfflineAssignment ? 0 : -1}
                             className={`px-4 py-4 text-center whitespace-nowrap relative ${rowBg} ${cellBg} transition-all duration-150 ${hasSubmission || assignment.published || assignment.isOfflineAssignment ? 'cursor-pointer' : ''}`}
                             onClick={handleCellClick}
+                            onKeyDown={(e) => {
+                              onGradeCellKeyDown(e, localIdx, assIdx);
+                              if (handleGradeInputKeyDown && editingGrade?.studentId === student._id && editingGrade?.assignmentId === assignment._id) {
+                                handleGradeInputKeyDown(e, student._id, assignment._id);
+                              }
+                            }}
                           >
                             {editingGrade?.studentId === student._id && editingGrade?.assignmentId === assignment._id ? (
                               <div className="relative">
@@ -612,6 +743,11 @@ const GradebookView: React.FC<GradebookViewProps> = ({
                     </tr>
                   );
                 })}
+                {!isGradebookLoading && virtualEnabled && virtualRange.paddingBottom > 0 && (
+                  <tr aria-hidden style={{ height: virtualRange.paddingBottom }}>
+                    <td colSpan={assignments.length + 2} />
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -640,8 +776,21 @@ const GradebookView: React.FC<GradebookViewProps> = ({
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              Export CSV
+              Export Excel
             </button>
+            {gradingPolicyModal && (
+              <button
+                type="button"
+                className="inline-flex items-center rounded-lg border border-violet-200 bg-violet-50 px-5 py-2.5 text-sm font-semibold text-violet-700 transition-colors hover:bg-violet-100 dark:border-violet-800 dark:bg-violet-900/30 dark:text-violet-300 dark:hover:bg-violet-900/50"
+                onClick={() => gradingPolicyModal.setShow(true)}
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Grading Policies
+              </button>
+            )}
             <button
               className="inline-flex items-center rounded-lg border border-blue-200 bg-blue-50 px-5 py-2.5 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
               onClick={handleOpenGradeScaleModal}
@@ -704,7 +853,7 @@ const GradebookView: React.FC<GradebookViewProps> = ({
         {/* Desktop Table View */}
         <div className="hidden md:block p-6">
           <div className="bg-gray-50 dark:bg-gray-800 rounded-lg overflow-hidden">
-            <table className="w-full">
+            <table className="w-full" role="table" aria-label="Assignment group weights">
               <thead className="bg-gray-100 dark:bg-gray-700">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Assignment Group</th>
@@ -739,6 +888,22 @@ const GradebookView: React.FC<GradebookViewProps> = ({
         groupError={groupError}
         setShowGroupModal={setShowGroupModal}
       />
+      {gradingPolicyModal && (
+        <GradingPolicyModal
+          courseId={courseId}
+          userRole={userRole}
+          show={gradingPolicyModal.show}
+          onClose={() => gradingPolicyModal.setShow(false)}
+          editPolicy={gradingPolicyModal.editPolicy}
+          setEditPolicy={gradingPolicyModal.setEditPolicy}
+          onSave={gradingPolicyModal.onSave}
+          onPreview={gradingPolicyModal.onPreview}
+          saving={gradingPolicyModal.saving}
+          loading={gradingPolicyModal.loading}
+          error={gradingPolicyModal.error}
+          preview={gradingPolicyModal.preview}
+        />
+      )}
       <GradeScaleModal
         showGradeScaleModal={showGradeScaleModal}
         editGradeScale={editGradeScale}

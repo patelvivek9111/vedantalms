@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { calculateFinalGradeWithWeightedGroups, getLetterGrade } from '../utils/gradeUtils';
+import {
+  calculateFinalGradeWithWeightedGroups,
+  getLetterGrade as getCourseLetterGrade,
+} from '../utils/gradeUtils';
 
 interface WhatIfScoresProps {
   course: any;
@@ -33,23 +36,6 @@ const WhatIfScores: React.FC<WhatIfScoresProps> = ({
     return calculateFinalGradeWithWeightedGroups(studentId, course, assignments, grades, {});
   };
 
-  // Get letter grade from percentage
-  const getLetterGrade = (percent: number) => {
-    const scale = course.gradeScale || [
-      { letter: 'A', min: 94, max: 100 },
-      { letter: 'A-', min: 90, max: 93 },
-      { letter: 'B+', min: 87, max: 89 },
-      { letter: 'B', min: 84, max: 86 },
-      { letter: 'B-', min: 80, max: 83 },
-      { letter: 'C+', min: 77, max: 79 },
-      { letter: 'C', min: 74, max: 76 },
-      { letter: 'D', min: 64, max: 73 },
-      { letter: 'F', min: 0, max: 63 }
-    ];
-    const found = scale.find((s: any) => percent >= s.min && percent <= s.max);
-    return found ? found.letter : 'F';
-  };
-
   const handleScoreChange = (assignmentId: string, value: string) => {
     const numValue = value === '' ? 0 : parseFloat(value);
     if (!isNaN(numValue)) {
@@ -61,7 +47,7 @@ const WhatIfScores: React.FC<WhatIfScoresProps> = ({
   };
 
   const currentWeightedGrade = calculateWeightedGrade(whatIfScores);
-  const currentLetterGrade = getLetterGrade(currentWeightedGrade);
+  const currentLetterGrade = getCourseLetterGrade(currentWeightedGrade, course?.gradeScale);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-2 sm:p-4">

@@ -4,6 +4,10 @@
     "lib": ["dom", "es6"],
     "module": "esnext",
     "moduleResolution": "node",
+    "baseUrl": ".",
+    "paths": {
+      "@lms-shared/grading": ["../shared/grading/index.d.ts"]
+    },
     "jsx": "react",
     "esModuleInterop": true,
     "allowJs": true,

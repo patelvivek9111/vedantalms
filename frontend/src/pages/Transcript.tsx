@@ -3,6 +3,13 @@ import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { API_URL } from '../config';
 import DataTable, { Column } from '../components/common/DataTable';
+import {
+  calculateSGPA,
+  calculateCGPA,
+  calculateSemesterGPA,
+  calculateOverallGPA,
+  getIndianGradePoints,
+} from '../utils/transcriptGpa';
 
 interface CourseGrade {
   courseId: string;
@@ -138,110 +145,6 @@ const Transcript: React.FC = () => {
     return gpa.toFixed(2);
   };
 
-  // Convert letter grades to Indian 10-point grade points
-  const getIndianGradePoints = (letterGrade: string): number => {
-    const gradeMap: { [key: string]: number } = {
-      'A+': 10.0,  // O (Outstanding)
-      'A': 9.0,    // A+ (Excellent)
-      'A-': 8.0,   // A (Very Good)
-      'B+': 7.0,   // B+ (Good)
-      'B': 6.0,    // B (Above Average)
-      'B-': 5.5,   // 
-      'C+': 5.0,   // C (Average)
-      'C': 4.5,    // 
-      'C-': 4.0,   // P (Pass)
-      'D+': 3.5,   // 
-      'D': 3.0,    // 
-      'D-': 2.0,   // 
-      'F': 0.0     // F (Fail)
-    };
-    return gradeMap[letterGrade] ?? 0;
-  };
-
-  // Convert letter grades to US 4-point grade points (for GPA)
-  const getUSGradePoints = (letterGrade: string): number => {
-    const gradeMap: { [key: string]: number } = {
-      'A+': 4.0,
-      'A': 4.0,
-      'A-': 3.7,
-      'B+': 3.3,
-      'B': 3.0,
-      'B-': 2.7,
-      'C+': 2.3,
-      'C': 2.0,
-      'C-': 1.7,
-      'D+': 1.3,
-      'D': 1.0,
-      'D-': 0.7,
-      'F': 0.0
-    };
-    return gradeMap[letterGrade] ?? 0;
-  };
-
-  // Calculate SGPA (Semester Grade Point Average) - Indian 10-point system
-  const calculateSGPA = (courses: CourseGrade[]): number => {
-    if (courses.length === 0) return 0;
-    let totalPoints = 0;
-    let totalCredits = 0;
-    
-    courses.forEach(course => {
-      const credits = course.creditHours || 0;
-      const gradePoints = getIndianGradePoints(course.letterGrade);
-      totalPoints += gradePoints * credits;
-      totalCredits += credits;
-    });
-
-    return totalCredits > 0 ? totalPoints / totalCredits : 0;
-  };
-
-  // Calculate CGPA (Cumulative Grade Point Average) - Indian 10-point system
-  const calculateCGPA = (courses: CourseGrade[]): number => {
-    if (courses.length === 0) return 0;
-    let totalPoints = 0;
-    let totalCredits = 0;
-    
-    courses.forEach(course => {
-      const credits = course.creditHours || 0;
-      const gradePoints = getIndianGradePoints(course.letterGrade);
-      totalPoints += gradePoints * credits;
-      totalCredits += credits;
-    });
-
-    return totalCredits > 0 ? totalPoints / totalCredits : 0;
-  };
-
-  // Calculate Semester GPA (US 4-point system)
-  const calculateSemesterGPA = (courses: CourseGrade[]): number => {
-    if (courses.length === 0) return 0;
-    let totalPoints = 0;
-    let totalCredits = 0;
-    
-    courses.forEach(course => {
-      const credits = course.creditHours || 0;
-      const gradePoints = getUSGradePoints(course.letterGrade);
-      totalPoints += gradePoints * credits;
-      totalCredits += credits;
-    });
-
-    return totalCredits > 0 ? totalPoints / totalCredits : 0;
-  };
-
-  // Calculate Overall GPA (US 4-point system) for all courses
-  const calculateOverallGPA = (courses: CourseGrade[]): number => {
-    if (courses.length === 0) return 0;
-    let totalPoints = 0;
-    let totalCredits = 0;
-    
-    courses.forEach(course => {
-      const credits = course.creditHours || 0;
-      const gradePoints = getUSGradePoints(course.letterGrade);
-      totalPoints += gradePoints * credits;
-      totalCredits += credits;
-    });
-
-    return totalCredits > 0 ? totalPoints / totalCredits : 0;
-  };
-
   // Define columns for transcript table
   const transcriptColumns = useMemo<Column<CourseGrade>[]>(() => [
     {
@@ -311,6 +214,9 @@ const Transcript: React.FC = () => {
                 {user.firstName} {user.lastName} - {user.email}
               </p>
             )}
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-500">
+              Unofficial copy for your records. Official grades appear after your institution posts and finalizes the term.
+            </p>
           </div>
 
           {/* Semester Selector */}

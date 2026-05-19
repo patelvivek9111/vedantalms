@@ -20,6 +20,10 @@ const courseSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   }],
+  teachingAssistants: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  }],
   gradeScale: {
     type: [
       {
@@ -294,5 +298,8 @@ courseSchema.pre('save', async function assignEnrollmentQrToken(next) {
 courseSchema.index({ instructor: 1, updatedAt: -1 });
 courseSchema.index({ students: 1 });
 courseSchema.index({ 'catalog.courseCode': 1 });
+
+const { portabilityMetadataPlugin } = require('./plugins/portabilityMetadata.plugin');
+courseSchema.plugin(portabilityMetadataPlugin);
 
 module.exports = mongoose.model('Course', courseSchema); 

@@ -6,15 +6,22 @@ const Submission = require('../models/Submission');
 const Thread = require('../models/thread.model');
 const Group = require('../models/Group');
 const GroupSet = require('../models/GroupSet');
-const { calculateFinalGradeWithWeightedGroups, getWeightedGradeForStudent, getLetterGrade } = require('../utils/gradeCalculation');
+const {
+  calculateFinalGradeWithWeightedGroups,
+  getLetterGrade,
+  resolveAssignmentGrade,
+  buildGradesMapForStudent,
+  EXCUSED_GRADE,
+} = require('../utils/gradeCalculation');
 const { getJson, setJson } = require('../utils/cache');
+const { calculateCourseGradeForStudent } = require('../services/gradeCalculation.service');
 
 // GET /api/grades/student/course/:courseId
 exports.getStudentCourseGrade = async (req, res) => {
   try {
     const courseId = req.params.courseId;
     const studentId = req.user._id;
-    const cacheKey = `grades:student:${studentId}:course:${courseId}`;
+    const cacheKey = `grades:student:v3:${studentId}:course:${courseId}`;
     const cached = await getJson(cacheKey);
     if (cached) {
       return res.json(cached);
@@ -27,7 +34,7 @@ exports.getStudentCourseGrade = async (req, res) => {
     const gradeScale = course.gradeScale || [];
 
     // Fetch all modules for the course
-    const modules = await Module.find({ course: courseId }).select('_id title').lean();
+    const modules = await Module.find({ course: courseId }).select('_id title').sort({ createdAt: 1 }).lean();
     const moduleIds = modules.map(m => m._id);
 
     // Fetch all assignments for these modules
@@ -113,7 +120,7 @@ exports.getStudentCourseGrade = async (req, res) => {
         totalPoints: thread.totalPoints || 0,
         isDiscussion: true,
         published: thread.published !== false,
-        grade: studentGradeObj ? studentGradeObj.grade : null,
+        grade: resolveAssignmentGrade({ discussionGradeRow: studentGradeObj || null }),
         dueDate: thread.dueDate || null,
         hasSubmitted
       };
@@ -131,27 +138,15 @@ exports.getStudentCourseGrade = async (req, res) => {
         assignment: a,
         dueDate: a.dueDate,
         published: a.published,
-        grade: submissionMap[a._id.toString()] && typeof submissionMap[a._id.toString()].grade === 'number'
-          ? submissionMap[a._id.toString()].grade
-          : null
+        grade: resolveAssignmentGrade({ submission: submissionMap[a._id.toString()] || null })
       })),
       ...groupAssignments.map(a => {
         const submission = submissionMap[a._id.toString()];
-        let grade = null;
-        
-        if (submission) {
-          if (submission.useIndividualGrades && submission.memberGrades) {
-            // Find the individual grade for this student
-            const memberGrade = submission.memberGrades.find((mg) => {
-              const memberId = mg.student && (mg.student._id || mg.student);
-              return memberId && memberId.toString() === studentId.toString();
-            });
-            grade = memberGrade ? memberGrade.grade : null;
-          } else {
-            // Use the group grade for all members
-            grade = typeof submission.grade === 'number' ? submission.grade : null;
-          }
-        }
+        const grade = submission
+          ? resolveAssignmentGrade({
+              submission: { ...submission, _memberStudentId: studentId }
+            })
+          : null;
         
         return {
           _id: a._id,
@@ -169,18 +164,17 @@ exports.getStudentCourseGrade = async (req, res) => {
       ...discussionAssignments
     ];
 
-    // Create grades object for the utility function
+    const sid = String(studentId);
     const grades = {};
-    grades[studentId] = {};
-    allAssignments.forEach(assignment => {
-      if (assignment.grade !== null && assignment.grade !== undefined) {
-        grades[studentId][assignment._id.toString()] = assignment.grade;
-      }
-    });
+    buildGradesMapForStudent(grades, sid, allAssignments);
 
-    // Calculate weighted grade using the legacy function to match teacher gradebook
-    const totalPercent = getWeightedGradeForStudent(studentId, course, allAssignments, grades, submissionMap);
-    const letterGrade = getLetterGrade(totalPercent, gradeScale);
+    const { totalPercent, letterGrade } = await calculateCourseGradeForStudent(
+      sid,
+      course,
+      allAssignments,
+      grades,
+      submissionMap
+    );
 
     const payload = { totalPercent, letterGrade };
     await setJson(cacheKey, payload, 60);
@@ -203,7 +197,7 @@ exports.getStudentCourseGradeLegacy = async (req, res) => {
     const gradeScale = course.gradeScale || [];
 
     // Fetch all modules for the course
-    const modules = await Module.find({ course: courseId }).select('_id title');
+    const modules = await Module.find({ course: courseId }).select('_id title').sort({ createdAt: 1 });
     const moduleIds = modules.map(m => m._id);
 
     // Fetch all assignments for these modules
@@ -253,21 +247,32 @@ exports.getStudentCourseGradeLegacy = async (req, res) => {
 
     // Fetch all graded discussions (threads) for the course
     const threads = await Thread.find({ course: courseId, isGraded: true });
+    function hasReplyByUserLegacy(replies, userId) {
+      if (!Array.isArray(replies) || replies.length === 0) return false;
+      for (const r of replies) {
+        const authorId = r.author && typeof r.author === 'object' && r.author._id ? r.author._id.toString() : String(r.author || '');
+        if (authorId === String(userId)) return true;
+        if (Array.isArray(r.replies) && r.replies.length > 0 && hasReplyByUserLegacy(r.replies, userId)) return true;
+      }
+      return false;
+    }
     // For each thread, find the student's grade
     const discussionAssignments = threads.map(thread => {
       const studentGradeObj = thread.studentGrades.find(g => g.student.toString() === studentId.toString());
+      const hasSubmitted = hasReplyByUserLegacy(thread.replies, studentId);
       return {
         _id: thread._id,
         title: thread.title,
         group: thread.group || 'Discussions',
         totalPoints: thread.totalPoints || 0,
         isDiscussion: true,
-        grade: studentGradeObj ? studentGradeObj.grade : null,
-        dueDate: thread.dueDate || null
+        published: thread.published !== false,
+        grade: resolveAssignmentGrade({ discussionGradeRow: studentGradeObj || null }),
+        dueDate: thread.dueDate || null,
+        hasSubmitted
       };
     });
 
-    // Combine assignments and discussionAssignments for grade calculation
     const allAssignments = [
       ...assignments.map(a => ({
         _id: a._id,
@@ -279,26 +284,15 @@ exports.getStudentCourseGradeLegacy = async (req, res) => {
         assignment: a,
         dueDate: a.dueDate,
         published: a.published,
-        grade: submissionMap[a._id.toString()] && typeof submissionMap[a._id.toString()].grade === 'number'
-          ? submissionMap[a._id.toString()].grade
-          : null
+        grade: resolveAssignmentGrade({ submission: submissionMap[a._id.toString()] || null })
       })),
       ...groupAssignments.map(a => {
         const submission = submissionMap[a._id.toString()];
-        let grade = null;
-        
-        if (submission) {
-          if (submission.useIndividualGrades && submission.memberGrades) {
-            // Find the individual grade for this student
-            const memberGrade = submission.memberGrades.find(
-              mg => mg.student && mg.student._id.toString() === studentId.toString()
-            );
-            grade = memberGrade ? memberGrade.grade : null;
-          } else {
-            // Use the group grade for all members
-            grade = typeof submission.grade === 'number' ? submission.grade : null;
-      }
-        }
+        const grade = submission
+          ? resolveAssignmentGrade({
+              submission: { ...submission, _memberStudentId: studentId }
+            })
+          : null;
         
         return {
           _id: a._id,
@@ -316,18 +310,17 @@ exports.getStudentCourseGradeLegacy = async (req, res) => {
       ...discussionAssignments
     ];
 
-    // Create grades object for the utility function
+    const sid = String(studentId);
     const grades = {};
-    grades[studentId] = {};
-    allAssignments.forEach(assignment => {
-      if (assignment.grade !== null && assignment.grade !== undefined) {
-        grades[studentId][assignment._id.toString()] = assignment.grade;
-      }
-    });
+    buildGradesMapForStudent(grades, sid, allAssignments);
 
-    // Calculate weighted grade using the legacy function
-    const totalPercent = getWeightedGradeForStudent(studentId, course, allAssignments, grades, submissionMap);
-    const letterGrade = getLetterGrade(totalPercent, gradeScale);
+    const { totalPercent, letterGrade } = await calculateCourseGradeForStudent(
+      sid,
+      course,
+      allAssignments,
+      grades,
+      submissionMap
+    );
 
     res.json({ totalPercent, letterGrade });
   } catch (error) {
@@ -340,7 +333,7 @@ exports.getCourseClassAverage = async (req, res) => {
   try {
     const courseId = req.params.courseId;
     const userId = req.user._id;
-    const cacheKey = `grades:course-average:${courseId}:${userId}`;
+    const cacheKey = `grades:course-average:v2:${courseId}:${userId}`;
     const cached = await getJson(cacheKey);
     if (cached) {
       return res.json(cached);
@@ -366,7 +359,7 @@ exports.getCourseClassAverage = async (req, res) => {
     const gradeScale = course.gradeScale || [];
 
     // Fetch all modules for the course
-    const modules = await Module.find({ course: courseId }).select('_id title');
+    const modules = await Module.find({ course: courseId }).select('_id title').sort({ createdAt: 1 });
     const moduleIds = modules.map(m => m._id);
 
     // Fetch all assignments for these modules
@@ -415,7 +408,7 @@ exports.getCourseClassAverage = async (req, res) => {
       for (const gradeRow of discussion.studentGrades || []) {
         discussionGradeMap.set(
           `${String(discussion._id)}:${String(gradeRow.student)}`,
-          gradeRow.grade
+          resolveAssignmentGrade({ discussionGradeRow: gradeRow })
         );
       }
     }
@@ -507,24 +500,15 @@ exports.getCourseClassAverage = async (req, res) => {
             assignment: a,
             dueDate: a.dueDate,
             published: a.published,
-            grade: submissionMap[a._id.toString()] && typeof submissionMap[a._id.toString()].grade === 'number'
-              ? submissionMap[a._id.toString()].grade
-              : null
+            grade: resolveAssignmentGrade({ submission: submissionMap[a._id.toString()] || null })
           })),
           ...groupAssignments.map(a => {
             const submission = submissionMap[a._id.toString()];
-            let grade = null;
-            
-            if (submission) {
-              if (submission.useIndividualGrades && submission.memberGrades) {
-                const memberGrade = submission.memberGrades.find(
-                  mg => mg.student && String(mg.student._id || mg.student) === studentId.toString()
-                );
-                grade = memberGrade ? memberGrade.grade : null;
-              } else {
-                grade = typeof submission.grade === 'number' ? submission.grade : null;
-              }
-            }
+            const grade = submission
+              ? resolveAssignmentGrade({
+                  submission: { ...submission, _memberStudentId: studentId }
+                })
+              : null;
             
             return {
               _id: a._id,
@@ -550,24 +534,24 @@ exports.getCourseClassAverage = async (req, res) => {
               totalPoints: discussion.totalPoints || 0,
               isDiscussion: true,
               published: discussion.published,
-              grade: typeof discussionGrade === 'number' ? discussionGrade : null,
-              dueDate: discussion.dueDate
+              grade: discussionGrade ?? null,
+              dueDate: discussion.dueDate,
+              hasSubmitted: hasReplyByUser(discussion.replies || [], studentId)
             };
           })
         ];
 
-        // Create grades object
         const grades = {};
-        grades[studentId.toString()] = {};
-        allAssignments.forEach(assignment => {
-          if (assignment.grade !== null && assignment.grade !== undefined && typeof assignment.grade === 'number') {
-            grades[studentId.toString()][assignment._id.toString()] = assignment.grade;
-          }
-        });
+        buildGradesMapForStudent(grades, studentId.toString(), allAssignments);
 
-        // Calculate weighted grade
-        const totalPercent = getWeightedGradeForStudent(studentId.toString(), course, allAssignments, grades, submissionMap);
-        
+        const { totalPercent } = await calculateCourseGradeForStudent(
+          studentId.toString(),
+          course,
+          allAssignments,
+          grades,
+          submissionMap
+        );
+
         // Only include if grade is valid (not NaN)
         if (!isNaN(totalPercent) && isFinite(totalPercent)) {
           studentGrades.push(totalPercent);
@@ -596,5 +580,118 @@ exports.getCourseClassAverage = async (req, res) => {
   } catch (error) {
     console.error('Error calculating class average:', error);
     res.status(500).json({ message: error.message });
+  }
+};
+
+// GET /api/grades/course/:courseId/gradebook?page&pageSize
+exports.getCourseGradebook = async (req, res) => {
+  try {
+    const courseId = req.params.courseId;
+    const course = await Course.findById(courseId).select('instructor students').lean();
+    if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+
+    const { canViewCourseGrades } = require('../middleware/academicPermissions');
+    if (!canViewCourseGrades(req.user, course)) {
+      const ferpaAudit = require('../services/ferpaAudit.service');
+      await ferpaAudit.recordAccessDenied(req, {
+        reason: 'gradebook_access_denied',
+        entityType: 'course',
+        entityId: courseId,
+      }).catch(() => {});
+      return res.status(403).json({ success: false, message: 'Not authorized' });
+    }
+
+    const { getCourseGradebookPage } = require('../services/gradebookData.service');
+    const data = await getCourseGradebookPage(courseId, {
+      page: req.query.page,
+      pageSize: req.query.pageSize,
+    });
+
+    res.json({ success: true, data });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ success: false, message: error.message });
+  }
+};
+
+// POST /api/grades/course/:courseId/gradebook/export
+exports.enqueueGradebookExport = async (req, res) => {
+  try {
+    const courseId = req.params.courseId;
+    const course = await Course.findById(courseId).select('instructor students').lean();
+    if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+
+    const { canViewCourseGrades } = require('../middleware/academicPermissions');
+    if (!canViewCourseGrades(req.user, course)) {
+      const ferpaAudit = require('../services/ferpaAudit.service');
+      await ferpaAudit.recordAccessDenied(req, {
+        reason: 'gradebook_export_denied',
+        entityType: 'course',
+        entityId: courseId,
+      }).catch(() => {});
+      return res.status(403).json({ success: false, message: 'Not authorized' });
+    }
+
+    const jobQueueService = require('../services/jobQueue.service');
+    const ferpaAudit = require('../services/ferpaAudit.service');
+    const { job, async: isAsync } = await jobQueueService.enqueueJob(
+      'export.gradebook',
+      { courseId: String(courseId) },
+      req.user
+    );
+    await ferpaAudit.recordExportRequest(req, {
+      courseId,
+      jobId: job._id,
+      type: 'export.gradebook',
+    }).catch(() => {});
+
+    const downloadUrl =
+      job.status === 'completed' && job.downloadToken
+        ? `/api/jobs/${job._id}/download?token=${job.downloadToken}`
+        : null;
+
+    res.status(isAsync ? 202 : 200).json({
+      success: true,
+      data: {
+        jobId: job._id,
+        status: job.status,
+        async: isAsync,
+        result: job.result,
+        downloadUrl,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// POST /api/grades/course/:courseId/transcript/regenerate
+exports.regenerateTranscriptSnapshots = async (req, res) => {
+  try {
+    const courseId = req.params.courseId;
+    const course = await Course.findById(courseId).select('instructor').lean();
+    if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+
+    const { canRecomputeGrades } = require('../middleware/academicPermissions');
+    if (!canRecomputeGrades(req.user)) {
+      return res.status(403).json({ success: false, message: 'Not authorized' });
+    }
+
+    const jobQueueService = require('../services/jobQueue.service');
+    const { job, async: isAsync } = await jobQueueService.enqueueJob(
+      'transcript.regenerate',
+      {
+        courseId: String(courseId),
+        term: req.body.term,
+        year: req.body.year,
+      },
+      req.user
+    );
+
+    res.status(isAsync ? 202 : 200).json({
+      success: true,
+      data: { jobId: job._id, status: job.status, async: isAsync, result: job.result },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };

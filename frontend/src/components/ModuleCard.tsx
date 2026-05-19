@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Module, useModule } from '../contexts/ModuleContext';
-import PageViewer from './PageViewer';
 import { useAuth } from '../context/AuthContext';
 import { ChevronDown, ChevronRight, FileText, Plus, ClipboardList, Trash2, Lock, Unlock, Pencil } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -33,7 +32,6 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
   const [searchParams] = useSearchParams();
   const expandModuleId = searchParams.get('expand');
   const [isExpanded, setIsExpanded] = useState(expandModuleId === module._id);
-  const [selectedPage, setSelectedPage] = useState<string | null>(null);
   const [pages, setPages] = useState<any[]>([]);
   const [isLoadingPages, setIsLoadingPages] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -129,7 +127,12 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
 
   const handlePageClick = (e: React.MouseEvent, pageId: string) => {
     e.stopPropagation();
-    navigate(`/pages/${pageId}`);
+    const cid = typeof module.course === 'string' ? module.course : (module.course as any)?._id;
+    if (cid) {
+      navigate(`/courses/${cid}/pages/${pageId}`);
+    } else {
+      navigate(`/pages/${pageId}`);
+    }
   };
 
   const handleAddPageClick = (e: React.MouseEvent) => {
@@ -298,11 +301,9 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
                 >
                   <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
                     <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400 dark:text-gray-500 group-hover:text-blue-500 dark:group-hover:text-blue-400 flex-shrink-0" />
-                    <span className={`text-xs sm:text-sm md:text-base truncate ${
-                      page._id === selectedPage
-                        ? 'text-blue-600 dark:text-blue-400 font-semibold'
-                        : 'text-gray-500 dark:text-gray-300'
-                    }`}>{page.title}</span>
+                    <span className="text-xs sm:text-sm md:text-base truncate text-gray-500 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                      {page.title}
+                    </span>
                   </div>
                   {(user?.role === 'teacher' || user?.role === 'admin') && (
                     <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
@@ -493,12 +494,6 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
                 This module is empty. Add a page, assignment, or discussion to get started.
               </div>
             )}
-        </div>
-      )}
-
-      {selectedPage && (
-        <div className="border-t border-gray-200 dark:border-gray-700">
-          <PageViewer pageId={selectedPage} />
         </div>
       )}
 

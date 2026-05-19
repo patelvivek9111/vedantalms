@@ -4,6 +4,9 @@ const Submission = require('../models/Submission');
 const Assignment = require('../models/Assignment');
 const Thread = require('../models/thread.model');
 const Course = require('../models/course.model');
+const CourseGradeLifecycle = require('../models/courseGradeLifecycle.model');
+const StudentCourseGradeSnapshot = require('../models/studentCourseGradeSnapshot.model');
+const SystemAuditEvent = require('../models/systemAuditEvent.model');
 
 const criticalModels = [
   Message,
@@ -11,7 +14,10 @@ const criticalModels = [
   Submission,
   Assignment,
   Thread,
-  Course
+  Course,
+  CourseGradeLifecycle,
+  StudentCourseGradeSnapshot,
+  SystemAuditEvent,
 ];
 
 const ensureCriticalIndexes = async (logger = console) => {

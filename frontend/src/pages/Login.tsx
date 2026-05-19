@@ -97,8 +97,17 @@ export function Login() {
     try {
       await login(email, password);
       navigate('/dashboard', { replace: true });
-    } catch (err) {
-      setError('Failed to login. Please check your credentials.');
+    } catch (err: unknown) {
+      const axiosMsg =
+        err &&
+        typeof err === 'object' &&
+        'response' in err &&
+        (err as { response?: { data?: { message?: string } } }).response?.data?.message;
+      setError(
+        typeof axiosMsg === 'string' && axiosMsg.trim()
+          ? axiosMsg
+          : 'Failed to login. Please check your credentials.'
+      );
       setIsLoading(false);
     }
   };

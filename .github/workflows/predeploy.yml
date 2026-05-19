@@ -29,6 +29,19 @@ jobs:
       - name: Build frontend bundle
         run: npm run build
 
+      - name: Verify shared grading modules
+        run: npm run verify:grading
+
+      - name: Institution migration tests
+        run: npm run test:migration
+
+      - name: Grading policy tests (backend)
+        run: npm run test:grading
+
+      - name: Grading policy tests (frontend)
+        run: npm run test:grading
+        working-directory: frontend
+
       - name: Run smoke check (when secrets are present)
         if: ${{ secrets.MONGODB_URI != '' }}
         env:

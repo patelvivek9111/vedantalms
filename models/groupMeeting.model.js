@@ -76,4 +76,7 @@ const groupMeetingSchema = new mongoose.Schema(
 groupMeetingSchema.index({ group: 1, startTime: 1 });
 groupMeetingSchema.index({ course: 1, startTime: 1 });
 
+const { portabilityMetadataPlugin } = require('./plugins/portabilityMetadata.plugin');
+groupMeetingSchema.plugin(portabilityMetadataPlugin);
+
 module.exports = mongoose.model('GroupMeeting', groupMeetingSchema);

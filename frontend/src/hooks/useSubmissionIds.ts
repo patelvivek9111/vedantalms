@@ -19,6 +19,8 @@ interface UseSubmissionIdsProps {
     assignments: any[];
     grades: { [studentId: string]: { [assignmentId: string]: number | string } };
   }>>;
+  /** When set, all fetched assignment submissions are merged here (for gradebook / CSV late detection). */
+  setStudentSubmissions?: React.Dispatch<React.SetStateAction<any[]>>;
 }
 
 export const useSubmissionIds = ({
@@ -30,6 +32,7 @@ export const useSubmissionIds = ({
   studentDiscussions,
   setSubmissionMap,
   setGradebookData,
+  setStudentSubmissions,
 }: UseSubmissionIdsProps) => {
   useEffect(() => {
     const fetchSubmissionIds = async () => {
@@ -39,7 +42,8 @@ export const useSubmissionIds = ({
       const newSubmissionMap: { [key: string]: string } = {};
       const newGrades: { [studentId: string]: { [assignmentId: string]: number | string } } = { [String(user._id)]: {} };
       const token = localStorage.getItem('token');
-      
+      const submissionRecords: any[] = [];
+
       try {
         // For each assignment, fetch submissions
         for (const assignment of gradebookData.assignments) {
@@ -69,11 +73,12 @@ export const useSubmissionIds = ({
               ? res.data.data
               : Array.isArray(res.data) ? res.data : [];
             submissionsData.forEach((submission: any) => {
+              if (submission?._id) submissionRecords.push(submission);
               if (assignment.isGroupAssignment && submission.group && submission.group.members) {
                 // For group assignments, create entries for all group members
                 submission.group.members.forEach((member: any) => {
                   const memberId = member._id || member;
-                  const key = `${String(user._id)}_${String(assignment._id)}`;
+                  const key = `${String(memberId)}_${String(assignment._id)}`;
                   newSubmissionMap[key] = submission._id;
                   
                   // Check for individual member grades first
@@ -131,7 +136,15 @@ export const useSubmissionIds = ({
           }
         }
         setSubmissionMap(newSubmissionMap);
-        
+
+        if (setStudentSubmissions) {
+          const byId = new Map<string, any>();
+          submissionRecords.forEach((s) => {
+            if (s?._id) byId.set(String(s._id), s);
+          });
+          setStudentSubmissions(Array.from(byId.values()));
+        }
+
         // Merge all grades (both regular assignments and discussions)
         const allGrades = { ...newGrades };
         for (const discussion of studentDiscussions) {
@@ -150,7 +163,7 @@ export const useSubmissionIds = ({
     };
     
     fetchSubmissionIds();
-  }, [gradebookData.assignments, gradebookData.students, isInstructor, isAdmin, course?._id, user._id, studentDiscussions, setSubmissionMap, setGradebookData]);
+  }, [gradebookData.assignments, gradebookData.students, isInstructor, isAdmin, course?._id, user._id, studentDiscussions, setSubmissionMap, setGradebookData, setStudentSubmissions]);
 };
 
 

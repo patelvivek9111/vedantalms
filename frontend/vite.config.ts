@@ -1,10 +1,14 @@
-import { defineConfig } from 'vite'
+import path from 'path'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
   resolve: {
+    alias: {
+      '@lms-shared/grading': path.resolve(__dirname, '../shared/grading/index.browser.mjs'),
+    },
     // Prefer TypeScript source files when both TSX/JSX exist.
     extensions: ['.mjs', '.js', '.mts', '.ts', '.tsx', '.jsx', '.json'],
   },
@@ -49,13 +53,9 @@ export default defineConfig({
     testTimeout: 30000, // 30 seconds per test
     hookTimeout: 30000, // 30 seconds for hooks
     teardownTimeout: 10000, // 10 seconds for teardown
-    pool: 'forks', // Use forks instead of threads for better isolation
-    forks: {
-      singleFork: false,
-      isolate: true,
-    },
-    maxWorkers: 2, // Limit workers to prevent resource exhaustion
-    minWorkers: 1,
+    pool: 'forks',
+    isolate: true,
+    maxWorkers: 2,
     sequence: {
       shuffle: false, // Don't shuffle to make debugging easier
     },

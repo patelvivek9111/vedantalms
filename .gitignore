@@ -111,9 +111,12 @@ Thumbs.db
 uploads/
 !uploads/.gitkeep
 
-# Test files
-test-*.js
-*test*.js
-check-*.js
-create-*.js
-recreate-*.js
+# Vite / Vitest caches
+frontend/node_modules/.vite/
+**/.vitest/
+
+# Ad-hoc scratch scripts at repo root only (not tests/ or scripts/)
+/test-*.js
+/check-*.js
+/create-*.js
+/recreate-*.js

@@ -1,6 +1,12 @@
 import { useEffect } from 'react';
 import axios from 'axios';
 import { API_URL } from '../config';
+import { fetchGradebookColumnItems } from '../utils/fetchGradebookColumnItems';
+import {
+  assignGradebookCell,
+  discussionGradeToGradebookValue,
+  submissionToGradebookValue,
+} from '../utils/instructorGradebookGrades';
 
 interface UseInstructorGradebookDataProps {
   activeSection: string;
@@ -14,6 +20,8 @@ interface UseInstructorGradebookDataProps {
     assignments: any[];
     grades: { [studentId: string]: { [assignmentId: string]: number | string } };
   }>>;
+  /** When set, called so the UI can avoid showing stale counts while a fetch is in flight or cancelled. */
+  setGradebookLoading?: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export const useInstructorGradebookData = ({
@@ -24,59 +32,58 @@ export const useInstructorGradebookData = ({
   modules,
   gradebookRefresh,
   setGradebookData,
+  setGradebookLoading,
 }: UseInstructorGradebookDataProps) => {
   useEffect(() => {
+    let cancelled = false;
+
     const fetchInstructorGradebookData = async () => {
-      if (activeSection !== 'gradebook' || (!isInstructor && !isAdmin)) return;
+      if (activeSection !== 'gradebook' || (!isInstructor && !isAdmin)) {
+        setGradebookLoading?.(false);
+        return;
+      }
       try {
         const token = localStorage.getItem('token');
-        // 1. Get all students
         const students = course?.students || [];
-        
-        // 2. Get all assignments (across all modules)
-        const allAssignments = modules.flatMap((module: any) =>
-          (module.assignments || []).map((assignment: any) => ({
-            ...assignment,
-            moduleTitle: module.title
-          }))
-        );
+        if (!token || !course?._id) {
+          if (!cancelled) {
+            setGradebookData({ students, assignments: [], grades: {} });
+            setGradebookLoading?.(false);
+          }
+          return;
+        }
 
-        // 3. Get all group assignments for the course
-        const groupAssignmentsResponse = await axios.get(`${API_URL}/api/assignments/course/${course?._id}/group-assignments`, {
-          headers: { Authorization: `Bearer ${token}` }
+        if (!cancelled) {
+          setGradebookLoading?.(true);
+          // Drop stale columns/counts while this run loads (avoids e.g. 14 → 39 flicker when modules or deps change mid-flight)
+          setGradebookData({
+            students,
+            assignments: [],
+            grades: {},
+          });
+        }
+
+        const uniqueInstructor = await fetchGradebookColumnItems(course._id, modules, token);
+        if (cancelled) return;
+
+        uniqueInstructor.sort((a: any, b: any) => {
+          const getDate = (item: any) => {
+            if (item.createdAt) return new Date(item.createdAt).getTime();
+            if (item.dueDate) return new Date(item.dueDate).getTime();
+            return 0;
+          };
+          const dateA = getDate(a);
+          const dateB = getDate(b);
+          if (dateA > 0 && dateB > 0) return dateA - dateB;
+          if (dateA > 0 && dateB === 0) return -1;
+          if (dateA === 0 && dateB > 0) return 1;
+          return 0;
         });
-        const groupAssignments = Array.isArray(groupAssignmentsResponse.data) 
-          ? groupAssignmentsResponse.data.map((assignment: any) => ({
-              ...assignment,
-              moduleTitle: 'Group Assignments'
-            }))
-          : [];
 
-        // 4. Get all graded discussions
-        const threadsResponse = await axios.get(`${API_URL}/api/threads/course/${course?._id}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const threadsData = threadsResponse.data?.data || threadsResponse.data || [];
-        const gradedDiscussions = Array.isArray(threadsData)
-          ? threadsData
-              .filter((thread: any) => thread.isGraded)
-              .map((thread: any) => ({
-                _id: thread._id,
-                title: thread.title,
-                totalPoints: thread.totalPoints,
-                group: thread.group,
-                moduleTitle: 'Discussions',
-                isDiscussion: true,
-                studentGrades: thread.studentGrades || [],
-                dueDate: thread.dueDate,
-                replies: thread.replies || []
-              }))
-          : [];
-
-        // 5. Get all submissions for assignments (both regular and group assignments)
         let grades: { [studentId: string]: { [assignmentId: string]: number | string } } = {};
-        const allAssignmentsWithGroups = [...allAssignments, ...groupAssignments];
-        for (const assignment of allAssignmentsWithGroups) {
+        for (const assignment of uniqueInstructor) {
+          if (cancelled) return;
+          if (assignment.isDiscussion) continue;
           const res = await axios.get(`${API_URL}/api/submissions/assignment/${assignment._id}`, {
             headers: { Authorization: `Bearer ${token}` }
           });
@@ -86,97 +93,55 @@ export const useInstructorGradebookData = ({
             : Array.isArray(res.data) ? res.data : [];
           for (const submission of submissions) {
             if (assignment.isGroupAssignment && submission.group && submission.group.members) {
-              // For group assignments, create grades for all group members
               submission.group.members.forEach((member: any) => {
                 const memberId = member._id || member;
-                if (!grades[String(memberId)]) grades[String(memberId)] = {};
-                
-                // Check for individual member grades first
-                if (submission.useIndividualGrades && submission.memberGrades) {
-                  const memberGrade = submission.memberGrades.find(
-                    (mg: any) => mg.student && (mg.student.toString() === String(memberId) || mg.student._id?.toString() === String(memberId))
-                  );
-                  if (memberGrade && typeof memberGrade.grade === 'number') {
-                    grades[String(memberId)][String(assignment._id)] = memberGrade.grade;
-                  } else if (typeof submission.grade === 'number') {
-                    grades[String(memberId)][String(assignment._id)] = submission.grade;
-                  } else {
-                    grades[String(memberId)][String(assignment._id)] = '-';
-                  }
-                } else if (typeof submission.grade === 'number') {
-                  // Use group grade for all members
-                  grades[String(memberId)][String(assignment._id)] = submission.grade;
-                } else {
-                  grades[String(memberId)][String(assignment._id)] = '-';
-                }
+                const value = submissionToGradebookValue(submission, String(memberId));
+                assignGradebookCell(grades, String(memberId), assignment._id, value);
               });
             } else if (submission.student) {
-              // For regular assignments
               const studentId = submission.student._id || submission.student;
-              if (!grades[String(studentId)]) grades[String(studentId)] = {};
-              grades[String(studentId)][String(assignment._id)] = submission.grade ?? '-';
+              const value = submissionToGradebookValue(submission);
+              assignGradebookCell(grades, String(studentId), assignment._id, value);
             }
           }
         }
 
-        // 6. Add discussion grades
-        for (const discussion of gradedDiscussions) {
+        for (const discussion of uniqueInstructor.filter((a: any) => a.isDiscussion)) {
+          if (cancelled) return;
           for (const student of students) {
             if (!grades[String(student._id)]) grades[String(student._id)] = {};
             const studentGradeObj = discussion.studentGrades.find(
               (g: any) => g.student && (g.student._id === student._id || g.student === student._id)
             );
-            grades[String(student._id)][String(discussion._id)] =
-              typeof studentGradeObj?.grade === 'number' ? studentGradeObj.grade : '-';
+            assignGradebookCell(
+              grades,
+              student._id,
+              discussion._id,
+              discussionGradeToGradebookValue(studentGradeObj)
+            );
           }
         }
 
-        // Deduplicate for instructor view as well
-        const combined = [...allAssignments, ...groupAssignments, ...gradedDiscussions];
-        const byIdInstructor = combined.filter((a, i, arr) => i === arr.findIndex(b => b._id === a._id));
-        const seenInstructor = new Set<string>();
-        const uniqueInstructor = byIdInstructor.filter(a => {
-          const type = a.isDiscussion ? 'discussion' : 'assignment';
-          const key = `${String(a.title || '').trim().toLowerCase()}|${type}`;
-          if (seenInstructor.has(key)) return false;
-          seenInstructor.add(key);
-          return true;
-        });
-
-        // Sort assignments by creation date (oldest first, newest last)
-        // Use createdAt if available, otherwise use dueDate, otherwise use current date as fallback
-        uniqueInstructor.sort((a: any, b: any) => {
-          const getDate = (item: any) => {
-            if (item.createdAt) return new Date(item.createdAt).getTime();
-            if (item.dueDate) return new Date(item.dueDate).getTime();
-            return 0; // Put items without dates at the end
-          };
-          
-          const dateA = getDate(a);
-          const dateB = getDate(b);
-          
-          // If both have dates, sort oldest first
-          if (dateA > 0 && dateB > 0) {
-            return dateA - dateB;
-          }
-          // If only one has a date, prioritize it
-          if (dateA > 0 && dateB === 0) return -1;
-          if (dateA === 0 && dateB > 0) return 1;
-          // If neither has a date, maintain original order
-          return 0;
-        });
-
-        setGradebookData({ 
-          students, 
-          assignments: uniqueInstructor, 
-          grades 
-        });
+        if (!cancelled) {
+          setGradebookData({ 
+            students, 
+            assignments: uniqueInstructor, 
+            grades 
+          });
+        }
       } catch (err) {
-        setGradebookData({ students: [], assignments: [], grades: {} });
+        if (!cancelled) {
+          setGradebookData({ students: [], assignments: [], grades: {} });
+        }
+      } finally {
+        if (!cancelled) setGradebookLoading?.(false);
       }
     };
-    fetchInstructorGradebookData();
-  }, [activeSection, isInstructor, isAdmin, course, modules, gradebookRefresh, setGradebookData]);
+    void fetchInstructorGradebookData();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSection, isInstructor, isAdmin, course, modules, gradebookRefresh, setGradebookData, setGradebookLoading]);
 };
 
 

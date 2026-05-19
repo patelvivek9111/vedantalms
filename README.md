@@ -9,7 +9,7 @@ Vedanta LMS is a full-featured learning management platform that enables educato
 **Live URL**: [vedantaed.com](https://vedantaed.com)
 
 **Current product accents (beyond the checklist below)**  
-The codebase now emphasizes a mobile-friendly shell (customizable bottom navigation, pull-to-refresh, swipe gestures, haptics), a full notification center backed by REST APIs, granular inbox UX (folders, filters, unread tracking), QuizWave synchronous sessions powered by Socket.IO (with Redis adapter support in production), optional Zoho Meeting hooks for course/group meetings, shared UI primitives (`components/common` such as breadcrumbs, tables, skeletons), and offline-oriented helpers (`offlineStorage`, offline sync hooks). The frontend bundles `react-i18next` / `i18next` for eventual multi-language rollout. Backend exposure includes Prometheus-friendly `/metrics` when operating with the optional observability stack under `monitoring/`.
+The codebase emphasizes **institutional grading** (policy resolution, grade lifecycle post/finalize/amend, frozen snapshots, transcript recompute, FERPA-aware permissions, registrar tooling), a **shared canonical grading engine** (`shared/grading`) with backend/frontend parity tests, **data portability** (institution export/restore bundles, integrity verification, backup manifests), and **production operations** (async jobs via BullMQ, ops dashboard, extended health probes, provider adapters for storage/cache/queue). Existing strengths remain: mobile-friendly shell (bottom nav, pull-to-refresh, swipe, haptics), notification center + inbox, QuizWave over Socket.IO (Redis adapter in production), Zoho Meeting hooks, shared UI primitives (`components/common`, `design-system/`), and offline-minded helpers. The frontend bundles `react-i18next` for eventual multi-language rollout. Backend exposes Prometheus-friendly `/metrics` and deeper readiness via `/health/ready` when using the optional stack under `monitoring/`.
 
 ---
 
@@ -56,22 +56,48 @@ The codebase now emphasizes a mobile-friendly shell (customizable bottom navigat
 
 ### 📊 Grading & Assessment
 - **Flexible Grading System**
-  - Multiple grading schemes (points, percentages, letter grades)
-  - Weighted grade calculations
-  - Category-based grading (assignments, quizzes, discussions, etc.)
-  - Custom grade scales
+  - Institution-wide and per-course grading policies (letter scales, weights, drop-lowest, late penalties)
+  - Effective policy resolution with preview and diff against prior versions
+  - Category-based grading (assignment groups) with shared calculation engine
+  - Policy audit history and provenance panels in the UI
 
 - **Gradebook**
-  - Comprehensive gradebook view
-  - Student grade overview
-  - What-if score calculator
-  - Grade export functionality
+  - Instructor gradebook with filters (all / needs grading / below threshold), debounced search, virtualized rows
+  - Keyboard navigation between cells; async server-side Excel export with client fallback
+  - Student grade overview and what-if score calculator (policy-aware)
+  - Grade export tied to grading engine version and resolved policy snapshots
+
+- **Grade lifecycle & academic records**
+  - Course workflow: **post → finalize → amend** with confirmation dialogs and amendment timeline
+  - Frozen `studentCourseGradeSnapshot` rows and transcript issuance logs
+  - Course audit timeline, grade provenance, and academic audit events
+  - Capability-based access (`VIEW_LIFECYCLE`, `POST_GRADES`, `FINALIZE_GRADES`, `AMEND_GRADES`, `RECOMPUTE_GRADES`)
 
 - **Transcript System**
-  - Student academic transcript
-  - Semester-wise grade tracking
-  - GPA calculation
-  - Credit hours tracking
+  - Student academic transcript with semester-wise grades
+  - GPA calculation via shared `shared/grading` (parity-tested with backend)
+  - Transcript regenerate and institution-wide recompute endpoints
+
+### 🏛️ Institutional Operations & Data Portability
+- **Admin / registrar tooling**
+  - Institution grading policy tab in system settings
+  - Operations dashboard (`GET /api/ops/dashboard`) for queue, storage, and health signals
+  - Registrar report routes under `/api/registrar/reports`
+
+- **Export, backup & restore**
+  - Institution bundle export (`npm run export:institution`) with manifest v2, checksums, resumable checkpoints
+  - Restore/dry-run/merge flows (`npm run restore:institution`) with ID remapping guards
+  - Backup manifest model, compatibility verification, and data-integrity scripts
+
+- **Provider abstraction (Phase P)**
+  - Pluggable storage (`local` / Cloudinary), cache (`memory` / Redis), and job queue (`inline` / BullMQ)
+  - Configuration via `config/providers.js` and `STORAGE_PROVIDER`, `CACHE_PROVIDER`, `QUEUE_PROVIDER`
+
+- **Documentation & runbooks**
+  - Production guides: `docs/production/` (deployment, scaling, disaster recovery, grading audit model)
+  - Operations runbooks: `docs/operations/` (backup, restore, migration cutover, incident response)
+  - Architecture notes: `docs/architecture/` (export, backup, portability, migration readiness)
+  - FERPA controls: `docs/security/ferpa-access-controls.md`
 
 ### 👥 Student Management
 - **Enrollment System**
@@ -186,7 +212,7 @@ The codebase now emphasizes a mobile-friendly shell (customizable bottom navigat
 
 - **User Management**
   - Create and manage user accounts
-  - Role assignment (Admin, Teacher, Student)
+  - Role assignment (Admin, Registrar, Teacher, Student, and related academic roles)
   - User search and filtering
   - Bulk user operations
   - Login activity tracking
@@ -203,6 +229,7 @@ The codebase now emphasizes a mobile-friendly shell (customizable bottom navigat
   - Email configuration
   - Storage settings
   - Maintenance mode
+  - Institution grading policy and operations dashboard tab
 
 - **Reports & Analytics**
   - Student performance reports
@@ -239,7 +266,8 @@ The codebase now emphasizes a mobile-friendly shell (customizable bottom navigat
 - **react-markdown** + **dompurify** - Safer rich text rendering paths
 - **lottie-react** - Lightweight motion assets
 - **react-split** - Resizable panes (gradebook / complex layouts)
-- **Vitest** + **jsdom** - Frontend unit/integration tests (configured inside `vite.config.ts`, setup in `src/test/setup.ts`)
+- **ExcelJS** - Gradebook Excel export (client fallback + server async exports)
+- **Vitest** + **jsdom** - Frontend unit/integration tests (`vite.config.ts`, `src/test/setup.ts`; policy parity + FUX workflow suites)
 
 ### Backend
 - **Node.js** - Runtime environment
@@ -256,374 +284,201 @@ The codebase now emphasizes a mobile-friendly shell (customizable bottom navigat
 - **Helmet** - Security headers
 - **express-rate-limit** - HTTP rate limiting
 - **pino** + **pino-http** - Structured logging
-- **Supertest** + **Jest** - API and controller tests (`tests/*.test.js`, `tests/setup.js`)
+- **Supertest** + **Jest** - API tests (`tests/`, `tests/grading/`, `tests/portability/`, `tests/migration/`)
+- **BullMQ** - Async grading jobs (exports, recompute) when `REDIS_URL` is set
+- **shared/grading** + **shared/portability** - Canonical grading math and export manifest utilities (CJS/MJS/browser builds)
 
 ### Infrastructure
 - **MongoDB Atlas** - Cloud database
 - **Railway/Render** - Hosting (backend)
 - **Vercel** - Hosting (frontend)
 - **Cloudinary** - File storage (optional)
-- **Redis** - Optional dependency when `REDIS_URL` is provided (Socket.IO adapter + session helpers)
+- **Redis** - Optional: Socket.IO adapter, BullMQ job queue, distributed policy cache, session helpers
 - **Prometheus / Grafana / Alertmanager** - Local observability recipe via `monitoring/docker-compose.observability.yml`
+- **Docker** - `Dockerfile`, `docker-compose.prod.yml` for containerized production layouts
+- **GitHub Actions** - `predeploy.yml`, `grading-production.yml`, `hardening-production.yml`
 
 ---
 
 ## 📁 Project Structure
 
-_This tree keeps the earlier file-level map and is extended (not replaced) with folders that landed in recent iterations—shared UI primitives, Vitest harness files, quizwave worker, fuller hook/util lists, and backend test harness files._
+_High-level map of the repository. Build artifacts (`frontend/dist/`, `coverage/`, Vite cache) are gitignored and not listed. See `docs/production/README.md` for the operational doc index._
 
 ```
 lms/
-├── frontend/                           # React frontend application
+├── .github/workflows/                  # CI/CD
+│   ├── predeploy.yml                   # Pre-release smoke + grading checks
+│   ├── grading-production.yml          # Grading policy / lifecycle gates
+│   └── hardening-production.yml        # Production hardening workflow
+│
+├── frontend/                           # React + TypeScript (Vite)
 │   ├── src/
-│   │   ├── components/                 # Reusable React components
-│   │   │   ├── announcements/          # Announcement-related components
-│   │   │   │   ├── AnnouncementForm.tsx
-│   │   │   │   └── AnnouncementList.tsx
-│   │   │   ├── assignments/            # Assignment-related components
-│   │   │   │   ├── AssignmentCard.tsx
-│   │   │   │   ├── AssignmentDetails.jsx
-│   │   │   │   ├── AssignmentDetailsWrapper.tsx
-│   │   │   │   ├── AssignmentGrading.jsx
-│   │   │   │   ├── AssignmentGradingWrapper.tsx
-│   │   │   │   ├── AssignmentList.tsx
-│   │   │   │   ├── AssignmentViewWrapper.tsx
-│   │   │   │   ├── AssignmentFileUploadSection.tsx
-│   │   │   │   ├── CreateAssignmentForm.tsx
-│   │   │   │   ├── CreateAssignmentWrapper.tsx
-│   │   │   │   ├── FilePreview.tsx
-│   │   │   │   ├── GradeSubmissions.jsx
-│   │   │   │   └── ScrollableQuizSidebar.tsx
-│   │   │   ├── course/                 # Course-related components
-│   │   │   │   ├── AssignmentsSection.tsx
-│   │   │   │   ├── CourseAssignments.tsx
-│   │   │   │   ├── CourseMeetingsSection.tsx
-│   │   │   │   ├── CourseOverview.tsx
-│   │   │   │   ├── CourseQuizzes.tsx
-│   │   │   │   ├── CourseSidebar.tsx
-│   │   │   │   ├── MobileNavigation.tsx
-│   │   │   │   ├── ModulesSection.tsx
-│   │   │   │   ├── OverviewSection.tsx
-│   │   │   │   ├── PollsSection.tsx
-│   │   │   │   ├── QuizzesSection.tsx
-│   │   │   │   └── SyllabusSection.tsx
-│   │   │   ├── common/                  # Shared UI primitives (breadcrumb, tables, modals, a11y)
-│   │   │   │   ├── BackButton.tsx
-│   │   │   │   ├── BaseModal.tsx
-│   │   │   │   ├── Breadcrumb.tsx
-│   │   │   │   ├── ConfirmationModal.tsx
-│   │   │   │   ├── DataTable.tsx
-│   │   │   │   ├── DatePicker.tsx
-│   │   │   │   ├── FloatingActionButton.tsx
-│   │   │   │   ├── FloatingLabelInput.tsx
-│   │   │   │   ├── FloatingLabelPasswordInput.tsx
-│   │   │   │   ├── FloatingLabelSelect.tsx
-│   │   │   │   ├── FloatingLabelTextarea.tsx
-│   │   │   │   ├── FormFieldGroup.tsx
-│   │   │   │   ├── MobileTopNav.tsx
-│   │   │   │   ├── PullToRefresh.tsx
-│   │   │   │   ├── ScreenReaderAnnouncement.tsx
-│   │   │   │   ├── SkeletonLoader.tsx
-│   │   │   │   ├── SwipeableContainer.tsx
-│   │   │   │   ├── SwipeableListItem.tsx
-│   │   │   │   └── SyncIndicator.tsx
-│   │   │   ├── enrollment/             # Enrollment-related components
-│   │   │   │   └── EnrollmentRequestsHandler.tsx
-│   │   │   ├── grades/                 # Grade-related components
-│   │   │   │   ├── AssignmentGroupsModal.tsx
-│   │   │   │   ├── GradebookView.tsx
-│   │   │   │   ├── GradeScaleModal.tsx
-│   │   │   │   └── StudentGradesView.tsx
-│   │   │   ├── groups/                 # Group-related components
-│   │   │   │   ├── GroupAnnouncements.tsx
-│   │   │   │   ├── GroupDashboard.tsx
-│   │   │   │   ├── GroupDiscussion.tsx
-│   │   │   │   ├── GroupHome.tsx
-│   │   │   │   ├── GroupManagement.tsx
-│   │   │   │   ├── GroupMeetings.tsx
-│   │   │   │   ├── GroupPages.tsx
-│   │   │   │   ├── GroupPageView.tsx
-│   │   │   │   ├── GroupPeople.tsx
-│   │   │   │   ├── GroupPeopleWrapper.tsx
-│   │   │   │   ├── GroupSetView.tsx
-│   │   │   │   └── StudentGroupView.tsx
-│   │   │   ├── polls/                  # Poll-related components
-│   │   │   │   ├── PollForm.tsx
-│   │   │   │   ├── PollList.tsx
-│   │   │   │   └── PollVote.tsx
-│   │   │   ├── quizwave/               # QuizWave interactive quiz components
-│   │   │   │   ├── QuizBuilder.tsx
-│   │   │   │   ├── QuizSessionControl.tsx
-│   │   │   │   ├── QuizWaveDashboard.tsx
-│   │   │   │   ├── StudentGameScreen.tsx
-│   │   │   │   ├── StudentJoinScreen.tsx
-│   │   │   │   └── StudentQuizWaveView.tsx
-│   │   │   ├── students/               # Student-related components
-│   │   │   │   ├── StudentCard.tsx
-│   │   │   │   └── StudentsManagement.tsx
-│   │   │   ├── AnnouncementDetailModal.tsx
-│   │   │   ├── Attendance.tsx
-│   │   │   ├── BottomNav.tsx
-│   │   │   ├── BurgerMenu.tsx
-│   │   │   ├── Calendar.tsx
-│   │   │   ├── ChangeUserModal.tsx
-│   │   │   ├── CourseDetail.tsx
-│   │   │   ├── CourseDiscussions.tsx
-│   │   │   ├── CourseForm.tsx
-│   │   │   ├── CourseList.tsx
-│   │   │   ├── CoursePages.tsx
-│   │   │   ├── CreateModuleForm.tsx
-│   │   │   ├── CreatePageForm.tsx
-│   │   │   ├── CreateThreadModal.tsx
-│   │   │   ├── ErrorBoundary.tsx
-│   │   │   ├── GlobalSidebar.tsx
-│   │   │   ├── InteractiveEyes.tsx
-│   │   │   ├── LatestAnnouncements.tsx
-│   │   │   ├── LoadingSpinner.tsx
-│   │   │   ├── ModuleCard.tsx
-│   │   │   ├── ModuleList.tsx
-│   │   │   ├── NavCustomizationModal.tsx
-│   │   │   ├── Navigation.tsx
-│   │   │   ├── NotificationCenter.tsx
-│   │   │   ├── OverviewConfigModal.tsx
-│   │   │   ├── PageView.tsx
-│   │   │   ├── PageViewer.tsx
-│   │   │   ├── PageViewWrapper.tsx
-│   │   │   ├── PrivateRoute.tsx
-│   │   │   ├── ProfileImage.tsx
-│   │   │   ├── RichTextEditor.tsx
-│   │   │   ├── SidebarConfigModal.tsx
-│   │   │   ├── StudentGradeSidebar.tsx
-│   │   │   ├── ThreadView.tsx
-│   │   │   ├── ThreadViewWrapper.tsx
-│   │   │   ├── ToDoPanel.tsx
+│   │   ├── components/
+│   │   │   ├── admin/                  # InstitutionGradingPolicyTab, OpsDashboardPanel
+│   │   │   ├── announcements/          # AnnouncementForm, AnnouncementList
+│   │   │   ├── assignments/            # Assignment CRUD, grading, file upload
+│   │   │   ├── common/                 # BaseModal, DataTable, PullToRefresh, AsyncJobBanner, …
+│   │   │   ├── course/                 # Course shell sections (modules, quizzes, meetings, …)
+│   │   │   ├── enrollment/             # EnrollmentRequestsHandler
+│   │   │   ├── grades/                 # Gradebook, lifecycle, policy modals, audit UI
+│   │   │   │   ├── GradebookView.tsx / StudentGradesView.tsx
+│   │   │   │   ├── GradingPolicyModal.tsx / PolicyAuditHistory.tsx / PolicyDiffViewer.tsx
+│   │   │   │   ├── EffectivePolicyPreview.tsx / PolicyProvenancePanel.tsx
+│   │   │   │   ├── CourseGradeLifecyclePanel.tsx / AmendmentTimeline.tsx
+│   │   │   │   └── AssignmentGroupsModal.tsx / GradeScaleModal.tsx
+│   │   │   ├── groups/                 # Group sets, meetings, discussions
+│   │   │   ├── polls/                  # PollForm, PollList, PollVote
+│   │   │   ├── quizwave/               # Live quiz builder + student join/game screens
+│   │   │   ├── students/               # StudentsManagement, StudentCard
+│   │   │   ├── CourseDetail.tsx        # Course hub (gradebook, lifecycle, exports)
 │   │   │   ├── WhatIfScores.tsx
-│   │   │   └── __tests__/              # Vitest specs (mirrors routes, hooks, utils)
-│   │   ├── pages/                      # Page-level components (routes)
-│   │   │   ├── AccountPage.tsx
-│   │   │   ├── AdminAnalytics.tsx
-│   │   │   ├── AdminCourseOversight.tsx
-│   │   │   ├── AdminDashboard.tsx
-│   │   │   ├── AdminSecurity.tsx
-│   │   │   ├── AdminSystemSettings.tsx
-│   │   │   ├── AdminUserManagement.tsx
-│   │   │   ├── Announcements.tsx
-│   │   │   ├── AssignmentEditPage.tsx
-│   │   │   ├── Catalog.tsx
-│   │   │   ├── CourseDetail.tsx
-│   │   │   ├── CoursePeople.tsx
-│   │   │   ├── Dashboard.tsx
-│   │   │   ├── Groups.tsx
-│   │   │   ├── Inbox.tsx
-│   │   │   ├── LandingPage.tsx
-│   │   │   ├── Login.tsx
-│   │   │   ├── ModuleEditPage.tsx
-│   │   │   ├── PageEditPage.tsx
-│   │   │   ├── Signup.tsx
-│   │   │   ├── TeacherCourseOversight.tsx
-│   │   │   ├── ToDoPage.tsx
-│   │   │   └── Transcript.tsx
-│   │   ├── services/                   # API service layer
-│   │   │   ├── announcementService.ts
-│   │   │   ├── api.ts
-│   │   │   ├── inboxService.ts
-│   │   │   └── quizwaveService.ts
-│   │   ├── hooks/                      # Custom React hooks
-│   │   │   ├── useAssignmentGroupsManagement.ts
-│   │   │   ├── useBottomNavSwipe.ts
-│   │   │   ├── useCourseSectionSwipe.ts
-│   │   │   ├── useDiscussions.ts
-│   │   │   ├── useDraftManager.ts
-│   │   │   ├── useGradebookData.ts
-│   │   │   ├── useGradeManagement.ts
-│   │   │   ├── useGradeScaleManagement.ts
-│   │   │   ├── useInstructorGradebookData.ts
-│   │   │   ├── useMobileDevice.ts
-│   │   │   ├── useNavigationHistory.ts
-│   │   │   ├── useOfflineSync.ts
-│   │   │   ├── useOnlineStatus.ts
-│   │   │   ├── useSidebarConfig.ts
-│   │   │   ├── useStudentGradeData.ts
-│   │   │   ├── useStudentSubmissions.ts
-│   │   │   ├── useSubmissionIds.ts
-│   │   │   ├── useSwipeGesture.ts
-│   │   │   ├── useSyllabusManagement.ts
-│   │   │   └── useUnreadMessages.ts
-│   │   ├── utils/                      # Utility functions
-│   │   │   ├── dateUtils.ts
-│   │   │   ├── gradebookExport.ts
-│   │   │   ├── gradeUtils.ts
-│   │   │   ├── hapticFeedback.ts
-│   │   │   ├── inboxFilters.ts
-│   │   │   ├── logger.ts
-│   │   │   ├── offlineStorage.ts
-│   │   │   ├── pushNotifications.ts
-│   │   │   └── quizwaveSocket.ts
-│   │   ├── context/                    # React context providers
-│   │   │   ├── AuthContext.tsx
-│   │   │   └── ThemeContext.tsx
-│   │   ├── contexts/                   # Additional context providers
-│   │   │   ├── CourseContext.tsx
-│   │   │   └── ModuleContext.tsx
-│   │   ├── store/                      # Redux store configuration
-│   │   │   └── store.ts
-│   │   ├── constants/                  # Application constants
-│   │   │   └── courseNavigation.ts
-│   │   ├── App.tsx                     # Main application component
-│   │   ├── main.tsx                    # Application entry point
-│   │   ├── index.css                   # Global styles
-│   │   ├── config.ts                   # Frontend configuration
-│   │   ├── global.d.ts                 # TypeScript global type definitions
-│   │   └── test/                       # Vitest bootstrap
-│   │       └── setup.ts                # Quiet Router/act noise + shared matchers config
-│   ├── public/                         # Static assets
-│   │   └── assets/                     # Images and other static files
-│   ├── dist/                           # Production build output
-│   ├── index.html                      # HTML template
-│   ├── package.json                    # Frontend dependencies
-│   ├── tsconfig.json                   # TypeScript configuration
-│   ├── vite.config.ts                  # Vite build configuration + embedded Vitest settings
-│   ├── tailwind.config.js              # Tailwind CSS configuration
-│   └── postcss.config.js               # PostCSS configuration
+│   │   │   └── …                       # Navigation, inbox shell, calendar, etc.
+│   │   ├── design-system/              # tokens, StatusBadge, ErrorBanner, ConfirmDialog, …
+│   │   ├── features/
+│   │   │   ├── gradebook/              # Toolbar, filters, keyboard nav, status utils
+│   │   │   └── audit/                  # AuditFilterBar, filterAuditEntries
+│   │   ├── pages/                      # Route pages (Admin*, Catalog, Transcript, …)
+│   │   ├── services/
+│   │   │   ├── api.ts                  # Core REST client
+│   │   │   ├── gradingApi.ts           # Policy, lifecycle, provenance, audit
+│   │   │   ├── jobsApi.ts / opsApi.ts  # Async jobs + ops dashboard
+│   │   │   └── announcementService.ts / inboxService.ts / quizwaveService.ts
+│   │   ├── hooks/
+│   │   │   ├── useGradingPolicy.ts / useCourseGradeLifecycle.ts
+│   │   │   ├── useInstructorGradebookData.ts / useAsyncJob.ts
+│   │   │   ├── useNetworkStatus.ts / useUnsavedChangesGuard.ts / useDebounce.ts
+│   │   │   └── …                       # Mobile, offline, grade scale, submissions
+│   │   ├── utils/
+│   │   │   ├── gradebookCompute.ts     # Client gradebook (uses shared/grading)
+│   │   │   ├── instructorGradebookGrades.ts / transcriptGpa.ts
+│   │   │   ├── gradebookExport.ts / gradeUtils.ts / gradeUtils.types.ts
+│   │   │   └── __tests__/              # Vitest policy parity (*.policy.test.ts)
+│   │   ├── context/ / contexts/ / store/ / constants/
+│   │   ├── App.tsx / main.tsx / config.ts
+│   │   └── test/setup.ts               # Vitest bootstrap
+│   ├── public/assets/                  # Logos, favicons (dist/ and .vite/ are gitignored)
+│   ├── index.html / vite.config.ts / package.json
+│   └── tailwind.config.js / postcss.config.js
 │
-├── controllers/                        # Express route controllers
-│   ├── admin.controller.js             # Admin operations controller
-│   ├── announcement.controller.js      # Announcement operations controller
-│   ├── assignment.controller.js        # Assignment operations controller
-│   ├── attendance.controller.js       # Attendance operations controller
-│   ├── auth.controller.js              # Authentication controller
-│   ├── course.controller.js            # Course operations controller
-│   ├── event.controller.js             # Event operations controller
-│   ├── grades.controller.js            # Grade operations controller
-│   ├── group.controller.js             # Group operations controller
-│   ├── groupMeeting.controller.js      # Group meeting operations controller
-│   ├── inbox.controller.js             # Messaging/inbox controller
-│   ├── module.controller.js            # Module operations controller
-│   ├── page.controller.js              # Page operations controller
-│   ├── poll.controller.js              # Poll operations controller
-│   ├── quizwave.controller.js          # QuizWave operations controller
-│   ├── reports.controller.js           # Reports controller
-│   ├── submission.controller.js        # Submission operations controller
-│   ├── todo.controller.js              # Todo operations controller
-│   ├── user.controller.js              # User operations controller
-│   └── zohoMeeting.controller.js       # Zoho meeting integration controller
+├── shared/                             # Cross-runtime packages (no DOM)
+│   ├── grading/                        # Canonical policy + grade math (cjs/mjs/browser)
+│   │   ├── policyResolver.* / policySnapshot.* / gradeCalculation.*
+│   │   ├── gradebookCell.* / transcriptHash.* / gradingEngineVersion.*
+│   │   └── package.json / index.d.ts
+│   └── portability/                    # Export manifest v2, section registry, checkpoints
+│       ├── exportManifest.cjs / exportUtils.cjs / sectionRegistry.cjs
+│       └── checkpoint.cjs / schemaMetadata.cjs
 │
-├── models/                             # Mongoose data models
-│   ├── announcement.model.js           # Announcement model
-│   ├── Assignment.js                   # Assignment model
-│   ├── attendance.model.js             # Attendance model
-│   ├── Conversation.js                 # Conversation model (messaging)
-│   ├── ConversationParticipant.js      # Conversation participant model
-│   ├── course.model.js                 # Course model
-│   ├── event.model.js                  # Event model
-│   ├── Group.js                        # Group model
-│   ├── GroupSet.js                     # Group set model
-│   ├── groupMeeting.model.js           # Group meeting model
-│   ├── loginActivity.model.js         # Login activity tracking model
-│   ├── Message.js                      # Message model (messaging)
-│   ├── module.model.js                 # Module model
-│   ├── notification.model.js           # Notification model
-│   ├── notificationPreferences.model.js # Notification preferences model
-│   ├── page.model.js                   # Page model
-│   ├── poll.model.js                   # Poll model
-│   ├── quizwave.model.js               # QuizWave model
-│   ├── Submission.js                   # Submission model
-│   ├── systemSettings.model.js         # System settings model
-│   ├── thread.model.js                 # Discussion thread model
-│   ├── todo.model.js                   # Todo model
-│   ├── user.model.js                   # User model
-│   └── zohoMeetingConnection.model.js  # Zoho meeting connection model
+├── adapters/                           # Provider implementations (Phase P)
+│   ├── cache/                          # memoryCacheAdapter, redisCacheAdapter
+│   ├── storage/                        # localStorageAdapter, cloudStorageAdapter
+│   └── jobs/                           # bullMQAdapter
 │
-├── routes/                             # Express route definitions
-│   ├── admin.routes.js                 # Admin routes
-│   ├── announcement.routes.js         # Announcement routes
-│   ├── assignment.routes.js            # Assignment routes
-│   ├── attendance.routes.js            # Attendance routes
-│   ├── auth.routes.js                  # Authentication routes
-│   ├── catalog.routes.js               # Course catalog routes
-│   ├── course.routes.js                # Course routes
-│   ├── event.routes.js                 # Event routes
-│   ├── grades.routes.js                # Grade routes
-│   ├── groupRoutes.js                  # Group routes
-│   ├── inbox.routes.js                 # Messaging/inbox routes
-│   ├── module.routes.js                # Module routes
-│   ├── notification.routes.js          # Notification routes
-│   ├── page.routes.js                  # Page routes
-│   ├── poll.routes.js                  # Poll routes
-│   ├── quizwave.routes.js              # QuizWave routes
-│   ├── reports.routes.js               # Report routes
-│   ├── submission.routes.js            # Submission routes
-│   ├── thread.routes.js                # Discussion thread routes
-│   ├── todo.routes.js                  # Todo routes
-│   ├── user.routes.js                  # User routes
-│   └── zohoMeeting.routes.js           # Zoho meeting integration routes
+├── config/
+│   ├── providers.js                    # STORAGE/CACHE/QUEUE provider resolution
+│   ├── paths.js                        # Export/restore/migration paths
+│   └── startupValidation.js            # Boot-time env checks
 │
-├── middleware/                         # Express middleware
-│   ├── auth.js                         # Authentication middleware
-│   ├── roleCheck.js                    # Role-based access control middleware
-│   └── upload.js                       # File upload middleware
+├── domains/                            # Domain facades (grading, audit, transcript)
+│   ├── grading/index.js
+│   ├── audit/index.js
+│   └── transcript/index.js
 │
-├── middlewares/                        # Additional middleware
-│   └── auth.middleware.js              # Alternative auth middleware
+├── controllers/
+│   ├── grades.controller.js            # Gradebook, transcript regenerate, exports
+│   ├── gradeLifecycle.controller.js    # Post / finalize / amend / audit timeline
+│   ├── gradingPolicy.controller.js     # Institution + course policy CRUD/preview
+│   ├── jobs.controller.js              # Async job status + download
+│   ├── ops.controller.js               # Ops dashboard aggregates
+│   ├── registrarReports.controller.js
+│   └── …                               # course, assignment, quizwave, admin, inbox, …
 │
-├── utils/                              # Backend utility functions
-│   ├── cache.js                        # Lightweight caching helpers
-│   ├── cloudinary.js                   # Cloudinary integration for file storage
-│   ├── emailService.js                 # Transactional/system email bootstrap
-│   ├── ensureIndexes.js                # Mongo index enforcement on boot
-│   ├── gradeCalculation.js             # Grade calculation utilities
-│   ├── quizwaveCleanup.js              # QuizWave session cleanup timers (skipped in NODE_ENV=test)
-│   ├── quizwaveSessionStore.js         # QuizWave ephemeral session persistence (Redis-ready)
-│   └── quizwaveSocketThrottle.js       # Socket event throttling helpers
+├── services/
+│   ├── gradingPolicy.service.js
+│   ├── gradeLifecycle.service.js / gradeCalculation.service.js
+│   ├── gradingPolicyAudit.service.js / gradingPolicySnapshot.service.js
+│   ├── gradebookData.service.js / gradebookExport.service.js
+│   ├── transcriptIssuance.service.js / transcriptRecompute.service.js
+│   ├── academicAudit.service.js / academicAuditTimeline.service.js
+│   ├── ferpaAudit.service.js / jobQueue.service.js / gradingJobProcessors.js
+│   ├── export/institutionalExport.service.js / chunkedWriter.js
+│   ├── import/institutionalImport.service.js / importGuards.js / idRemapper.js
+│   ├── integrity/dataIntegrity.service.js
+│   ├── backup/backupManifest.service.js / snapshotArchive.service.js
+│   ├── cache/index.js / storage/index.js / jobs/index.js
+│   └── sis/ / lti/                     # SIS staging + LTI readiness stubs
 │
-├── socket/                             # Socket.io real-time functionality
-│   └── quizwave.socket.js              # QuizWave socket handlers
+├── models/
+│   ├── institutionGradingPolicy.model.js / courseGradingPolicy.model.js
+│   ├── courseGradeLifecycle.model.js / studentCourseGradeSnapshot.model.js
+│   ├── gradeAmendmentRecord.model.js / gradingPolicyAudit.model.js
+│   ├── transcriptIssueLog.model.js / institutionBackupManifest.model.js
+│   ├── asyncJob.model.js / migrationRun.model.js / systemAuditEvent.model.js
+│   ├── sisStagingEnrollment.model.js
+│   └── …                               # course, user, assignment, submission, …
 │
-├── scripts/                            # Utility scripts
-│   ├── auditDuplicateExtensions.js     # Frontend duplicate-extension audit (pairs with npm run audit:duplicates)
-│   ├── checkQuizWaveStatus.js          # QuizWave status checking script
-│   ├── cleanupOldSessions.js           # Session cleanup script
-│   ├── day1BaselineCheck.js            # Local baseline health checks
-│   ├── day2AlertDryRun.js              # Dry-run alerting paths
-│   ├── day2CaptureBaseline.js          # Capture baseline metrics
-│   ├── day2SyntheticProbe.js           # Synthetic probe validation
-│   ├── day3EndpointBenchmark.js        # Endpoint benchmarking script
-│   ├── day4CheckLocalPair.js           # Local pair validation helpers
-│   ├── day4SocketValidation.js         # Socket behavior validation
-│   ├── day5LoadRamp.js                 # Progressive load ramp test
-│   ├── fixDuplicatePins.js             # Fix duplicate pins script
-│   ├── fixPinIndex.js                  # Fix pin index script
-│   ├── predeploySmokeCheck.js          # Invoked via npm run smoke:predeploy
-│   ├── runDay5ApiRamp.js               # API-focused ramp harness
-│   └── startPeerServer.js              # Local peer server for multi-node testing (`npm run dev:peer`)
+├── routes/
+│   ├── grades.routes.js                # Gradebook + lifecycle + provenance
+│   ├── gradingPolicy.routes.js         # /api/grading-policy/*
+│   ├── jobs.routes.js                  # /api/jobs/:jobId
+│   ├── ops.routes.js                   # /api/ops/dashboard
+│   ├── registrarReports.routes.js
+│   └── …                               # auth, courses, quizwave, admin, …
 │
-├── workers/                            # Long-running worker entrypoints
-│   └── quizwaveCleanupWorker.js       # Dedicated QuizWave janitor (`npm run worker:quizwave-cleanup`)
+├── middleware/
+│   ├── auth.js / roleCheck.js / upload.js
+│   ├── academicPermissions.js          # Capability gates for grading
+│   ├── ferpaAccess.js                  # FERPA-scoped record access
+│   └── requestCorrelation.js           # Request ID propagation
 │
-├── monitoring/                         # Observability and local monitoring
-│   ├── docker-compose.observability.yml    # Prometheus + Grafana + Alertmanager stack
-│   ├── alertmanager/                   # Alertmanager configuration
-│   ├── prometheus/                     # Prometheus scrape/rule configuration
-│   └── grafana/                        # Dashboards and provisioning
+├── utils/                              # Server helpers (cache, cloudinary, indexes, …)
+│   ├── gradeCalculation.js             # Delegates to shared/grading
+│   ├── bullmqConnection.js / ensureIndexes.js
+│   └── quizwaveCleanup.js / quizwaveSessionStore.js / …
 │
-├── uploads/                            # File upload directory
+├── socket/quizwave.socket.js
 │
-├── tests/                               # Backend Jest suites (supertest + mongoose)
-│   ├── setup.js                        # NODE_ENV=test, silent logs, mongo disconnect hooks
-│   ├── helpers.js                      # mongo wait helpers
-│   └── *.test.js                       # Integration + controller/middleware specs (notifications, inbox, catalog, ...)
-├── docs/                               # Operational / release notes (non-code)
-│   ├── production-checklist.md         # Rollout readiness list
-│   └── predeploy-bug-hunt-report-2026-04-29.md
-├── server.js                           # Express server entry point
-├── package.json                        # Backend dependencies
-├── vercel.json                         # Vercel deployment configuration
-├── generate-secret.js                  # Secret generation utility
-├── jest.config.js                      # Jest testing configuration
-├── Dockerfile                          # Container build (referenced in Deployment section)
-└── .dockerignore                       # Docker build exclusions
+├── workers/
+│   ├── quizwaveCleanupWorker.js        # npm run worker:quizwave-cleanup
+│   └── gradingJobsWorker.js            # npm run worker:grading-jobs
+│
+├── scripts/
+│   ├── migrations/                     # DB migrations (registry + runner)
+│   │   ├── migrations/001-backfill-grade-lifecycle.js
+│   │   ├── migrations/002-backfill-snapshot-is-current.js
+│   │   └── migrations/003-sync-grading-indexes.js
+│   ├── exportInstitutionBundle.js / restoreInstitutionBundle.js
+│   ├── verifyDataIntegrity.js / verifyRestore.js / verifyInstitutionExport.js
+│   ├── verifyBackupCompatibility.js / verifyAuditIntegrity.js / verifySnapshots.js
+│   ├── verifySharedGrading.js / checkDeprecatedGradingCalculator.js
+│   ├── validateMongoIndexes.js / perf/gradebookBench.js
+│   ├── predeploySmokeCheck.js
+│   ├── day1BaselineCheck.js … day5LoadRamp.js   # Hardening benchmarks → DAY_PROGRESS.md
+│   ├── demoData/ + seedGrade8*Demo.js + patchGrade8Math8DemoRealism.js
+│   └── fixDuplicatePins.js / fixPinIndex.js     # One-off DB maintenance
+│
+├── tests/
+│   ├── setup.js / helpers.js
+│   ├── *.test.js                       # API integration suites
+│   ├── grading/                        # Policy, lifecycle, FERPA, parity, e2e
+│   ├── portability/                    # Provider + export manifest tests
+│   └── migration/                      # institutionMigration.test.js
+│
+├── docs/
+│   ├── production-checklist.md
+│   ├── production/                     # deployment, scaling, DR, readiness reports
+│   ├── operations/                     # backup, restore, cutover, incident runbooks
+│   ├── architecture/                   # export, backup, portability, migration
+│   └── security/ferpa-access-controls.md
+│
+├── monitoring/                         # Prometheus + Grafana + Alertmanager compose
+├── uploads/                            # Local file storage (gitignored)
+├── server.js
+├── package.json / jest.config.js
+├── Dockerfile / docker-compose.prod.yml / .dockerignore
+├── vercel.json / generate-secret.js
+└── DAY_PROGRESS.md                     # Append-only hardening notes (day1–5 scripts)
 ```
-
 ---
 
 ## 🚀 Getting Started
@@ -681,9 +536,11 @@ lms/
    - Backend API: http://localhost:5000
 
 ### Advanced / Production Path
-- Use `docs/production-checklist.md` for release readiness and production rollout steps.
-- Use the deployment section below for hosting options and required production environment variables.
-- Optional observability stack is available at `monitoring/docker-compose.observability.yml`.
+- Start with `docs/production-checklist.md` and the index at `docs/production/README.md`.
+- Run grading gates before release: `npm run verify:grading`, `npm run test:grading`, `npm run validate:indexes`.
+- Preview DB migrations: `npm run migrate:dry-run` then apply in a maintenance window with `npm run migrate`.
+- For async exports/recompute, set `REDIS_URL` and run `npm run worker:grading-jobs` alongside the API.
+- Optional observability stack: `monitoring/docker-compose.observability.yml` (`npm run obs:up`).
 
 ---
 
@@ -693,9 +550,16 @@ lms/
 - Full system access
 - User management
 - Course oversight
-- System settings
+- System settings (including institution grading policy and ops dashboard)
 - Analytics and reports
 - Security management
+- Institution export/restore and integrity verification (via CLI scripts)
+
+### Registrar / department admin
+- Institution grading policy read/write
+- Grade lifecycle oversight and registrar reports
+- Operations dashboard access
+- Transcript recompute (capability-gated)
 
 ### Teacher
 - Create and manage courses
@@ -704,6 +568,7 @@ lms/
 - Manage course content (modules, pages)
 - Track student progress
 - Generate reports
+- Manage course grading policy, post/finalize/amend grades, and run gradebook exports
 
 ### Student
 - Enroll in courses
@@ -747,11 +612,36 @@ lms/
 - `GET /api/submissions/student/:id` - Get student submissions
 - `PUT /api/submissions/:id/grade` - Grade submission
 
-### Grades
-- `GET /api/grades/course/:id` - Get course grades
-- `GET /api/grades/student/:id` - Get student grades
-- `POST /api/grades` - Create grade entry
-- `PUT /api/grades/:id` - Update grade
+### Grades & gradebook
+- `GET /api/grades/student/course/:courseId` - Student course grade summary
+- `GET /api/grades/course/:courseId/gradebook` - Instructor gradebook payload
+- `POST /api/grades/course/:courseId/gradebook/export` - Enqueue async gradebook export (job id)
+- `POST /api/grades/course/:courseId/transcript/regenerate` - Regenerate frozen snapshots (capability-gated)
+
+### Grading policy (`/api/grading-policy`)
+- `GET/PUT /api/grading-policy/institution` - Institution-wide policy (admin/registrar)
+- `GET/PUT /api/grading-policy/course/:courseId` - Course policy overrides
+- `POST /api/grading-policy/course/:courseId/preview` - Preview effective policy
+- `GET /api/grading-policy/course/:courseId/effective` - Resolved effective policy
+- `GET /api/grading-policy/audit/:entityType/:entityId` - Policy change audit history
+- `POST /api/grading-policy/transcript/recompute` - Institution transcript recompute
+
+### Grade lifecycle (`/api/grades/course/:courseId/...`)
+- `GET .../lifecycle` - Lifecycle state for a course
+- `GET .../amendments` - Amendment history
+- `GET .../audit` / `GET .../audit-timeline` - Course grading audit views
+- `GET .../provenance` - Grade provenance for compliance review
+- `POST .../post` - Post grades to students
+- `POST .../finalize` - Finalize course grades (frozen snapshots)
+- `POST .../amend` - Amend finalized grades (append-only audit trail)
+
+### Async jobs
+- `GET /api/jobs/:jobId` - Poll export/recompute job status
+- `GET /api/jobs/:jobId/download` - Download completed export artifact
+
+### Operations & registrar
+- `GET /api/ops/dashboard` - Admin/registrar ops dashboard aggregates
+- `GET /api/registrar/reports/*` - Registrar report endpoints (see `registrarReports.routes.js`)
 
 ### Discussions
 - `GET /api/threads` - Get discussion threads
@@ -794,7 +684,9 @@ lms/
 - Refer to `quizwave.routes.js` for session lifecycle (`/api/quizwave/...`) covering builder assets, live session control, and participant flows
 
 ### Observability
-- `GET /health` — JSON payload with Mongo/Redis readiness, storage flags, socket counters
+- `GET /health` — Liveness: Mongo/Redis readiness, storage flags, socket counters
+- `GET /health/ready` — Readiness probe (Mongo, Redis adapter, job queue, storage)
+- `GET /health/ops` — Request metrics JSON for the ops dashboard
 - `GET /metrics` — Prometheus text exposition (compatible with the `monitoring/` compose stack)
 
 ---
@@ -803,12 +695,14 @@ lms/
 
 - JWT-based authentication
 - Password hashing with bcrypt
-- Role-based access control (RBAC)
+- Role-based access control (RBAC) plus academic **capabilities** for grading actions
+- FERPA-scoped access middleware (`ferpaAccess.js`) and audit logging for sensitive grade reads
 - CORS configuration
 - Input validation
 - File upload restrictions
 - Session timeout management
 - Login activity tracking
+- Rate limits on grading lifecycle, transcript, and recompute endpoints
 
 ---
 
@@ -824,7 +718,8 @@ Current repository deployment configuration:
 - Frontend deployment config: `vercel.json`
 - Environment variable template: `.env.example`
 - Optional container baseline: `Dockerfile` and `.dockerignore`
-- Release process checklist: `docs/production-checklist.md`
+- Release process checklist: `docs/production-checklist.md` and `docs/production/deployment.md`
+- Production compose reference: `docker-compose.prod.yml`
 - Optional monitoring stack: `monitoring/docker-compose.observability.yml`
 
 ### Environment Variables for Production
@@ -850,15 +745,25 @@ For **Vercel + Render** in this repo, `vercel.json` rewrites `/api/*`, `/uploads
 **Root directory:**
 - `npm start` - Start production server
 - `npm run dev` - Start development server with nodemon
-- `npm run build` - Build frontend
-- `npm run build:frontend` - Build frontend only
-- `npm test` - Run backend tests (Jest; needs MongoDB; defaults to `mongodb://localhost:27017/lms-test` unless `MONGODB_URI` is set). Set `JEST_VERBOSE_LOGS` to restore `console.*` output during failures.
-- `npm run smoke:predeploy` - Run Mongo/Redis predeploy smoke checks
-- `npm run audit:duplicates` - Detect duplicate `.jsx/.tsx` or `.js/.ts` basenames before migration
-- `npm run worker:quizwave-cleanup` - Run the dedicated QuizWave janitor process
-- `npm run obs:*` - Helper aliases for the dockerized Prometheus/Grafana stack (`monitoring/docker-compose.observability.yml`)
-- `npm run check:day1` … `npm run check:day5` (+ variants) - Local reliability / benchmarking scripts used during hardening milestones
-- `npm run dev:peer` - Starts the auxiliary peer server used when validating multi-node/socket flows (`scripts/startPeerServer.js`)
+- `npm run build` / `npm run build:frontend` - Build frontend
+- `npm test` - Run all backend Jest suites (needs MongoDB; defaults to `mongodb://localhost:27017/lms-test`). Set `JEST_VERBOSE_LOGS` to restore `console.*` on failures.
+- `npm run test:grading` / `npm run test:grading:policy` - Grading policy, lifecycle, FERPA, and parity suites
+- `npm run test:portability` / `npm run test:migration` - Provider/export and institution migration tests
+- `npm run verify:grading` - Shared grading source + deprecated calculator guard
+- `npm run validate:indexes` - Mongo index validation
+- `npm run migrate` / `npm run migrate:dry-run` - Apply or preview DB migrations
+- `npm run verify:audit-integrity` / `npm run verify:snapshots` - Post-migration grading integrity checks
+- `npm run export:institution` / `npm run restore:institution` - Institution bundle export and restore
+- `npm run verify:data-integrity` / `npm run verify:restore` / `npm run verify:backup-compatibility` - DR verification
+- `npm run verify:institution-export` - Validate export bundle structure
+- `npm run perf:gradebook` - Gradebook benchmark harness
+- `npm run smoke:predeploy` - Mongo/Redis predeploy smoke checks
+- `npm run worker:quizwave-cleanup` / `npm run worker:grading-jobs` - Background workers (grading jobs need `REDIS_URL`)
+- `npm run seed:demo:*` / `npm run patch:demo:math8-realism` - Demo course seeding
+- `npm run audit:duplicates` - Detect duplicate `.jsx/.tsx` basenames
+- `npm run obs:*` - Prometheus/Grafana docker compose helpers
+- `npm run check:day1` … `npm run check:day5` (+ variants) - Hardening benchmarks (append to `DAY_PROGRESS.md`)
+- `npm run dev:peer` - Auxiliary peer server for multi-node/socket validation
 
 **Frontend directory:**
 - `npm run dev` - Start Vite dev server
@@ -866,8 +771,9 @@ For **Vercel + Render** in this repo, `vercel.json` rewrites `/api/*`, `/uploads
 - `npm run preview` - Preview production build
 - `npm run lint` - Run ESLint
 - `npm run test` - Vitest in watch mode
-- `npm run test:run` - Single Vitest run
-- `npm run test:run:stable` - Single run with capped workers/memory (recommended in CI or if the suite struggles to finish)
+- `npm run test:run` / `npm run test:run:stable` - Single Vitest run (stable caps workers/memory)
+- `npm run test:grading` - Policy parity unit tests (`src/utils/__tests__/*.policy.test.ts`)
+- `npm run test:workflows` / `npm run test:fux` - Gradebook + hook workflow tests
 
 ---
 
@@ -911,6 +817,17 @@ For **Vercel + Render** in this repo, `vercel.json` rewrites `/api/*`, `/uploads
 - Category organization
 - Student and course association
 
+### Institutional grading & records
+- **InstitutionGradingPolicy** / **CourseGradingPolicy** — Defaults, scales, weights, penalties
+- **GradingPolicyAudit** — Append-only policy change log
+- **CourseGradeLifecycle** — Posted/finalized state per course term
+- **StudentCourseGradeSnapshot** — Frozen grades for transcripts (with `isCurrent` flag)
+- **GradeAmendmentRecord** — Post-finalize amendments
+- **TranscriptIssueLog** — Transcript issuance audit
+- **SystemAuditEvent** — Cross-cutting academic audit events
+- **AsyncJob** — Background export/recompute jobs
+- **InstitutionBackupManifest** / **MigrationRun** — Export bundles and migration tracking
+
 ---
 
 ## 🎨 UI/UX Features
@@ -925,7 +842,7 @@ For **Vercel + Render** in this repo, `vercel.json` rewrites `/api/*`, `/uploads
 - Modal dialogs
 - Sidebar navigation
 - Search functionality
-- Shared design system pieces under `components/common` (floating labels, skeletons, data tables, breadcrumbs, pull-to-refresh)
+- Shared design system under `components/common` and `design-system/` (tokens, status badges, error banners, confirm dialogs, skip link, offline banner)
 - Customizable navigation (global sidebar + bottom nav with persisted layout options)
 - Mobile interactions (swipe gestures, optional haptics, floating action affordances)
 
@@ -934,19 +851,19 @@ For **Vercel + Render** in this repo, `vercel.json` rewrites `/api/*`, `/uploads
 ## 🔄 Future Enhancements
 
 Potential features for future releases:
-- Deepen meeting integrations (provider abstraction, recording metadata, attendance sync)
+- Full SIS/LTI integration beyond current staging/readiness stubs
+- Cloud object storage with signed URLs and streaming exports (adapter hooks exist)
+- Deepen meeting integrations (recording metadata, attendance sync)
 - AI-assisted course help expansion (context-aware tutoring and study plans)
 - Advanced quiz builder enhancements (adaptive flows and richer analytics)
 - Plagiarism detection
 - Mobile app (React Native)
-- Email notifications (transactional email service utilities exist server-side—extend templates & triggers)
+- Email notifications (extend server-side `emailService` templates & triggers)
 - Two-factor authentication
-- Advanced analytics dashboard
-- Content duplication
-- Course templates
+- Content duplication and course templates
 - SCORM compliance
-- Wire `i18next` resources + language switcher (dependencies already ship with the frontend bundle)
-- Expand automated coverage for Socket.IO paths now that HTTP suites exit cleanly with `mongoose.disconnect` per file
+- Wire `i18next` locale files + language switcher
+- Expand Socket.IO automated coverage alongside existing HTTP Jest suites
 
 ---
 
@@ -974,6 +891,6 @@ Built with modern web technologies to provide an exceptional learning management
 
 ---
 
-**Version**: 1.0.0  
-**Last Updated**: 2026-05-06
+**Version**: 1.1.0  
+**Last Updated**: 2026-05-18
 

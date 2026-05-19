@@ -30,4 +30,7 @@ const announcementSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
+const { portabilityMetadataPlugin } = require('./plugins/portabilityMetadata.plugin');
+announcementSchema.plugin(portabilityMetadataPlugin);
+
 module.exports = mongoose.model('Announcement', announcementSchema); 

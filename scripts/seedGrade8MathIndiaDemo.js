@@ -7,7 +7,10 @@
  * Usage:
  *   node scripts/seedGrade8MathIndiaDemo.js
  *   node scripts/seedGrade8MathIndiaDemo.js --sync-pages   # refresh Page.content from demoData when course already exists
+ *   node scripts/seedGrade8MathIndiaDemo.js --sync-assignment-groups   # set course.groups + assignment/thread group labels to match Assignments tab (Assignments / Discussions)
+ *   node scripts/seedGrade8MathIndiaDemo.js --sync-assignment-groups --course-code=MATH8-SPRING   # when your course uses a custom catalog.courseCode
  *
+ * Optional: GRADE8_MATH_DEMO_COURSE_CODE in .env (same as --course-code) if you do not want to pass the flag each time.
  * Requires: MONGODB_URI (and optional MONGO_DB_NAME). Full seed also needs teacher user teacher@vidyalms.com.
  * Optional: DEMO_STUDENT_PASSWORD (default VedantaDemo8!) for created demo students.
  * Idempotent: skips creation if a course with catalog.courseCode DEMO-MATH8-IN-2026 already exists
@@ -52,6 +55,66 @@ const TEACHER_EMAIL = 'teacher@vidyalms.com';
 
 const syncPagesRequested =
   process.argv.includes('--sync-pages') || process.env.SYNC_GRADE8_MATH8_PAGES === 'true';
+
+const syncAssignmentGroupsRequested = process.argv.includes('--sync-assignment-groups');
+
+/** Matches the Assignments list UI (AssignmentList defaults): module work → "Assignments", threads → "Discussions". */
+const DEMO_UI_ASSIGNMENT_GROUPS = [
+  { name: 'Assignments', weight: 80 },
+  { name: 'Discussions', weight: 20 },
+];
+
+function parseCourseCodeCliOverride() {
+  const raw = process.argv.find((a) => a.startsWith('--course-code='));
+  if (raw) return raw.slice('--course-code='.length).trim();
+  return '';
+}
+
+/**
+ * Resolve the Grade 8 Math demo course for --sync-* when the default catalog code is absent (e.g. custom courseCode).
+ */
+async function findCourseForMathDemoSync() {
+  const fromCli = parseCourseCodeCliOverride();
+  const fromEnv = (process.env.GRADE8_MATH_DEMO_COURSE_CODE || '').trim();
+  const orderedCodes = [...new Set([fromCli, fromEnv, COURSE_CODE].filter(Boolean))];
+
+  for (const code of orderedCodes) {
+    const c = await Course.findOne({ 'catalog.courseCode': code });
+    if (c) return { course: c, how: `catalog.courseCode "${code}"` };
+  }
+
+  let c = await Course.findOne({ title: COURSE_TITLE });
+  if (c) return { course: c, how: `exact title "${COURSE_TITLE}"` };
+
+  c = await Course.findOne({
+    'catalog.subject': { $regex: /mathematics/i },
+    title: { $regex: /grade\s*8/i },
+  });
+  if (c) return { course: c, how: 'catalog.subject Mathematics + title /Grade 8/i (first match)' };
+
+  return { course: null, how: null };
+}
+
+async function logMathLikeCoursesHint(limit = 20) {
+  const rows = await Course.find({
+    $or: [
+      { title: { $regex: /math/i } },
+      { 'catalog.subject': { $regex: /math/i } },
+      { 'catalog.courseCode': { $regex: /math/i } },
+    ],
+  })
+    .select('title catalog.courseCode')
+    .limit(limit)
+    .lean();
+  if (!rows.length) {
+    console.error('[sync] No mathematics-like courses found in this database.');
+    return;
+  }
+  console.error('[sync] Mathematics-like courses (pick catalog.courseCode for --course-code=...):');
+  for (const r of rows) {
+    console.error(`     code: ${String(r.catalog?.courseCode || '(none)').padEnd(22)}  title: ${r.title || ''}`);
+  }
+}
 
 /** Push MODULE_SPECS page HTML into existing demo course (match by title, then by order in module.pages). */
 async function syncPageContentFromSpecs(courseId) {
@@ -115,6 +178,38 @@ async function syncPageContentFromSpecs(courseId) {
   if (updated === 0 && (missingPage > 0 || missingMod > 0)) {
     console.log('[sync] Hint: Open MongoDB Compass / Atlas and confirm this database has course code ' + COURSE_CODE + ' and module titles exactly as in grade8MathIndiaModules.js.');
   }
+}
+
+async function syncAssignmentGroupsToUISpec(courseId) {
+  await Course.updateOne({ _id: courseId }, { $set: { groups: DEMO_UI_ASSIGNMENT_GROUPS } });
+  console.log('[sync-groups] Set course.groups to Assignments (80%) / Discussions (20%).');
+
+  const mods = await Module.find({ course: courseId }).select('_id');
+  const moduleIds = mods.map((m) => m._id);
+  if (moduleIds.length) {
+    const modRes = await Assignment.updateMany(
+      { module: { $in: moduleIds }, isGroupAssignment: { $ne: true } },
+      { $set: { group: 'Assignments' } }
+    );
+    console.log(
+      `[sync-groups] Module assignments → "Assignments": matched=${modRes.matchedCount}, modified=${modRes.modifiedCount}`
+    );
+  }
+
+  const sets = await GroupSet.find({ course: courseId }).select('_id');
+  const setIds = sets.map((s) => s._id);
+  if (setIds.length) {
+    const gaRes = await Assignment.updateMany(
+      { isGroupAssignment: true, groupSet: { $in: setIds } },
+      { $set: { group: 'Assignments' } }
+    );
+    console.log(
+      `[sync-groups] Group-set assignments → "Assignments": matched=${gaRes.matchedCount}, modified=${gaRes.modifiedCount}`
+    );
+  }
+
+  const thRes = await Thread.updateMany({ course: courseId }, { $set: { group: 'Discussions' } });
+  console.log(`[sync-groups] Threads → "Discussions": matched=${thRes.matchedCount}, modified=${thRes.modifiedCount}`);
 }
 
 const DEMO_STUDENTS = [
@@ -193,17 +288,31 @@ async function main() {
   const dbName = mongoose.connection?.db?.databaseName || process.env.MONGO_DB_NAME || 'lms';
   console.log(`[seed] Connected to MongoDB database: ${dbName}`);
 
-  if (syncPagesRequested) {
-    const existing = await Course.findOne({ 'catalog.courseCode': COURSE_CODE });
+  if (syncPagesRequested || syncAssignmentGroupsRequested) {
+    const { course: existing, how } = await findCourseForMathDemoSync();
     if (!existing) {
       console.error(
-        `[sync] No course with catalog.courseCode "${COURSE_CODE}" in database "${dbName}". Run: npm run seed:demo:math8-india (without --sync-pages) once to create it.`
+        `[sync] Could not find the Grade 8 Mathematics demo course in database "${dbName}".`
       );
+      console.error(
+        `[sync] Tried: --course-code=..., env GRADE8_MATH_DEMO_COURSE_CODE, "${COURSE_CODE}", exact title, then fuzzy Mathematics + Grade 8 in title.`
+      );
+      await logMathLikeCoursesHint();
+      console.error('[sync] Create the seed course: npm run seed:demo:math8-india');
+      console.error('[sync] Or pass your course catalog code, e.g.:');
+      console.error('      node scripts/seedGrade8MathIndiaDemo.js --sync-assignment-groups --course-code=YOUR-CODE');
       await mongoose.disconnect();
       process.exit(1);
     }
-    console.log(`[sync] Course ${COURSE_CODE} found (_id=${existing._id}). Syncing page HTML from MODULE_SPECS…`);
-    await syncPageContentFromSpecs(existing._id);
+    console.log(`[sync] Matched course _id=${existing._id} (${how}).`);
+    if (syncPagesRequested) {
+      console.log('[sync] Syncing page HTML from MODULE_SPECS…');
+      await syncPageContentFromSpecs(existing._id);
+    }
+    if (syncAssignmentGroupsRequested) {
+      console.log('[sync-groups] Aligning groups with Assignments tab labels…');
+      await syncAssignmentGroupsToUISpec(existing._id);
+    }
     await mongoose.disconnect();
     return;
   }
@@ -223,6 +332,9 @@ async function main() {
     console.log(`[seed] Course with code ${COURSE_CODE} already exists (_id=${existing._id}). Nothing to do.`);
     console.log('[seed] To refresh module page content from scripts/demoData/grade8MathIndiaModules.js, run:');
     console.log('      npm run seed:demo:math8-india:sync-pages');
+    console.log('[seed] To align grading groups + assignment labels with the Assignments tab (Assignments / Discussions), run:');
+    console.log('      node scripts/seedGrade8MathIndiaDemo.js --sync-assignment-groups');
+    console.log('      node scripts/seedGrade8MathIndiaDemo.js --sync-assignment-groups --course-code=YOUR-CATALOG-CODE');
     await mongoose.disconnect();
     return;
   }
@@ -253,6 +365,7 @@ async function main() {
       numberOfAnnouncements: 5,
     },
     defaultColor: '#1e40af',
+    groups: DEMO_UI_ASSIGNMENT_GROUPS,
   });
   console.log(`[seed] Created course ${course._id}`);
 
@@ -295,6 +408,7 @@ async function main() {
       title: spec.homework.title,
       description: spec.homework.description,
       module: mod._id,
+      group: 'Assignments',
       availableFrom: hwAvail,
       dueDate: hwDue,
       createdBy: teacher._id,
@@ -312,6 +426,7 @@ async function main() {
       description:
         'Auto-graded multiple choice. You may attempt once before the due date; review the module pages if you miss a question.',
       module: mod._id,
+      group: 'Assignments',
       availableFrom: qzAvail,
       dueDate: qzDue,
       createdBy: teacher._id,
@@ -626,6 +741,7 @@ async function main() {
     published: true,
     isGroupAssignment: true,
     groupSet: groupSet._id,
+    group: 'Assignments',
     isOfflineAssignment: true,
     totalPoints: 30,
     allowStudentUploads: true,

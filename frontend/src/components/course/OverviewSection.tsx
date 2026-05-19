@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Unlock, Settings, Layout, Gamepad2 } from 'lucide-react';
 import LatestAnnouncements from '../LatestAnnouncements';
@@ -6,6 +6,7 @@ import ConfirmationModal from '../common/ConfirmationModal';
 import CourseEnrollmentQrCard from './CourseEnrollmentQrCard';
 import { useCourse } from '../../contexts/CourseContext';
 import { toast } from 'react-toastify';
+import { fetchGradebookColumnItems } from '../../utils/fetchGradebookColumnItems';
 
 interface OverviewSectionProps {
   course: any;
@@ -38,6 +39,37 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
   const { deleteCourse } = useCourse();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [gradebookAssignmentCount, setGradebookAssignmentCount] = useState<number | 'loading'>(
+    'loading'
+  );
+
+  useEffect(() => {
+    if (!isInstructor && !isAdmin) return;
+    let cancelled = false;
+    const run = async () => {
+      setGradebookAssignmentCount('loading');
+      try {
+        const token = localStorage.getItem('token');
+        const fallback = modules.reduce((acc, m) => acc + (m.assignments?.length || 0), 0);
+        if (!token || !course?._id) {
+          if (!cancelled) setGradebookAssignmentCount(fallback);
+          return;
+        }
+        const items = await fetchGradebookColumnItems(course._id, modules, token);
+        if (!cancelled) setGradebookAssignmentCount(items.length);
+      } catch {
+        if (!cancelled) {
+          setGradebookAssignmentCount(
+            modules.reduce((acc, m) => acc + (m.assignments?.length || 0), 0)
+          );
+        }
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [isInstructor, isAdmin, course?._id, modules]);
 
   const handleDeleteCourse = async () => {
     setIsDeleting(true);
@@ -138,8 +170,18 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
           </div>
           <div className={metricCardClassName}>
             <div className="mb-1 text-sm font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Assignments</div>
-            <div className="text-3xl font-semibold text-slate-900 dark:text-slate-100">
-              {modules.reduce((acc, m) => acc + (m.assignments?.length || 0), 0)}
+            <div className="text-3xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums">
+              {gradebookAssignmentCount === 'loading' ? (
+                <span
+                  className="inline-block text-slate-400 animate-pulse dark:text-slate-500"
+                  aria-busy="true"
+                  aria-label="Loading assignment count"
+                >
+                  …
+                </span>
+              ) : (
+                gradebookAssignmentCount
+              )}
             </div>
           </div>
         </div>

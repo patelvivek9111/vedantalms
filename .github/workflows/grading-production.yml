@@ -1,0 +1,59 @@
+name: Grading Production Matrix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'shared/grading/**'
+      - 'services/**'
+      - 'models/**'
+      - 'scripts/migrations/**'
+      - 'tests/grading/**'
+      - '.github/workflows/grading-production.yml'
+  pull_request:
+    paths:
+      - 'shared/grading/**'
+      - 'services/**'
+      - 'models/**'
+      - 'scripts/migrations/**'
+      - 'tests/grading/**'
+  workflow_dispatch:
+
+jobs:
+  grading-matrix:
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+
+    env:
+      MONGODB_URI: mongodb://127.0.0.1:27017/lms-grading-ci
+      JWT_SECRET: ci-test-jwt-secret
+      NODE_ENV: test
+      FORCE_INLINE_JOBS: 'true'
+      DISABLE_RATE_LIMIT: 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify shared grading
+        run: npm run verify:grading
+
+      - name: Grading test suite
+        run: npm run test:grading
+
+      - name: Validate Mongo indexes
+        run: npm run validate:indexes
+
+      - name: Migrations dry-run
+        run: npm run migrate:dry-run
