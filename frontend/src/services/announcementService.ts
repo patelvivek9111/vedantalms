@@ -6,7 +6,8 @@ export const getAnnouncements = async (courseId: string) => {
   const res = await axios.get(`${API_URL}/api/courses/${courseId}/announcements`, {
     headers: { Authorization: `Bearer ${token}` }
   });
-  return res.data.data;
+  const data = res.data?.data;
+  return Array.isArray(data) ? data : [];
 };
 
 export const createAnnouncement = async (courseId: string, data: FormData) => {
@@ -22,7 +23,8 @@ export const getAnnouncementComments = async (announcementId: string) => {
   const res = await axios.get(`${API_URL}/api/announcements/${announcementId}/comments`, {
     headers: { Authorization: `Bearer ${token}` }
   });
-  return res.data.data;
+  const data = res.data?.data;
+  return Array.isArray(data) ? data : [];
 };
 
 export const postAnnouncementComment = async (announcementId: string, text: string) => {

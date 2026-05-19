@@ -967,7 +967,7 @@ const CourseDetail: React.FC = () => {
       case 'announcements':
         return (
           <Suspense fallback={<div className="text-sm text-gray-500 dark:text-gray-400">Loading announcements...</div>}>
-            <Announcements courseId={course._id} />
+            <Announcements courseId={course._id || id || ''} />
           </Suspense>
         );
 

@@ -1,5 +1,4 @@
 import React from 'react';
-import { useAuth } from '../../context/AuthContext';
 import { Megaphone } from 'lucide-react';
 
 export interface Announcement {
@@ -25,8 +24,8 @@ interface AnnouncementListProps {
 }
 
 const AnnouncementList: React.FC<AnnouncementListProps> = ({ announcements, onSelect }) => {
-  const { user } = useAuth();
-  if (!announcements.length) {
+  const items = Array.isArray(announcements) ? announcements : [];
+  if (!items.length) {
     return (
       <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50/70 py-14 text-center dark:border-gray-600 dark:bg-gray-800/50">
         <div className="flex flex-col items-center">
@@ -39,7 +38,7 @@ const AnnouncementList: React.FC<AnnouncementListProps> = ({ announcements, onSe
   }
   return (
     <ul className="space-y-3 sm:space-y-4">
-      {announcements.map(a => (
+      {items.map(a => (
         <li
           key={a._id}
           className="cursor-pointer rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition hover:border-gray-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600"
@@ -58,7 +57,7 @@ const AnnouncementList: React.FC<AnnouncementListProps> = ({ announcements, onSe
           </div>
           <div className="text-xs sm:text-sm text-gray-800 dark:text-gray-200 mb-1 prose max-w-none">
             {(() => {
-              const plain = a.body.replace(/<[^>]+>/g, '');
+              const plain = String(a.body ?? '').replace(/<[^>]+>/g, '');
               const firstLine = plain.split(/\r?\n|\r|<br\s*\/?>/i)[0];
               return firstLine.length > 120 ? firstLine.slice(0, 120) + '…' : firstLine;
             })()}

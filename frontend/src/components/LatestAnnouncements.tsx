@@ -199,8 +199,10 @@ const LatestAnnouncements: React.FC<LatestAnnouncementsProps> = ({
               </div>
               
               <div className="text-sm text-gray-600 dark:text-gray-300 mb-4 leading-relaxed line-clamp-3">
-                {announcement.body.replace(/<[^>]+>/g, '').substring(0, 200)}
-                {announcement.body.replace(/<[^>]+>/g, '').length > 200 && '...'}
+                {(() => {
+                  const plain = String(announcement.body ?? '').replace(/<[^>]+>/g, '');
+                  return plain.substring(0, 200) + (plain.length > 200 ? '...' : '');
+                })()}
               </div>
               
               <div className="flex items-center justify-between">

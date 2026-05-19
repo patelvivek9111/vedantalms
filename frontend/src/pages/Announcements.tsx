@@ -45,7 +45,7 @@ const Announcements: React.FC<AnnouncementsProps> = ({ courseId }) => {
     setError(null);
     try {
       const data = await getAnnouncements(courseId);
-      setAnnouncements(data);
+      setAnnouncements(Array.isArray(data) ? data : []);
     } catch (err: any) {
       setError('Failed to load announcements');
     } finally {
@@ -57,9 +57,12 @@ const Announcements: React.FC<AnnouncementsProps> = ({ courseId }) => {
     setCommentsLoading(true);
     try {
       const data = await getAnnouncementComments(announcementId);
-      setComments(data);
+      const safeComments = Array.isArray(data) ? data : [];
+      setComments(safeComments);
       if (user && selectedAnnouncement?.options?.requirePostBeforeSeeingReplies) {
-        const hasPosted = data.some((comment: Comment) => comment.author._id === user._id);
+        const hasPosted = safeComments.some(
+          (comment: Comment) => comment.author?._id === user._id
+        );
         setUserHasPosted(hasPosted);
       } else {
         setUserHasPosted(true);
@@ -193,14 +196,16 @@ const Announcements: React.FC<AnnouncementsProps> = ({ courseId }) => {
       selectedAnnouncement?.options?.requirePostBeforeSeeingReplies &&
       !userHasPosted;
     if (shouldHideOthers) {
-      visibleComments = comments.filter((comment) => comment.author._id === user._id);
+      visibleComments = comments.filter((comment) => comment.author?._id === user._id);
     }
     return (
       <ul className={level === 0 ? 'space-y-6' : 'ml-8 space-y-4 mt-4'}>
         {visibleComments
           .filter(comment => comment._id)
           .map((comment) => {
-            const isLiked = user && comment.likes && comment.likes.includes(user._id);
+            const isLiked = Boolean(
+              user && Array.isArray(comment.likes) && comment.likes.includes(user._id)
+            );
             const shouldShowReplies = userHasPosted || 
               !selectedAnnouncement?.options?.requirePostBeforeSeeingReplies ||
               user?.role !== 'student';
@@ -210,11 +215,14 @@ const Announcements: React.FC<AnnouncementsProps> = ({ courseId }) => {
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/50 rounded-full flex items-center justify-center">
                     <span className="text-blue-600 dark:text-blue-300 font-semibold text-sm">
-                      {comment.author.firstName[0]}{comment.author.lastName[0]}
+                      {(comment.author?.firstName?.[0] ?? '?')}
+                      {(comment.author?.lastName?.[0] ?? '')}
                     </span>
                   </div>
                   <div>
-                    <span className="font-semibold text-gray-900 dark:text-gray-100">{comment.author.firstName} {comment.author.lastName}</span>
+                    <span className="font-semibold text-gray-900 dark:text-gray-100">
+                      {[comment.author?.firstName, comment.author?.lastName].filter(Boolean).join(' ') || 'Unknown user'}
+                    </span>
                     <div className="text-xs text-gray-500 dark:text-gray-400">{new Date(comment.createdAt).toLocaleString()}</div>
                   </div>
                 </div>
@@ -377,9 +385,17 @@ const Announcements: React.FC<AnnouncementsProps> = ({ courseId }) => {
                       {new Date(selectedAnnouncement.createdAt).toLocaleString()}
                     </span>
                   </div>
-                  <div className="prose max-w-none text-gray-700 dark:text-gray-300 leading-relaxed prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-p:text-gray-700 dark:prose-p:text-gray-300" dangerouslySetInnerHTML={{ __html: selectedAnnouncement.body }} />
+                  <div
+                    className="prose max-w-none text-gray-700 dark:text-gray-300 leading-relaxed prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-p:text-gray-700 dark:prose-p:text-gray-300"
+                    dangerouslySetInnerHTML={{ __html: selectedAnnouncement.body ?? '' }}
+                  />
                   <div className="mt-4 text-sm text-gray-600 dark:text-gray-400">
-                    By <span className="font-medium text-gray-900 dark:text-gray-100">{selectedAnnouncement.author.firstName} {selectedAnnouncement.author.lastName}</span>
+                    By{' '}
+                    <span className="font-medium text-gray-900 dark:text-gray-100">
+                      {[selectedAnnouncement.author?.firstName, selectedAnnouncement.author?.lastName]
+                        .filter(Boolean)
+                        .join(' ') || 'Unknown user'}
+                    </span>
                   </div>
                 </div>
                 
