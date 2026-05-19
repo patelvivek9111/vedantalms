@@ -76,12 +76,15 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
   );
 
   const timeRemaining = phase === 'TRANSITION' ? transitionTimer : questionTimer;
-  const showAnswerDistribution = phase === 'ANSWER_REVEAL' && phaseElapsed < 3000;
-  const showCorrectAnswer =
-    (phase === 'ANSWER_REVEAL' && phaseElapsed >= 3000) ||
-    phase === 'SCOREBOARD' ||
-    phase === 'TRANSITION';
   const countdown = phase === 'TRANSITION' ? transitionTimer : 0;
+
+  /** Host (teacher) presentation — never use student personal-result UI */
+  const isHostLiveQuestion = phase === 'QUESTION_ACTIVE' || phase === 'QUESTION_LOCKED';
+  const isHostDistribution = phase === 'ANSWER_REVEAL' || phase === 'SCOREBOARD';
+  const isHostTransition = phase === 'TRANSITION';
+  /** Highlight correct answers on the bar chart only after the live-count phase */
+  const hostRevealCorrectOnChart =
+    (phase === 'ANSWER_REVEAL' && phaseElapsed >= 3000) || phase === 'SCOREBOARD';
 
   const loadSession = async () => {
     try {
@@ -468,8 +471,22 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
               </div>
 
               {/* Answer Distribution Chart */}
-              {showAnswerDistribution && (
+              {isHostDistribution && (
                 <div className="mb-4 sm:mb-6 lg:mb-8 w-full">
+                  {phase === 'SCOREBOARD' && gameSnapshot?.leaderboard && gameSnapshot.leaderboard.length > 0 && (
+                    <div className="mb-6 flex flex-wrap justify-center gap-3">
+                      {gameSnapshot.leaderboard.slice(0, 3).map((entry, rank) => (
+                        <div
+                          key={entry.studentId}
+                          className="bg-gray-100 dark:bg-gray-800 rounded-lg px-4 py-2 text-center min-w-[100px]"
+                        >
+                          <p className="text-xs text-gray-500 dark:text-gray-400">#{rank + 1}</p>
+                          <p className="font-semibold text-gray-900 dark:text-white truncate">{entry.nickname}</p>
+                          <p className="text-sm text-purple-600 dark:text-purple-400">{entry.totalScore} pts</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:gap-6">
                     {currentQuestion.options.map((opt: any, idx: number) => {
                       const colorClass = getAnswerColor(idx);
@@ -477,7 +494,7 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
                       const count = answerDistribution[idx] || 0;
                       const maxCount = Math.max(...Object.values(answerDistribution), 1);
                       const barHeight = maxCount > 0 ? Math.max((count / maxCount) * 200, count > 0 ? 40 : 0) : 0;
-                      const isCorrect = opt.isCorrect;
+                      const isCorrect = hostRevealCorrectOnChart && opt.isCorrect;
                       
                       return (
                         <div key={idx} className="flex flex-col items-center">
@@ -533,21 +550,17 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
               )}
 
               {/* Answer Options - Kahoot Style */}
-              {!showAnswerDistribution && (
+              {isHostLiveQuestion && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                   {currentQuestion.options.map((opt: any, idx: number) => {
                     const colorClass = getAnswerColor(idx);
                     const shape = getAnswerShape(idx);
-                    const isCorrect = showCorrectAnswer && opt.isCorrect;
-                    // Make correct answer green when shown
-                    const finalColorClass = isCorrect ? 'bg-green-500' : colorClass;
-                    
                     return (
                       <div
                         key={idx}
-                        className={`${finalColorClass} rounded-2xl p-4 sm:p-6 lg:p-8 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 cursor-pointer ${isCorrect ? 'ring-2 sm:ring-4 ring-green-300 ring-offset-2 sm:ring-offset-4' : ''}`}
+                        className={`${colorClass} rounded-2xl p-4 sm:p-6 lg:p-8 shadow-lg`}
                       >
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 sm:gap-4">
                           <div className="flex items-center gap-3 sm:gap-4">
                             {/* Shape Icon */}
                             <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white/30 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -566,11 +579,6 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
                             </div>
                             <span className="text-white text-lg sm:text-xl lg:text-2xl font-bold break-words">{opt.text}</span>
                           </div>
-                          {isCorrect && (
-                            <div className="bg-white/30 rounded-full p-2">
-                              <Check className="w-6 h-6 text-white" />
-                            </div>
-                          )}
                         </div>
                       </div>
                     );
@@ -579,7 +587,7 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
               )}
 
               {/* Countdown Overlay */}
-              {showCorrectAnswer && countdown > 0 && (
+              {isHostTransition && countdown > 0 && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                   <div className="bg-white dark:bg-gray-800 rounded-full w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 flex items-center justify-center shadow-2xl">
                     <span className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-gray-100 animate-pulse">

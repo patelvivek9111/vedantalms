@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
+    "check:mongo": "node scripts/testMongoConnection.js",
     "worker:quizwave-cleanup": "node workers/quizwaveCleanupWorker.js",
     "worker:grading-jobs": "node workers/gradingJobsWorker.js",
     "check:day1": "node scripts/day1BaselineCheck.js",

@@ -33,7 +33,10 @@ const StudentGameScreen: React.FC = () => {
     gameSnapshot?.phaseEndsAt,
     phase === 'QUESTION_ACTIVE'
   );
-  const showResultMessage = isRevealPhase(phase) || phase === 'FINISHED';
+  /** Personal feedback (student-only) — immediate after answer, not tied to host reveal */
+  const showPersonalFeedback = answered && answerResult != null;
+  /** Option colors/icons reveal when server enters host reveal phases */
+  const showOptionReveal = isRevealPhase(phase);
   const leaderboard = gameSnapshot?.leaderboard ?? [];
 
   const applySnapshot = useCallback((snap: QuizWaveGameSnapshot) => {
@@ -335,8 +338,8 @@ const StudentGameScreen: React.FC = () => {
                 ? colors[(currentColorIndex + index) % colors.length]
                 : getAnswerColor(index);
               const shape = getAnswerShape(index);
-              const isCorrect = showResultMessage && option.isCorrect;
-              const isWrong = showResultMessage && isSelected && !option.isCorrect;
+              const isCorrect = showOptionReveal && option.isCorrect;
+              const isWrong = showOptionReveal && isSelected && !option.isCorrect;
 
               return (
                 <button
@@ -345,8 +348,8 @@ const StudentGameScreen: React.FC = () => {
                   disabled={answered || phase !== 'QUESTION_ACTIVE'}
                   className={`${colorClass} rounded-2xl p-8 sm:p-10 lg:p-12 shadow-2xl transition-all transform ${
                     isSelected && !showColorAnimation ? 'scale-110 ring-4 ring-white' : 'hover:scale-105'
-                  } ${showResultMessage && isCorrect ? 'ring-4 ring-green-300' : ''} ${
-                    showResultMessage && isWrong ? 'ring-4 ring-red-300 opacity-70' : ''
+                  } ${showOptionReveal && isCorrect ? 'ring-4 ring-green-300' : ''} ${
+                    showOptionReveal && isWrong ? 'ring-4 ring-red-300 opacity-70' : ''
                   } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   <div className="flex flex-col items-center justify-center">
@@ -358,15 +361,15 @@ const StudentGameScreen: React.FC = () => {
                       {shape === 'circle' && <div className="w-10 h-10 bg-white rounded-full" />}
                       {shape === 'square' && <div className="w-10 h-10 bg-white" />}
                     </div>
-                    {showResultMessage && isCorrect && <CheckCircle className="w-8 h-8 text-white" />}
-                    {showResultMessage && isWrong && <XCircle className="w-8 h-8 text-white" />}
+                    {showOptionReveal && isCorrect && <CheckCircle className="w-8 h-8 text-white" />}
+                    {showOptionReveal && isWrong && <XCircle className="w-8 h-8 text-white" />}
                   </div>
                 </button>
               );
             })}
           </div>
 
-          {showResultMessage && answerResult && (
+          {showPersonalFeedback && (
             <div className="mt-8 text-center animate-fade-in">
               <div
                 className={`inline-block px-8 py-4 rounded-lg shadow-2xl ${
