@@ -4,6 +4,8 @@
  */
 const { QuizSession } = require('../models/quizwave.model');
 const { setSession, deleteSession } = require('../utils/quizwaveSessionStore');
+const { buildLeaderboard, computeGameSummary } = require('./quizScoringEngine');
+const { leaderboardTopN } = require('../config/quizwaveScoringConfig');
 
 const PHASES = Object.freeze({
   LOBBY: 'LOBBY',
@@ -55,16 +57,6 @@ const schedule = (gamePin, fn, delayMs) => {
   rt.timeouts.push(handle);
   return handle;
 };
-
-const buildLeaderboard = (session) =>
-  session.participants
-    .map((p) => ({
-      studentId: p.student.toString(),
-      nickname: p.nickname,
-      totalScore: p.totalScore,
-      answers: p.answers.length
-    }))
-    .sort((a, b) => b.totalScore - a.totalScore);
 
 const computeAnswerDistribution = (session, questionIndex) => {
   const dist = {};
@@ -145,11 +137,15 @@ const buildSnapshot = (session, quiz, role = 'student') => {
   }
 
   if ([PHASES.SCOREBOARD, PHASES.TRANSITION, PHASES.FINISHED].includes(phase)) {
-    snapshot.leaderboard = buildLeaderboard(session);
+    snapshot.leaderboard = buildLeaderboard(session, {
+      limit: phase === PHASES.SCOREBOARD ? leaderboardTopN : null
+    });
   }
 
   if (phase === PHASES.FINISHED) {
-    snapshot.leaderboard = buildLeaderboard(session);
+    const summary = computeGameSummary(session);
+    snapshot.leaderboard = summary.leaderboard;
+    snapshot.gameSummary = summary;
   }
 
   return snapshot;
@@ -170,7 +166,18 @@ const broadcastGameState = (io, session, quiz) => {
     io.to(`quizwave:${pin}`).emit('quizwave:question-started', studentSnapshot.question);
   }
   if (studentSnapshot.phase === PHASES.FINISHED && studentSnapshot.leaderboard) {
-    io.to(`quizwave:${pin}`).emit('quizwave:quiz-ended', { leaderboard: studentSnapshot.leaderboard });
+    io.to(`quizwave:${pin}`).emit('quizwave:quiz-ended', {
+      leaderboard: studentSnapshot.leaderboard,
+      gameSummary: studentSnapshot.gameSummary
+    });
+  }
+  if (studentSnapshot.phase === PHASES.SCOREBOARD && studentSnapshot.leaderboard) {
+    io.to(`quizwave:${pin}`).emit('quizwave:leaderboard-update', {
+      leaderboard: studentSnapshot.leaderboard
+    });
+    io.to(`quizwave:teacher:${pin}`).emit('quizwave:leaderboard-update', {
+      leaderboard: studentSnapshot.leaderboard
+    });
   }
 };
 
@@ -342,8 +349,10 @@ const finishGame = async (io, sessionId) => {
   const sessionPop = await QuizSession.findById(sessionId).populate('quiz');
   broadcastGameState(io, sessionPop, sessionPop.quiz);
 
+  const endSummary = computeGameSummary(sessionPop);
   io.to(`quizwave:teacher:${session.gamePin}`).emit('quizwave:ended', {
-    leaderboard: buildLeaderboard(sessionPop)
+    leaderboard: endSummary.leaderboard,
+    gameSummary: endSummary
   });
 };
 

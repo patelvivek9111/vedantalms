@@ -30,6 +30,7 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [copied, setCopied] = useState(false);
   const [showFullLeaderboard, setShowFullLeaderboard] = useState(false);
+  const [gameSummary, setGameSummary] = useState<QuizWaveGameSnapshot['gameSummary'] | null>(null);
   const podiumTimerRef = useRef<NodeJS.Timeout | null>(null);
   const token = localStorage.getItem('token') || '';
 
@@ -51,6 +52,7 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
     if (snap.leaderboard?.length) {
       setLeaderboard(snap.leaderboard);
     }
+    if (snap.gameSummary) setGameSummary(snap.gameSummary);
     if (snap.phase === 'FINISHED') {
       if (podiumTimerRef.current) clearTimeout(podiumTimerRef.current);
       podiumTimerRef.current = setTimeout(() => setShowFullLeaderboard(true), 10000);
@@ -77,6 +79,7 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
   /** Host (teacher) presentation — never use student personal-result UI */
   const isHostLiveQuestion = phase === 'QUESTION_ACTIVE' || phase === 'QUESTION_LOCKED';
   const isHostDistribution = phase === 'ANSWER_REVEAL' || phase === 'SCOREBOARD';
+  const isHostScoreboard = phase === 'SCOREBOARD';
   const isHostTransition = phase === 'TRANSITION';
   /** Show correct-answer checkmarks on chart + tiles during reveal (Kahoot-style) */
   const hostRevealCorrectOnChart = phase === 'ANSWER_REVEAL' || phase === 'SCOREBOARD';
@@ -472,9 +475,49 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
                   options={currentQuestion.options}
                   answerDistribution={answerDistribution}
                   showCorrectMarks={hostRevealCorrectOnChart}
-                  leaderboard={gameSnapshot?.leaderboard}
-                  showLeaderboard={phase === 'SCOREBOARD'}
                 />
+              )}
+
+              {isHostScoreboard && leaderboard.length > 0 && (
+                <div className="mt-6 bg-white/10 backdrop-blur rounded-xl p-4 sm:p-6 max-w-2xl mx-auto w-full">
+                  <h3 className="text-white text-lg font-bold mb-4 flex items-center gap-2">
+                    <Trophy className="w-5 h-5 text-yellow-400" />
+                    Top {Math.min(leaderboard.length, 5)}
+                  </h3>
+                  <ul className="space-y-2">
+                    {leaderboard.slice(0, 5).map((entry) => (
+                      <li
+                        key={entry.studentId || entry.nickname}
+                        className="flex items-center justify-between bg-white/10 rounded-lg px-4 py-2"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="text-yellow-400 font-bold w-6">#{entry.rank}</span>
+                          <span className="text-white font-semibold truncate">{entry.nickname}</span>
+                          {(entry.streak ?? 0) >= 2 && (
+                            <span className="text-sm" title="Answer streak">
+                              🔥
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          {(entry.rankDelta ?? 0) > 0 && (
+                            <span className="text-green-300 text-xs font-medium">
+                              ↑{entry.rankDelta}
+                            </span>
+                          )}
+                          {(entry.rankDelta ?? 0) < 0 && (
+                            <span className="text-red-300 text-xs font-medium">
+                              ↓{Math.abs(entry.rankDelta)}
+                            </span>
+                          )}
+                          <span className="text-white font-bold tabular-nums">
+                            {entry.totalScore.toLocaleString()}
+                          </span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
 
               {/* Answer Options - Kahoot Style */}

@@ -152,6 +152,30 @@ const quizSessionSchema = new mongoose.Schema({
       type: Number,
       default: 0
     },
+    streak: {
+      type: Number,
+      default: 0
+    },
+    correctAnswers: {
+      type: Number,
+      default: 0
+    },
+    totalResponseTimeMs: {
+      type: Number,
+      default: 0
+    },
+    lastEarnedPoints: {
+      type: Number,
+      default: 0
+    },
+    lastRankDelta: {
+      type: Number,
+      default: 0
+    },
+    rankHistory: [{
+      questionIndex: { type: Number },
+      rank: { type: Number }
+    }],
     answers: [{
       questionIndex: {
         type: Number,

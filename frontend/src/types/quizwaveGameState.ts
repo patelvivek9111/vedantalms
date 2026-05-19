@@ -17,10 +17,29 @@ export interface QuizWaveQuestionPayload {
 }
 
 export interface QuizWaveLeaderboardEntry {
+  rank?: number;
   studentId: string;
   nickname: string;
   totalScore: number;
+  streak?: number;
+  correctAnswers?: number;
   answers: number;
+  rankDelta?: number;
+  lastEarnedPoints?: number;
+  averageResponseTimeMs?: number;
+}
+
+export interface QuizWaveGameSummary {
+  leaderboard: QuizWaveLeaderboardEntry[];
+  mvpBadges?: Record<string, { nickname: string; [key: string]: unknown }>;
+  participantStats?: Array<{
+    nickname: string;
+    totalScore: number;
+    correctAnswers: number;
+    accuracy: number;
+    averageResponseTimeMs: number;
+    biggestStreak: number;
+  }>;
 }
 
 export interface QuizWaveGameSnapshot {
@@ -39,6 +58,7 @@ export interface QuizWaveGameSnapshot {
   correctOptionIndices?: number[];
   answerDistribution?: Record<number, number>;
   leaderboard?: QuizWaveLeaderboardEntry[];
+  gameSummary?: QuizWaveGameSummary;
 }
 
 export const isQuestionPhase = (phase: QuizWavePhase) =>

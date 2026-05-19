@@ -6,6 +6,9 @@ import { useAuth } from '../../context/AuthContext';
 import { CheckCircle, XCircle } from 'lucide-react';
 import { QuizWaveGameSnapshot, isRevealPhase } from '../../types/quizwaveGameState';
 import { useQuizWavePhaseTimer } from '../../hooks/useQuizWavePhaseTimer';
+import StudentAnswerFeedbackView from './StudentAnswerFeedbackView';
+import type { QuizWavePlayerResult } from '../../types/quizwaveScoring';
+import type { QuizWaveGameSummary } from '../../types/quizwaveGameState';
 
 const StudentGameScreen: React.FC = () => {
   const { pin } = useParams<{ pin: string }>();
@@ -18,7 +21,8 @@ const StudentGameScreen: React.FC = () => {
   const [gameSnapshot, setGameSnapshot] = useState<QuizWaveGameSnapshot | null>(null);
   const [selectedAnswer, setSelectedAnswer] = useState<number[]>([]);
   const [answered, setAnswered] = useState(false);
-  const [answerResult, setAnswerResult] = useState<{ isCorrect: boolean; points: number } | null>(null);
+  const [answerResult, setAnswerResult] = useState<QuizWavePlayerResult | null>(null);
+  const [gameSummary, setGameSummary] = useState<QuizWaveGameSummary | null>(null);
   const [socket, setSocket] = useState<any>(null);
   const [showColorAnimation, setShowColorAnimation] = useState(false);
   const [currentColorIndex, setCurrentColorIndex] = useState(0);
@@ -101,6 +105,7 @@ const StudentGameScreen: React.FC = () => {
         sock.off('quizwave:joined');
         sock.off('quizwave:game-state');
         sock.off('quizwave:answer-received');
+        sock.off('quizwave:player-result');
         sock.off('quizwave:quiz-ended');
         sock.off('quizwave:error');
 
@@ -112,17 +117,25 @@ const StudentGameScreen: React.FC = () => {
           sock.emit('quizwave:sync-game-state', { gamePin: pin });
         });
 
-        sock.on('quizwave:answer-received', (data: any) => {
-          setAnswerResult({
-            isCorrect: data.isCorrect,
-            points: data.points
-          });
-        });
+        const applyPlayerResult = (data: QuizWavePlayerResult) => {
+          setAnswerResult(data);
+          setShowColorAnimation(false);
+        };
+
+        sock.on('quizwave:answer-received', applyPlayerResult);
+        sock.on('quizwave:player-result', applyPlayerResult);
 
         sock.on('quizwave:quiz-ended', (data: any) => {
+          if (data.gameSummary) setGameSummary(data.gameSummary);
           setGameSnapshot((prev) =>
             prev
-              ? { ...prev, phase: 'FINISHED', status: 'ended', leaderboard: data.leaderboard }
+              ? {
+                  ...prev,
+                  phase: 'FINISHED',
+                  status: 'ended',
+                  leaderboard: data.leaderboard,
+                  gameSummary: data.gameSummary
+                }
               : null
           );
         });
@@ -164,6 +177,7 @@ const StudentGameScreen: React.FC = () => {
         sock.off('quizwave:joined');
         sock.off('quizwave:game-state');
         sock.off('quizwave:answer-received');
+        sock.off('quizwave:player-result');
         sock.off('quizwave:quiz-ended');
         sock.off('quizwave:error');
         sock.off('connect');
@@ -232,10 +246,35 @@ const StudentGameScreen: React.FC = () => {
   }
 
   if (phase === 'FINISHED' || session?.status === 'ended') {
+    const summary = gameSummary ?? gameSnapshot?.gameSummary;
+    const myStats = summary?.participantStats?.find((s) => s.nickname === nickname);
+    const mvp = summary?.mvpBadges;
     const myRank = leaderboard.findIndex((entry: any) => entry.nickname === nickname) + 1;
     const myScore = leaderboard.find((entry: any) => entry.nickname === nickname)?.totalScore || 0;
     const isTopThree = myRank <= 3 && myRank > 0;
     const myEntry = leaderboard.find((entry: any) => entry.nickname === nickname);
+
+    const endStatsBlock = (myStats || mvp) && (
+      <div className="mt-6 text-left space-y-3 text-white/90 text-sm">
+        {myStats && (
+          <div className="grid grid-cols-2 gap-2">
+            <p>Accuracy: <span className="font-bold text-white">{myStats.accuracy}%</span></p>
+            <p>Correct: <span className="font-bold text-white">{myStats.correctAnswers}</span></p>
+            <p>Avg time: <span className="font-bold text-white">{(myStats.averageResponseTimeMs / 1000).toFixed(1)}s</span></p>
+            <p>Best streak: <span className="font-bold text-white">{myStats.biggestStreak} 🔥</span></p>
+          </div>
+        )}
+        {mvp && Object.keys(mvp).length > 0 && (
+          <div className="border-t border-white/20 pt-3 space-y-1">
+            <p className="font-semibold text-white">MVP badges</p>
+            {mvp.fastestAnswer && <p>⚡ Fastest: {mvp.fastestAnswer.nickname}</p>}
+            {mvp.highestAccuracy && <p>🎯 Accuracy: {mvp.highestAccuracy.nickname}</p>}
+            {mvp.biggestClimber && <p>📈 Climber: {mvp.biggestClimber.nickname}</p>}
+            {mvp.longestStreak && <p>🔥 Streak: {mvp.longestStreak.nickname}</p>}
+          </div>
+        )}
+      </div>
+    );
 
     if (isTopThree && myEntry) {
       const podiumData = [
@@ -267,6 +306,7 @@ const StudentGameScreen: React.FC = () => {
                   </div>
                 </div>
               </div>
+              {endStatsBlock}
               <button
                 onClick={() => navigate('/quizwave/join')}
                 className="w-full mt-6 bg-white/20 hover:bg-white/30 text-white py-3 rounded-lg font-semibold transition-colors"
@@ -286,6 +326,7 @@ const StudentGameScreen: React.FC = () => {
             <h2 className="text-2xl sm:text-3xl font-bold text-white mb-6">Quiz Complete! 🎉</h2>
             <p className="text-5xl font-bold text-white">#{myRank}</p>
             <p className="text-4xl font-bold text-white mt-4">{myScore} pts</p>
+            {endStatsBlock}
             <button
               onClick={() => navigate('/quizwave/join')}
               className="w-full mt-8 bg-white/20 hover:bg-white/30 text-white py-3 rounded-lg font-semibold"
@@ -315,6 +356,19 @@ const StudentGameScreen: React.FC = () => {
     const shapes = ['triangle', 'diamond', 'circle', 'square'];
     return shapes[index % shapes.length];
   };
+
+  if (showPersonalFeedback && answerResult) {
+    const questionNumber = (currentQuestion.questionIndex ?? 0) + 1;
+    const totalQuestions = gameSnapshot?.totalQuestions ?? session?.quiz?.questions?.length ?? 1;
+    return (
+      <StudentAnswerFeedbackView
+        result={answerResult}
+        pin={pin!}
+        questionNumber={questionNumber}
+        totalQuestions={totalQuestions}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-500 via-purple-600 to-pink-500 flex flex-col">
@@ -369,30 +423,6 @@ const StudentGameScreen: React.FC = () => {
             })}
           </div>
 
-          {showPersonalFeedback && (
-            <div className="mt-8 text-center animate-fade-in">
-              <div
-                className={`inline-block px-8 py-4 rounded-lg shadow-2xl ${
-                  answerResult.isCorrect ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
-                }`}
-              >
-                <div className="flex items-center justify-center gap-3">
-                  {answerResult.isCorrect ? (
-                    <>
-                      <CheckCircle className="w-8 h-8" />
-                      <span className="font-bold text-2xl">Correct!</span>
-                    </>
-                  ) : (
-                    <>
-                      <XCircle className="w-8 h-8" />
-                      <span className="font-bold text-2xl">Incorrect</span>
-                    </>
-                  )}
-                </div>
-                <p className="text-lg mt-2 font-semibold">+{answerResult.points} points</p>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>

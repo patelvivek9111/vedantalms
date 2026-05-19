@@ -4,6 +4,7 @@ const { setSession } = require('../utils/quizwaveSessionStore');
 const { allowQuizWaveEvent } = require('../utils/quizwaveSocketThrottle');
 const engine = require('../services/quizwaveSessionEngine');
 const { PHASES } = engine;
+const { processAnswer, buildLeaderboard } = require('../services/quizScoringEngine');
 
 // Store active sessions through redis-backed store when available
 const activeSessions = new Map(); // Legacy export for backward compatibility
@@ -300,79 +301,15 @@ const initializeQuizWaveSocket = (io) => {
           return;
         }
 
-        // Check if correct
-        const correctOptions = question.options
-          .map((opt, idx) => opt.isCorrect ? idx : -1)
-          .filter(idx => idx !== -1)
-          .sort();
-
-        // Normalize selectedOptions to ensure it's an array and sorted
-        const normalizedSelected = Array.isArray(selectedOptions) 
-          ? [...selectedOptions].sort() 
-          : [selectedOptions].sort();
-        
-        const isCorrect = JSON.stringify(normalizedSelected) === JSON.stringify(correctOptions);
-        
-        console.log(`✅ Answer check for question ${questionIndex} (${question.questionType}):`, {
-          questionText: question.questionText.substring(0, 50) + '...',
-          selectedOptions: normalizedSelected,
-          correctOptions: correctOptions,
-          isCorrect: isCorrect,
-          questionOptions: question.options.map((opt, idx) => ({ idx, text: opt.text, isCorrect: opt.isCorrect }))
-        });
-
-        // Calculate streak (consecutive correct answers before this question)
-        // Streak is the number of consecutive correct answers ending with the previous question
-        let streak = 0;
-        const sortedAnswers = [...participant.answers].sort((a, b) => a.questionIndex - b.questionIndex);
-        // Count backwards from the most recent answer (before current question)
-        for (let i = sortedAnswers.length - 1; i >= 0; i--) {
-          if (sortedAnswers[i].isCorrect) {
-            streak++;
-          } else {
-            break;
-          }
-        }
-        // If current answer is correct, it will be part of the streak for the next question
-
-        // Authoritative time taken (clamp client value to server phase window)
-        const phaseStart = session.phaseStartedAt ? session.phaseStartedAt.getTime() : Date.now();
-        const maxTime = question.timeLimit * 1000;
-        const serverElapsed = Math.min(maxTime, Math.max(0, Date.now() - phaseStart));
-        const authoritativeTimeTaken = Math.min(
-          maxTime,
-          Math.max(0, typeof timeTaken === 'number' ? timeTaken : serverElapsed)
-        );
-
-        // Calculate points using new formula
-        let points = 0;
-        if (isCorrect) {
-          // points = 500 * (1 - (time_taken / max_time))
-          points = 500 * (1 - (authoritativeTimeTaken / maxTime));
-          // Ensure points is not negative
-          if (points < 0) {
-            points = 0;
-          }
-          // Add streak bonus
-          points += (streak * 50);
-          // Round to whole number
-          points = Math.round(points);
-        } else {
-          // Incorrect answer = 0 points
-          points = 0;
-        }
-
-        // Save answer
-        participant.answers.push({
+        const { playerResult } = processAnswer({
+          participant,
+          session,
+          question,
           questionIndex,
           selectedOptions,
-          isCorrect,
-          points,
-          timeTaken: authoritativeTimeTaken,
-          answeredAt: new Date()
+          clientTimeTaken: timeTaken
         });
 
-        participant.totalScore += points;
         await session.save();
 
         const sessionFresh = await QuizSession.findById(sessionId).populate('quiz');
@@ -382,27 +319,27 @@ const initializeQuizWaveSocket = (io) => {
 
         await engine.checkAllAnswered(io, sessionId);
 
-        // Emit answer received
-        socket.emit('quizwave:answer-received', {
-          isCorrect,
-          points,
-          correctOptions: question.options
-            .map((opt, idx) => opt.isCorrect ? idx : -1)
-            .filter(idx => idx !== -1)
-        });
+        // Student-only personal result (teacher must not receive this card)
+        socket.emit('quizwave:answer-received', playerResult);
+        socket.emit('quizwave:player-result', playerResult);
 
-        // Notify teacher of answer submission
+        const lastAnswer = participant.answers[participant.answers.length - 1];
         const answerSubmittedData = {
           participantId: socket.userId,
           nickname: participant.nickname,
           questionIndex,
           selectedOptions,
-          timeTaken
+          timeTaken: lastAnswer?.timeTaken ?? playerResult.responseTimeMs,
+          answered: true
         };
-        console.log(`📤 Emitting answer-submitted to teacher room: quizwave:teacher:${session.gamePin}`, answerSubmittedData);
-        io.to(`quizwave:teacher:${session.gamePin}`).emit('quizwave:answer-submitted', answerSubmittedData);
-        
-        console.log(`✅ Answer saved for ${participant.nickname}: ${isCorrect ? 'Correct' : 'Incorrect'}, ${points} points`);
+        io.to(`quizwave:teacher:${session.gamePin}`).emit(
+          'quizwave:answer-submitted',
+          answerSubmittedData
+        );
+
+        console.log(
+          `✅ Answer saved for ${participant.nickname}: ${playerResult.isCorrect ? 'Correct' : 'Incorrect'}, ${playerResult.points} points (rank ${playerResult.rank})`
+        );
       } catch (error) {
         socketMetrics.eventErrors += 1;
         console.error('❌ Answer error:', error);
@@ -529,15 +466,7 @@ const initializeQuizWaveSocket = (io) => {
           return;
         }
 
-        const leaderboard = session.participants
-          .map(p => ({
-            studentId: p.student.toString(),
-            nickname: p.nickname,
-            totalScore: p.totalScore,
-            answers: p.answers.length
-          }))
-          .sort((a, b) => b.totalScore - a.totalScore);
-
+        const leaderboard = buildLeaderboard(session);
         socket.emit('quizwave:leaderboard', { leaderboard });
       } catch (error) {
         socketMetrics.eventErrors += 1;
