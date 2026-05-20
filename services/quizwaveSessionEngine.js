@@ -5,8 +5,6 @@
 const { QuizSession } = require('../models/quizwave.model');
 const { setSession, deleteSession } = require('../utils/quizwaveSessionStore');
 const { buildLeaderboard, computeGameSummary } = require('./quizScoringEngine');
-const { leaderboardTopN } = require('../config/quizwaveScoringConfig');
-
 const PHASES = Object.freeze({
   LOBBY: 'LOBBY',
   QUESTION_ACTIVE: 'QUESTION_ACTIVE',
@@ -136,12 +134,6 @@ const buildSnapshot = (session, quiz, role = 'student') => {
     ).length;
   }
 
-  if ([PHASES.SCOREBOARD, PHASES.TRANSITION, PHASES.FINISHED].includes(phase)) {
-    snapshot.leaderboard = buildLeaderboard(session, {
-      limit: phase === PHASES.SCOREBOARD ? leaderboardTopN : null
-    });
-  }
-
   if (phase === PHASES.FINISHED) {
     const summary = computeGameSummary(session);
     snapshot.leaderboard = summary.leaderboard;
@@ -169,14 +161,6 @@ const broadcastGameState = (io, session, quiz) => {
     io.to(`quizwave:${pin}`).emit('quizwave:quiz-ended', {
       leaderboard: studentSnapshot.leaderboard,
       gameSummary: studentSnapshot.gameSummary
-    });
-  }
-  if (studentSnapshot.phase === PHASES.SCOREBOARD && studentSnapshot.leaderboard) {
-    io.to(`quizwave:${pin}`).emit('quizwave:leaderboard-update', {
-      leaderboard: studentSnapshot.leaderboard
-    });
-    io.to(`quizwave:teacher:${pin}`).emit('quizwave:leaderboard-update', {
-      leaderboard: studentSnapshot.leaderboard
     });
   }
 };
@@ -255,6 +239,11 @@ const transitionTo = async (io, sessionId, expectedPhase, nextPhase, durationMs)
 };
 
 const scheduleNext = (io, sessionId, currentPhase, _durationMs) => {
+  // Teacher advances to the next question manually (no auto chain after scoreboard/transition).
+  if (currentPhase === PHASES.SCOREBOARD || currentPhase === PHASES.TRANSITION) {
+    return;
+  }
+
   const run = async () => {
     const session = await QuizSession.findById(sessionId).populate('quiz');
     if (!session) return;
@@ -301,7 +290,7 @@ const advanceOrFinish = async (io, sessionId) => {
     return;
   }
 
-  await transitionTo(io, sessionId, PHASES.SCOREBOARD, PHASES.TRANSITION, PHASE_MS.TRANSITION);
+  await startQuestion(io, sessionId, nextIndex);
 };
 
 const startQuestion = async (io, sessionId, questionIndex) => {

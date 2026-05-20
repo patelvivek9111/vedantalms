@@ -37,8 +37,12 @@ const StudentGameScreen: React.FC = () => {
     gameSnapshot?.phaseEndsAt,
     phase === 'QUESTION_ACTIVE'
   );
-  /** Personal feedback (student-only) — immediate after answer, not tied to host reveal */
-  const showPersonalFeedback = answered && answerResult != null;
+  const postAnswerPhases = ['QUESTION_LOCKED', 'ANSWER_REVEAL', 'SCOREBOARD', 'TRANSITION'];
+  const isPostAnswerPhase = postAnswerPhases.includes(phase);
+  /** Personal feedback stays visible until the teacher advances to the next question */
+  const showPersonalFeedback =
+    answered &&
+    (answerResult != null || isPostAnswerPhase || phase === 'QUESTION_ACTIVE');
   /** Option colors/icons reveal when server enters host reveal phases */
   const showOptionReveal = isRevealPhase(phase);
   const leaderboard = gameSnapshot?.leaderboard ?? [];
@@ -47,17 +51,25 @@ const StudentGameScreen: React.FC = () => {
     if (process.env.NODE_ENV === 'development') {
       console.log('[CLIENT SYNC] student', snap.phase, 'Q', snap.currentQuestionIndex);
     }
-    setGameSnapshot(snap);
+
+    setGameSnapshot((prev) => {
+      const advancedToNewQuestion =
+        snap.phase === 'QUESTION_ACTIVE' &&
+        prev != null &&
+        snap.currentQuestionIndex !== prev.currentQuestionIndex;
+
+      if (advancedToNewQuestion) {
+        setSelectedAnswer([]);
+        setAnswered(false);
+        setAnswerResult(null);
+        setShowColorAnimation(false);
+      }
+      return snap;
+    });
+
     setSession((prev: any) =>
       prev ? { ...prev, status: snap.status, currentQuestionIndex: snap.currentQuestionIndex } : prev
     );
-
-    if (snap.phase === 'QUESTION_ACTIVE') {
-      setSelectedAnswer([]);
-      setAnswered(false);
-      setAnswerResult(null);
-      setShowColorAnimation(false);
-    }
   }, []);
 
   const loadSession = async () => {
@@ -357,7 +369,7 @@ const StudentGameScreen: React.FC = () => {
     return shapes[index % shapes.length];
   };
 
-  if (showPersonalFeedback && answerResult) {
+  if (showPersonalFeedback) {
     const questionNumber = (currentQuestion.questionIndex ?? 0) + 1;
     const totalQuestions = gameSnapshot?.totalQuestions ?? session?.quiz?.questions?.length ?? 1;
     return (
@@ -366,6 +378,7 @@ const StudentGameScreen: React.FC = () => {
         pin={pin!}
         questionNumber={questionNumber}
         totalQuestions={totalQuestions}
+        isLoading={!answerResult}
       />
     );
   }

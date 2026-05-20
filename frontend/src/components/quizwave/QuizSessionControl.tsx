@@ -478,48 +478,6 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
                 />
               )}
 
-              {isHostScoreboard && leaderboard.length > 0 && (
-                <div className="mt-6 bg-white/10 backdrop-blur rounded-xl p-4 sm:p-6 max-w-2xl mx-auto w-full">
-                  <h3 className="text-white text-lg font-bold mb-4 flex items-center gap-2">
-                    <Trophy className="w-5 h-5 text-yellow-400" />
-                    Top {Math.min(leaderboard.length, 5)}
-                  </h3>
-                  <ul className="space-y-2">
-                    {leaderboard.slice(0, 5).map((entry) => (
-                      <li
-                        key={entry.studentId || entry.nickname}
-                        className="flex items-center justify-between bg-white/10 rounded-lg px-4 py-2"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <span className="text-yellow-400 font-bold w-6">#{entry.rank}</span>
-                          <span className="text-white font-semibold truncate">{entry.nickname}</span>
-                          {(entry.streak ?? 0) >= 2 && (
-                            <span className="text-sm" title="Answer streak">
-                              🔥
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-3 shrink-0">
-                          {(entry.rankDelta ?? 0) > 0 && (
-                            <span className="text-green-300 text-xs font-medium">
-                              ↑{entry.rankDelta}
-                            </span>
-                          )}
-                          {(entry.rankDelta ?? 0) < 0 && (
-                            <span className="text-red-300 text-xs font-medium">
-                              ↓{Math.abs(entry.rankDelta)}
-                            </span>
-                          )}
-                          <span className="text-white font-bold tabular-nums">
-                            {entry.totalScore.toLocaleString()}
-                          </span>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
               {/* Answer Options - Kahoot Style */}
               {isHostLiveQuestion && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
@@ -579,7 +537,7 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
                 className="bg-blue-600 text-white px-4 sm:px-6 lg:px-8 py-2 sm:py-2.5 lg:py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm sm:text-base lg:text-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <SkipForward className="w-4 h-4 sm:w-5 sm:h-5" />
-                {phase === 'QUESTION_ACTIVE' ? 'Wait for timer...' : 'Next Question'}
+                {phase === 'QUESTION_ACTIVE' ? 'Wait for answers / timer...' : 'Next Question'}
               </button>
             ) : (
               <button
