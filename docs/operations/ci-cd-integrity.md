@@ -108,6 +108,16 @@ Canonical engine: **`calculateFinalGradeWithWeightedGroups`**.
 - `shared/grading/gradeCalculation.mjs`
 - Type declarations in `shared/grading/index.d.ts`
 
+## Workflow-specific notes
+
+| Workflow | Mongo in CI | Notes |
+|----------|-------------|--------|
+| **Predeploy Check** | Optional (smoke secrets) | Build + tests; smoke skips without `MONGODB_URI` |
+| **Grading Production Matrix** | `mongo:7` service + `lms-grading-ci` | Grading tests use in-memory Mongo; `validate:indexes` syncs indexes on the service DB |
+| **Institutional Hardening** | `mongo:7` service + `lms-hardening-ci` | Requires `MONGODB_URI` for `migrate:dry-run` |
+
+Set `MONGO_DB_NAME` to match the database in `MONGODB_URI` when both are used (avoids mongoose overriding the URI database with a default).
+
 ## Common deployment failures
 
 | Symptom | Likely cause | Fix |
@@ -115,6 +125,8 @@ Canonical engine: **`calculateFinalGradeWithWeightedGroups`**.
 | “Invalid workflow file… Unrecognized named-value: 'secrets'” | `secrets` in `if:` | Use shell gating (see above) |
 | Workflow graph empty / 0 jobs | Same YAML parse error | `npm run verify:workflows` |
 | `verify:grading` fails on deprecated calculator | New call/import outside allowlist | Use canonical calculator in app code |
+| `validate:indexes` / `ns does not exist` | Fresh CI Mongo, no collections yet | Script runs `syncIndexes()` first; ensure job has Mongo service + `MONGODB_URI` |
+| `migrate:dry-run` fails instantly | `MONGODB_URI` missing | Add Mongo service + env (see hardening workflow) |
 | Smoke fails on Mongo | Bad URI / network / Atlas IP allowlist | Fix `MONGODB_URI` secret or connectivity |
 | Smoke warns on Redis | Redis down but not required | Set `REDIS_URL` or accept warning when `REQUIRE_REDIS=false` |
 

@@ -58,13 +58,30 @@ function collectionHasIndex(collectionIndexes, expectedKeys) {
   return collectionIndexes.some((idx) => indexKeySig(idx.key) === want);
 }
 
+async function syncModelIndexes(Model, modelName) {
+  try {
+    await Model.syncIndexes();
+  } catch (err) {
+    if (err.code === 86 || err.codeName === 'IndexKeySpecsConflict') {
+      console.warn(`WARN  ${modelName} syncIndexes index conflict (continuing validation)`);
+      return;
+    }
+    throw err;
+  }
+}
+
 async function main() {
   const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/lms';
-  await mongoose.connect(uri);
+  const connectOptions = {};
+  if (process.env.MONGO_DB_NAME) {
+    connectOptions.dbName = process.env.MONGO_DB_NAME;
+  }
+  await mongoose.connect(uri, connectOptions);
   let failed = 0;
 
   for (const spec of EXPECTED) {
     const Model = require(spec.path);
+    await syncModelIndexes(Model, spec.model);
     const indexes = await Model.collection.indexes();
     for (const exp of spec.indexes) {
       const ok = collectionHasIndex(indexes, exp.keys);

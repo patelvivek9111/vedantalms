@@ -22,7 +22,6 @@ const migrationRunSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-migrationRunSchema.index({ migrationId: 1 });
 migrationRunSchema.index({ status: 1, createdAt: -1 });
 
 module.exports = mongoose.model('MigrationRun', migrationRunSchema);

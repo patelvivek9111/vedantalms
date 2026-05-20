@@ -9,6 +9,18 @@ on:
 jobs:
   hardening:
     runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+
+    env:
+      MONGODB_URI: mongodb://127.0.0.1:27017/lms-hardening-ci
+      MONGO_DB_NAME: lms-hardening-ci
+      JWT_SECRET: ci-test-jwt-secret
+      NODE_ENV: test
+
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -18,7 +30,9 @@ jobs:
       - run: npm ci
       - run: npm audit --audit-level=high || true
       - run: npm run verify:grading
+      - run: npm run verify:workflows
       - run: npm run test:grading
+      - run: npm run validate:indexes
       - run: npm run migrate:dry-run
       - run: node scripts/verifyAuditIntegrity.js || echo "skip audit integrity without mongo"
         continue-on-error: true

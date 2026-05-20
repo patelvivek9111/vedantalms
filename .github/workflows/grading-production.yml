@@ -30,6 +30,7 @@ jobs:
 
     env:
       MONGODB_URI: mongodb://127.0.0.1:27017/lms-grading-ci
+      MONGO_DB_NAME: lms-grading-ci
       JWT_SECRET: ci-test-jwt-secret
       NODE_ENV: test
       FORCE_INLINE_JOBS: 'true'
@@ -48,6 +49,9 @@ jobs:
 
       - name: Verify shared grading
         run: npm run verify:grading
+
+      - name: Verify workflow files
+        run: npm run verify:workflows
 
       - name: Grading test suite
         run: npm run test:grading

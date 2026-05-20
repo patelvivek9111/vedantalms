@@ -44,10 +44,13 @@ Usage: node scripts/migrations/run.js [options]
     process.exit(1);
   }
 
-  await mongoose.connect(uri, {
-    dbName: process.env.MONGO_DB_NAME || 'lms',
+  const connectOptions = {
     maxPoolSize: parseInt(process.env.MONGO_MAX_POOL_SIZE || '10', 10),
-  });
+  };
+  if (process.env.MONGO_DB_NAME) {
+    connectOptions.dbName = process.env.MONGO_DB_NAME;
+  }
+  await mongoose.connect(uri, connectOptions);
 
   console.log(`[migrate] Connected. dryRun=${opts.dryRun} force=${opts.force}`);
   const results = await runAll(migrations, opts);
