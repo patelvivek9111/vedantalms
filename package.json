@@ -27,6 +27,7 @@
     "test:grading": "jest tests/grading --runInBand --forceExit",
     "test:grading:policy": "jest tests/grading --testPathPattern=policy|parity",
     "verify:grading": "node scripts/verifySharedGrading.js && node scripts/checkDeprecatedGradingCalculator.js",
+    "verify:workflows": "node scripts/validateWorkflowFiles.js",
     "validate:indexes": "node scripts/validateMongoIndexes.js",
     "migrate": "node scripts/migrations/run.js",
     "migrate:dry-run": "node scripts/migrations/run.js --dry-run",

@@ -189,7 +189,10 @@ export function calculateFinalGradeWithWeightedGroups(
   return weightedSum / totalAdjustedWeight;
 }
 
-/** @deprecated */
+/**
+ * @deprecated Legacy weighted calculator — use calculateFinalGradeWithWeightedGroups.
+ * Exported only for backward compatibility; do not use in gradebook, exports, transcripts, or reports.
+ */
 export function getWeightedGradeForStudent(studentId, course, assignments, grades, submissions = {}) {
   const sid = String(studentId);
   let weightedSum = 0;

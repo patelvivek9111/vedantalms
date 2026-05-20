@@ -12,7 +12,9 @@ const NEEDLE = 'getWeightedGradeForStudent';
 /** May define, re-export, or reference in verification lists only. */
 const ALLOWED_MENTION = new Set([
   'shared/grading/gradeCalculation.cjs',
+  'shared/grading/gradeCalculation.mjs',
   'shared/grading/index.cjs',
+  'shared/grading/index.d.ts',
   'utils/gradeCalculation.js',
   'frontend/src/utils/gradeUtils.ts',
   'scripts/verifySharedGrading.js',
@@ -20,9 +22,16 @@ const ALLOWED_MENTION = new Set([
   'tests/grading/canonicalCalculatorUsage.policy.test.js',
 ]);
 
+/** Legacy implementations that may define the deprecated calculator. */
+const LEGACY_DEFINITION = new Set([
+  'shared/grading/gradeCalculation.cjs',
+  'shared/grading/gradeCalculation.mjs',
+]);
+
 /** May call the deprecated function (legacy regression tests only). */
 const ALLOWED_CALLERS = new Set([
   'shared/grading/gradeCalculation.cjs',
+  'shared/grading/gradeCalculation.mjs',
   'tests/grading/legacyCalculator.policy.test.js',
   'tests/grading/edgeCases.policy.test.js',
 ]);
@@ -59,7 +68,8 @@ for (const file of walk(ROOT)) {
   if (!content.includes(NEEDLE)) continue;
 
   if (ALLOWED_MENTION.has(rel)) {
-    if (hasCall(content) && rel !== 'shared/grading/gradeCalculation.cjs') {
+    const isTypeDeclaration = rel.endsWith('.d.ts');
+    if (hasCall(content) && !LEGACY_DEFINITION.has(rel) && !isTypeDeclaration) {
       violations.push(`${rel} (re-export/mention only — must not call)`);
     }
     continue;

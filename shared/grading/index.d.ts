@@ -69,6 +69,9 @@ export function calculateFinalGradeWithWeightedGroups(
   policyOverride?: GradingPolicyConfig | null
 ): number;
 
+/**
+ * @deprecated Legacy weighted calculator — use calculateFinalGradeWithWeightedGroups.
+ */
 export function getWeightedGradeForStudent(
   studentId: string,
   course: CourseGradingContext,

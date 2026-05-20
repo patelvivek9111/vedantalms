@@ -42,11 +42,15 @@ jobs:
         run: npm run test:grading
         working-directory: frontend
 
-      - name: Run smoke check (when secrets are present)
-        if: ${{ secrets.MONGODB_URI != '' }}
+      - name: Run smoke check (optional — skips when secrets unavailable)
         env:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
           REDIS_URL: ${{ secrets.REDIS_URL }}
           REQUIRE_REDIS: "false"
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
-        run: npm run smoke:predeploy
+        run: |
+          if [ -z "$MONGODB_URI" ]; then
+            echo "Skipping smoke test because MONGODB_URI secret is not configured"
+            exit 0
+          fi
+          npm run smoke:predeploy
