@@ -594,22 +594,20 @@ if (process.env.NODE_ENV === 'production') {
     requestPath.startsWith('/assets/') &&
     /\.(js|mjs|css|map|woff2?|ttf|svg|png|jpe?g|gif|webp|ico)$/i.test(requestPath);
 
-  // Hashed build assets: long cache. Missing files must 404 (not index.html) or lazy chunks break.
+  // Hashed bundles under /assets: 404 when missing (express.static fallthrough only calls next(), not our callback).
   app.use((req, res, next) => {
     if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.method !== 'GET') {
       return next();
     }
-    express.static(frontendDist, {
-      maxAge: '1y',
-      immutable: true,
-      fallthrough: true
-    })(req, res, (err) => {
-      if (err) return next(err);
-      if (isBundledAssetRequest(req.path)) {
+    if (isBundledAssetRequest(req.path)) {
+      const assetPath = path.normalize(path.join(frontendDist, req.path));
+      if (!assetPath.startsWith(frontendDist) || !fs.existsSync(assetPath)) {
         return res.status(404).type('text/plain').send('Not found');
       }
-      return next();
-    });
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      return res.sendFile(assetPath, (err) => (err ? next(err) : undefined));
+    }
+    express.static(frontendDist, { maxAge: '1d' })(req, res, next);
   });
 
   // SPA shell: always revalidate so clients pick up new chunk hashes after deploy.

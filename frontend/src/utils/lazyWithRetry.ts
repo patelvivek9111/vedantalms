@@ -15,11 +15,15 @@ export function isChunkLoadError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   const msg = error.message.toLowerCase();
   return (
-    error.name === 'TypeError' &&
-    (msg.includes('failed to fetch dynamically imported module') ||
-      msg.includes('importing a module script failed') ||
-      msg.includes('error loading dynamically imported module') ||
-      msg.includes('failed to load module script'))
+    (error.name === 'TypeError' &&
+      (msg.includes('failed to fetch dynamically imported module') ||
+        msg.includes('importing a module script failed') ||
+        msg.includes('error loading dynamically imported module') ||
+        msg.includes('failed to load module script') ||
+        msg.includes('not a valid javascript mime type') ||
+        msg.includes("'text/html' is not a valid"))) ||
+    msg.includes('loading chunk') ||
+    msg.includes('loading css chunk')
   );
 }
 
