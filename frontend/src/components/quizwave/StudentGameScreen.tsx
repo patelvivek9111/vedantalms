@@ -7,6 +7,7 @@ import { CheckCircle, XCircle } from 'lucide-react';
 import { QuizWaveGameSnapshot, isRevealPhase } from '../../types/quizwaveGameState';
 import { useQuizWavePhaseTimer } from '../../hooks/useQuizWavePhaseTimer';
 import StudentAnswerFeedbackView from './StudentAnswerFeedbackView';
+import StudentGameResults from './StudentGameResults';
 import type { QuizWavePlayerResult } from '../../types/quizwaveScoring';
 import type { QuizWaveGameSummary } from '../../types/quizwaveGameState';
 
@@ -258,96 +259,24 @@ const StudentGameScreen: React.FC = () => {
   }
 
   if (phase === 'FINISHED' || session?.status === 'ended') {
-    const summary = gameSummary ?? gameSnapshot?.gameSummary;
-    const myStats = summary?.participantStats?.find((s) => s.nickname === nickname);
-    const mvp = summary?.mvpBadges;
-    const myRank = leaderboard.findIndex((entry: any) => entry.nickname === nickname) + 1;
-    const myScore = leaderboard.find((entry: any) => entry.nickname === nickname)?.totalScore || 0;
-    const isTopThree = myRank <= 3 && myRank > 0;
-    const myEntry = leaderboard.find((entry: any) => entry.nickname === nickname);
-
-    const endStatsBlock = (myStats || mvp) && (
-      <div className="mt-6 text-left space-y-3 text-white/90 text-sm">
-        {myStats && (
-          <div className="grid grid-cols-2 gap-2">
-            <p>Accuracy: <span className="font-bold text-white">{myStats.accuracy}%</span></p>
-            <p>Correct: <span className="font-bold text-white">{myStats.correctAnswers}</span></p>
-            <p>Avg time: <span className="font-bold text-white">{(myStats.averageResponseTimeMs / 1000).toFixed(1)}s</span></p>
-            <p>Best streak: <span className="font-bold text-white">{myStats.biggestStreak} 🔥</span></p>
-          </div>
-        )}
-        {mvp && Object.keys(mvp).length > 0 && (
-          <div className="border-t border-white/20 pt-3 space-y-1">
-            <p className="font-semibold text-white">MVP badges</p>
-            {mvp.fastestAnswer && <p>⚡ Fastest: {mvp.fastestAnswer.nickname}</p>}
-            {mvp.highestAccuracy && <p>🎯 Accuracy: {mvp.highestAccuracy.nickname}</p>}
-            {mvp.biggestClimber && <p>📈 Climber: {mvp.biggestClimber.nickname}</p>}
-            {mvp.longestStreak && <p>🔥 Streak: {mvp.longestStreak.nickname}</p>}
-          </div>
-        )}
-      </div>
-    );
-
-    if (isTopThree && myEntry) {
-      const podiumData = [
-        { rank: 1, color: 'bg-orange-500', height: '280px', avatarSize: 'w-32 h-32', textSize: 'text-6xl', nameSize: 'text-xl' },
-        { rank: 2, color: 'bg-red-500', height: '200px', avatarSize: 'w-24 h-24', textSize: 'text-5xl', nameSize: 'text-lg' },
-        { rank: 3, color: 'bg-blue-500', height: '160px', avatarSize: 'w-24 h-24', textSize: 'text-5xl', nameSize: 'text-lg' }
-      ];
-      const myPodium = podiumData[myRank - 1];
-
+    if (leaderboard.length === 0) {
       return (
-        <div className="min-h-screen bg-gradient-to-b from-indigo-900 via-blue-900 to-purple-900 flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl">
-            <div className="bg-white/10 backdrop-blur-lg rounded-xl shadow-2xl p-4 sm:p-6 lg:p-8">
-              <div className="text-center mb-6 sm:mb-8">
-                <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">Quiz Complete! 🎉</h2>
-                <p className="text-lg sm:text-xl text-white/90">
-                  You finished in <span className="font-bold text-yellow-400">#{myRank}</span> place!
-                </p>
-              </div>
-              <div className="flex items-end justify-center mb-6 sm:mb-8" style={{ height: '300px', minHeight: '300px' }}>
-                <div className="flex flex-col items-center">
-                  <div className={`${myPodium.avatarSize} bg-yellow-400 rounded-full flex items-center justify-center text-5xl font-bold animate-bounce shadow-2xl`}>
-                    {myEntry.nickname.charAt(0).toUpperCase()}
-                  </div>
-                  <div className={`${myPodium.color} rounded-t-lg px-8 py-6 text-center min-w-[180px] ring-4 ring-yellow-300 ring-offset-2`} style={{ height: myPodium.height }}>
-                    <div className={`text-white ${myPodium.textSize} font-bold mb-2`}>{myRank}</div>
-                    <div className={`text-white ${myPodium.nameSize} font-bold`}>{myEntry.nickname}</div>
-                    <div className="text-white/90 text-base mt-2 font-semibold">{myScore} pts</div>
-                  </div>
-                </div>
-              </div>
-              {endStatsBlock}
-              <button
-                onClick={() => navigate('/quizwave/join')}
-                className="w-full mt-6 bg-white/20 hover:bg-white/30 text-white py-3 rounded-lg font-semibold transition-colors"
-              >
-                Join Another Game
-              </button>
-            </div>
+        <div className="min-h-screen bg-[#46178f] flex items-center justify-center">
+          <div className="text-center text-white">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4" />
+            <p className="text-lg">Loading your results…</p>
           </div>
         </div>
       );
     }
 
     return (
-      <div className="min-h-screen bg-gradient-to-b from-indigo-900 via-blue-900 to-purple-900 flex items-center justify-center p-4">
-        <div className="w-full max-w-2xl">
-          <div className="bg-white/10 backdrop-blur-lg rounded-xl shadow-2xl p-4 sm:p-6 lg:p-8 text-center">
-            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-6">Quiz Complete! 🎉</h2>
-            <p className="text-5xl font-bold text-white">#{myRank}</p>
-            <p className="text-4xl font-bold text-white mt-4">{myScore} pts</p>
-            {endStatsBlock}
-            <button
-              onClick={() => navigate('/quizwave/join')}
-              className="w-full mt-8 bg-white/20 hover:bg-white/30 text-white py-3 rounded-lg font-semibold"
-            >
-              Join Another Game
-            </button>
-          </div>
-        </div>
-      </div>
+      <StudentGameResults
+        nickname={nickname}
+        leaderboard={leaderboard}
+        gameSummary={gameSummary ?? gameSnapshot?.gameSummary}
+        onDone={() => navigate('/quizwave/join')}
+      />
     );
   }
 

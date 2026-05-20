@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { getQuizWaveSocket } from '../../utils/quizwaveSocket';
 import { quizwaveService, Quiz, QuizSession } from '../../services/quizwaveService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -7,6 +7,7 @@ import { Socket } from 'socket.io-client';
 import { QuizWaveGameSnapshot } from '../../types/quizwaveGameState';
 import { useQuizWavePhaseTimer } from '../../hooks/useQuizWavePhaseTimer';
 import TeacherHostRevealView from './TeacherHostRevealView';
+import TeacherResultsReveal from './TeacherResultsReveal';
 
 interface QuizSessionControlProps {
   sessionId: string;
@@ -29,9 +30,7 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
   const [participants, setParticipants] = useState<any[]>([]);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [copied, setCopied] = useState(false);
-  const [showFullLeaderboard, setShowFullLeaderboard] = useState(false);
   const [gameSummary, setGameSummary] = useState<QuizWaveGameSnapshot['gameSummary'] | null>(null);
-  const podiumTimerRef = useRef<NodeJS.Timeout | null>(null);
   const token = localStorage.getItem('token') || '';
 
   const applySnapshot = useCallback((snap: QuizWaveGameSnapshot) => {
@@ -53,10 +52,6 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
       setLeaderboard(snap.leaderboard);
     }
     if (snap.gameSummary) setGameSummary(snap.gameSummary);
-    if (snap.phase === 'FINISHED') {
-      if (podiumTimerRef.current) clearTimeout(podiumTimerRef.current);
-      podiumTimerRef.current = setTimeout(() => setShowFullLeaderboard(true), 10000);
-    }
   }, []);
 
   const phase = gameSnapshot?.phase ?? (session?.status === 'waiting' ? 'LOBBY' : session?.status === 'ended' ? 'FINISHED' : 'LOBBY');
@@ -182,7 +177,6 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
 
       sock.on('quizwave:ended', (data) => {
         setLeaderboard(data.leaderboard || []);
-        setShowFullLeaderboard(false);
         setSession((prev) => (prev ? { ...prev, status: 'ended' as const } : null));
         loadSession();
       });
@@ -552,193 +546,29 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
         </div>
       )}
 
-      {/* Ended Screen */}
+      {/* Ended — phased podium reveal (teacher) */}
       {isEnded && (
-        <div className="min-h-screen bg-gradient-to-b from-indigo-900 via-blue-900 to-purple-900 p-3 sm:p-4 lg:p-6">
-          <div className="max-w-6xl mx-auto">
-            <div className="bg-white/10 backdrop-blur-lg rounded-xl shadow-2xl p-4 sm:p-6 lg:p-8">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-4 sm:mb-6">
-                <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white">
-                  Quiz Complete! 🎉
-                </h2>
-                <button
-                  onClick={onEnd}
-                  className="px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors"
-                >
-                  Close Session
-                </button>
-              </div>
-
-              {/* Show message if no leaderboard data yet */}
-              {leaderboard.length === 0 && (
-                <div className="text-center py-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-                  <p className="text-white text-lg">Loading leaderboard...</p>
-                </div>
-              )}
-
-              {/* Podium View - Top 3 Only */}
-              {!showFullLeaderboard && leaderboard.length > 0 && (
-                <div className="flex flex-col items-center">
-                  <h3 className="text-2xl font-bold text-white mb-8">
-                    {leaderboard.length === 1 ? 'Winner!' : leaderboard.length >= 3 ? 'Top 3 Winners!' : 'Winners!'}
-                  </h3>
-                  <div className="flex items-end justify-center gap-4 mb-8" style={{ height: '400px' }}>
-                    {/* 2nd Place (Left) - only show if there are at least 2 participants */}
-                    {leaderboard.length >= 2 && leaderboard[1] && (
-                      <div className="flex flex-col items-center">
-                        <div className="relative mb-4">
-                          {/* Character/Avatar with emote */}
-                          <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center text-4xl animate-bounce">
-                            {leaderboard[1].nickname.charAt(0).toUpperCase()}
-                          </div>
-                          <div className="absolute -top-2 -right-2 text-3xl animate-pulse">🎉</div>
-                        </div>
-                        <div className="bg-red-500 rounded-t-lg px-3 sm:px-4 lg:px-6 py-3 sm:py-4 text-center min-w-[120px] sm:min-w-[140px] lg:min-w-[150px]" style={{ height: '200px' }}>
-                          <div className="text-white text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold mb-2">2</div>
-                          <div className="text-white text-lg font-semibold">{leaderboard[1].nickname}</div>
-                          <div className="text-white/90 text-sm mt-2">{leaderboard[1].totalScore} pts</div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 1st Place (Center - Tallest) */}
-                    {leaderboard[0] && (
-                      <div className="flex flex-col items-center">
-                        <div className="relative mb-4">
-                          {/* Character/Avatar with emote */}
-                          <div className="w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 bg-yellow-400 rounded-full flex items-center justify-center text-3xl sm:text-4xl lg:text-5xl font-bold animate-bounce shadow-2xl">
-                            {leaderboard[0].nickname.charAt(0).toUpperCase()}
-                          </div>
-                          <div className="absolute -top-4 -right-4 text-5xl animate-pulse">👑</div>
-                          <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 text-4xl animate-bounce">🏆</div>
-                        </div>
-                        <div className="bg-orange-500 rounded-t-lg px-4 sm:px-6 lg:px-8 py-4 sm:py-5 lg:py-6 text-center min-w-[140px] sm:min-w-[160px] lg:min-w-[180px]" style={{ height: '280px' }}>
-                          <div className="text-white text-4xl sm:text-5xl lg:text-6xl font-bold mb-2">1</div>
-                          <div className="text-white text-base sm:text-lg lg:text-xl font-bold break-words">{leaderboard[0].nickname}</div>
-                          <div className="text-white/90 text-xs sm:text-sm lg:text-base mt-2 font-semibold">{leaderboard[0].totalScore} pts</div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 3rd Place (Right) - only show if there are at least 3 participants */}
-                    {leaderboard.length >= 3 && leaderboard[2] && (
-                      <div className="flex flex-col items-center">
-                        <div className="relative mb-4">
-                          {/* Character/Avatar with emote */}
-                          <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center text-4xl animate-bounce">
-                            {leaderboard[2].nickname.charAt(0).toUpperCase()}
-                          </div>
-                          <div className="absolute -top-2 -right-2 text-3xl animate-pulse">🎊</div>
-                        </div>
-                        <div className="bg-blue-500 rounded-t-lg px-3 sm:px-4 lg:px-6 py-3 sm:py-4 text-center min-w-[120px] sm:min-w-[140px] lg:min-w-[150px]" style={{ height: '160px' }}>
-                          <div className="text-white text-3xl sm:text-4xl lg:text-5xl font-bold mb-2">3</div>
-                          <div className="text-white text-sm sm:text-base lg:text-lg font-semibold break-words">{leaderboard[2].nickname}</div>
-                          <div className="text-white/90 text-xs sm:text-sm mt-2">{leaderboard[2].totalScore} pts</div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Full Leaderboard - After 10 seconds */}
-              {showFullLeaderboard && leaderboard.length > 0 && (
-                <div>
-                  {/* Top 3 Podium */}
-                  <div className="flex items-end justify-center gap-4 mb-8" style={{ height: '300px' }}>
-                    {/* 2nd Place */}
-                    {leaderboard[1] && (
-                      <div className="flex flex-col items-center">
-                        <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center text-3xl font-bold mb-2">
-                          {leaderboard[1].nickname.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="bg-red-500 rounded-t-lg px-3 sm:px-4 lg:px-6 py-3 sm:py-4 text-center min-w-[110px] sm:min-w-[130px] lg:min-w-[140px]" style={{ height: '180px' }}>
-                          <div className="text-white text-3xl sm:text-4xl font-bold mb-2">2</div>
-                          <div className="text-white text-sm sm:text-base font-semibold break-words">{leaderboard[1].nickname}</div>
-                          <div className="text-white/90 text-xs sm:text-sm mt-2">{leaderboard[1].totalScore} pts</div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 1st Place */}
-                    {leaderboard[0] && (
-                      <div className="flex flex-col items-center">
-                        <div className="w-24 h-24 bg-yellow-400 rounded-full flex items-center justify-center text-4xl font-bold mb-2 shadow-lg">
-                          {leaderboard[0].nickname.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="bg-orange-500 rounded-t-lg px-4 sm:px-6 lg:px-8 py-3 sm:py-4 lg:py-5 text-center min-w-[130px] sm:min-w-[150px] lg:min-w-[160px]" style={{ height: '240px' }}>
-                          <div className="text-white text-4xl sm:text-5xl font-bold mb-2">1</div>
-                          <div className="text-white text-sm sm:text-base lg:text-lg font-bold break-words">{leaderboard[0].nickname}</div>
-                          <div className="text-white/90 text-xs sm:text-sm lg:text-base mt-2 font-semibold">{leaderboard[0].totalScore} pts</div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 3rd Place */}
-                    {leaderboard[2] && (
-                      <div className="flex flex-col items-center">
-                        <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center text-3xl font-bold mb-2">
-                          {leaderboard[2].nickname.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="bg-blue-500 rounded-t-lg px-3 sm:px-4 lg:px-6 py-3 sm:py-4 text-center min-w-[110px] sm:min-w-[130px] lg:min-w-[140px]" style={{ height: '140px' }}>
-                          <div className="text-white text-3xl sm:text-4xl font-bold mb-2">3</div>
-                          <div className="text-white text-sm sm:text-base font-semibold break-words">{leaderboard[2].nickname}</div>
-                          <div className="text-white/90 text-xs sm:text-sm mt-2">{leaderboard[2].totalScore} pts</div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Rest of the Leaderboard */}
-                  {leaderboard.length > 3 && (
-                    <div className="mt-8">
-                      <h3 className="text-xl font-bold text-white mb-4">All Participants</h3>
-                      <div className="space-y-2 max-h-96 overflow-y-auto">
-                        {leaderboard.slice(3).map((entry, index) => (
-                          <div
-                            key={index + 3}
-                            className="flex items-center justify-between p-4 bg-white/10 backdrop-blur-sm rounded-lg"
-                          >
-                            <div className="flex items-center gap-4">
-                              <span className="text-xl font-bold text-white w-8">
-                                #{index + 4}
-                              </span>
-                              <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-white font-semibold">
-                                {entry.nickname.charAt(0).toUpperCase()}
-                              </div>
-                              <span className="font-semibold text-white">
-                                {entry.nickname}
-                              </span>
-                            </div>
-                            <span className="text-lg font-bold text-white">
-                              {entry.totalScore} pts
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <TeacherResultsReveal
+          quizTitle={quiz.title}
+          leaderboard={leaderboard}
+          gameSummary={gameSummary}
+          totalQuestions={quiz.questions.length}
+          participantCount={participantCount}
+          onClose={onEnd}
+        />
       )}
     </div>
   );
 
-  // Return with full screen wrapper when quiz is active
-  // Account for global sidebar width (80px) on the left for desktop only
-  if (isQuizActive) {
+  // Full screen while quiz is running or showing results reveal
+  if (isQuizActive || isEnded) {
     return (
-      <div className="fixed inset-0 bg-gray-50 dark:bg-gray-900 z-[60] overflow-auto lg:left-20 left-0">
+      <div className="fixed inset-0 bg-gray-50 dark:bg-gray-900 z-[60] overflow-hidden lg:left-20 left-0">
         {quizContent}
       </div>
     );
   }
 
-  // Regular layout when quiz is ended
   return quizContent;
 };
 
