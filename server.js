@@ -589,23 +589,37 @@ app.post('/api/test-post', (req, res) => {
 
 // Serve frontend static files in production
 if (process.env.NODE_ENV === 'production') {
-  // Serve static files from the frontend/dist directory (only for GET requests to non-API paths)
+  const frontendDist = path.join(__dirname, 'frontend', 'dist');
+  const isBundledAssetRequest = (requestPath) =>
+    requestPath.startsWith('/assets/') &&
+    /\.(js|mjs|css|map|woff2?|ttf|svg|png|jpe?g|gif|webp|ico)$/i.test(requestPath);
+
+  // Hashed build assets: long cache. Missing files must 404 (not index.html) or lazy chunks break.
   app.use((req, res, next) => {
-    // Skip static file serving for API routes, uploads, and non-GET requests
     if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.method !== 'GET') {
       return next();
     }
-    // Use static middleware only for GET requests to non-API paths
-    express.static(path.join(__dirname, 'frontend', 'dist'))(req, res, next);
+    express.static(frontendDist, {
+      maxAge: '1y',
+      immutable: true,
+      fallthrough: true
+    })(req, res, (err) => {
+      if (err) return next(err);
+      if (isBundledAssetRequest(req.path)) {
+        return res.status(404).type('text/plain').send('Not found');
+      }
+      return next();
+    });
   });
-  
-  // Handle all non-API routes by serving the frontend (must be last)
+
+  // SPA shell: always revalidate so clients pick up new chunk hashes after deploy.
   app.get('*', (req, res, next) => {
-    // Don't serve frontend for API routes or uploads
     if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
       return next();
     }
-    res.sendFile(path.join(__dirname, 'frontend', 'dist', 'index.html'));
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.sendFile(path.join(frontendDist, 'index.html'));
   });
 }
 

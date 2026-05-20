@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useState, useRef, useCallback } from 'react';
+import React, { Suspense, useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useCourse } from '../../contexts/CourseContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -83,8 +83,10 @@ import { useSidebarConfig } from '../../hooks/useSidebarConfig';
 import Breadcrumb from '../common/Breadcrumb';
 import { useCourseSectionSwipe } from '../../hooks/useCourseSectionSwipe';
 
-const Announcements = lazy(() => import('../../pages/Announcements'));
-const QuizWaveDashboard = lazy(() => import('../quizwave/QuizWaveDashboard'));
+import QuizWaveDashboard from '../quizwave/QuizWaveDashboard';
+import { lazyWithRetry } from '../../utils/lazyWithRetry';
+
+const Announcements = lazyWithRetry(() => import('../../pages/Announcements'));
 
 
 
@@ -820,9 +822,7 @@ const CourseDetail: React.FC = () => {
         if (isInstructor || isAdmin) {
           return (
             <div className="space-y-6">
-              <Suspense fallback={<div className="text-sm text-gray-500 dark:text-gray-400">Loading QuizWave...</div>}>
-                <QuizWaveDashboard courseId={course._id.toString()} />
-              </Suspense>
+              <QuizWaveDashboard courseId={course._id.toString()} />
             </div>
           );
         } else {

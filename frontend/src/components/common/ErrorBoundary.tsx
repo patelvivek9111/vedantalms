@@ -2,6 +2,7 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import logger from '../../utils/logger';
+import { isChunkLoadError } from '../../utils/lazyWithRetry';
 
 interface Props {
   children: ReactNode;
@@ -35,6 +36,10 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   handleRetry = () => {
+    if (isChunkLoadError(this.state.error)) {
+      window.location.reload();
+      return;
+    }
     this.setState({ hasError: false, error: undefined, errorInfo: undefined });
   };
 
