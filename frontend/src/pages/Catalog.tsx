@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import axios from 'axios';
 import { toast } from 'react-toastify';
-import { API_URL } from '../config';
+import api from '../services/api';
 import { Search, Filter, BookOpen, User, Users } from 'lucide-react';
 import { BurgerMenu } from '../components/layout/BurgerMenu';
 import ConfirmationModal from '../components/common/ConfirmationModal';
@@ -59,42 +58,32 @@ const Catalog: React.FC = () => {
   }, []);
 
   const fetchCatalog = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      setError(null);
-      
       const token = localStorage.getItem('token');
       if (!token) {
         setError('Please log in to view the course catalog');
-        setLoading(false);
         return;
       }
 
-      // Try the new available courses endpoint first
       try {
-        const response = await axios.get(`${API_URL}/api/courses/available/browse`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        
-        if (response.data.success) {
-          setCourses(response.data.data);
-          return; // Success, exit early
+        const response = await api.get('/courses/available/browse');
+        if (response.data?.success) {
+          setCourses(Array.isArray(response.data.data) ? response.data.data : []);
+          return;
         }
-      } catch (err: any) {
+      } catch {
+        // fall through to legacy catalog route
       }
 
-      // Fallback to the original catalog route
-      try {
-        const response = await axios.get(`${API_URL}/api/catalog`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        
-        setCourses(response.data);
-      } catch (err: any) {
-        setError('Failed to fetch course catalog. Please try again later.');
-      }
+      const response = await api.get('/catalog');
+      const payload = response.data;
+      const list = Array.isArray(payload) ? payload : payload?.data;
+      setCourses(Array.isArray(list) ? list : []);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to fetch course catalog');
+      setCourses([]);
     } finally {
       setLoading(false);
     }
@@ -123,12 +112,7 @@ const Catalog: React.FC = () => {
 
   const handleEnrollment = async (courseId: string) => {
     try {
-      const token = localStorage.getItem('token');
-      const res = await axios.post(
-        `${API_URL}/api/courses/${courseId}/enroll`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const res = await api.post(`/courses/${courseId}/enroll`, {});
       const d = res.data || {};
       if (d.waitlisted) {
         toast.success(d.message || 'You have been added to the waitlist. Your instructor will review your request.');
@@ -145,10 +129,7 @@ const Catalog: React.FC = () => {
 
   const handleUnenrollment = async (courseId: string) => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.post(`${API_URL}/api/courses/${courseId}/unenroll-self`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.post(`/courses/${courseId}/unenroll-self`, {});
       toast.success('You have been removed from this course.');
       await fetchCatalog();
     } catch (err: any) {

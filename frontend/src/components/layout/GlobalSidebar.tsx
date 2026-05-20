@@ -133,11 +133,7 @@ export default function GlobalSidebar() {
     window.location.href = '/login';
   };
 
-  // Filter courses based on user role
-  const isTeacherOrAdmin = user?.role === 'teacher' || user?.role === 'admin';
-  const availableCourses = isTeacherOrAdmin 
-    ? courses 
-    : courses.filter(course => course.published);
+  const availableCourses = courses.filter((course) => course.published);
 
 
   return (

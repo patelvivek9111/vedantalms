@@ -15,6 +15,7 @@ const {
 } = require('../utils/gradeCalculation');
 const { getJson, setJson } = require('../utils/cache');
 const { calculateCourseGradeForStudent } = require('../services/gradeCalculation.service');
+const { computeCourseClassAverage } = require('../services/gradebookData.service');
 
 // GET /api/grades/student/course/:courseId
 exports.getStudentCourseGrade = async (req, res) => {
@@ -333,248 +334,26 @@ exports.getCourseClassAverage = async (req, res) => {
   try {
     const courseId = req.params.courseId;
     const userId = req.user._id;
-    const cacheKey = `grades:course-average:v2:${courseId}:${userId}`;
+    const cacheKey = `grades:course-average:v4:${courseId}:${userId}`;
     const cached = await getJson(cacheKey);
     if (cached) {
       return res.json(cached);
     }
 
-    // Fetch course
-    const course = await Course.findById(courseId).lean();
+    const course = await Course.findById(courseId).select('instructor').lean();
     if (!course) return res.status(404).json({ message: 'Course not found' });
 
-    // Check if user is instructor or admin
-    const isInstructor = course.instructor.toString() === userId.toString();
+    const instructorId =
+      course.instructor && typeof course.instructor === 'object' && course.instructor._id
+        ? String(course.instructor._id)
+        : String(course.instructor || '');
+    const isInstructor = instructorId === userId.toString();
     const isAdmin = req.user.role === 'admin';
     if (!isInstructor && !isAdmin) {
       return res.status(403).json({ message: 'Not authorized to view class average' });
     }
 
-    const students = course.students || [];
-    if (students.length === 0) {
-      return res.json({ average: null, studentCount: 0 });
-    }
-
-    const groups = course.groups || [];
-    const gradeScale = course.gradeScale || [];
-
-    // Fetch all modules for the course
-    const modules = await Module.find({ course: courseId }).select('_id title').sort({ createdAt: 1 });
-    const moduleIds = modules.map(m => m._id);
-
-    // Fetch all assignments for these modules
-    const assignments = await Assignment.find({ module: { $in: moduleIds } }).lean();
-
-    // Fetch only course-relevant group assignments via GroupSet index
-    const courseGroupSets = await GroupSet.find({ course: courseId }).select('_id').lean();
-    const courseGroupSetIds = courseGroupSets.map((groupSet) => groupSet._id);
-    const groupAssignments = courseGroupSetIds.length > 0
-      ? await Assignment.find({
-          isGroupAssignment: true,
-          groupSet: { $in: courseGroupSetIds }
-        }).lean()
-      : [];
-
-    // Fetch all graded discussions
-    const threads = await Thread.find({ course: courseId, isGraded: true }).lean();
-    
-    // Helper to check if a user has replied anywhere in a nested replies tree
-    function hasReplyByUser(replies, userId) {
-      if (!Array.isArray(replies) || replies.length === 0) return false;
-      for (const r of replies) {
-        const authorId = r.author && typeof r.author === 'object' && r.author._id ? r.author._id.toString() : String(r.author || '');
-        if (authorId === String(userId)) return true;
-        if (Array.isArray(r.replies) && r.replies.length > 0 && hasReplyByUser(r.replies, userId)) return true;
-      }
-      return false;
-    }
-
-    // Build discussion assignments
-    const discussionAssignments = threads.map(thread => {
-      return {
-        _id: thread._id,
-        title: thread.title,
-        group: thread.group || 'Discussions',
-        totalPoints: thread.totalPoints || 0,
-        isDiscussion: true,
-        published: thread.published !== false,
-        studentGrades: thread.studentGrades || [],
-        dueDate: thread.dueDate || null,
-        replies: thread.replies || []
-      };
-    });
-    const discussionGradeMap = new Map();
-    for (const discussion of discussionAssignments) {
-      for (const gradeRow of discussion.studentGrades || []) {
-        discussionGradeMap.set(
-          `${String(discussion._id)}:${String(gradeRow.student)}`,
-          resolveAssignmentGrade({ discussionGradeRow: gradeRow })
-        );
-      }
-    }
-
-    // Preload regular submissions for all students in one query
-    const assignmentIds = assignments.map(a => a._id);
-    const regularSubmissionsAll = await Submission.find({
-      assignment: { $in: assignmentIds },
-      student: { $in: students }
-    }).lean();
-
-    const regularByStudent = new Map();
-    for (const submission of regularSubmissionsAll) {
-      const key = String(submission.student);
-      if (!regularByStudent.has(key)) {
-        regularByStudent.set(key, []);
-      }
-      regularByStudent.get(key).push(submission);
-    }
-
-    // Preload group membership for all students and group sets
-    const groupSetIds = groupAssignments
-      .map(a => a.groupSet?._id)
-      .filter(Boolean);
-    const groupsAll = groupSetIds.length > 0
-      ? await Group.find({
-          groupSet: { $in: groupSetIds },
-          members: { $in: students }
-        }).select('_id groupSet members').lean()
-      : [];
-
-    const studentGroupBySet = new Map();
-    for (const group of groupsAll) {
-      for (const memberId of group.members || []) {
-        studentGroupBySet.set(`${String(memberId)}:${String(group.groupSet)}`, String(group._id));
-      }
-    }
-
-    // Preload group submissions in one query and index by assignment+group
-    const groupAssignmentIds = groupAssignments.map(a => a._id);
-    const groupIds = [...new Set(groupsAll.map(g => String(g._id)))];
-    const groupSubmissionsAll = (groupAssignmentIds.length > 0 && groupIds.length > 0)
-      ? await Submission.find({
-          assignment: { $in: groupAssignmentIds },
-          group: { $in: groupIds }
-        }).lean()
-      : [];
-    const groupSubmissionMap = new Map();
-    for (const submission of groupSubmissionsAll) {
-      groupSubmissionMap.set(`${String(submission.assignment)}:${String(submission.group)}`, submission);
-    }
-
-    // Calculate grade for each student
-    const studentGrades = [];
-    
-    for (const studentId of students) {
-      try {
-        // Get preloaded regular submissions for this student
-        const regularSubmissions = regularByStudent.get(String(studentId)) || [];
-
-        // Resolve preloaded group submissions
-        let groupSubmissions = [];
-        for (const groupAssignment of groupAssignments) {
-          const groupId = studentGroupBySet.get(`${String(studentId)}:${String(groupAssignment.groupSet)}`);
-          if (groupId) {
-            const submission = groupSubmissionMap.get(`${String(groupAssignment._id)}:${groupId}`);
-            if (submission) {
-              groupSubmissions.push(submission);
-            }
-          }
-        }
-
-        // Combine all submissions
-        const allSubmissions = [...regularSubmissions, ...groupSubmissions];
-        const submissionMap = {};
-        allSubmissions.forEach(sub => {
-          submissionMap[sub.assignment.toString()] = sub;
-        });
-
-        // Build all assignments with grades
-        const allAssignments = [
-          ...assignments.map(a => ({
-            _id: a._id,
-            title: a.title,
-            group: a.group,
-            totalPoints: a.totalPoints || 0,
-            questions: a.questions,
-            isDiscussion: false,
-            assignment: a,
-            dueDate: a.dueDate,
-            published: a.published,
-            grade: resolveAssignmentGrade({ submission: submissionMap[a._id.toString()] || null })
-          })),
-          ...groupAssignments.map(a => {
-            const submission = submissionMap[a._id.toString()];
-            const grade = submission
-              ? resolveAssignmentGrade({
-                  submission: { ...submission, _memberStudentId: studentId }
-                })
-              : null;
-            
-            return {
-              _id: a._id,
-              title: a.title,
-              group: a.group,
-              totalPoints: a.totalPoints || 0,
-              questions: a.questions,
-              isDiscussion: false,
-              assignment: a,
-              dueDate: a.dueDate,
-              published: a.published,
-              grade: grade
-            };
-          }),
-          ...discussionAssignments.map(discussion => {
-            const discussionGrade = discussionGradeMap.get(
-              `${String(discussion._id)}:${String(studentId)}`
-            );
-            return {
-              _id: discussion._id,
-              title: discussion.title,
-              group: discussion.group,
-              totalPoints: discussion.totalPoints || 0,
-              isDiscussion: true,
-              published: discussion.published,
-              grade: discussionGrade ?? null,
-              dueDate: discussion.dueDate,
-              hasSubmitted: hasReplyByUser(discussion.replies || [], studentId)
-            };
-          })
-        ];
-
-        const grades = {};
-        buildGradesMapForStudent(grades, studentId.toString(), allAssignments);
-
-        const { totalPercent } = await calculateCourseGradeForStudent(
-          studentId.toString(),
-          course,
-          allAssignments,
-          grades,
-          submissionMap
-        );
-
-        // Only include if grade is valid (not NaN)
-        if (!isNaN(totalPercent) && isFinite(totalPercent)) {
-          studentGrades.push(totalPercent);
-        }
-      } catch (error) {
-        console.error(`Error calculating grade for student ${studentId}:`, error);
-        // Continue with other students
-      }
-    }
-
-    // Calculate average
-    if (studentGrades.length === 0) {
-      return res.json({ average: null, studentCount: students.length, gradedCount: 0 });
-    }
-
-    const sum = studentGrades.reduce((acc, grade) => acc + grade, 0);
-    const average = sum / studentGrades.length;
-
-    const payload = { 
-      average: Math.round(average * 100) / 100, // Round to 2 decimal places
-      studentCount: students.length,
-      gradedCount: studentGrades.length
-    };
+    const payload = await computeCourseClassAverage(courseId);
     await setJson(cacheKey, payload, 45);
     res.json(payload);
   } catch (error) {

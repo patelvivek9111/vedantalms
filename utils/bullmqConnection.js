@@ -12,6 +12,10 @@ function getBullmqConnection() {
   connection = new IORedis(process.env.REDIS_URL, {
     maxRetriesPerRequest: null,
     enableReadyCheck: false,
+    connectTimeout: 3000,
+    commandTimeout: 2000,
+    enableOfflineQueue: false,
+    retryStrategy: () => null,
   });
   return connection;
 }

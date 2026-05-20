@@ -135,7 +135,12 @@ exports.getAssignment = async (req, res) => {
   try {
     const assignment = await Assignment.findById(req.params.id)
       .populate('createdBy', 'firstName lastName profilePicture')
-      .populate('module', 'title');
+      .populate('module', 'title')
+      .populate({
+        path: 'groupSet',
+        select: 'name course',
+        populate: { path: 'course', select: '_id title' },
+      });
       
     if (!assignment) {
       return res.status(404).json({ message: 'Assignment not found' });

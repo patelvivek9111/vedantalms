@@ -25,9 +25,19 @@ async function getResolvedPolicyForCourse(course, options = {}) {
   }
 
   if (!options.skipRedisCache && courseId) {
-    const policyRedisCache = require('./policyRedisCache.service');
-    const cached = await policyRedisCache.getCachedResolvedPolicy(courseId);
-    if (cached) return cached;
+    try {
+      const policyRedisCache = require('./policyRedisCache.service');
+      const cached = await Promise.race([
+        policyRedisCache.getCachedResolvedPolicy(courseId),
+        new Promise((resolve) => setTimeout(() => resolve(null), 2000)),
+      ]);
+      if (cached) {
+        if (cache) cache.set(String(courseId), cached);
+        return cached;
+      }
+    } catch {
+      /* fall through to DB */
+    }
   }
 
   const [institutionPolicy, coursePolicy] = await Promise.all([
@@ -49,8 +59,15 @@ async function getResolvedPolicyForCourse(course, options = {}) {
   }
 
   if (!options.skipRedisCache && courseId) {
-    const policyRedisCache = require('./policyRedisCache.service');
-    await policyRedisCache.setCachedResolvedPolicy(courseId, resolved);
+    try {
+      const policyRedisCache = require('./policyRedisCache.service');
+      await Promise.race([
+        policyRedisCache.setCachedResolvedPolicy(courseId, resolved),
+        new Promise((resolve) => setTimeout(resolve, 2000)),
+      ]);
+    } catch {
+      /* ignore cache write failures */
+    }
   }
 
   return resolved;

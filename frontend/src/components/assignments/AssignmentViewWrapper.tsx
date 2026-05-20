@@ -36,7 +36,28 @@ const AssignmentViewWrapper: React.FC = () => {
 
         if (assignmentRes.data) {
           const assignment = assignmentRes.data;
-          if (assignment.module) {
+          let resolvedCourseId: string | null = null;
+
+          if (assignment.isGroupAssignment || assignment.groupSet) {
+            const gs = assignment.groupSet;
+            if (gs && typeof gs === 'object' && gs.course) {
+              resolvedCourseId =
+                gs.course._id || (typeof gs.course === 'string' ? gs.course : null);
+            } else {
+              const groupSetId =
+                typeof gs === 'object' && gs?._id ? gs._id : gs;
+              if (groupSetId) {
+                const groupSetRes = await axios.get(
+                  `${API_URL}/api/groups/sets/id/${groupSetId}`,
+                  { headers: { Authorization: `Bearer ${token}` } }
+                );
+                const groupSetData = groupSetRes.data;
+                resolvedCourseId =
+                  groupSetData?.course?._id ||
+                  (typeof groupSetData?.course === 'string' ? groupSetData.course : null);
+              }
+            }
+          } else if (assignment.module) {
             const moduleId =
               typeof assignment.module === 'string' ? assignment.module : assignment.module._id;
             const moduleRes = await axios.get(`${API_URL}/api/modules/view/${moduleId}`, {
@@ -44,14 +65,17 @@ const AssignmentViewWrapper: React.FC = () => {
             });
 
             if (moduleRes.data.success) {
-              const courseId = moduleRes.data.data.course._id || moduleRes.data.data.course;
-              const courseRes = await axios.get(`${API_URL}/api/courses/${courseId}`, {
-                headers: { Authorization: `Bearer ${token}` },
-              });
+              resolvedCourseId =
+                moduleRes.data.data.course._id || moduleRes.data.data.course;
+            }
+          }
 
-              if (courseRes.data.success) {
-                setCourse(courseRes.data.data);
-              }
+          if (resolvedCourseId) {
+            const courseRes = await axios.get(`${API_URL}/api/courses/${resolvedCourseId}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (courseRes.data.success) {
+              setCourse(courseRes.data.data);
             }
           }
         }
@@ -74,7 +98,21 @@ const AssignmentViewWrapper: React.FC = () => {
   }
 
   if (!course) {
-    return <div>Course not found</div>;
+    return (
+      <div className="mx-auto max-w-lg px-4 py-16 text-center">
+        <p className="text-slate-700 dark:text-slate-300">Could not load this assignment.</p>
+        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+          The course for this assignment could not be found.
+        </p>
+        <button
+          type="button"
+          onClick={() => window.history.back()}
+          className="mt-4 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+        >
+          Go back
+        </button>
+      </div>
+    );
   }
 
   const cid = course._id;

@@ -78,8 +78,7 @@ router.get('/available/browse', protect, async (req, res) => {
     }).populate('instructor', 'firstName lastName email')
       .populate('students', '_id firstName lastName')
       .populate('enrollmentRequests.student', '_id firstName lastName')
-      .populate('waitlist.student', '_id firstName lastName')
-      .populate('catalog', 'subject maxStudents description startDate endDate tags prerequisites');
+      .populate('waitlist.student', '_id firstName lastName');
     
     res.json({
       success: true,

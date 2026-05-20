@@ -498,7 +498,6 @@ export function Dashboard() {
   });
   const [courseGrades, setCourseGrades] = useState<{ [courseId: string]: { grade: number | null; letter?: string } }>({});
   const [loadingGrades, setLoadingGrades] = useState<{ [courseId: string]: boolean }>({});
-  const loadedGradesRef = useRef<Set<string>>(new Set());
   
   // Refs for dropdown containers
   const colorPickerRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
@@ -512,6 +511,44 @@ export function Dashboard() {
   const [showCourseQrScanner, setShowCourseQrScanner] = useState(false);
 
   const isTeacherOrAdmin = user?.role === 'teacher' || user?.role === 'admin';
+
+  const renderCourseGradeBadge = (courseId: string) => {
+    if (!showGrades) return null;
+
+    const gradeEntry = courseGrades[courseId];
+    const gradeLoaded = Object.prototype.hasOwnProperty.call(courseGrades, courseId);
+    const grade = gradeEntry?.grade;
+    const hasGrade =
+      grade !== null && grade !== undefined && typeof grade === 'number' && !isNaN(grade);
+
+    return (
+      <div className="absolute top-3 left-3 z-10">
+        {loadingGrades[courseId] || !gradeLoaded ? (
+          <div className="rounded bg-white/90 px-1.5 py-0.5 text-[11px] font-medium text-gray-500 backdrop-blur-sm dark:bg-gray-900/90 dark:text-gray-400">
+            …
+          </div>
+        ) : hasGrade ? (
+          <div
+            className="rounded bg-white/90 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-gray-900 shadow-sm backdrop-blur-sm dark:bg-gray-900/90 dark:text-gray-100"
+            title={!isTeacherOrAdmin && gradeEntry?.letter ? gradeEntry.letter : undefined}
+          >
+            {grade!.toFixed(2)}%
+          </div>
+        ) : (
+          <div
+            className="rounded bg-white/90 px-1.5 py-0.5 text-[11px] font-medium text-gray-500 shadow-sm backdrop-blur-sm dark:bg-gray-900/90 dark:text-gray-400"
+            title={
+              isTeacherOrAdmin
+                ? 'No student grades recorded yet for this course'
+                : 'Your grade has not been posted yet'
+            }
+          >
+            —
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const handleCourseQrScanSuccess = useCallback(
     (text: string) => {
@@ -588,71 +625,80 @@ export function Dashboard() {
   useEffect(() => {
     if (!showGrades) {
       setCourseGrades({});
-      loadedGradesRef.current.clear();
+      setLoadingGrades({});
       return;
     }
 
     if (!courses || courses.length === 0) return;
 
-    const fetchCourseGrades = async () => {
-      // Filter published courses
-      const publishedCoursesList = courses.filter(course => course.published);
-      if (publishedCoursesList.length === 0) return;
+    let cancelled = false;
+    const publishedCoursesList = courses.filter((course) => course.published);
+    if (publishedCoursesList.length === 0) return;
 
-      const courseIds = publishedCoursesList.map(c => c._id);
-      const coursesToLoad = courseIds.filter(id => !loadedGradesRef.current.has(id));
+    const courseIds = publishedCoursesList.map((c) => String(c._id));
 
-      for (const courseId of coursesToLoad) {
-        const course = publishedCoursesList.find(c => c._id === courseId);
-        if (!course) continue;
-        
-        loadedGradesRef.current.add(courseId);
-        setLoadingGrades(prev => ({ ...prev, [courseId]: true }));
-        try {
-          if (isTeacherOrAdmin) {
-            // Fetch class average for teachers/admin
-            const response = await api.get(`/grades/course/${courseId}/average`);
-            if (response.data && response.data.average !== null && response.data.average !== undefined) {
-              const average = response.data.average;
-              setCourseGrades(prev => ({
-                ...prev,
-                [courseId]: { grade: average }
-              }));
-            } else {
-              setCourseGrades(prev => ({
-                ...prev,
-                [courseId]: { grade: null }
-              }));
-            }
-          } else {
-            // Fetch student's own grade
-            const response = await api.get(`/grades/student/course/${courseId}`);
-            if (response.data && response.data.totalPercent !== null && response.data.totalPercent !== undefined) {
-              const grade = response.data.totalPercent;
-              const letter = response.data.letterGrade || '';
-              setCourseGrades(prev => ({
-                ...prev,
-                [courseId]: { grade, letter }
-              }));
-            } else {
-              setCourseGrades(prev => ({
-                ...prev,
-                [courseId]: { grade: null }
-              }));
-            }
+    setLoadingGrades((prev) => {
+      const next = { ...prev };
+      courseIds.forEach((id) => {
+        next[id] = true;
+      });
+      return next;
+    });
+
+    const fetchOne = async (courseId: string) => {
+      try {
+        if (isTeacherOrAdmin) {
+          const response = await api.get(`/grades/course/${courseId}/average`, {
+            timeout: 120000,
+          });
+          const average = response.data?.average;
+          const hasAverage =
+            average !== null && average !== undefined && typeof average === 'number' && !isNaN(average);
+          if (!cancelled) {
+            setCourseGrades((prev) => ({
+              ...prev,
+              [courseId]: { grade: hasAverage ? average : null },
+            }));
           }
-        } catch (error: any) {
-          setCourseGrades(prev => ({
+        } else {
+          const response = await api.get(`/grades/student/course/${courseId}`, {
+            timeout: 60000,
+          });
+          const totalPercent = response.data?.totalPercent;
+          const hasGrade =
+            totalPercent !== null &&
+            totalPercent !== undefined &&
+            typeof totalPercent === 'number' &&
+            !isNaN(totalPercent);
+          if (!cancelled) {
+            setCourseGrades((prev) => ({
+              ...prev,
+              [courseId]: {
+                grade: hasGrade ? totalPercent : null,
+                letter: response.data?.letterGrade || '',
+              },
+            }));
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          setCourseGrades((prev) => ({
             ...prev,
-            [courseId]: { grade: null }
+            [courseId]: { grade: null },
           }));
-        } finally {
-          setLoadingGrades(prev => ({ ...prev, [courseId]: false }));
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingGrades((prev) => ({ ...prev, [courseId]: false }));
         }
       }
     };
 
-    fetchCourseGrades();
+    Promise.all(courseIds.map((id) => fetchOne(id)));
+
+    return () => {
+      cancelled = true;
+    };
   }, [showGrades, courses, isTeacherOrAdmin, user?._id]);
 
   // Load current navigation items
@@ -1340,27 +1386,7 @@ export function Dashboard() {
                       </div>
                     </div>
                     {/* Grade Display - Top Left */}
-                    {showGrades && (
-                      <div className="absolute top-3 left-3 z-10">
-                        {loadingGrades[course._id] ? (
-                          <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm px-2 py-1 rounded-md">
-                            <div className="w-8 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                          </div>
-                        ) : (() => {
-                          const grade = courseGrades[course._id]?.grade;
-                          return grade !== null && grade !== undefined && typeof grade === 'number' && !isNaN(grade);
-                        })() ? (
-                          <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm px-2.5 py-1.5 rounded-md shadow-md">
-                            <div className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                              {(() => {
-                                const grade = courseGrades[course._id]?.grade;
-                                return grade !== null && grade !== undefined ? grade.toFixed(2) : '0.00';
-                              })()}%
-                            </div>
-                          </div>
-                        ) : null}
-                      </div>
-                    )}
+                    {renderCourseGradeBadge(course._id)}
                     {/* Drag Handle - Top Left (only when not showing grades) */}
                     {!showGrades && (
                       <div 
@@ -1561,28 +1587,7 @@ export function Dashboard() {
                         background: `linear-gradient(135deg, ${getCourseColor(course._id)} 0%, ${getCourseColor(course._id)}dd 100%)`
                       }}
                     >
-                      {/* Grade Display - Top Left */}
-                      {showGrades && (
-                        <div className="absolute top-3 left-3 z-10">
-                          {loadingGrades[course._id] ? (
-                            <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm px-2 py-1 rounded-md">
-                              <div className="w-8 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                            </div>
-                          ) : (() => {
-                            const grade = courseGrades[course._id]?.grade;
-                            return grade !== null && grade !== undefined && typeof grade === 'number' && !isNaN(grade);
-                          })() ? (
-                            <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm px-2.5 py-1.5 rounded-md shadow-md">
-                              <div className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                                {(() => {
-                                  const grade = courseGrades[course._id]?.grade;
-                                  return grade !== null && grade !== undefined ? grade.toFixed(2) : '0.00';
-                                })()}%
-                              </div>
-                            </div>
-                          ) : null}
-                        </div>
-                      )}
+                      {renderCourseGradeBadge(course._id)}
                       <div className="absolute top-3 right-3">
                         <div className="relative">
                           <button

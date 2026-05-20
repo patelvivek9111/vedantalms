@@ -61,11 +61,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({
               />
               <div className="absolute top-full left-0 mt-2 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 w-full max-h-[60vh] overflow-y-auto z-[152]">
                 {(() => {
-                  // Filter courses based on user role
-                  const isTeacherOrAdmin = user?.role === 'teacher' || user?.role === 'admin';
-                  const availableCourses = isTeacherOrAdmin 
-                    ? courses 
-                    : courses.filter((c: any) => c.published);
+                  const availableCourses = courses.filter((c: any) => c.published);
                   
                   return (
                     <>

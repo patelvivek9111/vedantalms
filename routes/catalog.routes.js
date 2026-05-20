@@ -32,15 +32,13 @@ router.get('/', async (req, res) => {
       }).populate('instructor', 'firstName lastName email')
         .populate('students', '_id firstName lastName')
         .populate('enrollmentRequests.student', '_id firstName lastName')
-        .populate('waitlist.student', '_id firstName lastName')
-        .populate('catalog', 'subject maxStudents description startDate endDate tags');
+        .populate('waitlist.student', '_id firstName lastName');
     } else {
       // User is not authenticated, don't populate students
       courses = await Course.find({
         'catalog.startDate': { $exists: true, $ne: null },
         'catalog.endDate': { $exists: true, $ne: null }
-      }).populate('instructor', 'firstName lastName email')
-        .populate('catalog', 'subject maxStudents description startDate endDate tags');
+      }).populate('instructor', 'firstName lastName email');
     }
     
     res.json(courses);

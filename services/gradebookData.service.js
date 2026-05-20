@@ -15,6 +15,8 @@ const {
 const gradingPolicyService = require('./gradingPolicy.service');
 const { generateResolvedPolicySnapshot } = require('../shared/grading/policySnapshot.cjs');
 const { getGradingEngineVersion } = require('../shared/grading/gradingEngineVersion.cjs');
+const { calculateFinalGradeWithWeightedGroups } = require('../utils/gradeCalculation');
+const { courseContextFromResolvedPolicy } = require('../shared/grading/policyResolver.cjs');
 
 function normalizeStudentId(id) {
   if (id && typeof id === 'object' && id._id) return String(id._id);
@@ -85,7 +87,7 @@ async function loadGradebookColumns(courseId) {
 /**
  * Build instructor gradebook grades map using batched submission queries.
  */
-async function buildGradebookGrades(course, assignments, studentIds, policyCache) {
+async function buildGradebookGrades(course, assignments, studentIds, policyCache, studentContextsOut = null) {
   const grades = {};
   studentIds.forEach((sid) => {
     grades[sid] = {};
@@ -203,9 +205,74 @@ async function buildGradebookGrades(course, assignments, studentIds, policyCache
     ];
 
     buildGradesMapForStudent(grades, sid, allAssignments);
+    if (studentContextsOut) {
+      studentContextsOut[sid] = { allAssignments, submissionMap };
+    }
   }
 
   return grades;
+}
+
+/**
+ * Class average for dashboard (batched gradebook load, same math as gradebook totals).
+ */
+async function computeCourseClassAverage(courseId) {
+  const course = await Course.findById(courseId).lean();
+  if (!course) {
+    const err = new Error('Course not found');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const studentIds = (course.students || []).map(normalizeStudentId);
+  if (studentIds.length === 0) {
+    return { average: null, studentCount: 0, gradedCount: 0 };
+  }
+
+  const assignments = await loadGradebookColumns(courseId);
+  const policyCache = new Map();
+  const resolved = await gradingPolicyService.getResolvedPolicyForCourse(course, {
+    policyCache,
+    skipRedisCache: true,
+  });
+  const courseContext = courseContextFromResolvedPolicy(resolved);
+  const studentContexts = {};
+  const grades = await buildGradebookGrades(
+    course,
+    assignments,
+    studentIds,
+    policyCache,
+    studentContexts
+  );
+
+  const studentGrades = [];
+  for (const sid of studentIds) {
+    const ctx = studentContexts[sid];
+    if (!ctx) continue;
+    const totalPercent = calculateFinalGradeWithWeightedGroups(
+      sid,
+      courseContext,
+      ctx.allAssignments,
+      grades,
+      ctx.submissionMap,
+      resolved
+    );
+    if (Number.isFinite(totalPercent) && !Number.isNaN(totalPercent)) {
+      studentGrades.push(totalPercent);
+    }
+  }
+
+  if (studentGrades.length === 0) {
+    return { average: null, studentCount: studentIds.length, gradedCount: 0 };
+  }
+
+  const sum = studentGrades.reduce((acc, n) => acc + n, 0);
+  const average = Math.round((sum / studentGrades.length) * 100) / 100;
+  return {
+    average,
+    studentCount: studentIds.length,
+    gradedCount: studentGrades.length,
+  };
 }
 
 async function getCourseGradebookPage(courseId, { page = 1, pageSize = 50, policyCache } = {}) {
@@ -298,6 +365,7 @@ async function getFullGradebookDataset(courseId, policyCache) {
 module.exports = {
   loadGradebookColumns,
   buildGradebookGrades,
+  computeCourseClassAverage,
   getCourseGradebookPage,
   getFullGradebookDataset,
   normalizeStudentId,

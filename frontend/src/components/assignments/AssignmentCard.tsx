@@ -1,4 +1,5 @@
 import React from 'react';
+import { stripHtmlToText } from '../../utils/htmlUtils';
 
 interface AssignmentCardProps {
   assignment: {
@@ -24,9 +25,13 @@ const AssignmentCard: React.FC<AssignmentCardProps> = ({
   isAdmin, 
   navigate 
 }) => {
-  const totalPoints = assignment.questions?.reduce((sum: number, q: any) => sum + (q.points || 0), 0) || assignment.totalPoints || 0;
-  // Ensure dueDate is a Date object
+  const totalPoints =
+    assignment.questions?.reduce((sum: number, q: { points?: number }) => sum + (q.points || 0), 0) ||
+    assignment.totalPoints ||
+    0;
   const dueDate = assignment.dueDate ? new Date(assignment.dueDate) : null;
+  const descriptionPreview = stripHtmlToText(assignment.description);
+  const categoryLabel = assignment.moduleTitle || (assignment.group ? 'Group assignment' : 'Assignment');
   
   return (
     <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
@@ -36,9 +41,11 @@ const AssignmentCard: React.FC<AssignmentCardProps> = ({
             <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-1 line-clamp-2">
               {assignment.title}
             </h3>
-            <span className="inline-block px-2 py-1 text-xs font-medium bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 rounded-full">
-              {assignment.moduleTitle}
-            </span>
+            {categoryLabel && (
+              <span className="inline-block rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900/50 dark:text-blue-300">
+                {categoryLabel}
+              </span>
+            )}
           </div>
           {assignment.group && (
             <span className="ml-2 px-2 py-1 text-xs font-medium bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-300 rounded-full">
@@ -46,9 +53,11 @@ const AssignmentCard: React.FC<AssignmentCardProps> = ({
             </span>
           )}
         </div>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 line-clamp-2">
-          {assignment.description}
-        </p>
+        {descriptionPreview && (
+          <p className="mb-4 line-clamp-2 text-sm text-gray-600 dark:text-gray-400">
+            {descriptionPreview}
+          </p>
+        )}
         <div className="space-y-2 mb-4">
           <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

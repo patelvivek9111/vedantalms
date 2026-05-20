@@ -468,26 +468,42 @@ const AssignmentGrading = () => {
       assignmentData.questions = Array.isArray(assignmentData.questions) ? assignmentData.questions : [];
       setAssignment(assignmentData);
 
-      // Fetch course data if we have a module
-      if (assignmentData.module) {
-        try {
-          const moduleId = typeof assignmentData.module === 'string' 
-            ? assignmentData.module 
-            : assignmentData.module._id;
-          const moduleRes = await api.get(`/modules/view/${moduleId}`);
-          
-          if (moduleRes.data.success) {
-            const courseId = moduleRes.data.data.course._id || moduleRes.data.data.course;
-            const courseRes = await api.get(`/courses/${courseId}`);
-            
-            if (courseRes.data.success) {
-              setCourse(courseRes.data.data);
+      // Fetch course data for course shell (module or group assignment)
+      try {
+        let courseId = null;
+        if (assignmentData.isGroupAssignment || assignmentData.groupSet) {
+          const gs = assignmentData.groupSet;
+          if (gs && typeof gs === 'object' && gs.course) {
+            courseId = gs.course._id || (typeof gs.course === 'string' ? gs.course : null);
+          } else {
+            const groupSetId = typeof gs === 'object' && gs?._id ? gs._id : gs;
+            if (groupSetId) {
+              const groupSetRes = await api.get(`/groups/sets/id/${groupSetId}`);
+              const groupSetData = groupSetRes.data;
+              courseId =
+                groupSetData?.course?._id ||
+                (typeof groupSetData?.course === 'string' ? groupSetData.course : null);
             }
           }
-        } catch (err) {
-          console.error('Error fetching course data:', err);
-          // Don't fail the whole page if course fetch fails
+        } else if (assignmentData.module) {
+          const moduleId =
+            typeof assignmentData.module === 'string'
+              ? assignmentData.module
+              : assignmentData.module._id;
+          const moduleRes = await api.get(`/modules/view/${moduleId}`);
+
+          if (moduleRes.data.success) {
+            courseId = moduleRes.data.data.course._id || moduleRes.data.data.course;
+          }
         }
+        if (courseId) {
+          const courseRes = await api.get(`/courses/${courseId}`);
+          if (courseRes.data.success) {
+            setCourse(courseRes.data.data);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching course data:', err);
       }
 
       const submissionsData = await fetchAllSubmissions(id);

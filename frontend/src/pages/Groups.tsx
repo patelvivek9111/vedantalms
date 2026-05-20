@@ -63,75 +63,55 @@ const Groups: React.FC = () => {
   const { user, loading: authLoading, logout } = useAuth();
   const { courses } = useCourse();
   const [showBurgerMenu, setShowBurgerMenu] = useState(false);
+  const { handleSwipeLeft, handleSwipeRight, enabled: swipeEnabled } = useBottomNavSwipe();
 
   useEffect(() => {
-    // Don't fetch if still loading auth or if user is not authenticated
-    if (authLoading || !user) {
+    if (!user) return;
+    const loadUserPreferences = async () => {
+      try {
+        const response = await getUserPreferences();
+        if (response.data.success && response.data.preferences?.courseColors) {
+          setUserCourseColors(response.data.preferences.courseColors || {});
+        }
+      } catch {
+        // preferences are optional for this page
+      }
+    };
+    loadUserPreferences();
+  }, [user?._id]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      setLoading(false);
       return;
     }
+
+    let cancelled = false;
 
     const fetchData = async () => {
       setLoading(true);
       setError(null);
       try {
         if (user.role === 'teacher' || user.role === 'admin') {
-          // For teachers, fetch groupsets and their group/member counts
           const res = await api.get('/groups/sets/my');
-          const groupSetsDataRaw = res.data?.data || res.data;
+          if (cancelled) return;
+          const groupSetsDataRaw = res.data?.data ?? res.data;
           const groupSetsData = Array.isArray(groupSetsDataRaw) ? groupSetsDataRaw : [];
-          
-            // Fetch group and member counts for each group set
-        const groupSetsWithCounts = await Promise.all(
-          groupSetsData.map(async (groupSet: GroupSet) => {
-            try {
-              const groupsRes = await api.get(`/groups/sets/${groupSet._id}/groups`);
-              const groupsDataRaw = groupsRes.data?.data || groupsRes.data;
-              const groups = Array.isArray(groupsDataRaw) ? groupsDataRaw : [];
-              
-              // Store groups data for this group set
-              setAllGroupsData(prev => ({
-                ...prev,
-                [groupSet._id]: groups
-              }));
-              
-                      // Count unique members across all groups in this set
-        const uniqueMembers = new Set();
-        
-        groups.forEach((group: any, groupIndex: number) => {
-          if (group.members && Array.isArray(group.members)) {
-            group.members.forEach((member: any, memberIndex: number) => {
-              // Use member ID to ensure uniqueness - check for _id first, then email as fallback
-              const memberId = member._id || member.id || member.email;
-              
-              if (memberId) {
-                uniqueMembers.add(memberId);
-              }
-            });
-          }
-        });
-              
-              return {
-                ...groupSet,
-                totalGroups: groups.length,
-                totalMembers: uniqueMembers.size
-              };
-            } catch (err) {
-              return {
-                ...groupSet,
-                totalGroups: 0,
-                totalMembers: 0
-              };
-            }
-          })
-        );
-        
-        setGroupSets(groupSetsWithCounts);
+          setGroupSets(
+            groupSetsData.map((groupSet: GroupSet) => ({
+              ...groupSet,
+              totalGroups: groupSet.totalGroups ?? 0,
+              totalMembers: groupSet.totalMembers ?? 0,
+            }))
+          );
         } else {
-          // For students, fetch groups
           const res = await api.get('/groups/my');
-          setGroups(res.data.data || []);
+          if (cancelled) return;
+          setGroups(res.data?.data ?? []);
         }
       } catch (err: any) {
+        if (cancelled) return;
         if (err.response?.status === 401) {
           setError('Please log in to view groups');
         } else if (err.response?.status === 500) {
@@ -140,11 +120,15 @@ const Groups: React.FC = () => {
           setError('Failed to load groups');
         }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
+
     fetchData();
-  }, [user, authLoading]);
+    return () => {
+      cancelled = true;
+    };
+  }, [user?._id, user?.role, authLoading]);
 
   // Show loading while checking authentication
   if (authLoading) {
@@ -179,23 +163,6 @@ const Groups: React.FC = () => {
   const subtitle = isTeacher 
     ? 'View all group sets from all your courses in one place' 
     : 'View all groups from all your courses in one place';
-
-  // Load user preferences on mount
-  useEffect(() => {
-    const loadUserPreferences = async () => {
-      if (!user) return;
-      
-      try {
-        const response = await getUserPreferences();
-        if (response.data.success && response.data.preferences?.courseColors) {
-          setUserCourseColors(response.data.preferences.courseColors || {});
-        }
-      } catch (err) {
-        }
-    };
-
-    loadUserPreferences();
-  }, [user]);
 
   // Helper to get course color (same logic as Dashboard)
   const getCourseColor = (courseId: string) => {
@@ -355,9 +322,6 @@ const Groups: React.FC = () => {
   };
 
   const stats = getStats();
-
-  // Swipe navigation for bottom nav
-  const { handleSwipeLeft, handleSwipeRight, enabled: swipeEnabled } = useBottomNavSwipe();
 
   return (
     <SwipeableContainer
