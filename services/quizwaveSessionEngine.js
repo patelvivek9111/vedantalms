@@ -398,9 +398,12 @@ const destroyEngine = (gamePin) => {
   runtimeByPin.delete(gamePin);
 };
 
+const isLastQuestion = (session, quiz) =>
+  session.currentQuestionIndex >= (quiz?.questions?.length ?? 0) - 1;
+
 /** Teacher manual skip — advances one phase or to next question from scoreboard. */
 const skipToNextQuestion = async (io, sessionId) => {
-  const session = await QuizSession.findById(sessionId);
+  const session = await QuizSession.findById(sessionId).populate('quiz');
   if (!session) return;
   clearTimers(session.gamePin);
 
@@ -412,7 +415,11 @@ const skipToNextQuestion = async (io, sessionId) => {
       await transitionTo(io, sessionId, PHASES.QUESTION_LOCKED, PHASES.ANSWER_REVEAL, PHASE_MS.ANSWER_REVEAL);
       break;
     case PHASES.ANSWER_REVEAL:
-      await transitionTo(io, sessionId, PHASES.ANSWER_REVEAL, PHASES.SCOREBOARD, PHASE_MS.SCOREBOARD);
+      if (isLastQuestion(session, session.quiz)) {
+        await finishGame(io, sessionId);
+      } else {
+        await transitionTo(io, sessionId, PHASES.ANSWER_REVEAL, PHASES.SCOREBOARD, PHASE_MS.SCOREBOARD);
+      }
       break;
     case PHASES.SCOREBOARD:
       await advanceOrFinish(io, sessionId);

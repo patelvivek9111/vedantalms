@@ -175,10 +175,22 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
         // Answer count/distribution come from authoritative game-state broadcast
       });
 
-      sock.on('quizwave:ended', (data) => {
+      sock.on('quizwave:ended', (data: { leaderboard?: any[]; gameSummary?: QuizWaveGameSnapshot['gameSummary'] }) => {
         setLeaderboard(data.leaderboard || []);
+        if (data.gameSummary) setGameSummary(data.gameSummary);
+        setGameSnapshot((prev) =>
+          prev
+            ? {
+                ...prev,
+                phase: 'FINISHED',
+                status: 'ended',
+                leaderboard: data.leaderboard || prev.leaderboard,
+                gameSummary: data.gameSummary || prev.gameSummary,
+                question: undefined
+              }
+            : prev
+        );
         setSession((prev) => (prev ? { ...prev, status: 'ended' as const } : null));
-        loadSession();
       });
 
       // Join as teacher after session is loaded
@@ -226,14 +238,8 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
     }
   };
 
-  const handleEnd = () => {
-    if (socket) {
-      socket.emit('quizwave:end', { sessionId });
-      // Don't wait for response - the socket event will handle state update
-    } else {
-      // If no socket, just call onEnd directly
-      onEnd();
-    }
+  const handleShowResults = () => {
+    handleNextQuestion();
   };
 
   const isEnded = phase === 'FINISHED' || session?.status === 'ended';
@@ -535,11 +541,12 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
               </button>
             ) : (
               <button
-                onClick={handleEnd}
+                onClick={handleShowResults}
                 disabled={phase === 'QUESTION_ACTIVE'}
-                className="bg-red-600 text-white px-4 sm:px-6 lg:px-8 py-2 sm:py-2.5 lg:py-3 rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 text-sm sm:text-base lg:text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-gradient-to-r from-amber-500 to-orange-600 text-white px-4 sm:px-6 lg:px-8 py-2 sm:py-2.5 lg:py-3 rounded-lg hover:from-amber-600 hover:to-orange-700 transition-colors flex items-center gap-2 text-sm sm:text-base lg:text-lg disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
               >
-                {phase === 'QUESTION_ACTIVE' ? 'Wait for timer...' : 'End Quiz'}
+                <Trophy className="w-4 h-4 sm:w-5 sm:h-5" />
+                {phase === 'QUESTION_ACTIVE' ? 'Wait for answers / timer...' : 'Show Results'}
               </button>
             )}
           </div>
