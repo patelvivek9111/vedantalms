@@ -67,6 +67,8 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
   const currentQuestion = gameSnapshot?.question ?? null;
   const answerCount = gameSnapshot?.answerCount ?? 0;
   const answerDistribution = gameSnapshot?.answerDistribution ?? {};
+  const answerPercent =
+    participantCount > 0 ? Math.round((answerCount / participantCount) * 100) : 0;
 
   const questionTimer = useQuizWavePhaseTimer(
     gameSnapshot?.phaseEndsAt,
@@ -239,6 +241,13 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
     handleNextQuestion();
   };
 
+  const handleCloseSession = () => {
+    if (socket?.connected) {
+      socket.emit('quizwave:end', { sessionId });
+    }
+    onEnd();
+  };
+
   const isEnded = phase === 'FINISHED' || session?.status === 'ended';
   const isWaiting = phase === 'LOBBY';
   const isActive =
@@ -278,19 +287,6 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
 
   const getAnswerTile = (index: number) => HOST_ANSWER_TILES[index % HOST_ANSWER_TILES.length];
 
-  const phaseLabel =
-    phase === 'QUESTION_ACTIVE'
-      ? 'Collecting answers'
-      : phase === 'QUESTION_LOCKED'
-        ? 'Answers locked'
-        : phase === 'ANSWER_REVEAL'
-          ? 'Revealing answer'
-          : phase === 'SCOREBOARD'
-            ? 'Scoreboard'
-            : phase === 'TRANSITION'
-              ? 'Next question'
-              : 'Live';
-
   const quizContent = (
     <div className="h-full min-h-0 bg-gray-50 dark:bg-gray-900">
       {/* Waiting Screen */}
@@ -318,7 +314,7 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
               </div>
               <button
                 type="button"
-                onClick={onEnd}
+                onClick={handleCloseSession}
                 className="shrink-0 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus:ring-offset-slate-950"
               >
                 Close session
@@ -449,49 +445,81 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
       {isActive && currentQuestion && (
         <div className="flex h-full min-h-0 flex-col bg-slate-100/90 dark:bg-slate-950">
           {/* Top bar */}
-          <header className="shrink-0 border-b border-slate-200/90 bg-white/95 px-3 py-2 backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/95 sm:px-4 sm:py-2.5">
-            <div className="mx-auto flex max-w-5xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                <div className="flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 dark:border-slate-700 dark:bg-slate-800/80">
-                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Question</span>
-                  <span className="text-lg font-bold tabular-nums text-slate-900 dark:text-white">
-                    {currentQuestionIndex + 1}
-                    <span className="font-medium text-slate-400"> / {quiz.questions.length}</span>
+          <header className="shrink-0 border-b border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="relative mx-auto grid max-w-5xl grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3">
+              <div className="flex justify-start">
+                <div
+                  className="inline-flex w-fit max-w-full shrink-0 items-center gap-2 rounded-full border border-slate-200/90 bg-slate-50 px-4 py-2 shadow-md dark:border-slate-600/80 dark:bg-slate-800/90 sm:px-5 sm:py-2.5"
+                  title={`${answerCount} of ${participantCount} participants answered`}
+                >
+                  <span className="relative flex h-2 w-2 shrink-0">
+                    {phase === 'QUESTION_ACTIVE' && answerPercent < 100 && (
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-400 opacity-60" />
+                    )}
+                    <span
+                      className={`relative inline-flex h-2 w-2 rounded-full ${
+                        answerPercent >= 100 ? 'bg-emerald-500' : 'bg-violet-500'
+                      }`}
+                    />
+                  </span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Answered
+                  </span>
+                  <span className="text-lg font-bold tabular-nums leading-none text-slate-900 dark:text-white sm:text-xl">
+                    {answerPercent}
+                    <span className="ml-0.5 text-sm font-semibold text-slate-500 dark:text-slate-400">%</span>
                   </span>
                 </div>
-                <span className="hidden rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 sm:inline dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300">
-                  {phaseLabel}
-                </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-800 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-300">
-                  <span className="h-1.5 w-1.5 rounded-full bg-violet-500 animate-pulse" />
-                  {answerCount} {answerCount === 1 ? 'answer' : 'answers'}
-                </span>
+              </div>
+
+              <div className="inline-flex w-fit max-w-full shrink-0 items-stretch justify-center overflow-hidden rounded-full border border-slate-200/90 bg-slate-50 shadow-md dark:border-slate-600/80 dark:bg-slate-800/90">
+                <div className="flex items-center gap-2 px-4 py-2 sm:px-5 sm:py-2.5">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Question
+                  </span>
+                  <span className="text-lg font-bold tabular-nums leading-none text-slate-900 dark:text-white sm:text-xl">
+                    {currentQuestionIndex + 1}
+                    <span className="font-semibold text-slate-400 dark:text-slate-500">
+                      /{quiz.questions.length}
+                    </span>
+                  </span>
+                </div>
                 {(phase === 'QUESTION_ACTIVE' || phase === 'TRANSITION') && (
-                  <span
-                    className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold tabular-nums ${
+                  <div
+                    className={`flex items-center gap-2 border-l border-slate-200/90 px-4 py-2 sm:px-5 sm:py-2.5 dark:border-slate-600/80 ${
                       timeRemaining <= 5
-                        ? 'border-red-200 bg-red-50 text-red-700 animate-pulse dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300'
-                        : 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200'
+                        ? 'bg-red-500 text-white animate-pulse'
+                        : 'bg-indigo-600 text-white'
                     }`}
                   >
-                    <Clock className="h-3.5 w-3.5" aria-hidden />
-                    {timeRemaining}s
-                  </span>
+                    <Clock className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
+                    <span className="text-lg font-bold tabular-nums leading-none sm:text-xl">
+                      {timeRemaining}
+                      <span className="ml-0.5 text-sm font-semibold opacity-90">s</span>
+                    </span>
+                  </div>
                 )}
               </div>
-              <div className="flex items-center justify-between gap-3 sm:justify-end">
-                <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 dark:border-slate-700 dark:bg-slate-800/80">
-                  <Users className="h-4 w-4 text-slate-500 dark:text-slate-400" aria-hidden />
-                  <span className="text-sm font-bold tabular-nums text-slate-900 dark:text-white">{participantCount}</span>
-                  <span className="text-xs text-slate-500 dark:text-slate-400">joined</span>
+
+              <div className="flex justify-end">
+                <div className="inline-flex w-fit max-w-full shrink-0 items-stretch overflow-hidden rounded-full border border-slate-200/90 bg-slate-50 shadow-md dark:border-slate-600/80 dark:bg-slate-800/90">
+                  <div className="flex shrink-0 items-center gap-2 px-4 py-2 sm:px-5 sm:py-2.5">
+                    <Users className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
+                    <span className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      Joined
+                    </span>
+                    <span className="text-lg font-bold tabular-nums leading-none text-slate-900 dark:text-white sm:text-xl">
+                      {participantCount}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCloseSession}
+                    className="shrink-0 border-l border-slate-200/90 px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-600/80 dark:text-slate-300 dark:hover:bg-slate-700/80 sm:px-5 sm:py-2.5"
+                  >
+                    Close
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={onEnd}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-                >
-                  Close
-                </button>
               </div>
             </div>
           </header>
@@ -524,6 +552,7 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
                     options={currentQuestion.options}
                     answerDistribution={answerDistribution}
                     showCorrectMarks={hostRevealCorrectOnChart}
+                    participantCount={Math.max(participantCount, 1)}
                   />
                 </div>
               )}
