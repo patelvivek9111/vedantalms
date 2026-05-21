@@ -63,6 +63,15 @@ const courseSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  operationalStatus: {
+    type: String,
+    enum: ['active', 'draft', 'archived'],
+    default: 'active',
+  },
+  archivedAt: { type: Date, default: null },
+  archivedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  restoredAt: { type: Date, default: null },
+  copyOfCourseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Course', default: null },
   publishedStateSnapshot: {
     type: {
       modules: [{
@@ -101,12 +110,15 @@ const courseSchema = new mongoose.Schema({
     courseCode: { type: String, default: '' },
     officeHours: { type: String, default: 'By Appointment' },
     syllabusContent: { type: String, default: '' },
-    syllabusFiles: [{ 
+    syllabusFiles: [{
       name: { type: String },
       url: { type: String },
       size: { type: Number },
-      uploadedAt: { type: Date, default: Date.now }
-    }]
+      fileAssetId: { type: mongoose.Schema.Types.ObjectId, ref: 'FileAsset' },
+      versionGroupId: { type: String },
+      order: { type: Number, default: 0 },
+      uploadedAt: { type: Date, default: Date.now },
+    }],
   },
   semester: {
     term: { type: String, enum: ['Fall', 'Spring', 'Summer', 'Winter'], default: 'Fall' },
@@ -296,6 +308,8 @@ courseSchema.pre('save', async function assignEnrollmentQrToken(next) {
 });
 
 courseSchema.index({ instructor: 1, updatedAt: -1 });
+courseSchema.index({ operationalStatus: 1, published: 1 });
+courseSchema.index({ instructor: 1, operationalStatus: 1 });
 courseSchema.index({ students: 1 });
 courseSchema.index({ 'catalog.courseCode': 1 });
 

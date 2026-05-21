@@ -88,6 +88,18 @@ const systemSettingsSchema = new mongoose.Schema({
     retentionDays: {
       type: Number,
       default: 30
+    },
+    deletedBlobRetentionDays: {
+      type: Number,
+      default: 30
+    },
+    deletedFileRetentionDays: {
+      type: Number,
+      default: 30
+    },
+    zipRetentionHours: {
+      type: Number,
+      default: 72
     }
   }
 }, {

@@ -540,8 +540,8 @@ exports.getAllCourses = async (req, res) => {
       });
       
       // Determine status
-      let status = 'active';
-      if (!course.published) {
+      let status = course.operationalStatus || 'active';
+      if (status === 'active' && !course.published) {
         status = 'draft';
       }
       

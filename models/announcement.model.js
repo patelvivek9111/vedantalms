@@ -16,6 +16,10 @@ const announcementSchema = new mongoose.Schema({
   course: { type: mongoose.Schema.Types.ObjectId, ref: 'Course', required: true },
   author: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   attachments: [{ type: String }],
+  fileAssets: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'FileAsset',
+  }],
   postTo: { type: String, enum: ['all', 'groupset'], default: 'all' },
   groupset: { type: mongoose.Schema.Types.ObjectId, ref: 'GroupSet' },
   options: {

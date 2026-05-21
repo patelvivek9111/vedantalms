@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../../services/api';
 import { API_URL } from '../../config';
 import ReactMarkdown from 'react-markdown';
@@ -8,6 +8,9 @@ import { safeFormatDate } from '../../utils/dateUtils';
 import { Lock, Unlock, HelpCircle, CheckCircle, Circle, Bookmark, BarChart3, Edit, Eye, X, Download } from 'lucide-react';
 import FilePreview from './FilePreview';
 import AssignmentFileUploadSection from './AssignmentFileUploadSection';
+import FileAttachmentChips from '../files/FileAttachmentChips';
+import type { NormalizedFile } from '../../utils/fileTypes';
+import { fetchCourseLifecycle } from '../../services/gradingApi';
 import ScrollableQuizSidebar from './ScrollableQuizSidebar';
 import logger from '../../utils/logger';
 import ConfirmationModal from '../common/ConfirmationModal';
@@ -54,6 +57,7 @@ interface Assignment {
   availableFrom?: string;
   questions?: Question[];
   attachments?: string[];
+  fileAssets?: Array<string | Record<string, unknown>>;
   published?: boolean;
   totalPoints?: number;
   module?: string | { _id: string };
@@ -152,6 +156,7 @@ const shuffleArray = <T,>(array: T[]): T[] => {
 const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [courseId, setCourseId] = useState<string | undefined>(propCourseId);
   
   // Track courseId changes
@@ -174,7 +179,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
   const [quizStarted, setQuizStarted] = useState<boolean>(false);
   const [quizStartTime, setQuizStartTime] = useState<Date | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-  const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [courseFinalized, setCourseFinalized] = useState<boolean>(false);
   const [showTimer, setShowTimer] = useState<boolean>(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
   const [showUploadSection, setShowUploadSection] = useState<boolean>(false);
@@ -209,6 +214,25 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
   // Define instructor and student checks early
   const isInstructor = user?.role === 'teacher' || user?.role === 'admin';
   const isStudent = user?.role === 'student';
+  const studentPreviewParam = searchParams.get('studentPreview');
+  const studentPreviewMode =
+    studentPreviewParam === '1' ||
+    studentPreviewParam === 'true' ||
+    studentPreviewParam === 'yes';
+  const viewAsStudent = isInstructor && studentPreviewMode;
+  const showStudentExperience = isStudent || viewAsStudent;
+
+  const enterStudentPreview = () => {
+    const next = new URLSearchParams(searchParams);
+    next.set('studentPreview', '1');
+    setSearchParams(next, { replace: true });
+  };
+
+  const exitStudentPreview = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('studentPreview');
+    setSearchParams(next, { replace: true });
+  };
 
   const queueDraftSave = (draftAnswers: Answers, draftUploadedFiles: UploadedFile[]) => {
     if (!user?._id || !id || user.role !== 'student' || submission) return;
@@ -283,9 +307,35 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
     setSubmission(null); // Clear submission state when user changes
   }, [user, id]);
 
+  /** Blank slate for teacher student preview — no real submission or saved answers. */
+  useEffect(() => {
+    if (!viewAsStudent || !assignment?.questions?.length) return;
+
+    setSubmission(null);
+    setUploadedFiles([]);
+    setQuizStarted(false);
+    setQuizStartTime(null);
+    setTimeLeft(null);
+    setCurrentQuestion(0);
+    setAnsweredQuestions(new Set());
+    setMarkedQuestions(new Set());
+    setShowUploadSection(false);
+
+    const initialAnswers: Answers = {};
+    const shuffled: Record<number, Question['rightItems']> = {};
+    assignment.questions.forEach((question: Question, index: number) => {
+      initialAnswers[index] = question.type === 'matching' ? {} : '';
+      if (question.type === 'matching' && Array.isArray(question.rightItems) && question.rightItems.length > 0) {
+        shuffled[index] = shuffleArray([...question.rightItems]);
+      }
+    });
+    setAnswers(initialAnswers);
+    setShuffledOptions(shuffled);
+  }, [viewAsStudent, assignment?._id]);
+
   // Fetch submission statistics for teachers
   const fetchSubmissionStats = async () => {
-    if (!isInstructor || !assignment?._id) return;
+    if (!isInstructor || !assignment?._id || studentPreviewMode) return;
     
     try {
       setLoadingStats(true);
@@ -492,16 +542,34 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
               }
             }
           }
-        } else if (user?.role === 'teacher' || user?.role === 'admin') {
+        } else if (
+          (user?.role === 'teacher' || user?.role === 'admin') &&
+          !studentPreviewMode
+        ) {
           try {
             const submissionRes = await api.get(`/submissions/assignment/${id}`);
             const submissionList = Array.isArray(submissionRes.data?.data)
               ? submissionRes.data.data
               : Array.isArray(submissionRes.data) ? submissionRes.data : [];
-            setSubmission(submissionList[0] || null);
+            const first = submissionList[0] || null;
+            setSubmission(first);
+            if (first?.answers) {
+              const parsedAnswers: Record<string, string | Record<number, string>> = {};
+              Object.keys(first.answers).forEach((questionIndex) => {
+                const answer = first.answers[questionIndex];
+                try {
+                  parsedAnswers[questionIndex] = JSON.parse(answer);
+                } catch {
+                  parsedAnswers[questionIndex] = answer;
+                }
+              });
+              setAnswers(parsedAnswers);
+            }
           } catch (err) {
             setSubmission(null);
           }
+        } else if (studentPreviewMode) {
+          setSubmission(null);
         }
 
         setLoading(false);
@@ -515,14 +583,14 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
     if (user) {
       fetchData();
     }
-  }, [id, user]);
+  }, [id, user, studentPreviewMode]);
 
   // Fetch submission stats when assignment is loaded and user is instructor
   useEffect(() => {
-    if (assignment && isInstructor) {
+    if (assignment && isInstructor && !studentPreviewMode) {
       fetchSubmissionStats();
     }
-  }, [assignment, isInstructor]);
+  }, [assignment, isInstructor, studentPreviewMode]);
 
   // Fetch course-level grade data
   useEffect(() => {
@@ -554,6 +622,16 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
 
     fetchCourseGradeData();
   }, [courseId, user, isStudent]);
+
+  useEffect(() => {
+    if (!courseId) return;
+    fetchCourseLifecycle(courseId)
+      .then((res) => {
+        const status = res?.data?.lifecycle?.status ?? res?.lifecycle?.status;
+        if (status === 'FINALIZED') setCourseFinalized(true);
+      })
+      .catch(() => {});
+  }, [courseId]);
 
   // Update answeredQuestions when answers are loaded or changed
   useEffect(() => {
@@ -603,7 +681,17 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
 
   useEffect(() => {
     // Only run timer if quiz is started, no submission exists, and user is actively taking the quiz
-    if (quizStarted && quizStartTime && assignment?.isTimedQuiz && assignment?.quizTimeLimit && !submission && user?.role === 'student' && !hasAutoSubmitted && !isSubmitting) {
+    if (
+      quizStarted &&
+      quizStartTime &&
+      assignment?.isTimedQuiz &&
+      assignment?.quizTimeLimit &&
+      !submission &&
+      user?.role === 'student' &&
+      !viewAsStudent &&
+      !hasAutoSubmitted &&
+      !isSubmitting
+    ) {
       const timer = setInterval(() => {
         const now = new Date();
         const elapsed = Math.floor((now.getTime() - (quizStartTime?.getTime() || 0)) / 1000); // seconds
@@ -617,7 +705,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
           setHasAutoSubmitted(true);
           
           // Auto-submit the assignment/quiz
-          if (user && user.role === 'student' && !submission && handleSubmitRef.current) {
+          if (user && user.role === 'student' && !viewAsStudent && !submission && handleSubmitRef.current) {
             handleSubmitRef.current().catch(err => {
               logger.error('Auto-submit error', err instanceof Error ? err : new Error(String(err)));
               setError('Error auto-submitting quiz. Please submit manually.');
@@ -640,62 +728,19 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
       // Make timer user-specific by including user ID in the key
       const timerKey = `quiz_start_${id}_${user._id}`;
       localStorage.setItem(timerKey, startTime.toISOString());
-      setTimeLeft(assignment.quizTimeLimit);
+      setTimeLeft((assignment.quizTimeLimit || 0) * 60);
     }
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []);
-    if (files.length === 0) return;
-
-    setIsUploading(true);
-    try {
-      const formData = new FormData();
-      files.forEach(file => {
-        formData.append('files', file);
-      });
-
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setError('Authentication token not found. Please log in again.');
-        setIsUploading(false);
-        return;
-      }
-      const response = await api.post('/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
-
-      const newFiles = Array.isArray(response.data?.files) 
-        ? response.data.files.map((file: any) => ({
-            name: file.originalname,
-            url: file.path,
-            size: file.size
-          }))
-        : [];
-
-      setUploadedFiles(prev => {
-        const updated = [...prev, ...newFiles];
-        queueDraftSave(answers, updated);
-        
-        return updated;
-      });
-    } catch (error) {
-      logger.error('Error uploading files', error instanceof Error ? error : new Error(String(error)));
-      setError('Error uploading files. Please try again.');
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const removeFile = (index: number) => {
-    setUploadedFiles(prev => {
-      const updated = prev.filter((_, i) => i !== index);
-      queueDraftSave(answers, updated);
-      
-      return updated;
-    });
+  const handleUploadedFilesChange = (files: NormalizedFile[]) => {
+    const mapped = files.map((f) => ({
+      name: f.name,
+      url: f.url,
+      size: f.size,
+      fileAssetId: f.fileAssetId,
+    }));
+    setUploadedFiles(mapped);
+    queueDraftSave(answers, mapped);
   };
 
   const formatTime = (seconds: number): string => {
@@ -903,7 +948,21 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
 
   const isCreator = isInstructor && assignment?.createdBy?._id === user?._id;
   const isPastDue = new Date() > new Date(assignment?.dueDate);
-  const isTeacherPreview = isInstructor;
+  /** Teachers previewing as student can interact even if the real due date passed. */
+  const effectivePastDue = viewAsStudent ? false : isPastDue;
+  const canInteractAsStudent = showStudentExperience && !effectivePastDue;
+  const isTeacherDashboard = isInstructor && !studentPreviewMode;
+  /** In student preview, ignore any loaded submission so the UI stays blank. */
+  const activeSubmission = viewAsStudent ? null : submission;
+  /** Students must start timed quizzes first; teachers in preview see questions immediately. */
+  const canShowQuestionPanel =
+    !isTeacherDashboard &&
+    (viewAsStudent ||
+      !assignment.isTimedQuiz ||
+      quizStarted ||
+      !!activeSubmission ||
+      effectivePastDue);
+  const showTimedQuizChrome = !viewAsStudent && !!assignment.isTimedQuiz;
   
 
   
@@ -950,8 +1009,8 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
               <h1 className="lg:hidden text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 dark:text-gray-100 break-words mt-2">{assignment.title}</h1>
             <p className="mt-1 text-xs sm:text-sm text-gray-500 dark:text-gray-400 dark:text-gray-400">
               <span className="block sm:inline">Due: {safeFormatDate(assignment.dueDate, 'MMM d, yyyy, h:mm a')}</span>
-              {submission && (
-                <span className="block sm:inline sm:ml-4 mt-1 sm:mt-0 text-green-600 dark:text-green-400 dark:text-green-400">Submitted: {safeFormatDate(submission.submittedAt, 'MMM d, yyyy, h:mm a')}</span>
+              {activeSubmission && (
+                <span className="block sm:inline sm:ml-4 mt-1 sm:mt-0 text-green-600 dark:text-green-400 dark:text-green-400">Submitted: {safeFormatDate(activeSubmission.submittedAt, 'MMM d, yyyy, h:mm a')}</span>
               )}
             </p>
             {/* Show feedback if student and feedback exists */}
@@ -1119,7 +1178,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
 
           </div>
           <div className="flex space-x-2">
-            {isStudent && !submission && !isPastDue && (!assignment.isTimedQuiz || quizStarted) && (
+            {isStudent && !activeSubmission && (!assignment.isTimedQuiz || quizStarted) && (
               <button
                 onClick={handleSubmit}
                 disabled={isSubmitting}
@@ -1128,7 +1187,17 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                 {isSubmitting ? 'Submitting...' : 'Submit Assignment'}
               </button>
             )}
-            {isCreator && (
+            {isInstructor && !studentPreviewMode && (
+              <button
+                type="button"
+                onClick={enterStudentPreview}
+                className="inline-flex items-center px-4 py-2 border border-amber-300 dark:border-amber-600 text-sm font-medium rounded-md text-amber-900 dark:text-amber-100 bg-amber-50 dark:bg-amber-900/40 hover:bg-amber-100 dark:hover:bg-amber-900/60"
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                Student preview
+              </button>
+            )}
+            {isCreator && !viewAsStudent && (
               <button
                 onClick={handleDelete}
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 dark:bg-red-500 dark:bg-red-500 hover:bg-red-700 dark:hover:bg-red-600 dark:hover:bg-red-600 dark:bg-red-500"
@@ -1141,16 +1210,65 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
 
 
 
-        {/* Timer for timed quizzes - Start Quiz button only */}
-        {assignment.isTimedQuiz && assignment.quizTimeLimit && isStudent && !submission && !isPastDue && !quizStarted && (
+        {!isTeacherDashboard && (assignment.fileAssets?.length || assignment.attachments?.length) ? (
+          <div className="mt-6">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Attachments</h3>
+            <FileAttachmentChips
+              files={
+                (assignment as { attachmentFiles?: unknown[] }).attachmentFiles ||
+                assignment.attachments ||
+                assignment.fileAssets
+              }
+              className="mt-2"
+            />
+          </div>
+        ) : null}
+
+        {canInteractAsStudent && !activeSubmission && !assignment.isTimedQuiz && !assignment.isGradedQuiz && assignment.group !== 'Quizzes' && (
+          <AssignmentFileUploadSection
+            uploadedFiles={uploadedFiles}
+            onFilesChange={handleUploadedFilesChange}
+            courseId={courseId}
+            assignmentId={id}
+            finalized={courseFinalized}
+            disabled={viewAsStudent}
+          />
+        )}
+
+        {viewAsStudent && (
+          <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 dark:border-amber-700 dark:bg-amber-900/30">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <Eye className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-700 dark:text-amber-300" />
+                <div>
+                  <p className="font-semibold text-amber-900 dark:text-amber-100">Student preview</p>
+                  <p className="text-sm text-amber-800 dark:text-amber-200">
+                    You are viewing this assignment as students see it. Answers and uploads are not saved.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={exitStudentPreview}
+                className="inline-flex items-center justify-center rounded-md border border-amber-400 bg-white px-3 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100 dark:border-amber-600 dark:bg-amber-950 dark:text-amber-100 dark:hover:bg-amber-900/50"
+              >
+                Exit student preview
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Timed quiz start screen — students only (not teacher preview) */}
+        {showTimedQuizChrome && assignment.quizTimeLimit && canInteractAsStudent && !activeSubmission && !quizStarted && (
           <div className="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
             <div className="text-center">
               <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-2">Timed Quiz</h3>
               <p className="text-blue-700 dark:text-blue-300 mb-4">
-                This quiz has a time limit of {assignment.quizTimeLimit} minutes. 
+                This quiz has a time limit of {assignment.quizTimeLimit} minutes.
                 Once you start, the timer will begin and cannot be paused.
               </p>
               <button
+                type="button"
                 onClick={startQuiz}
                 className="inline-flex items-center px-6 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600"
               >
@@ -1160,131 +1278,8 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
           </div>
         )}
 
-
-
-        {assignment.attachments && assignment.attachments.length > 0 && (
-          <div className="mt-6">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 dark:text-gray-100">Attachments</h3>
-            <ul className="mt-2 divide-y divide-gray-200 dark:divide-gray-700">
-              {assignment.attachments.map((attachment, index) => (
-                <li key={index} className="py-3">
-                  <a
-                    href={attachment}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-indigo-600 dark:text-indigo-400 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 dark:hover:text-indigo-300"
-                  >
-                    {attachment.split('/').pop()}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {/* File Upload Section - Always available for students */}
-        {isStudent && !submission && !isPastDue && (
-          <div className="mt-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">File Upload</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Upload a file, or choose a file you've already uploaded.
-            </p>
-            <div className="space-y-4">
-              {/* Upload Button */}
-              <div>
-                <div className="flex items-center space-x-4">
-                  <input
-                    type="file"
-                    multiple
-                    onChange={handleFileUpload}
-                    disabled={isUploading}
-                    className="hidden"
-                    id="file-upload-main"
-                  />
-                  <label
-                    htmlFor="file-upload-main"
-                    className={`inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600 cursor-pointer ${
-                      isUploading ? 'opacity-50 cursor-not-allowed' : ''
-                    }`}
-                  >
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
-                    {isUploading ? 'Uploading...' : 'Upload File'}
-                  </label>
-                  {uploadedFiles.length > 0 && (
-                    <button
-                      onClick={() => document.getElementById('file-upload-main')?.click()}
-                      className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
-                    >
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                      </svg>
-                      Add Another File
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Uploaded Files List */}
-              {uploadedFiles.length > 0 && (
-                <div className="mt-4">
-                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Uploaded Files:</h4>
-                  <div className="space-y-2">
-                    {uploadedFiles.map((file, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md">
-                        <div className="flex items-center space-x-3 flex-1 min-w-0">
-                          <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{file.name}</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                              {file.size ? `${((file.size || 0) / 1024 / 1024).toFixed(2)} MB` : 'Size unknown'}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-2 ml-2">
-                          <button
-                            onClick={() => setPreviewFile({ url: file.url, name: file.name })}
-                            className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 p-1"
-                            title="Preview file"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => removeFile(index)}
-                            className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 p-1"
-                            title="Remove file"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  {/* File Preview Modal */}
-                  {previewFile && previewFile.url && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-sm" onClick={() => setPreviewFile(null)}>
-                      <div className="relative max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-auto rounded-lg shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                        <FilePreview
-                          fileUrl={previewFile.url || ''}
-                          fileName={previewFile.name || ''}
-                          onClose={() => setPreviewFile(null)}
-                          showCloseButton={true}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
         {/* Teacher Analytics Dashboard - Always show for teachers */}
-        {isTeacherPreview && (
+        {isTeacherDashboard && (
           <div className="mt-8">
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
                     <div className="flex items-center justify-between mb-6">
@@ -1518,6 +1513,14 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                               </>
                             )}
                           </button>
+                          <button
+                            type="button"
+                            onClick={enterStudentPreview}
+                            className="w-full text-left px-3 py-2 text-sm bg-amber-50 dark:bg-amber-900/50 hover:bg-amber-100 dark:hover:bg-amber-900/70 rounded-md transition-colors flex items-center space-x-2 text-gray-900 dark:text-gray-100"
+                          >
+                            <Eye className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                            <span>Student preview</span>
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -1527,19 +1530,21 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
 
         {/* Assignment Questions Section */}
         {assignment.questions && assignment.questions.length > 0 && (() => {
-          // Check if we should show questions to students after submission
+          // Check if we should show questions to students after activeSubmission
           const isQuiz = assignment.isGradedQuiz || assignment.group === 'Quizzes';
-          const shouldShowQuestions = !isStudent || !submission || isPastDue || 
-            (submission?.showCorrectAnswers || assignment.showCorrectAnswers || 
-             submission?.showStudentAnswers || assignment.showStudentAnswers);
-          
+          const shouldShowQuestions =
+            viewAsStudent ||
+            !showStudentExperience ||
+            !activeSubmission ||
+            effectivePastDue ||
+            (activeSubmission?.showCorrectAnswers || assignment.showCorrectAnswers ||
+              activeSubmission?.showStudentAnswers || assignment.showStudentAnswers);
+
           return (
             <div className="mt-8">
-              {/* Show questions for students, but not in teacher preview */}
-              {(
-                !isTeacherPreview && (!assignment.isTimedQuiz || quizStarted || !isStudent || submission || isPastDue) && shouldShowQuestions
-              ) ? (
-                assignment.displayMode === 'single' && isStudent && !submission && !isPastDue ? (
+              {/* Show questions for students, but not in teacher dashboard */}
+              {canShowQuestionPanel && shouldShowQuestions ? (
+                canInteractAsStudent && !activeSubmission && assignment.displayMode === 'single' ? (
                 // Student answering view with sidebar (single question mode)
                 <div className="flex gap-6">
                   {/* Main content area */}
@@ -1599,7 +1604,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                               <label htmlFor={`question-${currentQuestion}-answer`} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                 Your Answer:
                               </label>
-                              {submission && isStudent ? (
+                              {activeSubmission && isStudent ? (
                                 <div className="p-4 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md">
                                   <p className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
                                     {typeof answers[currentQuestion] === 'string' && answers[currentQuestion] 
@@ -1616,7 +1621,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                   onChange={(e) => handleAnswerChange(currentQuestion, e.target.value)}
                                   placeholder="Enter your answer here..."
                                   rows={5}
-                                  disabled={!!submission || !isStudent || isPastDue || isTeacherPreview}
+                                  disabled={!!activeSubmission || !canInteractAsStudent}
                                 />
                               )}
                             </div>
@@ -1666,7 +1671,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                              assignment.questions[currentQuestion].rightItems && assignment.questions[currentQuestion].rightItems.length > 0 ? (
                               <>
                                 {/* Only show reference columns for teachers/admins, not for students */}
-                                {(user?.role === 'teacher' || user?.role === 'admin') && (
+                                {(user?.role === 'teacher' || user?.role === 'admin') && !viewAsStudent && (
                                   <div className="grid grid-cols-2 gap-6 mb-6">
                                     {/* Left Column - Items to match */}
                                     <div>
@@ -1701,7 +1706,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                 )}
                                 
                                 {/* Student matching interface */}
-                                {isStudent && !submission && !isPastDue && (
+                                {canInteractAsStudent && !activeSubmission && (
                                   <div className="space-y-3">
                                     {assignment.questions && assignment.questions[currentQuestion]?.leftItems?.map((leftItem, leftIndex) => {
                                       const currentQ = assignment.questions?.[currentQuestion];
@@ -1748,8 +1753,8 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                 )}
                                 
                                 {/* Show answers for submitted assignments */}
-                                {submission && (() => {
-                                  const currentSubmission: Submission = submission; // Type assertion for IIFE
+                                {activeSubmission && (() => {
+                                  const currentSubmission: Submission = activeSubmission; // Type assertion for IIFE
                                   const isQuiz = assignment.isGradedQuiz || assignment.group === 'Quizzes';
                                   const showFeedback = (currentSubmission.showCorrectAnswers || assignment.showCorrectAnswers || currentSubmission.showStudentAnswers || assignment.showStudentAnswers || currentSubmission.autoGraded);
                                   
@@ -1807,13 +1812,15 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                           </button>
                           
                           {currentQuestion === assignment.questions.length - 1 ? (
-                            <button
-                              onClick={handleSubmit}
-                              disabled={isSubmitting}
-                              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
-                            >
-                              {isSubmitting ? 'Submitting...' : 'Submit Assignment'}
-                            </button>
+                            isStudent ? (
+                              <button
+                                onClick={handleSubmit}
+                                disabled={isSubmitting}
+                                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+                              >
+                                {isSubmitting ? 'Submitting...' : 'Submit Assignment'}
+                              </button>
+                            ) : null
                           ) : (
                             <button
                               onClick={nextQuestion}
@@ -1825,100 +1832,15 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                         </div>
                       </div>
                     ) : (
-                      // Upload section
-                      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Upload Files</h3>
-                          <div className="space-y-4">
-                            {/* Upload Button */}
-                            <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Upload File</label>
-                              <div className="flex items-center space-x-4">
-                                <input
-                                  type="file"
-                                  multiple
-                                  onChange={handleFileUpload}
-                                  disabled={isUploading}
-                                  className="hidden"
-                                  id="file-upload-final"
-                                />
-                                <label
-                                  htmlFor="file-upload-final"
-                                className={`inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer ${
-                                    isUploading ? 'opacity-50 cursor-not-allowed' : ''
-                                  }`}
-                                >
-                                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                  </svg>
-                                  {isUploading ? 'Uploading...' : 'Upload File'}
-                                </label>
-                                {uploadedFiles.length > 0 && (
-                                  <button
-                                    onClick={() => document.getElementById('file-upload-final')?.click()}
-                                  className="inline-flex items-center px-4 py-2 border border-pink-500 dark:border-pink-600 rounded-md shadow-sm text-sm font-medium text-pink-600 dark:text-pink-400 bg-white dark:bg-gray-800 hover:bg-pink-50 dark:hover:bg-pink-900/20"
-                                  >
-                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                    </svg>
-                                    Add Another File
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Uploaded Files List */}
-                            {uploadedFiles.length > 0 && (
-                              <div className="mt-4">
-                              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Uploaded Files:</h4>
-                                <div className="space-y-2">
-                                  {uploadedFiles.map((file, index) => (
-                                  <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md">
-                                      <div className="flex items-center space-x-3 flex-1 min-w-0">
-                                      <svg className="w-5 h-5 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                        </svg>
-                                        <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{file.name}</p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">{file.size ? `${((file.size || 0) / 1024 / 1024).toFixed(2)} MB` : 'Size unknown'}</p>
-                                        </div>
-                                      </div>
-                                      <div className="flex items-center space-x-2 ml-2">
-                                        <button
-                                          onClick={() => setPreviewFile({ url: file.url, name: file.name })}
-                                          className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 p-1"
-                                          title="Preview file"
-                                        >
-                                          <Eye className="w-4 h-4" />
-                                        </button>
-                                        <button
-                                          onClick={() => removeFile(index)}
-                                          className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 p-1"
-                                          title="Remove file"
-                                        >
-                                          <X className="w-4 h-4" />
-                                        </button>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                                
-                                {/* File Preview Modal */}
-                                {previewFile && previewFile.url && (
-                                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setPreviewFile(null)}>
-                                    <div className="relative max-w-4xl w-full max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
-                                      <FilePreview
-                                        fileUrl={previewFile.url || ''}
-                                        fileName={previewFile.name || ''}
-                                        onClose={() => setPreviewFile(null)}
-                                        showCloseButton={true}
-                                      />
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        
+                      <>
+                      <AssignmentFileUploadSection
+                        uploadedFiles={uploadedFiles}
+                        onFilesChange={handleUploadedFilesChange}
+                        courseId={courseId}
+                        assignmentId={id}
+                        finalized={courseFinalized}
+                        disabled={viewAsStudent}
+                      />
                         <div className="flex justify-between mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
                           <button
                             onClick={() => navigateToQuestion(0)}
@@ -1928,13 +1850,15 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                           </button>
                           
                           {currentQuestion === assignment.questions.length - 1 ? (
-                            <button
-                              onClick={handleSubmit}
-                              disabled={isSubmitting}
-                              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600"
-                            >
-                              {isSubmitting ? 'Submitting...' : 'Submit Assignment'}
-                            </button>
+                            isStudent ? (
+                              <button
+                                onClick={handleSubmit}
+                                disabled={isSubmitting}
+                                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600"
+                              >
+                                {isSubmitting ? 'Submitting...' : 'Submit Assignment'}
+                              </button>
+                            ) : null
                           ) : (
                             <button
                               onClick={nextQuestion}
@@ -1944,7 +1868,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                             </button>
                           )}
                         </div>
-                      </div>
+                      </>
                     )}
                   </div>
                   
@@ -2000,7 +1924,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                       </div>
                       
                       {/* Timer Display for timed quizzes - under the progress bar */}
-                      {assignment.isTimedQuiz && (
+                      {showTimedQuizChrome && (
                         <div className="mt-4 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
                           <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                             <div className="flex items-center justify-between">
@@ -2054,11 +1978,11 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                         let isCorrect = false;
                         let showFeedback = false;
                         let correctAnswer = null;
-                        if (submission && isQuiz && 
-                            (submission.showCorrectAnswers || assignment.showCorrectAnswers) &&
+                        if (activeSubmission && isQuiz && 
+                            (activeSubmission.showCorrectAnswers || assignment.showCorrectAnswers) &&
                             (question.type === 'multiple-choice' || question.type === 'matching')) {
                           showFeedback = true;
-                          // Use the parsed answers from state instead of raw submission answers
+                          // Use the parsed answers from state instead of raw activeSubmission answers
                           const studentAnswer = answers[index];
                           
                           if (question.type === 'multiple-choice' && question.options) {
@@ -2094,41 +2018,41 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                         }
                         
                         // For teacher preview, show correct answers
-                        if (isTeacherPreview && question.type === 'multiple-choice' && question.options) {
+                        if (isTeacherDashboard && question.type === 'multiple-choice' && question.options) {
                           correctAnswer = question.options.find(opt => opt.isCorrect)?.text;
                         }
                         
                         // Enhanced teacher preview styling
-                        const isTeacherPreviewMode = isTeacherPreview;
+                        const isTeacherDashboardMode = isTeacherDashboard;
                         
                         // Determine feedback mode
-                        const showFullFeedback = submission && isQuiz && 
-                          (submission.showCorrectAnswers || assignment.showCorrectAnswers || submission.autoGraded);
-                        const showOnlyCorrectHighlight = submission && isQuiz && 
-                          (submission.showStudentAnswers || assignment.showStudentAnswers) && 
-                          !(submission.showCorrectAnswers || assignment.showCorrectAnswers || submission.autoGraded);
+                        const showFullFeedback = activeSubmission && isQuiz && 
+                          (activeSubmission.showCorrectAnswers || assignment.showCorrectAnswers || activeSubmission.autoGraded);
+                        const showOnlyCorrectHighlight = activeSubmission && isQuiz && 
+                          (activeSubmission.showStudentAnswers || assignment.showStudentAnswers) && 
+                          !(activeSubmission.showCorrectAnswers || assignment.showCorrectAnswers || activeSubmission.autoGraded);
                         const feedbackEnabled = showFullFeedback || showOnlyCorrectHighlight;
                         
 
                                                   
                                                   return (
                             <div key={question.id || question._id || index} className={`bg-white dark:bg-gray-800 border-2 rounded-lg p-4 sm:p-6 shadow-sm ${
-                              isTeacherPreview 
+                              isTeacherDashboard 
                                 ? 'border-blue-400 bg-blue-50 shadow-blue-100' 
                                 : (() => {
                                     // Determine feedback mode for border colors
-                                    const showFullFeedbackForBorder = submission && submission.autoGraded;
-                                    const showOnlyCorrectForBorder = submission && isQuiz && 
-                                      (submission.showStudentAnswers || assignment.showStudentAnswers) && 
-                                      !(submission.showCorrectAnswers || assignment.showCorrectAnswers || submission.autoGraded);
+                                    const showFullFeedbackForBorder = activeSubmission && activeSubmission.autoGraded;
+                                    const showOnlyCorrectForBorder = activeSubmission && isQuiz && 
+                                      (activeSubmission.showStudentAnswers || assignment.showStudentAnswers) && 
+                                      !(activeSubmission.showCorrectAnswers || assignment.showCorrectAnswers || activeSubmission.autoGraded);
                                     
-                                    if (submission && (submission.autoGraded || (submission.showCorrectAnswers || assignment.showCorrectAnswers || submission.showStudentAnswers || assignment.showStudentAnswers)) && (question.type === 'multiple-choice' || question.type === 'matching')) {
+                                    if (activeSubmission && (activeSubmission.autoGraded || (activeSubmission.showCorrectAnswers || assignment.showCorrectAnswers || activeSubmission.showStudentAnswers || assignment.showStudentAnswers)) && (question.type === 'multiple-choice' || question.type === 'matching')) {
                                       if (question.type === 'multiple-choice') {
                                         const studentAnswer = answers[index];
                                         const correctOption = question.options?.find(opt => opt.isCorrect);
                                         const isCorrect = String(studentAnswer) === String(correctOption?.text);
                                         
-                                        if (showFullFeedbackForBorder || (submission.showCorrectAnswers || assignment.showCorrectAnswers)) {
+                                        if (showFullFeedbackForBorder || (activeSubmission.showCorrectAnswers || assignment.showCorrectAnswers)) {
                                           // Full feedback: green/red
                                           return isCorrect 
                                             ? 'border-green-500 dark:border-green-500' 
@@ -2140,13 +2064,13 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                             : 'border-red-500 dark:border-red-500';
                                         }
                                       } else if (question.type === 'matching') {
-                                        const autoGrade = submission.autoQuestionGrades instanceof Map 
-                                          ? submission.autoQuestionGrades.get(index.toString())
-                                          : submission.autoQuestionGrades?.[index.toString()];
+                                        const autoGrade = activeSubmission.autoQuestionGrades instanceof Map 
+                                          ? activeSubmission.autoQuestionGrades.get(index.toString())
+                                          : activeSubmission.autoQuestionGrades?.[index.toString()];
                                         const maxPoints = question.points || 0;
                                         const percentageCorrect = autoGrade && maxPoints > 0 ? autoGrade / maxPoints : 0;
                                         
-                                        if (showFullFeedbackForBorder || (submission.showCorrectAnswers || assignment.showCorrectAnswers)) {
+                                        if (showFullFeedbackForBorder || (activeSubmission.showCorrectAnswers || assignment.showCorrectAnswers)) {
                                           // Full feedback: green/red/yellow
                                           if (percentageCorrect === 1) {
                                             return 'border-green-500 dark:border-green-500'; // All correct
@@ -2179,16 +2103,16 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                     return 'border-gray-200 dark:border-gray-700';
                                   })()
                             }`}>
-                          <div className={`rounded-lg p-3 sm:p-4 mb-3 ${isTeacherPreview ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-gray-100 dark:bg-gray-700'}`}>
+                          <div className={`rounded-lg p-3 sm:p-4 mb-3 ${isTeacherDashboard ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-gray-100 dark:bg-gray-700'}`}>
                             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-0">
                               <div className="flex items-center space-x-2 sm:space-x-3">
                                 <h4 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-100">Question {index + 1}</h4>
-                                {isTeacherPreview && (
+                                {isTeacherDashboard && (
                                   <span className="px-3 py-1 text-xs font-medium bg-blue-500 text-white rounded-full font-bold">
                                     TEACHER PREVIEW
                                   </span>
                                 )}
-                                {isStudent && !submission && !isPastDue && (
+                                {canInteractAsStudent && !activeSubmission && (
                                   <button
                                     onClick={() => toggleMarkQuestion(index)}
                                     className={`p-1 rounded border ${
@@ -2206,11 +2130,11 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                 )}
                               </div>
                               <div className="flex items-center space-x-2">
-                                {submission && submission.autoGraded && (question.type === 'multiple-choice' || question.type === 'matching') ? (
+                                {activeSubmission && activeSubmission.autoGraded && (question.type === 'multiple-choice' || question.type === 'matching') ? (
                                   (() => {
-                                    const autoGrade = submission.autoQuestionGrades instanceof Map 
-                                      ? submission.autoQuestionGrades.get(index.toString())
-                                      : submission.autoQuestionGrades?.[index.toString()];
+                                    const autoGrade = activeSubmission.autoQuestionGrades instanceof Map 
+                                      ? activeSubmission.autoQuestionGrades.get(index.toString())
+                                      : activeSubmission.autoQuestionGrades?.[index.toString()];
                                     return (
                                       <span className="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-100">
                                         {(() => {
@@ -2244,17 +2168,17 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                           {question.type === 'multiple-choice' && question.options && (
                             <div>
                               {/* Show detailed feedback for submitted assignments */}
-                              {submission && (submission.autoGraded || (submission.showCorrectAnswers || assignment.showCorrectAnswers || submission.showStudentAnswers || assignment.showStudentAnswers)) && (
+                              {activeSubmission && (activeSubmission.autoGraded || (activeSubmission.showCorrectAnswers || assignment.showCorrectAnswers || activeSubmission.showStudentAnswers || assignment.showStudentAnswers)) && (
                                 <div className={`mb-4 p-3 sm:p-4 rounded-lg ${
                                   (() => {
                                     const studentAnswer = answers[index];
                                     const correctOption = question.options.find(opt => opt.isCorrect);
                                     const isCorrect = String(studentAnswer) === String(correctOption?.text);
-                                    const showFullFeedbackForBox = submission && isQuiz && 
-                                      (submission.showCorrectAnswers || assignment.showCorrectAnswers);
-                                    const showOnlyCorrectForBox = submission && isQuiz && 
-                                      (submission.showStudentAnswers || assignment.showStudentAnswers) && 
-                                      !(submission.showCorrectAnswers || assignment.showCorrectAnswers);
+                                    const showFullFeedbackForBox = activeSubmission && isQuiz && 
+                                      (activeSubmission.showCorrectAnswers || assignment.showCorrectAnswers);
+                                    const showOnlyCorrectForBox = activeSubmission && isQuiz && 
+                                      (activeSubmission.showStudentAnswers || assignment.showStudentAnswers) && 
+                                      !(activeSubmission.showCorrectAnswers || assignment.showCorrectAnswers);
                                     
                                     if (isCorrect) {
                                       return 'bg-green-50 dark:bg-green-900/50 border border-green-200 dark:border-green-600';
@@ -2273,9 +2197,9 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                   </div>
                                   {(() => {
                                     const studentAnswer = answers[index];
-                                    const autoGrade = submission.autoQuestionGrades instanceof Map 
-                                      ? submission.autoQuestionGrades.get(index.toString())
-                                      : submission.autoQuestionGrades?.[index.toString()];
+                                    const autoGrade = activeSubmission.autoQuestionGrades instanceof Map 
+                                      ? activeSubmission.autoQuestionGrades.get(index.toString())
+                                      : activeSubmission.autoQuestionGrades?.[index.toString()];
                                     const maxPoints = question.points || 0;
                                     const correctOption = question.options?.find(opt => opt.isCorrect);
                                     const isCorrect = String(studentAnswer) === String(correctOption?.text);
@@ -2292,13 +2216,13 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                           })()}
                                         </div>
                                         {/* Option 1: showCorrectAnswers - Show correctness (green/red) but NOT the correct answer */}
-                                        {(submission.showCorrectAnswers || assignment.showCorrectAnswers) && !(submission.showStudentAnswers || assignment.showStudentAnswers) && (
+                                        {(activeSubmission.showCorrectAnswers || assignment.showCorrectAnswers) && !(activeSubmission.showStudentAnswers || assignment.showStudentAnswers) && (
                                           <div className={`text-sm sm:text-base font-medium ${isCorrect ? 'text-green-600 dark:text-green-300' : 'text-red-600 dark:text-red-300'}`}>
                                             {isCorrect ? '✓ Correct!' : '✗ Incorrect'}
                                           </div>
                                         )}
                                         {/* Option 2: showStudentAnswers - Show student's answer, mark wrong in red, and show correct answer for wrong ones */}
-                                        {(submission.showStudentAnswers || assignment.showStudentAnswers) && !(submission.showCorrectAnswers || assignment.showCorrectAnswers) && (
+                                        {(activeSubmission.showStudentAnswers || assignment.showStudentAnswers) && !(activeSubmission.showCorrectAnswers || assignment.showCorrectAnswers) && (
                                           <>
                                             <div>
                                               <div className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-100 mb-1.5 sm:mb-2">Your Answer:</div>
@@ -2324,7 +2248,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                               )}
                               
                               {/* Show regular multiple-choice interface for non-submitted or non-auto-graded assignments */}
-                              {(!submission || (!submission.autoGraded && !(submission.showCorrectAnswers || assignment.showCorrectAnswers || submission.showStudentAnswers || assignment.showStudentAnswers))) && (
+                              {(!activeSubmission || (!activeSubmission.autoGraded && !(activeSubmission.showCorrectAnswers || assignment.showCorrectAnswers || activeSubmission.showStudentAnswers || assignment.showStudentAnswers))) && (
                                 <div className="divide-y divide-gray-200">
                                   {question.options.map((option, optionIndex) => (
                                     <div key={optionIndex} className="relative py-2">
@@ -2334,13 +2258,13 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                         name={`question-${index}`}
                                         value={option.text}
                                         checked={answers[index] === option.text}
-                                        onChange={(e) => !submission && isStudent && handleAnswerChange(index, e.target.value)}
-                                        disabled={!!submission || !isStudent || isPastDue || isTeacherPreview}
+                                        onChange={(e) => !activeSubmission && showStudentExperience && handleAnswerChange(index, e.target.value)}
+                                        disabled={!!activeSubmission || !canInteractAsStudent}
                                         className="sr-only"
                                       />
                                       <label 
                                         htmlFor={`question-${index}-option-${optionIndex}`} 
-                                        className={`flex items-center space-x-3 cursor-pointer ${(!!submission || !isStudent || isPastDue || isTeacherPreview) ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                        className={`flex items-center space-x-3 cursor-pointer ${(!!activeSubmission || !canInteractAsStudent) ? 'opacity-60 cursor-not-allowed' : ''}`}
                                       >
                                         <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
                                           answers[index] === option.text
@@ -2352,7 +2276,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                           )}
                                         </div>
                                         <span className="text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">{option.text}</span>
-                                        {isTeacherPreview && option.isCorrect && (
+                                        {isTeacherDashboard && option.isCorrect && (
                                           <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                             Correct Answer
                                           </span>
@@ -2375,9 +2299,9 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                 name={`question-${index}-answer`}
                                 className="w-full min-h-[120px] sm:min-h-[128px] p-3 sm:p-4 border-2 border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 resize-y text-sm sm:text-base"
                                 value={typeof answers[index] === 'string' ? answers[index] : ''}
-                                onChange={(e) => !submission && isStudent && handleAnswerChange(index, e.target.value)}
-                                placeholder={isStudent ? "Enter your answer here..." : "Student's answer will appear here"}
-                                disabled={!!submission || !isStudent || isPastDue || isTeacherPreview}
+                                onChange={(e) => !activeSubmission && showStudentExperience && handleAnswerChange(index, e.target.value)}
+                                placeholder={showStudentExperience ? "Enter your answer here..." : "Student's answer will appear here"}
+                                disabled={!!activeSubmission || !canInteractAsStudent}
                                 rows={5}
                               />
                             </div>
@@ -2387,28 +2311,28 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                             <div className="space-y-2">
                               
                               {/* Show detailed feedback for submitted assignments */}
-                              {submission && (submission.autoGraded || (submission.showCorrectAnswers || assignment.showCorrectAnswers || submission.showStudentAnswers || assignment.showStudentAnswers)) && (
+                              {activeSubmission && (activeSubmission.autoGraded || (activeSubmission.showCorrectAnswers || assignment.showCorrectAnswers || activeSubmission.showStudentAnswers || assignment.showStudentAnswers)) && (
                                 <div className={`mb-4 p-3 sm:p-4 rounded-lg ${
                                   (() => {
                                     const studentAnswer = answers[index];
-                                    const autoGrade = submission.autoQuestionGrades instanceof Map 
-                                      ? submission.autoQuestionGrades.get(index.toString())
-                                      : submission.autoQuestionGrades?.[index.toString()];
+                                    const autoGrade = activeSubmission.autoQuestionGrades instanceof Map 
+                                      ? activeSubmission.autoQuestionGrades.get(index.toString())
+                                      : activeSubmission.autoQuestionGrades?.[index.toString()];
                                     const maxPoints = question.points || 0;
                                     const percentageCorrect = autoGrade && maxPoints > 0 ? autoGrade / maxPoints : 0;
                                     
                                     // Option 1: showCorrectAnswers - just show green/red
-                                    const showOption1MatchBox = submission && isQuiz && 
-                                      (submission.showCorrectAnswers || assignment.showCorrectAnswers) &&
-                                      !(submission.showStudentAnswers || assignment.showStudentAnswers);
+                                    const showOption1MatchBox = activeSubmission && isQuiz && 
+                                      (activeSubmission.showCorrectAnswers || assignment.showCorrectAnswers) &&
+                                      !(activeSubmission.showStudentAnswers || assignment.showStudentAnswers);
                                     // Option 2: showStudentAnswers - show student answer and correct answer for wrong ones
-                                    const showOption2MatchBox = submission && isQuiz && 
-                                      (submission.showStudentAnswers || assignment.showStudentAnswers) && 
-                                      !(submission.showCorrectAnswers || assignment.showCorrectAnswers);
+                                    const showOption2MatchBox = activeSubmission && isQuiz && 
+                                      (activeSubmission.showStudentAnswers || assignment.showStudentAnswers) && 
+                                      !(activeSubmission.showCorrectAnswers || assignment.showCorrectAnswers);
                                     
                                     if (percentageCorrect === 1) {
                                       return 'bg-green-50 dark:bg-green-900/50 border border-green-200 dark:border-green-600'; // All correct
-                                    } else if (showOption1MatchBox || showOption2MatchBox || submission.autoGraded) {
+                                    } else if (showOption1MatchBox || showOption2MatchBox || activeSubmission.autoGraded) {
                                       // Both options show red/yellow for wrong/partial
                                       if (percentageCorrect > 0) {
                                         return 'bg-yellow-50 dark:bg-yellow-900/50 border border-yellow-200 dark:border-yellow-600'; // Partially correct
@@ -2425,9 +2349,9 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                   </div>
                                   {(() => {
                                     const studentAnswer = answers[index];
-                                    const autoGrade = submission.autoQuestionGrades instanceof Map 
-                                      ? submission.autoQuestionGrades.get(index.toString())
-                                      : submission.autoQuestionGrades?.[index.toString()];
+                                    const autoGrade = activeSubmission.autoQuestionGrades instanceof Map 
+                                      ? activeSubmission.autoQuestionGrades.get(index.toString())
+                                      : activeSubmission.autoQuestionGrades?.[index.toString()];
                                     const maxPoints = question.points || 0;
                                     
                                     return (
@@ -2454,13 +2378,13 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                             <div key={leftItem.id} className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-lg ${
                                               (() => {
                                                 // Option 1: showCorrectAnswers - just show green/red
-                                                const showOption1Match = submission && isQuiz && 
-                                                  (submission.showCorrectAnswers || assignment.showCorrectAnswers) &&
-                                                  !(submission.showStudentAnswers || assignment.showStudentAnswers);
+                                                const showOption1Match = activeSubmission && isQuiz && 
+                                                  (activeSubmission.showCorrectAnswers || assignment.showCorrectAnswers) &&
+                                                  !(activeSubmission.showStudentAnswers || assignment.showStudentAnswers);
                                                 // Option 2: showStudentAnswers - show student answer and correct answer for wrong ones
-                                                const showOption2Match = submission && isQuiz && 
-                                                  (submission.showStudentAnswers || assignment.showStudentAnswers) && 
-                                                  !(submission.showCorrectAnswers || assignment.showCorrectAnswers);
+                                                const showOption2Match = activeSubmission && isQuiz && 
+                                                  (activeSubmission.showStudentAnswers || assignment.showStudentAnswers) && 
+                                                  !(activeSubmission.showCorrectAnswers || assignment.showCorrectAnswers);
                                                 
                                                 if (isCorrect) {
                                                   return 'bg-green-50 dark:bg-green-900/40 border border-green-200 dark:border-green-700';
@@ -2488,12 +2412,12 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                                 ) : (
                                                   <div className={`flex items-center ${
                                                     (() => {
-                                                      const showOption1Match = submission && isQuiz && 
-                                                        (submission.showCorrectAnswers || assignment.showCorrectAnswers) &&
-                                                        !(submission.showStudentAnswers || assignment.showStudentAnswers);
-                                                      const showOption2Match = submission && isQuiz && 
-                                                        (submission.showStudentAnswers || assignment.showStudentAnswers) && 
-                                                        !(submission.showCorrectAnswers || assignment.showCorrectAnswers);
+                                                      const showOption1Match = activeSubmission && isQuiz && 
+                                                        (activeSubmission.showCorrectAnswers || assignment.showCorrectAnswers) &&
+                                                        !(activeSubmission.showStudentAnswers || assignment.showStudentAnswers);
+                                                      const showOption2Match = activeSubmission && isQuiz && 
+                                                        (activeSubmission.showStudentAnswers || assignment.showStudentAnswers) && 
+                                                        !(activeSubmission.showCorrectAnswers || assignment.showCorrectAnswers);
                                                       
                                                       if (showOption1Match || showOption2Match) {
                                                         // Both options show red for incorrect
@@ -2512,7 +2436,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                                 {!isCorrect && correctRightItem && (
                                                   <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-200 ml-0 sm:ml-4 mt-1 sm:mt-0 w-full sm:w-auto">
                                                     {/* Only show correct answer if showStudentAnswers is enabled (Option 2) */}
-                                                    {(submission.showStudentAnswers || assignment.showStudentAnswers) && !(submission.showCorrectAnswers || assignment.showCorrectAnswers) ? (
+                                                    {(activeSubmission.showStudentAnswers || assignment.showStudentAnswers) && !(activeSubmission.showCorrectAnswers || assignment.showCorrectAnswers) ? (
                                                       <>Correct: <span className="font-medium text-green-600 dark:text-green-300 break-words">{correctRightItem.text}</span></>
                                                     ) : null}
                                                   </div>
@@ -2528,7 +2452,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                               )}
                               
                               {/* Show regular matching interface for non-submitted or non-auto-graded assignments */}
-                              {(!submission || !submission.autoGraded) && (
+                              {(!activeSubmission || !activeSubmission.autoGraded) && (
                                 question.leftItems.map((leftItem, leftIndex) => {
                                   // Use the same shuffled options for all dropdowns in this question
                                   // This ensures consistency - all dropdowns show the same shuffled order
@@ -2555,14 +2479,14 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                           name={`question-${index}-matching-${leftIndex}`}
                                           value={typeof answers[index] === 'object' ? (answers[index] as Record<number, string>)[leftIndex] || '' : ''}
                                           onChange={(e) => {
-                                            if (!submission && isStudent && !isPastDue) {
+                                            if (!activeSubmission && canInteractAsStudent) {
                                               const newAnswers: Record<string, string | Record<number, string>> = { ...answers };
                                               if (!newAnswers[index]) newAnswers[index] = {};
                                               (newAnswers[index] as Record<number, string>)[leftIndex] = e.target.value;
                                               handleAnswerChange(index, newAnswers[index] as Record<number, string>);
                                             }
                                           }}
-                                          disabled={!!submission || !isStudent || isPastDue}
+                                          disabled={!!activeSubmission || !canInteractAsStudent}
                                           className="border border-gray-300 rounded-md px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-800 min-w-[120px]"
                                         >
                                           <option value="">Choose...</option>
@@ -2585,20 +2509,19 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                     </div>
                     
                     {/* File Upload Section for Students - at the bottom of scrollable mode */}
-                    {isStudent && !submission && !isPastDue && (
+                    {canInteractAsStudent && !activeSubmission && !assignment.isTimedQuiz && !assignment.isGradedQuiz && assignment.group !== 'Quizzes' && (
                       <AssignmentFileUploadSection
                         uploadedFiles={uploadedFiles}
-                        isUploading={isUploading}
-                        onFileInputChange={handleFileUpload}
-                        onRemoveFile={removeFile}
-                        previewFile={previewFile}
-                        onPreviewFile={(file) => setPreviewFile(file)}
-                        onClosePreview={() => setPreviewFile(null)}
+                        onFilesChange={handleUploadedFilesChange}
+                        courseId={courseId}
+                        assignmentId={id}
+                        finalized={courseFinalized}
+                        disabled={viewAsStudent}
                       />
                     )}
 
                     {/* Submit button for scrollable mode */}
-                    {isStudent && !submission && !isPastDue && assignment.displayMode === 'scrollable' && (
+                    {isStudent && !activeSubmission && !effectivePastDue && assignment.displayMode === 'scrollable' && (
                       <div className="mt-8">
                         <button
                           onClick={handleSubmit}
@@ -2615,13 +2538,13 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                   </div>
                   
                   {/* Sidebar for scrollable mode - only show for students answering */}
-                  {isStudent && !submission && !isPastDue && (
+                  {canInteractAsStudent && !activeSubmission && (
                     <ScrollableQuizSidebar
                       totalQuestions={assignment.questions.length}
                       questions={assignment.questions}
                       answeredQuestions={answeredQuestions}
                       markedQuestions={markedQuestions}
-                      isTimedQuiz={!!assignment.isTimedQuiz}
+                      isTimedQuiz={showTimedQuizChrome}
                       showTimer={showTimer}
                       onToggleTimer={() => setShowTimer(!showTimer)}
                       dueDate={assignment.dueDate}

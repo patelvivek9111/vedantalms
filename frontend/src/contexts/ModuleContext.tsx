@@ -33,7 +33,10 @@ interface ModuleContextType {
   getModules: (courseId: string) => Promise<void>;
   createModule: (courseId: string, data: { title: string; description: string }) => Promise<void>;
   updateModule: (moduleId: string, data: { title: string; description: string }, courseId: string) => Promise<void>;
-  createPage: (data: { title: string; content: string; module?: string; groupSet?: string }, attachments?: File[]) => Promise<void>;
+  createPage: (
+    data: { title: string; content: string; module?: string; groupSet?: string },
+    options?: { attachments?: File[]; fileAssetIds?: string[] }
+  ) => Promise<void>;
   getPages: (moduleId: string) => Promise<Page[]>;
   getPage: (pageId: string) => Promise<Page>;
   deleteModule: (moduleId: string, courseId: string) => Promise<void>;
@@ -113,21 +116,27 @@ export const ModuleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  const createPage = async (data: { title: string; content: string; module?: string; groupSet?: string }, attachments?: File[]) => {
+  const createPage = async (
+    data: { title: string; content: string; module?: string; groupSet?: string },
+    options?: { attachments?: File[]; fileAssetIds?: string[] }
+  ) => {
     setLoading(true);
     setError(null);
     try {
       let res;
-      if (attachments && attachments.length > 0) {
+      const attachments = options?.attachments;
+      const fileAssetIds = options?.fileAssetIds;
+      if ((attachments && attachments.length > 0) || (fileAssetIds && fileAssetIds.length > 0)) {
         const form = new FormData();
         form.append('title', data.title);
         form.append('content', data.content);
         if (data.module) form.append('module', data.module);
         if (data.groupSet) form.append('groupSet', data.groupSet);
-        attachments.forEach(file => form.append('attachments', file));
+        attachments?.forEach((file) => form.append('attachments', file));
+        if (fileAssetIds?.length) form.append('fileAssetIds', JSON.stringify(fileAssetIds));
         res = await api.post('/pages', form, { headers: { 'Content-Type': 'multipart/form-data' } });
       } else {
-        const payload: any = { title: data.title, content: data.content };
+        const payload: Record<string, unknown> = { title: data.title, content: data.content };
         if (data.module) payload.module = data.module;
         if (data.groupSet) payload.groupSet = data.groupSet;
         res = await api.post('/pages', payload);

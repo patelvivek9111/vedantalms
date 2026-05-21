@@ -19,6 +19,9 @@ import {
 } from 'lucide-react';
 import InstitutionGradingPolicyTab from '../components/admin/InstitutionGradingPolicyTab';
 import OpsDashboardPanel from '../components/admin/OpsDashboardPanel';
+import OpsFilesPanel from '../components/admin/OpsFilesPanel';
+import OpsRecoveryPanel from '../components/admin/OpsRecoveryPanel';
+import AdminRecoveryCenter from '../components/admin/AdminRecoveryCenter';
 
 interface SystemConfig {
   general: {
@@ -48,6 +51,9 @@ interface SystemConfig {
     compressionEnabled: boolean;
     backupFrequency: string;
     retentionDays: number;
+    deletedBlobRetentionDays?: number;
+    deletedFileRetentionDays?: number;
+    zipRetentionHours?: number;
   };
 }
 
@@ -268,7 +274,7 @@ export function AdminSystemSettings() {
                   value={config.general.allowedFileTypes.join(', ')}
                   onChange={(e) => handleConfigChange('general', 'allowedFileTypes', e.target.value.split(', '))}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
-                  placeholder="pdf, doc, docx, jpg, png"
+                  placeholder="pdf, doc, docx, jpg, png, mp4, mov"
                 />
               </div>
             </div>
@@ -483,6 +489,33 @@ export function AdminSystemSettings() {
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Deleted blob retention (days)</label>
+                <input
+                  type="number"
+                  value={config.storage.deletedBlobRetentionDays ?? config.storage.retentionDays}
+                  onChange={(e) => handleConfigChange('storage', 'deletedBlobRetentionDays', parseInt(e.target.value))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Deleted file metadata retention (days)</label>
+                <input
+                  type="number"
+                  value={config.storage.deletedFileRetentionDays ?? config.storage.retentionDays}
+                  onChange={(e) => handleConfigChange('storage', 'deletedFileRetentionDays', parseInt(e.target.value))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">ZIP export retention (hours)</label>
+                <input
+                  type="number"
+                  value={config.storage.zipRetentionHours ?? 72}
+                  onChange={(e) => handleConfigChange('storage', 'zipRetentionHours', parseInt(e.target.value))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
+                />
+              </div>
             </div>
 
             <div className="flex items-center space-x-3">
@@ -501,7 +534,22 @@ export function AdminSystemSettings() {
         )}
 
         {activeTab === 'grading' && <InstitutionGradingPolicyTab />}
-        {activeTab === 'operations' && <OpsDashboardPanel />}
+        {activeTab === 'operations' && (
+          <div className="space-y-8">
+            <OpsDashboardPanel />
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+              <AdminRecoveryCenter />
+            </div>
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+              <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-4">Maintenance tools</h3>
+              <OpsRecoveryPanel />
+            </div>
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+              <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-4">Files</h3>
+              <OpsFilesPanel />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -21,7 +21,11 @@ const pageSchema = new mongoose.Schema({
     required: true
   },
   attachments: [{
-    type: String // URL to file
+    type: String // Legacy paths — prefer fileAssets
+  }],
+  fileAssets: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'FileAsset',
   }],
   published: {
     type: Boolean,

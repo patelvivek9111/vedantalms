@@ -16,7 +16,8 @@
     "test:components": "vitest run tests/unit/components",
     "test:grading": "vitest run --maxWorkers=1 tests/unit/utils",
     "test:workflows": "vitest run --maxWorkers=1 tests/unit/features tests/unit/hooks",
-    "test:fux": "vitest run --maxWorkers=1 tests/unit/features tests/unit/hooks"
+    "test:fux": "vitest run --maxWorkers=1 tests/unit/features tests/unit/hooks",
+    "test:files": "vitest run tests/unit/files"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
@@ -31,6 +32,7 @@
     "@types/react-dom": "^18.2.19",
     "axios": "^1.7.9",
     "date-fns": "^4.1.0",
+    "docx-preview": "^0.3.7",
     "dompurify": "^3.3.1",
     "exceljs": "^4.4.0",
     "html5-qrcode": "^2.3.8",

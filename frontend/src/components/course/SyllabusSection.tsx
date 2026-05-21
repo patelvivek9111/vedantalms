@@ -1,6 +1,8 @@
 import React from 'react';
-import { API_URL } from '../../config';
 import RichTextEditor from '../common/RichTextEditor';
+import FileAttachmentPanel from '../files/FileAttachmentPanel';
+import FileAttachmentChips from '../files/FileAttachmentChips';
+import type { NormalizedFile } from '../../utils/fileTypes';
 
 interface SyllabusFields {
   courseTitle: string;
@@ -24,13 +26,12 @@ interface SyllabusSectionProps {
   setSyllabusMode: (mode: 'none' | 'upload' | 'editor') => void;
   syllabusContent: string;
   setSyllabusContent: (content: string) => void;
-  uploadedSyllabusFiles: any[];
-  setUploadedSyllabusFiles: (files: any[]) => void;
-  uploadingFiles: boolean;
-  handleSyllabusFileUpload: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  handleRemoveSyllabusFile: (index: number) => void;
+  syllabusAttachmentFiles: NormalizedFile[];
+  setSyllabusAttachmentFiles: (files: NormalizedFile[]) => void;
+  courseArchived?: boolean;
   handleSaveSyllabus: () => void;
   onCancelEdit: () => void;
+  onRemoveSyllabusFile?: (file: NormalizedFile, index: number) => void;
 }
 
 const SyllabusSection: React.FC<SyllabusSectionProps> = ({
@@ -47,13 +48,12 @@ const SyllabusSection: React.FC<SyllabusSectionProps> = ({
   setSyllabusMode,
   syllabusContent,
   setSyllabusContent,
-  uploadedSyllabusFiles,
-  setUploadedSyllabusFiles,
-  uploadingFiles,
-  handleSyllabusFileUpload,
-  handleRemoveSyllabusFile,
+  syllabusAttachmentFiles,
+  setSyllabusAttachmentFiles,
+  courseArchived = false,
   handleSaveSyllabus,
   onCancelEdit,
+  onRemoveSyllabusFile,
 }) => {
   return (
     <div className="space-y-6">
@@ -175,41 +175,20 @@ const SyllabusSection: React.FC<SyllabusSectionProps> = ({
 
             {syllabusMode === 'upload' && (
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Upload File</label>
-                  <input
-                    type="file"
-                    multiple
-                    onChange={handleSyllabusFileUpload}
-                    disabled={uploadingFiles}
-                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                  />
-                  {uploadingFiles && <p className="text-sm text-gray-500 mt-2">Uploading...</p>}
-                </div>
-
-                {uploadedSyllabusFiles.length > 0 && (
-                  <div className="space-y-2">
-                    <h4 className="font-medium">Uploaded Files:</h4>
-                    {uploadedSyllabusFiles.map((file: any, index: number) => (
-                      <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                        <a href={file.url?.startsWith('http') ? file.url : `${API_URL}${file.url}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                          {file.name}
-                        </a>
-                        <button
-                          onClick={() => handleRemoveSyllabusFile(index)}
-                          className="text-red-600 hover:text-red-800"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <FileAttachmentPanel
+                  files={syllabusAttachmentFiles}
+                  onChange={setSyllabusAttachmentFiles}
+                  courseId={course?._id}
+                  category="syllabus"
+                  finalized={courseArchived}
+                  label="Drop syllabus files here or browse"
+                  onRemoveFile={onRemoveSyllabusFile}
+                />
 
                 <div className="flex gap-2">
                   <button
                     onClick={handleSaveSyllabus}
-                    disabled={savingSyllabus || uploadingFiles}
+                    disabled={savingSyllabus || courseArchived}
                     className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50"
                   >
                     {savingSyllabus ? 'Saving...' : 'Save'}
@@ -217,7 +196,7 @@ const SyllabusSection: React.FC<SyllabusSectionProps> = ({
                   <button
                     onClick={() => {
                       setSyllabusMode('none');
-                      setUploadedSyllabusFiles(course.catalog?.syllabusFiles || []);
+                      setSyllabusAttachmentFiles([]);
                     }}
                     className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
                   >
@@ -240,41 +219,20 @@ const SyllabusSection: React.FC<SyllabusSectionProps> = ({
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Upload File</label>
-                  <input
-                    type="file"
-                    multiple
-                    onChange={handleSyllabusFileUpload}
-                    disabled={uploadingFiles}
-                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                  />
-                  {uploadingFiles && <p className="text-sm text-gray-500 mt-2">Uploading...</p>}
-                </div>
-
-                {uploadedSyllabusFiles.length > 0 && (
-                  <div className="space-y-2">
-                    <h4 className="font-medium">Uploaded Files:</h4>
-                    {uploadedSyllabusFiles.map((file: any, index: number) => (
-                      <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                        <a href={file.url?.startsWith('http') ? file.url : `${API_URL}${file.url}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                          {file.name}
-                        </a>
-                        <button
-                          onClick={() => handleRemoveSyllabusFile(index)}
-                          className="text-red-600 hover:text-red-800"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <FileAttachmentPanel
+                  files={syllabusAttachmentFiles}
+                  onChange={setSyllabusAttachmentFiles}
+                  courseId={course?._id}
+                  category="syllabus"
+                  finalized={courseArchived}
+                  label="Add syllabus attachments"
+                  onRemoveFile={onRemoveSyllabusFile}
+                />
 
                 <div className="flex gap-2">
                   <button
                     onClick={handleSaveSyllabus}
-                    disabled={savingSyllabus || uploadingFiles}
+                    disabled={savingSyllabus || courseArchived}
                     className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50"
                   >
                     {savingSyllabus ? 'Saving...' : 'Save'}
@@ -283,7 +241,7 @@ const SyllabusSection: React.FC<SyllabusSectionProps> = ({
                     onClick={() => {
                       setSyllabusMode('none');
                       setSyllabusContent(course.catalog?.syllabusContent || '');
-                      setUploadedSyllabusFiles(course.catalog?.syllabusFiles || []);
+                      setSyllabusAttachmentFiles([]);
                     }}
                     className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
                   >
@@ -307,15 +265,13 @@ const SyllabusSection: React.FC<SyllabusSectionProps> = ({
         {course.catalog?.syllabusFiles && course.catalog.syllabusFiles.length > 0 && (
           <div className="mt-6">
             <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Syllabus Files</h3>
-            <div className="space-y-2">
-              {course.catalog.syllabusFiles.map((file: any, index: number) => (
-                <div key={index} className="flex items-center p-2 bg-gray-50 rounded">
-                  <a href={file.url?.startsWith('http') ? file.url : `${API_URL}${file.url}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                    {file.name}
-                  </a>
-                </div>
-              ))}
-            </div>
+            <FileAttachmentChips
+              files={course.catalog.syllabusFiles.map((file: { name?: string; url?: string; fileAssetId?: string }) => ({
+                name: file.name,
+                url: file.url?.startsWith('http') ? file.url : `${API_URL}${file.url}`,
+                fileAssetId: file.fileAssetId,
+              }))}
+            />
           </div>
         )}
       </div>

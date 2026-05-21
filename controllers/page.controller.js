@@ -5,6 +5,8 @@ const mongoose = require('mongoose');
 const path = require('path');
 const fs = require('fs');
 const Course = require('../models/course.model');
+const fileAssetService = require('../services/fileAsset.service');
+const { assertCourseFilesMutable } = require('../services/fileLifecycle.service');
 
 // @desc    Create a page under a module
 // @route   POST /api/pages
@@ -54,11 +56,18 @@ exports.createPage = async (req, res) => {
       }
     }
     
-    let attachments = [];
-    if (req.files && req.files.length > 0) {
-      attachments = req.files.map(file => `/uploads/${file.filename}`);
+    let course = null;
+    if (module) {
+      const moduleDoc = await Module.findById(module).populate('course');
+      course = moduleDoc?.course;
     }
-    const pageData = { title, content, attachments };
+    if (course) await assertCourseFilesMutable(course, req.user, { action: 'page_attachment_upload' });
+    const { fileAssetIds, attachments } = await fileAssetService.resolveAttachmentsFromRequest(req, {
+      user: req.user,
+      courseId: course?._id,
+      category: 'page',
+    });
+    const pageData = { title, content, attachments, fileAssets: fileAssetIds };
     if (module) pageData.module = module;
     if (groupSet) pageData.groupSet = groupSet;
     const page = await Page.create(pageData);
@@ -222,26 +231,41 @@ exports.updatePage = async (req, res) => {
       });
     }
 
-    // Handle file attachments if any
-    let attachments = page.attachments;
-    if (req.files && req.files.length > 0) {
-      // Delete old attachments
-      for (const attachment of page.attachments) {
-        const filePath = path.join(__dirname, '..', attachment);
+    if (req.files?.length || fileAssetService.parseFileAssetIdsFromBody(req.body).length) {
+      await assertCourseFilesMutable(course, req.user, { action: 'page_attachment_update' });
+      const resolved = await fileAssetService.resolveAttachmentsFromRequest(req, {
+        user: req.user,
+        courseId: course._id,
+        category: 'page',
+      });
+      let removeIds = req.body.removeFileAssetIds;
+      if (typeof removeIds === 'string') {
         try {
-          await fs.unlink(filePath);
-        } catch (err) {
-          console.error('Error deleting old attachment:', err);
+          removeIds = JSON.parse(removeIds);
+        } catch {
+          removeIds = [];
         }
       }
-      // Add new attachments
-      attachments = req.files.map(file => `/uploads/${file.filename}`);
+      if (Array.isArray(removeIds) && removeIds.length) {
+        for (const id of removeIds) {
+          await fileAssetService.deleteFileAsset(id, req.user, { ip: req.ip }).catch(() => {});
+        }
+        const removeSet = new Set(removeIds.map(String));
+        page.fileAssets = (page.fileAssets || []).filter((id) => !removeSet.has(String(id)));
+      }
+      const mergedIds = [...new Set([...(page.fileAssets || []).map(String), ...resolved.fileAssetIds.map(String)])];
+      page.fileAssets = mergedIds;
+      page.attachments = mergedIds.map((id) => fileAssetService.buildDownloadPath(id));
+      await fileAssetService.attachFileAssets(resolved.fileAssetIds, {
+        courseId: course._id,
+        pageId: page._id,
+        category: 'page',
+      });
     }
 
     // Update the page (only update provided fields)
     if (title !== undefined) page.title = title.trim();
     if (content !== undefined) page.content = content;
-    if (req.files && req.files.length > 0) page.attachments = attachments;
     await page.save();
 
     res.json({

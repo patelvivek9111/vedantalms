@@ -27,6 +27,12 @@ import {
 } from 'lucide-react';
 import ConfirmationModal from '../common/ConfirmationModal';
 import PullToRefresh from '../common/PullToRefresh';
+import DiscussionReplyComposer from '../discussions/DiscussionReplyComposer';
+import FileAttachmentChips from '../files/FileAttachmentChips';
+import FileAttachmentPanel, { normalizeLegacyFiles } from '../files/FileAttachmentPanel';
+import type { NormalizedFile } from '../../utils/fileTypes';
+
+const composerKeyForReply = (parentId: string | null) => (parentId ? `reply-${parentId}` : 'main');
 
 interface User {
   _id: string;
@@ -60,6 +66,7 @@ interface Reply {
     };
     likedAt: string;
   }>;
+  fileAssets?: Array<string | Record<string, unknown>>;
 }
 
 interface StudentGrade {
@@ -106,13 +113,14 @@ interface Thread {
     allowLikes: boolean;
     allowComments: boolean;
   };
+  fileAssets?: Array<string | Record<string, unknown>>;
 }
 
 interface ReplyComponentProps {
   reply: Reply;
   onReply: (parentId: string) => void;
   level: number;
-  onEdit: (replyId: string, content: string) => Promise<void>;
+  onEdit: (replyId: string, payload: { content: string; fileAssetIds: string[]; removeFileAssetIds: string[] }) => Promise<void>;
   onDelete: (replyId: string) => Promise<void>;
   canModify: boolean;
   threadId: string;
@@ -123,6 +131,11 @@ interface ReplyComponentProps {
   setReplyingTo: (id: string | null) => void;
   onLike: (replyId: string) => Promise<void>;
   allowLikes: boolean;
+  replyAttachmentFiles: NormalizedFile[];
+  onAttachmentsChange: (files: NormalizedFile[]) => void;
+  courseId?: string;
+  courseArchived?: boolean;
+  isSubmittingReply?: boolean;
 }
 
 const ReplyComponent: React.FC<ReplyComponentProps> = ({
@@ -139,10 +152,17 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
   setReplyContent,
   setReplyingTo,
   onLike,
-  allowLikes
+  allowLikes,
+  replyAttachmentFiles,
+  onAttachmentsChange,
+  courseId,
+  courseArchived,
+  isSubmittingReply,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(reply.content);
+  const [editAttachments, setEditAttachments] = useState<NormalizedFile[]>([]);
+  const [editRemoveIds, setEditRemoveIds] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -170,8 +190,10 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
     if (!editContent.trim()) return;
     setIsSubmitting(true);
     try {
-      await onEdit(reply._id, editContent);
+      const fileAssetIds = editAttachments.map((f) => f.fileAssetId).filter(Boolean) as string[];
+      await onEdit(reply._id, { content: editContent, fileAssetIds, removeFileAssetIds: editRemoveIds });
       setIsEditing(false);
+      setEditRemoveIds([]);
     } catch (error) {
       } finally {
       setIsSubmitting(false);
@@ -246,6 +268,8 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
                     <button
                       onClick={() => {
                         setIsEditing(true);
+                        setEditAttachments(normalizeLegacyFiles(reply.fileAssets || []));
+                        setEditRemoveIds([]);
                         setShowMenu(false);
                       }}
                       className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center space-x-2"
@@ -278,12 +302,24 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
                 placeholder="Edit your reply..."
                 className="min-h-[120px]"
               />
+              <FileAttachmentPanel
+                files={editAttachments}
+                onChange={setEditAttachments}
+                courseId={courseId}
+                category="discussion"
+                label="Attachments"
+                onRemoveFile={(file) => {
+                  if (file.fileAssetId) setEditRemoveIds((prev) => [...prev, file.fileAssetId!]);
+                }}
+              />
               <div className="flex justify-end space-x-3">
                 <button
                   type="button"
                   onClick={() => {
                     setIsEditing(false);
                     setEditContent(reply.content);
+                    setEditAttachments(normalizeLegacyFiles(reply.fileAssets || []));
+                    setEditRemoveIds([]);
                   }}
                   className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
@@ -304,6 +340,7 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
                 className="prose prose-gray max-w-none mb-4 text-gray-800 dark:text-gray-300 leading-relaxed prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-p:text-gray-800 dark:prose-p:text-gray-300"
                 dangerouslySetInnerHTML={{ __html: reply.content }}
               />
+              <FileAttachmentChips files={reply.fileAssets} className="mb-2" />
               
               {/* Reply button */}
               <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-gray-700">
@@ -346,40 +383,22 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
               <Reply className="w-4 h-4" />
               <span>Reply to {reply.author.firstName}</span>
             </h4>
-            <form onSubmit={e => onSubmitReply(e, reply._id)}>
-              <RichTextEditor
-                content={replyContent}
-                onChange={setReplyContent}
-                placeholder="Write your reply..."
-                className="mb-4"
-              />
-              <div className="flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setReplyingTo(null);
-                    setReplyContent('');
-                    
-                    // Clear draft when canceling
-                    if (threadId && user?._id) {
-                      const draftKey = `thread_reply_draft_${threadId}_${user._id}`;
-                      localStorage.removeItem(draftKey);
-                    }
-                  }}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting || !replyContent.trim()}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
-                >
-                  <Send className="w-4 h-4" />
-                  <span>{isSubmitting ? 'Posting...' : 'Post Reply'}</span>
-                </button>
-              </div>
-            </form>
+            <DiscussionReplyComposer
+              content={replyContent}
+              onContentChange={setReplyContent}
+              attachmentFiles={replyAttachmentFiles}
+              onAttachmentsChange={onAttachmentsChange}
+              courseId={courseId}
+              courseArchived={courseArchived}
+              onSubmit={(e) => onSubmitReply(e, reply._id)}
+              onCancel={() => {
+                setReplyingTo(null);
+                setReplyContent('');
+                onAttachmentsChange([]);
+              }}
+              isSubmitting={isSubmittingReply || isSubmitting}
+              compact
+            />
           </div>
         </div>
       )}
@@ -408,6 +427,15 @@ const ThreadView: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [resolvedCourseId, setResolvedCourseId] = useState<string | null>(courseId || null);
   const [replyContent, setReplyContent] = useState('');
+  const [attachmentByComposer, setAttachmentByComposer] = useState<Record<string, NormalizedFile[]>>({});
+  const [editThreadAttachments, setEditThreadAttachments] = useState<NormalizedFile[]>([]);
+  const [editThreadRemoveIds, setEditThreadRemoveIds] = useState<string[]>([]);
+
+  const getComposerAttachments = (key: string) => attachmentByComposer[key] || [];
+  const setComposerAttachments = (key: string, files: NormalizedFile[]) => {
+    setAttachmentByComposer((prev) => ({ ...prev, [key]: files }));
+  };
+  const [courseArchived, setCourseArchived] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Load saved draft from localStorage on mount
@@ -562,8 +590,10 @@ const ThreadView: React.FC = () => {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (courseRes.data.success) {
-          const studentsData = courseRes.data.data.students;
+          const courseData = courseRes.data.data;
+          const studentsData = courseData.students;
           setStudents(Array.isArray(studentsData) ? studentsData : []);
+          setCourseArchived(courseData.operationalStatus === 'archived');
         }
         
         // Fetch modules for the course
@@ -602,16 +632,21 @@ const ThreadView: React.FC = () => {
 
   const handleSubmitReply = async (e: React.FormEvent, parentReply: string | null = null) => {
     e.preventDefault();
-    if (!thread || !replyContent.trim()) return;
+    const textPlain = replyContent.replace(/<[^>]+>/g, '').trim();
+    const composerKey = composerKeyForReply(parentReply);
+    const composerFiles = getComposerAttachments(composerKey);
+    if (!thread || (!textPlain && !composerFiles.length)) return;
 
     setIsSubmitting(true);
     try {
       const token = localStorage.getItem('token');
+      const fileAssetIds = composerFiles.map((f) => f.fileAssetId).filter(Boolean);
       const response = await api.post(
         `${API_URL}/api/threads/${thread._id}/replies`,
         { 
           content: replyContent,
-          parentReply: parentReply || null
+          parentReply: parentReply || null,
+          fileAssetIds,
         },
         {
           headers: { Authorization: `Bearer ${token}` }
@@ -621,6 +656,9 @@ const ThreadView: React.FC = () => {
       if (response.data.success) {
         setThread(response.data.data);
         setReplyContent('');
+        setComposerAttachments(composerKey, []);
+        setReplyingTo(null);
+        setShowReplyEditor(false);
         
         // Clear draft from localStorage after successful reply
         if (threadId && user?._id) {
@@ -664,11 +702,14 @@ const ThreadView: React.FC = () => {
     setIsSubmitting(true);
     try {
       const token = localStorage.getItem('token');
+      const fileAssetIds = editThreadAttachments.map((f) => f.fileAssetId).filter(Boolean);
       const response = await api.put(
         `${API_URL}/api/threads/${thread._id}`,
         {
           title: editTitle,
-          content: editContent
+          content: editContent,
+          fileAssetIds,
+          removeFileAssetIds: editThreadRemoveIds,
         },
         {
           headers: { Authorization: `Bearer ${token}` }
@@ -729,14 +770,17 @@ const ThreadView: React.FC = () => {
       }
   };
 
-  const handleEditReply = async (replyId: string, content: string) => {
+  const handleEditReply = async (
+    replyId: string,
+    payload: { content: string; fileAssetIds: string[]; removeFileAssetIds: string[] }
+  ) => {
     if (!thread) return;
 
     try {
       const token = localStorage.getItem('token');
       const response = await api.put(
         `${API_URL}/api/threads/${thread._id}/replies/${replyId}`,
-        { content },
+        payload,
         {
           headers: { Authorization: `Bearer ${token}` }
         }
@@ -913,7 +957,7 @@ const ThreadView: React.FC = () => {
   const renderReplies = (
     replies: Reply[],
     level: number = 0,
-    onEdit: (replyId: string, content: string) => Promise<void>,
+    onEdit: (replyId: string, payload: { content: string; fileAssetIds: string[]; removeFileAssetIds: string[] }) => Promise<void>,
     onDelete: (replyId: string) => Promise<void>
   ) => {
     return replies.map(reply => (
@@ -933,6 +977,11 @@ const ThreadView: React.FC = () => {
           setReplyingTo={setReplyingTo}
           onLike={handleLike}
           allowLikes={thread.settings?.allowLikes !== false}
+          replyAttachmentFiles={getComposerAttachments(`reply-${reply._id}`)}
+          onAttachmentsChange={(files) => setComposerAttachments(`reply-${reply._id}`, files)}
+          courseId={resolvedCourseId || undefined}
+          courseArchived={courseArchived}
+          isSubmittingReply={isSubmitting}
         />
         {replyMap.get(reply._id) && renderReplies(replyMap.get(reply._id)!, level + 1, onEdit, onDelete)}
       </React.Fragment>
@@ -978,6 +1027,16 @@ const ThreadView: React.FC = () => {
                     placeholder="Edit your thread content..."
                     className="min-h-[200px]"
                   />
+                  <FileAttachmentPanel
+                    files={editThreadAttachments}
+                    onChange={setEditThreadAttachments}
+                    courseId={resolvedCourseId || undefined}
+                    category="discussion"
+                    label="Thread attachments"
+                    onRemoveFile={(file) => {
+                      if (file.fileAssetId) setEditThreadRemoveIds((prev) => [...prev, file.fileAssetId!]);
+                    }}
+                  />
                   <div className="flex justify-end space-x-3">
                     <button
                       type="button"
@@ -985,6 +1044,8 @@ const ThreadView: React.FC = () => {
                         setIsEditing(false);
                         setEditTitle(thread.title);
                         setEditContent(thread.content);
+                        setEditThreadAttachments(normalizeLegacyFiles(thread.fileAssets || []));
+                        setEditThreadRemoveIds([]);
                       }}
                       className="px-6 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                     >
@@ -1068,6 +1129,8 @@ const ThreadView: React.FC = () => {
                             setIsEditing(true);
                             setEditTitle(thread.title);
                             setEditContent(thread.content);
+                            setEditThreadAttachments(normalizeLegacyFiles(thread.fileAssets || []));
+                            setEditThreadRemoveIds([]);
                           }}
                           className="p-1.5 sm:p-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/50 rounded-lg transition-colors touch-manipulation"
                           title="Edit thread"
@@ -1117,6 +1180,7 @@ const ThreadView: React.FC = () => {
                 className="prose prose-lg prose-gray max-w-none mb-8 text-gray-800 dark:text-gray-300 leading-relaxed prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-p:text-gray-800 dark:prose-p:text-gray-300"
                 dangerouslySetInnerHTML={{ __html: thread.content }}
               />
+              <FileAttachmentChips files={thread.fileAssets} className="mb-4" />
               
               {/* Reply button */}
               {!hasUserMainReply && (!showReplyEditor ? (
@@ -1133,42 +1197,24 @@ const ThreadView: React.FC = () => {
                     <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
                     <span>Post a Reply</span>
                   </h3>
-                  <form onSubmit={e => handleSubmitReply(e, null)}>
-                    <div onClick={(e) => e.stopPropagation()}>
-                      <RichTextEditor
-                        content={replyContent}
-                        onChange={setReplyContent}
-                        placeholder="Share your thoughts..."
-                        className="mb-4"
-                      />
-                    </div>
-                    <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-3 sm:space-x-0">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowReplyEditor(false);
-                          setReplyContent('');
-                          
-                          // Clear draft when canceling
-                          if (threadId && user?._id) {
-                            const draftKey = `thread_reply_draft_${threadId}_${user._id}`;
-                            localStorage.removeItem(draftKey);
-                          }
-                        }}
-                        className="w-full sm:w-auto px-4 sm:px-6 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors touch-manipulation"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={isSubmitting || !replyContent.trim()}
-                        className="w-full sm:w-auto px-4 sm:px-6 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-2 touch-manipulation"
-                      >
-                        <Send className="w-4 h-4" />
-                        <span>{isSubmitting ? 'Posting...' : 'Post Reply'}</span>
-                      </button>
-                    </div>
-                  </form>
+                  <DiscussionReplyComposer
+                    content={replyContent}
+                    onContentChange={setReplyContent}
+                    attachmentFiles={getComposerAttachments('main')}
+                    onAttachmentsChange={(files) => setComposerAttachments('main', files)}
+                    courseId={resolvedCourseId || undefined}
+                    courseArchived={courseArchived}
+                    onSubmit={(e) => handleSubmitReply(e, null)}
+                    onCancel={() => {
+                      setShowReplyEditor(false);
+                      setReplyContent('');
+                      setComposerAttachments('main', []);
+                      if (threadId && user?._id) {
+                        localStorage.removeItem(`thread_reply_draft_${threadId}_${user._id}`);
+                      }
+                    }}
+                    isSubmitting={isSubmitting}
+                  />
                 </div>
               ))}
             </>

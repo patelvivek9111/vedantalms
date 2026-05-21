@@ -80,6 +80,10 @@ const submissionSchema = new mongoose.Schema({
   files: [{
     type: String
   }],
+  fileAssets: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'FileAsset',
+  }],
   memberGrades: [{
     student: {
       type: mongoose.Schema.Types.ObjectId,

@@ -75,21 +75,26 @@ async function enqueueJob(type, payload, requestedBy) {
   }
 
   const attempts = parseInt(process.env.JOB_MAX_ATTEMPTS || '3', 10);
-  const bullJob = await q.add(
-    type,
-    { jobId: String(jobDoc._id) },
-    {
-      jobId: String(jobDoc._id),
-      removeOnComplete: 100,
-      removeOnFail: 50,
-      attempts,
-      backoff: { type: 'exponential', delay: parseInt(process.env.JOB_BACKOFF_MS || '2000', 10) },
-    }
-  );
+  try {
+    const bullJob = await q.add(
+      type,
+      { jobId: String(jobDoc._id) },
+      {
+        jobId: String(jobDoc._id),
+        removeOnComplete: 100,
+        removeOnFail: 50,
+        attempts,
+        backoff: { type: 'exponential', delay: parseInt(process.env.JOB_BACKOFF_MS || '2000', 10) },
+      }
+    );
 
-  await AsyncJob.findByIdAndUpdate(jobDoc._id, { bullJobId: String(bullJob.id) });
-  const fresh = await AsyncJob.findById(jobDoc._id).lean();
-  return { job: fresh, async: true };
+    await AsyncJob.findByIdAndUpdate(jobDoc._id, { bullJobId: String(bullJob.id) });
+    const fresh = await AsyncJob.findById(jobDoc._id).lean();
+    return { job: fresh, async: true };
+  } catch {
+    const completed = await runInline(jobDoc);
+    return { job: completed, async: false };
+  }
 }
 
 async function getJobForUser(jobId, userId) {

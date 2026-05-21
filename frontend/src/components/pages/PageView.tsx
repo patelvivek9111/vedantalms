@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useModule } from '../../contexts/ModuleContext';
-import { Pencil, Printer, MoreHorizontal, ExternalLink } from 'lucide-react';
+import { Pencil, Printer, MoreHorizontal } from 'lucide-react';
+import FileAttachmentChips from '../files/FileAttachmentChips';
 import { printCoursePageRegion } from '../../utils/printCoursePageRegion';
 import Breadcrumb from '../common/Breadcrumb';
 
@@ -201,28 +202,14 @@ const PageView: React.FC<PageViewProps> = ({ courseId, courseLabel, canEdit, onC
 
         <div className={coursePageBodyHtmlClass} dangerouslySetInnerHTML={{ __html: sanitizePageHtml(page.content || '') }} />
 
-        {page.attachments && page.attachments.length > 0 && (
+        {(page.fileAssets?.length || page.attachments?.length) ? (
           <section className="mt-10 border-t border-slate-200 pt-6 print:border-slate-300 print:text-slate-900 dark:border-slate-700">
             <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500 print:text-slate-800 dark:text-slate-400">
               Attachments
             </h2>
-            <ul className="space-y-2">
-              {page.attachments.map((url: string, idx: number) => (
-                <li key={idx}>
-                  <a
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 print:text-blue-800 hover:underline dark:text-blue-400"
-                  >
-                    {url.split('/').pop()}
-                    <ExternalLink className="h-3.5 w-3.5 opacity-70 print:hidden" aria-hidden />
-                  </a>
-                </li>
-              ))}
-            </ul>
+            <FileAttachmentChips files={page.fileAssets || page.attachments} />
           </section>
-        )}
+        ) : null}
       </div>
 
     </article>

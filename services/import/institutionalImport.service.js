@@ -41,6 +41,7 @@ const IMPORT_STAGES = [
   'notifications',
   'notificationPreferences',
   'calendarEvents',
+  'fileAssets',
   'permissionsRoles',
 ];
 
@@ -71,6 +72,7 @@ const MODEL_BY_SECTION = {
   notifications: '../../models/notification.model',
   notificationPreferences: '../../models/notificationPreferences.model',
   calendarEvents: '../../models/event.model',
+  fileAssets: '../../models/fileAsset.model',
 };
 
 const REF_FIELDS = {

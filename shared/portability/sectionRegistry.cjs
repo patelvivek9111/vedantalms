@@ -35,6 +35,7 @@ const SECTION_ORDER = [
   'notificationPreferences',
   'calendarEvents',
   'uploadsMetadata',
+  'fileAssets',
   'permissionsRoles',
 ];
 
@@ -246,10 +247,11 @@ const SECTION_DEFINITIONS = {
     export: async () => {
       const Course = require('../../models/course.model');
       const Submission = require('../../models/Submission');
-      const courses = await Course.find({}).select('syllabusFiles title').lean();
+      const FileAsset = require('../../models/fileAsset.model');
+      const courses = await Course.find({}).select('catalog title').lean();
       const courseFiles = courses.flatMap((c) =>
-        (c.syllabusFiles || []).map((f) => ({
-          source: 'course.syllabusFiles',
+        (c.catalog?.syllabusFiles || []).map((f) => ({
+          source: 'course.catalog.syllabusFiles',
           courseId: String(c._id),
           courseTitle: c.title,
           name: f.name,
@@ -258,22 +260,54 @@ const SECTION_DEFINITIONS = {
           uploadedAt: f.uploadedAt,
         }))
       );
-      const subs = await Submission.find({ 'attachments.0': { $exists: true } })
-        .select('assignment student attachments')
+      const subs = await Submission.find({
+        $or: [{ 'files.0': { $exists: true } }, { 'fileAssets.0': { $exists: true } }],
+      })
+        .select('assignment student files fileAssets')
         .lean();
-      const submissionFiles = subs.flatMap((s) =>
-        (s.attachments || []).map((a) => ({
-          source: 'submission.attachments',
+      const submissionFiles = subs.flatMap((s) => {
+        const legacy = (s.files || []).map((url) => ({
+          source: 'submission.files',
           submissionId: String(s._id),
           assignmentId: s.assignment ? String(s.assignment) : null,
           studentId: s.student ? String(s.student) : null,
-          name: a.name || a.filename,
-          url: a.url || a.path,
-          size: a.size,
-        }))
-      );
-      return [...courseFiles, ...submissionFiles];
+          url: typeof url === 'string' ? url : url?.url,
+          legacy: true,
+        }));
+        const assetRefs = (s.fileAssets || []).map((id) => ({
+          source: 'submission.fileAssets',
+          submissionId: String(s._id),
+          fileAssetId: String(id),
+        }));
+        return [...legacy, ...assetRefs];
+      });
+      const assets = await FileAsset.find({ isDeleted: false })
+        .select(
+          'storageKey provider path originalName mimeType size checksumSha256 category courseId assignmentId submissionId createdAt'
+        )
+        .lean();
+      const blobInventory = assets.map((a) => ({
+        fileAssetId: String(a._id),
+        storageKey: a.storageKey,
+        provider: a.provider,
+        path: a.path,
+        checksumSha256: a.checksumSha256,
+        category: a.category,
+        courseId: a.courseId ? String(a.courseId) : null,
+        size: a.size,
+      }));
+      return {
+        syllabusFiles: courseFiles,
+        submissionReferences: submissionFiles,
+        blobInventory,
+        inventoryGeneratedAt: new Date().toISOString(),
+      };
     },
+  },
+  fileAssets: {
+    schemaVersion: SCHEMA_VERSION,
+    chunkable: true,
+    cursor: cursorExporter('../../models/fileAsset.model', { isDeleted: false }, '-__v', 'fileAssets'),
   },
   permissionsRoles: {
     schemaVersion: SCHEMA_VERSION,

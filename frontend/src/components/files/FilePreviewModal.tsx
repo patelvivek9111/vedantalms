@@ -1,0 +1,231 @@
+import React, { useEffect, useRef, useState } from 'react';
+import api from '../../services/api';
+import { X, Download } from 'lucide-react';
+import BaseModal from '../common/BaseModal';
+import {
+  detectPreviewKind,
+  extractFileAssetId,
+  buildSecureStreamPath,
+  type NormalizedFile,
+} from '../../utils/fileTypes';
+import UnsupportedFileBanner from './UnsupportedFileBanner';
+import ImagePreview from './previews/ImagePreview';
+import PdfPreview from './previews/PdfPreview';
+import TextPreview from './previews/TextPreview';
+import MediaPreview from './previews/MediaPreview';
+import OfficePreview from './previews/OfficePreview';
+import DocxPreview from './previews/DocxPreview';
+import { isDocxFile } from '../../utils/fileTypes';
+import { useFileDownload } from '../../hooks/useFileDownload';
+import { buildStreamUrl } from '../../services/fileUploadApi';
+import FileAccessBanner from './FileAccessBanner';
+import { useAuthenticatedFileBlob } from '../../hooks/useAuthenticatedFileBlob';
+import { LoadingInline } from '../../design-system';
+
+interface FilePreviewModalProps {
+  file: NormalizedFile | null;
+  open: boolean;
+  onClose: () => void;
+}
+
+const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, open, onClose }) => {
+  const { downloadFile, error: downloadError, clearError } = useFileDownload();
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewStreamUrl, setPreviewStreamUrl] = useState<string | null>(null);
+  const [previewCorrupted, setPreviewCorrupted] = useState(false);
+  const [resolvedFile, setResolvedFile] = useState<NormalizedFile | null>(null);
+  const [accessError, setAccessError] = useState('');
+
+  useEffect(() => {
+    if (!open || !file) {
+      setPreviewStreamUrl(null);
+      setResolvedFile(null);
+      setAccessError('');
+      return;
+    }
+
+    const fileAssetId = file.fileAssetId || extractFileAssetId(file.url);
+    if (!fileAssetId) {
+      setAccessError('This attachment has no secure file reference. Re-upload the file or contact your instructor.');
+      setResolvedFile(file);
+      return;
+    }
+
+    const base: NormalizedFile = {
+      ...file,
+      fileAssetId,
+      url: file.url || buildSecureStreamPath(fileAssetId),
+    };
+    setResolvedFile(base);
+    setPreviewLoading(true);
+    setAccessError('');
+
+    const skipServerPreview = isDocxFile({ name: file.name, mimeType: file.mimeType });
+    const fetches: [Promise<unknown>, Promise<unknown>?] = [
+      api.get(`/files/${fileAssetId}/metadata`).catch(() => null),
+    ];
+    if (!skipServerPreview) {
+      fetches.push(api.get(`/files/${fileAssetId}/preview`).catch(() => null));
+    }
+
+    Promise.all(fetches)
+      .then(([metaRes, previewRes]) => {
+        let next = { ...base };
+        if (metaRes?.data?.success && metaRes.data.data) {
+          const m = metaRes.data.data;
+          next = {
+            ...next,
+            name: m.originalName || next.name,
+            mimeType: m.mimeType,
+            size: m.size,
+          };
+        }
+        setResolvedFile(next);
+
+        const clientDocx = isDocxFile(next);
+        if (clientDocx) {
+          setPreviewStreamUrl(buildStreamUrl(fileAssetId));
+          setPreviewCorrupted(false);
+        } else if (previewRes?.data?.success) {
+          const d = previewRes.data.data;
+          setPreviewStreamUrl(d.streamUrl || d.thumbnailUrl || buildStreamUrl(fileAssetId));
+          setPreviewCorrupted(Boolean(d.previewCorrupted));
+        } else {
+          setPreviewStreamUrl(buildStreamUrl(fileAssetId));
+        }
+      })
+      .catch(() => {
+        setPreviewStreamUrl(buildStreamUrl(fileAssetId));
+      })
+      .finally(() => setPreviewLoading(false));
+  }, [open, file]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
+  const display = resolvedFile || file;
+  const fileAssetId =
+    display?.fileAssetId || (display?.url ? extractFileAssetId(display.url) : null) || undefined;
+  const kind = display
+    ? detectPreviewKind({ name: display.name, mimeType: display.mimeType })
+    : ('unsupported' as const);
+  const needsBlob =
+    open &&
+    Boolean(fileAssetId) &&
+    (kind === 'pdf' || kind === 'image' || kind === 'video' || kind === 'audio');
+  const { blobUrl, loading: blobLoading, error: blobError } = useAuthenticatedFileBlob(
+    fileAssetId,
+    needsBlob,
+    'stream'
+  );
+
+  if (!open || !file) return null;
+
+  return (
+    <BaseModal
+      isOpen={open}
+      onClose={onClose}
+      title={display.name}
+      size="xl"
+      ariaLabelledBy="file-preview-title"
+    >
+      <div className="flex justify-end gap-2 mb-3">
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 text-sm text-indigo-600 dark:text-indigo-400 disabled:opacity-50"
+          disabled={!fileAssetId}
+          onClick={() => {
+            if (fileAssetId) void downloadFile(display.url, display.name, fileAssetId);
+          }}
+        >
+          <Download className="w-4 h-4" /> Download
+        </button>
+        <button
+          ref={closeRef}
+          type="button"
+          className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+          onClick={onClose}
+          aria-label="Close preview"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      <FileAccessBanner
+        message={accessError || downloadError || blobError}
+        onDismiss={() => {
+          clearError();
+          setAccessError('');
+        }}
+      />
+
+      {(previewLoading || blobLoading) && (
+        <p className="text-sm text-gray-500 mb-2">Loading preview…</p>
+      )}
+      {previewCorrupted && (
+        <p className="text-sm text-amber-700 dark:text-amber-300 mb-2" role="status">
+          Preview may be outdated. Use Download to open the original file.
+        </p>
+      )}
+
+      {!fileAssetId ? (
+        <UnsupportedFileBanner />
+      ) : kind === 'image' ? (
+        blobUrl ? (
+          <ImagePreview url={blobUrl} alt={display.name} />
+        ) : (
+          <LoadingInline label="Loading image…" />
+        )
+      ) : kind === 'pdf' ? (
+        blobUrl ? (
+          <PdfPreview url={blobUrl} title={display.name} />
+        ) : (
+          <LoadingInline label="Loading PDF…" />
+        )
+      ) : kind === 'office' && fileAssetId && isDocxFile(display) ? (
+        <DocxPreview fileAssetId={fileAssetId} fileName={display.name} />
+      ) : kind === 'office' && fileAssetId ? (
+        <OfficePreview fileAssetId={fileAssetId} fileName={display.name} />
+      ) : kind === 'text' && fileAssetId ? (
+        <TextPreview fileAssetId={fileAssetId} fallbackUrl={previewStreamUrl || undefined} />
+      ) : kind === 'audio' ? (
+        blobUrl ? (
+          <MediaPreview url={blobUrl} kind="audio" title={display.name} />
+        ) : (
+          <LoadingInline label="Loading audio…" />
+        )
+      ) : kind === 'video' ? (
+        blobUrl ? (
+          <MediaPreview url={blobUrl} kind="video" title={display.name} />
+        ) : (
+          <LoadingInline label="Loading video…" />
+        )
+      ) : (
+        <div className="space-y-3">
+          <UnsupportedFileBanner />
+          {(kind === 'unsupported' && fileAssetId) && (
+            <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
+              <button
+                type="button"
+                className="text-indigo-600 underline"
+                onClick={() => void downloadFile(display.url, display.name, fileAssetId)}
+              >
+                Download file
+              </button>{' '}
+              to view locally.
+            </p>
+          )}
+        </div>
+      )}
+    </BaseModal>
+  );
+};
+
+export default FilePreviewModal;

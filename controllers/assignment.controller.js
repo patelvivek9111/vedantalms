@@ -5,6 +5,8 @@ const fs = require('fs').promises;
 const path = require('path');
 const mongoose = require('mongoose');
 const { startOfWeek, endOfWeek } = require('date-fns');
+const fileAssetService = require('../services/fileAsset.service');
+const { resolveCourseForAssignment, assertCourseFilesMutable } = require('../services/fileLifecycle.service');
 
 /** Plain object or Mongoose doc → assignment JSON with computed totalPoints (matches getModuleAssignments). */
 const enrichAssignmentTotalPoints = (a) => {
@@ -26,9 +28,18 @@ exports.createAssignment = async (req, res) => {
   try {
     const { title, description, moduleId, availableFrom, dueDate, questions, group } = req.body;
     
-    // Get file URLs from uploaded files
-    const attachments = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
-    
+    const course = moduleId
+      ? await Module.findById(moduleId).select('course').lean().then((m) =>
+          m?.course ? require('../models/course.model').findById(m.course) : null
+        )
+      : null;
+    if (course) await assertCourseFilesMutable(course, req.user, { action: 'assignment_attachment_upload' });
+    const { fileAssetIds, attachments } = await fileAssetService.resolveAttachmentsFromRequest(req, {
+      user: req.user,
+      courseId: course?._id,
+      category: 'assignment',
+    });
+
     // Build assignment data object
     const assignmentData = {
       title,
@@ -36,6 +47,7 @@ exports.createAssignment = async (req, res) => {
       availableFrom,
       dueDate,
       attachments,
+      fileAssets: fileAssetIds,
       createdBy: req.user._id,
       questions: questions ? JSON.parse(questions) : [],
       isGroupAssignment: req.body.isGroupAssignment === 'true' || req.body.isGroupAssignment === true,
@@ -145,8 +157,21 @@ exports.getAssignment = async (req, res) => {
     if (!assignment) {
       return res.status(404).json({ message: 'Assignment not found' });
     }
-    // Always return just the assignment object, never attach a submission
-    res.json(assignment);
+    const payload = assignment.toObject();
+    payload.attachments = fileAssetService.enrichLegacyFileUrls(payload.attachments, req.user._id);
+    const FileAsset = require('../models/fileAsset.model');
+    const ids = (payload.fileAssets || []).map((id) => String(id));
+    if (ids.length) {
+      const assets = await FileAsset.find({ _id: { $in: ids }, isDeleted: { $ne: true } }).lean();
+      const byId = new Map(assets.map((a) => [String(a._id), a]));
+      payload.attachmentFiles = ids
+        .map((id) => byId.get(id))
+        .filter(Boolean)
+        .map((a) => fileAssetService.serializeFileAsset(a, req.user._id));
+    } else {
+      payload.attachmentFiles = [];
+    }
+    res.json(payload);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -171,27 +196,58 @@ exports.updateAssignment = async (req, res) => {
     const submissionCount = await Submission.countDocuments({ assignment: req.params.id });
     const hasSubmissions = submissionCount > 0;
     
-    // Get new file URLs from uploaded files
-    const newAttachments = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
-    
-    // Delete old files if they exist
-    if (assignment.attachments.length > 0) {
-      await Promise.all(assignment.attachments.map(async (attachment) => {
-        const filePath = path.join(__dirname, '..', attachment);
-        try {
-          await fs.unlink(filePath);
-        } catch (err) {
-          console.error('Error deleting file:', err);
-        }
-      }));
+    const course = await resolveCourseForAssignment(assignment._id);
+    let removeIds = req.body.removeFileAssetIds;
+    if (typeof removeIds === 'string') {
+      try {
+        removeIds = JSON.parse(removeIds);
+      } catch {
+        removeIds = [];
+      }
     }
-    
+    const removeSet = new Set((Array.isArray(removeIds) ? removeIds : []).map(String));
+
+    if (removeSet.size) {
+      await assertCourseFilesMutable(course, req.user, { action: 'assignment_attachment_remove' });
+      for (const id of removeSet) {
+        await fileAssetService.deleteFileAsset(id, req.user, { ip: req.ip }).catch(() => {});
+      }
+      assignment.fileAssets = (assignment.fileAssets || []).filter((id) => !removeSet.has(String(id)));
+    }
+
+    let incomingFileIds = fileAssetService.parseFileAssetIdsFromBody(req.body).filter(
+      (id) => !removeSet.has(String(id))
+    );
+
+    if (req.files?.length || incomingFileIds.length) {
+      await assertCourseFilesMutable(course, req.user, { action: 'assignment_attachment_update' });
+      const resolved = await fileAssetService.resolveAttachmentsFromRequest(
+        {
+          ...req,
+          body: { ...req.body, fileAssetIds: JSON.stringify(incomingFileIds) },
+        },
+        {
+          user: req.user,
+          courseId: course?._id,
+          assignmentId: assignment._id,
+          category: 'assignment',
+        }
+      );
+      const mergedIds = [...new Set([...(assignment.fileAssets || []).map(String), ...resolved.fileAssetIds.map(String)])];
+      assignment.fileAssets = mergedIds;
+      assignment.attachments = mergedIds.map((id) => fileAssetService.buildDownloadPathForUser(id, req.user._id));
+      await fileAssetService.attachFileAssets(resolved.fileAssetIds, {
+        courseId: course?._id,
+        assignmentId: assignment._id,
+        category: 'assignment',
+      });
+    }
+
     // Update the assignment
     assignment.title = title || assignment.title;
     assignment.description = description || assignment.description;
     assignment.availableFrom = availableFrom || assignment.availableFrom;
     assignment.dueDate = dueDate || assignment.dueDate;
-    assignment.attachments = newAttachments.length > 0 ? newAttachments : assignment.attachments;
     if (group !== undefined) assignment.group = group;
     if (req.body.isGradedQuiz !== undefined) assignment.isGradedQuiz = req.body.isGradedQuiz === 'true' || req.body.isGradedQuiz === true;
     if (req.body.isTimedQuiz !== undefined) assignment.isTimedQuiz = req.body.isTimedQuiz === 'true' || req.body.isTimedQuiz === true;
@@ -233,24 +289,32 @@ exports.updateAssignment = async (req, res) => {
             }
           }
           
-          assignment.questions = parsedQuestions.map(q => ({
+          assignment.questions = parsedQuestions.map((q) => ({
             id: q.id || new mongoose.Types.ObjectId().toString(),
             type: q.type,
-            text: q.text,
-            points: q.points,
-            options: q.type === 'multiple-choice' ? q.options.map(opt => ({
-              text: opt.text,
-              isCorrect: opt.isCorrect
-            })) : undefined,
-            // Handle matching questions
-            leftItems: q.type === 'matching' && q.leftItems ? q.leftItems.map(item => ({
-              id: item.id || new mongoose.Types.ObjectId().toString(),
-              text: item.text
-            })) : undefined,
-            rightItems: q.type === 'matching' && q.rightItems ? q.rightItems.map(item => ({
-              id: item.id || new mongoose.Types.ObjectId().toString(),
-              text: item.text
-            })) : undefined
+            text: q.text || '',
+            points: q.points ?? 0,
+            options:
+              q.type === 'multiple-choice' && Array.isArray(q.options)
+                ? q.options.map((opt) => ({
+                    text: opt.text || '',
+                    isCorrect: Boolean(opt.isCorrect),
+                  }))
+                : undefined,
+            leftItems:
+              q.type === 'matching' && Array.isArray(q.leftItems)
+                ? q.leftItems.map((item) => ({
+                    id: item.id || new mongoose.Types.ObjectId().toString(),
+                    text: item.text || '',
+                  }))
+                : undefined,
+            rightItems:
+              q.type === 'matching' && Array.isArray(q.rightItems)
+                ? q.rightItems.map((item) => ({
+                    id: item.id || new mongoose.Types.ObjectId().toString(),
+                    text: item.text || '',
+                  }))
+                : undefined,
           }));
         }
       } catch (err) {
@@ -267,13 +331,22 @@ exports.updateAssignment = async (req, res) => {
       hasSubmissions: hasSubmissions
     });
   } catch (error) {
-    // If there's an error, delete any uploaded files
-    if (req.files) {
-      await Promise.all(req.files.map(file => 
-        fs.unlink(file.path).catch(err => console.error('Error deleting file:', err))
-      ));
+    if (req.files?.length) {
+      await Promise.all(
+        req.files.map((file) =>
+          fs.unlink(file.path).catch((err) => console.error('Error deleting file:', err))
+        )
+      );
     }
-    res.status(500).json({ message: error.message });
+    const status = error.statusCode && error.statusCode >= 400 && error.statusCode < 600 ? error.statusCode : 500;
+    if (status >= 500) {
+      console.error('updateAssignment error:', error);
+    }
+    res.status(status).json({
+      success: false,
+      message: error.message || 'Failed to update assignment',
+      submissionCount: error.submissionCount,
+    });
   }
 };
 

@@ -41,6 +41,31 @@ class LocalStorageAdapter {
     return path.join(this.baseDir, relativePath);
   }
 
+  /**
+   * Store a Multer file under a relative academic path.
+   */
+  async uploadFile(file, options = {}) {
+    const rel = options.relativePath || file.filename || `upload-${Date.now()}`;
+    if (file.path && fs.existsSync(file.path)) {
+      const dest = path.join(this.baseDir, rel);
+      const dir = path.dirname(dest);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      await fs.promises.rename(file.path, dest).catch(async () => {
+        await fs.promises.copyFile(file.path, dest);
+        await fs.promises.unlink(file.path).catch(() => {});
+      });
+      return {
+        path: rel,
+        url: `/uploads/${rel.replace(/\\/g, '/')}`,
+        provider: this.name,
+      };
+    }
+    if (file.buffer) {
+      return this.writeFile(rel, file.buffer);
+    }
+    throw new Error('Unsupported upload file payload');
+  }
+
   getCapabilities() {
     return {
       supportsSignedUrls: false,

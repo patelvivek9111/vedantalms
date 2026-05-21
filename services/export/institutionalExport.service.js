@@ -12,6 +12,7 @@ const fs = require('fs');
 const { hashContent } = require('../../shared/portability/exportUtils.cjs');
 const { writeSectionChunks } = require('./chunkedWriter');
 const { registerBackupManifest } = require('../backup/backupManifest.service');
+const { buildBlobManifestForExport } = require('./blobManifest.service');
 
 /**
  * Build institution-level portable export package (JSON sections + manifest).
@@ -81,6 +82,13 @@ async function exportInstitutionBundle(options = {}) {
     markSectionComplete(checkpointPath, name, sectionMeta.files || [sectionMeta.file]);
   }
 
+  let blobManifest = null;
+  if (options.includeBlobManifest !== false) {
+    blobManifest = await buildBlobManifestForExport(exportRoot, batchId, {
+      includeBinaries: options.includeBinaries === true,
+    });
+  }
+
   const manifest = buildExportManifest({
     institutionId: options.institutionId || 'default',
     exportType: 'institution',
@@ -91,6 +99,19 @@ async function exportInstitutionBundle(options = {}) {
     backupId: options.backupId || batchId,
     checkpointPath: 'checkpoint.json',
   });
+
+  if (blobManifest) {
+    manifest.blobManifest = {
+      path: 'blob-manifest.json',
+      includedCount: blobManifest.includedCount,
+      missingCount: blobManifest.missingCount,
+      includeBinaries: blobManifest.includeBinaries,
+      manifestHash: blobManifest.manifestHash,
+    };
+    const crypto = require('crypto');
+    const { checksum, ...rest } = manifest;
+    manifest.checksum = crypto.createHash('sha256').update(JSON.stringify(rest)).digest('hex');
+  }
 
   await exportRoot.writeFile(path.join(batchId, 'manifest.json'), manifest);
 
@@ -110,6 +131,7 @@ async function exportInstitutionBundle(options = {}) {
     manifest,
     sections,
     backupRecord,
+    blobManifest,
   };
 }
 

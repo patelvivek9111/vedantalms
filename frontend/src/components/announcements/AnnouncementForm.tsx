@@ -8,6 +8,8 @@ import FormFieldGroup from '../common/FormFieldGroup';
 import { useDraftManager } from '../../hooks/useDraftManager';
 import { Save, RefreshCw } from 'lucide-react';
 import ConfirmationModal from '../common/ConfirmationModal';
+import FileAttachmentPanel from '../files/FileAttachmentPanel';
+import type { NormalizedFile } from '../../utils/fileTypes';
 
 interface AnnouncementFormProps {
   onSubmit: (data: FormData) => void;
@@ -26,7 +28,7 @@ const AnnouncementForm: React.FC<AnnouncementFormProps> = ({ onSubmit, loading, 
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [postTo, setPostTo] = useState('all');
-  const [files, setFiles] = useState<FileList | null>(null);
+  const [attachmentFiles, setAttachmentFiles] = useState<NormalizedFile[]>([]);
   const [options, setOptions] = useState({
     delayPosting: false,
     allowComments: false,
@@ -181,9 +183,8 @@ const AnnouncementForm: React.FC<AnnouncementFormProps> = ({ onSubmit, loading, 
     formData.append('title', title);
     formData.append('body', body);
     formData.append('postTo', postTo);
-    if (files) {
-      Array.from(files).forEach(file => formData.append('attachments', file));
-    }
+    const ids = attachmentFiles.map((f) => f.fileAssetId).filter(Boolean);
+    if (ids.length) formData.append('fileAssetIds', JSON.stringify(ids));
     formData.append('options', JSON.stringify(options));
     if (options.delayPosting && delayedUntil) {
       formData.append('delayedUntil', delayedUntil);
@@ -260,17 +261,13 @@ const AnnouncementForm: React.FC<AnnouncementFormProps> = ({ onSubmit, loading, 
             }))
           ]}
         />
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Attachments</label>
-          <input 
-            type="file" 
-            id="announcement-attachments" 
-            name="attachments" 
-            multiple 
-            onChange={e => setFiles(e.target.files)}
-            className="block w-full text-sm text-gray-700 dark:text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 dark:file:bg-blue-900/50 file:text-blue-700 dark:file:text-blue-300 hover:file:bg-blue-100 dark:hover:file:bg-blue-900/70"
-          />
-        </div>
+        <FileAttachmentPanel
+          files={attachmentFiles}
+          onChange={setAttachmentFiles}
+          courseId={courseId}
+          category="announcement"
+          label="Drop announcement attachments here or browse"
+        />
       </FormFieldGroup>
 
       <FormFieldGroup

@@ -2,6 +2,59 @@ const express = require('express');
 const router = express.Router();
 const Thread = require('../models/thread.model');
 const { protect, authorize } = require('../middleware/auth');
+const fileAssetService = require('../services/fileAsset.service');
+
+function parseRemoveFileAssetIds(body = {}) {
+  let removeIds = body.removeFileAssetIds;
+  if (typeof removeIds === 'string') {
+    try {
+      removeIds = JSON.parse(removeIds);
+    } catch {
+      removeIds = [];
+    }
+  }
+  return Array.isArray(removeIds) ? removeIds.map(String) : [];
+}
+
+async function applyDiscussionFileAssets(target, { fileAssetIds, removeIds, user, courseId, discussionId }) {
+  const removeSet = new Set(removeIds);
+  if (removeIds.length) {
+    for (const id of removeIds) {
+      await fileAssetService.deleteFileAsset(id, user, {}).catch(() => {});
+    }
+    target.fileAssets = (target.fileAssets || []).filter((id) => !removeSet.has(String(id)));
+  }
+  if (fileAssetIds?.length) {
+    await fileAssetService.validateFileAssetIdsForAttach(fileAssetIds, {
+      user,
+      courseId,
+      category: 'discussion',
+      ownerOnly: true,
+    });
+    target.fileAssets = [...new Set([...(target.fileAssets || []).map(String), ...fileAssetIds.map(String)])];
+    await fileAssetService.attachFileAssets(fileAssetIds, {
+      courseId,
+      discussionId,
+      category: 'discussion',
+    });
+  }
+}
+
+const populateThread = (query) =>
+  query
+    .populate('fileAssets', 'originalName mimeType size path')
+    .populate('author', 'firstName lastName role profilePicture')
+    .populate('studentGrades.student', 'firstName lastName')
+    .populate('studentGrades.gradedBy', 'firstName lastName')
+    .populate('groupSet', 'name')
+    .populate({
+      path: 'replies',
+      populate: [
+        { path: 'fileAssets', select: 'originalName mimeType size path' },
+        { path: 'author', select: '_id firstName lastName role profilePicture' },
+        { path: 'likes.user', select: 'firstName lastName' },
+      ],
+    });
 
 // Helper function to check if user is authorized to modify content
 const isAuthorized = (user, contentAuthor, isTeacher) => {
@@ -12,16 +65,17 @@ const isAuthorized = (user, contentAuthor, isTeacher) => {
 router.get('/course/:courseId', protect, async (req, res) => {
   try {
     const threads = await Thread.find({ course: req.params.courseId })
+      .populate('fileAssets', 'originalName mimeType size path')
       .populate('author', 'firstName lastName role profilePicture')
       .populate('studentGrades.student', 'firstName lastName')
       .populate('studentGrades.gradedBy', 'firstName lastName')
       .populate('groupSet', 'name')
       .populate({
         path: 'replies',
-        populate: {
-          path: 'author',
-          select: '_id firstName lastName role profilePicture'
-        }
+        populate: [
+          { path: 'fileAssets', select: 'originalName mimeType size path' },
+          { path: 'author', select: '_id firstName lastName role profilePicture' },
+        ],
       })
       .sort({ lastActivity: -1 });
 
@@ -42,16 +96,17 @@ router.get('/course/:courseId', protect, async (req, res) => {
 router.get('/groupset/:groupSetId', protect, async (req, res) => {
   try {
     const threads = await Thread.find({ groupSet: req.params.groupSetId })
+      .populate('fileAssets', 'originalName mimeType size path')
       .populate('author', 'firstName lastName role profilePicture')
       .populate('studentGrades.student', 'firstName lastName')
       .populate('studentGrades.gradedBy', 'firstName lastName')
       .populate('groupSet', 'name')
       .populate({
         path: 'replies',
-        populate: {
-          path: 'author',
-          select: '_id firstName lastName role profilePicture'
-        }
+        populate: [
+          { path: 'fileAssets', select: 'originalName mimeType size path' },
+          { path: 'author', select: '_id firstName lastName role profilePicture' },
+        ],
       })
       .sort({ lastActivity: -1 });
 
@@ -81,7 +136,8 @@ router.post('/', protect, authorize(['teacher', 'admin']), async (req, res) => {
       group, 
       dueDate, 
       groupSet,
-      settings 
+      settings,
+      fileAssetIds,
     } = req.body;
     
     const thread = new Thread({
@@ -99,16 +155,13 @@ router.post('/', protect, authorize(['teacher', 'admin']), async (req, res) => {
         requirePostBeforeSee: settings?.requirePostBeforeSee || false,
         allowLikes: settings?.allowLikes !== undefined ? settings.allowLikes : true,
         allowComments: settings?.allowComments !== undefined ? settings.allowComments : true
-      }
+      },
+      fileAssets: Array.isArray(fileAssetIds) ? fileAssetIds : [],
     });
 
     await thread.save();
     
-    const populatedThread = await Thread.findById(thread._id)
-      .populate('author', 'firstName lastName role profilePicture')
-      .populate('studentGrades.student', 'firstName lastName')
-      .populate('studentGrades.gradedBy', 'firstName lastName')
-      .populate('groupSet', 'name');
+    const populatedThread = await populateThread(Thread.findById(thread._id));
 
     res.status(201).json({
       success: true,
@@ -127,6 +180,7 @@ router.post('/', protect, authorize(['teacher', 'admin']), async (req, res) => {
 router.get('/:threadId', protect, async (req, res) => {
   try {
     const thread = await Thread.findById(req.params.threadId)
+      .populate('fileAssets', 'originalName mimeType size path')
       .populate('author', 'firstName lastName role profilePicture')
       .populate('studentGrades.student', 'firstName lastName')
       .populate('studentGrades.gradedBy', 'firstName lastName')
@@ -134,6 +188,7 @@ router.get('/:threadId', protect, async (req, res) => {
       .populate({
         path: 'replies',
         populate: [
+          { path: 'fileAssets', select: 'originalName mimeType size path' },
           {
             path: 'author',
             select: 'firstName lastName role profilePicture'
@@ -168,7 +223,7 @@ router.get('/:threadId', protect, async (req, res) => {
 // Add a reply to a thread or to another reply
 router.post('/:threadId/replies', protect, async (req, res) => {
   try {
-    const { content, parentReply } = req.body;
+    const { content, parentReply, fileAssetIds } = req.body;
     const thread = await Thread.findById(req.params.threadId);
 
     if (!thread) {
@@ -193,7 +248,8 @@ router.post('/:threadId/replies', protect, async (req, res) => {
     thread.replies.push({
       content,
       author: req.user._id,
-      parentReply: parentReply || null
+      parentReply: parentReply || null,
+      fileAssets: Array.isArray(fileAssetIds) ? fileAssetIds : [],
     });
 
     // If this is a graded discussion and the user is a student
@@ -217,23 +273,7 @@ router.post('/:threadId/replies', protect, async (req, res) => {
 
     await thread.save();
 
-    const updatedThread = await Thread.findById(thread._id)
-      .populate('author', 'firstName lastName role profilePicture')
-      .populate('studentGrades.student', 'firstName lastName')
-      .populate('studentGrades.gradedBy', 'firstName lastName')
-      .populate({
-        path: 'replies',
-        populate: [
-          {
-            path: 'author',
-            select: 'firstName lastName role profilePicture'
-          },
-          {
-            path: 'likes.user',
-            select: 'firstName lastName'
-          }
-        ]
-      });
+    const updatedThread = await populateThread(Thread.findById(thread._id));
 
     res.json({
       success: true,
@@ -245,6 +285,66 @@ router.post('/:threadId/replies', protect, async (req, res) => {
       success: false,
       message: 'Error adding reply'
     });
+  }
+});
+
+// Update a reply
+router.put('/:threadId/replies/:replyId', protect, async (req, res) => {
+  try {
+    const thread = await Thread.findById(req.params.threadId);
+    if (!thread) {
+      return res.status(404).json({ success: false, message: 'Thread not found' });
+    }
+    const reply = thread.replies.id(req.params.replyId);
+    if (!reply) {
+      return res.status(404).json({ success: false, message: 'Reply not found' });
+    }
+    if (!isAuthorized(req.user, reply.author, req.user.role === 'teacher')) {
+      return res.status(403).json({ success: false, message: 'Not authorized to edit this reply' });
+    }
+    const { content, fileAssetIds } = req.body;
+    if (content !== undefined) reply.content = content;
+    const newIds = fileAssetService.parseFileAssetIdsFromBody({ fileAssetIds });
+    const removeIds = parseRemoveFileAssetIds(req.body);
+    if (newIds.length || removeIds.length) {
+      await applyDiscussionFileAssets(reply, {
+        fileAssetIds: newIds,
+        removeIds,
+        user: req.user,
+        courseId: thread.course,
+        discussionId: thread._id,
+      });
+    }
+    await thread.save();
+    const updatedThread = await populateThread(Thread.findById(thread._id));
+    res.json({ success: true, data: updatedThread });
+  } catch (error) {
+    console.error('Error updating reply:', error);
+    res.status(500).json({ success: false, message: 'Error updating reply' });
+  }
+});
+
+// Delete a reply
+router.delete('/:threadId/replies/:replyId', protect, async (req, res) => {
+  try {
+    const thread = await Thread.findById(req.params.threadId);
+    if (!thread) {
+      return res.status(404).json({ success: false, message: 'Thread not found' });
+    }
+    const reply = thread.replies.id(req.params.replyId);
+    if (!reply) {
+      return res.status(404).json({ success: false, message: 'Reply not found' });
+    }
+    if (!isAuthorized(req.user, reply.author, req.user.role === 'teacher')) {
+      return res.status(403).json({ success: false, message: 'Not authorized to delete this reply' });
+    }
+    reply.deleteOne();
+    await thread.save();
+    const updatedThread = await populateThread(Thread.findById(thread._id));
+    res.json({ success: true, data: updatedThread });
+  } catch (error) {
+    console.error('Error deleting reply:', error);
+    res.status(500).json({ success: false, message: 'Error deleting reply' });
   }
 });
 
@@ -268,9 +368,21 @@ router.put('/:threadId', protect, async (req, res) => {
       });
     }
 
-    const { title, content, isGraded, totalPoints, group, dueDate, module, groupSet, settings } = req.body;
+    const { title, content, isGraded, totalPoints, group, dueDate, module, groupSet, settings, fileAssetIds } = req.body;
     thread.title = title || thread.title;
     thread.content = content || thread.content;
+
+    const newIds = fileAssetService.parseFileAssetIdsFromBody({ fileAssetIds });
+    const removeIds = parseRemoveFileAssetIds(req.body);
+    if (newIds.length || removeIds.length) {
+      await applyDiscussionFileAssets(thread, {
+        fileAssetIds: newIds,
+        removeIds,
+        user: req.user,
+        courseId: thread.course,
+        discussionId: thread._id,
+      });
+    }
     thread.isGraded = isGraded !== undefined ? isGraded : thread.isGraded;
     thread.totalPoints = isGraded ? totalPoints : null;
     thread.group = group || thread.group;
@@ -289,24 +401,7 @@ router.put('/:threadId', protect, async (req, res) => {
 
     await thread.save();
     
-    const updatedThread = await Thread.findById(thread._id)
-      .populate('author', 'firstName lastName role profilePicture')
-      .populate('studentGrades.student', 'firstName lastName')
-      .populate('studentGrades.gradedBy', 'firstName lastName')
-      .populate('groupSet', 'name')
-      .populate({
-        path: 'replies',
-        populate: [
-          {
-            path: 'author',
-            select: 'firstName lastName role profilePicture'
-          },
-          {
-            path: 'likes.user',
-            select: 'firstName lastName'
-          }
-        ]
-      });
+    const updatedThread = await populateThread(Thread.findById(thread._id));
 
     res.json({
       success: true,

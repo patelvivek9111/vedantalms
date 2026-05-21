@@ -22,6 +22,21 @@ vi.mock('@/config', () => ({
   API_URL: 'http://localhost:5000',
 }));
 
+vi.mock('@/components/files/FileAttachmentPanel', () => ({
+  default: ({ onChange, label }: { onChange: (files: unknown[]) => void; label?: string }) => (
+    <div>
+      <span>{label}</span>
+      <input
+        id="announcement-attachments"
+        name="attachments"
+        type="file"
+        data-testid="announcement-attachments"
+        onChange={() => onChange([])}
+      />
+    </div>
+  ),
+}));
+
 global.fetch = vi.fn();
 
 const mockedUseAuth = useAuth as any;

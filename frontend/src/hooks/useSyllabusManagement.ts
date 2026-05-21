@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import axios from 'axios';
 import api from '../services/api';
-import { API_URL } from '../config';
+import type { NormalizedFile } from '../utils/fileTypes';
+import { mapUploadResponse } from '../utils/fileTypes';
 
 interface UseSyllabusManagementProps {
   course: any;
@@ -23,9 +23,8 @@ export const useSyllabusManagement = ({
   const [savingSyllabus, setSavingSyllabus] = useState(false);
   const [syllabusMode, setSyllabusMode] = useState<'none' | 'upload' | 'editor'>('none');
   const [syllabusContent, setSyllabusContent] = useState('');
-  const [syllabusFiles, setSyllabusFiles] = useState<File[]>([]);
-  const [uploadedSyllabusFiles, setUploadedSyllabusFiles] = useState<any[]>([]);
-  const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [syllabusAttachmentFiles, setSyllabusAttachmentFiles] = useState<NormalizedFile[]>([]);
+  const [removeSyllabusAssetIds, setRemoveSyllabusAssetIds] = useState<string[]>([]);
 
   const handleSyllabusFieldChange = (field: string, value: string) => {
     setSyllabusFields(prev => ({ ...prev, [field]: value }));
@@ -58,45 +57,19 @@ export const useSyllabusManagement = ({
     }
   };
 
-  const handleSyllabusFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []);
-    if (files.length === 0) return;
-
-    setUploadingFiles(true);
-    try {
-      const formData = new FormData();
-      files.forEach(file => {
-        formData.append('files', file);
-      });
-
-      const token = localStorage.getItem('token');
-      const response = await axios.post(`${API_URL}/api/upload`, formData, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data'
-        }
-      });
-
-      const newFiles = Array.isArray(response.data?.files)
-        ? response.data.files.map((file: any) => ({
-            name: file.originalname,
-            url: file.path,
-            size: file.size,
-            uploadedAt: new Date()
-          }))
-        : [];
-
-      setUploadedSyllabusFiles(prev => [...prev, ...newFiles]);
-      setSyllabusFiles(prev => [...prev, ...files]);
-    } catch (error: any) {
-      alert('Error uploading files. Please try again.');
-    } finally {
-      setUploadingFiles(false);
-    }
-  };
-
-  const handleRemoveSyllabusFile = (index: number) => {
-    setUploadedSyllabusFiles(prev => prev.filter((_, i) => i !== index));
+  const loadSyllabusFilesFromCourse = (
+    catalogFiles: Array<{ name?: string; url?: string; size?: number; fileAssetId?: string }>
+  ) => {
+    setSyllabusAttachmentFiles(
+      (catalogFiles || []).map((f, i) =>
+        mapUploadResponse({
+          path: f.url,
+          originalname: f.name || `file-${i + 1}`,
+          size: f.size,
+          fileAssetId: f.fileAssetId,
+        })
+      )
+    );
   };
 
   const handleSaveSyllabus = async () => {
@@ -104,11 +77,13 @@ export const useSyllabusManagement = ({
     setSavingSyllabus(true);
     try {
       const token = localStorage.getItem('token');
+      const fileAssetIds = syllabusAttachmentFiles.map((f) => f.fileAssetId).filter(Boolean);
       const response = await api.put(`/courses/${course._id}`, {
         catalog: {
           ...course.catalog,
           syllabusContent: syllabusContent,
-          syllabusFiles: uploadedSyllabusFiles
+          syllabusFileAssetIds: fileAssetIds,
+          removeSyllabusFileAssetIds: removeSyllabusAssetIds,
         }
       }, {
         headers: { Authorization: `Bearer ${token}` }
@@ -118,7 +93,7 @@ export const useSyllabusManagement = ({
         setCourse(response.data.data);
         setSyllabusMode('none');
         setSyllabusContent('');
-        setSyllabusFiles([]);
+        setSyllabusAttachmentFiles([]);
       }
     } catch (err: any) {
       alert('Failed to save syllabus');
@@ -137,16 +112,16 @@ export const useSyllabusManagement = ({
     setSyllabusMode,
     syllabusContent,
     setSyllabusContent,
-    uploadedSyllabusFiles,
-    setUploadedSyllabusFiles,
-    uploadingFiles,
-    syllabusFiles,
-    setSyllabusFiles,
+    syllabusAttachmentFiles,
+    setSyllabusAttachmentFiles,
+    loadSyllabusFilesFromCourse,
     handleSyllabusFieldChange,
     handleSaveSyllabusFields,
-    handleSyllabusFileUpload,
-    handleRemoveSyllabusFile,
     handleSaveSyllabus,
+    removeSyllabusAssetIds,
+    onRemoveSyllabusFile: (file: NormalizedFile) => {
+      if (file.fileAssetId) setRemoveSyllabusAssetIds((prev) => [...prev, file.fileAssetId!]);
+    },
   };
 };
 

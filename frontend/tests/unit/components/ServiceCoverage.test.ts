@@ -34,7 +34,10 @@ describe('Service coverage', () => {
     expect(list).toEqual([{ id: 1 }]);
     expect(sent).toEqual({ ok: true });
     expect(mockedApi.get).toHaveBeenCalledWith('/inbox/conversations', { params: undefined });
-    expect(mockedApi.post).toHaveBeenCalledWith('/inbox/conversations/conv-1/messages', { body: 'hello' });
+    expect(mockedApi.post).toHaveBeenCalledWith('/inbox/conversations/conv-1/messages', {
+      body: 'hello',
+      attachments: [],
+    });
   });
 
   it('announcementService calls announcement endpoints with token', async () => {

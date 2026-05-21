@@ -1,5 +1,6 @@
 import React from 'react';
 import { Megaphone } from 'lucide-react';
+import FileAttachmentChips from '../files/FileAttachmentChips';
 
 export interface Announcement {
   _id: string;
@@ -16,6 +17,8 @@ export interface Announcement {
   };
   postTo?: string;
   delayedUntil?: string;
+  attachments?: Array<string | Record<string, unknown>>;
+  fileAssets?: Array<string | Record<string, unknown>>;
 }
 
 interface AnnouncementListProps {
@@ -62,6 +65,7 @@ const AnnouncementList: React.FC<AnnouncementListProps> = ({ announcements, onSe
               return firstLine.length > 120 ? firstLine.slice(0, 120) + '…' : firstLine;
             })()}
           </div>
+          <FileAttachmentChips files={a.fileAssets || a.attachments} />
         </li>
       ))}
     </ul>

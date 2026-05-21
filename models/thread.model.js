@@ -25,6 +25,10 @@ const replySchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  fileAssets: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'FileAsset',
+  }],
   // Like/reaction system
   likes: [{
     user: {
@@ -71,6 +75,10 @@ const threadSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  fileAssets: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'FileAsset',
+  }],
   replies: [replySchema],
   lastActivity: {
     type: Date,
@@ -153,6 +161,7 @@ const threadSchema = new mongoose.Schema({
 
 threadSchema.index({ course: 1, isGraded: 1, published: 1, dueDate: 1 });
 threadSchema.index({ module: 1, published: 1, lastActivity: -1 });
+threadSchema.index({ course: 1, lastActivity: -1 });
 
 // Virtual for reply count
 threadSchema.virtual('replyCount').get(function() {

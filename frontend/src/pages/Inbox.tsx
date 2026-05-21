@@ -14,6 +14,8 @@ import PullToRefresh from '../components/common/PullToRefresh';
 import SwipeableContainer from '../components/common/SwipeableContainer';
 import { useBottomNavSwipe } from '../hooks/useBottomNavSwipe';
 import { matchesInboxFilters } from '../utils/inboxFilters';
+import FileAttachmentPanel from '../components/files/FileAttachmentPanel';
+import type { NormalizedFile } from '../utils/fileTypes';
 
 function capitalizeFirst(str: string) {
   return str.charAt(0).toUpperCase() + str.slice(1);
@@ -64,6 +66,8 @@ const Inbox: React.FC = () => {
   const [composeUserResults, setComposeUserResults] = useState<any[]>([]);
   const [composeSubject, setComposeSubject] = useState('');
   const [composeBody, setComposeBody] = useState('');
+  const [composeAttachments, setComposeAttachments] = useState<NormalizedFile[]>([]);
+  const [replyAttachments, setReplyAttachments] = useState<NormalizedFile[]>([]);
   const [composeLoading, setComposeLoading] = useState(false);
   const [composeError, setComposeError] = useState<string | null>(null);
   const [composeCourse, setComposeCourse] = useState<string>('');
@@ -281,7 +285,12 @@ const Inbox: React.FC = () => {
     setSending(true);
     setSendError(null);
     try {
-      await sendMessage(selectedConversation._id, reply);
+      await sendMessage(
+        selectedConversation._id,
+        reply,
+        replyAttachments.map((f) => f.url)
+      );
+      setReplyAttachments([]);
       setReply('');
       setShowReplyBox(false);
       // Refresh messages
@@ -341,12 +350,14 @@ const Inbox: React.FC = () => {
         participantIds: recipients,
         subject: composeSubject,
         body: composeBody,
-        sendIndividually, // <-- add this field
+        sendIndividually,
+        attachments: composeAttachments.map((f) => f.url),
       });
       setShowCompose(false);
       setComposeRecipients([]);
       setComposeSubject('');
       setComposeBody('');
+      setComposeAttachments([]);
       setComposeToGroup('');
       setComposeGroupUsers([]);
       setComposeCourse('');
@@ -932,11 +943,30 @@ const Inbox: React.FC = () => {
                     disabled={composeLoading}
                   />
                 </div>
-                {/* Attachment icon */}
+                {composeAttachments.length > 0 && (
+                  <FileAttachmentPanel
+                    files={composeAttachments}
+                    onChange={setComposeAttachments}
+                    category="temporary"
+                    className="mb-3"
+                    label="Add more attachments"
+                  />
+                )}
                 <div className="flex items-center justify-between gap-3 sm:gap-2">
-                  <button type="button" className="min-h-[44px] min-w-[44px] p-2 sm:p-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 touch-manipulation active:scale-95 transition-transform" title="Attach file" disabled>
-                    <Paperclip size={18} className="sm:w-[22px] sm:h-[22px]" />
-                  </button>
+                  {composeAttachments.length === 0 ? (
+                    <FileAttachmentPanel
+                      files={[]}
+                      onChange={setComposeAttachments}
+                      category="temporary"
+                      className="flex-1"
+                      label="Attach files"
+                      multiple
+                    />
+                  ) : (
+                    <span className="text-xs text-gray-500 flex items-center gap-1">
+                      <Paperclip size={14} /> {composeAttachments.length} attached
+                    </span>
+                  )}
                   <div className="flex gap-3 sm:gap-2">
                     <button type="button" className="min-h-[44px] px-4 sm:px-4 py-2.5 sm:py-2 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 text-sm sm:text-sm touch-manipulation active:scale-95 transition-transform" onClick={() => setShowCompose(false)} disabled={composeLoading}>Cancel</button>
                     <button type="submit" className="min-h-[44px] px-4 sm:px-4 py-2.5 sm:py-2 rounded bg-red-600 dark:bg-red-500 text-white hover:bg-red-700 dark:hover:bg-red-600 text-sm sm:text-sm touch-manipulation active:scale-95 transition-transform" disabled={composeLoading || (!composeRecipients.length && (composeToGroup !== 'sections' || !composeCourse)) || !composeSubject.trim() || !composeBody.trim()}>{composeLoading ? 'Sending...' : 'Send'}</button>
@@ -1188,6 +1218,14 @@ const Inbox: React.FC = () => {
                     onChange={setReply}
                     placeholder="Type your reply..."
                     className="flex-1 border border-gray-200 dark:border-gray-700 rounded p-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm sm:text-base min-h-[100px] sm:min-h-[120px]"
+                  />
+                  <FileAttachmentPanel
+                    files={replyAttachments}
+                    onChange={setReplyAttachments}
+                    category="inbox"
+                    label="Attach files to reply"
+                    accept="image/*,application/pdf,.doc,.docx"
+                    capture="environment"
                   />
                   <div className="flex justify-end gap-2 mt-2">
                     <button

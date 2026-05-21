@@ -115,6 +115,11 @@ uploads/
 frontend/node_modules/.vite/
 **/.vitest/
 
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+
 # Ad-hoc scratch scripts at repo root only (not tests/ or scripts/)
 /test-*.js
 /check-*.js

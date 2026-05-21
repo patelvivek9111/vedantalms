@@ -12,6 +12,9 @@ import DatePicker from '../common/DatePicker';
 import FormFieldGroup from '../common/FormFieldGroup';
 import { useDraftManager } from '../../hooks/useDraftManager';
 import ConfirmationModal from '../common/ConfirmationModal';
+import FileAttachmentPanel from '../files/FileAttachmentPanel';
+import { normalizeAttachmentSources } from '../../utils/fileTypes';
+import type { NormalizedFile } from '../../utils/fileTypes';
 
 interface CreateAssignmentFormProps {
   moduleId: string;
@@ -107,6 +110,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
   });
   const [preview, setPreview] = useState(false);
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [newOption, setNewOption] = useState({ text: '', isCorrect: false });
   const [courseId, setCourseId] = useState<string | null>(null);
   const [courseGroups, setCourseGroups] = useState<{ name: string; weight: number }[]>([]);
@@ -114,6 +118,8 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
   const [group, setGroup] = useState(searchParams.get('group') || '');
   const [currentStep, setCurrentStep] = useState(1);
   const [existingAttachments, setExistingAttachments] = useState<string[]>([]);
+  const [attachmentFiles, setAttachmentFiles] = useState<NormalizedFile[]>([]);
+  const [removeAssetIds, setRemoveAssetIds] = useState<string[]>([]);
   const [submissionCount, setSubmissionCount] = useState(0);
   const [hasSubmissions, setHasSubmissions] = useState(false);
   const [totalPointsInput, setTotalPointsInput] = useState<string>('');
@@ -327,7 +333,10 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
         availableFrom: availableFromDate,
         dueDate: assignmentData.dueDate ? format(new Date(assignmentData.dueDate), "yyyy-MM-dd'T'HH:mm") : '',
         attachments: [],
-        moduleId: assignmentData.module || '',
+        moduleId:
+          typeof assignmentData.module === 'string'
+            ? assignmentData.module
+            : assignmentData.module?._id || '',
         totalPoints: questions.reduce((sum, q) => sum + (q.points || 0), 0) || assignmentData.totalPoints || 0,
         questions: questions,
         isGroupAssignment: Boolean(assignmentData.isGroupAssignment),
@@ -348,6 +357,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
         setGroup(assignmentData.group || '');
       }
       setExistingAttachments(assignmentData.attachments || []);
+      setAttachmentFiles(normalizeAttachmentSources(assignmentData));
       // Set totalPointsInput for offline assignments in edit mode
       if (assignmentData.isOfflineAssignment) {
         const calculatedTotalPoints = assignmentData.questions?.reduce((sum: number, q: any) => sum + (q.points || 0), 0) || assignmentData.totalPoints || 0;
@@ -517,15 +527,17 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
     e.preventDefault();
     setError('');
 
-    // Final validation
+    // Final validation (show messages — step 1 fields may be off-screen)
     if (!validateTitle(formData.title)) {
+      setError('Title is required. Go back to step 1 to fix it.');
       return;
     }
     if (!formData.description.trim()) {
-      setError('Description is required');
+      setError('Description is required. Go back to step 2 to add it.');
       return;
     }
     if (!validateDates()) {
+      setError('Check Available from and Due date on step 1 — due must be after available from.');
       return;
     }
     // Only require module if not a group assignment, or if group assignment but no group set selected
@@ -552,13 +564,18 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
       clearDraft();
     }
 
+    setIsSubmitting(true);
     try {
       const formDataToSend = new FormData();
+      const moduleIdValue =
+        typeof formData.moduleId === 'string'
+          ? formData.moduleId
+          : (formData.moduleId as { _id?: string })?._id || '';
       formDataToSend.append('title', formData.title);
       formDataToSend.append('description', formData.description);
       formDataToSend.append('availableFrom', formData.availableFrom);
       formDataToSend.append('dueDate', formData.dueDate);
-      formDataToSend.append('moduleId', formData.moduleId);
+      if (moduleIdValue) formDataToSend.append('moduleId', moduleIdValue);
       formDataToSend.append('totalPoints', formData.totalPoints.toString());
       formDataToSend.append('questions', JSON.stringify(formData.questions));
       formDataToSend.append('isGroupAssignment', formData.isGroupAssignment.toString());
@@ -576,9 +593,16 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
       if (group) {
         formDataToSend.append('group', group);
       }
-      formData.attachments.forEach(file => {
-        formDataToSend.append('attachments', file);
-      });
+      const removeSet = new Set(removeAssetIds.map(String));
+      const fileAssetIds = attachmentFiles
+        .map((f) => f.fileAssetId)
+        .filter((id): id is string => Boolean(id) && !removeSet.has(String(id)));
+      if (fileAssetIds.length) {
+        formDataToSend.append('fileAssetIds', JSON.stringify(fileAssetIds));
+      }
+      if (removeAssetIds.length) {
+        formDataToSend.append('removeFileAssetIds', JSON.stringify(removeAssetIds));
+      }
 
 
       const token = localStorage.getItem('token');
@@ -592,8 +616,10 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
           }
         });
         
-        if (response.data) {
-          navigate(-1); // Go back to previous page after successful update
+        if (response.data?.success !== false) {
+          navigate(-1);
+        } else {
+          setError(response.data?.message || 'Update failed');
         }
       } else {
         // Create new assignment
@@ -638,8 +664,15 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
       } else if (err.response?.status === 400 && err.response?.data?.submissionCount) {
         setError(`${err.response.data.message} (${err.response.data.submissionCount} submission${err.response.data.submissionCount !== 1 ? 's' : ''} exist)`);
       } else {
-        setError(err.response?.data?.message || `Error ${editMode ? 'updating' : 'creating'} assignment`);
+        const msg =
+          err.response?.data?.message ||
+          err.message ||
+          `Error ${editMode ? 'updating' : 'creating'} assignment`;
+        setError(msg);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1222,7 +1255,6 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
                       }}
                       className="block w-full rounded-md border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2"
                       placeholder="Enter total points (e.g., 100)"
-                      required
                     />
                   </div>
                   <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
@@ -1230,44 +1262,17 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
                   </p>
                 </div>
 
-                {/* Attachments Section - Still available for offline assignments */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Attachments (Optional)</label>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                    You can attach the question paper or any related documents here.
-                  </p>
-                  <input
-                    type="file"
-                    id="attachments"
-                    name="attachments"
-                    multiple
-                    onChange={(e) => {
-                      const files = Array.from(e.target.files || []);
-                      setFormData({ ...formData, attachments: [...formData.attachments, ...files] });
-                    }}
-                    className="block w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 dark:file:bg-indigo-900/50 file:text-indigo-700 dark:file:text-indigo-300 hover:file:bg-indigo-100 dark:hover:file:bg-indigo-900/70"
-                  />
-                  {formData.attachments.length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      {formData.attachments.map((file, index) => (
-                        <div key={index} className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
-                          <span>{file.name}</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const newAttachments = [...formData.attachments];
-                              newAttachments.splice(index, 1);
-                              setFormData({ ...formData, attachments: newAttachments });
-                            }}
-                            className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <FileAttachmentPanel
+                  files={attachmentFiles}
+                  onChange={setAttachmentFiles}
+                  courseId={courseId || undefined}
+                  assignmentId={editMode ? assignmentData?._id : undefined}
+                  category="assignment"
+                  label="Drop offline assignment attachments here or browse"
+                  onRemoveFile={(file) => {
+                    if (file.fileAssetId) setRemoveAssetIds((prev) => [...prev, file.fileAssetId!]);
+                  }}
+                />
               </div>
             ) : (
               <>
@@ -1540,21 +1545,17 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
                 </div>
               ))}
             </div>
-            <div>
-              <label htmlFor="assignment-attachments" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Attachments</label>
-              <input
-                type="file"
-                id="assignment-attachments"
-                name="attachments"
-                multiple
-                onChange={(e) => {
-                  if (e.target.files) {
-                    setFormData({ ...formData, attachments: [...formData.attachments, ...Array.from(e.target.files)] });
-                  }
-                }}
-                className="mt-1 block w-full"
-              />
-            </div>
+            <FileAttachmentPanel
+              files={attachmentFiles}
+              onChange={setAttachmentFiles}
+              courseId={courseId || undefined}
+              assignmentId={editMode ? assignmentData?._id : undefined}
+              category="assignment"
+              label="Drop assignment attachments here or browse"
+              onRemoveFile={(file) => {
+                if (file.fileAssetId) setRemoveAssetIds((prev) => [...prev, file.fileAssetId!]);
+              }}
+            />
               </>
             )}
             
@@ -1584,12 +1585,18 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="w-full sm:w-auto min-h-[44px] inline-flex items-center justify-center px-4 py-2.5 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 touch-manipulation active:scale-95 transition-transform"
+                  disabled={isSubmitting}
+                  className="w-full sm:w-auto min-h-[44px] inline-flex items-center justify-center px-4 py-2.5 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed touch-manipulation active:scale-95 transition-transform"
                 >
-                  {editMode 
-                    ? (formData.isGradedQuiz ? 'Update Quiz' : 'Update Assignment')
-                    : (formData.isGradedQuiz ? 'Create Quiz' : 'Create Assignment')
-                  }
+                  {isSubmitting
+                    ? 'Saving…'
+                    : editMode
+                      ? formData.isGradedQuiz
+                        ? 'Update Quiz'
+                        : 'Update Assignment'
+                      : formData.isGradedQuiz
+                        ? 'Create Quiz'
+                        : 'Create Assignment'}
                 </button>
               </div>
             </div>

@@ -144,55 +144,49 @@ exports.uploadProfilePicture = async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
-    
-    const { uploadToCloudinary, isCloudinaryConfigured, deleteFromCloudinary, extractPublicId } = require('../utils/cloudinary');
-    
-    const userId = req.user._id;
-    let profilePictureUrl;
-    
-    // Get current user to delete old profile picture if exists
-    const currentUser = await User.findById(userId);
-    
-    // Use Cloudinary if configured, otherwise use local storage
-    if (isCloudinaryConfigured()) {
-      try {
-        const result = await uploadToCloudinary(req.file, {
-          folder: 'lms/profile-pictures',
-          resource_type: 'image',
-          transformation: [
-            { width: 400, height: 400, crop: 'fill', gravity: 'face' } // Optimize for profile pictures
-          ]
-        });
-        profilePictureUrl = result.url;
-        
-        // Delete old profile picture from Cloudinary if it exists
-        if (currentUser.profilePicture && currentUser.profilePicture.includes('cloudinary.com')) {
-          const oldPublicId = extractPublicId(currentUser.profilePicture);
-          if (oldPublicId) {
-            try {
-              await deleteFromCloudinary(oldPublicId, 'image');
-            } catch (deleteErr) {
-              console.error('Error deleting old profile picture from Cloudinary:', deleteErr);
-            }
-          }
-        }
-      } catch (cloudinaryError) {
-        console.error('Cloudinary upload failed, falling back to local storage:', cloudinaryError);
-        profilePictureUrl = `/uploads/${req.file.filename}`;
+
+    const fileAssetService = require('../services/fileAsset.service');
+    const currentUser = await User.findById(req.user._id);
+
+    if (currentUser?.profilePicture) {
+      const oldMatch = String(currentUser.profilePicture).match(/\/api\/files\/([a-f0-9]{24})\//i);
+      if (oldMatch) {
+        await fileAssetService.deleteFileAsset(oldMatch[1], req.user, { ip: req.ip }).catch(() => {});
       }
-    } else {
-      profilePictureUrl = `/uploads/${req.file.filename}`;
     }
-    
+
+    const asset = await fileAssetService.createFileAsset({
+      file: req.file,
+      uploadedBy: req.user,
+      category: 'profile',
+      visibility: 'public',
+      accessScope: { ownerOnly: false },
+      cloudinaryFolder: 'lms/profile-pictures',
+      resourceType: 'image',
+      skipLifecycleCheck: true,
+      metadata: { ip: req.ip, requestId: req.requestId },
+    });
+
+    let profilePictureUrl;
+    if (asset.provider === 'cloudinary' && asset.metadata?.providerUrl) {
+      profilePictureUrl = asset.metadata.providerUrl;
+    } else {
+      profilePictureUrl = `/uploads/${asset.storageKey}`;
+    }
+
     const updatedUser = await User.findByIdAndUpdate(
-      userId,
+      req.user._id,
       { profilePicture: profilePictureUrl },
       { new: true, runValidators: true }
     ).select('-password');
     res.json({ success: true, user: updatedUser });
   } catch (err) {
     console.error('Profile picture upload error:', err);
-    res.status(500).json({ success: false, message: 'Server error while uploading profile picture', error: err.message });
+    res.status(err.statusCode || 500).json({
+      success: false,
+      message: err.message || 'Server error while uploading profile picture',
+      error: err.message,
+    });
   }
 };
 

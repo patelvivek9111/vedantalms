@@ -266,8 +266,48 @@ exports.updateCourse = async (req, res) => {
       });
     }
 
-    // Only allow updating gradeScale if provided
     const updateFields = { ...req.body };
+    const syllabusFilesService = require('../services/syllabusFiles.service');
+
+    if (updateFields.catalog) {
+      const catalogPatch = { ...updateFields.catalog };
+      const fileAssetIds = catalogPatch.syllabusFileAssetIds || catalogPatch.fileAssetIds;
+      const removeIds = catalogPatch.removeSyllabusFileAssetIds || catalogPatch.removeFileAssetIds;
+      if (fileAssetIds?.length || removeIds?.length) {
+        let ids = fileAssetIds;
+        if (typeof ids === 'string') {
+          try {
+            ids = JSON.parse(ids);
+          } catch {
+            ids = [];
+          }
+        }
+        let removeFileAssetIds = removeIds;
+        if (typeof removeFileAssetIds === 'string') {
+          try {
+            removeFileAssetIds = JSON.parse(removeFileAssetIds);
+          } catch {
+            removeFileAssetIds = [];
+          }
+        }
+        await syllabusFilesService.applySyllabusFileAssets(course, {
+          fileAssetIds: Array.isArray(ids) ? ids.map(String) : [],
+          removeFileAssetIds: Array.isArray(removeFileAssetIds) ? removeFileAssetIds.map(String) : [],
+          user: req.user,
+          audit: { ip: req.ip, requestId: req.requestId },
+        });
+        delete catalogPatch.syllabusFileAssetIds;
+        delete catalogPatch.removeSyllabusFileAssetIds;
+        delete catalogPatch.fileAssetIds;
+        delete catalogPatch.removeFileAssetIds;
+        if (!catalogPatch.syllabusFiles) {
+          catalogPatch.syllabusFiles = course.catalog?.syllabusFiles;
+        }
+      }
+      updateFields.catalog = catalogPatch;
+    }
+
+    // Only allow updating gradeScale if provided
     if (req.body.gradeScale) {
       try {
         const validationError = validateGradeScale(req.body.gradeScale);
@@ -988,4 +1028,68 @@ exports.updateSidebarConfig = async (req, res) => {
       error: err.message 
     });
   }
-}; 
+};
+
+const courseCopyService = require('../services/courseCopy.service');
+const { enqueueJob } = require('../services/jobQueue.service');
+
+exports.copyCourse = async (req, res) => {
+  try {
+    const { targetTitle, includeAnnouncements, includeDiscussions, async: runAsync } = req.body;
+    const sourceId = req.params.id;
+
+    if (runAsync) {
+      const { job } = await enqueueJob(
+        'course.copy',
+        { sourceCourseId: sourceId, targetTitle, includeAnnouncements, includeDiscussions },
+        req.user
+      );
+      return res.status(202).json({ success: true, data: { jobId: job._id, async: true } });
+    }
+
+    const result = await courseCopyService.copyCourseContent(sourceId, {
+      targetTitle,
+      requestedBy: req.user,
+      includeAnnouncements: includeAnnouncements !== false,
+      includeDiscussions: includeDiscussions !== false,
+    });
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ success: false, message: error.message });
+  }
+};
+
+exports.archiveCourse = async (req, res) => {
+  try {
+    const course = await courseCopyService.archiveCourse(req.params.id, req.user);
+    res.json({ success: true, data: course });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ success: false, message: error.message });
+  }
+};
+
+exports.restoreCourse = async (req, res) => {
+  try {
+    const course = await courseCopyService.restoreCourse(req.params.id, req.user);
+    res.json({ success: true, data: course });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ success: false, message: error.message });
+  }
+};
+
+exports.bulkCourseOperation = async (req, res) => {
+  try {
+    const { courseIds, operation, payload } = req.body;
+    if (!Array.isArray(courseIds) || !courseIds.length) {
+      return res.status(400).json({ success: false, message: 'courseIds required' });
+    }
+    const { job } = await enqueueJob(
+      'course.bulk',
+      { courseIds, operation, payload },
+      req.user
+    );
+    res.status(202).json({ success: true, data: { jobId: job._id } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

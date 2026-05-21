@@ -10,8 +10,15 @@ export const fetchMessages = async (conversationId: string) => {
   return Array.isArray(res.data?.data) ? res.data.data : [];
 };
 
-export const sendMessage = async (conversationId: string, body: string) => {
-  const res = await api.post(`/inbox/conversations/${conversationId}/messages`, { body });
+export const sendMessage = async (
+  conversationId: string,
+  body: string,
+  attachments?: string[]
+) => {
+  const res = await api.post(`/inbox/conversations/${conversationId}/messages`, {
+    body,
+    attachments: attachments || [],
+  });
   return res.data;
 };
 

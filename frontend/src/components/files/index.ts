@@ -1,0 +1,12 @@
+export { default as FileUploadDropzone } from './FileUploadDropzone';
+export { default as FileUploadList } from './FileUploadList';
+export { default as FileUploadItem } from './FileUploadItem';
+export { default as FilePreviewModal } from './FilePreviewModal';
+export { default as FileUploadProgress } from './FileUploadProgress';
+export { default as FileReplaceDialog } from './FileReplaceDialog';
+export { default as UnsupportedFileBanner } from './UnsupportedFileBanner';
+export { default as FileGovernanceBadge } from './FileGovernanceBadge';
+export { default as FileAttachmentPanel } from './FileAttachmentPanel';
+export { default as FileVersionHistory } from './FileVersionHistory';
+export { default as FileAccessBanner } from './FileAccessBanner';
+export { normalizeLegacyFiles } from './FileAttachmentPanel';

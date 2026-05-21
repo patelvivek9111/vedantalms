@@ -14,7 +14,11 @@ const {
   getCourseModules,
   updateOverviewConfig,
   updateSidebarConfig,
-  assignInstructor
+  assignInstructor,
+  copyCourse,
+  archiveCourse,
+  restoreCourse,
+  bulkCourseOperation,
 } = require('../controllers/course.controller');
 const Course = require('../models/course.model');
 const announcementController = require('../controllers/announcement.controller');
@@ -391,6 +395,11 @@ router
 router
   .route('/:id/publish')
   .patch(protect, authorize('teacher', 'admin'), publishCourse);
+
+router.post('/:id/copy', protect, authorize('teacher', 'admin'), copyCourse);
+router.patch('/:id/archive', protect, authorize('teacher', 'admin'), archiveCourse);
+router.patch('/:id/restore', protect, authorize('teacher', 'admin'), restoreCourse);
+router.post('/bulk', protect, authorize('teacher', 'admin'), bulkCourseOperation);
 
 router
   .route('/:id/assign-instructor')
@@ -794,5 +803,25 @@ router.post('/:courseId/enrollment/:studentId/deny', protect, authorize('teacher
     });
   }
 });
+
+const courseStorageController = require('../controllers/courseStorage.controller');
+router.get(
+  '/:courseId/storage',
+  protect,
+  authorize('teacher', 'admin'),
+  courseStorageController.getCourseStorage
+);
+router.post(
+  '/:courseId/storage/recalculate',
+  protect,
+  authorize('teacher', 'admin'),
+  courseStorageController.recalculateCourseStorage
+);
+router.post(
+  '/:courseId/storage/zip',
+  protect,
+  authorize('teacher', 'admin'),
+  courseStorageController.createCourseZip
+);
 
 module.exports = router; 

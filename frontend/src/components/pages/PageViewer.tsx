@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useModule, Page } from '../../contexts/ModuleContext';
 import { coursePageBodyHtmlClass, sanitizePageHtml } from './PageView';
+import FileAttachmentChips from '../files/FileAttachmentChips';
 
 interface PageViewerProps {
   pageId: string;
@@ -32,20 +33,12 @@ const PageViewer: React.FC<PageViewerProps> = ({ pageId }) => {
       </h4>
       <div className="mb-2 border-b border-slate-100 dark:border-slate-700" role="presentation" />
       <div className={coursePageBodyHtmlClass} dangerouslySetInnerHTML={{ __html: sanitizePageHtml(page.content || '') }} />
-      {page.attachments && page.attachments.length > 0 && (
+      {(page.fileAssets?.length || page.attachments?.length) ? (
         <div className="mt-2 sm:mt-3">
-          <div className="font-semibold text-xs sm:text-sm mb-1 text-gray-900 dark:text-gray-100">Attachments:</div>
-          <ul className="list-disc ml-4 sm:ml-5 space-y-1">
-            {page.attachments.map((url, idx) => (
-              <li key={idx} className="text-xs sm:text-sm">
-                <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 underline break-all">
-                  {url.split('/').pop()}
-                </a>
-              </li>
-            ))}
-          </ul>
+          <div className="font-semibold text-xs sm:text-sm mb-1 text-gray-900 dark:text-gray-100">Attachments</div>
+          <FileAttachmentChips files={page.fileAssets || page.attachments} />
         </div>
-      )}
+      ) : null}
     </div>
   );
 };

@@ -11,6 +11,8 @@ import DatePicker from '../common/DatePicker';
 import FormFieldGroup from '../common/FormFieldGroup';
 import { useDraftManager } from '../../hooks/useDraftManager';
 import { Save, RefreshCw } from 'lucide-react';
+import FileAttachmentPanel from '../files/FileAttachmentPanel';
+import type { NormalizedFile } from '../../utils/fileTypes';
 
 interface CreateThreadModalProps {
   isOpen: boolean;
@@ -61,6 +63,7 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
   const [allowLikes, setAllowLikes] = useState(true);
   const [allowComments, setAllowComments] = useState(true);
   const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({});
+  const [attachmentFiles, setAttachmentFiles] = useState<NormalizedFile[]>([]);
 
   // Draft manager
   const formId = `thread-create-${courseId}`;
@@ -261,6 +264,8 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
       if (isGroupDiscussion && selectedGroupSet) {
         threadData.groupSet = selectedGroupSet;
       }
+      const fileAssetIds = attachmentFiles.map((f) => f.fileAssetId).filter(Boolean);
+      if (fileAssetIds.length) threadData.fileAssetIds = fileAssetIds;
 
       const response = await api.post(
         `${API_URL}/api/threads`,
@@ -382,6 +387,14 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
               </div>
             </div>
           </FormFieldGroup>
+
+          <FileAttachmentPanel
+            files={attachmentFiles}
+            onChange={setAttachmentFiles}
+            courseId={courseId}
+            category="discussion"
+            label="Attach files to this discussion"
+          />
 
           <FormFieldGroup
             title="Group Discussion"

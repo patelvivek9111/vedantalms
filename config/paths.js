@@ -11,6 +11,8 @@ const paths = {
   institutionExports: process.env.INSTITUTION_EXPORTS_DIR || path.join(ROOT, 'uploads', 'exports', 'institution'),
   migrationTemp: process.env.MIGRATION_TEMP_DIR || path.join(ROOT, 'uploads', 'migration', 'temp'),
   migrationCheckpoints: process.env.MIGRATION_CHECKPOINTS_DIR || path.join(ROOT, 'uploads', 'migration', 'checkpoints'),
+  fileReports: process.env.FILE_REPORTS_DIR || path.join(ROOT, 'uploads', 'reports'),
+  institutionBlobs: process.env.INSTITUTION_BLOBS_DIR || path.join(ROOT, 'uploads', 'exports', 'institution'),
 };
 
 function resolveUnderRoot(relativePath) {

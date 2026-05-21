@@ -133,6 +133,104 @@ async function processExportGradebook(jobDoc) {
   };
 }
 
+async function processCourseCopy(jobDoc) {
+  const courseCopyService = require('./courseCopy.service');
+  const { sourceCourseId, targetTitle, includeAnnouncements, includeDiscussions } = jobDoc.payload;
+  const result = await courseCopyService.copyCourseContent(sourceCourseId, {
+    targetTitle,
+    requestedBy: jobDoc.requestedBy,
+    includeAnnouncements: includeAnnouncements !== false,
+    includeDiscussions: includeDiscussions !== false,
+  });
+  return { newCourseId: String(result.course._id), moduleCount: Object.keys(result.moduleIdMap).length };
+}
+
+async function processCourseBulk(jobDoc) {
+  const Course = require('../models/course.model');
+  const Assignment = require('../models/Assignment');
+  const Module = require('../models/module.model');
+  const { courseIds, operation, payload = {} } = jobDoc.payload;
+  let completed = 0;
+  const results = [];
+
+  for (const courseId of courseIds) {
+    const course = await Course.findById(courseId);
+    if (!course) {
+      results.push({ courseId, ok: false, error: 'not_found' });
+      continue;
+    }
+    try {
+      if (operation === 'publish') {
+        course.published = true;
+        await course.save();
+      } else if (operation === 'unpublish') {
+        course.published = false;
+        await course.save();
+      } else if (operation === 'archive') {
+        const courseCopyService = require('./courseCopy.service');
+        await courseCopyService.archiveCourse(courseId, { _id: jobDoc.requestedBy });
+      } else if (operation === 'dueDateShift' && payload.days) {
+        const mods = await Module.find({ course: courseId }).select('_id');
+        const modIds = mods.map((m) => m._id);
+        const assignments = await Assignment.find({ module: { $in: modIds } });
+        for (const a of assignments) {
+          if (a.dueDate) {
+            a.dueDate = new Date(new Date(a.dueDate).getTime() + payload.days * 86400000);
+            await a.save();
+          }
+        }
+      }
+      completed += 1;
+      results.push({ courseId, ok: true });
+    } catch (e) {
+      results.push({ courseId, ok: false, error: e.message });
+    }
+    await updateProgress(jobDoc._id, completed, courseIds.length);
+  }
+  return { completed, total: courseIds.length, results };
+}
+
+async function processMaintenanceFiles(jobDoc) {
+  const courseMaintenanceService = require('./courseMaintenance.service');
+  return courseMaintenanceService.runMaintenanceBundle(jobDoc.payload || {});
+}
+
+async function processFilesBulkJob(jobDoc) {
+  const fileBulkOperations = require('./fileBulkOperations.service');
+  const { fileAssetIds = [], reason, dryRun } = jobDoc.payload || {};
+  const user = { _id: jobDoc.requestedBy, role: 'admin' };
+  if (dryRun) return { dryRun: true, count: fileAssetIds.length };
+  switch (jobDoc.type) {
+    case 'files.bulk.restore':
+      return fileBulkOperations.bulkRestore(fileAssetIds, user, {});
+    case 'files.bulk.quarantine':
+      return fileBulkOperations.bulkQuarantine(fileAssetIds, reason, user, {});
+    case 'files.bulk.release':
+      return fileBulkOperations.bulkRelease(fileAssetIds, user, {});
+    case 'files.bulk.zip':
+      return fileBulkOperations.bulkZipExport(fileAssetIds, user, {});
+    case 'files.bulk.retention':
+      return fileBulkOperations.bulkMarkRetention(fileAssetIds, user, {});
+    default:
+      return { skipped: true };
+  }
+}
+
+async function processFilePreviewJob(jobDoc) {
+  const { processPreviewJob } = require('./filePreviewJob.service');
+  const ids = jobDoc.payload?.fileAssetIds || [];
+  const results = [];
+  for (const id of ids) {
+    results.push(
+      await processPreviewJob(id, {
+        actorId: jobDoc.requestedBy,
+        regenerate: Boolean(jobDoc.payload?.regenerate),
+      })
+    );
+  }
+  return { processed: results.length, results };
+}
+
 async function runJobByType(jobDoc) {
   switch (jobDoc.type) {
     case 'grades.finalize':
@@ -143,6 +241,37 @@ async function runJobByType(jobDoc) {
       return processTranscriptRegenerate(jobDoc);
     case 'export.gradebook':
       return processExportGradebook(jobDoc);
+    case 'course.copy':
+      return processCourseCopy(jobDoc);
+    case 'course.bulk':
+      return processCourseBulk(jobDoc);
+    case 'maintenance.files':
+      return processMaintenanceFiles(jobDoc);
+    case 'files.bulk.restore':
+    case 'files.bulk.quarantine':
+    case 'files.bulk.release':
+    case 'files.bulk.zip':
+    case 'files.bulk.retention':
+      return processFilesBulkJob(jobDoc);
+    case 'files.preview':
+      return processFilePreviewJob(jobDoc);
+    case 'files.bulk.download': {
+      const bulkDownload = require('./bulkDownload.service');
+      const user = { _id: jobDoc.requestedBy, role: 'admin' };
+      const ids = jobDoc.payload?.fileAssetIds || [];
+      return bulkDownload.buildZipArchive({
+        fileAssetIds: ids,
+        label: jobDoc.payload?.label,
+        user,
+        audit: {},
+      });
+    }
+    case 'files.storage.recalculate': {
+      const courseStorageAnalytics = require('./courseStorageAnalytics.service');
+      return courseStorageAnalytics.aggregateCourseStorage(jobDoc.payload.courseId, {
+        bypassCache: true,
+      });
+    }
     default:
       throw new Error(`Unknown job type: ${jobDoc.type}`);
   }

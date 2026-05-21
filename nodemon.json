@@ -1,0 +1,33 @@
+{
+  "watch": [
+    "server.js",
+    "routes",
+    "controllers",
+    "services",
+    "middleware",
+    "models",
+    "utils",
+    "config",
+    "workers",
+    "adapters",
+    "shared"
+  ],
+  "ext": "js,json",
+  "delay": 3500,
+  "signal": "SIGTERM",
+  "ignore": [
+    "uploads/**",
+    "frontend/**",
+    "e2e/**",
+    "node_modules/**",
+    "docs/**",
+    "monitoring/**",
+    "scripts/load/**",
+    "scripts/migrations/**",
+    "tests/**",
+    ".git/**",
+    "**/*.log",
+    "**/agent-transcripts/**"
+  ],
+  "exec": "node scripts/devServer.js"
+}

@@ -1,22 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const { check } = require('express-validator');
-const multer = require('multer');
 const { protect, authorize } = require('../middleware/auth');
+const upload = require('../middleware/upload');
 const { createPage, getPagesByModule, getPageById, updatePage, getPagesByGroupSet, deletePage } = require('../controllers/page.controller');
 const Page = require('../models/page.model');
 const Module = require('../models/module.model');
-
-// Multer setup for file uploads
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/');
-  },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + '-' + file.originalname);
-  }
-});
-const upload = multer({ storage });
 
 // Validation middleware
 const pageValidation = [

@@ -10,6 +10,69 @@ const { createNotification } = require('../routes/notification.routes');
 const gradingPolicySnapshotService = require('../services/gradingPolicySnapshot.service');
 const gradeLifecycleService = require('../services/gradeLifecycle.service');
 const { getSemesterFromCourse } = require('../utils/semesterUtils');
+const fileAssetService = require('../services/fileAsset.service');
+const { assertCourseFilesMutable, resolveCourseForAssignment } = require('../services/fileLifecycle.service');
+const { buildDownloadPath, attachFileAssets } = fileAssetService;
+const { supersedeFileAssets } = require('../services/fileVersioning.service');
+const { assertFileMutable } = require('../services/fileGovernance.service');
+const { buildClientFileList } = require('../utils/fileResponse');
+
+async function applySubmissionFiles(submission, assignmentDoc, req) {
+  const course = await resolveCourseForAssignment(assignmentDoc._id);
+  await fileAssetService.assertStudentEnrolledInCourse(req.user, course);
+
+  if (assignmentDoc.allowStudentUploads === false && req.body.uploadedFiles?.length) {
+    const err = new Error('File uploads are not allowed for this assignment');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  if (course) {
+    await assertCourseFilesMutable(course, req.user, { action: 'submission_file_update' });
+  }
+
+  const { fileAssetIds, legacyUrls } = await fileAssetService.resolveSubmissionFileInputs(
+    req.body.uploadedFiles,
+    {
+      user: req.user,
+      assignmentId: assignmentDoc._id,
+      courseId: course?._id,
+    }
+  );
+
+  if (legacyUrls.length) {
+    const err = new Error(
+      'Legacy file URLs are not accepted. Upload files via POST /api/upload and attach fileAssetId references.'
+    );
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const previousIds = (submission.fileAssets || []).map(String);
+
+  for (const id of fileAssetIds) {
+    const asset = await require('../models/fileAsset.model').findById(id);
+    if (asset) await assertFileMutable(asset, { action: 'attach', user: req.user });
+  }
+
+  await supersedeFileAssets({
+    previousAssetIds: previousIds,
+    newAssetIds: fileAssetIds,
+    patch: {
+      category: 'submission',
+      courseId: course?._id,
+      assignmentId: assignmentDoc._id,
+      submissionId: submission._id,
+      accessScope: { enrolledOnly: true, ownerOnly: false },
+      visibility: 'course',
+    },
+    audit: { userId: req.user._id, ip: req.ip, requestId: req.requestId },
+  });
+
+  submission.fileAssets = fileAssetIds;
+  submission.files = fileAssetIds.map((id) => buildDownloadPath(id));
+  return submission;
+}
 
 async function saveGradedSubmission(submission, auditMeta = {}) {
   const isGraded =
@@ -239,7 +302,9 @@ exports.createSubmission = async (req, res) => {
       existingSubmission.answers = answers;
       existingSubmission.submittedAt = new Date();
       existingSubmission.submittedBy = req.user._id;
-      existingSubmission.files = req.body.uploadedFiles || [];
+      if (req.body.uploadedFiles) {
+        await applySubmissionFiles(existingSubmission, assignmentDoc, req);
+      }
       
       await existingSubmission.save();
       
@@ -264,7 +329,9 @@ exports.createSubmission = async (req, res) => {
         await existingSubmission.save();
       }
       
-      return res.status(200).json(existingSubmission);
+      const enriched = existingSubmission.toObject();
+      enriched.clientFiles = await buildClientFileList(existingSubmission);
+      return res.status(200).json(enriched);
     }
 
     // Create new submission
@@ -275,12 +342,16 @@ exports.createSubmission = async (req, res) => {
       submittedBy: req.user._id,
       answers,
       submittedAt: new Date(),
-      files: req.body.uploadedFiles || []
+      files: [],
+      fileAssets: [],
     });
 
-    
-
     await submission.save();
+
+    if (req.body.uploadedFiles?.length) {
+      await applySubmissionFiles(submission, assignmentDoc, req);
+      await submission.save();
+    }
     
 
 
@@ -327,9 +398,11 @@ exports.createSubmission = async (req, res) => {
       // Don't fail the submission if notification fails
     }
 
-    res.status(201).json(submission);
+    const enriched = submission.toObject();
+    enriched.clientFiles = await buildClientFileList(submission);
+    res.status(201).json(enriched);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(error.statusCode || 500).json({ message: error.message });
   }
 };
 
@@ -1049,7 +1122,7 @@ exports.getStudentSubmission = async (req, res) => {
     }
 
     let submission;
-    
+
     if (assignment.isGroupAssignment) {
       // For group assignments, find the student's group and then the submission
       const group = await Group.findOne({
@@ -1077,7 +1150,9 @@ exports.getStudentSubmission = async (req, res) => {
       return res.status(404).json({ message: 'Submission not found' });
     }
 
-    res.json(submission);
+    const payload = submission.toObject();
+    payload.files = fileAssetService.enrichLegacyFileUrls(payload.files, req.user._id);
+    res.json(payload);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

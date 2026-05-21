@@ -1,6 +1,8 @@
 const Announcement = require('../models/announcement.model');
 const Course = require('../models/course.model');
 const mongoose = require('mongoose');
+const fileAssetService = require('../services/fileAsset.service');
+const { assertCourseFilesMutable } = require('../services/fileLifecycle.service');
 
 // Get all announcements for a course
 exports.getAnnouncementsByCourse = async (req, res) => {
@@ -89,7 +91,12 @@ exports.createAnnouncement = async (req, res) => {
 
     const course = await Course.findById(courseId);
     if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
-    const attachments = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
+    await assertCourseFilesMutable(course, req.user, { action: 'announcement_attachment_upload' });
+    const { fileAssetIds, attachments } = await fileAssetService.resolveAttachmentsFromRequest(req, {
+      user: req.user,
+      courseId: course._id,
+      category: 'announcement',
+    });
     let groupsetId = undefined;
     let postToValue = 'all';
     if (postTo && postTo !== 'all') {
@@ -102,6 +109,7 @@ exports.createAnnouncement = async (req, res) => {
       course: courseId,
       author: req.user._id,
       attachments,
+      fileAssets: fileAssetIds,
       postTo: postToValue,
       groupset: groupsetId,
       options: options ? JSON.parse(options) : {},
@@ -301,8 +309,25 @@ exports.updateAnnouncement = async (req, res) => {
     if (body) announcement.body = body;
     if (options) announcement.options = JSON.parse(options);
     if (delayedUntil) announcement.delayedUntil = delayedUntil;
-    if (req.files && req.files.length > 0) {
-      announcement.attachments = req.files.map(file => `/uploads/${file.filename}`);
+    if (req.files?.length) {
+      const course = await Course.findById(announcement.course);
+      if (course) await assertCourseFilesMutable(course, req.user, { action: 'announcement_attachment_update' });
+      if (announcement.fileAssets?.length) {
+        for (const id of announcement.fileAssets) {
+          await fileAssetService.deleteFileAsset(id, req.user, { ip: req.ip }).catch(() => {});
+        }
+      }
+      const assets = await fileAssetService.createFileAssetsFromMulter(req.files, {
+        uploadedBy: req.user,
+        category: 'announcement',
+        courseId: announcement.course,
+        announcementId: announcement._id,
+        visibility: 'course',
+        accessScope: { enrolledOnly: true },
+        metadata: { ip: req.ip, requestId: req.requestId },
+      });
+      announcement.fileAssets = assets.map((a) => a._id);
+      announcement.attachments = assets.map((a) => fileAssetService.buildDownloadPath(a._id));
     }
     await announcement.save();
     res.json({ success: true, data: announcement });

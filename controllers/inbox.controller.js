@@ -168,7 +168,8 @@ exports.getConversations = async (req, res) => {
 // Start a new conversation
 exports.createConversation = async (req, res) => {
   try {
-    const { subject, participantIds, body, sendIndividually, course } = req.body;
+    const { subject, participantIds, body, sendIndividually, course, attachments } = req.body;
+    const safeAttachments = Array.isArray(attachments) ? attachments : [];
     const userId = req.user._id;
 
     // Validate required fields
@@ -226,7 +227,7 @@ exports.createConversation = async (req, res) => {
           conversationId: conversation._id,
           senderId: userId,
           body,
-          attachments: []
+          attachments: safeAttachments,
         });
         return { conversation, message };
       }));
@@ -250,7 +251,7 @@ exports.createConversation = async (req, res) => {
         conversationId: conversation._id,
         senderId: userId,
         body,
-        attachments: []
+        attachments: safeAttachments,
       });
       await invalidateInboxConversationListCaches([userId, ...participantIds]);
       res.status(201).json({ conversation, message });

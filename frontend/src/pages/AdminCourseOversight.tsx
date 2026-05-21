@@ -204,7 +204,7 @@ export function AdminCourseOversight() {
         break;
       case 'archive':
         try {
-          await axios.patch(`${API_URL}/api/courses/${course._id}`, { status: 'archived' }, { headers });
+          await axios.patch(`${API_URL}/api/courses/${course._id}/archive`, {}, { headers });
         setCourses(courses.map(c => 
           c._id === course._id ? { ...c, status: 'archived' as const } : c
         ));
@@ -379,7 +379,7 @@ export function AdminCourseOversight() {
     try {
       await Promise.all(selectedCourseIds.map(async (id) => {
         try {
-          await axios.patch(`${API_URL}/api/courses/${id}`, { status: 'archived' }, { headers });
+          await axios.patch(`${API_URL}/api/courses/${id}/archive`, {}, { headers });
           successCount++;
         } catch (error) {
           failCount++;

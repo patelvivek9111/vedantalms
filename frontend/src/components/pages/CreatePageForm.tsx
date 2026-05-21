@@ -8,6 +8,8 @@ import FormFieldGroup from '../common/FormFieldGroup';
 import { useDraftManager } from '../../hooks/useDraftManager';
 import { Save, RefreshCw } from 'lucide-react';
 import ConfirmationModal from '../common/ConfirmationModal';
+import FileAttachmentPanel from '../files/FileAttachmentPanel';
+import type { NormalizedFile } from '../../utils/fileTypes';
 
 interface Module {
   _id: string;
@@ -33,7 +35,7 @@ const CreatePageForm: React.FC<CreatePageFormProps> = ({ modules, courseId, onSu
   const [selectedModule, setSelectedModule] = useState('');
   const [groupSets, setGroupSets] = useState<GroupSet[]>([]);
   const [selectedGroupSet, setSelectedGroupSet] = useState('');
-  const [attachments, setAttachments] = useState<File[]>([]);
+  const [attachmentFiles, setAttachmentFiles] = useState<NormalizedFile[]>([]);
   const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({});
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const { createPage } = useModule();
@@ -84,7 +86,7 @@ const CreatePageForm: React.FC<CreatePageFormProps> = ({ modules, courseId, onSu
       setContent('');
       setSelectedModule('');
       setSelectedGroupSet('');
-      setAttachments([]);
+      setAttachmentFiles([]);
       setFieldErrors({});
   };
 
@@ -145,12 +147,14 @@ const CreatePageForm: React.FC<CreatePageFormProps> = ({ modules, courseId, onSu
       const payload: any = { title, content };
       if (selectedModule) payload.module = selectedModule;
       if (selectedGroupSet) payload.groupSet = selectedGroupSet;
-      await createPage(payload, attachments);
+      await createPage(payload, {
+        fileAssetIds: attachmentFiles.map((f) => f.fileAssetId).filter(Boolean) as string[],
+      });
       setTitle('');
       setContent('');
       setSelectedModule('');
       setSelectedGroupSet('');
-      setAttachments([]);
+      setAttachmentFiles([]);
       onSuccess();
     } catch (error) {
       } finally {
@@ -224,15 +228,13 @@ const CreatePageForm: React.FC<CreatePageFormProps> = ({ modules, courseId, onSu
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Content</label>
               <RichTextEditor content={content} onChange={setContent} height={400} />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Attachments (optional)</label>
-              <input
-                type="file"
-                multiple
-                onChange={(e) => setAttachments(Array.from(e.target.files || []))}
-                className="block w-full text-sm text-gray-700 dark:text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 dark:file:bg-blue-900/50 file:text-blue-700 dark:file:text-blue-300 hover:file:bg-blue-100 dark:hover:file:bg-blue-900/70"
-              />
-            </div>
+            <FileAttachmentPanel
+              files={attachmentFiles}
+              onChange={setAttachmentFiles}
+              courseId={courseId}
+              category="page"
+              label="Drop page attachments here or browse"
+            />
           </FormFieldGroup>
 
           <FormFieldGroup

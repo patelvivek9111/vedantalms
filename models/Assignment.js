@@ -26,7 +26,11 @@ const assignmentSchema = new mongoose.Schema({
     required: true
   },
   attachments: [{
-    type: String // URLs to files
+    type: String // Legacy URL paths — prefer fileAssets
+  }],
+  fileAssets: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'FileAsset',
   }],
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,

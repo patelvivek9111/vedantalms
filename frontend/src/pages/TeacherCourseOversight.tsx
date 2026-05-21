@@ -16,8 +16,13 @@ import {
   TrendingUp,
   User,
   Plus,
-  ChevronDown
+  ChevronDown,
+  Copy,
+  Archive,
+  ArchiveRestore,
 } from 'lucide-react';
+import CourseCopyModal from '../components/course/CourseCopyModal';
+import { archiveCourse, restoreCourse } from '../services/courseOpsApi';
 import { BurgerMenu } from '../components/layout/BurgerMenu';
 import DataTable, { Column } from '../components/common/DataTable';
 import ConfirmationModal from '../components/common/ConfirmationModal';
@@ -62,6 +67,9 @@ export function TeacherCourseOversight() {
   // Confirmation modal state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [courseToDelete, setCourseToDelete] = useState<Course | null>(null);
+  const [courseToCopy, setCourseToCopy] = useState<Course | null>(null);
+  const [archiveTarget, setArchiveTarget] = useState<Course | null>(null);
+  const [restoreTarget, setRestoreTarget] = useState<Course | null>(null);
 
   useEffect(() => {
     const fetchCourses = async () => {
@@ -94,9 +102,10 @@ export function TeacherCourseOversight() {
                 // Skip if we can't get average (course might have no grades yet)
                 }
               
-              // Determine status
               let status: 'active' | 'draft' | 'archived' = 'active';
-              if (!course.published) {
+              if (course.operationalStatus === 'archived') {
+                status = 'archived';
+              } else if (!course.published) {
                 status = 'draft';
               }
               
@@ -217,6 +226,49 @@ export function TeacherCourseOversight() {
         setCourseToDelete(course);
         setShowDeleteConfirm(true);
         break;
+      case 'copy':
+        setCourseToCopy(course);
+        break;
+      case 'archive':
+        setArchiveTarget(course);
+        break;
+      case 'restore':
+        setRestoreTarget(course);
+        break;
+    }
+  };
+
+  const applyArchive = async () => {
+    if (!archiveTarget) return;
+    try {
+      await archiveCourse(archiveTarget._id);
+      setCourses((prev) =>
+        prev.map((c) => (c._id === archiveTarget._id ? { ...c, status: 'archived' as const } : c))
+      );
+      toast.success('Course archived. Content is read-only for students.');
+    } catch (error: unknown) {
+      const msg = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg || 'Failed to archive course');
+    } finally {
+      setArchiveTarget(null);
+    }
+  };
+
+  const applyRestore = async () => {
+    if (!restoreTarget) return;
+    try {
+      await restoreCourse(restoreTarget._id);
+      setCourses((prev) =>
+        prev.map((c) =>
+          c._id === restoreTarget._id ? { ...c, status: 'active' as const, published: true } : c
+        )
+      );
+      toast.success('Course restored.');
+    } catch (error: unknown) {
+      const msg = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg || 'Failed to restore course');
+    } finally {
+      setRestoreTarget(null);
     }
   };
 
@@ -569,6 +621,33 @@ export function TeacherCourseOversight() {
           </button>
           <button
             type="button"
+            onClick={() => handleCourseAction('copy', course)}
+            className="rounded-md p-1.5 text-gray-600 transition-colors hover:bg-white hover:text-indigo-600 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-indigo-400"
+            title="Copy course"
+          >
+            <Copy className="h-4 w-4" />
+          </button>
+          {course.status === 'archived' ? (
+            <button
+              type="button"
+              onClick={() => handleCourseAction('restore', course)}
+              className="rounded-md p-1.5 text-gray-600 transition-colors hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-950/40"
+              title="Restore course"
+            >
+              <ArchiveRestore className="h-4 w-4" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => handleCourseAction('archive', course)}
+              className="rounded-md p-1.5 text-gray-600 transition-colors hover:bg-amber-50 hover:text-amber-700 dark:hover:bg-amber-950/40"
+              title="Archive course"
+            >
+              <Archive className="h-4 w-4" />
+            </button>
+          )}
+          <button
+            type="button"
             onClick={() => handleCourseAction('delete', course)}
             className="rounded-md p-1.5 text-gray-600 transition-colors hover:bg-red-50 hover:text-red-600 dark:text-gray-400 dark:hover:bg-red-950/50 dark:hover:text-red-400"
             title="Delete course"
@@ -825,6 +904,40 @@ export function TeacherCourseOversight() {
           </div>
         </div>
       )}
+
+      {courseToCopy && (
+        <CourseCopyModal
+          open={!!courseToCopy}
+          courseId={courseToCopy._id}
+          sourceTitle={courseToCopy.title}
+          onClose={() => setCourseToCopy(null)}
+          onSuccess={(newId) => {
+            toast.success('Course copied');
+            navigate(`/courses/${newId}`);
+          }}
+        />
+      )}
+
+      <ConfirmationModal
+        isOpen={!!archiveTarget}
+        onClose={() => setArchiveTarget(null)}
+        onConfirm={applyArchive}
+        title="Archive course"
+        message={`Archive "${archiveTarget?.title}"? Students lose write access; grades and transcripts are unchanged.`}
+        confirmText="Archive"
+        cancelText="Cancel"
+        variant="warning"
+      />
+
+      <ConfirmationModal
+        isOpen={!!restoreTarget}
+        onClose={() => setRestoreTarget(null)}
+        onConfirm={applyRestore}
+        title="Restore course"
+        message={`Restore "${restoreTarget?.title}" to active operation?`}
+        confirmText="Restore"
+        cancelText="Cancel"
+      />
 
       {/* Delete Course Confirmation Modal */}
       <ConfirmationModal

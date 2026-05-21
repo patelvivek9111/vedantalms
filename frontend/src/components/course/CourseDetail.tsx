@@ -59,6 +59,7 @@ import EnrollmentRequestsHandler from '../enrollment/EnrollmentRequestsHandler';
 import StudentCard from '../students/StudentCard';
 import OverviewSection from '../course/OverviewSection';
 import SyllabusSection from '../course/SyllabusSection';
+import CourseStoragePanel from '../course/CourseStoragePanel';
 import StudentsManagement from '../students/StudentsManagement';
 import MobileNavigation from '../course/MobileNavigation';
 import CourseSidebar from '../course/CourseSidebar';
@@ -304,7 +305,7 @@ const CourseDetail: React.FC = () => {
         officeHours: course.catalog?.officeHours || 'By Appointment'
       });
       syllabusManagement.setSyllabusContent(course.catalog?.syllabusContent || '');
-      syllabusManagement.setUploadedSyllabusFiles(course.catalog?.syllabusFiles || []);
+      syllabusManagement.loadSyllabusFilesFromCourse(course.catalog?.syllabusFiles || []);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [course]);
@@ -713,6 +714,7 @@ const CourseDetail: React.FC = () => {
 
       case 'syllabus':
         return (
+          <>
           <SyllabusSection
             course={course}
             isInstructor={isInstructor}
@@ -727,12 +729,11 @@ const CourseDetail: React.FC = () => {
             setSyllabusMode={syllabusManagement.setSyllabusMode}
             syllabusContent={syllabusManagement.syllabusContent}
             setSyllabusContent={syllabusManagement.setSyllabusContent}
-            uploadedSyllabusFiles={syllabusManagement.uploadedSyllabusFiles}
-            setUploadedSyllabusFiles={syllabusManagement.setUploadedSyllabusFiles}
-            uploadingFiles={syllabusManagement.uploadingFiles}
-            handleSyllabusFileUpload={syllabusManagement.handleSyllabusFileUpload}
-            handleRemoveSyllabusFile={syllabusManagement.handleRemoveSyllabusFile}
+            syllabusAttachmentFiles={syllabusManagement.syllabusAttachmentFiles}
+            setSyllabusAttachmentFiles={syllabusManagement.setSyllabusAttachmentFiles}
+            courseArchived={course?.operationalStatus === 'archived'}
             handleSaveSyllabus={syllabusManagement.handleSaveSyllabus}
+            onRemoveSyllabusFile={syllabusManagement.onRemoveSyllabusFile}
             onCancelEdit={() => {
               syllabusManagement.setEditingSyllabus(false);
               // Reset to original values
@@ -747,6 +748,12 @@ const CourseDetail: React.FC = () => {
               }
             }}
           />
+          {(isInstructor || isAdmin) && course?._id ? (
+            <div className="mt-6">
+              <CourseStoragePanel courseId={course._id} />
+            </div>
+          ) : null}
+          </>
         );
 
       case 'modules':

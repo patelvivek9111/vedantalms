@@ -38,7 +38,14 @@ const corsOptions = {
           'https://vedantaed.com',
           'https://vedantalms-backend.onrender.com',
       ]
-      : ['http://localhost:3000', 'http://localhost:5173'];
+      : [
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'http://localhost:5173',
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:3001',
+        'http://127.0.0.1:5173',
+      ];
     
     // Check if origin is in allowed list or matches patterns
     const isAllowed = allowedOrigins.includes(origin) ||
@@ -379,12 +386,20 @@ const uploadsStatic = express.static(path.join(__dirname, 'uploads'), {
 });
 
 app.use('/uploads', (req, res, next) => {
-  // Check if file exists before serving
-  const filePath = path.join(__dirname, 'uploads', req.path.replace('/uploads/', ''));
+  const relative = req.path.replace(/^\/+/, '');
+  const isPublicAsset =
+    relative.startsWith('public/') ||
+    relative.startsWith('public\\') ||
+    relative.startsWith('branding/');
+  if (!isPublicAsset) {
+    return res.status(403).json({
+      message: 'Academic files require authentication. Use GET /api/files/:id/download',
+    });
+  }
+  const filePath = path.join(__dirname, 'uploads', relative);
   if (fs.existsSync(filePath)) {
     uploadsStatic(req, res, next);
   } else {
-    // File doesn't exist - return 404 (browser will handle fallback)
     res.status(404).json({ message: 'File not found' });
   }
 });
@@ -417,71 +432,134 @@ app.use('/api/admin', require('./routes/admin.routes'));
 app.use('/api/notifications', require('./routes/notification.routes').router);
 app.use('/api/quizwave', require('./routes/quizwave.routes'));
 app.use('/api/integrations/zoho-meeting', require('./routes/zohoMeeting.routes'));
+app.use('/api/files', require('./routes/file.routes'));
 
-// Upload route for file uploads
+// Upload route for file uploads (staged FileAssets — Phase U3)
 const upload = require('./middleware/upload');
 const { protect } = require('./middleware/auth');
-const { uploadMultipleToCloudinary } = require('./utils/cloudinary');
+const fileAssetService = require('./services/fileAsset.service');
+
+const chunkedUploadService = require('./services/chunkedUpload.service');
+const expressRaw = express.raw({ type: 'application/octet-stream', limit: '10mb' });
+
+app.post('/api/upload/chunk/init', protect, async (req, res) => {
+  try {
+    const { fileName, fileSize, mimeType, totalChunks, category, courseId, assignmentId } = req.body;
+    if (!fileName || !fileSize || !totalChunks) {
+      return res.status(400).json({ message: 'fileName, fileSize, and totalChunks required' });
+    }
+    const session = await chunkedUploadService.initSession({
+      userId: req.user._id,
+      fileName,
+      fileSize: Number(fileSize),
+      mimeType: mimeType || 'application/octet-stream',
+      totalChunks: Number(totalChunks),
+      category,
+      courseId,
+      assignmentId,
+    });
+    res.json({ success: true, ...session });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ message: error.message });
+  }
+});
+
+app.get('/api/upload/chunk/:uploadId/status', protect, async (req, res) => {
+  const status = chunkedUploadService.getSessionStatus(req.params.uploadId);
+  if (!status) return res.status(404).json({ message: 'Session not found' });
+  res.json({ success: true, ...status });
+});
+
+// Must be registered before /:chunkIndex — otherwise "complete" is parsed as a chunk index.
+app.post('/api/upload/chunk/:uploadId/complete', protect, async (req, res) => {
+  try {
+    const asset = await chunkedUploadService.completeSession(req.params.uploadId, req.user, {
+      ip: req.ip,
+      requestId: req.requestId,
+    });
+    const downloadPath = fileAssetService.buildDownloadPathForUser(asset._id, req.user._id);
+    res.json({
+      success: true,
+      files: [{
+        originalname: asset.originalName,
+        fileAssetId: asset._id.toString(),
+        path: downloadPath,
+        url: downloadPath,
+        size: asset.size,
+      }],
+    });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ message: error.message });
+  }
+});
+
+app.post('/api/upload/chunk/:uploadId/:chunkIndex', protect, expressRaw, async (req, res) => {
+  try {
+    const chunkIndex = Number(req.params.chunkIndex);
+    if (!Number.isInteger(chunkIndex) || chunkIndex < 0) {
+      return res.status(400).json({ message: 'Invalid chunk index' });
+    }
+    const progress = chunkedUploadService.saveChunk(
+      req.params.uploadId,
+      chunkIndex,
+      req.body
+    );
+    res.json({ success: true, ...progress });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ message: error.message });
+  }
+});
 
 app.post('/api/upload', protect, upload.array('files', 10), async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ message: 'No files uploaded' });
     }
-    
-    let files;
-    
-    // Use Cloudinary if configured, otherwise use local storage
-    if (isCloudinaryConfigured()) {
-      try {
-        const cloudinaryResults = await uploadMultipleToCloudinary(req.files, {
-          folder: 'lms/uploads'
-        });
-        
-        files = cloudinaryResults.map((result, index) => ({
-          originalname: req.files[index].originalname,
-          filename: result.public_id.split('/').pop(),
-          path: result.url, // Cloudinary URL
-          size: result.bytes,
-          cloudinary: true
-        }));
-      } catch (cloudinaryError) {
-        if (process.env.NODE_ENV === 'production') {
-          return res.status(503).json({ message: 'Object storage upload failed. Please retry later.' });
-        }
-        if (req.files.some(file => !file.path || !file.filename)) {
-          return res.status(503).json({ message: 'File storage unavailable. Please retry later.' });
-        }
-        // Cloudinary upload failed, falling back to local storage when available
-        files = req.files.map(file => ({
-          originalname: file.originalname,
-          filename: file.filename,
-          path: `/uploads/${file.filename}`,
-          size: file.size,
-          cloudinary: false
-        }));
-      }
-    } else {
-      if (process.env.NODE_ENV === 'production' && process.env.FORCE_OBJECT_STORAGE === 'true') {
-        return res.status(503).json({ message: 'Object storage is required in production but not configured.' });
-      }
-      // Local storage
-      files = req.files.map(file => ({
-      originalname: file.originalname,
-      filename: file.filename,
-      path: `/uploads/${file.filename}`,
-        size: file.size,
-        cloudinary: false
-    }));
-    }
-    
-    res.json({ 
+
+    const category = req.body.category || 'temporary';
+    const courseId = req.body.courseId || null;
+    const assignmentId = req.body.assignmentId || null;
+
+    const fileQuotaService = require('./services/fileQuota.service');
+    const totalBytes = req.files.reduce((sum, f) => sum + (f.size || 0), 0);
+    await fileQuotaService.assertUploadWithinQuota({
+      user: req.user,
+      courseId,
+      additionalBytes: totalBytes,
+      audit: { ip: req.ip, requestId: req.requestId },
+    });
+
+    const assets = await fileAssetService.createFileAssetsFromMulter(req.files, {
+      uploadedBy: req.user,
+      category,
+      visibility: category === 'profile' ? 'private' : 'private',
+      accessScope: { ownerOnly: true },
+      courseId: courseId || undefined,
+      assignmentId: assignmentId || undefined,
+      metadata: { ip: req.ip, requestId: req.requestId },
+      skipLifecycleCheck: category === 'temporary' || category === 'profile',
+    });
+
+    const files = assets.map((asset) => {
+      const downloadPath = fileAssetService.buildDownloadPathForUser(asset._id, req.user._id);
+      return {
+        originalname: asset.originalName,
+        filename: asset._id.toString(),
+        path: downloadPath,
+        url: downloadPath,
+        fileAssetId: asset._id.toString(),
+        size: asset.size,
+        cloudinary: asset.provider === 'cloudinary',
+      };
+    });
+
+    res.json({
       message: 'Files uploaded successfully',
-      files: files
+      files,
     });
   } catch (error) {
     console.error('Upload error:', error);
-    res.status(500).json({ message: 'Error uploading files' });
+    res.status(error.statusCode || 500).json({ message: error.message || 'Error uploading files' });
   }
 });
 
@@ -667,7 +745,14 @@ if (process.env.NODE_ENV !== 'test') {
     cors: {
       origin: process.env.NODE_ENV === 'production'
         ? [process.env.FRONTEND_URL || 'https://vedantaed.com', 'https://www.vedantaed.com']
-        : ['http://localhost:3000', 'http://localhost:5173'],
+        : [
+          'http://localhost:3000',
+          'http://localhost:3001',
+          'http://localhost:5173',
+          'http://127.0.0.1:3000',
+          'http://127.0.0.1:3001',
+          'http://127.0.0.1:5173',
+        ],
       credentials: true,
       methods: ['GET', 'POST']
     },
@@ -687,40 +772,106 @@ if (process.env.NODE_ENV !== 'test') {
   initializeQuizWaveSocket(io);
 }
 
-// Start QuizWave auto-cleanup scheduler (skip in tests — avoids open timers + async logs after Jest teardown)
-const { startCleanupScheduler } = require('./utils/quizwaveCleanup');
-if (process.env.NODE_ENV !== 'test') {
-  startCleanupScheduler();
-}
+const { startCleanupScheduler, stopCleanupScheduler } = require('./utils/quizwaveCleanup');
 
 // Only start server if not in test mode
 if (process.env.NODE_ENV !== 'test') {
-  // Start server
-  const PORT = process.env.PORT || 5000;
-  server.listen(PORT, () => {
-    // Server running
-  });
+  const PORT = Number(process.env.PORT || 5000);
 
-  // Graceful shutdown
-  process.on('SIGTERM', () => {
-    // SIGTERM received, shutting down gracefully
-    io.close(() => {
-      mongoose.connection.close(() => {
-        // MongoDB connection closed
+  const listenOnce = () =>
+    new Promise((resolve, reject) => {
+      const onError = (err) => {
+        server.off('listening', onListening);
+        reject(err);
+      };
+      const onListening = () => {
+        server.off('error', onError);
+        resolve();
+      };
+      server.once('error', onError);
+      server.once('listening', onListening);
+      server.listen(PORT);
+    });
+
+  const startServer = async () => {
+    const managed = process.env.LMS_DEV_MANAGED === '1';
+    const maxAttempts = managed ? 12 : 1;
+    const { canBindPort, isPortAvailable } = require('./scripts/freePort');
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      if (managed) {
+        const bindReady =
+          (await isPortAvailable(PORT)) ||
+          (await canBindPort(PORT, '0.0.0.0'));
+        if (!bindReady) {
+          await new Promise((r) => setTimeout(r, 300 + attempt * 80));
+          continue;
+        }
+      }
+
+      try {
+        await listenOnce();
+        console.log(`✅ Server listening on http://localhost:${PORT}`);
+        startCleanupScheduler();
+        return;
+      } catch (err) {
+        if (err.code !== 'EADDRINUSE' || attempt === maxAttempts) {
+          if (err.code === 'EADDRINUSE') {
+            console.error(`❌ Port ${PORT} is already in use. Run: npm run stop:dev`);
+            console.error('   Then start a single terminal with: npm run dev');
+          } else {
+            console.error('❌ Server error:', err.message);
+          }
+          process.exit(1);
+        }
+        await new Promise((r) => setTimeout(r, 400 + attempt * 100));
+      }
+    }
+  };
+
+  void startServer();
+
+  let shuttingDown = false;
+  const shutdown = (signal) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    const forceTimer = setTimeout(() => process.exit(0), 5000);
+    forceTimer.unref();
+
+    const closeMongo = () =>
+      mongoose.connection.readyState === 0
+        ? Promise.resolve()
+        : mongoose.connection.close(false).catch(() => {});
+
+    const closeIo = () =>
+      new Promise((resolve) => {
+        if (!io) return resolve();
+        io.close(() => resolve());
+      });
+
+    const closeHttp = () =>
+      new Promise((resolve) => {
+        if (!server.listening) return resolve();
+        server.close(() => resolve());
+      });
+
+    if (typeof stopCleanupScheduler === 'function') stopCleanupScheduler();
+
+    closeIo()
+      .then(closeHttp)
+      .then(closeMongo)
+      .then(() => {
+        clearTimeout(forceTimer);
+        process.exit(0);
+      })
+      .catch(() => {
+        clearTimeout(forceTimer);
         process.exit(0);
       });
-    });
-  });
+  };
 
-  process.on('SIGINT', () => {
-    // SIGINT received, shutting down gracefully
-    io.close(() => {
-      mongoose.connection.close(() => {
-        // MongoDB connection closed
-        process.exit(0);
-      });
-    });
-  });
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
 // Export app for testing

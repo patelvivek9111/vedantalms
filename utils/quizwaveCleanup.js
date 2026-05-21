@@ -60,6 +60,8 @@ const cleanupOldSessions = async () => {
   }
 };
 
+let cleanupIntervalId = null;
+
 // Run cleanup on server start and then every 24 hours
 const startCleanupScheduler = () => {
   const runWithLock = async () => {
@@ -91,15 +93,23 @@ const startCleanupScheduler = () => {
   runWithLock().catch(console.error);
 
   // Then run every 24 hours
-  setInterval(() => {
+  cleanupIntervalId = setInterval(() => {
     runWithLock().catch(console.error);
   }, 24 * 60 * 60 * 1000); // 24 hours
 
   console.log('✅ QuizWave: Auto-cleanup scheduler started (runs every 24 hours)');
 };
 
+const stopCleanupScheduler = () => {
+  if (cleanupIntervalId) {
+    clearInterval(cleanupIntervalId);
+    cleanupIntervalId = null;
+  }
+};
+
 module.exports = {
   cleanupOldSessions,
-  startCleanupScheduler
+  startCleanupScheduler,
+  stopCleanupScheduler,
 };
 

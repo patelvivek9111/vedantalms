@@ -538,3 +538,35 @@ input[type="datetime-local"]::-webkit-outer-spin-button {
     color: #334155 !important;
   }
 }
+
+/* In-browser Word (.docx) preview (docx-preview) */
+.docx-preview-shell .docx-preview-styles {
+  display: none;
+}
+
+.docx-preview-zoom-host {
+  transform-origin: top center;
+  margin: 0 auto;
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Single surface — no nested page wrapper (avoids ghost layer when zooming) */
+.docx-preview-shell .docx-preview-body .docx-lms-wrapper {
+  display: contents;
+  background: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  min-height: 0 !important;
+}
+
+.docx-preview-shell .docx-preview-body > section.docx-lms,
+.docx-preview-shell .docx-preview-body section.docx-lms {
+  display: block;
+  background: #fff;
+  color: #111827;
+  max-width: 100%;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.1);
+}
