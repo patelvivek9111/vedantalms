@@ -49,10 +49,6 @@ const StudentGameScreen: React.FC = () => {
   const leaderboard = gameSnapshot?.leaderboard ?? [];
 
   const applySnapshot = useCallback((snap: QuizWaveGameSnapshot) => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[CLIENT SYNC] student', snap.phase, 'Q', snap.currentQuestionIndex);
-    }
-
     setGameSnapshot((prev) => {
       const advancedToNewQuestion =
         snap.phase === 'QUESTION_ACTIVE' &&

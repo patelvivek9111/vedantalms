@@ -32,30 +32,6 @@ export const getQuizWaveSocket = (token: string): Socket => {
     forceNew: false // Reuse connection if possible
   });
 
-  socket.on('connect', () => {
-    console.log('✅ QuizWave Socket Connected');
-  });
-
-  socket.on('disconnect', (reason) => {
-    console.log('❌ QuizWave Socket Disconnected:', reason);
-  });
-
-  socket.on('connect_error', (error) => {
-    console.error('❌ QuizWave Socket Connection Error:', error);
-  });
-
-  socket.on('reconnect', (attemptNumber) => {
-    console.log('✅ QuizWave Socket Reconnected after', attemptNumber, 'attempts');
-  });
-
-  socket.on('reconnect_error', (error) => {
-    console.error('❌ QuizWave Socket Reconnection Error:', error);
-  });
-
-  socket.on('reconnect_failed', () => {
-    console.error('❌ QuizWave Socket Reconnection Failed');
-  });
-
   return socket;
 };
 
