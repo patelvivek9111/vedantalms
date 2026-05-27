@@ -27,9 +27,15 @@ export const useDiscussions = ({
         const token = localStorage.getItem('token');
         let threadsRes;
         try {
-          threadsRes = await axios.get(`${API_URL}/api/threads/course/${course._id}`, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined);
+          threadsRes = await axios.get(
+            `${API_URL}/api/threads/course/${course._id}?includeGrades=true`,
+            token ? { headers: { Authorization: `Bearer ${token}` } } : undefined
+          );
         } catch (e) {
-          threadsRes = await axios.get(`${API_URL}/api/threads?course=${course._id}`, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined);
+          threadsRes = await axios.get(
+            `${API_URL}/api/threads?course=${course._id}&includeGrades=true`,
+            token ? { headers: { Authorization: `Bearer ${token}` } } : undefined
+          );
         }
         const threadsData = threadsRes.data.data || threadsRes.data;
         const threadsArray = Array.isArray(threadsData) ? threadsData : [];

@@ -96,6 +96,11 @@ const assignmentSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  quizSubmissionMode: {
+    type: String,
+    enum: ['online', 'paper_upload'],
+    default: 'online'
+  },
   isTimedQuiz: {
     type: Boolean,
     default: false

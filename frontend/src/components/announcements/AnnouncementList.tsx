@@ -1,6 +1,7 @@
 import React from 'react';
-import { Megaphone } from 'lucide-react';
+import { Megaphone, ChevronRight } from 'lucide-react';
 import FileAttachmentChips from '../files/FileAttachmentChips';
+import { formatAnnouncementDate } from './announcementUi';
 
 export interface Announcement {
   _id: string;
@@ -30,46 +31,64 @@ const AnnouncementList: React.FC<AnnouncementListProps> = ({ announcements, onSe
   const items = Array.isArray(announcements) ? announcements : [];
   if (!items.length) {
     return (
-      <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50/70 py-14 text-center dark:border-gray-600 dark:bg-gray-800/50">
-        <div className="flex flex-col items-center">
-          <Megaphone className="mb-4 h-14 w-14 text-gray-300 dark:text-gray-600" />
-          <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">No announcements yet</h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Check back later for course announcements.</p>
-        </div>
+      <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 py-16 text-center dark:border-slate-700 dark:bg-slate-800/30">
+        <Megaphone className="mx-auto mb-4 h-12 w-12 text-slate-300 dark:text-slate-600" />
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">No announcements yet</h3>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          Check back later for course updates.
+        </p>
       </div>
     );
   }
   return (
-    <ul className="space-y-3 sm:space-y-4">
-      {items.map(a => (
-        <li
-          key={a._id}
-          className="cursor-pointer rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition hover:border-gray-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600"
-          onClick={() => onSelect?.(a)}
-        >
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-2">
-            <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white leading-tight break-words">{a.title}</h3>
-            <span className="text-xs text-gray-400 dark:text-gray-300 whitespace-nowrap">
-              {(() => {
-                const d = new Date(a.createdAt);
-                const date = d.toLocaleDateString();
-                let time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-                return `${date} at ${time}`;
-              })()}
-            </span>
-          </div>
-          <div className="text-xs sm:text-sm text-gray-800 dark:text-gray-200 mb-1 prose max-w-none">
-            {(() => {
-              const plain = String(a.body ?? '').replace(/<[^>]+>/g, '');
-              const firstLine = plain.split(/\r?\n|\r|<br\s*\/?>/i)[0];
-              return firstLine.length > 120 ? firstLine.slice(0, 120) + '…' : firstLine;
-            })()}
-          </div>
-          <FileAttachmentChips files={a.fileAssets || a.attachments} />
-        </li>
-      ))}
+    <ul className="space-y-3">
+      {items.map(a => {
+        const plain = String(a.body ?? '').replace(/<[^>]+>/g, '');
+        const preview =
+          plain.length > 140 ? `${plain.slice(0, 140).trim()}…` : plain;
+        const authorName = [a.author?.firstName, a.author?.lastName].filter(Boolean).join(' ');
+
+        return (
+          <li key={a._id}>
+            <button
+              type="button"
+              className="group flex w-full items-start gap-4 rounded-2xl border border-slate-200/80 bg-white p-4 text-left shadow-sm transition hover:border-indigo-200 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-800 sm:p-5"
+              onClick={() => onSelect?.(a)}
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-950/40">
+                <Megaphone className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                  <h3 className="text-base font-semibold text-slate-900 group-hover:text-indigo-700 dark:text-slate-100 dark:group-hover:text-indigo-300 sm:text-lg">
+                    {a.title}
+                  </h3>
+                  <time
+                    className="shrink-0 text-xs text-slate-500 dark:text-slate-400"
+                    dateTime={a.createdAt}
+                  >
+                    {formatAnnouncementDate(a.createdAt)}
+                  </time>
+                </div>
+                {preview ? (
+                  <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+                    {preview}
+                  </p>
+                ) : null}
+                {authorName ? (
+                  <p className="mt-2 text-xs font-medium text-slate-500 dark:text-slate-500">
+                    {authorName}
+                  </p>
+                ) : null}
+                <FileAttachmentChips files={a.fileAssets || a.attachments} />
+              </div>
+              <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-slate-300 transition group-hover:text-indigo-500 dark:text-slate-600" />
+            </button>
+          </li>
+        );
+      })}
     </ul>
   );
 };
 
-export default AnnouncementList; 
+export default AnnouncementList;

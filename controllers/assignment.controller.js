@@ -11,12 +11,20 @@ const assignmentAccess = require('../services/assignmentAccess.service');
 const timedQuizAttemptService = require('../services/timedQuizAttempt.service');
 const assignmentGroupService = require('../services/assignmentGroup.service');
 const discussionReplyService = require('../services/discussionReply.service');
+const {
+  parseQuizSubmissionMode,
+  isPaperUploadQuiz,
+  applyPaperUploadQuizFields,
+  validatePaperUploadQuizPayload,
+} = require('../utils/quizSubmissionMode');
 
 /** Plain object or Mongoose doc → assignment JSON with computed totalPoints (matches getModuleAssignments). */
 const enrichAssignmentTotalPoints = (a) => {
   const obj = typeof a.toObject === 'function' ? a.toObject() : { ...a };
   let totalPoints = 0;
   if (obj.isOfflineAssignment && obj.totalPoints) {
+    totalPoints = obj.totalPoints;
+  } else if (isPaperUploadQuiz(obj) && obj.totalPoints) {
     totalPoints = obj.totalPoints;
   } else if (Array.isArray(obj.questions) && obj.questions.length > 0) {
     totalPoints = obj.questions.reduce((sum, q) => sum + (q.points || 0), 0);
@@ -46,8 +54,20 @@ exports.createAssignment = async (req, res) => {
 
     const parsedQuestions = questions ? JSON.parse(questions) : [];
     const isGradedQuiz = req.body.isGradedQuiz === 'true' || req.body.isGradedQuiz === true;
+    const quizSubmissionMode = parseQuizSubmissionMode(req.body.quizSubmissionMode, isGradedQuiz);
     const gradeReleaseMode =
       req.body.gradeReleaseMode || (isGradedQuiz ? 'manual' : 'immediate');
+    const totalPoints = req.body.totalPoints ? parseFloat(req.body.totalPoints) : 0;
+
+    if (quizSubmissionMode === 'paper_upload') {
+      const validationErrors = validatePaperUploadQuizPayload({
+        isGradedQuiz,
+        totalPoints,
+      });
+      if (validationErrors.length) {
+        return res.status(400).json({ message: validationErrors[0] });
+      }
+    }
 
     // Build assignment data object
     const assignmentData = {
@@ -62,12 +82,13 @@ exports.createAssignment = async (req, res) => {
       attachments,
       fileAssets: fileAssetIds,
       createdBy: req.user._id,
-      questions: parsedQuestions,
+      questions: quizSubmissionMode === 'paper_upload' ? [] : parsedQuestions,
       isGroupAssignment: req.body.isGroupAssignment === 'true' || req.body.isGroupAssignment === true,
       groupSet: req.body.groupSet || null,
       group,
       groupId: req.body.groupId || null,
       isGradedQuiz,
+      quizSubmissionMode,
       isTimedQuiz: req.body.isTimedQuiz === 'true' || req.body.isTimedQuiz === true,
       quizTimeLimit: req.body.quizTimeLimit ? parseInt(req.body.quizTimeLimit) : null,
       allowStudentUploads: req.body.allowStudentUploads === 'true' || req.body.allowStudentUploads === true,
@@ -80,8 +101,12 @@ exports.createAssignment = async (req, res) => {
           ? req.body.defaultGradeHidden === 'true' || req.body.defaultGradeHidden === true
           : gradeReleaseMode === 'manual',
       isOfflineAssignment: req.body.isOfflineAssignment === 'true' || req.body.isOfflineAssignment === true,
-      totalPoints: req.body.totalPoints ? parseFloat(req.body.totalPoints) : 0
+      totalPoints,
     };
+
+    if (quizSubmissionMode === 'paper_upload') {
+      applyPaperUploadQuizFields(assignmentData);
+    }
     // Only set module for non-group assignments
     if (moduleId && !assignmentData.isGroupAssignment) {
       assignmentData.module = moduleId;
@@ -306,6 +331,12 @@ exports.updateAssignment = async (req, res) => {
       });
     }
     if (req.body.isGradedQuiz !== undefined) assignment.isGradedQuiz = req.body.isGradedQuiz === 'true' || req.body.isGradedQuiz === true;
+    if (req.body.quizSubmissionMode !== undefined || req.body.isGradedQuiz !== undefined) {
+      assignment.quizSubmissionMode = parseQuizSubmissionMode(
+        req.body.quizSubmissionMode ?? assignment.quizSubmissionMode,
+        assignment.isGradedQuiz
+      );
+    }
     if (req.body.isTimedQuiz !== undefined) assignment.isTimedQuiz = req.body.isTimedQuiz === 'true' || req.body.isTimedQuiz === true;
     if (req.body.quizTimeLimit !== undefined) assignment.quizTimeLimit = req.body.quizTimeLimit ? parseInt(req.body.quizTimeLimit) : null;
     if (req.body.allowStudentUploads !== undefined) assignment.allowStudentUploads = req.body.allowStudentUploads === 'true' || req.body.allowStudentUploads === true;
@@ -378,6 +409,20 @@ exports.updateAssignment = async (req, res) => {
       } catch (err) {
         console.error('Error parsing questions:', err);
         return res.status(400).json({ message: 'Invalid questions format' });
+      }
+    }
+
+    if (assignment.quizSubmissionMode === 'paper_upload') {
+      const validationErrors = validatePaperUploadQuizPayload({
+        isGradedQuiz: assignment.isGradedQuiz,
+        totalPoints: assignment.totalPoints,
+      });
+      if (validationErrors.length) {
+        return res.status(400).json({ message: validationErrors[0] });
+      }
+      applyPaperUploadQuizFields(assignment);
+      if (!hasSubmissions) {
+        assignment.questions = [];
       }
     }
     

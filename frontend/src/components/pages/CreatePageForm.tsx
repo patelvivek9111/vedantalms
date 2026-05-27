@@ -6,7 +6,8 @@ import FloatingLabelInput from '../common/FloatingLabelInput';
 import FloatingLabelSelect from '../common/FloatingLabelSelect';
 import FormFieldGroup from '../common/FormFieldGroup';
 import { useDraftManager } from '../../hooks/useDraftManager';
-import { Save, RefreshCw } from 'lucide-react';
+import { FormPageHeader, FormActions } from '../common/FormControls';
+import { FORM_ERROR, FORM_SHELL } from '../common/formStyles';
 import ConfirmationModal from '../common/ConfirmationModal';
 import FileAttachmentPanel from '../files/FileAttachmentPanel';
 import type { NormalizedFile } from '../../utils/fileTypes';
@@ -171,38 +172,15 @@ const CreatePageForm: React.FC<CreatePageFormProps> = ({ modules, courseId, onSu
   };
 
   return (
-    <div className="w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 sm:p-6 border dark:border-gray-700">
-      <div className="flex justify-between items-center mb-4 sm:mb-6">
-        <div className="flex items-center gap-3">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100">Create New Page</h2>
-          {isDraftSaved && (
-            <div className="flex items-center text-sm text-green-600 dark:text-green-400">
-              <Save className="w-4 h-4 mr-1" />
-              Draft saved
-            </div>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleResetForm}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
-            title="Clear form and start fresh"
-          >
-            <RefreshCw className="w-4 h-4" />
-            Reset
-          </button>
-          <button
-            type="button"
-            onClick={handleCancel}
-            className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 text-xl sm:text-2xl font-bold focus:outline-none"
-            aria-label="Close"
-          >
-            ×
-          </button>
-        </div>
-      </div>
-        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+    <div className={`${FORM_SHELL} p-4 sm:p-6`}>
+      <FormPageHeader
+        title="Create new page"
+        subtitle="Add content and choose where students will find it."
+        isDraftSaved={isDraftSaved}
+        onReset={handleResetForm}
+        onClose={handleCancel}
+      />
+        <form onSubmit={handleSubmit} className="space-y-6">
           <FormFieldGroup
             title="Page Information"
             description="Enter the page title and content"
@@ -225,7 +203,9 @@ const CreatePageForm: React.FC<CreatePageFormProps> = ({ modules, courseId, onSu
               maxLength={200}
             />
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Content</label>
+              <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Content
+              </label>
               <RichTextEditor content={content} onChange={setContent} height={400} />
             </div>
             <FileAttachmentPanel
@@ -242,7 +222,7 @@ const CreatePageForm: React.FC<CreatePageFormProps> = ({ modules, courseId, onSu
             description="Select where this page should be available"
           >
             {fieldErrors.selection && (
-              <p className="text-sm text-red-600 dark:text-red-400 mb-2">{fieldErrors.selection}</p>
+              <p className={`${FORM_ERROR} mb-2`} role="alert">{fieldErrors.selection}</p>
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FloatingLabelSelect
@@ -293,22 +273,13 @@ const CreatePageForm: React.FC<CreatePageFormProps> = ({ modules, courseId, onSu
               />
             </div>
           </FormFieldGroup>
-          <div className="flex justify-end space-x-2 pt-4 border-t dark:border-gray-700">
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="min-h-[44px] px-4 py-2.5 bg-gray-500 dark:bg-gray-600 text-white rounded hover:bg-gray-600 dark:hover:bg-gray-700 touch-manipulation active:scale-95 transition-transform"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting || (!selectedModule && !selectedGroupSet)}
-              className="min-h-[44px] px-4 py-2.5 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 touch-manipulation active:scale-95 transition-transform"
-            >
-              {isSubmitting ? 'Creating...' : 'Create Page'}
-            </button>
-          </div>
+          <FormActions
+            onCancel={handleCancel}
+            submitLabel="Create page"
+            loading={isSubmitting}
+            loadingLabel="Creating…"
+            disabled={!selectedModule && !selectedGroupSet}
+          />
         </form>
 
         {/* Reset Form Confirmation Modal */}

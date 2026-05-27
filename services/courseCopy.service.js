@@ -133,6 +133,7 @@ async function copyCourseContent(sourceCourseId, {
         allowStudentUploads: a.allowStudentUploads,
         displayMode: a.displayMode,
         isGradedQuiz: a.isGradedQuiz,
+        quizSubmissionMode: a.quizSubmissionMode || 'online',
         isTimedQuiz: a.isTimedQuiz,
         quizTimeLimit: a.quizTimeLimit,
         showCorrectAnswers: a.showCorrectAnswers,

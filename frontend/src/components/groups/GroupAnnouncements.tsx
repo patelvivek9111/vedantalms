@@ -2,7 +2,14 @@ import React, { useEffect, useState } from 'react';
 import AnnouncementList, { Announcement } from '../announcements/AnnouncementList';
 import { getGroupSetAnnouncements, getAnnouncementComments, postAnnouncementComment, postAnnouncementReply, likeAnnouncementComment, unlikeAnnouncementComment } from '../../services/announcementService';
 import { useAuth } from '../../contexts/AuthContext';
-import { ThumbsUp } from 'lucide-react';
+import { ArrowLeft, ThumbsUp } from 'lucide-react';
+import { BTN_SECONDARY, FORM_SHELL } from '../common/formStyles';
+import {
+  AnnouncementAuthorAvatar,
+  AnnouncementCommentComposer,
+  AnnouncementOptionBadges,
+  formatAnnouncementDate,
+} from '../announcements/announcementUi';
 
 // Detect mobile device
 const useMobileDevice = () => {
@@ -265,71 +272,68 @@ const GroupAnnouncements: React.FC<GroupAnnouncementsProps> = ({ courseId, group
 
       <div className={`${isMobileDevice ? 'px-4' : 'px-4 sm:px-6'} pb-4 sm:pb-6`}>
       {selectedAnnouncement ? (
-          <div className={`bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 ${isMobileDevice ? 'p-4' : 'p-4 sm:p-6'}`}>
+          <div className="mx-auto max-w-4xl">
           <button
-              className={`mb-3 sm:mb-4 px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 ${isMobileDevice ? 'text-xs' : 'text-sm'} font-medium transition-colors touch-manipulation active:scale-95`}
+              type="button"
+              className={`${BTN_SECONDARY} mb-4 ${isMobileDevice ? 'text-xs' : ''}`}
             onClick={() => setSelectedAnnouncement(null)}
           >
-            ← Back to Announcements
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to announcements
           </button>
-            <div className={`${isMobileDevice ? 'flex flex-col gap-2' : 'flex flex-col sm:flex-row justify-between items-start sm:items-start gap-2'} mb-3`}>
-              <h3 className={`${isMobileDevice ? 'text-base' : 'text-base sm:text-lg'} font-bold text-gray-900 dark:text-gray-100 break-words`}>
-                {selectedAnnouncement.title}
-              </h3>
-              <span className={`${isMobileDevice ? 'text-xs' : 'text-xs'} text-gray-400 dark:text-gray-500 ${isMobileDevice ? '' : 'whitespace-nowrap'}`}>
-                {new Date(selectedAnnouncement.createdAt).toLocaleString()}
-              </span>
-          </div>
-            <div className={`${isMobileDevice ? 'text-sm' : 'text-sm'} text-gray-800 dark:text-gray-200 mb-3 prose max-w-none dark:prose-invert`} dangerouslySetInnerHTML={{ __html: selectedAnnouncement.body }} />
-            <div className={`${isMobileDevice ? 'text-xs' : 'text-xs'} text-gray-500 dark:text-gray-400 mb-3`}>
-              By {selectedAnnouncement.author.firstName} {selectedAnnouncement.author.lastName}
-            </div>
-          {selectedAnnouncement.options && Object.values(selectedAnnouncement.options).some(Boolean) && user && user.role !== 'student' && (
-              <div className={`${isMobileDevice ? 'mt-2' : 'mt-1'} flex flex-wrap gap-2`}>
-                {selectedAnnouncement.options.delayPosting && <span className={`${isMobileDevice ? 'px-2 py-0.5 text-[10px]' : 'px-2 py-0.5 text-xs'} bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-300 rounded-full font-semibold`}>Delay posting</span>}
-                {selectedAnnouncement.options.allowComments && <span className={`${isMobileDevice ? 'px-2 py-0.5 text-[10px]' : 'px-2 py-0.5 text-xs'} bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 rounded-full font-semibold`}>Comments enabled</span>}
-                {selectedAnnouncement.options.requirePostBeforeSeeingReplies && <span className={`${isMobileDevice ? 'px-2 py-0.5 text-[10px]' : 'px-2 py-0.5 text-xs'} bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-300 rounded-full font-semibold`}>Post before seeing replies</span>}
-                {selectedAnnouncement.options.enablePodcastFeed && <span className={`${isMobileDevice ? 'px-2 py-0.5 text-[10px]' : 'px-2 py-0.5 text-xs'} bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300 rounded-full font-semibold`}>Podcast feed</span>}
-                {selectedAnnouncement.options.allowLiking && <span className={`${isMobileDevice ? 'px-2 py-0.5 text-[10px]' : 'px-2 py-0.5 text-xs'} bg-pink-100 dark:bg-pink-900/50 text-pink-800 dark:text-pink-300 rounded-full font-semibold`}>Liking enabled</span>}
-            </div>
-          )}
-          {/* Comments Section */}
-            <div className={`${isMobileDevice ? 'mt-6' : 'mt-10'}`}>
-              <h4 className={`${isMobileDevice ? 'text-base' : 'text-lg'} font-bold mb-4 text-gray-900 dark:text-gray-100`}>Comments</h4>
+            <article className={`${FORM_SHELL} overflow-hidden ${isMobileDevice ? '' : ''}`}>
+              <div className="border-b border-slate-100 px-4 py-4 dark:border-slate-800 sm:px-6">
+                <h3 className={`font-bold tracking-tight text-slate-900 dark:text-slate-50 ${isMobileDevice ? 'text-lg' : 'text-xl sm:text-2xl'}`}>
+                  {selectedAnnouncement.title}
+                </h3>
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                  <time dateTime={selectedAnnouncement.createdAt}>
+                    {formatAnnouncementDate(selectedAnnouncement.createdAt)}
+                  </time>
+                  <span className="text-slate-300 dark:text-slate-600">·</span>
+                  <AnnouncementAuthorAvatar
+                    firstName={selectedAnnouncement.author.firstName}
+                    lastName={selectedAnnouncement.author.lastName}
+                    size="sm"
+                  />
+                  <span className="font-medium text-slate-700 dark:text-slate-300">
+                    {selectedAnnouncement.author.firstName} {selectedAnnouncement.author.lastName}
+                  </span>
+                </div>
+                {user && user.role !== 'student' && (
+                  <AnnouncementOptionBadges options={selectedAnnouncement.options} className="mt-3" />
+                )}
+              </div>
+              <div className="px-4 py-5 sm:px-6">
+                <div
+                  className="prose prose-slate max-w-none text-sm dark:prose-invert sm:text-base"
+                  dangerouslySetInnerHTML={{ __html: selectedAnnouncement.body }}
+                />
+              </div>
+            </article>
+          <section className={`${FORM_SHELL} mt-6 p-4 sm:p-6`}>
+              <h4 className={`font-semibold text-slate-900 dark:text-slate-100 ${isMobileDevice ? 'text-base' : 'text-lg'}`}>Comments</h4>
             {user && user.role === 'student' && selectedAnnouncement?.options?.requirePostBeforeSeeingReplies && !userHasPosted && (
-              <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded text-sm text-blue-700 dark:text-blue-300">
-                <span role="img" aria-label="Info">💡</span> Post a comment first to see replies from other students.
+              <div className="mt-4 rounded-xl border border-blue-200/80 bg-blue-50/80 p-3 text-sm text-blue-800 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-200">
+                Post a comment first to see replies from other students.
               </div>
             )}
             {commentsLoading ? (
-              <div className="text-gray-500 dark:text-gray-400">Loading comments...</div>
+              <div className="py-8 text-center text-sm text-slate-500">Loading comments…</div>
             ) : (
-              <>
+              <div className="mt-4 space-y-4">
                 {renderComments(comments)}
                 {user && (
-                  <div className={`${isMobileDevice ? 'mt-4' : 'mt-6'}`}>
-                    <textarea
-                      className={`w-full border border-gray-300 dark:border-gray-700 rounded-lg ${isMobileDevice ? 'px-3 py-2 text-sm' : 'px-2 py-2 text-sm'} bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400`}
-                      rows={isMobileDevice ? 4 : 3}
-                      placeholder="Write a comment..."
-                      value={commentText}
-                      onChange={e => setCommentText(e.target.value)}
-                      disabled={posting}
-                    />
-                    <div className={`flex gap-2 ${isMobileDevice ? 'mt-2' : 'mt-2'} justify-end`}>
-                      <button
-                        className={`${isMobileDevice ? 'px-4 py-2 text-sm' : 'px-4 py-2'} bg-gradient-to-r from-blue-600 to-blue-500 dark:from-blue-500 dark:to-blue-600 hover:from-blue-700 hover:to-blue-600 dark:hover:from-blue-600 dark:hover:to-blue-700 text-white rounded-lg font-semibold shadow-md hover:shadow-lg transition-all active:scale-95 touch-manipulation disabled:opacity-50`}
-                        onClick={handlePostComment}
-                        disabled={posting}
-                      >
-                        {posting ? 'Posting...' : 'Post Comment'}
-                      </button>
-                    </div>
-                  </div>
+                  <AnnouncementCommentComposer
+                    value={commentText}
+                    onChange={setCommentText}
+                    onSubmit={handlePostComment}
+                    posting={posting}
+                  />
                 )}
-              </>
+              </div>
             )}
-          </div>
+          </section>
         </div>
       ) : (
         loading ? (

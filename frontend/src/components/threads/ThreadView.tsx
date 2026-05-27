@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, format } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
 import api, { getImageUrl } from '../../services/api';
 import { API_URL } from '../../config';
@@ -37,6 +37,43 @@ import type { NormalizedFile } from '../../utils/fileTypes';
 import { deriveDiscussionWorkflowState, sanitizeDiscussionHtml } from '../../utils/discussionWorkflowStatus';
 import { resolveDiscussionStatus, type DiscussionStatus } from '../../utils/discussionStatus';
 import { normalizeMongoIdRef } from '../../utils/mongoId';
+
+function formatDiscussionDue(d: Date): string {
+  return format(d, "MMM d 'at' h:mmaaa");
+}
+
+function formatGradePointsValue(grade: number): string {
+  const value = Number(grade);
+  if (Number.isInteger(value)) return String(value);
+  return value.toFixed(1).replace(/\.0$/, '');
+}
+
+function renderGradeScoreBadge(grade: number | null | undefined, totalPoints: number): React.ReactNode {
+  const total = Math.max(0, Math.round(Number(totalPoints) || 0));
+  if (total <= 0) return <span className="text-slate-400">—</span>;
+
+  const hasGrade = typeof grade === 'number' && !Number.isNaN(grade);
+  const earnedDisplay = hasGrade ? formatGradePointsValue(grade) : '—';
+  const isPerfect = hasGrade && Number(grade) >= total;
+
+  return (
+    <span className="inline-flex items-baseline gap-px rounded-md bg-slate-100/90 px-2 py-1 tabular-nums dark:bg-slate-800/80">
+      <span
+        className={
+          hasGrade
+            ? isPerfect
+              ? 'text-sm font-semibold text-emerald-700 dark:text-emerald-400'
+              : 'text-sm font-semibold text-slate-900 dark:text-slate-100'
+            : 'text-sm font-medium text-slate-400 dark:text-slate-500'
+        }
+      >
+        {earnedDisplay}
+      </span>
+      <span className="text-sm text-slate-400 dark:text-slate-500">/</span>
+      <span className="text-sm font-medium text-slate-600 dark:text-slate-300">{total}</span>
+    </span>
+  );
+}
 
 const composerKeyForReply = (parentId: string | null) => (parentId ? `reply-${parentId}` : 'main');
 
@@ -1210,65 +1247,65 @@ const ThreadView: React.FC = () => {
   };
 
   return (
-    <PullToRefresh onRefresh={handleRefresh} className="min-h-screen">
-      <div className="max-w-4xl mx-auto space-y-4 sm:space-y-8 px-2 sm:px-4">
+    <PullToRefresh onRefresh={handleRefresh} className="min-h-screen bg-slate-50/80 dark:bg-slate-950">
+      <div className="mx-auto max-w-4xl space-y-5 px-3 py-4 sm:space-y-6 sm:px-4 sm:py-6">
       {/* Main Thread Card */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-100 dark:border-gray-700">
-          <div className="flex flex-col sm:flex-row items-start justify-between gap-3">
-            <div className="flex-1 w-full">
-              <div className="flex flex-wrap items-center gap-3 sm:gap-2 mb-2 sm:mb-3" aria-live="polite" aria-label="Discussion status">
+      <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        {/* Status strip */}
+        <div className="border-b border-slate-100 px-4 py-3 dark:border-slate-800 sm:px-6">
+          <div className="flex flex-wrap items-center gap-2" aria-live="polite" aria-label="Discussion status">
                 {thread.isPinned && (
-                  <div className="flex items-center space-x-1 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/50 px-2 sm:px-3 py-1 rounded-full">
-                    <Pin className="w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
-                    <span className="text-xs sm:text-sm font-medium">Pinned</span>
+                  <div className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-amber-700 ring-1 ring-amber-200/80 dark:bg-amber-950/40 dark:text-amber-300 dark:ring-amber-900/50">
+                    <Pin className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span className="text-xs font-medium">Pinned</span>
                   </div>
                 )}
                 {thread.isGraded && (
-                  <div className="flex items-center space-x-1 text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/50 px-2 sm:px-3 py-1 rounded-full">
-                    <Award className="w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
-                    <span className="text-xs sm:text-sm font-medium">{thread.totalPoints} points</span>
+                  <div className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700 ring-1 ring-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-900/50">
+                    <Award className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span className="text-xs font-medium">{thread.totalPoints} pts</span>
                   </div>
                 )}
                 {workflowState.locked && (
-                  <div className="flex items-center space-x-1 text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/50 px-2 sm:px-3 py-1 rounded-full">
-                    <Lock className="w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
-                    <span className="text-xs sm:text-sm font-medium">Locked</span>
+                  <div className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-amber-800 ring-1 ring-amber-200/80 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900/50">
+                    <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span className="text-xs font-medium">Locked</span>
                   </div>
                 )}
                 {unreadCount > 0 && (
-                  <div className="flex items-center space-x-1 text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/50 px-2 sm:px-3 py-1 rounded-full" aria-label={`${unreadCount} unread replies`}>
-                    <MessageSquare className="w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
-                    <span className="text-xs sm:text-sm font-medium">{unreadCount} unread</span>
+                  <div className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-indigo-700 ring-1 ring-indigo-200/80 dark:bg-indigo-950/40 dark:text-indigo-300 dark:ring-indigo-900/50" aria-label={`${unreadCount} unread replies`}>
+                    <MessageSquare className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span className="text-xs font-medium">{unreadCount} unread</span>
                   </div>
                 )}
                 {user?.role === 'student' && !hasPosted && (
-                  <div className="flex items-center space-x-1 text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/50 px-2 sm:px-3 py-1 rounded-full">
-                    <AlertCircle className="w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
-                    <span className="text-xs sm:text-sm font-medium">You have not posted yet</span>
+                  <div className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2.5 py-1 text-orange-700 ring-1 ring-orange-200/80 dark:bg-orange-950/40 dark:text-orange-300 dark:ring-orange-900/50">
+                    <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span className="text-xs font-medium">Not posted yet</span>
                   </div>
                 )}
                 {hasInstructorReply && (
-                  <div className="flex items-center space-x-1 text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/50 px-2 sm:px-3 py-1 rounded-full">
-                    <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
-                    <span className="text-xs sm:text-sm font-medium">Instructor replied</span>
+                  <div className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-1 text-sky-700 ring-1 ring-sky-200/80 dark:bg-sky-950/40 dark:text-sky-300 dark:ring-sky-900/50">
+                    <CheckCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span className="text-xs font-medium">Instructor replied</span>
                   </div>
                 )}
                 {discussionStatus === 'unpublished' && (
-                  <div className="flex items-center space-x-1 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 px-2 sm:px-3 py-1 rounded-full">
-                    <AlertCircle className="w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
-                    <span className="text-xs sm:text-sm font-medium">Unpublished</span>
+                  <div className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-slate-600 ring-1 ring-slate-200/80 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700">
+                    <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span className="text-xs font-medium">Unpublished</span>
                   </div>
                 )}
                 {thread.isGraded && !workflowState.released && user?.role === 'student' && (
-                  <div className="flex items-center space-x-1 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 px-2 sm:px-3 py-1 rounded-full">
-                    <AlertCircle className="w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
-                    <span className="text-xs sm:text-sm font-medium">Grade hidden</span>
+                  <div className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-slate-600 ring-1 ring-slate-200/80 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700">
+                    <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span className="text-xs font-medium">Grade hidden</span>
                   </div>
                 )}
-              </div>
-              
+          </div>
+        </div>
+
+        <div className="px-4 py-5 sm:px-6 sm:py-6">
               {isEditing ? (
                 <form onSubmit={handleEditThread} className="space-y-3 sm:space-y-4">
                   <input
@@ -1319,12 +1356,12 @@ const ThreadView: React.FC = () => {
                 </form>
               ) : (
                 <>
-                  <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-3 sm:mb-4 break-words">{thread.title}</h1>
-                  
-                  {/* Author info */}
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 gap-3 sm:gap-0">
-                    <div className="flex items-center space-x-2 sm:space-x-3">
-                      <div className="relative">
+                  <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <h1 className="break-words text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50 sm:text-3xl">
+                        {thread.title}
+                      </h1>
+                      <div className="mt-4 flex items-center gap-3">
                         <img
                           src={thread.author.profilePicture
                             ? (thread.author.profilePicture.startsWith('http')
@@ -1336,63 +1373,59 @@ const ThreadView: React.FC = () => {
                                 : getImageUrl(thread.author.avatarUrl))
                             : '/default-avatar.png'}
                           alt={thread.author.firstName}
-                          className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-white dark:border-gray-700 shadow-sm"
+                          className="h-11 w-11 rounded-full border-2 border-white object-cover shadow-sm ring-1 ring-slate-200 dark:border-slate-800 dark:ring-slate-700"
                           onError={e => (e.currentTarget.src = '/default-avatar.png')}
                         />
-
-                      </div>
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <span className="font-semibold text-sm sm:text-base text-gray-900 dark:text-gray-100">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-900 dark:text-slate-100">
                             {thread.author.firstName} {thread.author.lastName}
-                          </span>
-                          
-                        </div>
-                        <div className="flex flex-wrap items-center gap-1 sm:gap-0 sm:space-x-1 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                          <div className="flex items-center space-x-1">
-                            <Clock className="w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
-                          <span>{formatDistanceToNow(new Date(thread.createdAt), { addSuffix: true })}</span>
+                          </p>
+                          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-500 dark:text-slate-400">
+                            <span className="inline-flex items-center gap-1">
+                              <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                              {formatDistanceToNow(new Date(thread.createdAt), { addSuffix: true })}
+                            </span>
+                            {thread.dueDate && (
+                              <>
+                                <span className="text-slate-300 dark:text-slate-600" aria-hidden>
+                                  ·
+                                </span>
+                                <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400">
+                                  <Calendar className="h-3.5 w-3.5" aria-hidden="true" />
+                                  Due {formatDiscussionDue(new Date(thread.dueDate))}
+                                </span>
+                              </>
+                            )}
                           </div>
-                          {thread.dueDate && (
-                            <>
-                              <span className="hidden sm:inline">•</span>
-                              <div className="flex items-center space-x-1">
-                                <Calendar className="w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
-                              <span className="text-orange-600 dark:text-orange-400">
-                                Due {formatDistanceToNow(new Date(thread.dueDate), { addSuffix: true })}
-                              </span>
-                              </div>
-                            </>
-                          )}
                         </div>
                       </div>
                     </div>
-                    
-                    {user?.role === 'teacher' && (
-                      <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
+
+                    {isModerator && (
+                      <div className="flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-slate-50/80 p-1 dark:border-slate-700 dark:bg-slate-800/60">
                         <button
                           onClick={handleTogglePin}
-                          className={`p-1.5 sm:p-2 rounded-lg transition-colors touch-manipulation ${
+                          className={`rounded-lg p-2 transition-colors touch-manipulation ${
                             thread.isPinned
-                              ? 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/50 hover:bg-amber-100 dark:hover:bg-amber-900/70'
-                              : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                              ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300'
+                              : 'text-slate-500 hover:bg-white hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200'
                           }`}
                           title={thread.isPinned ? 'Unpin thread' : 'Pin thread'}
                           aria-label={thread.isPinned ? 'Unpin discussion' : 'Pin discussion'}
                         >
-                          <Pin className="w-4 h-4 sm:w-5 sm:h-5" aria-hidden="true" />
+                          <Pin className="h-4 w-4" aria-hidden="true" />
                         </button>
                         <button
                           onClick={handleToggleLock}
-                          className={`p-1.5 sm:p-2 rounded-lg transition-colors touch-manipulation ${
+                          className={`rounded-lg p-2 transition-colors touch-manipulation ${
                             thread.locked
-                              ? 'text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/50 hover:bg-amber-100 dark:hover:bg-amber-900/70'
-                              : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                              ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200'
+                              : 'text-slate-500 hover:bg-white hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200'
                           }`}
                           title={thread.locked ? 'Unlock discussion' : 'Lock discussion'}
                           aria-label={thread.locked ? 'Unlock discussion' : 'Lock discussion'}
                         >
-                          <Lock className="w-4 h-4 sm:w-5 sm:h-5" aria-hidden="true" />
+                          <Lock className="h-4 w-4" aria-hidden="true" />
                         </button>
                         <button
                           onClick={() => {
@@ -1402,11 +1435,11 @@ const ThreadView: React.FC = () => {
                             setEditThreadAttachments(normalizeLegacyFiles(thread.fileAssets || []));
                             setEditThreadRemoveIds([]);
                           }}
-                          className="p-1.5 sm:p-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/50 rounded-lg transition-colors touch-manipulation"
+                          className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-white hover:text-indigo-600 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-indigo-400"
                           title="Edit thread"
                           aria-label="Edit discussion"
                         >
-                          <Edit3 className="w-4 h-4 sm:w-5 sm:h-5" aria-hidden="true" />
+                          <Edit3 className="h-4 w-4" aria-hidden="true" />
                         </button>
                         <button
                           onClick={() => {
@@ -1422,91 +1455,81 @@ const ThreadView: React.FC = () => {
                             });
                             setShowEditModal(true);
                           }}
-                          className="p-1.5 sm:p-2 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/50 rounded-lg transition-colors touch-manipulation"
+                          className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-white hover:text-indigo-600 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-indigo-400"
                           title="Edit discussion settings"
                           aria-label="Edit discussion settings"
                         >
-                          <Settings className="w-4 h-4 sm:w-5 sm:h-5" aria-hidden="true" />
+                          <Settings className="h-4 w-4" aria-hidden="true" />
                         </button>
                         <button
                           onClick={handleDeleteThread}
-                          className="p-1.5 sm:p-2 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/50 rounded-lg transition-colors touch-manipulation"
+                          className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-white hover:text-red-600 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-red-400"
                           title="Delete thread"
                           aria-label="Delete discussion"
                         >
-                          <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" aria-hidden="true" />
+                          <Trash2 className="h-4 w-4" aria-hidden="true" />
                         </button>
                       </div>
                     )}
                   </div>
+
+                  <div
+                    className="prose prose-slate mb-6 max-w-none leading-relaxed dark:prose-invert prose-headings:text-slate-900 prose-p:text-slate-700 dark:prose-headings:text-slate-100 dark:prose-p:text-slate-300"
+                    dangerouslySetInnerHTML={{ __html: sanitizeDiscussionHtml(thread.content) }}
+                  />
+                  <FileAttachmentChips files={thread.fileAssets} className="mb-5" />
+                  {thread.repliesHiddenUntilPost && (
+                    <div className="mb-4 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-200" role="status">
+                      Replies are hidden until you post your first reply.
+                    </div>
+                  )}
+                  {!canPostDiscussion && (
+                    <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200" role="status">
+                      This discussion is read-only{workflowState.locked ? ' because it is locked' : courseArchived || workflowState.archived ? ' because the course is archived' : ''}.
+                    </div>
+                  )}
+
+                  {canPostDiscussion && !hasPosted && (!showReplyEditor ? (
+                    <button
+                      onClick={() => setShowReplyEditor(true)}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3.5 text-base font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:bg-indigo-500 dark:hover:bg-indigo-600 touch-manipulation"
+                    >
+                      <MessageSquare className="h-5 w-5" aria-hidden="true" />
+                      <span>Start the discussion</span>
+                    </button>
+                  ) : (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-800/50 sm:p-5">
+                      <h3 className="mb-4 flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-100 sm:text-lg">
+                        <MessageSquare className="h-5 w-5" aria-hidden="true" />
+                        <span>Post a reply</span>
+                      </h3>
+                      <DiscussionReplyComposer
+                        content={replyContent}
+                        onContentChange={setReplyContent}
+                        attachmentFiles={getComposerAttachments('main')}
+                        onAttachmentsChange={(files) => setComposerAttachments('main', files)}
+                        courseId={resolvedCourseId || undefined}
+                        courseArchived={courseArchived || !canPostDiscussion}
+                        onSubmit={(e) => handleSubmitReply(e, null)}
+                        onCancel={() => {
+                          setShowReplyEditor(false);
+                          setReplyContent('');
+                          setComposerAttachments('main', []);
+                          if (threadId && user?._id) {
+                            localStorage.removeItem(`thread_reply_draft_${threadId}_${user._id}`);
+                          }
+                        }}
+                        isSubmitting={isSubmitting}
+                      />
+                      {replyError && (
+                        <p className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200" role="alert">
+                          {replyError}
+                        </p>
+                      )}
+                    </div>
+                  ))}
                 </>
               )}
-            </div>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="p-3 sm:p-6">
-          {!isEditing && (
-            <>
-              <div 
-                className="prose prose-lg prose-gray max-w-none mb-8 text-gray-800 dark:text-gray-300 leading-relaxed prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-p:text-gray-800 dark:prose-p:text-gray-300"
-                dangerouslySetInnerHTML={{ __html: sanitizeDiscussionHtml(thread.content) }}
-              />
-              <FileAttachmentChips files={thread.fileAssets} className="mb-4" />
-              {thread.repliesHiddenUntilPost && (
-                <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-200" role="status">
-                  Replies are hidden until you post your first reply.
-                </div>
-              )}
-              {!canPostDiscussion && (
-                <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200" role="status">
-                  This discussion is read-only{workflowState.locked ? ' because it is locked' : courseArchived || workflowState.archived ? ' because the course is archived' : ''}.
-                </div>
-              )}
-              
-              {/* Reply button */}
-              {canPostDiscussion && !hasPosted && (!showReplyEditor ? (
-                <button
-                  onClick={() => setShowReplyEditor(true)}
-                  className="w-full px-4 sm:px-6 py-3 sm:py-4 text-base sm:text-lg font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 border-dashed rounded-lg sm:rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:border-blue-300 dark:hover:border-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all duration-200 flex items-center justify-center space-x-2 touch-manipulation"
-                >
-                  <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" aria-hidden="true" />
-                  <span>Start the discussion</span>
-                </button>
-              ) : (
-                <div className="bg-gray-50 dark:bg-gray-900 rounded-lg sm:rounded-xl p-3 sm:p-4 border border-gray-200 dark:border-gray-700">
-                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3 sm:mb-4 flex items-center space-x-2">
-                    <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" aria-hidden="true" />
-                    <span>Post a Reply</span>
-                  </h3>
-                  <DiscussionReplyComposer
-                    content={replyContent}
-                    onContentChange={setReplyContent}
-                    attachmentFiles={getComposerAttachments('main')}
-                    onAttachmentsChange={(files) => setComposerAttachments('main', files)}
-                    courseId={resolvedCourseId || undefined}
-                    courseArchived={courseArchived || !canPostDiscussion}
-                    onSubmit={(e) => handleSubmitReply(e, null)}
-                    onCancel={() => {
-                      setShowReplyEditor(false);
-                      setReplyContent('');
-                      setComposerAttachments('main', []);
-                      if (threadId && user?._id) {
-                        localStorage.removeItem(`thread_reply_draft_${threadId}_${user._id}`);
-                      }
-                    }}
-                    isSubmitting={isSubmitting}
-                  />
-                  {replyError && (
-                    <p className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200" role="alert">
-                      {replyError}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </>
-          )}
         </div>
       </div>
 
@@ -1841,31 +1864,34 @@ const ThreadView: React.FC = () => {
 
       {/* Student Grades Section (for teachers) */}
       {isTeacher && thread?.isGraded && (
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-          <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 px-4 py-3 border-b border-gray-100 dark:border-gray-700">
-            <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center space-x-2">
-              <Award className="w-5 h-5" />
+        <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800 sm:px-6">
+            <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900 dark:text-slate-100">
+              <Award className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
               <span>Student Grades</span>
             </h2>
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              {students.length} {students.length === 1 ? 'student' : 'students'}
+            </span>
           </div>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-900">
-                <tr>
-                                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Student</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Grade</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Feedback</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Graded By</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+            <table className="min-w-full">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-800/50">
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 sm:px-6">Student</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 sm:px-6">Grade</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 sm:px-6">Feedback</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 sm:px-6">Graded by</th>
+                  <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 sm:px-6">Actions</th>
                 </tr>
               </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {students.map((student) => {
                   const gradeObj = thread.studentGrades.find(g => g.student._id === student._id);
                   return (
-                    <tr key={student._id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="flex items-center space-x-3">
+                    <tr key={student._id} className="transition hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
+                      <td className="whitespace-nowrap px-5 py-4 sm:px-6">
+                        <div className="flex items-center gap-3">
                           <div className="relative">
                             {student.profilePicture ? (
                               <img
@@ -1873,9 +1899,8 @@ const ThreadView: React.FC = () => {
                                   ? student.profilePicture
                                   : getImageUrl(student.profilePicture)}
                                 alt={`${student.firstName} ${student.lastName}`}
-                                className="w-8 h-8 rounded-full object-cover border-2 border-gray-100 dark:border-gray-700"
+                                className="h-9 w-9 rounded-full border border-slate-200 object-cover dark:border-slate-700"
                                 onError={(e) => {
-                                  // Hide the failed image and show fallback
                                   e.currentTarget.style.display = 'none';
                                   const fallback = e.currentTarget.nextElementSibling as HTMLElement;
                                   if (fallback) {
@@ -1884,35 +1909,42 @@ const ThreadView: React.FC = () => {
                                 }}
                               />
                             ) : null}
-                            {/* Fallback avatar - always present but hidden when image loads */}
-                            <div 
-                              className={`w-8 h-8 bg-blue-100 dark:bg-blue-900/50 rounded-full flex items-center justify-center ${student.profilePicture ? 'hidden' : ''}`}
+                            <div
+                              className={`flex h-9 w-9 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-950/50 ${student.profilePicture ? 'hidden' : ''}`}
                               style={{ display: student.profilePicture ? 'none' : 'flex' }}
                             >
-                              <User className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                              <User className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                             </div>
                           </div>
-                          <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{student.firstName} {student.lastName}</div>
+                          <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                            {student.firstName} {student.lastName}
+                          </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="text-sm text-gray-900 dark:text-gray-100">
-                          {gradeObj ? `${Number.isInteger(gradeObj.grade) ? gradeObj.grade : Number(gradeObj.grade).toFixed(2)} / ${thread.totalPoints}` : '-'}
+                      <td className="whitespace-nowrap px-5 py-4 sm:px-6">
+                        {renderGradeScoreBadge(gradeObj?.grade, thread.totalPoints)}
+                      </td>
+                      <td className="max-w-xs px-5 py-4 sm:px-6">
+                        <div className="truncate text-sm text-slate-600 dark:text-slate-300">
+                          {gradeObj?.feedback || <span className="text-slate-400">—</span>}
                         </div>
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="text-sm text-gray-900 dark:text-gray-100 max-w-xs truncate">{gradeObj?.feedback || '-'}</div>
+                      <td className="whitespace-nowrap px-5 py-4 sm:px-6">
+                        <div className="text-sm text-slate-900 dark:text-slate-100">
+                          {gradeObj?.gradedBy ? `${gradeObj.gradedBy.firstName} ${gradeObj.gradedBy.lastName}` : <span className="text-slate-400">—</span>}
+                        </div>
+                        {gradeObj?.gradedAt ? (
+                          <div className="text-xs text-slate-500 dark:text-slate-400">
+                            {format(new Date(gradeObj.gradedAt), 'MMM d, yyyy · h:mm a')}
+                          </div>
+                        ) : null}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="text-sm text-gray-900 dark:text-gray-100">{gradeObj?.gradedBy ? `${gradeObj.gradedBy.firstName} ${gradeObj.gradedBy.lastName}` : '-'}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">{gradeObj?.gradedAt ? new Date(gradeObj.gradedAt).toLocaleString() : ''}</div>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
+                      <td className="whitespace-nowrap px-5 py-4 text-right sm:px-6">
                         <button
                           onClick={() => openGradingModal(student)}
-                          className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 transition-colors"
+                          className="rounded-lg px-3 py-1.5 text-sm font-medium text-indigo-600 transition hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/40"
                         >
-                          {gradeObj ? 'Edit Grade' : 'Add Grade'}
+                          {gradeObj ? 'Edit grade' : 'Add grade'}
                         </button>
                       </td>
                     </tr>
@@ -1925,15 +1957,17 @@ const ThreadView: React.FC = () => {
       )}
 
       {/* Replies Section */}
-      <div className="space-y-6">
-        <div className="flex items-center space-x-3">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Replies</h2>
-          <div className="flex items-center space-x-1 text-sm text-gray-500 dark:text-gray-400">
-            <MessageSquare className="w-4 h-4" />
+      <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800 sm:px-6">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Replies</h2>
+          <div className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+            <MessageSquare className="h-4 w-4" />
             <span>{rootReplies.length} {rootReplies.length === 1 ? 'reply' : 'replies'}</span>
           </div>
         </div>
-        {renderReplies(rootReplies, 0, handleEditReply, handleDeleteReply)}
+        <div className="px-4 py-5 sm:px-6 sm:py-6">
+          {renderReplies(rootReplies, 0, handleEditReply, handleDeleteReply)}
+        </div>
       </div>
 
       {/* Delete Thread Confirmation Modal */}

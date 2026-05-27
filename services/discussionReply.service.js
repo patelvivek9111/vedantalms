@@ -515,7 +515,86 @@ async function populateThreadReplyPage(thread, options = {}) {
   return obj;
 }
 
+/**
+ * One aggregate for many threads: non-deleted replies in the DiscussionReply collection per thread.
+ * Used to fix list views that `.select('-replies')` and skip populateThreadReplyPage (limit 0),
+ * where thread.counters.replyCount can be stale or missing after migrations.
+ */
+async function batchCountRepliesByThreadId(threadIds) {
+  const result = new Map();
+  const unique = [...new Set(threadIds.map(normalizeId).filter(Boolean))];
+  if (!unique.length) return result;
+  const oids = unique.filter((id) => mongoose.Types.ObjectId.isValid(id)).map((id) => new mongoose.Types.ObjectId(id));
+  if (!oids.length) return result;
+  const rows = await DiscussionReply.aggregate([
+    { $match: { threadId: { $in: oids }, deletedAt: null } },
+    { $group: { _id: '$threadId', n: { $sum: 1 } } },
+  ]);
+  for (const row of rows) {
+    result.set(String(row._id), row.n);
+  }
+  return result;
+}
+
+/**
+ * For discussion list APIs: max of (collection reply rows, embedded thread.replies[], counters.replyCount)
+ * per thread so counts stay correct before/after migration and when list queries omit `replies`.
+ */
+async function batchResolveReplyCountsForList(threadIds) {
+  const unique = [...new Set(threadIds.map(normalizeId).filter(Boolean))];
+  const out = new Map();
+  if (!unique.length) return out;
+
+  const oids = unique.filter((id) => mongoose.Types.ObjectId.isValid(id)).map((id) => new mongoose.Types.ObjectId(id));
+  if (!oids.length) return out;
+
+  const [collectionRows, threadRows] = await Promise.all([
+    DiscussionReply.aggregate([
+      { $match: { threadId: { $in: oids }, deletedAt: null } },
+      { $group: { _id: '$threadId', n: { $sum: 1 } } },
+    ]),
+    Thread.aggregate([
+      { $match: { _id: { $in: oids } } },
+      {
+        $project: {
+          _id: 1,
+          counterVal: { $ifNull: ['$counters.replyCount', 0] },
+          embeddedActive: {
+            $size: {
+              $filter: {
+                input: { $ifNull: ['$replies', []] },
+                as: 'r',
+                cond: {
+                  $or: [
+                    { $eq: ['$$r.deletedAt', null] },
+                    { $eq: [{ $type: '$$r.deletedAt' }, 'missing'] },
+                  ],
+                },
+              },
+            },
+          },
+        },
+      },
+    ]),
+  ]);
+
+  for (const row of threadRows) {
+    const tid = String(row._id);
+    const n = Math.max(Number(row.embeddedActive) || 0, Number(row.counterVal) || 0);
+    out.set(tid, n);
+  }
+  for (const row of collectionRows) {
+    const tid = String(row._id);
+    const prev = out.get(tid) || 0;
+    out.set(tid, Math.max(prev, Number(row.n) || 0));
+  }
+
+  return out;
+}
+
 module.exports = {
+  batchCountRepliesByThreadId,
+  batchResolveReplyCountsForList,
   createReply,
   getReplyById,
   getReplyOrLegacy,
@@ -531,3 +610,4 @@ module.exports = {
   toggleLike,
   updateReply,
 };
+

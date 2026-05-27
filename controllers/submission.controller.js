@@ -22,6 +22,7 @@ const gradeReleaseService = require('../services/gradeRelease.service');
 const submissionVersionService = require('../services/submissionVersion.service');
 const observability = require('../services/workflowObservability.service');
 const workflowCache = require('../services/workflowCache.service');
+const { isPaperUploadQuiz } = require('../utils/quizSubmissionMode');
 
 function getIdempotencyKey(req, prefix) {
   const raw = req.headers['idempotency-key'] || req.headers['x-idempotency-key'];
@@ -348,28 +349,32 @@ exports.createSubmission = async (req, res) => {
     }
     await assignmentAccess.assertStudentCanSubmitAssignment(req.user, assignmentDoc);
     const submitIdempotencyKey = getIdempotencyKey(req, 'submission');
+    const paperUploadQuiz = isPaperUploadQuiz(assignmentDoc);
 
     // Check if there are any answers provided
     const hasAnswers = answers && Object.keys(answers).length > 0;
-    
-    
-    // For assignments with questions, require at least some answers
-    if (assignmentDoc.questions && assignmentDoc.questions.length > 0) {
-      const hasAnyAnswers = hasAnswers && Object.values(answers).some(answer => 
+
+    if (paperUploadQuiz) {
+      const uploadedFiles = req.body.uploadedFiles;
+      const hasFiles = Array.isArray(uploadedFiles) && uploadedFiles.length > 0;
+      if (!hasFiles) {
+        return res.status(400).json({ message: 'Please upload at least one file before submitting your quiz' });
+      }
+    } else if (assignmentDoc.questions && assignmentDoc.questions.length > 0) {
+      const hasAnyAnswers = hasAnswers && Object.values(answers).some(answer =>
         answer && answer.toString().trim() !== ''
       );
-      
-      
-      
+
       if (!hasAnyAnswers) {
-        
         return res.status(400).json({ message: 'Please provide answers for the assignment questions' });
       }
     }
-    const timedQuizSubmission = await timedQuizAttemptService.transitionTimedQuizToSubmitted(req.user, assignmentDoc, {
-      groupId,
-      answers,
-    });
+    const timedQuizSubmission = paperUploadQuiz
+      ? null
+      : await timedQuizAttemptService.transitionTimedQuizToSubmitted(req.user, assignmentDoc, {
+          groupId,
+          answers,
+        });
 
     let group = null;
     if (assignmentDoc.isGroupAssignment) {

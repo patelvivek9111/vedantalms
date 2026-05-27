@@ -1,20 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
 import { format } from 'date-fns';
-import { API_URL } from '../../config';
-import ProfileImage from '../common/ProfileImage';
-import DataTable, { Column } from '../common/DataTable';
 import ConfirmationModal from '../common/ConfirmationModal';
 import PullToRefresh from '../common/PullToRefresh';
-import SwipeableListItem from '../common/SwipeableListItem';
-import { Trash2, Edit } from 'lucide-react';
+import { FilePenLine, MessageSquare, Rocket, ChevronDown, ChevronRight, Search, CalendarDays, Layers } from 'lucide-react';
+import { FORM_INPUT, FORM_SELECT } from '../common/formStyles';
 import {
-  ASSIGNMENT_STATUS_LABELS,
-  resolveAssignmentWorkflowStatus,
-} from '../../utils/assignmentWorkflowStatus';
-
+  discussionGradeToGradebookValue,
+  submissionToGradebookValue,
+} from '../../utils/instructorGradebookGrades';
 interface Attachment {
   _id: string;
   filename: string;
@@ -48,13 +44,29 @@ interface AssignmentListProps {
   isQuizzesView?: boolean;
 }
 
-const TABS = [
-  { label: 'All', value: 'all' },
-  { label: 'Published', value: 'published' },
-  { label: 'Unpublished', value: 'unpublished' },
-  { label: 'Assignments', value: 'assignment' },
-  { label: 'Discussions', value: 'discussion' },
-];
+
+type ListViewMode = 'date' | 'type';
+
+/** Single chronological list: earliest due first; items without a due date last. */
+function sortItemsByDueDateAsc<T extends { dueDate?: string | null; title?: string; _id?: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) => {
+    const at = a.dueDate ? new Date(a.dueDate).getTime() : NaN;
+    const bt = b.dueDate ? new Date(b.dueDate).getTime() : NaN;
+    const hasA = !Number.isNaN(at);
+    const hasB = !Number.isNaN(bt);
+    if (hasA && hasB) {
+      const byDate = at - bt;
+      if (byDate !== 0) return byDate;
+    } else if (hasA && !hasB) {
+      return -1;
+    } else if (!hasA && hasB) {
+      return 1;
+    }
+    const byTitle = (a.title || '').localeCompare(b.title || '');
+    if (byTitle !== 0) return byTitle;
+    return (a._id || '').localeCompare(b._id || '');
+  });
+}
 
 /** Single chronological list: latest due first, then earlier dates; items without a due date last. */
 function sortItemsByDueDateDesc<T extends { dueDate?: string | null; title?: string; _id?: string }>(items: T[]): T[] {
@@ -77,19 +89,500 @@ function sortItemsByDueDateDesc<T extends { dueDate?: string | null; title?: str
   });
 }
 
+function isQuizItem(item: { isGradedQuiz?: boolean; group?: string }): boolean {
+  if (item.isGradedQuiz === true) return true;
+  const group = (item.group || '').trim().toLowerCase();
+  return group === 'quizzes' || group.includes('quiz');
+}
+
+/** Canvas-style due line, e.g. "Apr 2 at 11:59pm" */
+function formatCanvasDue(d: Date): string {
+  return format(d, "MMM d 'at' h:mmaaa");
+}
+
+function getEarnedScoreForItem(item: any, submission: any | undefined, studentId?: string): number | null {
+  if (!studentId) return null;
+  if (item.type === 'discussion') {
+    const grades = item.studentGrades;
+    if (!Array.isArray(grades)) return null;
+    const row = grades.find((g: any) => String(g.student?._id || g.student) === String(studentId));
+    return typeof row?.grade === 'number' ? row.grade : null;
+  }
+  if (!submission) return null;
+  if (submission.useIndividualGrades && Array.isArray(submission.memberGrades)) {
+    const mg = submission.memberGrades.find(
+      (m: any) => String(m.student?._id || m.student) === String(studentId)
+    );
+    if (mg && typeof mg.grade === 'number') return mg.grade;
+  }
+  if (typeof submission.grade === 'number') return submission.grade;
+  return null;
+}
+
+function formatEarnedPointsValue(earned: number): string {
+  const value = Number(earned);
+  if (Number.isInteger(value)) return String(value);
+  return value.toFixed(1).replace(/\.0$/, '');
+}
+
+function renderStudentPointsDisplay(earned: number | null, totalPoints: number): React.ReactNode {
+  const total = Math.max(0, Math.round(Number(totalPoints) || 0));
+  if (total <= 0) return null;
+
+  const hasGrade = earned !== null && !Number.isNaN(Number(earned));
+  const earnedDisplay = hasGrade ? formatEarnedPointsValue(Number(earned)) : '—';
+  const isPerfect = hasGrade && Number(earned) >= total;
+
+  return (
+    <span
+      className="inline-flex items-baseline gap-px rounded-md bg-slate-100/90 px-1.5 py-0.5 tabular-nums dark:bg-slate-800/80"
+      aria-label={
+        hasGrade
+          ? `${earnedDisplay} out of ${total} points`
+          : `Not graded yet, ${total} points possible`
+      }
+    >
+      <span
+        className={
+          hasGrade
+            ? isPerfect
+              ? 'text-sm font-semibold text-emerald-700 dark:text-emerald-400'
+              : 'text-sm font-semibold text-slate-900 dark:text-slate-100'
+            : 'text-sm font-medium text-slate-400 dark:text-slate-500'
+        }
+      >
+        {earnedDisplay}
+      </span>
+      <span className="text-sm text-slate-400 dark:text-slate-500">/</span>
+      <span className="text-sm font-medium text-slate-600 dark:text-slate-300">{total}</span>
+      <span className="ml-0.5 text-[0.7rem] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        pts
+      </span>
+    </span>
+  );
+}
+
+/** Canvas-style subline: "Due … | n/m pts" (points only for students). */
+function buildAssignmentMetaParts(opts: {
+  dueOk: boolean;
+  dueDate: Date | null;
+  showPoints: boolean;
+  pointsSegment: string;
+}): string[] {
+  const parts: string[] = [];
+  if (opts.dueOk && opts.dueDate) {
+    parts.push(`Due ${formatCanvasDue(opts.dueDate)}`);
+  }
+  if (parts.length === 0) {
+    parts.push('No due date');
+  }
+  if (opts.showPoints) {
+    parts.push(opts.pointsSegment);
+  }
+  return parts;
+}
+
+function filterListBySearch(list: any[], query: string): any[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return list;
+  return list.filter(item => (item.title || '').toLowerCase().includes(q));
+}
+
+function buildTeacherTypeGroups(
+  items: any[],
+  isQuizzesView: boolean
+): { key: string; label: string; items: any[] }[] {
+  const quizzes = items.filter(item => item.type === 'assignment' && isQuizItem(item));
+  const assignments = items.filter(item => item.type === 'assignment' && !isQuizItem(item));
+  const discussions = items.filter(item => item.type === 'discussion');
+
+  const groups: { key: string; label: string; items: any[] }[] = [];
+
+  if (isQuizzesView) {
+    if (quizzes.length > 0) {
+      groups.push({ key: 'quizzes', label: 'Quizzes', items: sortItemsByTitle(quizzes) });
+    }
+  } else {
+    if (assignments.length > 0) {
+      groups.push({ key: 'assignments', label: 'Assignments', items: sortItemsByTitle(assignments) });
+    }
+    if (discussions.length > 0) {
+      groups.push({ key: 'discussions', label: 'Discussions', items: sortItemsByTitle(discussions) });
+    }
+    if (quizzes.length > 0) {
+      groups.push({ key: 'quizzes', label: 'Quizzes', items: sortItemsByTitle(quizzes) });
+    }
+  }
+
+  return groups.length > 0 ? groups : [{ key: 'all', label: '', items }];
+}
+
+function sortItemsByTitle<T extends { title?: string; _id?: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) => {
+    const byTitle = (a.title || '').localeCompare(b.title || '');
+    if (byTitle !== 0) return byTitle;
+    return (a._id || '').localeCompare(b._id || '');
+  });
+}
+
+const STUDENT_DUE_SECTIONS = [
+  { key: 'overdue', label: 'Overdue' },
+  { key: 'upcoming', label: 'Upcoming' },
+  { key: 'undated', label: 'Undated' },
+  { key: 'past', label: 'Past' },
+] as const;
+
+type StudentDueCategory = (typeof STUDENT_DUE_SECTIONS)[number]['key'];
+
+function hasStudentSubmittedItem(
+  item: any,
+  studentId: string | undefined,
+  submissionMap: Record<string, string> | undefined,
+  submissionByAssignmentId: Map<string, any>
+): boolean {
+  if (!studentId) return false;
+
+  if (item.type === 'discussion') {
+    if (item.hasSubmitted || item.hasPosted) return true;
+    if (Array.isArray(item.replies)) {
+      const posted = item.replies.some(
+        (reply: any) =>
+          reply.author &&
+          (String(reply.author._id || reply.author) === String(studentId))
+      );
+      if (posted) return true;
+    }
+    if (Array.isArray(item.studentGrades)) {
+      return item.studentGrades.some(
+        (row: any) =>
+          row.student &&
+          (String(row.student._id || row.student) === String(studentId))
+      );
+    }
+    return false;
+  }
+
+  const submission = submissionByAssignmentId.get(String(item._id));
+  if (submission) {
+    return Boolean(
+      submission._id ||
+        submission.submittedAt ||
+        submission.attemptStatus === 'in_progress' ||
+        submission.attemptStatus === 'submitted'
+    );
+  }
+
+  return Boolean(submissionMap?.[`${String(studentId)}_${String(item._id)}`]);
+}
+
+function categorizeStudentListItem(
+  item: any,
+  opts: {
+    studentId?: string;
+    submissionMap?: Record<string, string>;
+    submissionByAssignmentId: Map<string, any>;
+    now?: Date;
+  }
+): StudentDueCategory {
+  const now = opts.now ?? new Date();
+  const dueDate = item.dueDate ? new Date(item.dueDate) : null;
+  const hasDue = Boolean(dueDate && !Number.isNaN(dueDate.getTime()));
+  const submitted = hasStudentSubmittedItem(
+    item,
+    opts.studentId,
+    opts.submissionMap,
+    opts.submissionByAssignmentId
+  );
+
+  if (!hasDue) return 'undated';
+  if (now > dueDate!) {
+    return submitted ? 'past' : 'overdue';
+  }
+  return 'upcoming';
+}
+
+function buildStudentCanvasGroups(
+  items: any[],
+  opts: {
+    studentId?: string;
+    submissionMap?: Record<string, string>;
+    submissionByAssignmentId: Map<string, any>;
+    itemNoun: string;
+    now?: Date;
+  }
+): { key: string; label: string; items: any[] }[] {
+  const buckets: Record<StudentDueCategory, any[]> = {
+    overdue: [],
+    upcoming: [],
+    undated: [],
+    past: [],
+  };
+
+  for (const item of items) {
+    if (item.published === false && item.type !== 'discussion') continue;
+    const category = categorizeStudentListItem(item, opts);
+    buckets[category].push(item);
+  }
+
+  return STUDENT_DUE_SECTIONS.map(({ key, label }) => {
+    let sorted: any[];
+    if (key === 'overdue' || key === 'upcoming') {
+      sorted = sortItemsByDueDateAsc(buckets[key]);
+    } else if (key === 'past') {
+      sorted = sortItemsByDueDateDesc(buckets[key]);
+    } else {
+      sorted = sortItemsByTitle(buckets[key]);
+    }
+    return { key, label: `${label} ${opts.itemNoun}`, items: sorted };
+  }).filter(group => group.items.length > 0);
+}
+
+function normalizeListItem(item: any) {
+  return {
+    _id: item._id,
+    title: item.title,
+    dueDate: item.dueDate || item.due_date || item.discussionDueDate || null,
+    availableFrom: item.availableFrom ?? item.available_from ?? null,
+    attachments: item.attachments || [],
+    createdBy: item.createdBy || item.author || { firstName: '', lastName: '' },
+    type: item.type === 'discussion' || item.group === 'Discussions' ? 'discussion' : 'assignment',
+    group: item.group || 'Assignments',
+    isGradedQuiz: Boolean(item.isGradedQuiz),
+    totalPoints: item.totalPoints || item.points || 0,
+    published: item.published !== undefined ? item.published : true,
+    replies: item.replies || [],
+    studentGrades: item.studentGrades || [],
+    hasSubmitted: Boolean(item.hasSubmitted ?? item.hasPosted),
+  };
+}
+
+function renderMetaPartContent(part: string, emphasizeWholePart = false): React.ReactNode {
+  if (part.startsWith('Due ')) {
+    return (
+      <>
+        <span className="font-semibold text-slate-800 dark:text-slate-200">Due</span>
+        <span>{part.slice(3)}</span>
+      </>
+    );
+  }
+  if (emphasizeWholePart) {
+    return <span className="font-semibold text-slate-800 dark:text-slate-200">{part}</span>;
+  }
+  return part;
+}
+
+function computeAveragePercentFromGradedOnly(grades: number[], totalPoints: number): number | null {
+  const total = Math.max(0, Number(totalPoints) || 0);
+  if (total <= 0 || grades.length === 0) return null;
+  const avgPoints = grades.reduce((sum, g) => sum + g, 0) / grades.length;
+  return Math.round((avgPoints / total) * 1000) / 10;
+}
+
+/** Class average: sum of points across enrolled students (missing/ungraded = 0) ÷ enrollment. */
+function computeClassAveragePercent(
+  pointsByStudentId: Map<string, number>,
+  excusedStudentIds: Set<string>,
+  enrolledStudentIds: string[],
+  totalPoints: number
+): number | null {
+  const total = Math.max(0, Number(totalPoints) || 0);
+  const eligibleStudentIds = enrolledStudentIds.filter(id => !excusedStudentIds.has(id));
+  if (total <= 0 || eligibleStudentIds.length === 0) return null;
+
+  const pointsSum = eligibleStudentIds.reduce(
+    (sum, studentId) => sum + (pointsByStudentId.get(studentId) ?? 0),
+    0
+  );
+  return Math.round((pointsSum / eligibleStudentIds.length / total) * 1000) / 10;
+}
+
+function computeAveragePercent(
+  pointsByStudentId: Map<string, number>,
+  excusedStudentIds: Set<string>,
+  enrolledStudentIds: string[],
+  totalPoints: number
+): number | null {
+  if (enrolledStudentIds.length > 0) {
+    return computeClassAveragePercent(
+      pointsByStudentId,
+      excusedStudentIds,
+      enrolledStudentIds,
+      totalPoints
+    );
+  }
+  const gradedPoints = [...pointsByStudentId.values()];
+  return computeAveragePercentFromGradedOnly(gradedPoints, totalPoints);
+}
+
+function buildAssignmentGradeMap(submissions: any[]): {
+  pointsByStudentId: Map<string, number>;
+  excusedStudentIds: Set<string>;
+} {
+  const pointsByStudentId = new Map<string, number>();
+  const excusedStudentIds = new Set<string>();
+
+  for (const submission of submissions) {
+    if (submission.group?.members?.length) {
+      for (const member of submission.group.members) {
+        const memberId = String(member._id || member);
+        const value = submissionToGradebookValue(submission, memberId);
+        if (value === 'excused') excusedStudentIds.add(memberId);
+        else if (typeof value === 'number') pointsByStudentId.set(memberId, value);
+      }
+      continue;
+    }
+
+    if (!submission.student) continue;
+    const studentId = String(submission.student._id || submission.student);
+    const value = submissionToGradebookValue(submission);
+    if (value === 'excused') excusedStudentIds.add(studentId);
+    else if (typeof value === 'number') pointsByStudentId.set(studentId, value);
+  }
+
+  return { pointsByStudentId, excusedStudentIds };
+}
+
+function buildDiscussionGradeMap(item: {
+  studentGrades?: Array<{ student?: any; grade?: number; excused?: boolean }>;
+}): {
+  pointsByStudentId: Map<string, number>;
+  excusedStudentIds: Set<string>;
+} {
+  const pointsByStudentId = new Map<string, number>();
+  const excusedStudentIds = new Set<string>();
+
+  for (const row of item.studentGrades || []) {
+    const studentId = String(row.student?._id || row.student || '');
+    if (!studentId) continue;
+    const value = discussionGradeToGradebookValue(row);
+    if (value === 'excused') excusedStudentIds.add(studentId);
+    else if (typeof value === 'number') pointsByStudentId.set(studentId, value);
+  }
+
+  return { pointsByStudentId, excusedStudentIds };
+}
+
+function computeDiscussionAveragePercent(
+  item: {
+    studentGrades?: Array<{ student?: any; grade?: number; excused?: boolean }>;
+    totalPoints?: number;
+  },
+  enrolledStudentIds: string[]
+): number | null {
+  const { pointsByStudentId, excusedStudentIds } = buildDiscussionGradeMap(item);
+  return computeAveragePercent(
+    pointsByStudentId,
+    excusedStudentIds,
+    enrolledStudentIds,
+    item.totalPoints || 0
+  );
+}
+
+async function fetchDiscussionAveragePercent(
+  threadId: string,
+  totalPoints: number,
+  enrolledStudentIds: string[],
+  cachedItem?: { studentGrades?: Array<{ student?: any; grade?: number; excused?: boolean }> }
+): Promise<number | null> {
+  const total = Math.max(0, Number(totalPoints) || 0);
+  if (total <= 0) return null;
+
+  const cachedGrades = cachedItem?.studentGrades || [];
+  if (cachedGrades.length > 0) {
+    return computeDiscussionAveragePercent(
+      { studentGrades: cachedGrades, totalPoints: total },
+      enrolledStudentIds
+    );
+  }
+
+  try {
+    const res = await api.get(`/threads/${threadId}`, {
+      params: { includeGrades: 'true', limit: 0 },
+    });
+    const thread = res.data?.data || res.data;
+    return computeDiscussionAveragePercent(
+      {
+        studentGrades: thread?.studentGrades || [],
+        totalPoints: thread?.totalPoints ?? total,
+      },
+      enrolledStudentIds
+    );
+  } catch {
+    return null;
+  }
+}
+
+async function fetchAllAssignmentSubmissions(assignmentId: string): Promise<any[]> {
+  const submissions: any[] = [];
+  let cursor: string | null = null;
+
+  for (;;) {
+    const params: { limit: number; cursor?: string } = { limit: 200 };
+    if (cursor) params.cursor = cursor;
+
+    const res = await api.get(`/submissions/assignment/${assignmentId}`, { params });
+    const page = res.data?.data || res.data || [];
+    if (!Array.isArray(page)) break;
+
+    submissions.push(...page);
+    if (!res.data?.hasMore || !res.data?.nextCursor) break;
+    cursor = res.data.nextCursor;
+  }
+
+  return submissions;
+}
+
+async function fetchAssignmentAveragePercent(
+  assignmentId: string,
+  totalPoints: number,
+  enrolledStudentIds: string[]
+): Promise<number | null> {
+  const total = Math.max(0, Number(totalPoints) || 0);
+  if (total <= 0) return null;
+  try {
+    const submissions = await fetchAllAssignmentSubmissions(assignmentId);
+    const { pointsByStudentId, excusedStudentIds } = buildAssignmentGradeMap(submissions);
+    return computeAveragePercent(
+      pointsByStudentId,
+      excusedStudentIds,
+      enrolledStudentIds,
+      total
+    );
+  } catch {
+    return null;
+  }
+}
+
+function formatAveragePercentLabel(value: number | null | undefined): string {
+  if (value === null || value === undefined || Number.isNaN(value)) return '—';
+  return Number.isInteger(value) ? `${value}%` : `${value.toFixed(1)}%`;
+}
+
 const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: propAssignments, userRole, studentSubmissions, studentId, submissionMap, courseId, isQuizzesView = false }) => {
   const navigate = useNavigate();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [discussions, setDiscussions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [selectedTab, setSelectedTab] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [listViewMode, setListViewMode] = useState<ListViewMode>('date');
+  const [gradingPeriod, setGradingPeriod] = useState('all');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [groupedAssignments, setGroupedAssignments] = useState<{ label: string; items: any[] }[]>([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+  const [expandedStudentSections, setExpandedStudentSections] = useState<Record<string, boolean>>({
+    overdue: true,
+    upcoming: true,
+    undated: true,
+    past: true,
+  });
+  const [averagePercentById, setAveragePercentById] = useState<Record<string, number | null>>({});
+  const [loadingAverages, setLoadingAverages] = useState(false);
+  const [enrolledStudentIds, setEnrolledStudentIds] = useState<string[]>([]);
+  const [enrolledStudentsLoaded, setEnrolledStudentsLoaded] = useState(false);
 
-  const isTeacherOrAdmin = userRole === 'teacher' || userRole === 'admin';
+  const isTeacherOrAdmin =
+    userRole === 'teacher' || userRole === 'admin' || userRole === 'teaching_assistant';
+  const isStudentViewer = userRole === 'student';
   const submissionByAssignmentId = useMemo(() => {
     const map = new Map<string, any>();
     (studentSubmissions || []).forEach((submission: any) => {
@@ -99,57 +592,13 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
     return map;
   }, [studentSubmissions]);
 
-  // Handle single item delete
-  const handleDeleteItem = (itemId: string) => {
-    setItemToDelete(itemId);
-    setShowDeleteConfirm(true);
-  };
-
-  const confirmDeleteItem = async () => {
-    if (!itemToDelete) return;
-    setShowDeleteConfirm(false);
-
-    try {
-      const item = flatList.find(a => a._id === itemToDelete);
-      if (item?.type === 'discussion') {
-        await api.delete(`/threads/${itemToDelete}`);
-      } else {
-        await api.delete(`/assignments/${itemToDelete}`);
-      }
-      
-      // Refresh the list
-      if (moduleId) {
-        const response = await api.get(`/assignments/module/${moduleId}`);
-        const assignmentsData = response.data?.data || response.data;
-        setAssignments(Array.isArray(assignmentsData) ? assignmentsData : []);
-        
-        try {
-          const threadsRes = await api.get(`/threads/module/${moduleId}`);
-          const threadsData = threadsRes.data?.data || threadsRes.data;
-          setDiscussions(Array.isArray(threadsData) ? threadsData : []);
-        } catch (e) {
-          try {
-            const threadsRes = await api.get(`/threads?module=${moduleId}`);
-            const threadsData = threadsRes.data?.data || threadsRes.data;
-            setDiscussions(Array.isArray(threadsData) ? threadsData : []);
-          } catch (e2) {
-            // If both fail, just continue
-          }
-        }
-      }
-      
-      toast.success('Item deleted successfully');
-      setItemToDelete(null);
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to delete item');
-      setItemToDelete(null);
-    }
-  };
-
   const handleRowClick = (item: any, event: React.MouseEvent) => {
-    // Don't navigate if clicking on checkbox or action buttons
     const target = event.target as HTMLElement;
-    if (target.tagName === 'INPUT' || target.closest('a') || target.closest('button')) {
+    if (target.tagName === 'INPUT' || target.closest('a')) {
+      return;
+    }
+    const buttonAncestor = target.closest('button');
+    if (buttonAncestor && buttonAncestor !== event.currentTarget) {
       return;
     }
     
@@ -180,10 +629,10 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
       // Fetch graded discussions (threads)
       let threadsRes;
       try {
-        threadsRes = await api.get(`/threads/module/${moduleId}`);
+        threadsRes = await api.get(`/threads/module/${moduleId}`, { params: { includeGrades: 'true' } });
       } catch (e) {
         // fallback if /api/threads/module/:moduleId does not exist
-        threadsRes = await api.get(`/threads?module=${moduleId}`);
+        threadsRes = await api.get(`/threads`, { params: { module: moduleId, includeGrades: 'true' } });
       }
       // Only include graded discussions
       const gradedDiscussions = (threadsRes.data.data || threadsRes.data || []).filter((thread: any) => thread.isGraded);
@@ -204,204 +653,147 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
     await fetchAssignments();
   };
 
-  useEffect(() => {
-    const assignmentsList = propAssignments 
+  const studentListItems = useMemo(() => {
+    if (!isStudentViewer) return [];
+
+    const assignmentsList = propAssignments
       ? (Array.isArray(propAssignments) ? propAssignments : [])
       : (Array.isArray(assignments) ? assignments : []);
-    const mergedList = [
-      ...assignmentsList.map(a => ({
-        _id: a._id,
-        title: a.title,
-        dueDate: a.dueDate || (a as any).due_date || (a as any).discussionDueDate || null,
-        availableFrom: (a as any).availableFrom || null,
-        lockAfterDue: (a as any).lockAfterDue,
-        gradeReleaseMode: (a as any).gradeReleaseMode,
-        defaultGradeHidden: (a as any).defaultGradeHidden,
-        attachments: a.attachments || [],
-        createdBy: a.createdBy,
-        type: ((a as any).type === 'discussion' || (a as any).group === 'Discussions') ? 'discussion' : 'assignment',
-        group: (a as any).group || 'Assignments',
-        totalPoints: (a as any).totalPoints || (a as any).points || 0,
-        published: (a as any).published !== undefined ? (a as any).published : true,
-        replies: (a as any).replies || [],
-        studentGrades: (a as any).studentGrades || [],
-      })),
-      ...discussions.map(d => ({
-        _id: d._id,
-        title: d.title,
-        dueDate: d.dueDate || (d as any).due_date || (d as any).discussionDueDate || null,
-        availableFrom: (d as any).availableFrom || null,
-        lockAfterDue: (d as any).lockAfterDue,
-        attachments: [],
-        createdBy: d.author || { firstName: '', lastName: '' },
-        type: 'discussion',
-        group: d.group || 'Discussions',
-        totalPoints: d.totalPoints || 0,
-        published: d.published !== undefined ? d.published : true,
-        replies: d.replies || [],
-        studentGrades: d.studentGrades || [],
-      }))
-    ];
-    const filteredList = mergedList.filter(item => {
-      if (selectedTab === 'all') return true;
-      if (selectedTab === 'published') return item.published;
-      if (selectedTab === 'unpublished') return !item.published;
-      if (selectedTab === 'assignment') return item.type === 'assignment';
-      if (selectedTab === 'discussion') return item.type === 'discussion';
-      return true;
+
+    const mergedList = propAssignments
+      ? assignmentsList.map(item => normalizeListItem(item))
+      : [
+          ...assignmentsList.map(item => normalizeListItem(item)),
+          ...discussions.map(d =>
+            normalizeListItem({
+              ...d,
+              type: 'discussion',
+              group: d.group || 'Discussions',
+              createdBy: d.author || { firstName: '', lastName: '' },
+            })
+          ),
+        ];
+
+    return mergedList.filter(item => item.published !== false || item.type === 'discussion');
+  }, [isStudentViewer, propAssignments, assignments, discussions]);
+
+  const studentCanvasGroups = useMemo(() => {
+    if (!isStudentViewer) return [];
+    const itemNoun = isQuizzesView ? 'Quizzes' : 'Assignments';
+    return buildStudentCanvasGroups(studentListItems, {
+      studentId,
+      submissionMap,
+      submissionByAssignmentId,
+      itemNoun,
     });
-    const chronological = sortItemsByDueDateDesc(filteredList);
-    setGroupedAssignments([{ label: '', items: chronological }]);
-  }, [propAssignments, assignments, discussions, studentSubmissions, submissionMap, studentId, userRole, selectedTab]);
+  }, [
+    isStudentViewer,
+    studentListItems,
+    studentId,
+    submissionMap,
+    submissionByAssignmentId,
+    isQuizzesView,
+  ]);
 
-  // Define columns for teacher/admin table view (must be before early returns)
-  type AssignmentItem = {
-    _id: string;
-    title: string;
-    dueDate: string | null;
-    group: string;
-    totalPoints: number;
-    published: boolean;
-    type: 'assignment' | 'discussion';
-  };
-
-  // Function to generate consistent color for any group name
-  const getGroupColor = (groupName: string) => {
-    // Create a hash from the group name to generate consistent colors
-    let hash = 0;
-    for (let i = 0; i < groupName.length; i++) {
-      hash = groupName.charCodeAt(i) + ((hash << 5) - hash);
+  useEffect(() => {
+    if (!isTeacherOrAdmin || !courseId) {
+      setEnrolledStudentIds([]);
+      setEnrolledStudentsLoaded(true);
+      return;
     }
-    
-    // Use the hash to select from a predefined set of colors
-    const colors = [
-      'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300',
-      'bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300', 
-      'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300',
-      'bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-300',
-      'bg-pink-100 dark:bg-pink-900/50 text-pink-700 dark:text-pink-300',
-      'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300',
-      'bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300',
-      'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-300',
-      'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300',
-      'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-    ];
-    
-    const colorIndex = Math.abs(hash) % colors.length;
-    return colors[colorIndex];
-  };
 
-  const assignmentColumns = useMemo<Column<AssignmentItem>[]>(() => {
-    const cols: Column<AssignmentItem>[] = [
-      {
-        key: 'title',
-        label: 'Title',
-        sortable: true,
-        render: (item) => (
-          <div>
-            <span className="text-indigo-700 dark:text-indigo-400 font-medium hover:underline text-xs sm:text-sm truncate block max-w-[200px]">{item.title}</span>
-            {!isQuizzesView && (
-              <div className="sm:hidden mt-1">
-                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getGroupColor(item.group)}`}>
-                  {item.group}
-                </span>
-              </div>
-            )}
-            <div className="md:hidden mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {item.dueDate ? format(new Date(item.dueDate), 'PPp') : '-'}
-            </div>
-            <div className="lg:hidden mt-1">
-              {item.published ? (
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300">Published</span>
-              ) : (
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300">Unpublished</span>
-              )}
-            </div>
-          </div>
-        ),
-        className: 'px-2 sm:px-4 py-2 w-[200px] max-w-[200px]',
-        headerClassName: 'w-[200px] max-w-[200px]',
-        sortFn: (a, b) => a.title.localeCompare(b.title)
+    let cancelled = false;
+    setEnrolledStudentsLoaded(false);
+
+    const loadEnrolledStudents = async () => {
+      try {
+        const res = await api.get(`/courses/${courseId}/students`);
+        const students = Array.isArray(res.data) ? res.data : res.data?.data || [];
+        if (!cancelled) {
+          setEnrolledStudentIds(
+            students
+              .map((student: { _id?: string }) => String(student._id || ''))
+              .filter(Boolean)
+          );
+        }
+      } catch {
+        if (!cancelled) setEnrolledStudentIds([]);
+      } finally {
+        if (!cancelled) setEnrolledStudentsLoaded(true);
       }
-    ];
+    };
 
-    if (!isQuizzesView) {
-      cols.push({
-        key: 'group',
-        label: 'Group',
-        sortable: true,
-        render: (item) => (
-          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getGroupColor(item.group)}`}>
-            {item.group}
-          </span>
-        ),
-        className: 'px-2 sm:px-4 py-2 text-xs sm:text-sm text-gray-600 dark:text-gray-300 hidden sm:table-cell',
-        sortFn: (a, b) => a.group.localeCompare(b.group)
-      });
+    loadEnrolledStudents();
+    return () => {
+      cancelled = true;
+    };
+  }, [isTeacherOrAdmin, courseId]);
+
+  const assignmentsList = useMemo(
+    () =>
+      propAssignments
+        ? (Array.isArray(propAssignments) ? propAssignments : [])
+        : (Array.isArray(assignments) ? assignments : []),
+    [propAssignments, assignments]
+  );
+
+  const flatList = useMemo(() => {
+    const normalized = assignmentsList.map(item => normalizeListItem(item));
+    const searched = filterListBySearch(normalized, searchQuery);
+    return sortItemsByDueDateDesc(searched);
+  }, [assignmentsList, searchQuery]);
+
+  const flatListItemKey = useMemo(
+    () => (isTeacherOrAdmin ? flatList.map(item => `${item._id}:${item.type}`).join('|') : ''),
+    [isTeacherOrAdmin, flatList]
+  );
+
+  useEffect(() => {
+    if (!isTeacherOrAdmin || flatList.length === 0) {
+      setAveragePercentById({});
+      setLoadingAverages(false);
+      return;
     }
 
-    cols.push({
-      key: 'dueDate',
-      label: 'Due Date',
-      sortable: true,
-      render: (item) => item.dueDate ? format(new Date(item.dueDate), 'PPp') : '-',
-      className: 'px-2 sm:px-4 py-2 text-xs sm:text-sm text-gray-600 dark:text-gray-300 hidden md:table-cell',
-      sortFn: (a, b) => {
-        if (!a.dueDate && !b.dueDate) return 0;
-        if (!a.dueDate) return 1;
-        if (!b.dueDate) return -1;
-        return new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime();
+    if (courseId && !enrolledStudentsLoaded) {
+      setLoadingAverages(true);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingAverages(true);
+
+    const loadAverages = async () => {
+      const results = await Promise.all(
+        flatList.map(async item => {
+          if (item.type === 'discussion') {
+            const percent = await fetchDiscussionAveragePercent(
+              item._id,
+              item.totalPoints,
+              enrolledStudentIds,
+              item
+            );
+            return [item._id, percent] as const;
+          }
+          const percent = await fetchAssignmentAveragePercent(
+            item._id,
+            item.totalPoints,
+            enrolledStudentIds
+          );
+          return [item._id, percent] as const;
+        })
+      );
+      if (!cancelled) {
+        setAveragePercentById(Object.fromEntries(results));
+        setLoadingAverages(false);
       }
-    });
+    };
 
-    cols.push({
-      key: 'totalPoints',
-      label: isQuizzesView ? 'Total Points' : 'Points',
-      sortable: true,
-      render: (item) => item.totalPoints,
-      className: 'px-2 sm:px-4 py-2 text-xs sm:text-sm text-gray-600 dark:text-gray-300',
-      sortFn: (a, b) => a.totalPoints - b.totalPoints
-    });
-
-    if (isTeacherOrAdmin) {
-      cols.push({
-        key: 'published',
-        label: 'Status',
-        sortable: true,
-        render: (item) => (
-          item.published ? (
-            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300">Published</span>
-          ) : (
-            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300">Unpublished</span>
-          )
-        ),
-        className: 'px-2 sm:px-4 py-2 hidden lg:table-cell',
-        sortFn: (a, b) => (a.published ? 1 : 0) - (b.published ? 1 : 0)
-      });
-
-      cols.push({
-        key: 'actions',
-        label: 'Actions',
-        sortable: false,
-        render: (item) => (
-          <div className="space-x-1 sm:space-x-2" onClick={(e) => e.stopPropagation()}>
-            {item.type === 'assignment' && (
-              <Link
-                to={`/assignments/${item._id}/edit`}
-                className="inline-flex min-h-[38px] items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-                style={{ textDecoration: 'none' }}
-              >
-                Edit
-              </Link>
-            )}
-          </div>
-        ),
-        className: 'px-2 sm:px-4 py-2'
-      });
-    }
-
-    return cols;
-  }, [isQuizzesView, isTeacherOrAdmin]);
+    loadAverages();
+    return () => {
+      cancelled = true;
+    };
+  }, [isTeacherOrAdmin, flatListItemKey, enrolledStudentIds, courseId, enrolledStudentsLoaded]);
 
   if (loading) {
     return (
@@ -418,15 +810,6 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
       </div>
     );
   }
-
-  // Bulk actions (UI only, logic to be implemented as needed)
-  const allSelected = selectedIds.length === groupedAssignments.length && groupedAssignments.length > 0;
-  const toggleSelectAll = () => {
-    setSelectedIds(allSelected ? [] : groupedAssignments.map(group => group.label));
-  };
-  const toggleSelect = (id: string) => {
-    setSelectedIds(ids => ids.includes(id) ? ids.filter(i => i !== id) : [...ids, id]);
-  };
 
   // Bulk action handlers
   const handleBulkPublish = async () => {
@@ -603,310 +986,313 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
   };
 
   // Filtering and sorting logic for both roles
-  const filterList = (list: any[]) => {
-    return list.filter(item => {
-      if (selectedTab === 'all') return true;
-      if (selectedTab === 'published') return item.published;
-      if (selectedTab === 'unpublished') return !item.published;
-      if (selectedTab === 'assignment') return item.type === 'assignment';
-      if (selectedTab === 'discussion') return item.type === 'discussion';
-      return true;
-    });
+  const toggleSelect = (id: string) => {
+    setSelectedIds(ids => (ids.includes(id) ? ids.filter(i => i !== id) : [...ids, id]));
+  };
+  const allRowsSelected =
+    isTeacherOrAdmin &&
+    flatList.length > 0 &&
+    flatList.every(item => selectedIds.includes(item._id));
+  const toggleSelectAll = () => {
+    if (!isTeacherOrAdmin) return;
+    setSelectedIds(allRowsSelected ? [] : flatList.map(i => i._id));
   };
 
-  // For teacher/admin, normalize and filter the flat list
-  const assignmentsList = propAssignments 
-    ? (Array.isArray(propAssignments) ? propAssignments : [])
-    : (Array.isArray(assignments) ? assignments : []);
-  const flatList = sortItemsByDueDateDesc(
-    filterList(
-      assignmentsList.map(item => ({
-        _id: item._id,
-        title: item.title,
-        dueDate: item.dueDate || (item as any).due_date || (item as any).discussionDueDate || null,
-        attachments: item.attachments || [],
-        createdBy: item.createdBy || (item as any).author || { firstName: '', lastName: '' },
-        type: ((item as any).type === 'discussion' || (item as any).group === 'Discussions') ? 'discussion' : 'assignment',
-        group: (item as any).group || 'Assignments',
-        totalPoints: (item as any).totalPoints || (item as any).points || 0,
-        published: (item as any).published !== undefined ? (item as any).published : true,
-        replies: (item as any).replies || [],
-        studentGrades: (item as any).studentGrades || [],
-      }))
-    )
-  );
+  const toggleStudentSection = (sectionKey: string) => {
+    setExpandedStudentSections(prev => ({
+      ...prev,
+      [sectionKey]: !prev[sectionKey],
+    }));
+  };
 
-  // For students, filter grouped assignments as before
-  const filteredGroupedAssignments = userRole === 'student' && groupedAssignments.length > 0
-    ? groupedAssignments.map(group => ({
-        ...group,
-        items: filterList(group.items)
-      })).filter(group => group.items.length > 0)
-    : [];
+  const canvasGroups =
+    isStudentViewer
+      ? studentCanvasGroups
+      : isTeacherOrAdmin
+        ? listViewMode === 'type'
+          ? buildTeacherTypeGroups(flatList, isQuizzesView)
+          : [{ key: 'all', label: '', items: flatList }]
+        : [];
+
+  const showGroupHeaders = isStudentViewer || (isTeacherOrAdmin && listViewMode === 'type');
+  const searchPlaceholder = isQuizzesView ? 'Search for Quiz' : 'Search for Assignment';
+
+  const canvasHasItems = canvasGroups.some(g => g.items.length > 0);
 
   return (
     <PullToRefresh onRefresh={handleRefresh} className="space-y-3 sm:space-y-4">
       <div className="space-y-3 sm:space-y-4">
-      {/* Tabs */}
+      {/* Assignment list toolbar (teachers) */}
       {isTeacherOrAdmin && (
-        <div className="mb-4 flex flex-wrap gap-2 overflow-x-auto rounded-lg border border-gray-200 bg-gray-50 p-1.5 dark:border-gray-700 dark:bg-gray-800">
-          {(isQuizzesView ? TABS.filter(tab => tab.value !== 'assignment' && tab.value !== 'discussion') : TABS).map(tab => (
-            <button
-              key={tab.value}
-              className={`min-h-[40px] whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none touch-manipulation active:scale-95 ${selectedTab === tab.value ? 'bg-white text-indigo-700 shadow-sm dark:bg-gray-900 dark:text-indigo-300' : 'text-gray-600 dark:text-gray-400 hover:bg-white/70 hover:text-indigo-600 dark:hover:bg-gray-700 dark:hover:text-indigo-300'}`}
-              onClick={() => setSelectedTab(tab.value)}
+        <div className="mb-4 overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="relative w-full sm:w-auto sm:min-w-[200px]">
+              <label htmlFor="assignment-grading-period" className="sr-only">
+                Grading period
+              </label>
+              <select
+                id="assignment-grading-period"
+                value={gradingPeriod}
+                onChange={e => setGradingPeriod(e.target.value)}
+                className={`${FORM_SELECT} min-h-[44px] w-full appearance-none bg-slate-50/80 pr-10 dark:bg-slate-800/50`}
+              >
+                <option value="all">All grading periods</option>
+              </select>
+              <ChevronDown
+                className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                aria-hidden
+              />
+            </div>
+
+            <div className="relative min-w-0 flex-1">
+              <label htmlFor="assignment-search" className="sr-only">
+                {searchPlaceholder}
+              </label>
+              <Search
+                className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                aria-hidden
+              />
+              <input
+                id="assignment-search"
+                type="search"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder={searchPlaceholder}
+                className={`${FORM_INPUT} min-h-[44px] w-full bg-slate-50/80 pl-10 dark:bg-slate-800/50`}
+              />
+            </div>
+
+            <div
+              className="flex shrink-0 rounded-xl border border-slate-200 bg-slate-100/80 p-1 dark:border-slate-700 dark:bg-slate-800/60"
+              role="group"
+              aria-label="List view"
             >
-              {tab.label}
-            </button>
-          ))}
+              <button
+                type="button"
+                onClick={() => setListViewMode('date')}
+                className={`inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition touch-manipulation sm:px-4 sm:text-sm ${
+                  listViewMode === 'date'
+                    ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200/80 dark:bg-slate-900 dark:text-indigo-300 dark:ring-slate-700'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
+                }`}
+              >
+                <CalendarDays className="h-4 w-4 shrink-0" aria-hidden />
+                <span>By date</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setListViewMode('type')}
+                className={`inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition touch-manipulation sm:px-4 sm:text-sm ${
+                  listViewMode === 'type'
+                    ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200/80 dark:bg-slate-900 dark:text-indigo-300 dark:ring-slate-700'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
+                }`}
+              >
+                <Layers className="h-4 w-4 shrink-0" aria-hidden />
+                <span>By type</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
-
-      {/* Mobile Card View */}
-      <div className="md:hidden space-y-3">
-        {userRole === 'student' && filteredGroupedAssignments.length > 0 ? (
-          filteredGroupedAssignments.map(group => (
-            <div key={group.label || 'by-due-date'}>
-              {group.label ? (
-                <div className="bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-semibold py-2 px-3 text-xs sm:text-sm rounded-t-lg">{group.label}</div>
-              ) : null}
-              {group.items.map(item => {
-                const dueDate = item.dueDate ? new Date(item.dueDate) : null;
-                const status = resolveAssignmentWorkflowStatus({
-                  assignment: item,
-                  submission: submissionByAssignmentId.get(String(item._id)) || null,
-                });
-                return (
-                  <div key={item._id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-3 mb-2 last:mb-0">
-                    <div className="flex items-start justify-between gap-3 sm:gap-2 mb-2">
-                      <h3 className="text-sm font-medium text-indigo-700 dark:text-indigo-400 flex-1">{item.title}</h3>
-                      <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{item.totalPoints} pts</span>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-3 sm:gap-2 text-xs text-gray-500 dark:text-gray-400">
-                      {!isQuizzesView && (
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded font-medium ${getGroupColor(item.group)}`}>
-                          {item.group}
-                        </span>
-                      )}
-                      {dueDate && (
-                        <span>{format(dueDate, 'PPp')}</span>
-                      )}
-                      <span
-                        className="inline-flex items-center rounded bg-slate-100 px-2 py-0.5 font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200"
-                        aria-label={`Assignment status: ${ASSIGNMENT_STATUS_LABELS[status]}`}
-                      >
-                        {ASSIGNMENT_STATUS_LABELS[status]}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
+      {isTeacherOrAdmin && flatList.length > 0 && (
+        <div className="mb-1 flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/90 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-900/60">
+          <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+              checked={allRowsSelected}
+              onChange={toggleSelectAll}
+              aria-label="Select all items"
+            />
+            Select all
+          </label>
+          {selectedIds.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2 border-l border-slate-200 pl-3 dark:border-slate-600">
+              <button
+                type="button"
+                onClick={handleBulkPublish}
+                className="rounded px-3 py-1.5 text-xs font-medium text-green-800 transition-colors hover:bg-green-200 dark:text-green-200 bg-green-100 dark:bg-green-900/50 dark:hover:bg-green-900/70"
+              >
+                Publish
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkUnpublish}
+                className="rounded px-3 py-1.5 text-xs font-medium text-yellow-800 transition-colors hover:bg-yellow-200 dark:text-yellow-200 bg-yellow-100 dark:bg-yellow-900/50 dark:hover:bg-yellow-900/70"
+              >
+                Unpublish
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkDelete}
+                className="rounded px-3 py-1.5 text-xs font-medium text-red-800 transition-colors hover:bg-red-200 dark:text-red-200 bg-red-100 dark:bg-red-900/50 dark:hover:bg-red-900/70"
+              >
+                Delete
+              </button>
             </div>
-          ))
-        ) : isTeacherOrAdmin ? (
-          flatList.length === 0 ? (
-            <div className="text-center py-6 text-gray-400 dark:text-gray-500 text-sm">No {isQuizzesView ? 'quizzes' : 'assignments'} found</div>
-          ) : (
-            flatList.map(item => {
-              const dueDate = item.dueDate ? new Date(item.dueDate) : null;
-              return (
-                <SwipeableListItem
-                  key={item._id}
-                  rightActions={
-                    isTeacherOrAdmin ? (
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => navigate(`/assignments/${item._id}/edit`)}
-                          className="flex items-center justify-center w-12 h-12 rounded-full bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white transition-all active:scale-95 shadow-lg"
-                          aria-label="Edit"
-                        >
-                          <Edit className="w-5 h-5" strokeWidth={2} />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteItem(item._id)}
-                          className="flex items-center justify-center w-12 h-12 rounded-full bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 text-white transition-all active:scale-95 shadow-lg"
-                          aria-label="Delete"
-                        >
-                          <Trash2 className="w-5 h-5" strokeWidth={2} />
-                        </button>
-                      </div>
-                    ) : undefined
-                  }
-                  enabled={isTeacherOrAdmin}
-                  actionWidth={140}
-                >
-                  <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-3 sm:gap-2 flex-1 min-w-0">
-                      <label 
-                        htmlFor={`select-assignment-mobile-${item._id}`}
-                        className="min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer p-2 flex-shrink-0"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <input 
-                          type="checkbox" 
-                          id={`select-assignment-mobile-${item._id}`} 
-                          checked={selectedIds.includes(item._id)} 
-                          onChange={() => toggleSelect(item._id)} 
-                          className="w-4 h-4 flex-shrink-0"
-                        />
-                      </label>
-                      <h3 
-                        className="text-sm font-medium text-indigo-700 dark:text-indigo-400 flex-1 cursor-pointer"
-                        onClick={(e) => handleRowClick(item, e)}
-                      >
-                        {item.title}
-                      </h3>
-                    </div>
-                    <span className="text-xs font-medium text-gray-600 dark:text-gray-300 flex-shrink-0">{item.totalPoints} pts</span>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mb-2">
-                    {!isQuizzesView && (
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded font-medium ${getGroupColor(item.group)}`}>
-                        {item.group}
-                      </span>
-                    )}
-                    {dueDate && (
-                      <span>{format(dueDate, 'PPp')}</span>
-                    )}
-                    {item.published ? (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded font-medium bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300">Published</span>
-                    ) : (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded font-medium bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300">Unpublished</span>
-                    )}
-                  </div>
-                  </div>
-                </SwipeableListItem>
-              );
-            })
-          )
-        ) : (
-          <div className="text-center py-6 text-gray-400 dark:text-gray-500 text-sm">No {isQuizzesView ? 'quizzes' : 'assignments'} found</div>
-        )}
-      </div>
+          ) : null}
+        </div>
+      )}
 
-      {/* Desktop Table View */}
-      <div className="hidden md:block -mx-2 sm:mx-0">
-        {userRole === 'student' && filteredGroupedAssignments.length > 0 ? (
-          // Student view with grouping - keep original table
-          <div className="overflow-x-auto bg-white dark:bg-gray-900 shadow rounded-lg border border-gray-200 dark:border-gray-700">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50 dark:bg-gray-800">
-            <tr>
-              <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-[200px] max-w-[200px]">Title</th>
-              {!isQuizzesView && <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">Group</th>}
-              <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden md:table-cell">Due Date</th>
-              <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{isQuizzesView ? 'Total Points' : 'Points'}</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                {filteredGroupedAssignments.flatMap(group => [
-                ...(group.label
-                  ? [
-                      <tr key={`hdr-${group.label}`}>
-                        <td colSpan={isQuizzesView ? 3 : 4} className="bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-semibold py-2 pl-2 text-xs sm:text-sm">{group.label}</td>
-                      </tr>,
-                    ]
-                  : []),
-                ...group.items.map(item => {
-                  const dueDate = item.dueDate ? new Date(item.dueDate) : null;
-                  return (
-                    <tr
-                      key={item._id}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
-                      onClick={(e) => handleRowClick(item, e)}
-                    >
-                      <td className="px-2 sm:px-4 py-2 w-[200px] max-w-[200px]">
-                        <span className="text-indigo-700 dark:text-indigo-400 font-medium hover:underline text-xs sm:text-sm truncate block max-w-[200px]">{item.title}</span>
-                        {!isQuizzesView && (
-                          <div className="sm:hidden mt-1">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getGroupColor(item.group)}`}>
-                              {item.group}
+      {(isStudentViewer || isTeacherOrAdmin) &&
+        (canvasHasItems ? (
+          <div className="space-y-4">
+            {canvasGroups.map(group => {
+              const isExpanded = isStudentViewer ? expandedStudentSections[group.key] !== false : true;
+              return (
+              <div key={group.key || group.label || 'by-due-date'}>
+                {isStudentViewer && group.label ? (
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 border border-b-0 border-slate-200 bg-slate-100 px-3 py-2.5 text-left transition hover:bg-slate-200/80 dark:border-slate-700 dark:bg-slate-800/80 dark:hover:bg-slate-800"
+                    onClick={() => toggleStudentSection(group.key)}
+                    aria-expanded={isExpanded}
+                  >
+                    {isExpanded ? (
+                      <ChevronDown className="h-4 w-4 shrink-0 text-slate-600 dark:text-slate-300" aria-hidden />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 shrink-0 text-slate-600 dark:text-slate-300" aria-hidden />
+                    )}
+                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                      {group.label}
+                    </span>
+                  </button>
+                ) : isTeacherOrAdmin && listViewMode === 'type' && group.label ? (
+                  <div className="border border-b-0 border-slate-200 bg-slate-100 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800/80">
+                    <span className="text-sm font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200">
+                      {group.label}
+                    </span>
+                  </div>
+                ) : null}
+                {(!isStudentViewer || isExpanded) && (
+                <div className={`border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950 ${showGroupHeaders && group.label ? 'border-t-0' : 'border-y'}`}>
+                  <ul className="divide-y divide-slate-200 dark:divide-slate-800">
+                    {group.items.map(item => {
+                      const dueDate = item.dueDate ? new Date(item.dueDate) : null;
+                      const dueOk = Boolean(dueDate && !Number.isNaN(dueDate.getTime()));
+                      const submission = submissionByAssignmentId.get(String(item._id));
+                      const earned = getEarnedScoreForItem(item, submission, studentId);
+                      const dateMetaParts = buildAssignmentMetaParts({
+                        dueOk,
+                        dueDate,
+                        showPoints: false,
+                        pointsSegment: '',
+                      });
+                      const showStudentPoints =
+                        isStudentViewer && Math.max(0, Math.round(Number(item.totalPoints) || 0)) > 0;
+                      const rowIcon =
+                        item.type === 'discussion' ? (
+                          <MessageSquare className="h-5 w-5" aria-hidden />
+                        ) : isQuizItem(item) ? (
+                          <Rocket className="h-5 w-5" aria-hidden />
+                        ) : (
+                          <FilePenLine className="h-5 w-5" aria-hidden />
+                        );
+                      return (
+                        <li key={item._id} className="flex items-stretch">
+                          {isTeacherOrAdmin ? (
+                            <label
+                              className="flex shrink-0 cursor-pointer items-center px-2 py-4"
+                              onClick={e => e.stopPropagation()}
+                            >
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                checked={selectedIds.includes(item._id)}
+                                onChange={() => toggleSelect(item._id)}
+                                aria-label={`Select ${item.title}`}
+                              />
+                            </label>
+                          ) : null}
+                          <button
+                            type="button"
+                            className="flex min-w-0 flex-1 items-center gap-4 px-1 py-4 text-left transition hover:bg-slate-50/80 sm:px-2 dark:hover:bg-slate-900/80"
+                            onClick={e => handleRowClick(item, e)}
+                          >
+                            <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center text-slate-600 dark:text-slate-400">
+                              {rowIcon}
                             </span>
-                          </div>
-                        )}
-                        <div className="md:hidden mt-1 text-xs text-gray-500 dark:text-gray-400">
-                          {dueDate ? format(dueDate, 'PPp') : '-'}
-                        </div>
-                      </td>
-                      {!isQuizzesView && (
-                        <td className="px-2 sm:px-4 py-2 text-xs sm:text-sm text-gray-600 dark:text-gray-300 hidden sm:table-cell">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getGroupColor(item.group)}`}>
-                            {item.group}
-                          </span>
-                        </td>
-                      )}
-                      <td className="px-2 sm:px-4 py-2 text-xs sm:text-sm text-gray-600 dark:text-gray-300 hidden md:table-cell">{dueDate ? format(dueDate, 'PPp') : '-'}</td>
-                      <td className="px-2 sm:px-4 py-2 text-xs sm:text-sm text-gray-600 dark:text-gray-300">{item.totalPoints}</td>
-                    </tr>
-                  );
-                })
-                ])}
-              </tbody>
-            </table>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-[0.95rem] font-semibold leading-snug text-slate-900 dark:text-slate-50 sm:text-base">
+                                {item.title}
+                              </span>
+                              <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+                                {isStudentViewer ? (
+                                  <>
+                                    {dateMetaParts.map((part, i) => (
+                                      <React.Fragment key={`${item._id}-meta-${i}`}>
+                                        {i > 0 ? (
+                                          <span className="text-slate-300 dark:text-slate-600" aria-hidden>
+                                            |
+                                          </span>
+                                        ) : null}
+                                        <span>{renderMetaPartContent(part)}</span>
+                                      </React.Fragment>
+                                    ))}
+                                    {showStudentPoints ? (
+                                      <>
+                                        <span className="text-slate-300 dark:text-slate-600" aria-hidden>
+                                          |
+                                        </span>
+                                        {renderStudentPointsDisplay(earned, item.totalPoints)}
+                                      </>
+                                    ) : null}
+                                  </>
+                                ) : (
+                                  dateMetaParts.map((part, i) => (
+                                    <React.Fragment key={`${item._id}-date-${i}`}>
+                                      {i > 0 ? (
+                                        <span className="text-slate-300 dark:text-slate-600" aria-hidden>
+                                          |
+                                        </span>
+                                      ) : null}
+                                      <span>{renderMetaPartContent(part)}</span>
+                                    </React.Fragment>
+                                  ))
+                                )}
+                              </span>
+                            </span>
+                          </button>
+                          {isTeacherOrAdmin ? (
+                            <div
+                              className="flex shrink-0 items-center border-l border-slate-100 px-3 py-2 dark:border-slate-800"
+                              onClick={e => e.stopPropagation()}
+                            >
+                              <span
+                                className="min-w-[3.5rem] text-right text-sm font-semibold tabular-nums text-slate-800 dark:text-slate-100"
+                                title="Class average across enrolled students (missing or ungraded work counts as 0)"
+                              >
+                                {loadingAverages && averagePercentById[item._id] === undefined
+                                  ? '…'
+                                  : formatAveragePercentLabel(averagePercentById[item._id])}
+                              </span>
+                            </div>
+                          ) : null}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+                )}
+              </div>
+            );
+            })}
           </div>
-            ) : isTeacherOrAdmin ? (
-          // Teacher/Admin view - use DataTable with sorting and pagination
-          <DataTable<AssignmentItem>
-            data={flatList as AssignmentItem[]}
-            columns={assignmentColumns}
-            keyExtractor={(item) => item._id}
-            selectable={true}
-            selectedKeys={selectedIds}
-            onSelectionChange={setSelectedIds}
-            emptyMessage={`No ${isQuizzesView ? 'quizzes' : 'assignments'} found`}
-            pageSize={25}
-            onRowClick={(item, e) => handleRowClick(item, e)}
-            className=""
-            tableClassName="divide-y divide-gray-200"
-            virtualScrolling={true}
-            virtualScrollingThreshold={100}
-            virtualScrollingHeight={600}
-            estimatedRowHeight={55}
-            bulkActions={
-              <>
-                <button
-                  onClick={handleBulkPublish}
-                  className="px-3 py-1.5 text-xs sm:text-sm bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 rounded hover:bg-green-200 dark:hover:bg-green-900/70 transition-colors"
-                >
-                  Publish
-                </button>
-                <button
-                  onClick={handleBulkUnpublish}
-                  className="px-3 py-1.5 text-xs sm:text-sm bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-300 rounded hover:bg-yellow-200 dark:hover:bg-yellow-900/70 transition-colors"
-                >
-                  Unpublish
-                </button>
-                <button
-                  onClick={handleBulkDelete}
-                  className="px-3 py-1.5 text-xs sm:text-sm bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 rounded hover:bg-red-200 dark:hover:bg-red-900/70 transition-colors"
-                >
-                  Delete
-                </button>
-              </>
-            }
-          />
         ) : (
-          <div className="bg-white dark:bg-gray-900 shadow rounded-lg border border-gray-200 dark:border-gray-700 p-6 text-center text-gray-400 dark:text-gray-500">
+          <div className="border border-slate-200 bg-white py-12 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400">
             No {isQuizzesView ? 'quizzes' : 'assignments'} found
-                          </div>
-                        )}
-      </div>
+          </div>
+        ))}
 
       {/* Delete Confirmation Modal */}
       <ConfirmationModal
         isOpen={showDeleteConfirm}
-        onClose={() => {
-          setShowDeleteConfirm(false);
-          setItemToDelete(null);
-        }}
-        onConfirm={itemToDelete ? confirmDeleteItem : confirmBulkDelete}
-        title={itemToDelete ? "Delete Item" : "Delete Items"}
-        message={itemToDelete 
-          ? "Are you sure you want to delete this item? This action cannot be undone."
-          : `Are you sure you want to delete ${selectedIds.length} item${selectedIds.length !== 1 ? 's' : ''}? This action cannot be undone.`
-        }
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmBulkDelete}
+        title="Delete Items"
+        message={`Are you sure you want to delete ${selectedIds.length} item${selectedIds.length !== 1 ? 's' : ''}? This action cannot be undone.`}
         confirmText="Delete"
         cancelText="Cancel"
         variant="danger"

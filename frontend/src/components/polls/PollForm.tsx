@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { API_URL } from '../../config';
-import { X, Plus, Trash2, Calendar, Save, RefreshCw } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import FloatingLabelInput from '../common/FloatingLabelInput';
 import DatePicker from '../common/DatePicker';
 import FormFieldGroup from '../common/FormFieldGroup';
 import { useDraftManager } from '../../hooks/useDraftManager';
+import { FormCheckboxOption, FormPageHeader, FormActions } from '../common/FormControls';
+import { BTN_ADD, BTN_ICON_DANGER, FORM_ERROR, FORM_INPUT, FORM_SHELL } from '../common/formStyles';
 import ConfirmationModal from '../common/ConfirmationModal';
 
 interface PollFormProps {
@@ -280,70 +282,38 @@ const PollForm: React.FC<PollFormProps> = ({ courseId, poll, onClose, onSuccess 
   };
 
   return (
-    <div className="w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 sm:p-6 border dark:border-gray-700">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4 sm:mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center gap-3">
-          <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100">
-            {isEditing ? 'Edit Poll' : 'Create New Poll'}
-          </h2>
-          {isDraftSaved && !isEditing && (
-            <div className="flex items-center text-sm text-green-600 dark:text-green-400">
-              <Save className="w-4 h-4 mr-1" />
-              Draft saved
-            </div>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {!isEditing && (
-            <button
-              type="button"
-              onClick={handleResetForm}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
-              title="Clear form and start fresh"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Reset
-            </button>
-          )}
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors flex-shrink-0"
-          >
-            <X className="w-5 h-5 sm:w-6 sm:h-6" />
-          </button>
-        </div>
-      </div>
+    <div className={`${FORM_SHELL} p-4 sm:p-6`}>
+      <FormPageHeader
+        title={isEditing ? 'Edit poll' : 'Create new poll'}
+        subtitle="Ask your class a question and collect votes."
+        isDraftSaved={isDraftSaved && !isEditing}
+        onReset={!isEditing ? handleResetForm : undefined}
+        onClose={onClose}
+      />
 
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6">
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="text-red-700">{error}</p>
+            <div className={FORM_ERROR} role="alert">
+              {error}
             </div>
           )}
 
-          {/* Title */}
-          <div>
-            <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Poll Title *
-            </label>
-            <input
-              type="text"
+          <FormFieldGroup title="Poll details" description="Title and when voting closes">
+            <FloatingLabelInput
               id="title"
+              name="title"
+              type="text"
+              label="Poll title"
+              required
               value={formData.title}
               onChange={(e) => handleInputChange('title', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-100"
-              placeholder="e.g., What type of content would you prefer for next week?"
+              showCharacterCount
               maxLength={200}
+              placeholder="e.g., What type of content would you prefer for next week?"
             />
-          </div>
-
-          
-
             <DatePicker
               id="endDate"
-              label="End Date"
+              label="End date"
               showTime={true}
               required
               value={formData.endDate}
@@ -358,20 +328,20 @@ const PollForm: React.FC<PollFormProps> = ({ courseId, poll, onClose, onSuccess 
               helperText="Select when the poll should end (10-minute increments)"
               min={new Date().toISOString().split('T')[0]}
             />
+          </FormFieldGroup>
 
-          {/* Options */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Poll Options * (at least 2)
-            </label>
+          <FormFieldGroup title="Answer options" description="Add at least two choices for students">
             <div className="space-y-3">
               {formData.options.map((option, index) => (
                 <div key={index} className="flex items-center gap-2">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                    {index + 1}
+                  </span>
                   <input
                     type="text"
                     value={option}
                     onChange={(e) => handleOptionChange(index, e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-100"
+                    className={`${FORM_INPUT} min-w-0 flex-1`}
                     placeholder={`Option ${index + 1}`}
                     maxLength={200}
                   />
@@ -379,97 +349,48 @@ const PollForm: React.FC<PollFormProps> = ({ courseId, poll, onClose, onSuccess 
                     <button
                       type="button"
                       onClick={() => removeOption(index)}
-                      className="p-2 text-red-500 hover:text-red-700 transition-colors"
+                      className={BTN_ICON_DANGER}
                       title="Remove option"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   )}
                 </div>
               ))}
             </div>
             {formData.options.length < 10 && (
-              <button
-                type="button"
-                onClick={addOption}
-                className="mt-3 flex items-center gap-2 text-blue-600 hover:text-blue-700 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                Add Option
+              <button type="button" onClick={addOption} className={`${BTN_ADD} mt-3`}>
+                <Plus className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                Add option
               </button>
             )}
-          </div>
+          </FormFieldGroup>
 
-          {/* Settings */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Allow Multiple Votes
-                </label>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Students can select multiple options
-                </p>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.allowMultipleVotes}
-                  onChange={(e) => handleInputChange('allowMultipleVotes', e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-              </label>
+          <FormFieldGroup title="Poll settings" description="Control how students vote and see results">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <FormCheckboxOption
+                id="allowMultipleVotes"
+                checked={formData.allowMultipleVotes}
+                onChange={(e) => handleInputChange('allowMultipleVotes', e.target.checked)}
+                title="Allow multiple votes"
+                description="Students can select more than one option."
+              />
+              <FormCheckboxOption
+                id="resultsVisible"
+                checked={formData.resultsVisible}
+                onChange={(e) => handleInputChange('resultsVisible', e.target.checked)}
+                title="Show results to students"
+                description="Students can see results before the poll ends."
+              />
             </div>
+          </FormFieldGroup>
 
-            <div className="flex items-center justify-between">
-              <div>
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Show Results to Students
-                </label>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Students can see voting results before poll ends
-                </p>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.resultsVisible}
-                  onChange={(e) => handleInputChange('resultsVisible', e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-              </label>
-            </div>
-          </div>
-
-        {/* Actions */}
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-          <button
-            type="button"
-            onClick={onClose}
-            className="min-h-[44px] px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 transition-colors touch-manipulation active:scale-95"
-            disabled={loading}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={loading}
-            className="min-h-[44px] px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 touch-manipulation active:scale-95"
-          >
-            {loading ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                Saving...
-              </>
-            ) : (
-              <>
-                {isEditing ? 'Update Poll' : 'Create Poll'}
-              </>
-            )}
-          </button>
-        </div>
+        <FormActions
+          onCancel={onClose}
+          submitLabel={isEditing ? 'Update poll' : 'Create poll'}
+          loading={loading}
+          loadingLabel="Saving…"
+        />
       </form>
 
       {/* Reset Form Confirmation Modal */}

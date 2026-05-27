@@ -56,6 +56,7 @@ const CourseAssignments: React.FC<CourseAssignmentsProps> = ({
       _id: d._id,
       title: d.title,
       dueDate: d.dueDate || d.due_date || d.discussionDueDate || null,
+      availableFrom: d.availableFrom ?? d.available_from ?? null,
       attachments: [],
       createdBy: d.author || { firstName: '', lastName: '' },
       type: 'discussion',
@@ -64,6 +65,7 @@ const CourseAssignments: React.FC<CourseAssignmentsProps> = ({
       published: true,
       studentGrades: d.studentGrades || [],
       replies: d.replies || [],
+      hasSubmitted: d.hasSubmitted ?? d.hasPosted ?? false,
     })),
   ];
   

@@ -10,11 +10,70 @@ import FloatingLabelTextarea from '../common/FloatingLabelTextarea';
 import FloatingLabelSelect from '../common/FloatingLabelSelect';
 import DatePicker from '../common/DatePicker';
 import FormFieldGroup from '../common/FormFieldGroup';
+import {
+  FormCheckboxOption,
+  FormRadioOption,
+  FormNavBar,
+} from '../common/FormControls';
+import {
+  BTN_PRIMARY,
+  BTN_SECONDARY,
+  BTN_ADD,
+  BTN_ADD_SM,
+  BTN_ICON,
+  BTN_ICON_DANGER,
+  FORM_INPUT,
+  FORM_SELECT,
+  INFO_CALLOUT,
+} from '../common/formStyles';
 import { useDraftManager } from '../../hooks/useDraftManager';
 import ConfirmationModal from '../common/ConfirmationModal';
 import FileAttachmentPanel from '../files/FileAttachmentPanel';
 import { normalizeAttachmentSources } from '../../utils/fileTypes';
 import type { NormalizedFile } from '../../utils/fileTypes';
+
+const FORM_STEPS = [
+  { id: 1, label: 'Basic details' },
+  { id: 2, label: 'Description' },
+  { id: 3, label: 'Questions & files' },
+] as const;
+
+function FormStepIndicator({ currentStep }: { currentStep: number }) {
+  return (
+    <div className="mb-8 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div className="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        {FORM_STEPS.map((step, index) => {
+          const active = currentStep >= step.id;
+          const current = currentStep === step.id;
+          return (
+            <React.Fragment key={step.id}>
+              <div className={`flex items-center gap-3 ${active ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-400 dark:text-slate-500'}`}>
+                <div
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold transition ${
+                    current
+                      ? 'bg-indigo-600 text-white shadow-sm dark:bg-indigo-500'
+                      : active
+                        ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300'
+                        : 'border border-slate-200 bg-slate-50 text-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-500'
+                  }`}
+                >
+                  {step.id}
+                </div>
+                <span className={`text-sm ${current ? 'font-semibold' : 'font-medium'}`}>{step.label}</span>
+              </div>
+              {index < FORM_STEPS.length - 1 ? (
+                <div
+                  className={`hidden h-px flex-1 sm:block ${currentStep > step.id ? 'bg-indigo-300 dark:bg-indigo-700' : 'bg-slate-200 dark:bg-slate-700'}`}
+                  aria-hidden
+                />
+              ) : null}
+            </React.Fragment>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 interface CreateAssignmentFormProps {
   moduleId: string;
@@ -30,9 +89,17 @@ interface Module {
   course: string;
 }
 
+type QuestionType = 'text' | 'multiple-choice' | 'matching';
+
+function questionTypeLabel(type: QuestionType): string {
+  if (type === 'text') return 'Text entry';
+  if (type === 'multiple-choice') return 'Multiple choice';
+  return 'Matching';
+}
+
 interface Question {
   id: string;
-  type: 'text' | 'multiple-choice' | 'matching';
+  type: QuestionType;
   text: string;
   points: number;
   options?: {
@@ -64,6 +131,7 @@ interface FormData {
   allowStudentUploads: boolean;
   displayMode: 'single' | 'scrollable';
   isGradedQuiz: boolean;
+  quizSubmissionMode: 'online' | 'paper_upload';
   isTimedQuiz: boolean;
   quizTimeLimit: number; // in minutes
   showCorrectAnswers: boolean; // Show correct answers to students after submission
@@ -105,6 +173,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
     allowStudentUploads: false,
     displayMode: 'single',
     isGradedQuiz: false,
+    quizSubmissionMode: 'online',
     isTimedQuiz: false,
     quizTimeLimit: 60,
     showCorrectAnswers: false,
@@ -175,6 +244,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
         allowStudentUploads: false,
         displayMode: 'single',
         isGradedQuiz: false,
+        quizSubmissionMode: 'online',
         isTimedQuiz: false,
         quizTimeLimit: 60,
         showCorrectAnswers: false,
@@ -353,6 +423,8 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
         allowStudentUploads: allowStudentUploads,
         displayMode: assignmentData.displayMode || 'single',
         isGradedQuiz: Boolean(assignmentData.isGradedQuiz),
+        quizSubmissionMode:
+          assignmentData.quizSubmissionMode === 'paper_upload' ? ('paper_upload' as const) : ('online' as const),
         isTimedQuiz: Boolean(assignmentData.isTimedQuiz),
         quizTimeLimit: assignmentData.quizTimeLimit || 60,
         showCorrectAnswers: Boolean(assignmentData.showCorrectAnswers),
@@ -371,7 +443,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
       setExistingAttachments(assignmentData.attachments || []);
       setAttachmentFiles(normalizeAttachmentSources(assignmentData));
       // Set totalPointsInput for offline assignments in edit mode
-      if (assignmentData.isOfflineAssignment) {
+      if (assignmentData.isOfflineAssignment || assignmentData.quizSubmissionMode === 'paper_upload') {
         const calculatedTotalPoints = assignmentData.questions?.reduce((sum: number, q: any) => sum + (q.points || 0), 0) || assignmentData.totalPoints || 0;
         if (calculatedTotalPoints > 0) {
           setTotalPointsInput(calculatedTotalPoints.toString());
@@ -535,6 +607,37 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
     }
   };
 
+  const handleCancel = () => {
+    const selectedModuleId =
+      formData.moduleId && formData.moduleId.trim() !== '' ? formData.moduleId : moduleId || null;
+    const isGroupAssignment = formData.isGroupAssignment && formData.groupSetId;
+
+    if (courseId) {
+      if (editMode) {
+        navigate(`/courses/${courseId}/${formData.isGradedQuiz ? 'quizzes' : 'assignments'}`);
+        return;
+      }
+      if (selectedModuleId && !isGroupAssignment) {
+        navigate(`/courses/${courseId}/modules?expand=${selectedModuleId}`);
+        return;
+      }
+      navigate(`/courses/${courseId}/${formData.isGradedQuiz ? 'quizzes' : 'assignments'}`);
+      return;
+    }
+
+    if (selectedModuleId) {
+      navigate(`/modules/${selectedModuleId}/assignments`);
+      return;
+    }
+
+    if (editMode) {
+      navigate(-1);
+      return;
+    }
+
+    navigate('/dashboard');
+  };
+
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
@@ -570,6 +673,14 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
       setError('Total points is required for offline assignments');
       return;
     }
+    if (
+      formData.isGradedQuiz &&
+      formData.quizSubmissionMode === 'paper_upload' &&
+      (!formData.totalPoints || formData.totalPoints <= 0)
+    ) {
+      setError('Total points is required for paper upload quizzes');
+      return;
+    }
 
     // Clear draft on successful submit
     if (!editMode) {
@@ -594,6 +705,12 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
       formDataToSend.append('allowStudentUploads', formData.allowStudentUploads.toString());
       formDataToSend.append('displayMode', formData.displayMode);
       formDataToSend.append('isGradedQuiz', formData.isGradedQuiz.toString());
+      formDataToSend.append('quizSubmissionMode', formData.quizSubmissionMode);
+      if (formData.isGradedQuiz && formData.quizSubmissionMode === 'paper_upload') {
+        formDataToSend.set('questions', JSON.stringify([]));
+        formDataToSend.set('allowStudentUploads', 'true');
+        formDataToSend.set('isTimedQuiz', 'false');
+      }
       formDataToSend.append('isTimedQuiz', formData.isTimedQuiz.toString());
       formDataToSend.append('quizTimeLimit', formData.quizTimeLimit.toString());
       formDataToSend.append('showCorrectAnswers', formData.showCorrectAnswers.toString());
@@ -696,74 +813,28 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
   const formInner = (
     <>
       {!embedded && (
-        <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 text-gray-800 dark:text-gray-100">
-          {editMode
-            ? formData.isGradedQuiz
-              ? 'Edit Quiz'
-              : 'Edit Assignment'
-            : formData.isGradedQuiz
-              ? 'Create New Quiz'
-              : 'Create New Assignment'}
-        </h2>
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50 sm:text-3xl">
+            {editMode
+              ? formData.isGradedQuiz
+                ? 'Edit quiz'
+                : 'Edit assignment'
+              : formData.isGradedQuiz
+                ? 'Create quiz'
+                : 'Create assignment'}
+          </h2>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            {editMode
+              ? 'Update settings, content, and grading options.'
+              : 'Complete each step to publish a new assignment or quiz for your course.'}
+          </p>
+        </div>
       )}
 
-      <div className="mb-8">
-        <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-4 dark:border-gray-700 dark:bg-gray-900/50 sm:px-5">
-          <div className="flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-2">
-            <div
-              className={`flex items-center ${currentStep >= 1 ? 'text-blue-700 dark:text-blue-300' : 'text-gray-400 dark:text-gray-500'}`}
-            >
-              <div
-                className={`flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-semibold sm:h-9 sm:w-9 sm:text-sm ${
-                  currentStep >= 1
-                    ? 'border-blue-600 bg-blue-600 text-white dark:border-blue-500 dark:bg-blue-500'
-                    : 'border-gray-300 dark:border-gray-600 dark:bg-gray-700'
-                }`}
-              >
-                1
-              </div>
-              <span className="ml-2 text-xs font-medium sm:text-sm">Basic details</span>
-            </div>
-            <div
-              className={`hidden h-0.5 w-10 sm:block ${currentStep >= 2 ? 'bg-blue-600 dark:bg-blue-500' : 'bg-gray-200 dark:bg-gray-600'}`}
-            />
-            <div
-              className={`flex items-center ${currentStep >= 2 ? 'text-blue-700 dark:text-blue-300' : 'text-gray-400 dark:text-gray-500'}`}
-            >
-              <div
-                className={`flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-semibold sm:h-9 sm:w-9 sm:text-sm ${
-                  currentStep >= 2
-                    ? 'border-blue-600 bg-blue-600 text-white dark:border-blue-500 dark:bg-blue-500'
-                    : 'border-gray-300 dark:border-gray-600 dark:bg-gray-700'
-                }`}
-              >
-                2
-              </div>
-              <span className="ml-2 text-xs font-medium sm:text-sm">Description</span>
-            </div>
-            <div
-              className={`hidden h-0.5 w-10 sm:block ${currentStep >= 3 ? 'bg-blue-600 dark:bg-blue-500' : 'bg-gray-200 dark:bg-gray-600'}`}
-            />
-            <div
-              className={`flex items-center ${currentStep >= 3 ? 'text-blue-700 dark:text-blue-300' : 'text-gray-400 dark:text-gray-500'}`}
-            >
-              <div
-                className={`flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-semibold sm:h-9 sm:w-9 sm:text-sm ${
-                  currentStep >= 3
-                    ? 'border-blue-600 bg-blue-600 text-white dark:border-blue-500 dark:bg-blue-500'
-                    : 'border-gray-300 dark:border-gray-600 dark:bg-gray-700'
-                }`}
-              >
-                3
-              </div>
-              <span className="ml-2 text-xs font-medium sm:text-sm">Questions & files</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      <FormStepIndicator currentStep={currentStep} />
 
       {error && (
-        <div className="bg-red-100 dark:bg-red-900/20 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded mb-4">
+        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
           {error}
         </div>
       )}
@@ -800,23 +871,23 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Draft saved indicator and reset button */}
         {!editMode && (
-          <div className="flex items-center justify-between bg-green-50 dark:bg-green-900/20 px-4 py-2 rounded-md">
+          <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/50">
             {isDraftSaved ? (
-              <div className="flex items-center text-sm text-green-600 dark:text-green-400">
-                <Save className="w-4 h-4 mr-2" />
+              <div className="flex items-center text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                <Save className="mr-2 h-4 w-4" />
                 Draft saved automatically
               </div>
             ) : (
-              <div></div>
+              <div className="text-sm text-slate-500 dark:text-slate-400">Your progress is saved as you type.</div>
             )}
             <button
               type="button"
               onClick={handleResetForm}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-white dark:hover:bg-gray-800 rounded-md transition-colors"
+              className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-white hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-slate-100"
               title="Clear form and start fresh"
             >
-              <RefreshCw className="w-4 h-4" />
-              Reset Form
+              <RefreshCw className="h-4 w-4" />
+              Reset form
             </button>
           </div>
         )}
@@ -866,117 +937,124 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
                 )}
               </div>
             </FormFieldGroup>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Assignment Type</label>
-                <div className="mt-2 space-y-4">
-                  <label htmlFor="isGroupAssignment" className="flex items-center min-h-[44px] cursor-pointer">
-                    <input
-                      type="checkbox"
-                      id="isGroupAssignment"
-                      checked={formData.isGroupAssignment}
-                      onChange={(e) => setFormData({ ...formData, isGroupAssignment: e.target.checked })}
-                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600 rounded"
-                    />
-                    <span className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
-                      This is a group assignment
-                    </span>
+            <FormFieldGroup
+              title="Assignment options"
+              description="Choose the assignment type, group, and quiz settings"
+            >
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <FormCheckboxOption
+                  id="isGroupAssignment"
+                  checked={formData.isGroupAssignment}
+                  onChange={(e) => setFormData({ ...formData, isGroupAssignment: e.target.checked })}
+                  title="Group assignment"
+                  description="Students submit as a team using a group set."
+                />
+                <div>
+                  <label htmlFor="assignment-group" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Assignment group
                   </label>
+                  <select
+                    id="assignment-group"
+                    name="group"
+                    value={group}
+                    onChange={e => setGroup(e.target.value)}
+                    className={FORM_SELECT}
+                  >
+                    <option value="">Select a group</option>
+                    {courseGroups.map((g) => (
+                      <option key={g.name} value={g.name}>{g.name}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
-              <div>
-                <label htmlFor="assignment-group" className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Assignment Group</label>
-                <select
-                  id="assignment-group"
-                  name="group"
-                  value={group}
-                  onChange={e => setGroup(e.target.value)}
-                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 dark:text-gray-100 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400"
-                >
-                  <option value="">Select a group</option>
-                  {courseGroups.map((g) => (
-                    <option key={g.name} value={g.name}>{g.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Graded Quiz Checkbox */}
-            <div className="space-y-4">
-              <label htmlFor="isGradedQuiz" className="flex items-center min-h-[44px] cursor-pointer">
-                <input
-                  type="checkbox"
+              <div className="space-y-3">
+                <FormCheckboxOption
                   id="isGradedQuiz"
                   checked={formData.isGradedQuiz}
                   onChange={(e) => setFormData({
                     ...formData,
                     isGradedQuiz: e.target.checked,
+                    quizSubmissionMode: e.target.checked ? formData.quizSubmissionMode : 'online',
                     gradeReleaseMode: e.target.checked ? 'manual' : formData.gradeReleaseMode,
                     defaultGradeHidden: e.target.checked ? true : formData.defaultGradeHidden,
                   })}
-                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600 rounded"
+                  title="Graded quiz"
+                  description="Create an auto-graded or paper-upload quiz instead of a standard assignment."
                 />
-                <span className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
-                  Graded Quiz
-                </span>
-              </label>
-              
-              {/* Offline Assignment Checkbox */}
-              <label htmlFor="isOfflineAssignment" className="flex items-center min-h-[44px] cursor-pointer">
-                <input
-                  type="checkbox"
+                <FormCheckboxOption
                   id="isOfflineAssignment"
                   checked={formData.isOfflineAssignment}
                   onChange={(e) => setFormData({ ...formData, isOfflineAssignment: e.target.checked })}
-                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600 rounded"
+                  title="Offline assignment"
+                  description="Paper-based work with manual grade entry in the gradebook."
                 />
-                <span className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
-                  Offline Assignment (Paper Based - manual grade entry)
-                </span>
-              </label>
-            </div>
+              </div>
+            </FormFieldGroup>
 
-            {/* Timer Options - Show when Graded Quiz is checked */}
+            {/* Graded quiz options */}
             {formData.isGradedQuiz && (
-              <div className="space-y-4">
+              <FormFieldGroup
+                title="Quiz settings"
+                description="Configure how students take and submit this quiz"
+              >
+                <div className="space-y-3">
+                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100">How will students submit?</p>
+                  <FormRadioOption
+                    id="quizModeOnline"
+                    name="quizSubmissionMode"
+                    checked={formData.quizSubmissionMode === 'online'}
+                    onChange={() => setFormData({ ...formData, quizSubmissionMode: 'online' })}
+                    title="Online quiz"
+                    description="Students answer questions in the browser."
+                  />
+                  <FormRadioOption
+                    id="quizModePaper"
+                    name="quizSubmissionMode"
+                    checked={formData.quizSubmissionMode === 'paper_upload'}
+                    onChange={() => setFormData({
+                      ...formData,
+                      quizSubmissionMode: 'paper_upload',
+                      allowStudentUploads: true,
+                      isTimedQuiz: false,
+                      questions: [],
+                      gradeReleaseMode: 'manual',
+                      defaultGradeHidden: true,
+                    })}
+                    title="Paper upload quiz"
+                    description="Students upload photos or files of completed work."
+                  />
+                </div>
+
+                {formData.quizSubmissionMode === 'online' && (
+              <div className="space-y-4 border-t border-slate-100 pt-5 dark:border-slate-800">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Quiz Timer</label>
-                  <div className="mt-2 space-y-4">
-                    <label htmlFor="noTimer" className="flex items-center min-h-[44px] cursor-pointer">
-                      <input
-                        type="radio"
-                        id="noTimer"
-                        name="timerOption"
-                        value="noTimer"
-                        checked={!formData.isTimedQuiz}
-                        onChange={() => setFormData({ ...formData, isTimedQuiz: false })}
-                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600"
-                      />
-                      <span className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
-                        No timer (unlimited time)
-                      </span>
-                    </label>
-                    <label htmlFor="withTimer" className="flex items-center min-h-[44px] cursor-pointer">
-                      <input
-                        type="radio"
-                        id="withTimer"
-                        name="timerOption"
-                        value="withTimer"
-                        checked={formData.isTimedQuiz}
-                        onChange={() => setFormData({ ...formData, isTimedQuiz: true })}
-                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600"
-                      />
-                      <span className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
-                        Timed quiz
-                      </span>
-                    </label>
+                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Quiz timer</p>
+                  <div className="mt-3 space-y-3">
+                    <FormRadioOption
+                      id="noTimer"
+                      name="timerOption"
+                      checked={!formData.isTimedQuiz}
+                      onChange={() => setFormData({ ...formData, isTimedQuiz: false })}
+                      title="No timer"
+                      description="Students have unlimited time to complete the quiz."
+                    />
+                    <FormRadioOption
+                      id="withTimer"
+                      name="timerOption"
+                      checked={formData.isTimedQuiz}
+                      onChange={() => setFormData({ ...formData, isTimedQuiz: true })}
+                      title="Timed quiz"
+                      description="Automatically submit when the time limit is reached."
+                    />
                   </div>
                 </div>
 
                 {formData.isTimedQuiz && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Time Limit (minutes)</label>
+                    <label htmlFor="quiz-time-limit" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                      Time limit (minutes)
+                    </label>
                     <input
                       type="number"
                       id="quiz-time-limit"
@@ -985,89 +1063,81 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
                       onChange={(e) => setFormData({ ...formData, quizTimeLimit: parseInt(e.target.value) || 60 })}
                       min="1"
                       max="480"
-                      className="mt-1 block w-full min-h-[48px] px-4 sm:px-3 py-3 sm:py-2 rounded-md border-gray-300 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-base sm:text-sm focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:outline-none focus:ring-2"
+                      className={`${FORM_SELECT} mt-1`}
                       placeholder="60"
                     />
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 dark:text-gray-400">Enter time limit in minutes (1-480 minutes)</p>
-                    <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
-                      Timed quizzes use the server clock. Refreshing, closing the browser, or opening another tab will not reset the timer.
+                    <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+                      Timed quizzes use the server clock. Refreshing or leaving the page will not reset the timer.
                     </p>
                   </div>
                 )}
 
                 {/* Quiz Feedback Options */}
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Quiz Feedback Options</label>
-                    <div className="mt-2 space-y-3">
-                      <label htmlFor="feedbackNone" className="flex items-center min-h-[44px] cursor-pointer">
-                        <input
-                          type="radio"
-                          id="feedbackNone"
-                          name="feedbackOption"
-                          checked={!formData.showCorrectAnswers && !formData.showStudentAnswers}
-                          onChange={() => setFormData({ ...formData, showCorrectAnswers: false, showStudentAnswers: false })}
-                          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600"
-                        />
-                        <span className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
-                          No feedback (students won't see results)
-                        </span>
-                      </label>
-                      <label htmlFor="showCorrectAnswers" className="flex items-center min-h-[44px] cursor-pointer">
-                        <input
-                          type="radio"
-                          id="showCorrectAnswers"
-                          name="feedbackOption"
-                          checked={formData.showCorrectAnswers && !formData.showStudentAnswers}
-                          onChange={() => setFormData({ ...formData, showCorrectAnswers: true, showStudentAnswers: false })}
-                          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600"
-                        />
-                        <span className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
-                          Show students which questions they got correct after submission (green for correct, red for wrong)
-                        </span>
-                      </label>
-                      <label htmlFor="showStudentAnswers" className="flex items-center min-h-[44px] cursor-pointer">
-                        <input
-                          type="radio"
-                          id="showStudentAnswers"
-                          name="feedbackOption"
-                          checked={formData.showStudentAnswers && !formData.showCorrectAnswers}
-                          onChange={() => setFormData({ ...formData, showStudentAnswers: true, showCorrectAnswers: false })}
-                          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600"
-                        />
-                        <span className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
-                          Show students their submitted answers after submission (green for correct, red for wrong, and show correct answer for wrong ones)
-                        </span>
-                      </label>
-                    </div>
-                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 dark:text-gray-400">
-                      Note: These options can be modified later in the grading page for individual submissions.
-                    </p>
-                  </div>
+                <div className="space-y-3">
+                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Feedback after submission</p>
+                  <FormRadioOption
+                    id="feedbackNone"
+                    name="feedbackOption"
+                    checked={!formData.showCorrectAnswers && !formData.showStudentAnswers}
+                    onChange={() => setFormData({ ...formData, showCorrectAnswers: false, showStudentAnswers: false })}
+                    title="No feedback"
+                    description="Students will not see results after submitting."
+                  />
+                  <FormRadioOption
+                    id="showCorrectAnswers"
+                    name="feedbackOption"
+                    checked={formData.showCorrectAnswers && !formData.showStudentAnswers}
+                    onChange={() => setFormData({ ...formData, showCorrectAnswers: true, showStudentAnswers: false })}
+                    title="Show correctness only"
+                    description="Highlight which questions were answered correctly."
+                  />
+                  <FormRadioOption
+                    id="showStudentAnswers"
+                    name="feedbackOption"
+                    checked={formData.showStudentAnswers && !formData.showCorrectAnswers}
+                    onChange={() => setFormData({ ...formData, showStudentAnswers: true, showCorrectAnswers: false })}
+                    title="Show answers and correctness"
+                    description="Display student responses with correct answers for missed items."
+                  />
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    You can change these options later on the grading page for individual submissions.
+                  </p>
                 </div>
               </div>
+                )}
+
+                {formData.quizSubmissionMode === 'paper_upload' && (
+                  <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300">
+                    Students must upload at least one file when submitting. You will grade their uploads manually in the gradebook.
+                  </p>
+                )}
+              </FormFieldGroup>
             )}
 
             {formData.isGroupAssignment && (
-              <div>
-                <label htmlFor="assignment-group-set" className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Group Set</label>
-                <select
-                  id="assignment-group-set"
-                  name="groupSetId"
-                  value={formData.groupSetId || ''}
-                  onChange={(e) => setFormData({ ...formData, groupSetId: e.target.value || null })}
-                  required={formData.isGroupAssignment}
-                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 dark:text-gray-100 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400"
-                >
-                  <option value="">Select a group set</option>
-                  {groupSets.map((set) => (
-                    <option key={set._id} value={set._id}>{set.name} {set.allowSelfSignup ? '(Self-signup enabled)' : ''}</option>
-                  ))}
-                </select>
-                {formData.isGroupAssignment && !formData.groupSetId && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400 dark:text-red-400">Please select a group set for the group assignment</p>
-                )}
-              </div>
+              <FormFieldGroup title="Group set" description="Select which group set this assignment belongs to">
+                <div>
+                  <label htmlFor="assignment-group-set" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Group set
+                  </label>
+                  <select
+                    id="assignment-group-set"
+                    name="groupSetId"
+                    value={formData.groupSetId || ''}
+                    onChange={(e) => setFormData({ ...formData, groupSetId: e.target.value || null })}
+                    required={formData.isGroupAssignment}
+                    className={FORM_SELECT}
+                  >
+                    <option value="">Select a group set</option>
+                    {groupSets.map((set) => (
+                      <option key={set._id} value={set._id}>{set.name} {set.allowSelfSignup ? '(Self-signup enabled)' : ''}</option>
+                    ))}
+                  </select>
+                  {formData.isGroupAssignment && !formData.groupSetId && (
+                    <p className="mt-2 text-sm text-red-600 dark:text-red-400">Please select a group set for the group assignment</p>
+                  )}
+                </div>
+              </FormFieldGroup>
             )}
             <FormFieldGroup
               title="Schedule"
@@ -1109,15 +1179,11 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
                 />
               </div>
             </FormFieldGroup>
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={nextStep}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600"
-              >
+            <FormNavBar>
+              <button type="button" onClick={nextStep} className={`${BTN_PRIMARY} w-full sm:w-auto`}>
                 Save & Continue
               </button>
-            </div>
+            </FormNavBar>
           </div>
         )}
         {/* Step 2: Description */}
@@ -1139,149 +1205,125 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
                 maxLength={2000}
                 placeholder="Enter a detailed description of the assignment..."
               />
-              <div className="mt-3">
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="allowStudentUploads"
-                    checked={formData.allowStudentUploads}
-                    onChange={(e) => setFormData({ ...formData, allowStudentUploads: e.target.checked })}
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600 rounded"
-                  />
-                  <label htmlFor="allowStudentUploads" className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
-                    Allow students to upload files
-                  </label>
-                </div>
-                {editMode && (
-                  <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 dark:text-gray-400">
-                    Debug: allowStudentUploads = {String(formData.allowStudentUploads)}
-                  </div>
-                )}
-              </div>
-              <div className="mt-3">
-                <label htmlFor="displayModeSingle" className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Assignment Display Mode</label>
-                <div className="mt-2 space-y-4">
-                  <div className="flex items-center">
-                    <input
-                      type="radio"
-                      id="displayModeSingle"
-                      name="displayMode"
-                      value="single"
-                      checked={formData.displayMode === 'single'}
-                      onChange={(e) => setFormData({ ...formData, displayMode: e.target.value as 'single' | 'scrollable' })}
-                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600 rounded"
-                    />
-                    <label htmlFor="displayModeSingle" className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
-                      Single Question View (one question at a time)
-                    </label>
-                  </div>
-                  <div className="flex items-center">
-                    <input
-                      type="radio"
-                      id="displayModeScrollable"
-                      name="displayMode"
-                      value="scrollable"
-                      checked={formData.displayMode === 'scrollable'}
-                      onChange={(e) => setFormData({ ...formData, displayMode: e.target.value as 'single' | 'scrollable' })}
-                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600 rounded"
-                    />
-                    <label htmlFor="displayModeScrollable" className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
-                      Scrollable View (all questions at once)
-                    </label>
-                  </div>
-                </div>
-              </div>
             </FormFieldGroup>
-            <div className="flex flex-col sm:flex-row justify-between gap-3">
-              <button
-                type="button"
-                onClick={prevStep}
-                className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-700 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:bg-gray-700 dark:hover:bg-gray-700"
-              >
-                Back
-              </button>
-              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                <button
-                  type="button"
-                  onClick={() => setPreview(!preview)}
-                  className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-700 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:bg-gray-700 dark:hover:bg-gray-700"
-                >
-                  {preview ? 'Edit' : 'Preview'}
-                </button>
-                <button
-                  type="button"
-                  onClick={nextStep}
-                  className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
-                >
-                  Continue
-                </button>
+
+            {formData.isGradedQuiz && formData.quizSubmissionMode === 'paper_upload' ? (
+              <div className={INFO_CALLOUT}>
+                <p className="text-sm font-medium text-blue-900 dark:text-blue-200">Paper upload quiz</p>
+                <p className="mt-1 text-sm leading-relaxed text-blue-700 dark:text-blue-300">
+                  Student file uploads are required for paper quizzes. Students will submit photos or scans of their completed work.
+                </p>
               </div>
-            </div>
+            ) : (
+              <FormFieldGroup
+                title="Student submissions"
+                description="Control whether students can attach files when submitting"
+              >
+                <FormCheckboxOption
+                  id="allowStudentUploads"
+                  checked={formData.allowStudentUploads}
+                  onChange={(e) => setFormData({ ...formData, allowStudentUploads: e.target.checked })}
+                  title="Allow students to upload files"
+                  description="Students can attach documents, images, or other files with their submission."
+                />
+              </FormFieldGroup>
+            )}
+
+            {!(formData.isGradedQuiz && formData.quizSubmissionMode === 'paper_upload') && !formData.isOfflineAssignment && (
+              <FormFieldGroup
+                title="Assignment display mode"
+                description="Choose how students navigate questions during the assignment"
+              >
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <FormRadioOption
+                    id="displayModeSingle"
+                    name="displayMode"
+                    checked={formData.displayMode === 'single'}
+                    onChange={() => setFormData({ ...formData, displayMode: 'single' })}
+                    title="Single question view"
+                    description="Show one question at a time with next/previous navigation."
+                  />
+                  <FormRadioOption
+                    id="displayModeScrollable"
+                    name="displayMode"
+                    checked={formData.displayMode === 'scrollable'}
+                    onChange={() => setFormData({ ...formData, displayMode: 'scrollable' })}
+                    title="Scrollable view"
+                    description="Show all questions on one scrollable page."
+                  />
+                </div>
+              </FormFieldGroup>
+            )}
+
+            <FormNavBar onBack={prevStep}>
+              <button type="button" onClick={() => setPreview(!preview)} className={`${BTN_SECONDARY} w-full sm:w-auto`}>
+                {preview ? 'Edit' : 'Preview'}
+              </button>
+              <button type="button" onClick={nextStep} className={`${BTN_PRIMARY} w-full sm:w-auto`}>
+                Continue
+              </button>
+            </FormNavBar>
           </div>
         )}
         {/* Step 3: Questions & Files */}
         {currentStep === 3 && (
           <div className="space-y-6">
-            {/* For offline assignments, show simplified interface */}
-            {formData.isOfflineAssignment ? (
-              <div className="space-y-6">
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                  <div className="flex items-start">
-                    <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <div>
-                      <h4 className="text-sm font-medium text-blue-900 dark:text-blue-200">Offline Assignment</h4>
-                      <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">
-                        Since this is a paper-based assignment, you only need to specify the total points. Students will complete the assignment on paper, and you can enter grades manually in the gradebook.
-                      </p>
-                    </div>
-                  </div>
+            {/* Offline assignments and paper upload quizzes use total points + attachments only */}
+            {formData.isOfflineAssignment || (formData.isGradedQuiz && formData.quizSubmissionMode === 'paper_upload') ? (
+              <FormFieldGroup
+                title={
+                  formData.isGradedQuiz && formData.quizSubmissionMode === 'paper_upload'
+                    ? 'Paper upload quiz'
+                    : 'Offline assignment'
+                }
+                description="Set points and attach any reference materials"
+              >
+                <div className={INFO_CALLOUT}>
+                  <p className="text-sm leading-relaxed text-blue-700 dark:text-blue-300">
+                    {formData.isGradedQuiz && formData.quizSubmissionMode === 'paper_upload'
+                      ? 'Set the total points and attach a blank quiz if needed. Students will upload photos or files of their completed work for you to grade.'
+                      : 'Since this is a paper-based assignment, specify the total points. Students complete the work on paper and you enter grades manually in the gradebook.'}
+                  </p>
                 </div>
-                
-                {/* Total Points Input for Offline Assignments */}
+
                 <div>
-                  <label htmlFor="totalPoints" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Total Points <span className="text-red-500">*</span>
+                  <label htmlFor="totalPoints" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Total points <span className="text-red-500">*</span>
                   </label>
-                  <div className="mt-1">
-                    <input
-                      type="number"
-                      id="totalPoints"
-                      name="totalPoints"
-                      min="0"
-                      step="0.01"
-                      value={totalPointsInput}
-                      onChange={(e) => {
-                        const inputValue = e.target.value;
-                        setTotalPointsInput(inputValue);
-                        // Update formData with parsed value
-                        if (inputValue === '' || inputValue === null) {
-                          setFormData({ ...formData, totalPoints: 0 });
-                        } else {
-                          const value = parseFloat(inputValue);
-                          if (!isNaN(value) && value >= 0) {
-                            setFormData({ ...formData, totalPoints: value });
-                          }
-                        }
-                      }}
-                      onBlur={(e) => {
-                        // Ensure we have a valid value on blur
-                        const value = parseFloat(e.target.value);
-                        if (isNaN(value) || value <= 0) {
-                          setTotalPointsInput('');
-                          setFormData({ ...formData, totalPoints: 0 });
-                        } else {
-                          setTotalPointsInput(value.toString());
+                  <input
+                    type="number"
+                    id="totalPoints"
+                    name="totalPoints"
+                    min="0"
+                    step="0.01"
+                    value={totalPointsInput}
+                    onChange={(e) => {
+                      const inputValue = e.target.value;
+                      setTotalPointsInput(inputValue);
+                      if (inputValue === '' || inputValue === null) {
+                        setFormData({ ...formData, totalPoints: 0 });
+                      } else {
+                        const value = parseFloat(inputValue);
+                        if (!isNaN(value) && value >= 0) {
                           setFormData({ ...formData, totalPoints: value });
                         }
-                      }}
-                      className="block w-full rounded-md border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2"
-                      placeholder="Enter total points (e.g., 100)"
-                    />
-                  </div>
-                  <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                    Enter the maximum points possible for this paper-based assignment or test.
+                      }
+                    }}
+                    onBlur={(e) => {
+                      const value = parseFloat(e.target.value);
+                      if (isNaN(value) || value <= 0) {
+                        setTotalPointsInput('');
+                        setFormData({ ...formData, totalPoints: 0 });
+                      } else {
+                        setTotalPointsInput(value.toString());
+                        setFormData({ ...formData, totalPoints: value });
+                      }
+                    }}
+                    className={`${FORM_INPUT} mt-1.5 max-w-xs`}
+                    placeholder="e.g. 100"
+                  />
+                  <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                    Maximum points possible for this assignment.
                   </p>
                 </div>
 
@@ -1296,340 +1338,388 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
                     if (file.fileAssetId) setRemoveAssetIds((prev) => [...prev, file.fileAssetId!]);
                   }}
                 />
-              </div>
+              </FormFieldGroup>
             ) : (
               <>
-                {/* Total Points Display for regular assignments */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Total Points</label>
-              <div className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 shadow-sm p-2">
-                {Number.isFinite(formData.totalPoints) ? formData.totalPoints : 0}
-              </div>
-            </div>
-            <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Questions</h3>
-                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                  <button
-                    type="button"
-                    onClick={() => addQuestion('text')}
-                    disabled={editMode && hasSubmissions}
-                    className={`inline-flex items-center justify-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md ${
-                      editMode && hasSubmissions 
-                        ? 'bg-gray-400 dark:bg-gray-600 text-gray-200 dark:text-gray-300 cursor-not-allowed' 
-                        : 'text-white bg-indigo-600 hover:bg-indigo-700'
-                    }`}
-                    title={editMode && hasSubmissions ? 'Cannot add questions after students have submitted' : ''}
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Text Question
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => addQuestion('multiple-choice')}
-                    disabled={editMode && hasSubmissions}
-                    className={`inline-flex items-center justify-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md ${
-                      editMode && hasSubmissions 
-                        ? 'bg-gray-400 dark:bg-gray-600 text-gray-200 dark:text-gray-300 cursor-not-allowed' 
-                        : 'text-white bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600'
-                    }`}
-                    title={editMode && hasSubmissions ? 'Cannot add questions after students have submitted' : ''}
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Multiple Choice
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => addQuestion('matching')}
-                    disabled={editMode && hasSubmissions}
-                    className={`inline-flex items-center justify-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md ${
-                      editMode && hasSubmissions 
-                        ? 'bg-gray-400 dark:bg-gray-600 text-gray-200 dark:text-gray-300 cursor-not-allowed' 
-                        : 'text-white bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600'
-                    }`}
-                    title={editMode && hasSubmissions ? 'Cannot add questions after students have submitted' : ''}
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Matching Question
-                  </button>
-                </div>
-              </div>
-              {formData.questions.map((question, index) => (
-                <div key={question.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 sm:p-4 space-y-4 bg-white dark:bg-gray-800 overflow-x-hidden">
-                  <div className="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-0">
-                    <div className="flex-grow w-full sm:w-auto min-w-0">
-                      <div className="flex flex-wrap items-center gap-2 mb-2">
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Question {index + 1}</span>
-                        <span className="text-sm text-gray-500 dark:text-gray-400">({question.type === 'text' ? 'Text Entry' : question.type === 'multiple-choice' ? 'Multiple Choice' : 'Matching'})</span>
-                      </div>
-                      <input
-                        type="text"
-                        id={`question-text-${index}`}
-                        name={`question-text-${index}`}
-                        value={question.text}
-                        onChange={(e) => updateQuestion(index, 'text', e.target.value)}
-                        placeholder="Enter question text"
-                        className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 text-sm sm:text-base"
-                      />
-                    </div>
-                    <div className="flex items-center space-x-2 sm:ml-4 flex-shrink-0 w-full sm:w-auto justify-between sm:justify-start">
-                      <input
-                        type="number"
-                        id={`question-points-${index}`}
-                        name={`question-points-${index}`}
-                        value={question.points}
-                        onChange={(e) => updateQuestion(index, 'points', parseInt(e.target.value) || 0)}
-                        onClick={(e) => {
-                          if (question.points === 0) {
-                            e.currentTarget.value = '';
-                          }
-                        }}
-                        min="0"
-                        className="w-16 sm:w-20 rounded-md border-gray-300 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none text-sm"
-                      />
-                      <span className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">points</span>
-                      <button
-                        type="button"
-                        onClick={() => removeQuestion(index)}
-                        disabled={editMode && hasSubmissions}
-                        className={`${
-                          editMode && hasSubmissions 
-                            ? 'text-gray-400 cursor-not-allowed' 
-                            : 'text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300'
-                        }`}
-                        title={editMode && hasSubmissions ? 'Cannot remove questions after students have submitted' : ''}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                      {index > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => moveQuestion(index, 'up')}
-                          className="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
-                        >
-                          <ArrowUp className="h-4 w-4" />
-                        </button>
-                      )}
-                      {index < formData.questions.length - 1 && (
-                        <button
-                          type="button"
-                          onClick={() => moveQuestion(index, 'down')}
-                          className="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
-                        >
-                          <ArrowDown className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
+                <FormFieldGroup title="Scoring" description="Total points are calculated from your questions">
+                  <div className="inline-flex items-baseline gap-2 rounded-xl border border-indigo-200/80 bg-indigo-50/60 px-5 py-3 dark:border-indigo-900/50 dark:bg-indigo-950/30">
+                    <span className="text-3xl font-bold tabular-nums text-indigo-700 dark:text-indigo-300">
+                      {Number.isFinite(formData.totalPoints) ? formData.totalPoints : 0}
+                    </span>
+                    <span className="text-sm font-medium text-indigo-600/80 dark:text-indigo-400/80">total points</span>
                   </div>
-                  {question.type === 'multiple-choice' && (
-                    <div className="ml-0 sm:ml-4 space-y-2 overflow-x-hidden">
-                      <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Options:</h4>
-                      {question.options?.map((option, optionIndex) => (
-                        <div key={optionIndex} className="flex items-center gap-2">
-                          <input
-                            type="radio"
-                            name={`question-${index}-correct`}
-                            checked={option.isCorrect}
-                            onChange={() => {
-                              const newQuestions = [...formData.questions];
-                              newQuestions[index].options = newQuestions[index].options?.map((opt, i) => ({ ...opt, isCorrect: i === optionIndex }));
-                              setFormData({ ...formData, questions: newQuestions });
-                            }}
-                            className="h-4 w-4 flex-shrink-0 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700"
-                          />
-                          <input
-                            type="text"
-                            value={option.text}
-                            onChange={(e) => {
-                              const newQuestions = [...formData.questions];
-                              if (newQuestions[index].options) {
-                                newQuestions[index].options![optionIndex].text = e.target.value;
-                                setFormData({ ...formData, questions: newQuestions });
-                              }
-                            }}
-                            className="flex-1 min-w-0 rounded-md border-gray-300 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 text-sm sm:text-base"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removeOption(index, optionIndex)}
-                            className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 flex-shrink-0"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ))}
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        <input
-                          type="text"
-                          id={`new-option-${index}`}
-                          name={`new-option-${index}`}
-                          value={newOption.text}
-                          onChange={(e) => setNewOption({ ...newOption, text: e.target.value })}
-                          placeholder="Add new option"
-                          className="flex-1 min-w-0 rounded-md border-gray-300 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 text-sm sm:text-base"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => addOption(index)}
-                          className="px-3 sm:px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 whitespace-nowrap"
-                        >
-                          Add Option
-                        </button>
-                      </div>
+                </FormFieldGroup>
+
+                <FormFieldGroup
+                  title="Questions"
+                  description="Add and configure assignment questions"
+                >
+                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => addQuestion('text')}
+                      disabled={editMode && hasSubmissions}
+                      className={BTN_ADD}
+                      title={editMode && hasSubmissions ? 'Cannot add questions after students have submitted' : ''}
+                    >
+                      <Plus className="h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-400" />
+                      Add text question
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => addQuestion('multiple-choice')}
+                      disabled={editMode && hasSubmissions}
+                      className={BTN_ADD}
+                      title={editMode && hasSubmissions ? 'Cannot add questions after students have submitted' : ''}
+                    >
+                      <Plus className="h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-400" />
+                      Add multiple choice
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => addQuestion('matching')}
+                      disabled={editMode && hasSubmissions}
+                      className={BTN_ADD}
+                      title={editMode && hasSubmissions ? 'Cannot add questions after students have submitted' : ''}
+                    >
+                      <Plus className="h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-400" />
+                      Add matching question
+                    </button>
+                  </div>
+
+                  {formData.questions.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-8 text-center dark:border-slate-700 dark:bg-slate-800/30">
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        No questions yet. Use the buttons above to add your first question.
+                      </p>
                     </div>
-                  )}
-                  {question.type === 'matching' && (
-                    <div className="mt-2 border border-gray-200 dark:border-gray-700 rounded p-3 bg-gray-50 dark:bg-gray-700 overflow-x-hidden">
-                      <div className="font-semibold mb-2 text-gray-900 dark:text-gray-100">Matching Pairs</div>
-                      {question.leftItems && question.leftItems.map((left, idx) => (
-                        <div key={left.id} className="flex flex-col sm:flex-row items-stretch sm:items-center mb-2 gap-2">
-                          <input
-                            type="text"
-                            className="flex-1 min-w-0 border border-gray-300 dark:border-gray-600 p-2 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 text-sm"
-                            value={left.text}
-                            onChange={e => {
-                              const updated = [...(question.leftItems || [])];
-                              updated[idx].text = e.target.value;
-                              updateQuestion(index, 'leftItems', updated);
-                            }}
-                            placeholder="Prompt (e.g., Red)"
-                          />
-                          <span className="hidden sm:inline mx-2 text-gray-700 dark:text-gray-300 flex-shrink-0">→</span>
-                          <input
-                            type="text"
-                            className="flex-1 min-w-0 border border-gray-300 dark:border-gray-600 p-2 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 text-sm"
-                            value={question.rightItems && question.rightItems[idx] ? question.rightItems[idx].text : ''}
-                            onChange={e => {
-                              const updated = [...(question.rightItems || [])];
-                              if (!updated[idx]) updated[idx] = { id: left.id, text: '' };
-                              updated[idx].text = e.target.value;
-                              updated[idx].id = left.id;
-                              updateQuestion(index, 'rightItems', updated);
-                            }}
-                            placeholder="Correct Match (e.g., Green)"
-                          />
-                          <button type="button" className="sm:ml-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 flex-shrink-0" onClick={() => {
-                            const newLeft = (question.leftItems || []).filter((_, i) => i !== idx);
-                            const newRight = (question.rightItems || []).filter((_, i) => i !== idx);
-                            updateQuestion(index, 'leftItems', newLeft);
-                            updateQuestion(index, 'rightItems', newRight);
-                          }}>Remove</button>
-                        </div>
-                      ))}
-                      <button type="button" className="mt-2 px-3 py-2 text-sm bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-900/70" onClick={() => {
-                        const newId = Math.random().toString(36).substr(2, 9);
-                        updateQuestion(index, 'leftItems', [...(question.leftItems || []), { id: newId, text: '' }]);
-                        updateQuestion(index, 'rightItems', [...(question.rightItems || []), { id: newId, text: '' }]);
-                      }}>Add Pair</button>
-                      <div className="font-semibold mt-4 mb-2 text-gray-900 dark:text-gray-100">Distractor Options (Right Side Only)</div>
-                      {(question.rightItems || []).slice((question.leftItems || []).length).map((right, idx) => (
-                        <div key={right.id || idx} className="flex flex-col sm:flex-row items-stretch sm:items-center mb-2 gap-2">
-                          <input
-                            type="text"
-                            className="flex-1 min-w-0 border border-gray-300 dark:border-gray-600 p-2 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 text-sm"
-                            value={right.text}
-                            onChange={e => {
-                              const base = question.leftItems ? question.leftItems.length : 0;
-                              const updated = [...(question.rightItems || [])];
-                              updated[base + idx].text = e.target.value;
-                              updateQuestion(index, 'rightItems', updated);
-                            }}
-                            placeholder="Distractor (e.g., Aqua)"
-                          />
-                          <button type="button" className="sm:ml-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 flex-shrink-0" onClick={() => {
-                            const base = question.leftItems ? question.leftItems.length : 0;
-                            const updated = [...(question.rightItems || [])];
-                            updated.splice(base + idx, 1);
-                            updateQuestion(index, 'rightItems', updated);
-                          }}>Remove</button>
-                        </div>
-                      ))}
-                      <button type="button" className="mt-2 px-3 py-2 text-sm bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-900/70" onClick={() => {
-                        const base = question.leftItems ? question.leftItems.length : 0;
-                        updateQuestion(index, 'rightItems', [...(question.rightItems || []), { id: Math.random().toString(36).substr(2, 9), text: '' }]);
-                      }}>Add Distractor</button>
-                      {/* Preview for matching question */}
-                      <div className="mt-4 overflow-x-hidden">
-                        <div className="font-semibold mb-1 text-gray-900 dark:text-gray-100">Preview:</div>
-                        {(question.leftItems || []).map((left, idx) => (
-                          <div key={left.id} className="flex flex-col sm:flex-row items-stretch sm:items-center mb-2 gap-2">
-                            <span className="flex-1 min-w-0 text-sm text-gray-900 dark:text-gray-100 break-words">{left.text || <em className="text-gray-500 dark:text-gray-400">Prompt</em>}</span>
-                            <select className="flex-1 min-w-0 border border-gray-300 dark:border-gray-600 p-2 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm" disabled>
-                              <option>[ Choose ]</option>
-                              {shuffleArray((question.rightItems || []).map(r => r.text)).map((opt, i) => (
-                                <option key={i}>{opt}</option>
-                              ))}
-                            </select>
+                  ) : null}
+
+                  <div className="space-y-4">
+                    {formData.questions.map((question, index) => (
+                      <div
+                        key={question.id}
+                        className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900"
+                      >
+                        <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-3 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">
+                              Question {index + 1}
+                            </span>
+                            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                              {questionTypeLabel(question.type)}
+                            </span>
                           </div>
-                        ))}
+                          <div className="flex items-center gap-1.5">
+                            <label htmlFor={`question-points-${index}`} className="sr-only">
+                              Points for question {index + 1}
+                            </label>
+                            <input
+                              type="number"
+                              id={`question-points-${index}`}
+                              name={`question-points-${index}`}
+                              value={question.points}
+                              onChange={(e) => updateQuestion(index, 'points', parseInt(e.target.value) || 0)}
+                              onClick={(e) => {
+                                if (question.points === 0) {
+                                  e.currentTarget.value = '';
+                                }
+                              }}
+                              min="0"
+                              className="w-16 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm tabular-nums text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">pts</span>
+                            <button
+                              type="button"
+                              onClick={() => removeQuestion(index)}
+                              disabled={editMode && hasSubmissions}
+                              className={BTN_ICON_DANGER}
+                              title={editMode && hasSubmissions ? 'Cannot remove questions after students have submitted' : 'Remove question'}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                            {index > 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => moveQuestion(index, 'up')}
+                                className={BTN_ICON}
+                                title="Move up"
+                              >
+                                <ArrowUp className="h-4 w-4" />
+                              </button>
+                            ) : null}
+                            {index < formData.questions.length - 1 ? (
+                              <button
+                                type="button"
+                                onClick={() => moveQuestion(index, 'down')}
+                                className={BTN_ICON}
+                                title="Move down"
+                              >
+                                <ArrowDown className="h-4 w-4" />
+                              </button>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        <div className="space-y-4 p-4">
+                          <input
+                            type="text"
+                            id={`question-text-${index}`}
+                            name={`question-text-${index}`}
+                            value={question.text}
+                            onChange={(e) => updateQuestion(index, 'text', e.target.value)}
+                            placeholder="Enter question text"
+                            className={FORM_INPUT}
+                          />
+
+                          {question.type === 'multiple-choice' && (
+                            <div className="space-y-3 rounded-xl border border-slate-100 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-800/30">
+                              <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300">Answer options</h4>
+                              {question.options?.map((option, optionIndex) => (
+                                <div
+                                  key={optionIndex}
+                                  className={`flex items-center gap-2 rounded-lg border p-2 transition ${
+                                    option.isCorrect
+                                      ? 'border-emerald-300 bg-emerald-50/80 dark:border-emerald-800 dark:bg-emerald-950/30'
+                                      : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'
+                                  }`}
+                                >
+                                  <input
+                                    type="radio"
+                                    name={`question-${index}-correct`}
+                                    checked={option.isCorrect}
+                                    onChange={() => {
+                                      const newQuestions = [...formData.questions];
+                                      newQuestions[index].options = newQuestions[index].options?.map((opt, i) => ({
+                                        ...opt,
+                                        isCorrect: i === optionIndex,
+                                      }));
+                                      setFormData({ ...formData, questions: newQuestions });
+                                    }}
+                                    className="h-4 w-4 shrink-0 border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600"
+                                    title="Mark as correct answer"
+                                  />
+                                  <input
+                                    type="text"
+                                    value={option.text}
+                                    onChange={(e) => {
+                                      const newQuestions = [...formData.questions];
+                                      if (newQuestions[index].options) {
+                                        newQuestions[index].options![optionIndex].text = e.target.value;
+                                        setFormData({ ...formData, questions: newQuestions });
+                                      }
+                                    }}
+                                    className={`${FORM_INPUT} min-w-0 flex-1 border-0 bg-transparent py-1.5 shadow-none focus:ring-0`}
+                                    placeholder="Option text"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => removeOption(index, optionIndex)}
+                                    className={BTN_ICON_DANGER}
+                                    title="Remove option"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              ))}
+                              <div className="flex flex-col gap-2 sm:flex-row">
+                                <input
+                                  type="text"
+                                  id={`new-option-${index}`}
+                                  name={`new-option-${index}`}
+                                  value={newOption.text}
+                                  onChange={(e) => setNewOption({ ...newOption, text: e.target.value })}
+                                  placeholder="Add new option"
+                                  className={`${FORM_INPUT} min-w-0 flex-1`}
+                                />
+                                <button type="button" onClick={() => addOption(index)} className={BTN_ADD_SM}>
+                                  Add option
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {question.type === 'matching' && (
+                            <div className="space-y-4 rounded-xl border border-slate-100 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-800/30">
+                              <div>
+                                <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300">Matching pairs</h4>
+                                {question.leftItems && question.leftItems.map((left, idx) => (
+                                  <div key={left.id} className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                                    <input
+                                      type="text"
+                                      className={`${FORM_INPUT} min-w-0 flex-1`}
+                                      value={left.text}
+                                      onChange={(e) => {
+                                        const updated = [...(question.leftItems || [])];
+                                        updated[idx].text = e.target.value;
+                                        updateQuestion(index, 'leftItems', updated);
+                                      }}
+                                      placeholder="Prompt (e.g., Red)"
+                                    />
+                                    <span className="hidden shrink-0 text-slate-400 sm:inline" aria-hidden>
+                                      →
+                                    </span>
+                                    <input
+                                      type="text"
+                                      className={`${FORM_INPUT} min-w-0 flex-1`}
+                                      value={question.rightItems && question.rightItems[idx] ? question.rightItems[idx].text : ''}
+                                      onChange={(e) => {
+                                        const updated = [...(question.rightItems || [])];
+                                        if (!updated[idx]) updated[idx] = { id: left.id, text: '' };
+                                        updated[idx].text = e.target.value;
+                                        updated[idx].id = left.id;
+                                        updateQuestion(index, 'rightItems', updated);
+                                      }}
+                                      placeholder="Correct match (e.g., Green)"
+                                    />
+                                    <button
+                                      type="button"
+                                      className={`${BTN_SECONDARY} shrink-0 px-3 py-1.5 text-xs`}
+                                      onClick={() => {
+                                        const newLeft = (question.leftItems || []).filter((_, i) => i !== idx);
+                                        const newRight = (question.rightItems || []).filter((_, i) => i !== idx);
+                                        updateQuestion(index, 'leftItems', newLeft);
+                                        updateQuestion(index, 'rightItems', newRight);
+                                      }}
+                                    >
+                                      Remove
+                                    </button>
+                                  </div>
+                                ))}
+                                <button
+                                  type="button"
+                                  className={`${BTN_ADD} mt-3`}
+                                  onClick={() => {
+                                    const newId = Math.random().toString(36).substr(2, 9);
+                                    updateQuestion(index, 'leftItems', [...(question.leftItems || []), { id: newId, text: '' }]);
+                                    updateQuestion(index, 'rightItems', [...(question.rightItems || []), { id: newId, text: '' }]);
+                                  }}
+                                >
+                                  <Plus className="h-4 w-4" />
+                                  Add pair
+                                </button>
+                              </div>
+
+                              <div>
+                                <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                                  Distractor options (right side only)
+                                </h4>
+                                {(question.rightItems || []).slice((question.leftItems || []).length).map((right, idx) => (
+                                  <div key={right.id || idx} className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                                    <input
+                                      type="text"
+                                      className={`${FORM_INPUT} min-w-0 flex-1`}
+                                      value={right.text}
+                                      onChange={(e) => {
+                                        const base = question.leftItems ? question.leftItems.length : 0;
+                                        const updated = [...(question.rightItems || [])];
+                                        updated[base + idx].text = e.target.value;
+                                        updateQuestion(index, 'rightItems', updated);
+                                      }}
+                                      placeholder="Distractor (e.g., Aqua)"
+                                    />
+                                    <button
+                                      type="button"
+                                      className={`${BTN_SECONDARY} shrink-0 px-3 py-1.5 text-xs`}
+                                      onClick={() => {
+                                        const base = question.leftItems ? question.leftItems.length : 0;
+                                        const updated = [...(question.rightItems || [])];
+                                        updated.splice(base + idx, 1);
+                                        updateQuestion(index, 'rightItems', updated);
+                                      }}
+                                    >
+                                      Remove
+                                    </button>
+                                  </div>
+                                ))}
+                                <button
+                                  type="button"
+                                  className={`${BTN_ADD} mt-3`}
+                                  onClick={() => {
+                                    updateQuestion(index, 'rightItems', [
+                                      ...(question.rightItems || []),
+                                      { id: Math.random().toString(36).substr(2, 9), text: '' },
+                                    ]);
+                                  }}
+                                >
+                                  <Plus className="h-4 w-4" />
+                                  Add distractor
+                                </button>
+                              </div>
+
+                              <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+                                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                  Preview
+                                </p>
+                                {(question.leftItems || []).map((left) => (
+                                  <div key={left.id} className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                                    <span className="min-w-0 flex-1 break-words text-sm text-slate-900 dark:text-slate-100">
+                                      {left.text || <em className="text-slate-400">Prompt</em>}
+                                    </span>
+                                    <select className={`${FORM_INPUT} min-w-0 flex-1 py-2`} disabled>
+                                      <option>[ Choose ]</option>
+                                      {shuffleArray((question.rightItems || []).map((r) => r.text)).map((opt, i) => (
+                                        <option key={i}>{opt}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-            <FileAttachmentPanel
-              files={attachmentFiles}
-              onChange={setAttachmentFiles}
-              courseId={courseId || undefined}
-              assignmentId={editMode ? assignmentData?._id : undefined}
-              category="assignment"
-              label="Drop assignment attachments here or browse"
-              onRemoveFile={(file) => {
-                if (file.fileAssetId) setRemoveAssetIds((prev) => [...prev, file.fileAssetId!]);
-              }}
-            />
+                    ))}
+                  </div>
+                </FormFieldGroup>
+
+                <FormFieldGroup title="Attachments" description="Optional files for students to download">
+                  <FileAttachmentPanel
+                    files={attachmentFiles}
+                    onChange={setAttachmentFiles}
+                    courseId={courseId || undefined}
+                    assignmentId={editMode ? assignmentData?._id : undefined}
+                    category="assignment"
+                    label="Drop assignment attachments here or browse"
+                    onRemoveFile={(file) => {
+                      if (file.fileAssetId) setRemoveAssetIds((prev) => [...prev, file.fileAssetId!]);
+                    }}
+                  />
+                </FormFieldGroup>
               </>
             )}
             
             {/* Navigation buttons for both offline and regular assignments */}
-            <div className="flex flex-col sm:flex-row justify-between gap-3">
+            <FormNavBar onBack={prevStep}>
+              <button type="button" onClick={() => setPreview(!preview)} className={`${BTN_SECONDARY} w-full sm:w-auto`}>
+                {preview ? 'Edit' : 'Preview'}
+              </button>
               <button
                 type="button"
-                onClick={prevStep}
-                className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white hover:bg-gray-50 dark:bg-gray-700"
+                onClick={handleCancel}
+                className={`${BTN_SECONDARY} w-full sm:w-auto`}
               >
-                Back
+                Cancel
               </button>
-              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                <button
-                  type="button"
-                  onClick={() => setPreview(!preview)}
-                  className="w-full sm:w-auto min-h-[44px] inline-flex items-center justify-center px-4 py-2.5 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white hover:bg-gray-50 dark:bg-gray-700 touch-manipulation active:scale-95 transition-transform"
-                >
-                  {preview ? 'Edit' : 'Preview'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate(`/modules/${formData.moduleId}/assignments`)}
-                  className="w-full sm:w-auto min-h-[44px] inline-flex items-center justify-center px-4 py-2.5 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white hover:bg-gray-50 dark:bg-gray-700 touch-manipulation active:scale-95 transition-transform"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full sm:w-auto min-h-[44px] inline-flex items-center justify-center px-4 py-2.5 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed touch-manipulation active:scale-95 transition-transform"
-                >
-                  {isSubmitting
-                    ? 'Saving…'
-                    : editMode
-                      ? formData.isGradedQuiz
-                        ? 'Update Quiz'
-                        : 'Update Assignment'
-                      : formData.isGradedQuiz
-                        ? 'Create Quiz'
-                        : 'Create Assignment'}
-                </button>
-              </div>
-            </div>
+              <button type="submit" disabled={isSubmitting} className={`${BTN_PRIMARY} w-full sm:w-auto`}>
+                {isSubmitting
+                  ? 'Saving…'
+                  : editMode
+                    ? formData.isGradedQuiz
+                      ? 'Update quiz'
+                      : 'Update assignment'
+                    : formData.isGradedQuiz
+                      ? 'Create quiz'
+                      : 'Create assignment'}
+              </button>
+            </FormNavBar>
           </div>
         )}
       </form>
 
       {preview && (
-        <div className="mt-6 sm:mt-8 p-4 sm:p-6 border rounded-lg bg-gray-50 dark:bg-gray-700 overflow-x-hidden">
-          <h3 className="text-lg sm:text-xl font-semibold mb-4 break-words">{formData.title}</h3>
+        <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+          <h3 className="mb-4 break-words text-xl font-semibold text-slate-900 dark:text-slate-100">{formData.title}</h3>
           <div className="prose max-w-none overflow-x-hidden">
             <ReactMarkdown>{formData.description}</ReactMarkdown>
           </div>
@@ -1739,8 +1829,8 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
       {embedded ? (
         <div className="w-full overflow-x-hidden">{formInner}</div>
       ) : (
-        <div className="w-full px-2 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8 overflow-x-hidden">
-          <div className="max-w-4xl mx-auto bg-white dark:bg-gray-800 rounded-lg shadow-lg p-2 sm:p-4 lg:p-6 overflow-x-hidden">
+        <div className="min-h-screen overflow-x-hidden bg-slate-50/80 px-3 py-4 dark:bg-slate-950 sm:px-4 sm:py-6 lg:px-8">
+          <div className="mx-auto max-w-4xl overflow-x-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6 lg:p-8">
             {formInner}
           </div>
         </div>

@@ -8,6 +8,7 @@ import CreateThreadModal from '../threads/CreateThreadModal';
 import axios from 'axios';
 import { deriveDiscussionWorkflowState } from '../../utils/discussionWorkflowStatus';
 import { resolveDiscussionStatus, type DiscussionStatus } from '../../utils/discussionStatus';
+import { Pin, MessageCircle, Clock } from 'lucide-react';
 
 interface Thread {
   _id: string;
@@ -74,6 +75,12 @@ const CourseDiscussions: React.FC<CourseDiscussionsProps> = ({
 }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
+
+  const formatRoleLabel = (role: string) => {
+    if (!role) return '';
+    const normalized = role.replace(/_/g, ' ');
+    return normalized.charAt(0).toUpperCase() + normalized.slice(1).toLowerCase();
+  };
   const [threads, setThreads] = useState<Thread[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -165,36 +172,101 @@ const CourseDiscussions: React.FC<CourseDiscussionsProps> = ({
     return (
       <>
         {unreadCount > 0 && (
-          <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 rounded-full" aria-label={`${unreadCount} unread replies`}>
+          <span
+            className="inline-flex items-center rounded-md border border-sky-200/90 bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-800 shadow-sm dark:border-sky-800/60 dark:bg-sky-950/40 dark:text-sky-200"
+            aria-label={`${unreadCount} unread replies`}
+          >
             {unreadCount} unread
           </span>
         )}
         {user?.role === 'student' && !hasPosted && (
-          <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-orange-100 dark:bg-orange-900/50 text-orange-800 dark:text-orange-300 rounded-full">
+          <span className="inline-flex items-center rounded-md border border-orange-200/90 bg-orange-50 px-2 py-0.5 text-[11px] font-semibold text-orange-900 shadow-sm dark:border-orange-800/50 dark:bg-orange-950/30 dark:text-orange-200">
             Not posted
           </span>
         )}
         {hasInstructorReply && (
-          <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-indigo-100 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-300 rounded-full">
+          <span className="inline-flex items-center rounded-md border border-violet-200/90 bg-violet-50 px-2 py-0.5 text-[11px] font-semibold text-violet-900 shadow-sm dark:border-violet-800/50 dark:bg-violet-950/35 dark:text-violet-200">
             Instructor replied
           </span>
         )}
         {state.locked && (
-          <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300 rounded-full">
+          <span className="inline-flex items-center rounded-md border border-amber-200/90 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-900 shadow-sm dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-200">
             Locked
           </span>
         )}
         {status === 'unpublished' && (
-          <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full">
+          <span className="inline-flex items-center rounded-md border border-slate-200 bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700 shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
             Unpublished
           </span>
         )}
         {thread.isGraded && !state.released && user?.role === 'student' && (
-          <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full">
+          <span className="inline-flex items-center rounded-md border border-slate-200 bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700 shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
             Grade hidden
           </span>
         )}
       </>
+    );
+  };
+
+  const renderThreadCard = (thread: Thread, pinned: boolean) => {
+    const surface = pinned
+      ? 'border-slate-200/90 border-l-[3px] border-l-blue-600 bg-white dark:border-slate-700/80 dark:border-l-blue-500 dark:bg-slate-900/60'
+      : 'border-slate-200/90 bg-white dark:border-slate-700/80 dark:bg-slate-900/60';
+
+    return (
+      <button
+        type="button"
+        key={thread._id}
+        onClick={() => handleThreadClick(thread._id)}
+        className={`group relative w-full overflow-hidden rounded-2xl border text-left shadow-sm shadow-slate-200/30 transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md hover:shadow-slate-900/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/80 focus-visible:ring-offset-2 dark:shadow-none dark:hover:border-slate-600 dark:hover:shadow-lg dark:hover:shadow-black/20 dark:focus-visible:ring-offset-slate-950 ${surface} p-4 sm:p-5`}
+        aria-label={`Open ${pinned ? 'pinned ' : ''}discussion ${thread.title}`}
+      >
+        <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+          <div className="min-w-0 space-y-3">
+            <div className="flex items-start gap-2">
+              {pinned && (
+                <span className="mt-1 shrink-0 text-blue-600 dark:text-blue-400" title="Pinned thread" aria-hidden>
+                  <Pin className="h-4 w-4" strokeWidth={2.25} />
+                </span>
+              )}
+              <h3 className="min-w-0 flex-1 text-[1.05rem] font-semibold leading-snug tracking-tight text-slate-900 dark:text-slate-50 sm:text-lg">
+                {thread.title}
+              </h3>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">{renderWorkflowBadges(thread)}</div>
+
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-600 dark:text-slate-400">
+              <span className="inline-flex flex-wrap items-center gap-2">
+                <span className="text-slate-500 dark:text-slate-500">Posted by</span>
+                <span className="font-medium text-slate-800 dark:text-slate-200">
+                  {thread.author.firstName} {thread.author.lastName}
+                </span>
+                <span className="inline-flex items-center rounded-md border border-slate-200/90 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold capitalize text-slate-700 shadow-sm dark:border-slate-600 dark:bg-slate-800/80 dark:text-slate-200">
+                  {formatRoleLabel(thread.author.role)}
+                </span>
+              </span>
+              {thread.dueDate && (
+                <span className="inline-flex items-center gap-1.5 text-sm font-medium text-amber-800 dark:text-amber-300/95">
+                  <Clock className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
+                  Due {formatDistanceToNow(new Date(thread.dueDate), { addSuffix: true })}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex shrink-0 flex-col items-end justify-center gap-2">
+            <span className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-slate-50/90 px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm ring-1 ring-slate-900/[0.03] dark:border-slate-600 dark:bg-slate-800/90 dark:text-slate-300 dark:ring-white/5">
+              <MessageCircle className="h-4 w-4 text-slate-400 dark:text-slate-500" aria-hidden />
+              {thread.replyCount} {thread.replyCount === 1 ? 'reply' : 'replies'}
+            </span>
+            {thread.isGraded && (
+              <span className="inline-flex w-max max-w-full items-center justify-center rounded-md border border-emerald-200/90 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold leading-tight text-emerald-900 shadow-sm dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-200">
+                Graded ({thread.totalPoints} pts)
+              </span>
+            )}
+          </div>
+        </div>
+      </button>
     );
   };
 
@@ -226,13 +298,16 @@ const CourseDiscussions: React.FC<CourseDiscussionsProps> = ({
           modules={modules}
         />
       ) : (
-        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
+        <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-b from-white to-slate-50/80 p-4 shadow-sm shadow-slate-200/40 dark:border-slate-800 dark:from-slate-900 dark:to-slate-950/80 dark:shadow-none sm:p-6">
           {canManageCourseDiscussions && (
-            <div className="mb-5 flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50/80 p-3 dark:border-gray-700 dark:bg-gray-800/70">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Create and manage discussion threads for this course</p>
+            <div className="mb-6 flex flex-col gap-3 rounded-xl border border-slate-200/70 bg-white/80 p-4 shadow-sm backdrop-blur-sm dark:border-slate-700 dark:bg-slate-800/50 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm font-medium leading-relaxed text-slate-600 dark:text-slate-300">
+                Create and manage discussion threads for this course
+              </p>
               <button
+                type="button"
                 onClick={handleCreateThread}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+                className="inline-flex shrink-0 items-center justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
               >
                 + Create New Thread
               </button>
@@ -269,124 +344,35 @@ const CourseDiscussions: React.FC<CourseDiscussionsProps> = ({
             )}
           </div>
         ) : (
-          <div className="space-y-4">
-            {/* Pinned threads */}
-            {threads.filter(thread => thread.isPinned).length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">Pinned Threads</h3>
-                <div className="space-y-4">
-                  {threads
-                    .filter(thread => thread.isPinned)
-                    .map((thread) => (
-                      <button
-                        type="button"
-                        key={thread._id}
-                        onClick={() => handleThreadClick(thread._id)}
-                        className="w-full text-left p-3 sm:p-4 bg-white dark:bg-gray-900 border border-yellow-200 dark:border-yellow-700 rounded-lg hover:shadow-md transition-shadow cursor-pointer relative focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        aria-label={`Open pinned discussion ${thread.title}`}
-                      >
-                        <div className="absolute top-2 right-2 text-yellow-500">
-                          <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                            <path d="M10 2a1 1 0 011 1v1.323l3.954 1.582 1.599-.8a1 1 0 01.894 1.79l-1.233.616 1.738 5.42a1 1 0 01-.285 1.05A3.989 3.989 0 0115 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.715-5.349L11 4.477V16h2a1 1 0 110 2H7a1 1 0 110-2h2V4.477L6.237 7.582l1.715 5.349a1 1 0 01-.285 1.05A3.989 3.989 0 015 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.738-5.42-1.233-.616a1 1 0 01.894-1.79l1.599.8L9 4.323V3a1 1 0 011-1z" />
-                          </svg>
-                        </div>
-                        <div className="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-0">
-                          <div className="flex-1 min-w-0">
-                            <h3 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2 break-words">
-                              {thread.title}
-                              {thread.isGraded && (
-                                <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300 rounded-full">
-                                  Graded ({thread.totalPoints} points)
-                                </span>
-                              )}
-                              {renderWorkflowBadges(thread)}
-                            </h3>
-                            <div className="flex flex-wrap items-center text-xs sm:text-sm text-gray-600 dark:text-gray-400 gap-2 sm:gap-0 sm:space-x-4">
-                              <span className="flex items-center gap-1">
-                                Posted by {thread.author.firstName} {thread.author.lastName}
-                                <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 rounded-full">
-                                  {thread.author.role}
-                                </span>
-                              </span>
-                              {thread.dueDate && (
-                                <>
-                                  <span className="text-orange-600 dark:text-orange-400">
-                                    Due {formatDistanceToNow(new Date(thread.dueDate), { addSuffix: true })}
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm">
-                            <div className="flex items-center">
-                              <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                              </svg>
-                              {thread.replyCount} {thread.replyCount === 1 ? 'reply' : 'replies'}
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
+          <div className="space-y-8">
+            {threads.filter((thread) => thread.isPinned).length > 0 && (
+              <section aria-labelledby="pinned-discussions-heading">
+                <div className="mb-4 flex items-center gap-3">
+                  <h3
+                    id="pinned-discussions-heading"
+                    className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
+                  >
+                    Pinned threads
+                  </h3>
+                  <span className="h-px flex-1 bg-gradient-to-r from-slate-200 to-transparent dark:from-slate-700" aria-hidden />
                 </div>
-              </div>
+                <div className="space-y-3">{threads.filter((t) => t.isPinned).map((thread) => renderThreadCard(thread, true))}</div>
+              </section>
             )}
 
-            {/* Regular threads */}
-            {threads.filter(thread => !thread.isPinned).length > 0 && (
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">All Threads</h3>
-                <div className="space-y-4">
-                  {threads
-                    .filter(thread => !thread.isPinned)
-                    .map((thread) => (
-                      <button
-                        type="button"
-                        key={thread._id}
-                        onClick={() => handleThreadClick(thread._id)}
-                        className="w-full text-left p-3 sm:p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-md transition-shadow cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        aria-label={`Open discussion ${thread.title}`}
-                      >
-                        <div className="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-0">
-                          <div className="flex-1 min-w-0">
-                            <h3 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2 break-words">
-                              {thread.title}
-                              {thread.isGraded && (
-                                <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300 rounded-full">
-                                  Graded ({thread.totalPoints} points)
-                                </span>
-                              )}
-                              {renderWorkflowBadges(thread)}
-                            </h3>
-                            <div className="flex flex-wrap items-center text-xs sm:text-sm text-gray-600 dark:text-gray-400 gap-2 sm:gap-0 sm:space-x-4">
-                              <span className="flex items-center gap-1">
-                                Posted by {thread.author.firstName} {thread.author.lastName}
-                                <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 rounded-full">
-                                  {thread.author.role}
-                                </span>
-                              </span>
-                              {thread.dueDate && (
-                                <>
-                                  <span className="text-orange-600 dark:text-orange-400">
-                                    Due {formatDistanceToNow(new Date(thread.dueDate), { addSuffix: true })}
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm">
-                            <div className="flex items-center">
-                              <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                              </svg>
-                              {thread.replyCount} {thread.replyCount === 1 ? 'reply' : 'replies'}
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
+            {threads.filter((thread) => !thread.isPinned).length > 0 && (
+              <section aria-labelledby="all-discussions-heading">
+                <div className="mb-4 flex items-center gap-3">
+                  <h3
+                    id="all-discussions-heading"
+                    className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
+                  >
+                    All threads
+                  </h3>
+                  <span className="h-px flex-1 bg-gradient-to-r from-slate-200 to-transparent dark:from-slate-700" aria-hidden />
                 </div>
-              </div>
+                <div className="space-y-3">{threads.filter((t) => !t.isPinned).map((thread) => renderThreadCard(thread, false))}</div>
+              </section>
             )}
           </div>
           )}

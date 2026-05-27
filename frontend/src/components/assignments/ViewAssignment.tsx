@@ -8,6 +8,7 @@ import { safeFormatDate } from '../../utils/dateUtils';
 import { Lock, Unlock, HelpCircle, CheckCircle, Circle, Bookmark, BarChart3, Edit, Eye, X, Download } from 'lucide-react';
 import FilePreview from './FilePreview';
 import AssignmentFileUploadSection from './AssignmentFileUploadSection';
+import { isPaperUploadQuiz } from '../../utils/quizSubmissionMode';
 import FileAttachmentChips from '../files/FileAttachmentChips';
 import type { NormalizedFile } from '../../utils/fileTypes';
 import { fetchCourseLifecycle } from '../../services/gradingApi';
@@ -62,6 +63,8 @@ interface Assignment {
   totalPoints?: number;
   module?: string | { _id: string };
   isGradedQuiz?: boolean;
+  quizSubmissionMode?: 'online' | 'paper_upload';
+  allowStudentUploads?: boolean;
   isTimedQuiz?: boolean;
   quizTimeLimit?: number;
   isGroupAssignment?: boolean;
@@ -823,6 +826,10 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
       setError('You are not a member of any group for this group assignment.');
       return;
     }
+    if (isPaperUploadQuiz(assignment) && uploadedFiles.length === 0) {
+      setError('Please upload at least one file before submitting your quiz.');
+      return;
+    }
     setIsSubmitting(true);
     try {
       // Prepare answers for submission
@@ -968,10 +975,15 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
       !!activeSubmission ||
       effectivePastDue);
   const showTimedQuizChrome = !viewAsStudent && !!assignment.isTimedQuiz;
-  
-
-  
-
+  const paperUploadQuiz = isPaperUploadQuiz(assignment);
+  const showStudentUploadSection =
+    canInteractAsStudent &&
+    !activeSubmission &&
+    !assignment.isTimedQuiz &&
+    (paperUploadQuiz ||
+      (Boolean(assignment.allowStudentUploads) &&
+        !assignment.isGradedQuiz &&
+        assignment.group !== 'Quizzes'));
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -1234,7 +1246,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
           </div>
         ) : null}
 
-        {canInteractAsStudent && !activeSubmission && !assignment.isTimedQuiz && !assignment.isGradedQuiz && assignment.group !== 'Quizzes' && (
+        {showStudentUploadSection && (
           <AssignmentFileUploadSection
             uploadedFiles={uploadedFiles}
             onFilesChange={handleUploadedFilesChange}
@@ -1243,6 +1255,22 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
             finalized={courseFinalized}
             disabled={viewAsStudent}
           />
+        )}
+
+        {paperUploadQuiz && canInteractAsStudent && !activeSubmission && (
+          <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-700 dark:bg-slate-900/40">
+            <p className="text-sm text-slate-700 dark:text-slate-200">
+              Upload photos or files of your completed quiz work, then submit when you are ready.
+            </p>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={isSubmitting || uploadedFiles.length === 0}
+              className="mt-4 inline-flex items-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+            >
+              {isSubmitting ? 'Submitting...' : 'Submit Quiz'}
+            </button>
+          </div>
         )}
 
         {viewAsStudent && (
@@ -2524,7 +2552,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                     </div>
                     
                     {/* File Upload Section for Students - at the bottom of scrollable mode */}
-                    {canInteractAsStudent && !activeSubmission && !assignment.isTimedQuiz && !assignment.isGradedQuiz && assignment.group !== 'Quizzes' && (
+                    {showStudentUploadSection && (
                       <AssignmentFileUploadSection
                         uploadedFiles={uploadedFiles}
                         onFilesChange={handleUploadedFilesChange}

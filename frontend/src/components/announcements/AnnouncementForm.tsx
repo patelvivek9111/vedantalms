@@ -6,7 +6,8 @@ import FloatingLabelSelect from '../common/FloatingLabelSelect';
 import DatePicker from '../common/DatePicker';
 import FormFieldGroup from '../common/FormFieldGroup';
 import { useDraftManager } from '../../hooks/useDraftManager';
-import { Save, RefreshCw } from 'lucide-react';
+import { FormCheckboxOption, FormPageHeader, FormActions } from '../common/FormControls';
+import { FORM_SHELL } from '../common/formStyles';
 import ConfirmationModal from '../common/ConfirmationModal';
 import FileAttachmentPanel from '../files/FileAttachmentPanel';
 import type { NormalizedFile } from '../../utils/fileTypes';
@@ -123,7 +124,7 @@ const AnnouncementForm: React.FC<AnnouncementFormProps> = ({ onSubmit, loading, 
       setTitle('');
       setBody('');
       setPostTo('all');
-      setFiles(null);
+      setAttachmentFiles([]);
       setOptions({
         delayPosting: false,
         allowComments: false,
@@ -193,30 +194,18 @@ const AnnouncementForm: React.FC<AnnouncementFormProps> = ({ onSubmit, loading, 
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-4 bg-white dark:bg-gray-800 rounded shadow p-4 sm:p-6 border dark:border-gray-700">
-      {/* Draft saved indicator and reset button */}
-      <div className="flex items-center justify-between bg-green-50 dark:bg-green-900/20 px-4 py-2 rounded-md mb-4">
-        {isDraftSaved ? (
-          <div className="flex items-center text-sm text-green-600 dark:text-green-400">
-            <Save className="w-4 h-4 mr-2" />
-            Draft saved automatically
-          </div>
-        ) : (
-          <div></div>
-        )}
-        <button
-          type="button"
-          onClick={handleResetForm}
-          className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-white dark:hover:bg-gray-800 rounded-md transition-colors"
-          title="Clear form and start fresh"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Reset Form
-        </button>
-      </div>
+    <div className={`${FORM_SHELL} p-4 sm:p-6`}>
+      <FormPageHeader
+        title="Announcement"
+        subtitle="Share updates with your course."
+        isDraftSaved={isDraftSaved && !initialValues}
+        onReset={!initialValues ? handleResetForm : undefined}
+        resetLabel="Reset form"
+      />
 
+      <form onSubmit={handleSubmit} className="space-y-6">
       <FormFieldGroup
-        title="Announcement Details"
+        title="Announcement details"
         description="Enter the topic title and content for your announcement"
       >
         <FloatingLabelInput
@@ -238,7 +227,9 @@ const AnnouncementForm: React.FC<AnnouncementFormProps> = ({ onSubmit, loading, 
           maxLength={200}
         />
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Content</label>
+          <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+            Content
+          </label>
           <RichTextEditor content={body} onChange={setBody} />
         </div>
       </FormFieldGroup>
@@ -271,38 +262,35 @@ const AnnouncementForm: React.FC<AnnouncementFormProps> = ({ onSubmit, loading, 
       </FormFieldGroup>
 
       <FormFieldGroup
-        title="Advanced Options"
+        title="Advanced options"
         description="Configure additional settings for your announcement"
       >
         <div className="space-y-3">
-          <label htmlFor="delayPosting" className="flex items-center min-h-[44px] cursor-pointer">
-            <input 
-              type="checkbox" 
-              id="delayPosting" 
-              checked={options.delayPosting} 
-              onChange={e => {
-                setOptions(o => ({ ...o, delayPosting: e.target.checked }));
-                if (!e.target.checked && fieldErrors.delayedUntil) {
-                  setFieldErrors(prev => {
-                    const newErrors = { ...prev };
-                    delete newErrors.delayedUntil;
-                    return newErrors;
-                  });
-                }
-              }}
-              className="h-4 w-4 text-blue-600 dark:text-blue-400 border-gray-300 dark:border-gray-700 rounded focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-900"
-            />
-            <span className="ml-2 text-gray-700 dark:text-gray-300">Delay posting</span>
-          </label>
+          <FormCheckboxOption
+            id="delayPosting"
+            checked={options.delayPosting}
+            onChange={(e) => {
+              setOptions((o) => ({ ...o, delayPosting: e.target.checked }));
+              if (!e.target.checked && fieldErrors.delayedUntil) {
+                setFieldErrors((prev) => {
+                  const newErrors = { ...prev };
+                  delete newErrors.delayedUntil;
+                  return newErrors;
+                });
+              }
+            }}
+            title="Delay posting"
+            description="Schedule this announcement to publish at a later date and time."
+          />
           {options.delayPosting && (
             <DatePicker
               id="announcement-delayed-until"
               name="delayedUntil"
-              label="Release Date and Time"
+              label="Release date and time"
               showTime={true}
               required={options.delayPosting}
               value={delayedUntil}
-              onChange={e => {
+              onChange={(e) => {
                 setDelayedUntil(e.target.value);
                 if (fieldErrors.delayedUntil) {
                   validateDelayedUntil();
@@ -313,65 +301,49 @@ const AnnouncementForm: React.FC<AnnouncementFormProps> = ({ onSubmit, loading, 
               helperText="Select when this announcement should be published"
             />
           )}
-          <label htmlFor="allowComments" className="flex items-center min-h-[44px] cursor-pointer">
-            <input 
-              type="checkbox" 
-              id="allowComments" 
-              checked={options.allowComments} 
-              onChange={e => setOptions(o => ({ ...o, allowComments: e.target.checked }))}
-              className="h-4 w-4 text-blue-600 dark:text-blue-400 border-gray-300 dark:border-gray-700 rounded focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-900"
-            />
-            <span className="ml-2 text-gray-700 dark:text-gray-300">Allow users to comment</span>
-          </label>
-          <label htmlFor="requirePostBeforeSeeingReplies" className="flex items-center min-h-[44px] cursor-pointer ml-6">
-            <input 
-              type="checkbox" 
-              id="requirePostBeforeSeeingReplies" 
-              checked={options.requirePostBeforeSeeingReplies} 
-              onChange={e => setOptions(o => ({ ...o, requirePostBeforeSeeingReplies: e.target.checked }))} 
+          <FormCheckboxOption
+            id="allowComments"
+            checked={options.allowComments}
+            onChange={(e) => setOptions((o) => ({ ...o, allowComments: e.target.checked }))}
+            title="Allow comments"
+            description="Let students reply to this announcement."
+          />
+          <div className="pl-2">
+            <FormCheckboxOption
+              id="requirePostBeforeSeeingReplies"
+              checked={options.requirePostBeforeSeeingReplies}
+              onChange={(e) =>
+                setOptions((o) => ({ ...o, requirePostBeforeSeeingReplies: e.target.checked }))
+              }
+              title="Require post before seeing replies"
+              description="Students must comment before they can read other replies."
               disabled={!options.allowComments}
-              className="h-4 w-4 text-blue-600 dark:text-blue-400 border-gray-300 dark:border-gray-700 rounded focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-900 disabled:opacity-50"
             />
-            <span className="ml-2 text-gray-700 dark:text-gray-300">Users must post before seeing replies</span>
-          </label>
-          <label htmlFor="enablePodcastFeed" className="flex items-center min-h-[44px] cursor-pointer">
-            <input 
-              type="checkbox" 
-              id="enablePodcastFeed" 
-              checked={options.enablePodcastFeed} 
-              onChange={e => setOptions(o => ({ ...o, enablePodcastFeed: e.target.checked }))}
-              className="h-4 w-4 text-blue-600 dark:text-blue-400 border-gray-300 dark:border-gray-700 rounded focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-900"
-            />
-            <span className="ml-2 text-gray-700 dark:text-gray-300">Enable podcast feed</span>
-          </label>
-          <label htmlFor="allowLiking" className="flex items-center min-h-[44px] cursor-pointer">
-            <input 
-              type="checkbox" 
-              id="allowLiking" 
-              checked={options.allowLiking} 
-              onChange={e => setOptions(o => ({ ...o, allowLiking: e.target.checked }))}
-              className="h-4 w-4 text-blue-600 dark:text-blue-400 border-gray-300 dark:border-gray-700 rounded focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-900"
-            />
-            <span className="ml-2 text-gray-700 dark:text-gray-300">Allow liking</span>
-          </label>
+          </div>
+          <FormCheckboxOption
+            id="enablePodcastFeed"
+            checked={options.enablePodcastFeed}
+            onChange={(e) => setOptions((o) => ({ ...o, enablePodcastFeed: e.target.checked }))}
+            title="Enable podcast feed"
+            description="Include this announcement in the course podcast feed."
+          />
+          <FormCheckboxOption
+            id="allowLiking"
+            checked={options.allowLiking}
+            onChange={(e) => setOptions((o) => ({ ...o, allowLiking: e.target.checked }))}
+            title="Allow liking"
+            description="Let students like this announcement."
+          />
         </div>
       </FormFieldGroup>
-      <div className="flex justify-end gap-2 mt-6">
-        <button
-          type="button"
-          className="min-h-[44px] bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded hover:bg-gray-300 dark:hover:bg-gray-600 touch-manipulation active:scale-95 transition-transform"
-          onClick={onCancel}
-        >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          className="min-h-[44px] bg-blue-600 dark:bg-blue-500 text-white px-4 py-2.5 rounded hover:bg-blue-700 dark:hover:bg-blue-600 touch-manipulation active:scale-95 transition-transform disabled:opacity-50"
-          disabled={loading}
-        >
-          {loading ? 'Saving...' : 'Save'}
-        </button>
-      </div>
+
+      <FormActions
+        onCancel={onCancel}
+        submitLabel="Save"
+        loading={loading}
+        loadingLabel="Saving…"
+      />
+      </form>
 
       {/* Reset Form Confirmation Modal */}
       <ConfirmationModal
@@ -384,7 +356,7 @@ const AnnouncementForm: React.FC<AnnouncementFormProps> = ({ onSubmit, loading, 
         cancelText="Cancel"
         variant="warning"
       />
-    </form>
+    </div>
   );
 };
 

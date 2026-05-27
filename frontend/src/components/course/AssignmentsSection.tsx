@@ -57,6 +57,7 @@ const AssignmentsSection: React.FC<AssignmentsSectionProps> = ({
       published: true, // Always treat discussions as published
       studentGrades: d.studentGrades || [],
       replies: d.replies || [],
+      hasSubmitted: d.hasSubmitted ?? d.hasPosted ?? false,
     }))
   ];
   

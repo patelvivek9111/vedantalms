@@ -131,6 +131,10 @@ async function serializeThreadForUser(req, thread, context = {}, options = {}) {
     payload.lastViewedAt = payload.currentUserParticipation.lastViewedAt || null;
     payload.hasInstructorReply = payload.currentUserParticipation.hasInstructorReply || false;
   }
+  const listReplyCountOverride = options.replyCountAggregate;
+  if (!payload.repliesHiddenUntilPost && typeof listReplyCountOverride === 'number') {
+    payload.replyCount = Math.max(payload.replyCount ?? 0, listReplyCountOverride);
+  }
   return discussionStatus.attachDiscussionStatus(payload, {
     course: context.course,
     module: context.module,
@@ -161,6 +165,9 @@ async function buildFilteredThreadListResponse(req, threads, routeType, { extraG
   const includeDebug =
     debugVisibility && courseDoc && discussionListDiagnostics.canAttachVisibilityDebug(req.user, courseDoc);
 
+  const threadIds = threads.map((t) => String(t._id));
+  const replyCountsByThread = await discussionReplyService.batchResolveReplyCountsForList(threadIds);
+
   const filteredReasons = {};
   let filteredCount = 0;
   const visibleThreads = [];
@@ -172,7 +179,14 @@ async function buildFilteredThreadListResponse(req, threads, routeType, { extraG
       if (extraGate) {
         await extraGate(req, thread, context);
       }
-      visibleThreads.push(await serializeThreadForUser(req, thread, context, { replies: { limit: 0 } }));
+      const tid = String(thread._id);
+      const replyCountAggregate = replyCountsByThread.get(tid) ?? 0;
+      visibleThreads.push(
+        await serializeThreadForUser(req, thread, context, {
+          replies: { limit: 0 },
+          replyCountAggregate,
+        })
+      );
     } catch (error) {
       if (error.statusCode >= 500) throw error;
       filteredCount += 1;
