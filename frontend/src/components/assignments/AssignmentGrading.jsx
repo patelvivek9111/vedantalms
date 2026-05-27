@@ -531,7 +531,7 @@ const AssignmentGrading = () => {
     fetchData();
   }, [fetchData]);
 
-  const handleGradeSubmission = async (approveGrade = false) => {
+  const handleGradeSubmission = async (approveGrade = false, releaseGrade = false) => {
     if (!selectedSubmission) {
       toast.error('Please select a submission to grade');
       return;
@@ -576,7 +576,9 @@ const AssignmentGrading = () => {
     try {
       const payload = {
         feedback: sanitizeFeedback(feedback),
-        approveGrade
+        approveGrade,
+        releaseGrade,
+        releaseFeedback: releaseGrade,
       };
 
       if (!approveGrade) {
@@ -1775,6 +1777,13 @@ const AssignmentGrading = () => {
                             'Approve Auto-Grade'
                           )}
                         </button>
+                        <button
+                          onClick={() => handleGradeSubmission(true, true)}
+                          disabled={isGrading}
+                          className="inline-flex items-center px-4 py-2 border border-green-600 text-sm font-medium rounded-md text-green-700 bg-white hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed dark:border-green-400 dark:bg-gray-900 dark:text-green-300 dark:hover:bg-green-900/20"
+                        >
+                          Approve & Release
+                        </button>
                         {assignment.questions && assignment.questions.some(q => q.type !== 'multiple-choice' && q.type !== 'matching') && (
                           <button
                             onClick={() => handleGradeSubmission(false)}
@@ -1794,24 +1803,33 @@ const AssignmentGrading = () => {
                         )}
                       </>
                     ) : (
-                      <button
-                        onClick={() => handleGradeSubmission(false)}
-                        disabled={isGrading}
-                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                        aria-label="Grade submission"
-                      >
-                        {isGrading ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Grading...
-                          </>
-                        ) : (
-                          <>
-                            <Save className="h-4 w-4 mr-2" />
-                            Grade Submission
-                          </>
-                        )}
-                      </button>
+                      <>
+                        <button
+                          onClick={() => handleGradeSubmission(false)}
+                          disabled={isGrading}
+                          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                          aria-label="Grade submission"
+                        >
+                          {isGrading ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Grading...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="h-4 w-4 mr-2" />
+                              Grade Submission
+                            </>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => handleGradeSubmission(false, true)}
+                          disabled={isGrading}
+                          className="inline-flex items-center px-4 py-2 border border-indigo-600 text-sm font-medium rounded-md text-indigo-700 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed dark:border-indigo-400 dark:bg-gray-900 dark:text-indigo-300 dark:hover:bg-indigo-900/20"
+                        >
+                          Save & Release
+                        </button>
+                      </>
                     )}
                     
                     {/* Delete Submission Button */}

@@ -5,9 +5,12 @@ const Page = require('../models/page.model');
 const Assignment = require('../models/Assignment');
 const Thread = require('../models/thread.model');
 const Announcement = require('../models/announcement.model');
+const GroupSet = require('../models/GroupSet');
+const Group = require('../models/Group');
 const fileAssetService = require('./fileAsset.service');
 const { assertCourseOperational } = require('./fileLifecycle.service');
 const academicAuditService = require('./academicAudit.service');
+const assignmentGroupService = require('./assignmentGroup.service');
 
 /**
  * Copy course instructional content without grades, transcripts, or lifecycle snapshots.
@@ -25,13 +28,21 @@ async function copyCourseContent(sourceCourseId, {
     throw err;
   }
 
+  const sourceGroups = assignmentGroupService.normalizeGroups(source.groups || []);
+  const groupIdMap = new Map();
+  const copiedGroups = sourceGroups.map((group) => {
+    const newId = new mongoose.Types.ObjectId().toString();
+    groupIdMap.set(String(group.id || group._id), newId);
+    return { ...group, id: newId };
+  });
+
   const newCourse = await Course.create({
     title: targetTitle || `${source.title} (Copy)`,
     description: source.description,
     instructor: requestedBy._id || requestedBy,
     published: false,
     operationalStatus: 'draft',
-    groups: source.groups,
+    groups: copiedGroups,
     gradeScale: source.gradeScale,
     catalog: {
       ...source.catalog,
@@ -72,6 +83,8 @@ async function copyCourseContent(sourceCourseId, {
 
   const modules = await Module.find({ course: sourceCourseId }).sort({ order: 1 }).lean();
   const moduleIdMap = new Map();
+  const groupSetIdMap = new Map();
+  const discussionGroupIdMap = new Map();
 
   for (const mod of modules) {
     const newMod = await Module.create({
@@ -127,11 +140,39 @@ async function copyCourseContent(sourceCourseId, {
         isOfflineAssignment: a.isOfflineAssignment,
         totalPoints: a.totalPoints,
         group: a.group,
+        groupId: a.groupId ? groupIdMap.get(String(a.groupId)) : undefined,
+        gradeReleaseMode: a.gradeReleaseMode,
+        defaultGradeHidden: a.defaultGradeHidden,
+        lockAfterDue: a.lockAfterDue,
         published: false,
         createdBy: requestedBy._id || requestedBy,
       });
     }
     await newMod.save();
+  }
+
+  const groupSets = await GroupSet.find({ course: sourceCourseId }).lean();
+  for (const groupSet of groupSets) {
+    const newGroupSet = await GroupSet.create({
+      name: groupSet.name,
+      course: newCourse._id,
+      allowSelfSignup: groupSet.allowSelfSignup,
+      groupStructure: groupSet.groupStructure,
+    });
+    groupSetIdMap.set(String(groupSet._id), newGroupSet._id);
+
+    const groups = await Group.find({ groupSet: groupSet._id }).lean();
+    for (const group of groups) {
+      const newGroup = await Group.create({
+        name: group.name,
+        groupSet: newGroupSet._id,
+        members: [],
+        leader: undefined,
+        groupId: new mongoose.Types.ObjectId().toString(),
+        course: newCourse._id,
+      });
+      discussionGroupIdMap.set(String(group._id), newGroup._id);
+    }
   }
 
   if (includeDiscussions) {
@@ -150,7 +191,14 @@ async function copyCourseContent(sourceCourseId, {
         isGraded: t.isGraded,
         totalPoints: t.totalPoints,
         group: t.group,
+        groupSet: t.groupSet ? groupSetIdMap.get(String(t.groupSet)) : undefined,
+        groupId: t.groupId ? discussionGroupIdMap.get(String(t.groupId)) : undefined,
         dueDate: t.dueDate,
+        availableFrom: t.availableFrom,
+        locked: false,
+        lockAfterDue: t.lockAfterDue,
+        discussionReleaseMode: t.discussionReleaseMode,
+        gradeHidden: t.gradeHidden,
         settings: t.settings,
         fileAssets: clonedFiles,
         published: false,

@@ -143,7 +143,7 @@ const BottomNav: React.FC = () => {
   }
 
   return (
-    <nav className="print:hidden lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 z-[100] safe-area-inset-bottom shadow-lg">
+    <nav className="print:hidden lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 z-[100] safe-area-inset-bottom shadow-lg" aria-label="Mobile primary navigation">
       <div className="flex items-center justify-around h-16 px-2">
         {navItems.map((item) => {
           const Icon = item.icon;

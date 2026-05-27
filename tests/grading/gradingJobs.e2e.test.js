@@ -4,7 +4,7 @@
 const mongoose = require('mongoose');
 const express = require('express');
 const request = require('supertest');
-const { MongoMemoryServer } = require('mongodb-memory-server');
+const { createMongoMemoryServer } = require('../mongoMemoryServer');
 const { seedGradingContractE2E } = require('./e2eContractSeed');
 const User = require('../../models/user.model');
 
@@ -26,7 +26,7 @@ describe('grading jobs E2E (Wave D)', () => {
     process.env.FORCE_INLINE_JOBS = 'true';
     process.env.DISABLE_RATE_LIMIT = 'true';
     process.env.GRADING_ASYNC_STUDENT_THRESHOLD = '1';
-    mongoServer = await MongoMemoryServer.create();
+    mongoServer = await createMongoMemoryServer();
     process.env.MONGODB_URI = mongoServer.getUri();
     await mongoose.connect(process.env.MONGODB_URI);
     app = createApp();

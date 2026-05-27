@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
+const { createMongoMemoryServer } = require('../mongoMemoryServer');
 const gradeLifecycleService = require('../../services/gradeLifecycle.service');
 const Course = require('../../models/course.model');
 const User = require('../../models/user.model');
@@ -11,7 +11,7 @@ describe('gradeLifecycle.service', () => {
   let teacher;
 
   beforeAll(async () => {
-    mongoServer = await MongoMemoryServer.create();
+    mongoServer = await createMongoMemoryServer();
     await mongoose.connect(mongoServer.getUri());
     teacher = await User.create({
       firstName: 'T',

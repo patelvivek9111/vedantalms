@@ -321,6 +321,11 @@ exports.updateCourse = async (req, res) => {
       }
     }
 
+    if (req.body.groups) {
+      const assignmentGroupService = require('../services/assignmentGroup.service');
+      updateFields.groups = assignmentGroupService.normalizeGroups(req.body.groups, course.groups || []);
+    }
+
     try {
       course = await Course.findByIdAndUpdate(
         req.params.id,

@@ -3,9 +3,18 @@ const router = express.Router();
 const submissionController = require('../controllers/submission.controller');
 const { protect, authorize } = require('../middleware/auth');
 const upload = require('../middleware/upload');
+const rateLimit = require('express-rate-limit');
+
+const submitLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many submission attempts. Please retry shortly.' },
+});
 
 // Create a submission (student only)
-router.post('/', protect, authorize(['student']), submissionController.createSubmission);
+router.post('/', protect, authorize(['student']), submitLimiter, submissionController.createSubmission);
 
 // Get all submissions for an assignment (instructor only)
 router.get('/assignment/:assignmentId', protect, authorize(['teacher', 'admin']), submissionController.getAssignmentSubmissions);
@@ -19,6 +28,10 @@ router.get('/student/:assignmentId', protect, submissionController.getStudentSub
 // Grade a submission (instructor only)
 router.put('/:id', protect, authorize(['teacher', 'admin']), submissionController.gradeSubmission);
 router.post('/:id/grade', protect, authorize(['teacher', 'admin']), submissionController.gradeSubmission);
+
+// Read-only submission version history
+router.get('/:id/versions', protect, submissionController.getSubmissionVersions);
+router.get('/:id/timeline', protect, submissionController.getSubmissionTimeline);
 
 // Create or update manual grade for offline assignment (instructor only)
 router.post('/manual-grade', protect, authorize(['teacher', 'admin']), submissionController.createOrUpdateManualGrade);

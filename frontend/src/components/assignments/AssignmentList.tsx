@@ -10,6 +10,10 @@ import ConfirmationModal from '../common/ConfirmationModal';
 import PullToRefresh from '../common/PullToRefresh';
 import SwipeableListItem from '../common/SwipeableListItem';
 import { Trash2, Edit } from 'lucide-react';
+import {
+  ASSIGNMENT_STATUS_LABELS,
+  resolveAssignmentWorkflowStatus,
+} from '../../utils/assignmentWorkflowStatus';
 
 interface Attachment {
   _id: string;
@@ -86,6 +90,14 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
 
   const isTeacherOrAdmin = userRole === 'teacher' || userRole === 'admin';
+  const submissionByAssignmentId = useMemo(() => {
+    const map = new Map<string, any>();
+    (studentSubmissions || []).forEach((submission: any) => {
+      const assignmentId = submission.assignment?._id || submission.assignment;
+      if (assignmentId) map.set(String(assignmentId), submission);
+    });
+    return map;
+  }, [studentSubmissions]);
 
   // Handle single item delete
   const handleDeleteItem = (itemId: string) => {
@@ -201,6 +213,10 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
         _id: a._id,
         title: a.title,
         dueDate: a.dueDate || (a as any).due_date || (a as any).discussionDueDate || null,
+        availableFrom: (a as any).availableFrom || null,
+        lockAfterDue: (a as any).lockAfterDue,
+        gradeReleaseMode: (a as any).gradeReleaseMode,
+        defaultGradeHidden: (a as any).defaultGradeHidden,
         attachments: a.attachments || [],
         createdBy: a.createdBy,
         type: ((a as any).type === 'discussion' || (a as any).group === 'Discussions') ? 'discussion' : 'assignment',
@@ -214,6 +230,8 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
         _id: d._id,
         title: d.title,
         dueDate: d.dueDate || (d as any).due_date || (d as any).discussionDueDate || null,
+        availableFrom: (d as any).availableFrom || null,
+        lockAfterDue: (d as any).lockAfterDue,
         attachments: [],
         createdBy: d.author || { firstName: '', lastName: '' },
         type: 'discussion',
@@ -655,6 +673,10 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
               ) : null}
               {group.items.map(item => {
                 const dueDate = item.dueDate ? new Date(item.dueDate) : null;
+                const status = resolveAssignmentWorkflowStatus({
+                  assignment: item,
+                  submission: submissionByAssignmentId.get(String(item._id)) || null,
+                });
                 return (
                   <div key={item._id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-3 mb-2 last:mb-0">
                     <div className="flex items-start justify-between gap-3 sm:gap-2 mb-2">
@@ -670,6 +692,12 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
                       {dueDate && (
                         <span>{format(dueDate, 'PPp')}</span>
                       )}
+                      <span
+                        className="inline-flex items-center rounded bg-slate-100 px-2 py-0.5 font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                        aria-label={`Assignment status: ${ASSIGNMENT_STATUS_LABELS[status]}`}
+                      >
+                        {ASSIGNMENT_STATUS_LABELS[status]}
+                      </span>
                     </div>
                   </div>
                 );

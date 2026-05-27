@@ -16,6 +16,93 @@ const { buildDownloadPath, attachFileAssets } = fileAssetService;
 const { supersedeFileAssets } = require('../services/fileVersioning.service');
 const { assertFileMutable } = require('../services/fileGovernance.service');
 const { buildClientFileList } = require('../utils/fileResponse');
+const assignmentAccess = require('../services/assignmentAccess.service');
+const timedQuizAttemptService = require('../services/timedQuizAttempt.service');
+const gradeReleaseService = require('../services/gradeRelease.service');
+const submissionVersionService = require('../services/submissionVersion.service');
+const observability = require('../services/workflowObservability.service');
+const workflowCache = require('../services/workflowCache.service');
+
+function getIdempotencyKey(req, prefix) {
+  const raw = req.headers['idempotency-key'] || req.headers['x-idempotency-key'];
+  if (!raw) return null;
+  return `${prefix}:${String(raw).slice(0, 128)}`;
+}
+
+async function invalidateStudentGradeCacheForSubmission(submission) {
+  const assignmentDoc = await Assignment.findById(submission.assignment).select('module groupSet').lean();
+  let courseId = null;
+  if (assignmentDoc?.module) {
+    const moduleDoc = await Module.findById(assignmentDoc.module).select('course').lean();
+    courseId = moduleDoc?.course;
+  } else if (assignmentDoc?.groupSet) {
+    const GroupSet = require('../models/GroupSet');
+    const groupSetDoc = await GroupSet.findById(assignmentDoc.groupSet).select('course').lean();
+    courseId = groupSetDoc?.course;
+  }
+  if (!courseId) return;
+
+  const studentIds = new Set();
+  if (submission.student) studentIds.add(String(submission.student._id || submission.student));
+  if (Array.isArray(submission.group?.members)) {
+    submission.group.members.forEach((member) => studentIds.add(String(member._id || member)));
+  }
+
+  await Promise.all(
+    [...studentIds].map((studentId) => workflowCache.invalidateStudentCourseGrade(studentId, courseId))
+  );
+  observability.metric('grade_visibility_cache_invalidated', {
+    assignmentId: String(submission.assignment),
+    courseId: String(courseId),
+    studentCount: studentIds.size,
+  });
+}
+
+async function autoGradeSubmissionOnce(submission, assignment) {
+  if (!assignment.questions || assignment.questions.length === 0) return submission;
+  const submittedAt = submission.submittedAt ? new Date(submission.submittedAt).toISOString() : 'draft';
+  const runKey = `${submission._id}:${submittedAt}`;
+  if (submission.autoGradeRunKey === runKey && submission.autoGradeExecutedAt) {
+    return submission;
+  }
+
+  const locked = await Submission.findOneAndUpdate(
+    {
+      _id: submission._id,
+      $or: [
+        { autoGradeRunKey: { $exists: false } },
+        { autoGradeRunKey: null },
+        { autoGradeRunKey: { $ne: runKey } },
+      ],
+    },
+    { $set: { autoGradeRunKey: runKey } },
+    { new: true }
+  );
+  if (!locked) {
+    return Submission.findById(submission._id);
+  }
+
+  const autoGradeResult = await autoGradeSubmission(locked, assignment);
+  locked.autoGraded = autoGradeResult.autoGraded;
+  locked.autoGrade = autoGradeResult.autoGrade;
+  locked.autoQuestionGrades = autoGradeResult.autoQuestionGrades;
+
+  if (autoGradeResult.allMultipleChoice) {
+    locked.finalGrade = autoGradeResult.autoGrade;
+    locked.teacherApproved = true;
+    locked.grade = autoGradeResult.autoGrade;
+    locked.gradedBy = locked.submittedBy;
+    locked.gradedAt = new Date();
+  }
+
+  locked.autoGradeExecutedAt = new Date();
+  await locked.save();
+  observability.metric('auto_grade_executed', {
+    assignmentId: String(assignment._id),
+    submissionId: String(locked._id),
+  });
+  return locked;
+}
 
 async function applySubmissionFiles(submission, assignmentDoc, req) {
   const course = await resolveCourseForAssignment(assignmentDoc._id);
@@ -128,11 +215,9 @@ exports.submitAssignment = async (req, res) => {
     if (!assignment) {
       return res.status(404).json({ message: 'Assignment not found' });
     }
-    
-    // Check if due date has passed
-    if (new Date() > assignment.dueDate) {
-      return res.status(400).json({ message: 'Assignment due date has passed' });
-    }
+    await assignmentAccess.assertStudentCanSubmitAssignment(req.user, assignment);
+    const submitIdempotencyKey = getIdempotencyKey(req, 'submission');
+    const timedQuizSubmission = await timedQuizAttemptService.transitionTimedQuizToSubmitted(req.user, assignment, { groupId });
 
     let group = null;
     if (assignment.isGroupAssignment) {
@@ -161,11 +246,17 @@ exports.submitAssignment = async (req, res) => {
       ? { assignment: assignmentId, group: groupId }
       : { assignment: assignmentId, student: req.user._id };
     
-    const existingSubmission = await Submission.findOne(query);
+    let existingSubmission = timedQuizSubmission || await Submission.findOne(query);
     
     if (existingSubmission) {
+      if (submitIdempotencyKey && existingSubmission.lastSubmitIdempotencyKey === submitIdempotencyKey) {
+        return res.json(existingSubmission);
+      }
+      if (!assignment.isTimedQuiz) {
+        await submissionVersionService.snapshotSubmission(existingSubmission, { actorId: req.user._id });
+      }
       // If there's an existing submission, delete its files
-      if (existingSubmission.files.length > 0) {
+      if (!assignment.isTimedQuiz && existingSubmission.files.length > 0) {
         await Promise.all(existingSubmission.files.map(async (file) => {
           // Check if file is from Cloudinary or local
           if (typeof file === 'string' && file.includes('cloudinary.com') && isCloudinaryConfigured()) {
@@ -191,11 +282,18 @@ exports.submitAssignment = async (req, res) => {
       }
       
       // Update existing submission
-      existingSubmission.submissionText = submissionText;
+      if (!assignment.isTimedQuiz) {
+        existingSubmission.submissionText = submissionText;
+      }
       // Files are already uploaded via /api/upload endpoint, so we get URLs from req.body
-      existingSubmission.files = req.body.uploadedFiles || (req.files ? req.files.map(file => `/uploads/${file.filename}`) : []);
-      existingSubmission.submittedAt = new Date();
-      existingSubmission.submittedBy = req.user._id;
+      if (!assignment.isTimedQuiz) {
+        existingSubmission.files = req.body.uploadedFiles || (req.files ? req.files.map(file => `/uploads/${file.filename}`) : []);
+        existingSubmission.submittedAt = new Date();
+        existingSubmission.submittedBy = req.user._id;
+      }
+      if (submitIdempotencyKey) {
+        existingSubmission.lastSubmitIdempotencyKey = submitIdempotencyKey;
+      }
       
       await existingSubmission.save();
       return res.json(existingSubmission);
@@ -222,7 +320,11 @@ exports.submitAssignment = async (req, res) => {
         fs.unlink(file.path).catch(err => console.error('Error deleting file:', err))
       ));
     }
-    res.status(500).json({ message: error.message });
+    res.status(error.statusCode || 500).json({
+      message: error.message,
+      code: error.code,
+      details: error.details,
+    });
   }
 };
 
@@ -244,11 +346,8 @@ exports.createSubmission = async (req, res) => {
       
       return res.status(404).json({ message: 'Assignment not found' });
     }
-
-    if (new Date() > new Date(assignmentDoc.dueDate)) {
-      
-      return res.status(400).json({ message: 'Assignment is past due' });
-    }
+    await assignmentAccess.assertStudentCanSubmitAssignment(req.user, assignmentDoc);
+    const submitIdempotencyKey = getIdempotencyKey(req, 'submission');
 
     // Check if there are any answers provided
     const hasAnswers = answers && Object.keys(answers).length > 0;
@@ -267,6 +366,10 @@ exports.createSubmission = async (req, res) => {
         return res.status(400).json({ message: 'Please provide answers for the assignment questions' });
       }
     }
+    const timedQuizSubmission = await timedQuizAttemptService.transitionTimedQuizToSubmitted(req.user, assignmentDoc, {
+      groupId,
+      answers,
+    });
 
     let group = null;
     if (assignmentDoc.isGroupAssignment) {
@@ -295,39 +398,31 @@ exports.createSubmission = async (req, res) => {
       ? { assignment, group: groupId }
       : { assignment, student: req.user._id };
 
-    const existingSubmission = await Submission.findOne(query);
+    let existingSubmission = timedQuizSubmission || await Submission.findOne(query);
     
     if (existingSubmission) {
-      // Update existing submission
-      existingSubmission.answers = answers;
-      existingSubmission.submittedAt = new Date();
-      existingSubmission.submittedBy = req.user._id;
-      if (req.body.uploadedFiles) {
+      if (submitIdempotencyKey && existingSubmission.lastSubmitIdempotencyKey === submitIdempotencyKey) {
+        const enriched = existingSubmission.toObject ? existingSubmission.toObject() : existingSubmission;
+        enriched.clientFiles = await buildClientFileList(existingSubmission);
+        return res.status(200).json(enriched);
+      }
+
+      if (!assignmentDoc.isTimedQuiz) {
+        await submissionVersionService.snapshotSubmission(existingSubmission, { actorId: req.user._id });
+        existingSubmission.answers = answers;
+        existingSubmission.submittedAt = new Date();
+        existingSubmission.submittedBy = req.user._id;
+      }
+      if (submitIdempotencyKey) {
+        existingSubmission.lastSubmitIdempotencyKey = submitIdempotencyKey;
+      }
+      if (req.body.uploadedFiles && !assignmentDoc.isTimedQuiz) {
         await applySubmissionFiles(existingSubmission, assignmentDoc, req);
       }
       
       await existingSubmission.save();
       
-      // Auto-grade multiple choice questions if they exist
-      if (assignmentDoc.questions && assignmentDoc.questions.length > 0) {
-        const autoGradeResult = await autoGradeSubmission(existingSubmission, assignmentDoc);
-        
-        // Update submission with auto-grade results
-        existingSubmission.autoGraded = autoGradeResult.autoGraded;
-        existingSubmission.autoGrade = autoGradeResult.autoGrade;
-        existingSubmission.autoQuestionGrades = autoGradeResult.autoQuestionGrades;
-        
-        // If all questions are multiple choice, set final grade immediately
-        if (autoGradeResult.allMultipleChoice) {
-          existingSubmission.finalGrade = autoGradeResult.autoGrade; // This is now points
-          existingSubmission.teacherApproved = true;
-          existingSubmission.grade = autoGradeResult.autoGrade; // This is now points
-          existingSubmission.gradedBy = req.user._id;
-          existingSubmission.gradedAt = new Date();
-        }
-        
-        await existingSubmission.save();
-      }
+      existingSubmission = await autoGradeSubmissionOnce(existingSubmission, assignmentDoc);
       
       const enriched = existingSubmission.toObject();
       enriched.clientFiles = await buildClientFileList(existingSubmission);
@@ -342,6 +437,7 @@ exports.createSubmission = async (req, res) => {
       submittedBy: req.user._id,
       answers,
       submittedAt: new Date(),
+      lastSubmitIdempotencyKey: submitIdempotencyKey,
       files: [],
       fileAssets: [],
     });
@@ -355,26 +451,7 @@ exports.createSubmission = async (req, res) => {
     
 
 
-    // Auto-grade multiple choice questions if they exist
-    if (assignmentDoc.questions && assignmentDoc.questions.length > 0) {
-      const autoGradeResult = await autoGradeSubmission(submission, assignmentDoc);
-      
-      // Update submission with auto-grade results
-      submission.autoGraded = autoGradeResult.autoGraded;
-      submission.autoGrade = autoGradeResult.autoGrade;
-      submission.autoQuestionGrades = autoGradeResult.autoQuestionGrades;
-      
-      // If all questions are multiple choice, set final grade immediately
-      if (autoGradeResult.allMultipleChoice) {
-        submission.finalGrade = autoGradeResult.autoGrade; // This is now points
-        submission.teacherApproved = true;
-        submission.grade = autoGradeResult.autoGrade; // This is now points
-        submission.gradedBy = req.user._id;
-        submission.gradedAt = new Date();
-      }
-      
-      await submission.save();
-    }
+    const finalSubmission = await autoGradeSubmissionOnce(submission, assignmentDoc);
 
     // Notify teacher about new submission
     try {
@@ -387,8 +464,8 @@ exports.createSubmission = async (req, res) => {
           type: 'submission',
           title: 'New Assignment Submission',
           message: `${studentName} submitted "${assignmentWithCourse.title}"`,
-          link: `/courses/${assignmentWithCourse.course._id}/assignments/${assignment._id}/grading`,
-          relatedId: submission._id,
+          link: `/courses/${assignmentWithCourse.course._id}/assignments/${assignment}/grading`,
+          relatedId: finalSubmission._id,
           relatedType: 'submission',
           priority: 'medium'
         });
@@ -398,11 +475,15 @@ exports.createSubmission = async (req, res) => {
       // Don't fail the submission if notification fails
     }
 
-    const enriched = submission.toObject();
-    enriched.clientFiles = await buildClientFileList(submission);
+    const enriched = finalSubmission.toObject();
+    enriched.clientFiles = await buildClientFileList(finalSubmission);
     res.status(201).json(enriched);
   } catch (error) {
-    res.status(error.statusCode || 500).json({ message: error.message });
+    res.status(error.statusCode || 500).json({
+      message: error.message,
+      code: error.code,
+      details: error.details,
+    });
   }
 };
 
@@ -589,9 +670,13 @@ exports.getStudentSubmissionsForCourse = async (req, res) => {
       }
     }
 
-    // Combine and return all submissions
+    // Combine and return all submissions with student-facing grade release rules applied.
     const allSubmissions = [...individualSubmissions, ...groupSubmissions];
-    res.json(allSubmissions);
+    res.json(
+      allSubmissions.map((submission) =>
+        gradeReleaseService.redactSubmissionForStudent(submission, submission.assignment)
+      )
+    );
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -600,7 +685,7 @@ exports.getStudentSubmissionsForCourse = async (req, res) => {
 // Grade a submission
 exports.gradeSubmission = async (req, res) => {
   try {
-    const { grade, feedback, questionGrades, useIndividualGrades, memberGrades, approveGrade, showCorrectAnswers, showStudentAnswers, studentId, excused } = req.body;
+    const { grade, feedback, questionGrades, useIndividualGrades, memberGrades, approveGrade, showCorrectAnswers, showStudentAnswers, studentId, excused, releaseGrade, hideGrade, releaseFeedback } = req.body;
     let submission = await Submission.findById(req.params.id).populate('group');
 
     // If submission doesn't exist, check if this is for an offline assignment
@@ -648,6 +733,7 @@ exports.gradeSubmission = async (req, res) => {
       submission.gradedAt = new Date();
       submission.feedback = feedback ?? submission.feedback;
       await saveGradedSubmission(submission, { user: req.user, userId: req.user._id, ip: req.ip, requestId: req.requestId });
+      await invalidateStudentGradeCacheForSubmission(submission);
       return res.json(submission);
     }
     if (excused === false) {
@@ -959,8 +1045,16 @@ exports.gradeSubmission = async (req, res) => {
     if (showStudentAnswers !== undefined) {
       submission.showStudentAnswers = showStudentAnswers;
     }
+
+    gradeReleaseService.applyReleaseFields(submission, {
+      releaseGrade: releaseGrade === true || releaseGrade === 'true',
+      hideGrade: hideGrade === true || hideGrade === 'true',
+      releaseFeedback: releaseFeedback === true || releaseFeedback === 'true',
+      idempotencyKey: getIdempotencyKey(req, 'release'),
+    });
     
     await saveGradedSubmission(submission, { user: req.user, userId: req.user._id, ip: req.ip, requestId: req.requestId });
+    await invalidateStudentGradeCacheForSubmission(submission);
     const populatedSubmission = await Submission.findById(submission._id)
       .populate('student', 'firstName lastName email')
       .populate('submittedBy', 'firstName lastName email')
@@ -1120,6 +1214,7 @@ exports.getStudentSubmission = async (req, res) => {
     if (!assignment) {
       return res.status(404).json({ message: 'Assignment not found' });
     }
+    await assignmentAccess.assertStudentCanViewAssignment(req.user, assignment);
 
     let submission;
 
@@ -1150,7 +1245,7 @@ exports.getStudentSubmission = async (req, res) => {
       return res.status(404).json({ message: 'Submission not found' });
     }
 
-    const payload = submission.toObject();
+    const payload = gradeReleaseService.redactSubmissionForStudent(submission, assignment);
     payload.files = fileAssetService.enrichLegacyFileUrls(payload.files, req.user._id);
     res.json(payload);
   } catch (error) {
@@ -1183,6 +1278,105 @@ exports.getSubmissionById = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 }; 
+
+exports.getSubmissionVersions = async (req, res) => {
+  try {
+    const submission = await Submission.findById(req.params.id);
+    if (!submission) {
+      return res.status(404).json({ message: 'Submission not found' });
+    }
+
+    const isOwner = String(submission.student) === String(req.user._id);
+    const isStaff = req.user.role === 'teacher' || req.user.role === 'admin';
+    if (!isOwner && !isStaff) {
+      return res.status(403).json({ message: 'Not authorized to view submission versions' });
+    }
+
+    const versions = await submissionVersionService.listSubmissionVersions(submission._id, {
+      limit: req.query.limit,
+      beforeVersion: req.query.beforeVersion,
+    });
+    res.json({
+      success: true,
+      data: versions,
+      nextBeforeVersion: versions.length ? versions[versions.length - 1].version : null,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.getSubmissionTimeline = async (req, res) => {
+  try {
+    const submission = await Submission.findById(req.params.id)
+      .populate('assignment', 'title')
+      .populate('submittedBy', 'firstName lastName')
+      .populate('gradedBy', 'firstName lastName')
+      .lean();
+    if (!submission) {
+      return res.status(404).json({ message: 'Submission not found' });
+    }
+
+    const isOwner = String(submission.student) === String(req.user._id);
+    const isStaff = req.user.role === 'teacher' || req.user.role === 'admin';
+    if (!isOwner && !isStaff) {
+      return res.status(403).json({ message: 'Not authorized to view submission timeline' });
+    }
+
+    const versions = await submissionVersionService.listSubmissionVersions(submission._id, {
+      limit: req.query.limit || 25,
+      beforeVersion: req.query.beforeVersion,
+    });
+    const events = [
+      submission.attemptStartedAt && {
+        type: 'attempt_started',
+        at: submission.attemptStartedAt,
+        actorId: String(submission.student),
+      },
+      submission.submittedAt && {
+        type: 'submitted',
+        at: submission.submittedAt,
+        actorId: String(submission.submittedBy?._id || submission.submittedBy || submission.student),
+      },
+      submission.gradedAt && {
+        type: 'graded',
+        at: submission.gradedAt,
+        actorId: String(submission.gradedBy?._id || submission.gradedBy || ''),
+      },
+      submission.gradesReleasedAt && {
+        type: 'grade_released',
+        at: submission.gradesReleasedAt,
+        releaseRevision: submission.releaseRevision || 0,
+      },
+      submission.feedbackReleasedAt && {
+        type: 'feedback_released',
+        at: submission.feedbackReleasedAt,
+        releaseRevision: submission.releaseRevision || 0,
+      },
+      ...versions.map((version) => ({
+        type: 'version_snapshot',
+        at: version.createdAt,
+        version: version.version,
+        actorId: String(version.createdBy || ''),
+      })),
+    ]
+      .filter(Boolean)
+      .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+
+    res.json({
+      success: true,
+      data: {
+        submissionId: String(submission._id),
+        assignmentId: String(submission.assignment?._id || submission.assignment),
+        attemptStatus: submission.attemptStatus || 'not_started',
+        releaseRevision: submission.releaseRevision || 0,
+        events,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 
 // Create or update a manual grade for an offline assignment
 exports.createOrUpdateManualGrade = async (req, res) => {

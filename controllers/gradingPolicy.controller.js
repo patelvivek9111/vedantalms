@@ -237,10 +237,11 @@ exports.recomputeTranscriptGrades = async (req, res) => {
       term,
       year,
       studentIds,
-      dryRun = true,
+      dryRun: dryRunBody,
       reason,
       forceAmend = false,
     } = req.body;
+    const dryRun = dryRunBody !== false && dryRunBody !== 'false';
 
     if (!courseId) {
       return res.status(400).json({ success: false, message: 'courseId is required' });
@@ -289,7 +290,7 @@ exports.recomputeTranscriptGrades = async (req, res) => {
       term,
       year,
       studentIds,
-      dryRun: dryRun !== false,
+      dryRun,
       reason,
       forceAmend: forceAmend === true,
       user: req.user,

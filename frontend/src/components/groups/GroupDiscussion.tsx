@@ -35,6 +35,15 @@ interface Thread {
     _id: string;
     name: string;
   };
+  unreadCount?: number;
+  hasPosted?: boolean;
+  hasInstructorReply?: boolean;
+  locked?: boolean;
+  currentUserParticipation?: {
+    unreadCount?: number;
+    hasPosted?: boolean;
+    hasInstructorReply?: boolean;
+  };
 }
 
 interface Module {
@@ -221,6 +230,36 @@ const GroupDiscussion: React.FC = () => {
     }
   };
 
+  const renderThreadBadges = (thread: Thread) => {
+    const unreadCount = thread.unreadCount ?? thread.currentUserParticipation?.unreadCount ?? 0;
+    const hasPosted = thread.hasPosted ?? thread.currentUserParticipation?.hasPosted ?? false;
+    const hasInstructorReply = thread.hasInstructorReply ?? thread.currentUserParticipation?.hasInstructorReply ?? false;
+    return (
+      <>
+        {unreadCount > 0 && (
+          <span className="ml-2 px-2 py-0.5 text-xs font-semibold bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 rounded-full" aria-label={`${unreadCount} unread replies`}>
+            {unreadCount} unread
+          </span>
+        )}
+        {user?.role === 'student' && !hasPosted && (
+          <span className="ml-2 px-2 py-0.5 text-xs font-semibold bg-orange-100 dark:bg-orange-900/50 text-orange-800 dark:text-orange-300 rounded-full">
+            Not posted
+          </span>
+        )}
+        {hasInstructorReply && (
+          <span className="ml-2 px-2 py-0.5 text-xs font-semibold bg-indigo-100 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-300 rounded-full">
+            Instructor replied
+          </span>
+        )}
+        {thread.locked && (
+          <span className="ml-2 px-2 py-0.5 text-xs font-semibold bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300 rounded-full">
+            Locked
+          </span>
+        )}
+      </>
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -275,6 +314,7 @@ const GroupDiscussion: React.FC = () => {
           courseGroups={courseGroups}
           modules={modules}
           defaultGroupSetId={groupSetId}
+          defaultGroupId={groupId}
         />
       ) : (
         <div className={`${isMobileDevice ? 'px-0' : 'px-4 sm:px-6'} pb-4 sm:pb-6`}>
@@ -339,6 +379,7 @@ const GroupDiscussion: React.FC = () => {
                                   Graded ({thread.totalPoints} pts)
                                 </span>
                               )}
+                              {renderThreadBadges(thread)}
                             </h3>
                             <div className={`${isMobileDevice ? 'flex flex-col gap-1.5' : 'flex items-center'} ${isMobileDevice ? 'text-xs' : 'text-sm'} text-gray-600 dark:text-gray-400 ${isMobileDevice ? '' : 'space-x-4'}`}>
                               <div className="flex items-center space-x-2">
@@ -471,6 +512,7 @@ const GroupDiscussion: React.FC = () => {
                                   Graded ({thread.totalPoints} pts)
                                 </span>
                               )}
+                              {renderThreadBadges(thread)}
                             </h3>
                             <div className={`${isMobileDevice ? 'flex flex-col gap-1.5' : 'flex items-center'} ${isMobileDevice ? 'text-xs' : 'text-sm'} text-gray-600 dark:text-gray-400 ${isMobileDevice ? '' : 'space-x-4'}`}>
                               <div className="flex items-center space-x-2">

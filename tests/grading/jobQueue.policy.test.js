@@ -2,7 +2,7 @@
  * Wave D: async job queue (inline fallback in test).
  */
 const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
+const { createMongoMemoryServer } = require('../mongoMemoryServer');
 const { seedGradingContractE2E } = require('./e2eContractSeed');
 const User = require('../../models/user.model');
 const AsyncJob = require('../../models/asyncJob.model');
@@ -15,7 +15,7 @@ describe('jobQueue (Wave D)', () => {
 
   beforeAll(async () => {
     process.env.FORCE_INLINE_JOBS = 'true';
-    mongoServer = await MongoMemoryServer.create();
+    mongoServer = await createMongoMemoryServer();
     process.env.MONGODB_URI = mongoServer.getUri();
     await mongoose.connect(process.env.MONGODB_URI);
     contract = await seedGradingContractE2E();

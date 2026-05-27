@@ -25,6 +25,10 @@ const assignmentSchema = new mongoose.Schema({
     type: Date,
     required: true
   },
+  lockAfterDue: {
+    type: Boolean,
+    default: true
+  },
   attachments: [{
     type: String // Legacy URL paths — prefer fileAssets
   }],
@@ -84,6 +88,10 @@ const assignmentSchema = new mongoose.Schema({
     type: String,
     required: false
   },
+  groupId: {
+    type: String,
+    required: false
+  },
   isGradedQuiz: {
     type: Boolean,
     default: false
@@ -117,6 +125,15 @@ const assignmentSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  gradeReleaseMode: {
+    type: String,
+    enum: ['immediate', 'manual', 'on_grade'],
+    default: 'immediate'
+  },
+  defaultGradeHidden: {
+    type: Boolean,
+    default: false
+  },
   isOfflineAssignment: {
     type: Boolean,
     default: false
@@ -136,4 +153,4 @@ assignmentSchema.index({ isGroupAssignment: 1, groupSet: 1, dueDate: 1 });
 const { portabilityMetadataPlugin } = require('./plugins/portabilityMetadata.plugin');
 assignmentSchema.plugin(portabilityMetadataPlugin);
 
-module.exports = mongoose.model('Assignment', assignmentSchema); 
+module.exports = mongoose.models.Assignment || mongoose.model('Assignment', assignmentSchema); 

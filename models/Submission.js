@@ -30,6 +30,29 @@ const submissionSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
+  lastSubmitIdempotencyKey: {
+    type: String,
+  },
+  autoGradeExecutedAt: {
+    type: Date,
+  },
+  autoGradeRunKey: {
+    type: String,
+  },
+  attemptStartedAt: {
+    type: Date
+  },
+  attemptDeadlineAt: {
+    type: Date
+  },
+  attemptStatus: {
+    type: String,
+    enum: ['not_started', 'in_progress', 'submitted', 'expired'],
+    default: 'not_started'
+  },
+  lastHeartbeatAt: {
+    type: Date
+  },
   grade: {
     type: Number,
     min: 0,
@@ -61,6 +84,23 @@ const submissionSchema = new mongoose.Schema({
   teacherApproved: {
     type: Boolean,
     default: false
+  },
+  gradesReleasedAt: {
+    type: Date
+  },
+  gradeHidden: {
+    type: Boolean,
+    default: false
+  },
+  feedbackReleasedAt: {
+    type: Date
+  },
+  releaseRevision: {
+    type: Number,
+    default: 0,
+  },
+  lastReleaseIdempotencyKey: {
+    type: String,
   },
   finalGrade: {
     type: Number,
@@ -171,8 +211,11 @@ submissionSchema.index(
 submissionSchema.index({ assignment: 1, submittedAt: -1 });
 submissionSchema.index({ student: 1, submittedAt: -1 });
 submissionSchema.index({ group: 1, submittedAt: -1 });
+submissionSchema.index({ attemptStatus: 1, attemptDeadlineAt: 1 });
+submissionSchema.index({ assignment: 1, student: 1, lastSubmitIdempotencyKey: 1 });
+submissionSchema.index({ assignment: 1, group: 1, lastSubmitIdempotencyKey: 1 });
 
 const { portabilityMetadataPlugin } = require('./plugins/portabilityMetadata.plugin');
 submissionSchema.plugin(portabilityMetadataPlugin);
 
-module.exports = mongoose.model('Submission', submissionSchema); 
+module.exports = mongoose.models.Submission || mongoose.model('Submission', submissionSchema); 

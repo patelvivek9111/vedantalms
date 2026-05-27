@@ -4,7 +4,7 @@
 const mongoose = require('mongoose');
 const express = require('express');
 const request = require('supertest');
-const { MongoMemoryServer } = require('mongodb-memory-server');
+const { createMongoMemoryServer } = require('../mongoMemoryServer');
 const { seedGradingContractE2E } = require('./e2eContractSeed');
 const User = require('../../models/user.model');
 const Submission = require('../../models/Submission');
@@ -29,7 +29,7 @@ describe('transcript recompute E2E (Wave C)', () => {
   let teacherToken;
 
   beforeAll(async () => {
-    mongoServer = await MongoMemoryServer.create();
+    mongoServer = await createMongoMemoryServer();
     process.env.MONGODB_URI = mongoServer.getUri();
     process.env.NODE_ENV = 'test';
     process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret-key-for-jwt';
@@ -97,6 +97,23 @@ describe('transcript recompute E2E (Wave C)', () => {
   });
 
   it('apply on finalized without forceAmend returns 403', async () => {
+    const CourseGradeLifecycle = require('../../models/courseGradeLifecycle.model');
+    const life = await CourseGradeLifecycle.findOne({
+      course: contract.courseId,
+      term: 'Spring',
+      year: 2025,
+    }).lean();
+    if (!life || !['FINALIZED', 'AMENDED'].includes(life.status)) {
+      await request(app)
+        .post(`/api/grades/course/${contract.courseId}/post`)
+        .set('Authorization', `Bearer ${teacherToken}`)
+        .expect(200);
+      await request(app)
+        .post(`/api/grades/course/${contract.courseId}/finalize`)
+        .set('Authorization', `Bearer ${registrarToken}`)
+        .expect(200);
+    }
+
     const res = await request(app)
       .post('/api/grading-policy/transcript/recompute')
       .set('Authorization', `Bearer ${registrarToken}`)

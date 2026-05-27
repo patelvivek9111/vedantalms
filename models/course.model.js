@@ -47,6 +47,7 @@ const courseSchema = new mongoose.Schema({
   groups: {
     type: [
       {
+        id: { type: String, default: () => new mongoose.Types.ObjectId().toString() },
         name: { type: String, required: true },
         weight: { type: Number, required: true }
       }

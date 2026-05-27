@@ -17,6 +17,8 @@ const { generateResolvedPolicySnapshot } = require('../shared/grading/policySnap
 const { getGradingEngineVersion } = require('../shared/grading/gradingEngineVersion.cjs');
 const { calculateFinalGradeWithWeightedGroups } = require('../utils/gradeCalculation');
 const { courseContextFromResolvedPolicy } = require('../shared/grading/policyResolver.cjs');
+const { resolveAssignmentWorkflowState } = require('./assignmentWorkflow.service');
+const discussionReplyService = require('./discussionReply.service');
 
 function normalizeStudentId(id) {
   if (id && typeof id === 'object' && id._id) return String(id._id);
@@ -62,7 +64,8 @@ async function loadGradebookColumns(courseId) {
     published: thread.published !== false,
     studentGrades: thread.studentGrades || [],
     dueDate: thread.dueDate,
-    replies: thread.replies || [],
+    replies: [],
+    counters: thread.counters || {},
     createdAt: thread.createdAt,
   }));
 
@@ -87,7 +90,7 @@ async function loadGradebookColumns(courseId) {
 /**
  * Build instructor gradebook grades map using batched submission queries.
  */
-async function buildGradebookGrades(course, assignments, studentIds, policyCache, studentContextsOut = null) {
+async function buildGradebookGrades(course, assignments, studentIds, policyCache, studentContextsOut = null, submissionIdsOut = null, cellMetaOut = null) {
   const grades = {};
   studentIds.forEach((sid) => {
     grades[sid] = {};
@@ -159,6 +162,24 @@ async function buildGradebookGrades(course, assignments, studentIds, policyCache
       }
     }
 
+    const discussionItems = [];
+    for (const thread of discussions) {
+      const studentGradeObj = (thread.studentGrades || []).find(
+        (g) => normalizeStudentId(g.student) === sid
+      );
+      discussionItems.push({
+        _id: thread._id,
+        title: thread.title,
+        group: thread.group || 'Discussions',
+        totalPoints: thread.totalPoints || 0,
+        isDiscussion: true,
+        published: thread.published !== false,
+        grade: resolveAssignmentGrade({ discussionGradeRow: studentGradeObj || null }),
+        dueDate: thread.dueDate,
+        hasSubmitted: await discussionReplyService.hasReplyByUser(thread, sid),
+      });
+    }
+
     const allAssignments = [
       ...regularAssignments.map((a) => ({
         _id: a._id,
@@ -186,25 +207,29 @@ async function buildGradebookGrades(course, assignments, studentIds, policyCache
             : null,
         }),
       })),
-      ...discussions.map((thread) => {
-        const studentGradeObj = (thread.studentGrades || []).find(
-          (g) => normalizeStudentId(g.student) === sid
-        );
-        return {
-          _id: thread._id,
-          title: thread.title,
-          group: thread.group || 'Discussions',
-          totalPoints: thread.totalPoints || 0,
-          isDiscussion: true,
-          published: thread.published !== false,
-          grade: resolveAssignmentGrade({ discussionGradeRow: studentGradeObj || null }),
-          dueDate: thread.dueDate,
-          hasSubmitted: hasReplyByUser(thread.replies, sid),
-        };
-      }),
+      ...discussionItems,
     ];
 
     buildGradesMapForStudent(grades, sid, allAssignments);
+    if (submissionIdsOut) {
+      for (const [assignmentId, sub] of Object.entries(submissionMap)) {
+        submissionIdsOut[`${sid}_${assignmentId}`] = String(sub._id);
+      }
+    }
+    if (cellMetaOut) {
+      if (!cellMetaOut[sid]) cellMetaOut[sid] = {};
+      for (const [assignmentId, sub] of Object.entries(submissionMap)) {
+        const assignment = allAssignments.find((item) => String(item._id) === String(assignmentId));
+        cellMetaOut[sid][assignmentId] = {
+          submissionId: String(sub._id),
+          status: resolveAssignmentWorkflowState({ assignment, submission: sub }),
+          gradesReleasedAt: sub.gradesReleasedAt || null,
+          gradeHidden: sub.gradeHidden === true,
+          feedbackReleasedAt: sub.feedbackReleasedAt || null,
+          attemptStatus: sub.attemptStatus || null,
+        };
+      }
+    }
     if (studentContextsOut) {
       studentContextsOut[sid] = { allAssignments, submissionMap };
     }
@@ -298,9 +323,11 @@ async function getCourseGradebookPage(courseId, { page = 1, pageSize = 50, polic
   const pageStudentIds = allStudentIds.slice(start, start + safeSize);
 
   const assignments = await loadGradebookColumns(courseId);
+  const submissionMap = {};
+  const cellMeta = {};
   const grades =
     pageStudentIds.length > 0
-      ? await buildGradebookGrades(course, assignments, pageStudentIds, cache)
+      ? await buildGradebookGrades(course, assignments, pageStudentIds, cache, null, submissionMap, cellMeta)
       : {};
 
   const students = (course.students || [])
@@ -318,6 +345,8 @@ async function getCourseGradebookPage(courseId, { page = 1, pageSize = 50, polic
     students,
     assignments,
     grades,
+    submissionMap,
+    cellMeta,
     pagination: {
       page: safePage,
       pageSize: safeSize,

@@ -2,7 +2,7 @@
  * Wave E: unified audit timeline + provenance.
  */
 const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
+const { createMongoMemoryServer } = require('../mongoMemoryServer');
 const { seedGradingContractE2E } = require('./e2eContractSeed');
 const academicAuditTimelineService = require('../../services/academicAuditTimeline.service');
 const gradeLifecycleService = require('../../services/gradeLifecycle.service');
@@ -15,7 +15,7 @@ describe('academicAuditTimeline (Wave E)', () => {
   let registrar;
 
   beforeAll(async () => {
-    mongoServer = await MongoMemoryServer.create();
+    mongoServer = await createMongoMemoryServer();
     await mongoose.connect(mongoServer.getUri());
     contract = await seedGradingContractE2E();
     registrar = await User.create({

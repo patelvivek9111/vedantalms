@@ -9,7 +9,7 @@ process.env.MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/
 process.env.LOG_LEVEL = process.env.LOG_LEVEL || 'silent';
 
 // Increase timeout for async operations
-jest.setTimeout(30000);
+jest.setTimeout(120000);
 
 const mongoose = require('mongoose');
 

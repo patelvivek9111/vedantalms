@@ -14,6 +14,20 @@ const base = import.meta.env.BASE_URL ?? '/';
 const courseHtmlSharedCss = `${base.endsWith('/') ? base : `${base}/`}course-html-shared.css`;
 
 const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, placeholder, className, height, id }) => {
+  if (typeof window !== 'undefined' && window.localStorage.getItem('lms:e2e:plain-editor') === '1') {
+    return (
+      <textarea
+        id={id}
+        aria-label={placeholder || 'Discussion rich text editor'}
+        value={content}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder || 'Write something...'}
+        className={`w-full rounded-lg border border-gray-300 bg-white p-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 ${className || ''}`}
+        style={{ minHeight: height || 160 }}
+      />
+    );
+  }
+
   return (
     <Editor
       apiKey="gdng5aigkhrb5lsxhh4j8u2s4elts687j9k2uzu63l6zd4gw"

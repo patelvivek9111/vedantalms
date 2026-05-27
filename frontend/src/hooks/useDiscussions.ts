@@ -2,6 +2,12 @@ import { useEffect } from 'react';
 import axios from 'axios';
 import { API_URL } from '../config';
 
+/**
+ * Assignments-section discussion list (CourseDetail → AssignmentsSection).
+ * **Graded discussions only** (`isGraded === true`): this hook backs assignment/gradebook
+ * surfaces, not the course Discussions tab (`CourseDiscussions` loads the full list).
+ */
+
 interface UseDiscussionsProps {
   course: any;
   setDiscussions: React.Dispatch<React.SetStateAction<any[]>>;

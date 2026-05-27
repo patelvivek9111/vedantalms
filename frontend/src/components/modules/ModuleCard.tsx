@@ -28,6 +28,30 @@ const DiscussionIcon = () => (
   </svg>
 );
 
+const DiscussionBadges = ({ discussion }: { discussion: any }) => {
+  const unreadCount = discussion.unreadCount ?? discussion.currentUserParticipation?.unreadCount ?? 0;
+  const hasInstructorReply = discussion.hasInstructorReply ?? discussion.currentUserParticipation?.hasInstructorReply ?? false;
+  return (
+    <span className="mt-1 flex flex-wrap gap-1">
+      {unreadCount > 0 && (
+        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-800 dark:bg-blue-900/50 dark:text-blue-300" aria-label={`${unreadCount} unread replies`}>
+          {unreadCount} unread
+        </span>
+      )}
+      {discussion.locked && (
+        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+          Locked
+        </span>
+      )}
+      {hasInstructorReply && (
+        <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-medium text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300">
+          Instructor replied
+        </span>
+      )}
+    </span>
+  );
+};
+
 const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
   const [searchParams] = useSearchParams();
   const expandModuleId = searchParams.get('expand');
@@ -460,6 +484,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
                             {d.totalPoints ? (
                               <span className="text-xs text-gray-500 dark:text-gray-400">({d.totalPoints} pts)</span>
                             ) : null}
+                            <DiscussionBadges discussion={d} />
                           </div>
                         </div>
                         {(user?.role === 'teacher' || user?.role === 'admin') && (

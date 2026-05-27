@@ -68,6 +68,9 @@ interface FormData {
   quizTimeLimit: number; // in minutes
   showCorrectAnswers: boolean; // Show correct answers to students after submission
   showStudentAnswers: boolean; // Show student answers after submission
+  gradeReleaseMode: 'immediate' | 'manual' | 'on_grade';
+  defaultGradeHidden: boolean;
+  lockAfterDue: boolean;
   isOfflineAssignment: boolean; // Offline/paper-based assignment (manual grade entry)
 }
 
@@ -106,6 +109,9 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
     quizTimeLimit: 60,
     showCorrectAnswers: false,
     showStudentAnswers: false,
+    gradeReleaseMode: 'immediate',
+    defaultGradeHidden: false,
+    lockAfterDue: true,
     isOfflineAssignment: false
   });
   const [preview, setPreview] = useState(false);
@@ -173,6 +179,9 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
         quizTimeLimit: 60,
         showCorrectAnswers: false,
         showStudentAnswers: false,
+        gradeReleaseMode: 'immediate',
+        defaultGradeHidden: false,
+        lockAfterDue: true,
         isOfflineAssignment: false
       });
       setTotalPointsInput('');
@@ -343,11 +352,14 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
         groupSetId: assignmentData.groupSet || null,
         allowStudentUploads: allowStudentUploads,
         displayMode: assignmentData.displayMode || 'single',
-        isGradedQuiz: Boolean(assignmentData.isGradedQuiz || assignmentData.isTimedQuiz || assignmentData.showCorrectAnswers || assignmentData.showStudentAnswers),
+        isGradedQuiz: Boolean(assignmentData.isGradedQuiz),
         isTimedQuiz: Boolean(assignmentData.isTimedQuiz),
         quizTimeLimit: assignmentData.quizTimeLimit || 60,
         showCorrectAnswers: Boolean(assignmentData.showCorrectAnswers),
         showStudentAnswers: Boolean(assignmentData.showStudentAnswers),
+        gradeReleaseMode: assignmentData.gradeReleaseMode || 'immediate',
+        defaultGradeHidden: Boolean(assignmentData.defaultGradeHidden),
+        lockAfterDue: assignmentData.lockAfterDue !== false,
         isOfflineAssignment: Boolean(assignmentData.isOfflineAssignment)
       };
       
@@ -586,6 +598,9 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
       formDataToSend.append('quizTimeLimit', formData.quizTimeLimit.toString());
       formDataToSend.append('showCorrectAnswers', formData.showCorrectAnswers.toString());
       formDataToSend.append('showStudentAnswers', formData.showStudentAnswers.toString());
+      formDataToSend.append('gradeReleaseMode', formData.gradeReleaseMode);
+      formDataToSend.append('defaultGradeHidden', formData.defaultGradeHidden.toString());
+      formDataToSend.append('lockAfterDue', formData.lockAfterDue.toString());
       formDataToSend.append('isOfflineAssignment', formData.isOfflineAssignment.toString());
       if (formData.isGroupAssignment && formData.groupSetId) {
         formDataToSend.append('groupSet', formData.groupSetId);
@@ -894,7 +909,12 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
                   type="checkbox"
                   id="isGradedQuiz"
                   checked={formData.isGradedQuiz}
-                  onChange={(e) => setFormData({ ...formData, isGradedQuiz: e.target.checked })}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    isGradedQuiz: e.target.checked,
+                    gradeReleaseMode: e.target.checked ? 'manual' : formData.gradeReleaseMode,
+                    defaultGradeHidden: e.target.checked ? true : formData.defaultGradeHidden,
+                  })}
                   className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 dark:border-gray-600 rounded"
                 />
                 <span className="ml-2 block text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">
@@ -969,6 +989,9 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
                       placeholder="60"
                     />
                     <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 dark:text-gray-400">Enter time limit in minutes (1-480 minutes)</p>
+                    <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+                      Timed quizzes use the server clock. Refreshing, closing the browser, or opening another tab will not reset the timer.
+                    </p>
                   </div>
                 )}
 

@@ -17,6 +17,9 @@ function getGradingQueue() {
   const connection = getBullmqConnection();
   if (!connection) return null;
   queue = new Queue(QUEUE_NAME, { connection });
+  queue.on('error', (err) => {
+    console.error('grading queue error', err?.message || err);
+  });
   return queue;
 }
 
@@ -128,6 +131,9 @@ function startGradingWorker() {
 
   worker.on('failed', (bullJob, err) => {
     console.error('grading worker job failed', bullJob?.id, err?.message);
+  });
+  worker.on('error', (err) => {
+    console.error('grading worker error', err?.message || err);
   });
 
   return worker;

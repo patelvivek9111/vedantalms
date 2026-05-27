@@ -24,11 +24,19 @@ const cleanupOldSessions = async () => {
   try {
     const oneDayAgo = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000);
     
-    // Find old ended sessions
+    const batchSize = Math.min(
+      Math.max(parseInt(process.env.QUIZWAVE_CLEANUP_BATCH_SIZE || '500', 10), 1),
+      5000
+    );
+
+    // Find a bounded batch so API or worker startup cannot retain large result sets.
     const oldSessions = await QuizSession.find({
       status: 'ended',
       createdAt: { $lt: oneDayAgo }
-    });
+    })
+      .select('_id')
+      .limit(batchSize)
+      .lean();
 
     if (oldSessions.length === 0) {
       console.log('✅ QuizWave: No old sessions to clean up');
@@ -43,10 +51,7 @@ const cleanupOldSessions = async () => {
     });
 
     // Delete old sessions
-    const sessionResult = await QuizSession.deleteMany({
-      status: 'ended',
-      createdAt: { $lt: oneDayAgo }
-    });
+    const sessionResult = await QuizSession.deleteMany({ _id: { $in: sessionIds } });
 
     console.log(`✅ QuizWave: Cleaned up ${sessionResult.deletedCount} old sessions and ${responseResult.deletedCount} responses`);
 
@@ -64,6 +69,11 @@ let cleanupIntervalId = null;
 
 // Run cleanup on server start and then every 24 hours
 const startCleanupScheduler = () => {
+  if (cleanupIntervalId) {
+    console.log('QuizWave: Auto-cleanup scheduler already running');
+    return;
+  }
+
   const runWithLock = async () => {
     if (!cleanupRedis || cleanupRedis.status !== 'ready') {
       return cleanupOldSessions();

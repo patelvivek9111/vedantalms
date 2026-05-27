@@ -5,6 +5,16 @@ const Thread = require('../models/thread.model');
 const Group = require('../models/Group');
 const GroupSet = require('../models/GroupSet');
 const { resolveAssignmentGrade, buildGradesMapForStudent } = require('../utils/gradeCalculation');
+const gradeReleaseService = require('./gradeRelease.service');
+const discussionGradeVisibility = require('./discussionGradeVisibility.service');
+const discussionReplyService = require('./discussionReply.service');
+
+function submissionVisibleForStudent(submission, assignment) {
+  if (!submission) return null;
+  return gradeReleaseService.resolveStudentGradeVisibility(submission, assignment).scoreVisible
+    ? submission
+    : null;
+}
 
 function hasReplyByUser(replies, userId) {
   if (!Array.isArray(replies) || replies.length === 0) return false;
@@ -69,11 +79,10 @@ async function buildStudentCourseGradeContext(course, studentId) {
   });
 
   const threads = await Thread.find({ course: course._id, isGraded: true });
-  const discussionAssignments = threads.map((thread) => {
-    const studentGradeObj = thread.studentGrades.find(
-      (g) => g.student.toString() === sid
-    );
-    return {
+  const discussionAssignments = [];
+  for (const thread of threads) {
+    const studentGradeObj = discussionGradeVisibility.discussionGradeForTotals(thread, sid);
+    discussionAssignments.push({
       _id: thread._id,
       title: thread.title,
       group: thread.group || 'Discussions',
@@ -82,9 +91,13 @@ async function buildStudentCourseGradeContext(course, studentId) {
       published: thread.published !== false,
       grade: resolveAssignmentGrade({ discussionGradeRow: studentGradeObj || null }),
       dueDate: thread.dueDate || null,
-      hasSubmitted: hasReplyByUser(thread.replies, studentId),
-    };
-  });
+      hasSubmitted: await discussionReplyService.hasReplyByUser(thread, studentId),
+      gradeVisibility: discussionGradeVisibility.resolveDiscussionGradeVisibility(
+        thread,
+        discussionGradeVisibility.findStudentGrade(thread, sid)
+      ),
+    });
+  }
 
   const allAssignments = [
     ...assignments.map((a) => ({
@@ -96,13 +109,16 @@ async function buildStudentCourseGradeContext(course, studentId) {
       isDiscussion: false,
       dueDate: a.dueDate,
       published: a.published,
-      grade: resolveAssignmentGrade({ submission: submissionMap[a._id.toString()] || null }),
+      grade: resolveAssignmentGrade({
+        submission: submissionVisibleForStudent(submissionMap[a._id.toString()], a),
+      }),
     })),
     ...groupAssignments.map((a) => {
       const submission = submissionMap[a._id.toString()];
-      const grade = submission
+      const visibleSubmission = submissionVisibleForStudent(submission, a);
+      const grade = visibleSubmission
         ? resolveAssignmentGrade({
-            submission: { ...submission.toObject?.() || submission, _memberStudentId: studentId },
+            submission: { ...(visibleSubmission.toObject?.() || visibleSubmission), _memberStudentId: studentId },
           })
         : null;
       return {

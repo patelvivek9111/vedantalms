@@ -227,6 +227,37 @@ describe('ModuleCard', () => {
 
     expect(screen.queryByTitle('Add Content')).not.toBeInTheDocument();
   });
+
+  it('renders discussion unread, lock, and instructor-replied badges in module rows', async () => {
+    mockGetPages.mockResolvedValue([]);
+    mockedAxios.get
+      .mockResolvedValueOnce({ data: [] })
+      .mockResolvedValueOnce({
+        data: {
+          data: [{
+            _id: 'discussion1',
+            title: 'Module Discussion',
+            course: 'course1',
+            totalPoints: 10,
+            dueDate: new Date().toISOString(),
+            unreadCount: 2,
+            locked: true,
+            hasInstructorReply: true,
+          }],
+        },
+      });
+
+    render(
+      <MemoryRouter initialEntries={['/?expand=module1']}>
+        <ModuleCard module={mockModule} onAddPage={mockOnAddPage} />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText('Module Discussion')).toBeInTheDocument();
+    expect(screen.getByText('2 unread')).toBeInTheDocument();
+    expect(screen.getByText('Locked')).toBeInTheDocument();
+    expect(screen.getByText('Instructor replied')).toBeInTheDocument();
+  });
 });
 
 

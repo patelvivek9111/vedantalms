@@ -23,7 +23,10 @@ import {
   Send,
   X,
   Settings,
-  Heart
+  Heart,
+  Lock,
+  EyeOff,
+  RotateCcw
 } from 'lucide-react';
 import ConfirmationModal from '../common/ConfirmationModal';
 import PullToRefresh from '../common/PullToRefresh';
@@ -31,6 +34,9 @@ import DiscussionReplyComposer from '../discussions/DiscussionReplyComposer';
 import FileAttachmentChips from '../files/FileAttachmentChips';
 import FileAttachmentPanel, { normalizeLegacyFiles } from '../files/FileAttachmentPanel';
 import type { NormalizedFile } from '../../utils/fileTypes';
+import { deriveDiscussionWorkflowState, sanitizeDiscussionHtml } from '../../utils/discussionWorkflowStatus';
+import { resolveDiscussionStatus, type DiscussionStatus } from '../../utils/discussionStatus';
+import { normalizeMongoIdRef } from '../../utils/mongoId';
 
 const composerKeyForReply = (parentId: string | null) => (parentId ? `reply-${parentId}` : 'main');
 
@@ -67,6 +73,11 @@ interface Reply {
     likedAt: string;
   }>;
   fileAssets?: Array<string | Record<string, unknown>>;
+  childCount?: number;
+  moderationState?: 'active' | 'hidden' | 'flagged' | 'archived';
+  hiddenByModerator?: boolean;
+  isHidden?: boolean;
+  isDeleted?: boolean;
 }
 
 interface StudentGrade {
@@ -106,6 +117,13 @@ interface Thread {
   totalPoints: number;
   group: string;
   dueDate: string | null;
+  availableFrom?: string | null;
+  locked?: boolean;
+  lockAfterDue?: boolean;
+  archivedAt?: string | null;
+  discussionReleaseMode?: 'immediate' | 'manual' | 'hidden';
+  gradesReleasedAt?: string | null;
+  gradeHidden?: boolean;
   module?: string;
   studentGrades: StudentGrade[];
   settings?: {
@@ -114,6 +132,25 @@ interface Thread {
     allowComments: boolean;
   };
   fileAssets?: Array<string | Record<string, unknown>>;
+  workflowState?: ReturnType<typeof deriveDiscussionWorkflowState>;
+  repliesHiddenUntilPost?: boolean;
+  repliesPagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+  discussionStatus?: DiscussionStatus;
+  unreadCount?: number;
+  hasPosted?: boolean;
+  hasInstructorReply?: boolean;
+  lastViewedAt?: string | null;
+  currentUserParticipation?: {
+    unreadCount?: number;
+    hasPosted?: boolean;
+    hasInstructorReply?: boolean;
+    lastViewedAt?: string | null;
+  };
 }
 
 interface ReplyComponentProps {
@@ -130,11 +167,16 @@ interface ReplyComponentProps {
   setReplyContent: (content: string) => void;
   setReplyingTo: (id: string | null) => void;
   onLike: (replyId: string) => Promise<void>;
+  onHide: (replyId: string) => Promise<void>;
+  onRestore: (replyId: string) => Promise<void>;
+  onLoadChildren: (replyId: string) => Promise<void>;
+  loadedChildCount: number;
   allowLikes: boolean;
   replyAttachmentFiles: NormalizedFile[];
   onAttachmentsChange: (files: NormalizedFile[]) => void;
   courseId?: string;
   courseArchived?: boolean;
+  canPostDiscussion?: boolean;
   isSubmittingReply?: boolean;
 }
 
@@ -152,11 +194,16 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
   setReplyContent,
   setReplyingTo,
   onLike,
+  onHide,
+  onRestore,
+  onLoadChildren,
+  loadedChildCount,
   allowLikes,
   replyAttachmentFiles,
   onAttachmentsChange,
   courseId,
   courseArchived,
+  canPostDiscussion = true,
   isSubmittingReply,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -169,7 +216,9 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
   const { user } = useAuth();
   const [showDeleteReplyConfirm, setShowDeleteReplyConfirm] = useState(false);
 
-  const isAuthorOrTeacher = String(user?._id) === String(reply.author._id) || user?.role === 'teacher';
+  const isModerator = ['teacher', 'teaching_assistant', 'admin'].includes(user?.role || '');
+  const isAuthorOrTeacher = String(user?._id) === String(reply.author._id) || isModerator;
+  const replyHidden = reply.isHidden || reply.moderationState === 'hidden';
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -219,6 +268,8 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
         marginLeft: `${Math.min(level * 32, 96)}px`,
       }}
       className="mb-6"
+      role="article"
+      aria-label={`Reply by ${reply.author.firstName} ${reply.author.lastName}, level ${level + 1}`}
     >
               <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow duration-200 overflow-hidden">
           <div className="p-4">
@@ -246,7 +297,7 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
 
                 </div>
                 <div className="flex items-center space-x-1 text-sm text-gray-500 dark:text-gray-400">
-                  <Clock className="w-3 h-3" />
+                  <Clock className="w-3 h-3" aria-hidden="true" />
                   <span>{formatDistanceToNow(new Date(reply.createdAt), { addSuffix: true })}</span>
                 </div>
               </div>
@@ -258,14 +309,17 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
                   onClick={() => setShowMenu(!showMenu)}
                   className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
                   title="More options"
-                  aria-label="More options"
+                  aria-label={`More options for reply by ${reply.author.firstName} ${reply.author.lastName}`}
+                  aria-expanded={showMenu}
+                  aria-haspopup="menu"
                 >
-                  <MoreVertical className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                  <MoreVertical className="w-4 h-4 text-gray-600 dark:text-gray-400" aria-hidden="true" />
                 </button>
                 
                 {showMenu && (
-                  <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-10">
+                  <div role="menu" className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-10">
                     <button
+                      role="menuitem"
                       onClick={() => {
                         setIsEditing(true);
                         setEditAttachments(normalizeLegacyFiles(reply.fileAssets || []));
@@ -274,19 +328,48 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
                       }}
                       className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center space-x-2"
                     >
-                      <Edit3 className="w-4 h-4" />
+                      <Edit3 className="w-4 h-4" aria-hidden="true" />
                       <span>Edit</span>
                     </button>
                     <button
+                      role="menuitem"
                       onClick={() => {
                         handleDelete();
                         setShowMenu(false);
                       }}
                       className="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/50 flex items-center space-x-2"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-4 h-4" aria-hidden="true" />
                       <span>Delete</span>
                     </button>
+                    {isModerator && !replyHidden && (
+                      <button
+                        role="menuitem"
+                        onClick={() => {
+                          onHide(reply._id);
+                          setShowMenu(false);
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/50 flex items-center space-x-2"
+                        aria-label="Hide reply"
+                      >
+                        <EyeOff className="w-4 h-4" aria-hidden="true" />
+                        <span>Hide</span>
+                      </button>
+                    )}
+                    {isModerator && replyHidden && (
+                      <button
+                        role="menuitem"
+                        onClick={() => {
+                          onRestore(reply._id);
+                          setShowMenu(false);
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-900/50 flex items-center space-x-2"
+                        aria-label="Restore reply"
+                      >
+                        <RotateCcw className="w-4 h-4" aria-hidden="true" />
+                        <span>Restore</span>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -336,20 +419,30 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
             </form>
           ) : (
             <>
-              <div 
-                className="prose prose-gray max-w-none mb-4 text-gray-800 dark:text-gray-300 leading-relaxed prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-p:text-gray-800 dark:prose-p:text-gray-300"
-                dangerouslySetInnerHTML={{ __html: reply.content }}
-              />
-              <FileAttachmentChips files={reply.fileAssets} className="mb-2" />
+              {replyHidden || reply.isDeleted ? (
+                <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300" role="status">
+                  {replyHidden ? 'This reply is hidden by a moderator.' : 'This reply was deleted.'}
+                </div>
+              ) : (
+                <>
+                  <div 
+                    className="prose prose-gray max-w-none mb-4 text-gray-800 dark:text-gray-300 leading-relaxed prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-p:text-gray-800 dark:prose-p:text-gray-300"
+                    dangerouslySetInnerHTML={{ __html: sanitizeDiscussionHtml(reply.content) }}
+                  />
+                  <FileAttachmentChips files={reply.fileAssets} className="mb-2" />
+                </>
+              )}
               
               {/* Reply button */}
               <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-gray-700">
                 <div className="flex items-center space-x-4">
                   <button
                     onClick={() => onReply(reply._id)}
+                    disabled={!canPostDiscussion}
                     className="flex items-center space-x-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition-colors"
+                    aria-label={`Reply to ${reply.author.firstName} ${reply.author.lastName}`}
                   >
-                    <Reply className="w-4 h-4" />
+                    <Reply className="w-4 h-4" aria-hidden="true" />
                     <span>Reply</span>
                   </button>
                   
@@ -357,6 +450,7 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
                     <button
                       onClick={() => onLike(reply._id)}
                       className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 font-medium transition-colors"
+                      aria-label={`Like reply by ${reply.author.firstName} ${reply.author.lastName}; ${reply.likes?.length || 0} likes`}
                     >
                       <Heart 
                         className={`w-4 h-4 ${
@@ -364,8 +458,20 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
                             ? 'fill-red-500 text-red-500' 
                             : ''
                         }`} 
+                        aria-hidden="true"
                       />
                       <span>{reply.likes?.length || 0}</span>
+                    </button>
+                  )}
+                  {(reply.childCount || 0) > loadedChildCount && (
+                    <button
+                      type="button"
+                      onClick={() => onLoadChildren(reply._id)}
+                      className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors"
+                      aria-label={`Load ${reply.childCount} child replies`}
+                    >
+                      <MessageSquare className="w-4 h-4" aria-hidden="true" />
+                      <span>Show replies ({reply.childCount})</span>
                     </button>
                   )}
                 </div>
@@ -389,7 +495,7 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
               attachmentFiles={replyAttachmentFiles}
               onAttachmentsChange={onAttachmentsChange}
               courseId={courseId}
-              courseArchived={courseArchived}
+              courseArchived={courseArchived || !canPostDiscussion}
               onSubmit={(e) => onSubmitReply(e, reply._id)}
               onCancel={() => {
                 setReplyingTo(null);
@@ -430,6 +536,8 @@ const ThreadView: React.FC = () => {
   const [attachmentByComposer, setAttachmentByComposer] = useState<Record<string, NormalizedFile[]>>({});
   const [editThreadAttachments, setEditThreadAttachments] = useState<NormalizedFile[]>([]);
   const [editThreadRemoveIds, setEditThreadRemoveIds] = useState<string[]>([]);
+  const [replyError, setReplyError] = useState<string | null>(null);
+  const replyAttemptKeyRef = useRef<string | null>(null);
 
   const getComposerAttachments = (key: string) => attachmentByComposer[key] || [];
   const setComposerAttachments = (key: string, files: NormalizedFile[]) => {
@@ -494,8 +602,11 @@ const ThreadView: React.FC = () => {
   // Add state for modules
   const [modules, setModules] = useState<{ _id: string; title: string }[]>([]);
   const [showDeleteThreadConfirm, setShowDeleteThreadConfirm] = useState(false);
+  const [lazyChildren, setLazyChildren] = useState<Record<string, Reply[]>>({});
+  const [loadingChildren, setLoadingChildren] = useState<Record<string, boolean>>({});
 
   const isTeacher = user?.role === 'teacher' || user?.role === 'admin';
+  const isModerator = ['teacher', 'teaching_assistant', 'admin'].includes(user?.role || '');
 
   // Fetch courseId from group if in group context
   useEffect(() => {
@@ -546,12 +657,14 @@ const ThreadView: React.FC = () => {
       const token = localStorage.getItem('token');
       
       // First, fetch the thread to check settings
-      const threadRes = await api.get(`/threads/${threadId}`, {
+      const threadRes = await api.get(`/threads/${threadId}${isModerator ? '?includeGrades=true' : ''}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
       if (threadRes.data.success) {
-        if (threadRes.data.data.course !== resolvedCourseId) {
+        const threadCourseNorm = normalizeMongoIdRef(threadRes.data.data.course);
+        const routeCourseNorm = normalizeMongoIdRef(resolvedCourseId);
+        if (threadCourseNorm !== routeCourseNorm) {
           setError('Thread not found in this course');
           setLoading(false);
           return;
@@ -614,6 +727,29 @@ const ThreadView: React.FC = () => {
     fetchThreadAndStudents();
   }, [resolvedCourseId, threadId, groupId, user?._id]);
 
+  useEffect(() => {
+    if (!thread?._id) return;
+    const markRead = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await api.post(`/threads/${thread._id}/mark-read`, {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.data.success) {
+          setThread((prev) => prev ? {
+            ...prev,
+            unreadCount: 0,
+            lastViewedAt: res.data.data.lastViewedAt,
+            currentUserParticipation: res.data.data,
+          } : prev);
+        }
+      } catch {
+        // Read-state failure should not block discussion viewing.
+      }
+    };
+    markRead();
+  }, [thread?._id]);
+
   // Refresh function for pull-to-refresh
   const handleRefresh = async () => {
     await fetchThreadAndStudents();
@@ -632,12 +768,17 @@ const ThreadView: React.FC = () => {
 
   const handleSubmitReply = async (e: React.FormEvent, parentReply: string | null = null) => {
     e.preventDefault();
+    if (!canPostDiscussion) return;
     const textPlain = replyContent.replace(/<[^>]+>/g, '').trim();
     const composerKey = composerKeyForReply(parentReply);
     const composerFiles = getComposerAttachments(composerKey);
     if (!thread || (!textPlain && !composerFiles.length)) return;
 
     setIsSubmitting(true);
+    setReplyError(null);
+    if (!replyAttemptKeyRef.current) {
+      replyAttemptKeyRef.current = `${thread._id}-${user?._id || 'anonymous'}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    }
     try {
       const token = localStorage.getItem('token');
       const fileAssetIds = composerFiles.map((f) => f.fileAssetId).filter(Boolean);
@@ -647,6 +788,7 @@ const ThreadView: React.FC = () => {
           content: replyContent,
           parentReply: parentReply || null,
           fileAssetIds,
+          idempotencyKey: replyAttemptKeyRef.current,
         },
         {
           headers: { Authorization: `Bearer ${token}` }
@@ -665,12 +807,14 @@ const ThreadView: React.FC = () => {
           const draftKey = `thread_reply_draft_${threadId}_${user._id}`;
           localStorage.removeItem(draftKey);
         }
+        replyAttemptKeyRef.current = null;
         
         setReplyingTo(null);
         setShowReplyEditor(false);
       }
     } catch (error) {
-      } finally {
+      setReplyError('We could not post your reply. Your draft is still here; retry when the connection recovers.');
+    } finally {
       setIsSubmitting(false);
     }
   };
@@ -770,6 +914,24 @@ const ThreadView: React.FC = () => {
       }
   };
 
+  const handleToggleLock = async () => {
+    if (!thread || !isModerator) return;
+    try {
+      const token = localStorage.getItem('token');
+      const endpoint = thread.locked ? 'unlock' : 'lock';
+      const response = await api.post(
+        `${API_URL}/api/threads/${thread._id}/${endpoint}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (response.data.success) {
+        setThread(response.data.data);
+      }
+    } catch {
+      // Moderator action errors are surfaced by the existing refresh/error flow.
+    }
+  };
+
   const handleEditReply = async (
     replyId: string,
     payload: { content: string; fileAssetIds: string[]; removeFileAssetIds: string[] }
@@ -822,6 +984,51 @@ const ThreadView: React.FC = () => {
       }
     } catch (error) {
       throw error;
+    }
+  };
+
+  const handleHideReply = async (replyId: string) => {
+    if (!isModerator) return;
+    const token = localStorage.getItem('token');
+    const response = await api.post(
+      `${API_URL}/api/replies/${replyId}/hide`,
+      {},
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (response.data.success) {
+      await fetchThreadAndStudents();
+    }
+  };
+
+  const handleRestoreReply = async (replyId: string) => {
+    if (!isModerator) return;
+    const token = localStorage.getItem('token');
+    const response = await api.post(
+      `${API_URL}/api/replies/${replyId}/restore`,
+      {},
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (response.data.success) {
+      await fetchThreadAndStudents();
+    }
+  };
+
+  const handleLoadChildren = async (replyId: string) => {
+    if (loadingChildren[replyId]) return;
+    setLoadingChildren((prev) => ({ ...prev, [replyId]: true }));
+    try {
+      const token = localStorage.getItem('token');
+      const response = await api.get(`/replies/${replyId}/children`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.data.success) {
+        setLazyChildren((prev) => ({
+          ...prev,
+          [replyId]: response.data.data || [],
+        }));
+      }
+    } finally {
+      setLoadingChildren((prev) => ({ ...prev, [replyId]: false }));
     }
   };
 
@@ -924,6 +1131,10 @@ const ThreadView: React.FC = () => {
     );
   }
 
+  const workflowState = deriveDiscussionWorkflowState(thread);
+  const commentsAllowed = thread.settings?.allowComments !== false;
+  const canPostDiscussion = commentsAllowed && !workflowState.locked && !workflowState.archived && !courseArchived;
+
   // Find feedback for the logged-in student
   let studentFeedback = '';
   if (user?.role === 'student' && Array.isArray(thread.studentGrades)) {
@@ -953,6 +1164,10 @@ const ThreadView: React.FC = () => {
   const hasUserMainReply = replies.some(
     (reply) => reply.parentReply === null && reply.author._id === user?._id
   );
+  const discussionStatus = resolveDiscussionStatus(thread);
+  const unreadCount = thread.unreadCount ?? thread.currentUserParticipation?.unreadCount ?? 0;
+  const hasPosted = thread.hasPosted ?? thread.currentUserParticipation?.hasPosted ?? hasUserMainReply;
+  const hasInstructorReply = thread.hasInstructorReply ?? thread.currentUserParticipation?.hasInstructorReply ?? false;
 
   const renderReplies = (
     replies: Reply[],
@@ -968,7 +1183,7 @@ const ThreadView: React.FC = () => {
           level={level}
           onEdit={onEdit}
           onDelete={onDelete}
-          canModify={user?._id === reply.author._id || user?.role === 'teacher'}
+          canModify={user?._id === reply.author._id || isModerator}
           threadId={thread._id}
           isReplying={replyingTo === reply._id}
           onSubmitReply={handleSubmitReply}
@@ -976,14 +1191,20 @@ const ThreadView: React.FC = () => {
           setReplyContent={setReplyContent}
           setReplyingTo={setReplyingTo}
           onLike={handleLike}
+          onHide={handleHideReply}
+          onRestore={handleRestoreReply}
+          onLoadChildren={handleLoadChildren}
+          loadedChildCount={(replyMap.get(reply._id)?.length || 0) + (lazyChildren[reply._id]?.length || 0)}
           allowLikes={thread.settings?.allowLikes !== false}
           replyAttachmentFiles={getComposerAttachments(`reply-${reply._id}`)}
           onAttachmentsChange={(files) => setComposerAttachments(`reply-${reply._id}`, files)}
           courseId={resolvedCourseId || undefined}
           courseArchived={courseArchived}
+          canPostDiscussion={canPostDiscussion}
           isSubmittingReply={isSubmitting}
         />
         {replyMap.get(reply._id) && renderReplies(replyMap.get(reply._id)!, level + 1, onEdit, onDelete)}
+        {lazyChildren[reply._id] && renderReplies(lazyChildren[reply._id], level + 1, onEdit, onDelete)}
       </React.Fragment>
     ));
   };
@@ -997,17 +1218,53 @@ const ThreadView: React.FC = () => {
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-100 dark:border-gray-700">
           <div className="flex flex-col sm:flex-row items-start justify-between gap-3">
             <div className="flex-1 w-full">
-              <div className="flex flex-wrap items-center gap-3 sm:gap-2 mb-2 sm:mb-3">
+              <div className="flex flex-wrap items-center gap-3 sm:gap-2 mb-2 sm:mb-3" aria-live="polite" aria-label="Discussion status">
                 {thread.isPinned && (
                   <div className="flex items-center space-x-1 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/50 px-2 sm:px-3 py-1 rounded-full">
-                    <Pin className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <Pin className="w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
                     <span className="text-xs sm:text-sm font-medium">Pinned</span>
                   </div>
                 )}
                 {thread.isGraded && (
                   <div className="flex items-center space-x-1 text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/50 px-2 sm:px-3 py-1 rounded-full">
-                    <Award className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <Award className="w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
                     <span className="text-xs sm:text-sm font-medium">{thread.totalPoints} points</span>
+                  </div>
+                )}
+                {workflowState.locked && (
+                  <div className="flex items-center space-x-1 text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/50 px-2 sm:px-3 py-1 rounded-full">
+                    <Lock className="w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
+                    <span className="text-xs sm:text-sm font-medium">Locked</span>
+                  </div>
+                )}
+                {unreadCount > 0 && (
+                  <div className="flex items-center space-x-1 text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/50 px-2 sm:px-3 py-1 rounded-full" aria-label={`${unreadCount} unread replies`}>
+                    <MessageSquare className="w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
+                    <span className="text-xs sm:text-sm font-medium">{unreadCount} unread</span>
+                  </div>
+                )}
+                {user?.role === 'student' && !hasPosted && (
+                  <div className="flex items-center space-x-1 text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/50 px-2 sm:px-3 py-1 rounded-full">
+                    <AlertCircle className="w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
+                    <span className="text-xs sm:text-sm font-medium">You have not posted yet</span>
+                  </div>
+                )}
+                {hasInstructorReply && (
+                  <div className="flex items-center space-x-1 text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/50 px-2 sm:px-3 py-1 rounded-full">
+                    <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
+                    <span className="text-xs sm:text-sm font-medium">Instructor replied</span>
+                  </div>
+                )}
+                {discussionStatus === 'unpublished' && (
+                  <div className="flex items-center space-x-1 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 px-2 sm:px-3 py-1 rounded-full">
+                    <AlertCircle className="w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
+                    <span className="text-xs sm:text-sm font-medium">Unpublished</span>
+                  </div>
+                )}
+                {thread.isGraded && !workflowState.released && user?.role === 'student' && (
+                  <div className="flex items-center space-x-1 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 px-2 sm:px-3 py-1 rounded-full">
+                    <AlertCircle className="w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
+                    <span className="text-xs sm:text-sm font-medium">Grade hidden</span>
                   </div>
                 )}
               </div>
@@ -1093,14 +1350,14 @@ const ThreadView: React.FC = () => {
                         </div>
                         <div className="flex flex-wrap items-center gap-1 sm:gap-0 sm:space-x-1 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                           <div className="flex items-center space-x-1">
-                            <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
+                            <Clock className="w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
                           <span>{formatDistanceToNow(new Date(thread.createdAt), { addSuffix: true })}</span>
                           </div>
                           {thread.dueDate && (
                             <>
                               <span className="hidden sm:inline">•</span>
                               <div className="flex items-center space-x-1">
-                                <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
+                                <Calendar className="w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
                               <span className="text-orange-600 dark:text-orange-400">
                                 Due {formatDistanceToNow(new Date(thread.dueDate), { addSuffix: true })}
                               </span>
@@ -1121,8 +1378,21 @@ const ThreadView: React.FC = () => {
                               : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                           }`}
                           title={thread.isPinned ? 'Unpin thread' : 'Pin thread'}
+                          aria-label={thread.isPinned ? 'Unpin discussion' : 'Pin discussion'}
                         >
-                          <Pin className="w-4 h-4 sm:w-5 sm:h-5" />
+                          <Pin className="w-4 h-4 sm:w-5 sm:h-5" aria-hidden="true" />
+                        </button>
+                        <button
+                          onClick={handleToggleLock}
+                          className={`p-1.5 sm:p-2 rounded-lg transition-colors touch-manipulation ${
+                            thread.locked
+                              ? 'text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/50 hover:bg-amber-100 dark:hover:bg-amber-900/70'
+                              : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                          }`}
+                          title={thread.locked ? 'Unlock discussion' : 'Lock discussion'}
+                          aria-label={thread.locked ? 'Unlock discussion' : 'Lock discussion'}
+                        >
+                          <Lock className="w-4 h-4 sm:w-5 sm:h-5" aria-hidden="true" />
                         </button>
                         <button
                           onClick={() => {
@@ -1134,8 +1404,9 @@ const ThreadView: React.FC = () => {
                           }}
                           className="p-1.5 sm:p-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/50 rounded-lg transition-colors touch-manipulation"
                           title="Edit thread"
+                          aria-label="Edit discussion"
                         >
-                          <Edit3 className="w-4 h-4 sm:w-5 sm:h-5" />
+                          <Edit3 className="w-4 h-4 sm:w-5 sm:h-5" aria-hidden="true" />
                         </button>
                         <button
                           onClick={() => {
@@ -1153,15 +1424,17 @@ const ThreadView: React.FC = () => {
                           }}
                           className="p-1.5 sm:p-2 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/50 rounded-lg transition-colors touch-manipulation"
                           title="Edit discussion settings"
+                          aria-label="Edit discussion settings"
                         >
-                          <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
+                          <Settings className="w-4 h-4 sm:w-5 sm:h-5" aria-hidden="true" />
                         </button>
                         <button
                           onClick={handleDeleteThread}
                           className="p-1.5 sm:p-2 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/50 rounded-lg transition-colors touch-manipulation"
                           title="Delete thread"
+                          aria-label="Delete discussion"
                         >
-                          <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                          <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" aria-hidden="true" />
                         </button>
                       </div>
                     )}
@@ -1178,23 +1451,33 @@ const ThreadView: React.FC = () => {
             <>
               <div 
                 className="prose prose-lg prose-gray max-w-none mb-8 text-gray-800 dark:text-gray-300 leading-relaxed prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-p:text-gray-800 dark:prose-p:text-gray-300"
-                dangerouslySetInnerHTML={{ __html: thread.content }}
+                dangerouslySetInnerHTML={{ __html: sanitizeDiscussionHtml(thread.content) }}
               />
               <FileAttachmentChips files={thread.fileAssets} className="mb-4" />
+              {thread.repliesHiddenUntilPost && (
+                <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-200" role="status">
+                  Replies are hidden until you post your first reply.
+                </div>
+              )}
+              {!canPostDiscussion && (
+                <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200" role="status">
+                  This discussion is read-only{workflowState.locked ? ' because it is locked' : courseArchived || workflowState.archived ? ' because the course is archived' : ''}.
+                </div>
+              )}
               
               {/* Reply button */}
-              {!hasUserMainReply && (!showReplyEditor ? (
+              {canPostDiscussion && !hasPosted && (!showReplyEditor ? (
                 <button
                   onClick={() => setShowReplyEditor(true)}
                   className="w-full px-4 sm:px-6 py-3 sm:py-4 text-base sm:text-lg font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 border-dashed rounded-lg sm:rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:border-blue-300 dark:hover:border-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all duration-200 flex items-center justify-center space-x-2 touch-manipulation"
                 >
-                  <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" aria-hidden="true" />
                   <span>Start the discussion</span>
                 </button>
               ) : (
                 <div className="bg-gray-50 dark:bg-gray-900 rounded-lg sm:rounded-xl p-3 sm:p-4 border border-gray-200 dark:border-gray-700">
                   <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3 sm:mb-4 flex items-center space-x-2">
-                    <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" aria-hidden="true" />
                     <span>Post a Reply</span>
                   </h3>
                   <DiscussionReplyComposer
@@ -1203,7 +1486,7 @@ const ThreadView: React.FC = () => {
                     attachmentFiles={getComposerAttachments('main')}
                     onAttachmentsChange={(files) => setComposerAttachments('main', files)}
                     courseId={resolvedCourseId || undefined}
-                    courseArchived={courseArchived}
+                    courseArchived={courseArchived || !canPostDiscussion}
                     onSubmit={(e) => handleSubmitReply(e, null)}
                     onCancel={() => {
                       setShowReplyEditor(false);
@@ -1215,6 +1498,11 @@ const ThreadView: React.FC = () => {
                     }}
                     isSubmitting={isSubmitting}
                   />
+                  {replyError && (
+                    <p className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200" role="alert">
+                      {replyError}
+                    </p>
+                  )}
                 </div>
               ))}
             </>
@@ -1282,7 +1570,7 @@ const ThreadView: React.FC = () => {
                             
                             <div 
                               className="prose prose-sm max-w-none text-gray-700 dark:text-gray-300 leading-relaxed prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-p:text-gray-700 dark:prose-p:text-gray-300"
-                              dangerouslySetInnerHTML={{ __html: reply.content }}
+                              dangerouslySetInnerHTML={{ __html: sanitizeDiscussionHtml(reply.content) }}
                             />
                             
                             {reply.updatedAt !== reply.createdAt && (
@@ -1555,10 +1843,10 @@ const ThreadView: React.FC = () => {
       {isTeacher && thread?.isGraded && (
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
           <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 px-4 py-3 border-b border-gray-100 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center space-x-2">
+            <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center space-x-2">
               <Award className="w-5 h-5" />
               <span>Student Grades</span>
-            </h3>
+            </h2>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">

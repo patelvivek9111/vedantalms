@@ -2,7 +2,7 @@
  * Wave F: migration runner dry-run + apply (in-memory Mongo).
  */
 const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
+const { createMongoMemoryServer } = require('../mongoMemoryServer');
 const { seedGradingContractE2E } = require('./e2eContractSeed');
 const StudentCourseGradeSnapshot = require('../../models/studentCourseGradeSnapshot.model');
 const CourseGradeLifecycle = require('../../models/courseGradeLifecycle.model');
@@ -14,7 +14,7 @@ describe('grading migrations (Wave F)', () => {
   let contract;
 
   beforeAll(async () => {
-    mongoServer = await MongoMemoryServer.create();
+    mongoServer = await createMongoMemoryServer();
     await mongoose.connect(mongoServer.getUri());
     contract = await seedGradingContractE2E();
   }, 120000);

@@ -7,6 +7,7 @@ import api from '../../services/api';
 import { API_URL } from '../../config';
 import { getImageUrl } from '../../services/api';
 import axios from 'axios';
+import { normalizeMongoIdRef } from '../../utils/mongoId';
 import { toast } from 'react-toastify';
 import { 
   Lock, 
@@ -73,7 +74,7 @@ import CourseMeetingsSection from '../course/CourseMeetingsSection';
 import { useStudentSubmissions } from '../../hooks/useStudentSubmissions';
 import { useGradeManagement } from '../../hooks/useGradeManagement';
 import { useSubmissionIds } from '../../hooks/useSubmissionIds';
-import { useInstructorGradebookData } from '../../hooks/useInstructorGradebookData';
+import { usePaginatedGradebook } from '../../hooks/usePaginatedGradebook';
 import { useDiscussions } from '../../hooks/useDiscussions';
 import { useStudentGradeData } from '../../hooks/useStudentGradeData';
 import { useGradeScaleManagement } from '../../hooks/useGradeScaleManagement';
@@ -109,8 +110,19 @@ const CourseDetail: React.FC = () => {
   const [assignmentPublished, setAssignmentPublished] = useState<{ [id: string]: boolean }>({});
   const [gradebookData, setGradebookData] = useState<any>({ students: [], assignments: [], grades: {} });
   const [instructorGradebookLoading, setInstructorGradebookLoading] = useState(false);
-  const isInstructor = user?.role === 'teacher' && course?.instructor?._id === user?._id;
   const isAdmin = user?.role === 'admin';
+  const isInstitutionalDiscussionStaff = ['registrar', 'department_admin'].includes(user?.role || '');
+  const isInstructor =
+    user?.role === 'teacher' &&
+    normalizeMongoIdRef(course?.instructor) !== '' &&
+    normalizeMongoIdRef(course?.instructor) === normalizeMongoIdRef(user?._id);
+  const isCourseTeachingAssistant =
+    user?.role === 'teaching_assistant' &&
+    Array.isArray(course?.teachingAssistants) &&
+    course.teachingAssistants.some((ta: unknown) => normalizeMongoIdRef(ta) === normalizeMongoIdRef(user?._id));
+  const discussionStaffAccess = Boolean(
+    isAdmin || isInstitutionalDiscussionStaff || isInstructor || isCourseTeachingAssistant
+  );
   const [editingGrade, setEditingGrade] = useState<{studentId: string, assignmentId: string} | null>(null);
   const [editingValue, setEditingValue] = useState<string>('');
   const [savingGrade, setSavingGrade] = useState<{studentId: string, assignmentId: string} | null>(null);
@@ -556,15 +568,15 @@ const CourseDetail: React.FC = () => {
     setStudentGradeSummaryReady,
   });
 
-  // Fetch gradebook data for instructors/admins
-  useInstructorGradebookData({
+  // Fetch paginated gradebook data for instructors/admins.
+  usePaginatedGradebook({
     activeSection,
     isInstructor,
     isAdmin,
-    course,
-    modules,
-    gradebookRefresh,
+    courseId: id,
+    refresh: gradebookRefresh,
     setGradebookData,
+    setSubmissionMap,
     setGradebookLoading: setInstructorGradebookLoading,
   });
 
@@ -807,6 +819,7 @@ const CourseDetail: React.FC = () => {
           <CourseDiscussions
             courseId={course?._id || ''}
             courseGroups={course?.groups || []}
+            canManageCourseDiscussions={discussionStaffAccess}
           />
         );
 
@@ -829,6 +842,9 @@ const CourseDetail: React.FC = () => {
         if (isInstructor || isAdmin) {
           return (
             <div className="space-y-6">
+              <div className="rounded-lg border border-purple-200 bg-purple-50 px-4 py-3 text-sm text-purple-900 dark:border-purple-800 dark:bg-purple-900/20 dark:text-purple-100">
+                QuizWave is live practice and does not sync to the gradebook.
+              </div>
               <QuizWaveDashboard courseId={course._id.toString()} />
             </div>
           );
@@ -836,6 +852,9 @@ const CourseDetail: React.FC = () => {
           // Student view
           return (
             <div className="space-y-6">
+              <div className="rounded-lg border border-purple-200 bg-purple-50 px-4 py-3 text-sm text-purple-900 dark:border-purple-800 dark:bg-purple-900/20 dark:text-purple-100">
+                Live practice only — QuizWave scores do not affect your course grade.
+              </div>
               <StudentQuizWaveView courseId={course._id.toString()} />
             </div>
           );

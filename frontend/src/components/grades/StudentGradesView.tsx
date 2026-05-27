@@ -237,6 +237,7 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
               const feedback = typeof submission?.feedback === 'string' ? submission.feedback : '';
               const dueDate = assignment.dueDate ? new Date(assignment.dueDate) : null;
               const now = new Date();
+              const discussionGradeHidden = assignment.isDiscussion && assignment.gradeVisibility?.scoreVisible === false;
               let statusCell: React.ReactNode = null;
               let scoreCell: string | number = typeof grade === 'number' ? 
                 (Number.isInteger(grade) ? grade.toString() : Number(grade).toFixed(2)) : '-';
@@ -266,6 +267,9 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
                     statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">Late</span>;
                   } else {
                     statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Submitted</span>;
+                  }
+                  if (discussionGradeHidden) {
+                    scoreCell = 'Hidden';
                   }
                 } else if (dueDate && now > dueDate) {
                   statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">Missing</span>;
@@ -366,6 +370,7 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
                   const feedback = typeof submission?.feedback === 'string' ? submission.feedback : '';
                   const dueDate = assignment.dueDate ? new Date(assignment.dueDate) : null;
                   const now = new Date();
+                  const discussionGradeHidden = assignment.isDiscussion && assignment.gradeVisibility?.scoreVisible === false;
                   let statusCell: React.ReactNode = null;
                   let scoreCell: string | number = typeof grade === 'number' ? 
                     (Number.isInteger(grade) ? grade.toString() : Number(grade).toFixed(2)) : '-';
@@ -395,6 +400,9 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
                         statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">Late</span>;
                       } else {
                         statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Submitted</span>;
+                      }
+                      if (discussionGradeHidden) {
+                        scoreCell = 'Hidden';
                       }
                     } else if (dueDate && now > dueDate) {
                       statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">Missing</span>;

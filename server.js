@@ -46,9 +46,14 @@ const corsOptions = {
         'http://127.0.0.1:3001',
         'http://127.0.0.1:5173',
       ];
-    
+    // Vite picks the next free port when 5173 is taken; allow any localhost port in dev.
+    const isLocalDevOrigin =
+      process.env.NODE_ENV !== 'production' &&
+      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d{1,5})?$/.test(origin);
+
     // Check if origin is in allowed list or matches patterns
-    const isAllowed = allowedOrigins.includes(origin) ||
+    const isAllowed = isLocalDevOrigin ||
+      allowedOrigins.includes(origin) ||
       origin.endsWith('.onrender.com') ||
       origin.endsWith('.vercel.app');
     
@@ -76,6 +81,32 @@ const logger = pino({
   level: process.env.LOG_LEVEL || 'info',
   base: undefined
 });
+const lifecycle = {
+  startupPhase: 'logger.initialized',
+  mongoStartupComplete: false,
+  mongoStartupError: null,
+  apiSchedulersEnabled:
+    process.env.ENABLE_API_SCHEDULERS === 'true' ||
+    process.env.START_API_SCHEDULERS === 'true',
+};
+
+const logStartupPhase = (phase, fields = {}) => {
+  lifecycle.startupPhase = phase;
+  logger.info({ phase, ...fields }, 'startup.phase');
+};
+
+const logFatalProcessError = (kind, error) => {
+  const err = error instanceof Error ? error : new Error(String(error));
+  logger.fatal({ err, kind, startupPhase: lifecycle.startupPhase }, 'process.fatal');
+  if (process.env.NODE_ENV !== 'test') {
+    process.exit(1);
+  }
+};
+
+if (process.env.NODE_ENV !== 'test') {
+  process.on('unhandledRejection', (reason) => logFatalProcessError('unhandledRejection', reason));
+  process.on('uncaughtException', (err) => logFatalProcessError('uncaughtException', err));
+}
 let redisAdapterEnabled = false;
 let redisAdapterError = null;
 let socketEngineConnectionErrors = 0;
@@ -122,8 +153,14 @@ const buildHealthOpsPayload = () => {
     },
     dependencies: {
       mongoConnected: mongoose.connection.readyState === 1,
+      mongoStartupComplete: lifecycle.mongoStartupComplete,
       redisAdapterEnabled,
       redisAdapterError
+    },
+    lifecycle: {
+      startupPhase: lifecycle.startupPhase,
+      apiSchedulersEnabled: lifecycle.apiSchedulersEnabled,
+      mongoStartupError: lifecycle.mongoStartupError,
     },
     socketEngine: {
       connectionErrors: socketEngineConnectionErrors
@@ -345,19 +382,31 @@ if (!MONGODB_URI.startsWith('mongodb://') && !MONGODB_URI.startsWith('mongodb+sr
   }
 }
 
-mongoose.connect(MONGODB_URI, mongoOptions)
+logStartupPhase('mongo.connecting', {
+  dbName: mongoOptions.dbName,
+  serverSelectionTimeoutMS: mongoOptions.serverSelectionTimeoutMS,
+});
+
+const mongoStartupPromise = mongoose.connect(MONGODB_URI, mongoOptions)
   .then(async () => {
     if (process.env.NODE_ENV === 'test') {
       return;
     }
 
-    // Connected to MongoDB (non-test)
+    logStartupPhase('mongo.connected');
     const { initializeEmailService } = require('./utils/emailService');
     const { ensureCriticalIndexes } = require('./utils/ensureIndexes');
+    logStartupPhase('indexes.syncing');
     await ensureCriticalIndexes(logger);
+    logStartupPhase('email.initializing');
     await initializeEmailService();
+    lifecycle.mongoStartupComplete = true;
+    lifecycle.mongoStartupError = null;
+    logStartupPhase('mongo.startup.complete');
   })
   .catch((err) => {
+    lifecycle.mongoStartupComplete = false;
+    lifecycle.mongoStartupError = err.message || String(err);
     console.error('❌ MongoDB startup error:', err.message);
     if (String(err.message || '').toLowerCase().includes('index')) {
       console.error('Index sync failed. Check model index definitions and your MongoDB provider index feature support.');
@@ -371,6 +420,7 @@ mongoose.connect(MONGODB_URI, mongoOptions)
       return;
     }
     process.exit(1); // Exit if cannot connect to database
+    throw err;
   });
 
 // Serve uploads directory for profile pictures and other files
@@ -414,7 +464,9 @@ app.use('/api/pages', require('./routes/page.routes'));
 app.use('/api/users', require('./routes/user.routes'));
 app.use('/api/assignments', require('./routes/assignment.routes'));
 app.use('/api/submissions', require('./routes/submission.routes'));
-app.use('/api/threads', require('./routes/thread.routes'));
+const discussionRouteMetrics = require('./middleware/discussionRouteMetrics');
+app.use('/api/threads', discussionRouteMetrics('threads'), require('./routes/thread.routes'));
+app.use('/api/replies', discussionRouteMetrics('replies'), require('./routes/reply.routes'));
 app.use('/api/grades', require('./routes/grades.routes'));
 app.use('/api/grading-policy', require('./routes/gradingPolicy.routes'));
 app.use('/api/groups', require('./routes/groupRoutes'));
@@ -607,6 +659,7 @@ app.get('/health/dependencies', async (req, res) => {
 
 app.get('/health/ready', async (req, res) => {
   const mongoConnected = mongoose.connection.readyState === 1;
+  const mongoStartupComplete = lifecycle.mongoStartupComplete;
   const objectStorageReady = isCloudinaryConfigured();
   const objectStorageMode = objectStorageReady ? 'cloudinary' : 'local';
   const redisRequired = process.env.REQUIRE_REDIS === 'true';
@@ -617,13 +670,14 @@ app.get('/health/ready', async (req, res) => {
   const jobQueueRedisConfigured = isRedisConfigured();
   const jobQueueRequired = process.env.REQUIRE_JOB_QUEUE === 'true';
   const jobQueueReady = jobQueueRedisConfigured || !jobQueueRequired;
-  const healthy = mongoConnected && redisReady && storageReady && jobQueueReady;
+  const healthy = mongoConnected && mongoStartupComplete && redisReady && storageReady && jobQueueReady;
 
   const payload = {
     status: healthy ? 'ready' : 'degraded',
     timestamp: new Date().toISOString(),
     checks: {
       mongoConnected,
+      mongoStartupComplete,
       redisAdapterEnabled,
       redisRequired,
       jobQueueRedisConfigured,
@@ -634,11 +688,18 @@ app.get('/health/ready', async (req, res) => {
       objectStorageRequired,
     },
     redisAdapterError,
+    mongoStartupError: lifecycle.mongoStartupError,
+    startupPhase: lifecycle.startupPhase,
+    apiSchedulersEnabled: lifecycle.apiSchedulersEnabled,
     notes: {
       gradingWorker:
         jobQueueRedisConfigured && process.env.NODE_ENV === 'production'
           ? 'Run npm run worker:grading-jobs alongside the API'
           : null,
+      quizwaveCleanup:
+        lifecycle.apiSchedulersEnabled
+          ? null
+          : 'Run npm run worker:quizwave-cleanup or set ENABLE_API_SCHEDULERS=true',
     },
   };
 
@@ -699,6 +760,22 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
+// Final error handler for routes registered after the primary API error middleware
+// (health, metrics, and production static handlers).
+app.use((err, req, res, next) => {
+  if (res.headersSent) {
+    return next(err);
+  }
+  logger.error({ err, requestId: req.requestId }, 'request.unhandled_error');
+  const message = process.env.NODE_ENV === 'production'
+    ? 'Something went wrong!'
+    : err.message;
+  return res.status(err.status || 500).json({
+    message,
+    ...(process.env.NODE_ENV !== 'production' && { stack: err.stack }),
+  });
+});
+
 const socketPingTimeoutMs = parseInt(process.env.SOCKET_PING_TIMEOUT_MS || '20000', 10);
 const socketPingIntervalMs = parseInt(process.env.SOCKET_PING_INTERVAL_MS || '25000', 10);
 const socketConnectTimeoutMs = parseInt(process.env.SOCKET_CONNECT_TIMEOUT_MS || '45000', 10);
@@ -734,7 +811,7 @@ const configureSocketRedisAdapter = async (socketIo) => {
   } catch (error) {
     redisAdapterEnabled = false;
     redisAdapterError = error?.message || 'unknown redis adapter error';
-    logger.error({ err: error }, 'failed to enable socket.io redis adapter');
+    logger.warn({ err: error }, 'socket.io redis adapter unavailable; continuing in single-node mode');
   }
 };
 
@@ -772,7 +849,25 @@ if (process.env.NODE_ENV !== 'test') {
   initializeQuizWaveSocket(io);
 }
 
-const { startCleanupScheduler, stopCleanupScheduler } = require('./utils/quizwaveCleanup');
+let stopCleanupScheduler = null;
+
+const startApiSchedulers = () => {
+  if (!lifecycle.apiSchedulersEnabled) {
+    logger.info(
+      {
+        enableWith: 'ENABLE_API_SCHEDULERS=true',
+        workerCommand: 'npm run worker:quizwave-cleanup',
+      },
+      'api.schedulers.disabled'
+    );
+    return;
+  }
+
+  const cleanupScheduler = require('./utils/quizwaveCleanup');
+  cleanupScheduler.startCleanupScheduler();
+  stopCleanupScheduler = cleanupScheduler.stopCleanupScheduler;
+  logger.info('api.schedulers.started');
+};
 
 // Only start server if not in test mode
 if (process.env.NODE_ENV !== 'test') {
@@ -797,6 +892,9 @@ if (process.env.NODE_ENV !== 'test') {
     const managed = process.env.LMS_DEV_MANAGED === '1';
     const maxAttempts = managed ? 12 : 1;
     const { canBindPort, isPortAvailable } = require('./scripts/freePort');
+    logStartupPhase('server.waiting_for_mongo');
+    await mongoStartupPromise;
+    logStartupPhase('server.listen.starting', { port: PORT, managed });
 
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       if (managed) {
@@ -811,8 +909,9 @@ if (process.env.NODE_ENV !== 'test') {
 
       try {
         await listenOnce();
+        logStartupPhase('server.listening', { port: PORT });
         console.log(`✅ Server listening on http://localhost:${PORT}`);
-        startCleanupScheduler();
+        startApiSchedulers();
         return;
       } catch (err) {
         if (err.code !== 'EADDRINUSE' || attempt === maxAttempts) {
@@ -855,6 +954,7 @@ if (process.env.NODE_ENV !== 'test') {
         server.close(() => resolve());
       });
 
+    logger.info({ signal }, 'shutdown.started');
     if (typeof stopCleanupScheduler === 'function') stopCleanupScheduler();
 
     closeIo()
@@ -862,10 +962,12 @@ if (process.env.NODE_ENV !== 'test') {
       .then(closeMongo)
       .then(() => {
         clearTimeout(forceTimer);
+        logger.info({ signal }, 'shutdown.complete');
         process.exit(0);
       })
-      .catch(() => {
+      .catch((err) => {
         clearTimeout(forceTimer);
+        logger.error({ err, signal }, 'shutdown.error');
         process.exit(0);
       });
   };

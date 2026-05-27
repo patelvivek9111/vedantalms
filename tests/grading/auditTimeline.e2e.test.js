@@ -4,7 +4,7 @@
 const mongoose = require('mongoose');
 const express = require('express');
 const request = require('supertest');
-const { MongoMemoryServer } = require('mongodb-memory-server');
+const { createMongoMemoryServer } = require('../mongoMemoryServer');
 const { seedGradingContractE2E } = require('./e2eContractSeed');
 const User = require('../../models/user.model');
 
@@ -22,7 +22,7 @@ describe('audit timeline E2E (Wave E)', () => {
   let teacherToken;
 
   beforeAll(async () => {
-    mongoServer = await MongoMemoryServer.create();
+    mongoServer = await createMongoMemoryServer();
     process.env.MONGODB_URI = mongoServer.getUri();
     process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret';
     process.env.DISABLE_RATE_LIMIT = 'true';

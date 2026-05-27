@@ -1,9 +1,9 @@
 /**
- * Dev entry for nodemon — sole owner of port 5000 lifecycle.
+ * Dev entry for nodemon — prepares the port, then lets nodemon own restarts.
  * 1. Acquire cross-process dev lock (no overlapping nodemon restarts).
  * 2. Wait until the port can be bound (kill stale + bind probe + settle).
- * 3. Spawn server.js with LMS_DEV_MANAGED=1 (listen retry inside server).
- * 4. On restart: kill child and wait until the port is released before exiting.
+ * 3. Spawn server.js with LMS_DEV_MANAGED=1.
+ * 4. On child exit: release the lock and exit; nodemon decides whether to restart.
  */
 const { spawn, execSync } = require('child_process');
 const path = require('path');
@@ -18,8 +18,6 @@ const lockPath = defaultLockPath(root);
 let child = null;
 let exiting = false;
 let shuttingDown = false;
-let childRestartAttempts = 0;
-const MAX_CHILD_RESTARTS = 4;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -34,6 +32,7 @@ function startChild() {
       LMS_DEV_MANAGED: '1',
     },
   });
+  console.log(`Dev supervisor started server.js pid=${child.pid} port=${port}`);
 
   child.on('exit', (code, signal) => {
     child = null;
@@ -42,32 +41,17 @@ function startChild() {
       return;
     }
 
-    if (code === 1 && childRestartAttempts < MAX_CHILD_RESTARTS) {
-      childRestartAttempts += 1;
-      console.warn(
-        `⚠️  Dev server exited (code ${code}). Retrying port ${port} (${childRestartAttempts}/${MAX_CHILD_RESTARTS})…`
-      );
-      void retryBootAfterCrash();
-      return;
-    }
-
+    releaseDevLock(lockPath);
     if (signal) {
+      console.error(`Dev server child exited from signal ${signal}; nodemon will handle restart.`);
       process.exit(1);
       return;
     }
+    if (code && code !== 0) {
+      console.error(`Dev server child exited with code ${code}; nodemon will handle restart.`);
+    }
     process.exit(code ?? 0);
   });
-}
-
-async function retryBootAfterCrash() {
-  try {
-    killListenersOnPort(port, { quiet: true });
-    await waitForPortFree(port, { maxWaitMs: 12000, settleMs: 600 });
-    startChild();
-  } catch (err) {
-    console.error(`❌ ${err.message}`);
-    process.exit(1);
-  }
 }
 
 async function stopChild() {
@@ -143,7 +127,6 @@ async function boot() {
     if (!(await isPortAvailable(port))) {
       throw new Error(`Port ${port} still in use after acquire`);
     }
-    childRestartAttempts = 0;
     startChild();
   } catch (err) {
     releaseDevLock(lockPath);
@@ -165,4 +148,20 @@ process.on('SIGTERM', () => {
 });
 process.on('SIGINT', () => {
   void shutdown('SIGINT');
+});
+
+process.once('exit', () => {
+  releaseDevLock(lockPath);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('Dev supervisor unhandled rejection:', reason);
+  releaseDevLock(lockPath);
+  process.exit(1);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('Dev supervisor uncaught exception:', err);
+  releaseDevLock(lockPath);
+  process.exit(1);
 });

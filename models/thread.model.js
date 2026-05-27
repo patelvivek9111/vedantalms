@@ -15,6 +15,21 @@ const replySchema = new mongoose.Schema({
     ref: 'Reply',
     default: null
   },
+  deletedAt: {
+    type: Date,
+    default: null
+  },
+  deletedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  editHistory: [{
+    editedAt: { type: Date, default: Date.now },
+    editedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    previousContent: { type: String },
+    reason: { type: String, default: null }
+  }],
   grade: {
     type: Number,
     min: 0,
@@ -70,6 +85,11 @@ const threadSchema = new mongoose.Schema({
     ref: 'GroupSet',
     required: false
   },
+  groupId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Group',
+    required: false
+  },
   author: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -80,6 +100,13 @@ const threadSchema = new mongoose.Schema({
     ref: 'FileAsset',
   }],
   replies: [replySchema],
+  counters: {
+    replyCount: { type: Number, min: 0, default: 0 },
+    participantCount: { type: Number, min: 0, default: 0 },
+    unreadCount: { type: Number, min: 0, default: 0 },
+    likeCount: { type: Number, min: 0, default: 0 },
+    unresolvedModerationCount: { type: Number, min: 0, default: 0 }
+  },
   lastActivity: {
     type: Date,
     default: Date.now
@@ -105,6 +132,35 @@ const threadSchema = new mongoose.Schema({
   published: {
     type: Boolean,
     default: true
+  },
+  availableFrom: {
+    type: Date,
+    default: null
+  },
+  locked: {
+    type: Boolean,
+    default: false
+  },
+  lockAfterDue: {
+    type: Boolean,
+    default: false
+  },
+  archivedAt: {
+    type: Date,
+    default: null
+  },
+  discussionReleaseMode: {
+    type: String,
+    enum: ['immediate', 'manual', 'hidden'],
+    default: 'immediate'
+  },
+  gradesReleasedAt: {
+    type: Date,
+    default: null
+  },
+  gradeHidden: {
+    type: Boolean,
+    default: false
   },
   dueDate: {
     type: Date,
@@ -154,18 +210,61 @@ const threadSchema = new mongoose.Schema({
       type: Boolean,
       default: true
     }
-  }
+  },
+  deletedAt: {
+    type: Date,
+    default: null
+  },
+  deletedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  editHistory: [{
+    editedAt: { type: Date, default: Date.now },
+    editedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    previousTitle: { type: String },
+    previousContent: { type: String },
+    reason: { type: String, default: null }
+  }],
+  moderation: {
+    state: {
+      type: String,
+      enum: ['active', 'hidden', 'flagged', 'archived'],
+      default: 'active'
+    },
+    lastAction: { type: String, default: null },
+    lastActionAt: { type: Date, default: null },
+    lastActionBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    note: { type: String, default: null }
+  },
+  moderationState: {
+    type: String,
+    enum: ['active', 'hidden', 'flagged', 'archived'],
+    default: 'active'
+  },
+  lastReplyIdempotencyKeys: [{
+    key: { type: String, required: true },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    replyId: { type: mongoose.Schema.Types.ObjectId },
+    createdAt: { type: Date, default: Date.now }
+  }]
 }, {
   timestamps: true
 });
 
 threadSchema.index({ course: 1, isGraded: 1, published: 1, dueDate: 1 });
 threadSchema.index({ module: 1, published: 1, lastActivity: -1 });
+threadSchema.index({ module: 1, deletedAt: 1, lastActivity: -1 });
 threadSchema.index({ course: 1, lastActivity: -1 });
+threadSchema.index({ groupSet: 1, groupId: 1, published: 1, lastActivity: -1 });
+threadSchema.index({ course: 1, deletedAt: 1, lastActivity: -1 });
+threadSchema.index({ course: 1, moderationState: 1, lastActivity: -1 });
+threadSchema.index({ groupSet: 1, published: 1, lastActivity: -1 });
 
 // Virtual for reply count
 threadSchema.virtual('replyCount').get(function() {
-  return this.replies.length;
+  return this.counters?.replyCount ?? this.replies.length;
 });
 
 // Update lastActivity when a reply is added

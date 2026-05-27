@@ -27,6 +27,19 @@ function defaultLockPath(rootDir) {
   return path.join(rootDir, 'tmp', '.dev-port-5000.lock');
 }
 
+function readDevLock(lockPath) {
+  try {
+    const ownerPid = Number(fs.readFileSync(lockPath, 'utf8').trim());
+    return {
+      exists: true,
+      ownerPid,
+      ownerAlive: isProcessAlive(ownerPid),
+    };
+  } catch {
+    return { exists: false, ownerPid: null, ownerAlive: false };
+  }
+}
+
 /**
  * @param {string} lockPath
  * @param {{ maxWaitMs?: number, staleKillMs?: number }} [options]
@@ -49,10 +62,9 @@ async function acquireDevLock(lockPath, options = {}) {
       }
     }
 
-    let ownerPid = NaN;
-    try {
-      ownerPid = Number(fs.readFileSync(lockPath, 'utf8').trim());
-    } catch {
+    const lock = readDevLock(lockPath);
+    let ownerPid = lock.ownerPid;
+    if (!lock.exists) {
       try {
         fs.unlinkSync(lockPath);
       } catch {
@@ -72,7 +84,7 @@ async function acquireDevLock(lockPath, options = {}) {
       continue;
     }
 
-    if (!isProcessAlive(ownerPid)) {
+    if (!lock.ownerAlive) {
       try {
         fs.unlinkSync(lockPath);
       } catch {
@@ -96,7 +108,9 @@ async function acquireDevLock(lockPath, options = {}) {
     await sleep(150);
   }
 
-  throw new Error(`Timed out waiting for dev lock (${lockPath})`);
+  const lock = readDevLock(lockPath);
+  const owner = lock.ownerPid ? ` ownerPid=${lock.ownerPid} ownerAlive=${lock.ownerAlive}` : '';
+  throw new Error(`Timed out waiting for dev lock (${lockPath})${owner}`);
 }
 
 function releaseDevLock(lockPath) {
@@ -110,9 +124,20 @@ function releaseDevLock(lockPath) {
   }
 }
 
+function forceReleaseDevLock(lockPath) {
+  try {
+    fs.unlinkSync(lockPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 module.exports = {
   acquireDevLock,
   releaseDevLock,
+  forceReleaseDevLock,
   defaultLockPath,
   isProcessAlive,
+  readDevLock,
 };

@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
+const { createMongoMemoryServer } = require('../mongoMemoryServer');
 require('../../models/user.model');
 const gradingPolicyAuditService = require('../../services/gradingPolicyAudit.service');
 const gradingPolicyService = require('../../services/gradingPolicy.service');
@@ -9,7 +9,7 @@ describe('gradingPolicyAudit', () => {
   let mongoServer;
 
   beforeAll(async () => {
-    mongoServer = await MongoMemoryServer.create();
+    mongoServer = await createMongoMemoryServer();
     await mongoose.connect(mongoServer.getUri());
   }, 60000);
 

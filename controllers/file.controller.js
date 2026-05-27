@@ -309,8 +309,12 @@ exports.streamPreviewThumbnail = async (req, res) => {
     }
     res.setHeader('Content-Type', asset.mimeType || 'application/octet-stream');
     res.setHeader('Cache-Control', 'private, max-age=3600');
-    const fs = require('fs');
-    fs.createReadStream(filePath).pipe(res);
+    const stream = fs.createReadStream(filePath);
+    stream.on('error', () => {
+      if (!res.headersSent) res.status(404).json({ success: false, message: 'Preview unavailable' });
+      else res.destroy();
+    });
+    stream.pipe(res);
   } catch (error) {
     if (!res.headersSent) res.status(error.statusCode || 500).json({ success: false, message: error.message });
   }
@@ -330,7 +334,12 @@ exports.streamPreviewContent = async (req, res) => {
     const type = ext === '.pdf' ? 'application/pdf' : 'text/plain; charset=utf-8';
     res.setHeader('Content-Type', type);
     res.setHeader('Cache-Control', 'private, max-age=3600');
-    require('fs').createReadStream(filePath).pipe(res);
+    const stream = fs.createReadStream(filePath);
+    stream.on('error', () => {
+      if (!res.headersSent) res.status(404).json({ success: false, message: 'Preview content unavailable' });
+      else res.destroy();
+    });
+    stream.pipe(res);
   } catch (error) {
     if (!res.headersSent) res.status(error.statusCode || 500).json({ success: false, message: error.message });
   }

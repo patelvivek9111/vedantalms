@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
+const { createMongoMemoryServer } = require('../mongoMemoryServer');
 const { seedGradingContractE2E } = require('./e2eContractSeed');
 const gradingPolicyService = require('../../services/gradingPolicy.service');
 const Course = require('../../models/course.model');
@@ -9,7 +9,7 @@ describe('effective grading policy', () => {
   let contract;
 
   beforeAll(async () => {
-    mongoServer = await MongoMemoryServer.create();
+    mongoServer = await createMongoMemoryServer();
     await mongoose.connect(mongoServer.getUri());
     contract = await seedGradingContractE2E();
   }, 120000);

@@ -102,7 +102,12 @@ describe('CourseDiscussions', () => {
     );
 
     await waitFor(() => {
-      expect(mockedApi.get).toHaveBeenCalledWith('/threads/course/course1', expect.any(Object));
+      expect(mockedApi.get).toHaveBeenCalledWith(
+        '/threads/course/course1',
+        expect.objectContaining({
+          params: expect.objectContaining({ _nocache: expect.any(Number) }),
+        })
+      );
     });
 
     await waitFor(() => {
@@ -110,7 +115,7 @@ describe('CourseDiscussions', () => {
     });
   });
 
-  it('should show create thread button for teachers', async () => {
+  it('should show create thread button for course staff teachers', async () => {
     mockedApi.get.mockResolvedValue({
       data: {
         success: true,
@@ -123,13 +128,36 @@ describe('CourseDiscussions', () => {
 
     render(
       <BrowserRouter>
-        <CourseDiscussions courseId="course1" />
+        <CourseDiscussions courseId="course1" canManageCourseDiscussions />
       </BrowserRouter>
     );
 
     await waitFor(() => {
       expect(screen.getByText(/create new thread/i)).toBeInTheDocument();
     });
+  });
+
+  it('should not show create UI for teachers who are not course staff', async () => {
+    mockedApi.get.mockResolvedValue({
+      data: {
+        success: true,
+        data: [],
+      },
+    });
+    mockedAxios.get.mockResolvedValue({
+      data: [],
+    });
+
+    render(
+      <BrowserRouter>
+        <CourseDiscussions courseId="course1" canManageCourseDiscussions={false} />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/discussions are restricted/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/create new thread/i)).not.toBeInTheDocument();
   });
 
   it('should open create thread modal', async () => {
@@ -145,7 +173,7 @@ describe('CourseDiscussions', () => {
 
     render(
       <BrowserRouter>
-        <CourseDiscussions courseId="course1" />
+        <CourseDiscussions courseId="course1" canManageCourseDiscussions />
       </BrowserRouter>
     );
 
@@ -252,6 +280,44 @@ describe('CourseDiscussions', () => {
     await waitFor(() => {
       expect(screen.getByText('Pinned Thread')).toBeInTheDocument();
     });
+  });
+
+  it('renders unread, not-posted, instructor, and locked discussion trust badges', async () => {
+    mockedUseAuth.mockReturnValue({
+      user: { _id: 'student1', role: 'student' },
+    });
+    mockedApi.get.mockResolvedValue({
+      data: {
+        success: true,
+        data: [{
+          ...mockThreads[0],
+          _id: 'thread-badges',
+          title: 'Badge Thread',
+          locked: true,
+          unreadCount: 3,
+          hasPosted: false,
+          hasInstructorReply: true,
+          published: true,
+          isGraded: true,
+          discussionReleaseMode: 'hidden',
+          gradeHidden: true,
+        }],
+      },
+    });
+    mockedAxios.get.mockResolvedValue({ data: [] });
+
+    render(
+      <BrowserRouter>
+        <CourseDiscussions courseId="course1" />
+      </BrowserRouter>
+    );
+
+    expect(await screen.findByText('Badge Thread')).toBeInTheDocument();
+    expect(screen.getByText('3 unread')).toBeInTheDocument();
+    expect(screen.getByText('Not posted')).toBeInTheDocument();
+    expect(screen.getByText('Instructor replied')).toBeInTheDocument();
+    expect(screen.getByText('Locked')).toBeInTheDocument();
+    expect(screen.getByText('Grade hidden')).toBeInTheDocument();
   });
 });
 

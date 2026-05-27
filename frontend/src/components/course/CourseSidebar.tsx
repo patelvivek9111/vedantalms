@@ -45,6 +45,7 @@ const CourseSidebar: React.FC<CourseSidebarProps> = ({
     >
       <nav
         className={`flex flex-col gap-1 border border-gray-100 bg-white/80 p-4 shadow-lg backdrop-blur dark:border-gray-700 dark:bg-gray-900/80 ${isMobileDevice ? 'rounded-t-2xl' : 'm-0 rounded-2xl pb-4'}`}
+        aria-label="Course navigation"
         style={
           isMobileDevice
             ? { height: '100%', maxHeight: '100%', overflow: 'hidden' }

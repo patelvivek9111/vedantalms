@@ -6,6 +6,7 @@ const Submission = require('../models/Submission');
 const Thread = require('../models/thread.model');
 const Group = require('../models/Group');
 const { calculateCourseGradeForStudent } = require('../services/gradeCalculation.service');
+const discussionReplyService = require('../services/discussionReply.service');
 
 // GET /api/reports/semesters
 // Get all unique semesters that the student has courses in
@@ -205,22 +206,12 @@ exports.getStudentTranscript = async (req, res) => {
       // Fetch all graded discussions (threads) for the course
       const threads = await Thread.find({ course: course._id, isGraded: true });
       
-      // Helper to check if a user has replied
-      function hasReplyByUser(replies, userId) {
-        if (!Array.isArray(replies) || replies.length === 0) return false;
-        for (const r of replies) {
-          const authorId = r.author && typeof r.author === 'object' && r.author._id ? r.author._id.toString() : String(r.author || '');
-          if (authorId === String(userId)) return true;
-          if (Array.isArray(r.replies) && r.replies.length > 0 && hasReplyByUser(r.replies, userId)) return true;
-        }
-        return false;
-      }
-
       // Map threads to assignment format
-      const discussionAssignments = threads.map(thread => {
+      const discussionAssignments = [];
+      for (const thread of threads) {
         const studentGradeObj = thread.studentGrades.find(g => g.student.toString() === studentId.toString());
-        const hasSubmitted = hasReplyByUser(thread.replies, studentId);
-        return {
+        const hasSubmitted = await discussionReplyService.hasReplyByUser(thread, studentId);
+        discussionAssignments.push({
           _id: thread._id,
           title: thread.title,
           group: thread.group || 'Discussions',
@@ -230,8 +221,8 @@ exports.getStudentTranscript = async (req, res) => {
           grade: resolveAssignmentGrade({ discussionGradeRow: studentGradeObj || null }),
           dueDate: thread.dueDate || null,
           hasSubmitted
-        };
-      });
+        });
+      }
 
       // Combine all assignments
       const allAssignments = [

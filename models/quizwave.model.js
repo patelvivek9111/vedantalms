@@ -380,9 +380,9 @@ const quizResponseSchema = new mongoose.Schema({
 quizResponseSchema.index({ session: 1, student: 1 });
 quizResponseSchema.index({ quiz: 1, student: 1 });
 
-const QuizWave = mongoose.model('QuizWave', quizSchema);
-const QuizSession = mongoose.model('QuizSession', quizSessionSchema);
-const QuizResponse = mongoose.model('QuizResponse', quizResponseSchema);
+const QuizWave = mongoose.models.QuizWave || mongoose.model('QuizWave', quizSchema);
+const QuizSession = mongoose.models.QuizSession || mongoose.model('QuizSession', quizSessionSchema);
+const QuizResponse = mongoose.models.QuizResponse || mongoose.model('QuizResponse', quizResponseSchema);
 
 module.exports = {
   QuizWave,

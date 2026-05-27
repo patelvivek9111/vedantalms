@@ -7,6 +7,10 @@ const mongoose = require('mongoose');
 const { startOfWeek, endOfWeek } = require('date-fns');
 const fileAssetService = require('../services/fileAsset.service');
 const { resolveCourseForAssignment, assertCourseFilesMutable } = require('../services/fileLifecycle.service');
+const assignmentAccess = require('../services/assignmentAccess.service');
+const timedQuizAttemptService = require('../services/timedQuizAttempt.service');
+const assignmentGroupService = require('../services/assignmentGroup.service');
+const discussionReplyService = require('../services/discussionReply.service');
 
 /** Plain object or Mongoose doc → assignment JSON with computed totalPoints (matches getModuleAssignments). */
 const enrichAssignmentTotalPoints = (a) => {
@@ -40,26 +44,41 @@ exports.createAssignment = async (req, res) => {
       category: 'assignment',
     });
 
+    const parsedQuestions = questions ? JSON.parse(questions) : [];
+    const isGradedQuiz = req.body.isGradedQuiz === 'true' || req.body.isGradedQuiz === true;
+    const gradeReleaseMode =
+      req.body.gradeReleaseMode || (isGradedQuiz ? 'manual' : 'immediate');
+
     // Build assignment data object
     const assignmentData = {
       title,
       description,
       availableFrom,
       dueDate,
+      lockAfterDue:
+        req.body.lockAfterDue !== undefined
+          ? req.body.lockAfterDue === 'true' || req.body.lockAfterDue === true
+          : true,
       attachments,
       fileAssets: fileAssetIds,
       createdBy: req.user._id,
-      questions: questions ? JSON.parse(questions) : [],
+      questions: parsedQuestions,
       isGroupAssignment: req.body.isGroupAssignment === 'true' || req.body.isGroupAssignment === true,
       groupSet: req.body.groupSet || null,
       group,
-      isGradedQuiz: req.body.isGradedQuiz === 'true' || req.body.isGradedQuiz === true,
+      groupId: req.body.groupId || null,
+      isGradedQuiz,
       isTimedQuiz: req.body.isTimedQuiz === 'true' || req.body.isTimedQuiz === true,
       quizTimeLimit: req.body.quizTimeLimit ? parseInt(req.body.quizTimeLimit) : null,
       allowStudentUploads: req.body.allowStudentUploads === 'true' || req.body.allowStudentUploads === true,
       displayMode: req.body.displayMode || 'single',
       showCorrectAnswers: req.body.showCorrectAnswers === 'true' || req.body.showCorrectAnswers === true,
       showStudentAnswers: req.body.showStudentAnswers === 'true' || req.body.showStudentAnswers === true,
+      gradeReleaseMode,
+      defaultGradeHidden:
+        req.body.defaultGradeHidden !== undefined
+          ? req.body.defaultGradeHidden === 'true' || req.body.defaultGradeHidden === true
+          : gradeReleaseMode === 'manual',
       isOfflineAssignment: req.body.isOfflineAssignment === 'true' || req.body.isOfflineAssignment === true,
       totalPoints: req.body.totalPoints ? parseFloat(req.body.totalPoints) : 0
     };
@@ -69,6 +88,12 @@ exports.createAssignment = async (req, res) => {
     }
 
     const assignment = new Assignment(assignmentData);
+    if (course) {
+      assignmentGroupService.applyAssignmentGroupSelection(assignment, course, {
+        group,
+        groupId: req.body.groupId,
+      });
+    }
 
     await assignment.save();
     res.status(201).json(assignment);
@@ -87,15 +112,26 @@ exports.createAssignment = async (req, res) => {
 exports.getModuleAssignments = async (req, res) => {
   try {
     const isStudent = req.user.role === 'student';
+    if (isStudent) {
+      const moduleDoc = await Module.findById(req.params.moduleId).select('published').lean();
+      if (!moduleDoc || moduleDoc.published === false) {
+        return res.json([]);
+      }
+    }
+    const now = new Date();
     const assignments = await Assignment.find({
       module: req.params.moduleId,
-      ...(isStudent ? { published: true } : {})
+      ...(isStudent ? { published: true, availableFrom: { $lte: now } } : {})
     })
       .populate('createdBy', 'firstName lastName profilePicture')
       .sort({ createdAt: -1 });
     res.json(assignments.map(enrichAssignmentTotalPoints));
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(error.statusCode || 500).json({
+      message: error.message,
+      code: error.code,
+      details: error.details,
+    });
   }
 };
 
@@ -109,7 +145,11 @@ exports.getCourseModuleAssignmentsBulk = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(courseId)) {
       return res.status(400).json({ message: 'Invalid course ID' });
     }
-    const modules = await Module.find({ course: courseId }).select('_id').lean();
+    const isStudent = req.user.role === 'student';
+    const modules = await Module.find({
+      course: courseId,
+      ...(isStudent ? { published: true } : {}),
+    }).select('_id').lean();
     const moduleIds = modules.map((m) => m._id);
     const byModuleId = {};
     moduleIds.forEach((id) => {
@@ -118,10 +158,10 @@ exports.getCourseModuleAssignmentsBulk = async (req, res) => {
     if (moduleIds.length === 0) {
       return res.json({ success: true, byModuleId });
     }
-    const isStudent = req.user.role === 'student';
+    const now = new Date();
     const query = {
       module: { $in: moduleIds },
-      ...(isStudent ? { published: true } : {})
+      ...(isStudent ? { published: true, availableFrom: { $lte: now } } : {})
     };
     const assignments = await Assignment.find(query)
       .populate('createdBy', 'firstName lastName profilePicture')
@@ -138,7 +178,11 @@ exports.getCourseModuleAssignmentsBulk = async (req, res) => {
     }
     res.json({ success: true, byModuleId });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(error.statusCode || 500).json({
+      message: error.message,
+      code: error.code,
+      details: error.details,
+    });
   }
 };
 
@@ -157,7 +201,13 @@ exports.getAssignment = async (req, res) => {
     if (!assignment) {
       return res.status(404).json({ message: 'Assignment not found' });
     }
+    const access = await assignmentAccess.assertStudentCanViewAssignment(req.user, assignment, {
+      preview: req.query.preview === 'true',
+    });
     const payload = assignment.toObject();
+    if (access.previewMetadata) {
+      payload.access = access.previewMetadata;
+    }
     payload.attachments = fileAssetService.enrichLegacyFileUrls(payload.attachments, req.user._id);
     const FileAsset = require('../models/fileAsset.model');
     const ids = (payload.fileAssets || []).map((id) => String(id));
@@ -248,7 +298,13 @@ exports.updateAssignment = async (req, res) => {
     assignment.description = description || assignment.description;
     assignment.availableFrom = availableFrom || assignment.availableFrom;
     assignment.dueDate = dueDate || assignment.dueDate;
-    if (group !== undefined) assignment.group = group;
+    if (req.body.lockAfterDue !== undefined) assignment.lockAfterDue = req.body.lockAfterDue === 'true' || req.body.lockAfterDue === true;
+    if (group !== undefined || req.body.groupId !== undefined) {
+      assignmentGroupService.applyAssignmentGroupSelection(assignment, course, {
+        group,
+        groupId: req.body.groupId,
+      });
+    }
     if (req.body.isGradedQuiz !== undefined) assignment.isGradedQuiz = req.body.isGradedQuiz === 'true' || req.body.isGradedQuiz === true;
     if (req.body.isTimedQuiz !== undefined) assignment.isTimedQuiz = req.body.isTimedQuiz === 'true' || req.body.isTimedQuiz === true;
     if (req.body.quizTimeLimit !== undefined) assignment.quizTimeLimit = req.body.quizTimeLimit ? parseInt(req.body.quizTimeLimit) : null;
@@ -256,6 +312,8 @@ exports.updateAssignment = async (req, res) => {
     if (req.body.displayMode !== undefined) assignment.displayMode = req.body.displayMode;
     if (req.body.showCorrectAnswers !== undefined) assignment.showCorrectAnswers = req.body.showCorrectAnswers === 'true' || req.body.showCorrectAnswers === true;
     if (req.body.showStudentAnswers !== undefined) assignment.showStudentAnswers = req.body.showStudentAnswers === 'true' || req.body.showStudentAnswers === true;
+    if (req.body.gradeReleaseMode !== undefined) assignment.gradeReleaseMode = req.body.gradeReleaseMode;
+    if (req.body.defaultGradeHidden !== undefined) assignment.defaultGradeHidden = req.body.defaultGradeHidden === 'true' || req.body.defaultGradeHidden === true;
     if (req.body.isOfflineAssignment !== undefined) assignment.isOfflineAssignment = req.body.isOfflineAssignment === 'true' || req.body.isOfflineAssignment === true;
     if (req.body.totalPoints !== undefined) assignment.totalPoints = req.body.totalPoints ? parseFloat(req.body.totalPoints) : 0;
     
@@ -419,6 +477,55 @@ exports.toggleAssignmentPublish = async (req, res) => {
   }
 };
 
+exports.startTimedQuizAttempt = async (req, res) => {
+  try {
+    const attempt = await timedQuizAttemptService.startTimedQuizAttempt(req.user, req.params.id, {
+      groupId: req.body.groupId,
+    });
+    res.json({ success: true, data: attempt });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message,
+      code: error.code,
+      details: error.details,
+    });
+  }
+};
+
+exports.getTimedQuizAttempt = async (req, res) => {
+  try {
+    const attempt = await timedQuizAttemptService.getTimedQuizAttempt(req.user, req.params.id, {
+      groupId: req.query.groupId,
+    });
+    res.json({ success: true, data: attempt });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message,
+      code: error.code,
+      details: error.details,
+    });
+  }
+};
+
+exports.heartbeatTimedQuizAttempt = async (req, res) => {
+  try {
+    const attempt = await timedQuizAttemptService.heartbeatTimedQuizAttempt(req.user, req.params.id, {
+      groupId: req.body.groupId,
+      answers: req.body.answers,
+    });
+    res.json({ success: true, data: attempt });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message,
+      code: error.code,
+      details: error.details,
+    });
+  }
+};
+
 // Get all group assignments for a group set
 exports.getGroupSetAssignments = async (req, res) => {
   try {
@@ -456,9 +563,15 @@ exports.getCourseGroupAssignments = async (req, res) => {
     const courseGroupAssignments = assignments.filter(assignment => assignment.groupSet);
     if (courseGroupAssignments.length > 0) {
     }
+    const now = new Date();
     // Apply student filter if needed
     const filteredAssignments = isStudent 
-      ? courseGroupAssignments.filter(assignment => assignment.published)
+      ? courseGroupAssignments.filter(assignment => {
+          if (!assignment.published) return false;
+          if (!assignment.availableFrom) return true;
+          const availableFrom = new Date(assignment.availableFrom);
+          return !Number.isFinite(availableFrom.getTime()) || now >= availableFrom;
+        })
       : courseGroupAssignments;
     res.json(filteredAssignments);
   } catch (error) {
@@ -636,13 +749,11 @@ exports.getAllItemsDueThisWeek = async (req, res) => {
     const filteredAssignments = assignments.filter(a => !submittedIds.has(a._id.toString()));
     
     // Filter out discussions where student has already posted
-    const filteredDiscussions = discussions.filter(d => {
-      // Check if student has posted in this discussion
-      const hasPosted = d.replies && d.replies.some(reply => 
-        reply.author && reply.author.toString() === userId.toString()
-      );
-      return !hasPosted;
-    });
+    const filteredDiscussions = [];
+    for (const discussion of discussions) {
+      const hasPosted = await discussionReplyService.hasReplyByUser(discussion, userId);
+      if (!hasPosted) filteredDiscussions.push(discussion);
+    }
     
     // Combine and format results
     const allItems = [

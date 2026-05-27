@@ -4,7 +4,7 @@
 const mongoose = require('mongoose');
 const express = require('express');
 const request = require('supertest');
-const { MongoMemoryServer } = require('mongodb-memory-server');
+const { createMongoMemoryServer } = require('../mongoMemoryServer');
 const { seedGradingContractE2E } = require('./e2eContractSeed');
 const InstitutionGradingPolicy = require('../../models/institutionGradingPolicy.model');
 const StudentCourseGradeSnapshot = require('../../models/studentCourseGradeSnapshot.model');
@@ -24,7 +24,7 @@ describe('transcript policy snapshots', () => {
   let contract;
 
   beforeAll(async () => {
-    mongoServer = await MongoMemoryServer.create();
+    mongoServer = await createMongoMemoryServer();
     process.env.MONGODB_URI = mongoServer.getUri();
     process.env.NODE_ENV = 'test';
     process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret-key-for-jwt';

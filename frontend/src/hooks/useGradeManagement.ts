@@ -49,9 +49,10 @@ export const useGradeManagement = ({
     // Find assignment to check if it's offline
     const assignment = gradebookData.assignments.find((a: any) => a._id === assignmentId);
     const isOfflineAssignment = assignment?.isOfflineAssignment === true;
+    const isDiscussion = assignment?.isDiscussion === true;
     
     // For offline assignments, we can create a grade even without a submission
-    if (!submissionId && !isOfflineAssignment) {
+    if (!submissionId && !isOfflineAssignment && !isDiscussion) {
       setGradeError('No submission found for this student');
       setSavingGrade(null);
       setEditingGrade(null);
@@ -68,7 +69,16 @@ export const useGradeManagement = ({
         let res: any;
         
         // Use manual-grade endpoint for offline assignments
-        if (isOfflineAssignment) {
+        if (isDiscussion) {
+          res = await axios.post(
+            `${API_URL}/api/threads/${assignmentId}/grade`,
+            {
+              studentId,
+              grade: null,
+            },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+        } else if (isOfflineAssignment) {
           res = await axios.post(
             `${API_URL}/api/submissions/manual-grade`,
             { 
@@ -139,7 +149,16 @@ export const useGradeManagement = ({
       let res: any;
       
       // Use manual-grade endpoint for offline assignments without submissions
-      if (isOfflineAssignment && !submissionId) {
+      if (isDiscussion) {
+        res = await axios.post(
+          `${API_URL}/api/threads/${assignmentId}/grade`,
+          {
+            studentId,
+            grade: gradeNum,
+          },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      } else if (isOfflineAssignment && !submissionId) {
         res = await axios.post(
           `${API_URL}/api/submissions/manual-grade`,
           { 

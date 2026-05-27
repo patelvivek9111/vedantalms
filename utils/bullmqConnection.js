@@ -17,6 +17,9 @@ function getBullmqConnection() {
     enableOfflineQueue: false,
     retryStrategy: () => null,
   });
+  connection.on('error', (err) => {
+    console.error('bullmq redis connection error', err?.message || err);
+  });
   return connection;
 }
 

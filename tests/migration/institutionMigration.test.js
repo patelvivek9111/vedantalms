@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
+const { createMongoMemoryServer } = require('../mongoMemoryServer');
 const { exportInstitutionBundle } = require('../../services/export/institutionalExport.service');
 const {
   restoreInstitutionBundle,
@@ -18,7 +18,7 @@ let mongoServer;
 let exportBaseDir;
 
 beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
+  mongoServer = await createMongoMemoryServer();
   await mongoose.connect(mongoServer.getUri());
   exportBaseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lms-export-'));
   process.env.INSTITUTION_EXPORTS_DIR = exportBaseDir;

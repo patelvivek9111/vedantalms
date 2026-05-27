@@ -145,6 +145,7 @@ export default function GlobalSidebar() {
       <nav 
         className="print:hidden hidden lg:flex fixed top-0 left-0 h-[100dvh] bg-blue-900 dark:bg-gray-900 flex-col items-center py-2 z-50 shadow-lg border-r-2 border-blue-700 dark:border-gray-700 transition-all duration-300 w-20 overflow-visible"
         data-testid="global-sidebar"
+        aria-label="Global navigation"
       >
       <div className="mb-3 flex flex-col items-center w-full px-2 shrink-0">
         {/* Logo placeholder */}

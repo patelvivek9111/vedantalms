@@ -22,6 +22,7 @@ interface CreateThreadModalProps {
   courseGroups?: { name: string; weight: number }[];
   modules?: { _id: string; title: string }[];
   defaultGroupSetId?: string;
+  defaultGroupId?: string;
 }
 
 interface GroupSet {
@@ -38,7 +39,8 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
   onThreadCreated,
   courseGroups = [],
   modules = [],
-  defaultGroupSetId
+  defaultGroupSetId,
+  defaultGroupId
 }) => {
   const { user } = useAuth();
   const [title, setTitle] = useState('');
@@ -243,7 +245,6 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
     setError(null);
 
     try {
-      const token = localStorage.getItem('token');
       const threadData: any = {
         title: title.trim(),
         content: content,
@@ -263,17 +264,16 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
       // Add groupset if this is a group discussion
       if (isGroupDiscussion && selectedGroupSet) {
         threadData.groupSet = selectedGroupSet;
+      if (defaultGroupId) {
+        threadData.groupId = defaultGroupId;
+      }
       }
       const fileAssetIds = attachmentFiles.map((f) => f.fileAssetId).filter(Boolean);
       if (fileAssetIds.length) threadData.fileAssetIds = fileAssetIds;
 
-      const response = await api.post(
-        `${API_URL}/api/threads`,
-        threadData,
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
+      // Must be path-only: `api` already has baseURL `${API_URL}/api`. A URL like `/api/threads`
+      // would merge to `/api/api/threads` when API_URL is empty (same-origin deploys).
+      const response = await api.post('/threads', threadData);
 
       if (response.data.success) {
         onThreadCreated(response.data.data);
@@ -295,8 +295,14 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
       } else {
         setError('Failed to create thread');
       }
-    } catch (err) {
-      setError('Failed to create thread. Please try again.');
+    } catch (err: unknown) {
+      const ax = err as { response?: { data?: { message?: string } } };
+      const msg = ax.response?.data?.message;
+      setError(
+        msg
+          ? `Failed to create thread. ${msg}`
+          : 'Failed to create thread. Please try again.'
+      );
     } finally {
       setIsSubmitting(false);
     }

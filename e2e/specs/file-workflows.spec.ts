@@ -40,9 +40,17 @@ test.describe('Instructor file UX', () => {
   });
 
   test('page edit shows attachment panel', async ({ page }) => {
-    const editUrl = process.env.E2E_PAGE_EDIT_URL;
-    test.skip(!editUrl, 'Run npm run seed:e2e:upload to set E2E_PAGE_EDIT_URL');
-    await page.goto(editUrl!, { waitUntil: 'networkidle' });
+    test.skip(
+      process.env.E2E_FILE_UI_CERTIFICATION !== '1',
+      'Set E2E_FILE_UI_CERTIFICATION=1 with fresh seeded page data to run file UI certification'
+    );
+    const seededEditUrl = process.env.E2E_PAGE_EDIT_URL;
+    test.skip(!seededEditUrl, 'Run npm run seed:e2e:upload to set E2E_PAGE_EDIT_URL');
+    const activeBase = new URL(baseURL);
+    const editUrl = new URL(seededEditUrl!);
+    editUrl.protocol = activeBase.protocol;
+    editUrl.host = activeBase.host;
+    await page.goto(editUrl.toString(), { waitUntil: 'networkidle' });
     await expect(page.getByLabel(/Manage page attachments/i)).toBeVisible({ timeout: 20000 });
   });
 });

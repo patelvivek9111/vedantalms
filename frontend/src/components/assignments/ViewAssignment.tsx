@@ -100,6 +100,11 @@ interface Submission {
   showCorrectAnswers?: boolean;
   showStudentAnswers?: boolean;
   timeSpent?: number;
+  gradeVisibility?: {
+    mode: 'hidden' | 'score_only' | 'score_and_feedback';
+    scoreVisible: boolean;
+    feedbackVisible: boolean;
+  };
 }
 
 interface UploadedFile {
@@ -178,6 +183,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [quizStarted, setQuizStarted] = useState<boolean>(false);
   const [quizStartTime, setQuizStartTime] = useState<Date | null>(null);
+  const [quizDeadlineAt, setQuizDeadlineAt] = useState<Date | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [courseFinalized, setCourseFinalized] = useState<boolean>(false);
   const [showTimer, setShowTimer] = useState<boolean>(true);
@@ -656,28 +662,21 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
   // Timer logic for timed quizzes
   useEffect(() => {
     if (assignment?.isTimedQuiz && assignment?.quizTimeLimit && user?.role === 'student' && !submission) {
-      // Check if quiz has been started - but don't auto-start
-      // Make timer user-specific by including user ID in the key
-      const timerKey = `quiz_start_${id}_${user._id}`;
-      const storedStartTime = localStorage.getItem(timerKey);
-      if (storedStartTime) {
-        // Only restore quiz state if there's no submission and user hasn't completed the quiz
-        const startTime = new Date(storedStartTime);
-        const now = new Date();
-        const elapsed = Math.floor((now.getTime() - startTime.getTime()) / 1000);
-        const totalSeconds = (assignment.quizTimeLimit || 0) * 60;
-        
-        // Only restore if quiz hasn't expired and no submission exists
-        if (elapsed < totalSeconds) {
+      api.get(`/assignments/${id}/quiz/attempt`, {
+        params: studentGroupId ? { groupId: studentGroupId } : undefined,
+      }).then((res) => {
+        const attempt = res.data?.data;
+        if (attempt?.attemptStatus === 'in_progress') {
           setQuizStarted(true);
-          setQuizStartTime(startTime);
-        } else {
-          // Clear expired quiz start time
-          localStorage.removeItem(timerKey);
+          setQuizStartTime(attempt.attemptStartedAt ? new Date(attempt.attemptStartedAt) : new Date(attempt.serverTime));
+          setQuizDeadlineAt(attempt.attemptDeadlineAt ? new Date(attempt.attemptDeadlineAt) : null);
+          setTimeLeft(typeof attempt.remainingSeconds === 'number' ? attempt.remainingSeconds : null);
         }
-      }
+      }).catch(() => {
+        // The start button can still initialize a server-authoritative attempt.
+      });
     }
-  }, [assignment, user, submission, id]);
+  }, [assignment, user, submission, id, studentGroupId]);
 
   useEffect(() => {
     // Only run timer if quiz is started, no submission exists, and user is actively taking the quiz
@@ -694,9 +693,10 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
     ) {
       const timer = setInterval(() => {
         const now = new Date();
-        const elapsed = Math.floor((now.getTime() - (quizStartTime?.getTime() || 0)) / 1000); // seconds
-        const totalSeconds = (assignment.quizTimeLimit || 0) * 60; // convert minutes to seconds
-        const remaining = totalSeconds - elapsed;
+        const remaining = quizDeadlineAt
+          ? Math.ceil((quizDeadlineAt.getTime() - now.getTime()) / 1000)
+          : ((assignment.quizTimeLimit || 0) * 60) -
+            Math.floor((now.getTime() - (quizStartTime?.getTime() || 0)) / 1000);
         
         if (remaining <= 0) {
           // Time's up! Auto-submit the quiz
@@ -718,17 +718,22 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
 
       return () => clearInterval(timer);
     }
-  }, [quizStarted, quizStartTime, assignment, submission, user, hasAutoSubmitted, isSubmitting, id]);
+  }, [quizStarted, quizStartTime, quizDeadlineAt, assignment, submission, user, hasAutoSubmitted, isSubmitting, id]);
 
-  const startQuiz = () => {
+  const startQuiz = async () => {
     if (assignment?.isTimedQuiz && assignment?.quizTimeLimit && user?._id) {
-      const startTime = new Date();
-      setQuizStartTime(startTime);
-      setQuizStarted(true);
-      // Make timer user-specific by including user ID in the key
-      const timerKey = `quiz_start_${id}_${user._id}`;
-      localStorage.setItem(timerKey, startTime.toISOString());
-      setTimeLeft((assignment.quizTimeLimit || 0) * 60);
+      try {
+        const res = await api.post(`/assignments/${id}/quiz/start`, {
+          groupId: studentGroupId || undefined,
+        });
+        const attempt = res.data?.data;
+        setQuizStartTime(attempt?.attemptStartedAt ? new Date(attempt.attemptStartedAt) : new Date());
+        setQuizDeadlineAt(attempt?.attemptDeadlineAt ? new Date(attempt.attemptDeadlineAt) : null);
+        setQuizStarted(attempt?.attemptStatus === 'in_progress');
+        setTimeLeft(typeof attempt?.remainingSeconds === 'number' ? attempt.remainingSeconds : (assignment.quizTimeLimit || 0) * 60);
+      } catch (err: any) {
+        setError(err.response?.data?.message || 'Unable to start timed quiz.');
+      }
     }
   };
 
@@ -1078,6 +1083,11 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
             )}
             
             {/* Show auto-grading status for students */}
+            {isStudent && submission?.gradeVisibility?.mode === 'hidden' && (
+              <div className="mt-4 rounded border-l-4 border-amber-400 bg-amber-50 p-4 text-amber-900 dark:border-amber-600 dark:bg-amber-900/20 dark:text-amber-100">
+                Your work has been received. Your grade is awaiting instructor release.
+              </div>
+            )}
             {isStudent && submission && submission.autoGraded && (
               <div className="mt-4 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-400 dark:border-blue-600 p-4 rounded">
                 <div className="text-blue-800 dark:text-blue-200 font-semibold mb-1">
@@ -1943,7 +1953,12 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                 Attempt due: {safeFormatDate(assignment.dueDate, 'MMM d \'at\' h:mm a')}
                               </div>
                               {quizStarted && timeLeft !== null ? (
-                                <div className={`text-sm font-medium ${timeLeft <= 300 ? 'text-red-600' : 'text-gray-700 dark:text-gray-300'}`}>
+                                <div
+                                  className={`text-sm font-medium ${timeLeft <= 300 ? 'text-red-600' : 'text-gray-700 dark:text-gray-300'}`}
+                                  role="status"
+                                  aria-live="polite"
+                                  aria-label={`Server-synced time remaining ${formatTime(timeLeft)}`}
+                                >
                                   {formatTime(timeLeft)}
                                 </div>
                               ) : (
