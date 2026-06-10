@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ToDoPanel } from '@/components/common/ToDoPanel';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/services/api';
 
-// Mock dependencies
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: vi.fn(),
 }));
@@ -18,6 +18,7 @@ vi.mock('@/services/api', () => ({
     },
     get: vi.fn(),
   },
+  getUserPreferences: vi.fn().mockResolvedValue({ data: { preferences: {} } }),
 }));
 
 vi.mock('@/utils/logger', () => ({
@@ -28,6 +29,20 @@ vi.mock('@/utils/logger', () => ({
 
 const mockedUseAuth = useAuth as any;
 const mockedApi = api as any;
+
+function renderToDoPanel() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <ToDoPanel />
+      </BrowserRouter>
+    </QueryClientProvider>
+  );
+}
 
 describe('ToDoPanel', () => {
   beforeEach(() => {
@@ -42,11 +57,7 @@ describe('ToDoPanel', () => {
       data: [],
     });
 
-    render(
-      <BrowserRouter>
-        <ToDoPanel />
-      </BrowserRouter>
-    );
+    renderToDoPanel();
 
     await waitFor(() => {
       expect(mockedApi.get).toHaveBeenCalled();
@@ -72,11 +83,7 @@ describe('ToDoPanel', () => {
       data: [],
     });
 
-    render(
-      <BrowserRouter>
-        <ToDoPanel />
-      </BrowserRouter>
-    );
+    renderToDoPanel();
 
     await waitFor(() => {
       expect(mockedApi.get).toHaveBeenCalledWith('/assignments/todo/ungraded');
@@ -93,11 +100,7 @@ describe('ToDoPanel', () => {
       data: [],
     });
 
-    render(
-      <BrowserRouter>
-        <ToDoPanel />
-      </BrowserRouter>
-    );
+    renderToDoPanel();
 
     await waitFor(() => {
       expect(mockedApi.get).toHaveBeenCalledWith('/assignments/todo/due-all');
@@ -114,11 +117,7 @@ describe('ToDoPanel', () => {
       data: [],
     });
 
-    render(
-      <BrowserRouter>
-        <ToDoPanel />
-      </BrowserRouter>
-    );
+    renderToDoPanel();
 
     await waitFor(() => {
       expect(mockedApi.get).toHaveBeenCalledWith('/todos');
@@ -146,11 +145,7 @@ describe('ToDoPanel', () => {
       data: [],
     });
 
-    render(
-      <BrowserRouter>
-        <ToDoPanel />
-      </BrowserRouter>
-    );
+    renderToDoPanel();
 
     await waitFor(() => {
       expect(mockedApi.get).toHaveBeenCalledWith('/assignments/todo/ungraded');
@@ -168,13 +163,8 @@ describe('ToDoPanel', () => {
     });
     mockedApi.get.mockImplementation(() => new Promise(() => {}));
 
-    render(
-      <BrowserRouter>
-        <ToDoPanel />
-      </BrowserRouter>
-    );
+    renderToDoPanel();
 
-    // Should show loading
     expect(mockedApi.get).toHaveBeenCalled();
   });
 
@@ -186,17 +176,10 @@ describe('ToDoPanel', () => {
       data: [],
     });
 
-    render(
-      <BrowserRouter>
-        <ToDoPanel />
-      </BrowserRouter>
-    );
+    renderToDoPanel();
 
     await waitFor(() => {
-      // The component shows "Failed to load To-Do assignments" or similar error messages
-      // Since the error state might not render a visible message, we just verify the API was called
       expect(mockedApi.get).toHaveBeenCalled();
     }, { timeout: 3000 });
   });
 });
-

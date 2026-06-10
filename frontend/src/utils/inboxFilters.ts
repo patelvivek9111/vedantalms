@@ -39,7 +39,7 @@ export const matchesInboxFilters = ({
     const matchesSearch = subject.includes(searchLower) || snippet.includes(searchLower) || senders.includes(searchLower);
     if (!matchesSearch) return false;
 
-    const isInInbox = conversation?.hasReceivedMessage === true && folder !== 'archived' && folder !== 'deleted';
+    const isInInbox = conversation?.hasReceivedMessage === true && folder === 'inbox';
     const isSent = conversation?.hasSentMessage === true;
     const isArchived = folder === 'archived';
     const isFavorite = participant?.starred === true;
@@ -52,7 +52,7 @@ export const matchesInboxFilters = ({
 
   if (selectedFolder === 'inbox') {
     if (!(conversation?.hasReceivedMessage === true)) return false;
-    if (folder === 'archived' || folder === 'deleted') return false;
+    if (folder !== 'inbox') return false;
   }
   if (selectedFolder === 'sent') {
     if (conversation?.hasSentMessage !== true) return false;

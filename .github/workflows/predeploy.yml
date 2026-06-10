@@ -32,6 +32,22 @@ jobs:
       - name: Verify shared grading modules
         run: npm run verify:grading
 
+      - name: Verify notification email fanout guard
+        run: npm run verify:notification-email-guard
+
+      - name: Fanout benchmark CI gate (P3-5)
+        run: npm run verify:fanout-bench:ci
+
+      - name: Validate Mongo indexes (optional)
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        run: |
+          if [ -z "$MONGODB_URI" ]; then
+            echo "Skipping validate:indexes — MONGODB_URI not configured"
+            exit 0
+          fi
+          npm run validate:indexes
+
       - name: Institution migration tests
         run: npm run test:migration
 

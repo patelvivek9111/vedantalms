@@ -69,7 +69,12 @@ const notificationSchema = new mongoose.Schema({
   expiresAt: {
     type: Date,
     default: null
-  }
+  },
+  /** Optional idempotency key (sparse unique per user when NOTIFICATION_DEDUPE_ENABLED). */
+  dedupeKey: {
+    type: String,
+    trim: true,
+  },
 }, {
   timestamps: true
 });
@@ -78,6 +83,14 @@ const notificationSchema = new mongoose.Schema({
 notificationSchema.index({ user: 1, read: 1, createdAt: -1 });
 notificationSchema.index({ user: 1, type: 1, createdAt: -1 });
 notificationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 }); // Auto-delete expired notifications
+notificationSchema.index(
+  { user: 1, dedupeKey: 1 },
+  {
+    unique: true,
+    name: 'notification_user_dedupe_unique',
+    partialFilterExpression: { dedupeKey: { $exists: true, $type: 'string' } },
+  }
+);
 
 // Method to mark as read
 notificationSchema.methods.markAsRead = function() {

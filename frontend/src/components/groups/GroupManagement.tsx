@@ -519,7 +519,7 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
                           <div className="flex items-center space-x-2">
                             <button
                               onClick={() => toggleGroupExpand(group._id)}
-                              className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+                              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
                             >
                               {expandedGroups.has(group._id) ? (
                                 <ChevronUp className="h-5 w-5" />

@@ -1,19 +1,14 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, X, Check, CheckCheck, Trash2, MessageSquare, Award, Megaphone, FileText, Calendar, Users, AlertCircle } from 'lucide-react';
-import api from '../../services/api';
 import { formatDistanceToNow } from 'date-fns';
-
-interface Notification {
-  _id: string;
-  type: string;
-  title: string;
-  message: string;
-  link?: string;
-  read: boolean;
-  createdAt: string;
-  priority?: string;
-}
+import { useAuth } from '../../contexts/AuthContext';
+import { useNotificationListQuery } from '../../hooks/notifications/useNotificationListQuery';
+import { useNotificationUnreadQuery } from '../../hooks/notifications/useNotificationUnreadQuery';
+import {
+  useNotificationMutations,
+  type NotificationItem,
+} from '../../hooks/notifications/useNotificationMutations';
 
 interface NotificationCenterProps {
   isOpen: boolean;
@@ -43,48 +38,18 @@ const normalizeNotificationMessage = (message: string) => {
 };
 
 const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose }) => {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [markingAll, setMarkingAll] = useState(false);
+  const { user } = useAuth() as { user?: { _id?: string } };
+  const userId = user?._id;
   const navigate = useNavigate();
   const notificationRef = useRef<HTMLDivElement>(null);
 
-  // Define fetchNotifications before using it in useEffect
-  const fetchNotifications = useCallback(async () => {
-    try {
-      const response = await api.get('/notifications?limit=20');
-      if (response.data.success) {
-        setNotifications(response.data.data);
-        setUnreadCount(response.data.unreadCount || 0);
-      }
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const { data: listData, isLoading: listLoading } = useNotificationListQuery(userId, isOpen);
+  const { data: badgeUnread = 0 } = useNotificationUnreadQuery(userId);
+  const { markRead, markAllRead, remove } = useNotificationMutations(userId);
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchNotifications();
-      // Poll for new notifications every 5 seconds (reduced for testing)
-      const interval = setInterval(fetchNotifications, 5000);
-      
-      // Listen for custom events to refresh immediately (though this won't work across browsers)
-      const handleNotificationCreated = () => {
-        fetchNotifications();
-      };
-      window.addEventListener('notificationCreated', handleNotificationCreated);
-      
-      return () => {
-        clearInterval(interval);
-        window.removeEventListener('notificationCreated', handleNotificationCreated);
-      };
-    }
-  }, [isOpen, fetchNotifications]);
+  const notifications: NotificationItem[] = listData?.items ?? [];
+  const unreadCount = badgeUnread;
 
-  // Close on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
@@ -96,46 +61,24 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
+    return undefined;
   }, [isOpen, onClose]);
 
-  const handleMarkAsRead = async (id: string) => {
-    try {
-      await api.patch(`/notifications/${id}/read`);
-      setNotifications(prev => 
-        prev.map(n => n._id === id ? { ...n, read: true } : n)
-      );
-      setUnreadCount(prev => Math.max(0, prev - 1));
-    } catch (error) {
-      }
+  const handleMarkAsRead = (id: string) => {
+    markRead.mutate(id);
   };
 
-  const handleMarkAllAsRead = async () => {
-    setMarkingAll(true);
-    try {
-      await api.patch('/notifications/read-all');
-      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-      setUnreadCount(0);
-    } catch (error) {
-      } finally {
-      setMarkingAll(false);
-    }
+  const handleMarkAllAsRead = () => {
+    markAllRead.mutate();
   };
 
-  const handleDelete = async (id: string) => {
-    try {
-      await api.delete(`/notifications/${id}`);
-      const notification = notifications.find(n => n._id === id);
-      if (notification && !notification.read) {
-        setUnreadCount(prev => Math.max(0, prev - 1));
-      }
-      setNotifications(prev => prev.filter(n => n._id !== id));
-    } catch (error) {
-      }
+  const handleDelete = (id: string) => {
+    remove.mutate(id);
   };
 
-  const handleNotificationClick = async (notification: Notification) => {
+  const handleNotificationClick = async (notification: NotificationItem) => {
     if (!notification.read) {
-      await handleMarkAsRead(notification._id);
+      handleMarkAsRead(notification._id);
     }
     if (notification.link) {
       navigate(notification.link);
@@ -182,17 +125,19 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-end pt-16 lg:pt-16 pt-20 pr-2 sm:pr-4 pointer-events-none">
-      <div 
+      <div
         ref={notificationRef}
         className="w-full max-w-sm bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 pointer-events-auto max-h-[calc(100vh-4rem)] flex flex-col"
       >
-        {/* Header */}
         <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
           <div className="flex items-center gap-2">
             <Bell className="h-4 w-4 text-gray-700 dark:text-gray-300" />
             <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Notifications</h2>
             {unreadCount > 0 && (
-              <span className="px-1.5 py-0.5 bg-blue-500 text-white text-xs font-medium rounded-full">
+              <span
+                className="px-1.5 py-0.5 bg-blue-500 text-white text-xs font-medium rounded-full"
+                aria-label={`${unreadCount} unread notifications`}
+              >
                 {unreadCount}
               </span>
             )}
@@ -201,25 +146,26 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAllAsRead}
-                disabled={markingAll}
-                className="p-1 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                disabled={markAllRead.isPending}
+                className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-100"
                 title="Mark all as read"
+                aria-label="Mark all as read"
               >
                 <CheckCheck className="h-3.5 w-3.5" />
               </button>
             )}
             <button
               onClick={onClose}
-              className="p-1 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-100"
+              aria-label="Close notifications"
             >
-              <X className="h-3.5 w-3.5" />
+              <X className="h-4 w-4" />
             </button>
           </div>
         </div>
 
-        {/* Notifications List - Scrollable */}
         <div className="flex-1 overflow-y-auto min-h-0">
-          {loading ? (
+          {listLoading ? (
             <div className="p-6 text-center text-gray-500 dark:text-gray-400 text-sm">
               Loading notifications...
             </div>
@@ -245,7 +191,9 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-1.5">
                         <div className="flex-1 min-w-0">
-                          <p className={`text-xs font-medium truncate ${notification.read ? 'text-gray-700 dark:text-gray-300' : 'text-gray-900 dark:text-gray-100'}`}>
+                          <p
+                            className={`text-xs font-medium truncate ${notification.read ? 'text-gray-700 dark:text-gray-300' : 'text-gray-900 dark:text-gray-100'}`}
+                          >
                             {notification.title}
                           </p>
                           <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 line-clamp-2">
@@ -262,10 +210,11 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose
                                 e.stopPropagation();
                                 handleMarkAsRead(notification._id);
                               }}
-                              className="p-0.5 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 rounded transition-colors"
+                              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-gray-400 transition-colors hover:text-blue-500 dark:hover:text-blue-400"
                               title="Mark as read"
+                              aria-label="Mark as read"
                             >
-                              <Check className="h-3 w-3" />
+                              <Check className="h-4 w-4" />
                             </button>
                           )}
                           <button
@@ -273,10 +222,11 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose
                               e.stopPropagation();
                               handleDelete(notification._id);
                             }}
-                            className="p-0.5 text-gray-400 hover:text-red-500 dark:hover:text-red-400 rounded transition-colors"
+                            className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-gray-400 transition-colors hover:text-red-500 dark:hover:text-red-400"
                             title="Delete"
+                            aria-label="Delete notification"
                           >
-                            <Trash2 className="h-3 w-3" />
+                            <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
                       </div>
@@ -293,4 +243,3 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose
 };
 
 export default NotificationCenter;
-

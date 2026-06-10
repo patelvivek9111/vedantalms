@@ -1,5 +1,10 @@
 import api from './api';
 
+export const fetchInboxUnreadCount = async (): Promise<number> => {
+  const res = await api.get('/inbox/unread-count');
+  return typeof res.data?.count === 'number' ? res.data.count : 0;
+};
+
 export const fetchConversations = async (folder?: string) => {
   const res = await api.get('/inbox/conversations', { params: folder ? { folder } : undefined });
   return res.data;
@@ -10,15 +15,29 @@ export const fetchMessages = async (conversationId: string) => {
   return Array.isArray(res.data?.data) ? res.data.data : [];
 };
 
+export const markConversationRead = async (conversationId: string) => {
+  const res = await api.post(`/inbox/conversations/${conversationId}/read`);
+  return res.data;
+};
+
 export const sendMessage = async (
   conversationId: string,
   body: string,
-  attachments?: string[]
+  fileAssetIds?: string[],
+  legacyAttachments?: string[]
 ) => {
-  const res = await api.post(`/inbox/conversations/${conversationId}/messages`, {
-    body,
-    attachments: attachments || [],
-  });
+  const payload: {
+    body: string;
+    fileAssetIds?: string[];
+    attachments?: string[];
+  } = { body };
+  if (fileAssetIds?.length) {
+    payload.fileAssetIds = fileAssetIds;
+  }
+  if (legacyAttachments?.length) {
+    payload.attachments = legacyAttachments;
+  }
+  const res = await api.post(`/inbox/conversations/${conversationId}/messages`, payload);
   return res.data;
 };
 
@@ -39,39 +58,15 @@ export const toggleStar = async (conversationId: string) => {
 
 // Move conversation to a folder (archive, delete, etc.)
 export const moveConversation = async (conversationId: string, folder: string) => {
-  // Ensure conversationId is a string
   const id = typeof conversationId === 'string' ? conversationId : String(conversationId);
-  console.log(`Moving conversation ${id} to folder: ${folder}`);
-  console.log(`API URL will be: /inbox/conversations/${id}/move`);
-  console.log(`Request body:`, { folder });
-  
-  try {
-    const res = await api.post(`/inbox/conversations/${id}/move`, { folder });
-    console.log(`Move response for ${id}:`, res.data);
-    return res.data;
-  } catch (error: any) {
-    console.error(`Error moving conversation ${id} to ${folder}:`, error);
-    console.error('Error response status:', error.response?.status);
-    console.error('Error response data:', error.response?.data);
-    console.error('Error response headers:', error.response?.headers);
-    console.error('Request config:', error.config);
-    throw error;
-  }
+  const res = await api.post(`/inbox/conversations/${id}/move`, { folder });
+  return res.data;
 };
 
 // Bulk operations
 export const bulkMoveConversations = async (conversationIds: string[], folder: string) => {
-  console.log(`Bulk moving ${conversationIds.length} conversations to folder: ${folder}`);
-  console.log('Conversation IDs:', conversationIds);
-  try {
-    const promises = conversationIds.map(id => moveConversation(id, folder));
-    const results = await Promise.all(promises);
-    console.log('Bulk move results:', results);
-    return results;
-  } catch (error: any) {
-    console.error('Bulk move error:', error);
-    throw error;
-  }
+  const promises = conversationIds.map((id) => moveConversation(id, folder));
+  return Promise.all(promises);
 };
 
 export const deleteForever = async (conversationId: string) => {

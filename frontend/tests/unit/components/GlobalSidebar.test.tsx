@@ -107,15 +107,18 @@ describe('GlobalSidebar', () => {
       </BrowserRouter>
     );
 
-    // Should show badge with count
-    const badge = screen.queryByText('5');
-    if (badge) {
-      expect(badge).toBeInTheDocument();
-    }
+    expect(screen.getByText('5')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Inbox, 5 unread' })).toBeInTheDocument();
   });
 
   it('should handle logout', () => {
     const mockLogout = vi.fn();
+    const locationAssign = vi.fn();
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...window.location, href: '', assign: locationAssign },
+    });
+
     mockedUseAuth.mockReturnValue({
       user: { _id: '1', firstName: 'John', lastName: 'Doe', role: 'student' },
       logout: mockLogout,
@@ -127,17 +130,8 @@ describe('GlobalSidebar', () => {
       </BrowserRouter>
     );
 
-    // Find logout button
-    const logoutButtons = screen.getAllByRole('button');
-    const logoutButton = logoutButtons.find(btn => 
-      btn.textContent?.includes('Logout') || 
-      btn.getAttribute('aria-label')?.includes('logout')
-    );
-
-    if (logoutButton) {
-      fireEvent.click(logoutButton);
-      expect(mockLogout).toHaveBeenCalled();
-    }
+    fireEvent.click(screen.getByRole('button', { name: 'Logout' }));
+    expect(mockLogout).toHaveBeenCalled();
   });
 
   it('should highlight active route', () => {

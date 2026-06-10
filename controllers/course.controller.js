@@ -3,6 +3,10 @@ const { validationResult } = require('express-validator');
 const mongoose = require('mongoose');
 const Module = require('../models/module.model');
 const Page = require('../models/page.model');
+const {
+  notifyCoursePublished,
+  notifyCourseUnpublished,
+} = require('../services/notification/academicNotificationProducers.service');
 
 // Earthy tone color palette for course cards
 const earthyColors = [
@@ -104,60 +108,58 @@ exports.createCourse = async (req, res) => {
 // @desc    Get all courses
 // @route   GET /api/courses
 // @access  Private
+const DEFAULT_COURSE_GROUPS = [
+  { name: 'Projects', weight: 15 },
+  { name: 'Homework', weight: 15 },
+  { name: 'Exams', weight: 20 },
+  { name: 'Quizzes', weight: 30 },
+  { name: 'Participation', weight: 20 },
+];
+
+const COURSE_LIST_SELECT =
+  'title description instructor students published operationalStatus defaultColor catalog semester groups createdAt updatedAt enrollmentRequests enrollmentQrToken';
+
+function toCourseListSummary(course, user) {
+  const o = { ...course };
+  o.studentCount = Array.isArray(o.students) ? o.students.length : 0;
+  // IDs only on list — full roster via GET /api/courses/:id
+  o.students = Array.isArray(o.students) ? o.students.map((s) => String(s._id || s)) : [];
+  if (!o.groups || o.groups.length === 0) {
+    o.groups = DEFAULT_COURSE_GROUPS;
+  }
+  const showEnrollmentQr =
+    user.role === 'admin' ||
+    (user.role === 'teacher' && String(o.instructor?._id || o.instructor) === String(user.id));
+  if (!showEnrollmentQr) {
+    delete o.enrollmentQrToken;
+  }
+  return o;
+}
+
 exports.getCourses = async (req, res) => {
   try {
-    let courses;
+    let query;
     if (req.user.role === 'admin') {
-      // Admin can see all courses
-      courses = await Course.find()
-        .populate('instructor', 'firstName lastName email')
-        .populate('students', 'firstName lastName email')
-        .populate('enrollmentRequests.student', 'firstName lastName email');
+      query = Course.find();
     } else if (req.user.role === 'teacher') {
-      // Teachers can see their own courses
-      courses = await Course.find({ instructor: req.user.id })
-        .populate('instructor', 'firstName lastName email')
-        .populate('students', 'firstName lastName email')
-        .populate('enrollmentRequests.student', 'firstName lastName email');
+      query = Course.find({ instructor: req.user.id });
     } else {
-      // Students can see courses they're enrolled in
-      courses = await Course.find({ students: req.user.id, published: true })
-        .populate('instructor', 'firstName lastName email')
-        .populate('students', 'firstName lastName email')
-        .populate('enrollmentRequests.student', 'firstName lastName email');
+      query = Course.find({ students: req.user.id, published: true });
     }
 
-    // Migration: Add default groups to courses that don't have them
-    const defaultGroups = [
-      { name: 'Projects', weight: 15 },
-      { name: 'Homework', weight: 15 },
-      { name: 'Exams', weight: 20 },
-      { name: 'Quizzes', weight: 30 },
-      { name: 'Participation', weight: 20 }
+    const populate = [
+      { path: 'instructor', select: 'firstName lastName email' },
     ];
-
-    const coursesToUpdate = courses.filter(course => !course.groups || course.groups.length === 0);
-    if (coursesToUpdate.length > 0) {
-      
-      for (const course of coursesToUpdate) {
-        course.groups = defaultGroups;
-        await course.save();
-      }
+    if (req.user.role === 'admin' || req.user.role === 'teacher') {
+      populate.push({ path: 'enrollmentRequests.student', select: 'firstName lastName email' });
     }
+
+    const courses = await query.select(COURSE_LIST_SELECT).populate(populate).lean();
 
     res.json({
       success: true,
       count: courses.length,
-      data: courses.map((course) => {
-        const o = typeof course.toObject === 'function' ? course.toObject() : { ...course };
-        const showEnrollmentQr =
-          req.user.role === 'admin' ||
-          (req.user.role === 'teacher' && course.instructor.toString() === req.user.id);
-        if (!showEnrollmentQr) {
-          delete o.enrollmentQrToken;
-        }
-        return o;
-      }),
+      data: courses.map((course) => toCourseListSummary(course, req.user)),
     });
   } catch (err) {
     console.error('Get courses error:', err);
@@ -197,25 +199,18 @@ exports.getCourse = async (req, res) => {
     }
     
 
-    // Migration: Add default groups if course has no groups
-    if (!course.groups || course.groups.length === 0) {
-      const defaultGroups = [
-        { name: 'Projects', weight: 15 },
-        { name: 'Homework', weight: 15 },
-        { name: 'Exams', weight: 20 },
-        { name: 'Quizzes', weight: 30 },
-        { name: 'Participation', weight: 20 }
-      ];
-      
-      course.groups = defaultGroups;
-      await course.save();
-    }
-
-    // All authenticated users can view course details
-    // This allows students to see course information before enrolling
-    // Teachers and admins can always view courses
+    const defaultGroups = [
+      { name: 'Projects', weight: 15 },
+      { name: 'Homework', weight: 15 },
+      { name: 'Exams', weight: 20 },
+      { name: 'Quizzes', weight: 30 },
+      { name: 'Participation', weight: 20 }
+    ];
 
     const data = typeof course.toObject === 'function' ? course.toObject() : { ...course };
+    if (!data.groups || data.groups.length === 0) {
+      data.groups = defaultGroups;
+    }
     const isInstructorOrAdmin =
       req.user.role === 'admin' || course.instructor.toString() === req.user.id;
     if (!isInstructorOrAdmin) {
@@ -582,6 +577,20 @@ exports.publishCourse = async (req, res) => {
 
     await course.save();
     const updatedCourse = await Course.findById(req.params.id);
+
+    if (!wasPublished && willBePublished) {
+      notifyCoursePublished({
+        course: updatedCourse,
+        actor: req.user,
+        requestId: req.id,
+      }).catch((err) => console.error('course.published notification error:', err));
+    } else if (wasPublished && !willBePublished) {
+      notifyCourseUnpublished({
+        course: updatedCourse,
+        actor: req.user,
+        requestId: req.id,
+      }).catch((err) => console.error('course.unpublished notification error:', err));
+    }
 
     res.json({
       success: true,

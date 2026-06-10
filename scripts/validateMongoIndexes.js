@@ -47,6 +47,55 @@ const EXPECTED = [
     path: '../models/migrationRun.model',
     indexes: [{ keys: { migrationId: 1 } }],
   },
+  {
+    model: 'Module',
+    path: '../models/module.model',
+    indexes: [{ keys: { course: 1, published: 1 } }],
+  },
+  {
+    model: 'Group',
+    path: '../models/Group',
+    indexes: [{ keys: { members: 1, course: 1 } }],
+  },
+  {
+    model: 'Course',
+    path: '../models/course.model',
+    indexes: [
+      { keys: { students: 1, published: 1, updatedAt: -1 } },
+      { keys: { 'catalog.isPublic': 1, 'catalog.startDate': 1, 'catalog.endDate': 1 } },
+    ],
+  },
+  {
+    model: 'User',
+    path: '../models/user.model',
+    indexes: [{ keys: { role: 1, createdAt: -1 } }],
+  },
+  {
+    model: 'Notification',
+    path: '../models/notification.model',
+    indexes: [
+      { keys: { user: 1, read: 1, createdAt: -1 } },
+      { keys: { user: 1, dedupeKey: 1 } },
+    ],
+  },
+  {
+    model: 'Message',
+    path: '../models/Message',
+    indexes: [{ keys: { conversationId: 1, createdAt: -1 } }],
+  },
+  {
+    model: 'Thread',
+    path: '../models/thread.model',
+    indexes: [{ keys: { course: 1, deletedAt: 1, lastActivity: -1 } }],
+  },
+  {
+    model: 'Submission',
+    path: '../models/Submission',
+    indexes: [
+      { keys: { assignment: 1, student: 1 } },
+      { keys: { student: 1, submittedAt: -1 } },
+    ],
+  },
 ];
 
 function indexKeySig(keys) {
@@ -100,7 +149,7 @@ async function main() {
     console.error(`\n${failed} expected index(es) missing. Run syncIndexes in dev or create migrations.`);
     process.exit(1);
   }
-  console.log('\nAll expected grading indexes present.');
+  console.log('\nAll expected scale indexes present.');
 }
 
 main().catch((err) => {

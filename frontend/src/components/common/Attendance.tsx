@@ -219,22 +219,24 @@ const CalendarDay: React.FC<CalendarDayProps> = ({ day, courseId, isInstructor, 
   };
 
   if (!day.isCurrentMonth) {
-    return <div className="p-3 text-center text-gray-300 dark:text-gray-600 bg-gray-50 dark:bg-gray-900"></div>;
+    return <div className="min-h-[44px] bg-gray-50 p-1 text-center text-gray-300 dark:bg-gray-900 dark:text-gray-600 sm:min-h-[72px] sm:p-3" />;
   }
 
   const breakdown = getAttendanceBreakdown();
   const isSelected = day.date === selectedDate;
 
   return (
-    <div 
-      className={`p-3 text-center cursor-pointer border rounded-lg transition-all hover:shadow-sm ${
+    <button
+      type="button"
+      className={`flex min-h-[44px] w-full flex-col items-center justify-center rounded-lg border p-1.5 text-center transition-all touch-manipulation hover:shadow-sm sm:min-h-[72px] sm:p-3 ${
         isSelected 
           ? 'bg-blue-100 dark:bg-blue-900/50 border-blue-300 dark:border-blue-700 shadow-md' 
           : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
       }`}
       onClick={() => day.date && onDateSelect(day.date)}
+      aria-label={day.date ? `Attendance for ${day.date}` : undefined}
     >
-      <div className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">{day.dayNumber}</div>
+      <div className="mb-1 text-xs font-semibold text-gray-900 dark:text-gray-100 sm:mb-2 sm:text-sm">{day.dayNumber}</div>
       
       {loading ? (
         <div className="w-2 h-2 bg-gray-400 rounded-full mx-auto animate-pulse"></div>
@@ -260,7 +262,7 @@ const CalendarDay: React.FC<CalendarDayProps> = ({ day, courseId, isInstructor, 
                   <div className="bg-gray-400 w-full" title="Unmarked"></div>
                 )}
               </div>
-              <div className="text-xs text-gray-600 dark:text-gray-400">
+              <div className="hidden text-xs text-gray-600 dark:text-gray-400 sm:block">
                 {breakdown.studentStatus === 'present' && 'Present'}
                 {breakdown.studentStatus === 'absent' && 'Absent'}
                 {breakdown.studentStatus === 'late' && 'Late'}
@@ -312,7 +314,7 @@ const CalendarDay: React.FC<CalendarDayProps> = ({ day, courseId, isInstructor, 
               
               {/* Attendance count */}
               {!breakdown.isStudent && (
-                <div className="text-xs text-gray-600 dark:text-gray-400">
+                <div className="hidden text-xs text-gray-600 dark:text-gray-400 sm:block">
                   {(breakdown as any).present}/{(breakdown as any).total}
                 </div>
               )}
@@ -322,7 +324,7 @@ const CalendarDay: React.FC<CalendarDayProps> = ({ day, courseId, isInstructor, 
       ) : (
         <div className="w-2 h-2 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto"></div>
       )}
-    </div>
+    </button>
   );
 };
 
@@ -1115,7 +1117,8 @@ const Attendance: React.FC = () => {
                       const prevMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
                       setSelectedDate(prevMonth.toISOString().split('T')[0]);
                     }}
-                    className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                    className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition-colors hover:bg-gray-100 touch-manipulation dark:hover:bg-gray-700"
+                    aria-label="Previous month"
                   >
                     <ChevronLeft className="h-5 w-5 text-gray-900 dark:text-gray-100" />
                   </button>
@@ -1135,7 +1138,8 @@ const Attendance: React.FC = () => {
                       const nextMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
                       setSelectedDate(nextMonth.toISOString().split('T')[0]);
                     }}
-                    className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                    className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition-colors hover:bg-gray-100 touch-manipulation dark:hover:bg-gray-700"
+                    aria-label="Next month"
                   >
                     <ChevronRight className="h-5 w-5 text-gray-900 dark:text-gray-100" />
                   </button>
@@ -1143,7 +1147,7 @@ const Attendance: React.FC = () => {
                 {(isInstructor || user?.role === 'admin') && (
                   <button
                     onClick={exportMonthlyAttendance}
-                    className="w-full sm:w-auto px-4 py-2 bg-green-600 dark:bg-green-500 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600 transition-colors font-medium flex items-center justify-center gap-2 text-xs sm:text-sm"
+                    className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-green-700 sm:w-auto sm:text-sm dark:bg-green-500 dark:hover:bg-green-600"
                   >
                     <Download className="h-4 w-4" />
                     Export CSV
@@ -1153,11 +1157,12 @@ const Attendance: React.FC = () => {
             </div>
             
             {/* Calendar Grid */}
-            <div className="grid grid-cols-7 gap-1">
+            <div className="grid grid-cols-7 gap-1 sm:gap-2">
               {/* Day Headers */}
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                <div key={day} className="p-3 text-center text-sm font-medium text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900">
-                  {day}
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, idx) => (
+                <div key={day} className="bg-gray-50 p-1.5 text-center text-[10px] font-semibold uppercase text-gray-500 dark:bg-gray-900 dark:text-gray-400 sm:p-3 sm:text-sm">
+                  <span className="sm:hidden">{day.charAt(0)}</span>
+                  <span className="hidden sm:inline">{day}</span>
                 </div>
               ))}
               

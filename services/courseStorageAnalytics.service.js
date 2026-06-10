@@ -1,13 +1,25 @@
+const mongoose = require('mongoose');
 const FileAsset = require('../models/fileAsset.model');
 const Course = require('../models/course.model');
 const { getQuotaSnapshot } = require('./fileQuota.service');
 const { isCourseGradingStaff, ADMIN_ROLES } = require('../middleware/academicPermissions');
 
+function toObjectId(id) {
+  if (!id) return id;
+  if (id instanceof mongoose.Types.ObjectId) return id;
+  const value = String(id);
+  return mongoose.Types.ObjectId.isValid(value) ? new mongoose.Types.ObjectId(value) : id;
+}
+
+function courseFileMatch(courseId) {
+  return { courseId: toObjectId(courseId), isDeleted: false };
+}
+
 const cache = new Map();
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 function cacheKey(courseId) {
-  return `course-storage:${courseId}`;
+  return `course-storage:v2:${courseId}`;
 }
 
 async function assertCourseStorageAccess(user, courseId) {
@@ -30,31 +42,33 @@ async function aggregateCourseStorage(courseId, { bypassCache = false } = {}) {
   const hit = cache.get(key);
   if (!bypassCache && hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.data;
 
+  const baseMatch = courseFileMatch(courseId);
+
   const [byCategory, byAssignment, largest, byStudent, totals] = await Promise.all([
     FileAsset.aggregate([
-      { $match: { courseId, isDeleted: false } },
+      { $match: baseMatch },
       { $group: { _id: '$category', bytes: { $sum: '$size' }, count: { $sum: 1 } } },
       { $sort: { bytes: -1 } },
     ]),
     FileAsset.aggregate([
-      { $match: { courseId, isDeleted: false, assignmentId: { $ne: null } } },
+      { $match: { ...baseMatch, assignmentId: { $ne: null } } },
       { $group: { _id: '$assignmentId', bytes: { $sum: '$size' }, count: { $sum: 1 } } },
       { $sort: { bytes: -1 } },
       { $limit: 20 },
     ]),
-    FileAsset.find({ courseId, isDeleted: false })
+    FileAsset.find(baseMatch)
       .sort({ size: -1 })
       .limit(10)
       .select('originalName size category assignmentId uploadedBy createdAt')
       .lean(),
     FileAsset.aggregate([
-      { $match: { courseId, isDeleted: false, category: 'submission' } },
+      { $match: { ...baseMatch, category: 'submission' } },
       { $group: { _id: '$uploadedBy', bytes: { $sum: '$size' }, count: { $sum: 1 } } },
       { $sort: { bytes: -1 } },
       { $limit: 25 },
     ]),
     FileAsset.aggregate([
-      { $match: { courseId, isDeleted: false } },
+      { $match: baseMatch },
       { $group: { _id: null, bytes: { $sum: '$size' }, count: { $sum: 1 } } },
     ]),
   ]);

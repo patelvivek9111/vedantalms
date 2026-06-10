@@ -312,6 +312,8 @@ courseSchema.index({ instructor: 1, updatedAt: -1 });
 courseSchema.index({ operationalStatus: 1, published: 1 });
 courseSchema.index({ instructor: 1, operationalStatus: 1 });
 courseSchema.index({ students: 1 });
+courseSchema.index({ students: 1, published: 1, updatedAt: -1 });
+courseSchema.index({ 'catalog.isPublic': 1, 'catalog.startDate': 1, 'catalog.endDate': 1 });
 courseSchema.index({ 'catalog.courseCode': 1 });
 
 const { portabilityMetadataPlugin } = require('./plugins/portabilityMetadata.plugin');

@@ -25,6 +25,7 @@ const announcementController = require('../controllers/announcement.controller')
 const upload = require('../middleware/upload');
 const mongoose = require('mongoose');
 const { courseSelfEnroll, ensureEnrollmentQrToken, ensureEnrollmentJoinCode } = require('../utils/courseSelfEnroll');
+const { shapeCatalogCourse } = require('../services/catalogBrowse.service');
 
 // Validation middleware for creating courses (requires title and description)
 const createCourseValidation = [
@@ -79,15 +80,18 @@ router.get('/available/browse', protect, async (req, res) => {
     const courses = await Course.find({
       'catalog.startDate': { $exists: true, $ne: null },
       'catalog.endDate': { $exists: true, $ne: null }
-    }).populate('instructor', 'firstName lastName email')
-      .populate('students', '_id firstName lastName')
-      .populate('enrollmentRequests.student', '_id firstName lastName')
-      .populate('waitlist.student', '_id firstName lastName');
-    
+    })
+      .populate('instructor', 'firstName lastName email')
+      .select('title description instructor catalog published students enrollmentRequests waitlist operationalStatus')
+      .lean();
+
+    const userId = req.user?._id || req.user?.id;
+    const data = courses.map((course) => shapeCatalogCourse(course, userId));
+
     res.json({
       success: true,
-      count: courses.length,
-      data: courses
+      count: data.length,
+      data,
     });
   } catch (err) {
     console.error('Get available courses error:', err);
@@ -520,6 +524,33 @@ router.post('/:id/enroll', protect, async (req, res) => {
       removeEnrollmentSummaryTodos,
       syncEnrollmentAttentionTodo
     );
+
+    try {
+      if (result.body?.awaitingTeacherApproval || result.body?.waitlisted) {
+        const {
+          recordDomainEvent,
+          DOMAIN_EVENT_TYPES,
+          AGGREGATE_TYPES,
+          AUDIENCE_SCOPES,
+        } = require('../services/domainEvents');
+        void recordDomainEvent({
+          eventType: DOMAIN_EVENT_TYPES.COURSE_ENROLLMENT_REQUESTED,
+          aggregateType: AGGREGATE_TYPES.COURSE,
+          aggregateId: course._id,
+          actorId: req.user._id,
+          audienceScope: AUDIENCE_SCOPES.COURSE,
+          correlationId: req.requestId,
+          payload: {
+            studentId: String(req.user.id),
+            waitlisted: Boolean(result.body?.waitlisted),
+          },
+          metadata: { source: 'course.routes.enroll' },
+        });
+      }
+    } catch (domainEventError) {
+      console.error('enrollment_request_domain_event_failed', domainEventError);
+    }
+
     return res.status(result.statusCode).json(result.body);
   } catch (err) {
     console.error('Enrollment error:', err);
@@ -698,20 +729,49 @@ router.post('/:courseId/enrollment/:studentId/approve', protect, authorize('teac
       await syncEnrollmentAttentionTodo(freshCourse, Todo);
     }
     try {
-      const { createNotification } = require('./notification.routes');
+      const {
+        createNotificationFromDomainEvent,
+        DOMAIN_EVENTS,
+      } = require('../services/domain');
       const courseForMsg = freshCourse || updatedCourse;
-      await createNotification(studentId, {
-        type: 'enrollment',
+      await createNotificationFromDomainEvent(DOMAIN_EVENTS.ENROLLMENT_APPROVED, {
+        userId: studentId,
+        recipientRole: 'student',
         title: 'Enrollment Approved',
         message: `Your enrollment request for "${courseForMsg?.title || 'the course'}" has been approved.`,
         link: `/courses/${courseId}`,
         relatedId: courseId,
         relatedType: 'course',
-        priority: 'high'
+        priority: 'high',
+        actorId: req.user._id,
+        courseId,
+        eventWindow: String(studentId),
+        requestId: req.requestId || null,
       });
     } catch (notifError) {
       console.error('Error creating enrollment approval notification:', notifError);
       // Don't fail the approval if notification fails
+    }
+
+    try {
+      const {
+        recordDomainEvent,
+        DOMAIN_EVENT_TYPES,
+        AGGREGATE_TYPES,
+        AUDIENCE_SCOPES,
+      } = require('../services/domainEvents');
+      void recordDomainEvent({
+        eventType: DOMAIN_EVENT_TYPES.COURSE_ENROLLMENT_APPROVED,
+        aggregateType: AGGREGATE_TYPES.COURSE,
+        aggregateId: courseId,
+        actorId: req.user._id,
+        audienceScope: AUDIENCE_SCOPES.USER,
+        correlationId: req.requestId,
+        payload: { studentId: String(studentId), courseId: String(courseId) },
+        metadata: { source: 'course.routes.enrollment.approve' },
+      });
+    } catch (domainEventError) {
+      console.error('enrollment_approved_domain_event_failed', domainEventError);
     }
     
     res.json({ success: true, message: 'Enrollment approved and student added to course' });
@@ -777,20 +837,49 @@ router.post('/:courseId/enrollment/:studentId/deny', protect, authorize('teacher
 
     // Notify student about enrollment denial
     try {
-      const { createNotification } = require('./notification.routes');
+      const {
+        createNotificationFromDomainEvent,
+        DOMAIN_EVENTS,
+      } = require('../services/domain');
       const courseForMsg = freshCourse || updatedCourse;
-      await createNotification(studentId, {
-        type: 'enrollment',
+      await createNotificationFromDomainEvent(DOMAIN_EVENTS.ENROLLMENT_DENIED, {
+        userId: studentId,
+        recipientRole: 'student',
         title: 'Enrollment Denied',
         message: `Your enrollment request for "${courseForMsg?.title || 'the course'}" has been denied.`,
-        link: `/courses`,
+        link: '/courses',
         relatedId: courseId,
         relatedType: 'course',
-        priority: 'medium'
+        priority: 'medium',
+        actorId: req.user._id,
+        courseId,
+        eventWindow: String(studentId),
+        requestId: req.requestId || null,
       });
     } catch (notifError) {
       console.error('Error creating enrollment denial notification:', notifError);
       // Don't fail the denial if notification fails
+    }
+
+    try {
+      const {
+        recordDomainEvent,
+        DOMAIN_EVENT_TYPES,
+        AGGREGATE_TYPES,
+        AUDIENCE_SCOPES,
+      } = require('../services/domainEvents');
+      void recordDomainEvent({
+        eventType: DOMAIN_EVENT_TYPES.COURSE_ENROLLMENT_DENIED,
+        aggregateType: AGGREGATE_TYPES.COURSE,
+        aggregateId: courseId,
+        actorId: req.user._id,
+        audienceScope: AUDIENCE_SCOPES.USER,
+        correlationId: req.requestId,
+        payload: { studentId: String(studentId), courseId: String(courseId) },
+        metadata: { source: 'course.routes.enrollment.deny' },
+      });
+    } catch (domainEventError) {
+      console.error('enrollment_denied_domain_event_failed', domainEventError);
     }
     
     res.json({ success: true, message: 'Enrollment denied' });

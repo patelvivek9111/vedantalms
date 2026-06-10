@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 import { API_URL } from '../config';
+import { MobileAppShell } from '../components/common/MobileAppShell';
 
 interface AnalyticsData {
   userGrowth: { month: string; users: number }[];
@@ -93,18 +94,21 @@ export function AdminAnalytics() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 dark:border-blue-400"></div>
-      </div>
+      <MobileAppShell title="Analytics" backButtonPath="/dashboard">
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 dark:border-blue-400"></div>
+        </div>
+      </MobileAppShell>
     );
   }
 
   return (
+    <MobileAppShell title="Analytics" backButtonPath="/dashboard">
     <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">Analytics Dashboard</h1>
+          <h1 className="hidden lg:block text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">Analytics Dashboard</h1>
           <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">System performance and user engagement insights</p>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:space-x-4 w-full sm:w-auto">
@@ -196,41 +200,62 @@ export function AdminAnalytics() {
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">User Growth</h3>
             <div className="flex items-center space-x-2">
               <button
+                type="button"
                 onClick={() => setSelectedMetric('users')}
-                className={`p-2 rounded-lg ${selectedMetric === 'users' ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}`}
+                aria-label="Users metric"
+                className={`inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 ${selectedMetric === 'users' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}`}
               >
                 <Users className="w-4 h-4" />
               </button>
               <button
+                type="button"
                 onClick={() => setSelectedMetric('courses')}
-                className={`p-2 rounded-lg ${selectedMetric === 'courses' ? 'bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500'}`}
+                aria-label="Courses metric"
+                className={`inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 ${selectedMetric === 'courses' ? 'bg-green-100 text-green-600 dark:bg-green-900/50 dark:text-green-400' : 'text-gray-400 dark:text-gray-500'}`}
               >
                 <BookOpen className="w-4 h-4" />
               </button>
               <button
+                type="button"
                 onClick={() => setSelectedMetric('activity')}
-                className={`p-2 rounded-lg ${selectedMetric === 'activity' ? 'bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-400' : 'text-gray-400 dark:text-gray-500'}`}
+                aria-label="Activity metric"
+                className={`inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 ${selectedMetric === 'activity' ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/50 dark:text-purple-400' : 'text-gray-400 dark:text-gray-500'}`}
               >
                 <Activity className="w-4 h-4" />
               </button>
             </div>
           </div>
-          <div className="h-64 flex items-end justify-between space-x-2">
+          <div className="space-y-2 sm:hidden">
+            {analyticsData.userGrowth.length > 0 ? (
+              analyticsData.userGrowth.map((data, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 dark:border-gray-700"
+                >
+                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{data.month}</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">{data.users} users</span>
+                </div>
+              ))
+            ) : (
+              <div className="py-8 text-center text-gray-500 dark:text-gray-400">No data available</div>
+            )}
+          </div>
+          <div className="hidden h-64 items-end justify-between space-x-2 sm:flex">
             {analyticsData.userGrowth.length > 0 ? (
               analyticsData.userGrowth.map((data, index) => {
                 const maxUsers = Math.max(...analyticsData.userGrowth.map(d => d.users), 1);
                 return (
-                  <div key={index} className="flex-1 flex flex-col items-center">
+                  <div key={index} className="flex flex-1 flex-col items-center">
                     <div 
-                      className="w-full bg-blue-200 dark:bg-blue-900/50 rounded-t"
+                      className="w-full rounded-t bg-blue-200 dark:bg-blue-900/50"
                       style={{ height: `${(data.users / maxUsers) * 200}px` }}
                     ></div>
-                    <span className="text-xs text-gray-500 dark:text-gray-400 mt-2">{data.month}</span>
+                    <span className="mt-2 text-xs text-gray-500 dark:text-gray-400">{data.month}</span>
                   </div>
                 );
               })
             ) : (
-              <div className="w-full text-center text-gray-500 dark:text-gray-400 py-8">No data available</div>
+              <div className="w-full py-8 text-center text-gray-500 dark:text-gray-400">No data available</div>
             )}
           </div>
         </div>
@@ -243,19 +268,19 @@ export function AdminAnalytics() {
               analyticsData.courseEngagement.map((course, index) => {
                 const maxStudents = Math.max(...analyticsData.courseEngagement.map(c => c.students), 1);
                 return (
-                  <div key={index} className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{course.course}</p>
+                  <div key={index} className="flex flex-col gap-2 rounded-lg border border-gray-100 p-3 sm:flex-row sm:items-center sm:justify-between sm:border-0 sm:p-0 dark:border-gray-700">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">{course.course}</p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">{course.students} students</p>
                     </div>
-                    <div className="flex items-center space-x-4">
+                    <div className="flex items-center justify-between gap-4 sm:justify-end">
                       <div className="text-right">
                         <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{course.assignments}</p>
                         <p className="text-xs text-gray-500 dark:text-gray-400">assignments</p>
                       </div>
-                      <div className="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                      <div className="h-2 w-16 rounded-full bg-gray-200 dark:bg-gray-700">
                         <div 
-                          className="bg-blue-600 dark:bg-blue-500 h-2 rounded-full"
+                          className="h-2 rounded-full bg-blue-600 dark:bg-blue-500"
                           style={{ width: `${(course.students / maxStudents) * 100}%` }}
                         ></div>
                       </div>
@@ -300,20 +325,22 @@ export function AdminAnalytics() {
           <div className="space-y-4">
             {analyticsData.topCourses.length > 0 ? (
               analyticsData.topCourses.map((course, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{course.name}</p>
+                <div key={index} className="flex flex-col gap-2 rounded-lg border border-gray-100 p-3 sm:flex-row sm:items-center sm:justify-between sm:border-0 sm:p-0 dark:border-gray-700">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">{course.name}</p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">{course.enrollment} enrolled</p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{course.completion}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">completed</p>
-                  </div>
-                  <div className="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-2 ml-4">
-                    <div 
-                      className="bg-green-600 dark:bg-green-500 h-2 rounded-full"
-                      style={{ width: course.enrollment > 0 ? `${(course.completion / course.enrollment) * 100}%` : '0%' }}
-                    ></div>
+                  <div className="flex items-center justify-between gap-4 sm:justify-end">
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{course.completion}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">completed</p>
+                    </div>
+                    <div className="ml-0 h-2 w-16 rounded-full bg-gray-200 sm:ml-4 dark:bg-gray-700">
+                      <div 
+                        className="h-2 rounded-full bg-green-600 dark:bg-green-500"
+                        style={{ width: course.enrollment > 0 ? `${(course.completion / course.enrollment) * 100}%` : '0%' }}
+                      ></div>
+                    </div>
                   </div>
                 </div>
               ))
@@ -346,5 +373,6 @@ export function AdminAnalytics() {
         </div>
       </div>
     </div>
+    </MobileAppShell>
   );
 } 

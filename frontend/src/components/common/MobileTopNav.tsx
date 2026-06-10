@@ -13,6 +13,15 @@ interface MobileTopNavProps {
    * If not provided, back button won't be shown
    */
   backButtonPath?: string;
+
+  /**
+   * Left control — back arrow, account menu trigger, or spacer
+   * @default 'back' when backButtonPath is set, otherwise 'none'
+   */
+  leftAction?: 'back' | 'user' | 'none';
+
+  /** Called when leftAction is 'user' */
+  onLeftActionClick?: () => void;
   
   /**
    * Custom back button label for accessibility
@@ -60,12 +69,45 @@ const MobileTopNav: React.FC<MobileTopNavProps> = ({
   title,
   backButtonPath,
   backButtonLabel = 'Go back',
+  leftAction,
+  onLeftActionClick,
   rightAction = 'none',
   customRightAction,
   onRightActionClick,
   className = '',
   mobileOnly = true,
 }) => {
+  const resolvedLeftAction = leftAction ?? (backButtonPath ? 'back' : 'none');
+
+  const renderLeftAction = () => {
+    const buttonClass =
+      'text-gray-700 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center flex-shrink-0';
+
+    if (resolvedLeftAction === 'back' && backButtonPath) {
+      return (
+        <BackButton
+          fallbackPath={backButtonPath}
+          className="flex-shrink-0"
+          ariaLabel={backButtonLabel}
+        />
+      );
+    }
+
+    if (resolvedLeftAction === 'user') {
+      return (
+        <button
+          type="button"
+          onClick={onLeftActionClick}
+          className={buttonClass}
+          aria-label="Open account menu"
+        >
+          <UserIcon className="h-6 w-6" />
+        </button>
+      );
+    }
+
+    return <div className="w-10 flex-shrink-0" />;
+  };
   const renderRightAction = () => {
     if (rightAction === 'none') {
       return <div className="w-10 flex-shrink-0"></div>; // Spacer for centering
@@ -108,16 +150,7 @@ const MobileTopNav: React.FC<MobileTopNavProps> = ({
   return (
     <nav className={`${mobileOnly ? 'lg:hidden' : ''} fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm safe-area-inset-top ${className}`}>
       <div className="relative flex items-center justify-between px-4 py-3 gap-2">
-        {/* Back Button */}
-        {backButtonPath ? (
-          <BackButton 
-            fallbackPath={backButtonPath}
-            className="flex-shrink-0"
-            ariaLabel={backButtonLabel}
-          />
-        ) : (
-          <div className="w-10 flex-shrink-0"></div> // Spacer when no back button
-        )}
+        {renderLeftAction()}
         
         {/* Title */}
         <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100 flex-1 text-center truncate px-2">

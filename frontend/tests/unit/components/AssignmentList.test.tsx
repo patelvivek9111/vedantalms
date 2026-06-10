@@ -370,6 +370,62 @@ describe('AssignmentList', () => {
     expect(screen.queryByRole('button', { name: /Empty/i })).not.toBeInTheDocument();
   });
 
+  it('orders items by due date within each teacher type group', () => {
+    render(
+      <BrowserRouter>
+        <AssignmentList
+          assignments={asAssignmentListProps([
+            {
+              _id: 'a-early',
+              title: 'Alpha First Alphabetically',
+              dueDate: new Date('2026-01-11T22:30:00.000Z').toISOString(),
+              published: true,
+              type: 'assignment',
+              group: 'Assignments',
+              totalPoints: 10,
+              attachments: [],
+              createdBy,
+            },
+            {
+              _id: 'z-late',
+              title: 'Zulu Last Alphabetically',
+              dueDate: new Date('2026-03-19T22:30:00.000Z').toISOString(),
+              published: true,
+              type: 'assignment',
+              group: 'Assignments',
+              totalPoints: 10,
+              attachments: [],
+              createdBy,
+            },
+            {
+              _id: 'm-mid',
+              title: 'Middle By Date',
+              dueDate: new Date('2026-02-19T22:30:00.000Z').toISOString(),
+              published: true,
+              type: 'assignment',
+              group: 'Assignments',
+              totalPoints: 10,
+              attachments: [],
+              createdBy,
+            },
+          ])}
+          userRole="teacher"
+        />
+      </BrowserRouter>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /By type/i }));
+
+    const titles = screen
+      .getAllByRole('button')
+      .map(button => button.textContent || '')
+      .filter(text => text.includes('Alphabetically') || text.includes('Middle By Date'));
+
+    expect(titles[0]).toContain('Zulu Last Alphabetically');
+    expect(titles[1]).toContain('Middle By Date');
+    expect(titles[2]).toContain('Alpha First Alphabetically');
+  });
+
   it('hides empty student sections', () => {
     const now = new Date('2026-05-27T12:00:00.000Z');
     vi.setSystemTime(now);

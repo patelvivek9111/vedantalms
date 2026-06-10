@@ -10,6 +10,7 @@ const { listVersionsForAsset } = require('../services/fileVersioning.service');
 const { buildDownloadPathForUser } = require('../services/fileAsset.service');
 const { ZIP_DIR } = require('../services/bulkDownload.service');
 const { isPathInside } = require('../config/paths');
+const { getSignedCloudinaryUrl } = require('../utils/cloudinary');
 
 exports.getFileMetadata = async (req, res) => {
   try {
@@ -62,29 +63,13 @@ async function streamAssetToResponse(req, res, asset, { download = true } = {}) 
   }).catch(() => {});
 
   if (asset.provider === 'cloudinary' && asset.metadata?.providerUrl) {
-    let upstream;
-    try {
-      upstream = await fetch(asset.metadata.providerUrl);
-    } catch {
-      return res.status(502).json({ success: false, message: 'Upstream file unavailable' });
-    }
-    if (!upstream.ok || !upstream.body) {
-      return res.status(502).json({ success: false, message: 'Upstream file unavailable' });
-    }
-    applyFileResponseHeaders(res, asset, {
+    const signedUrl = getSignedCloudinaryUrl(asset.metadata.providerUrl, {
       download,
-      contentType: asset.mimeType || upstream.headers.get('content-type') || undefined,
+      resourceType: asset.metadata?.resourceType || 'auto',
     });
-    const nodeStream = Readable.fromWeb(upstream.body);
-    nodeStream.on('error', () => {
-      if (!res.headersSent) {
-        res.status(502).json({ success: false, message: 'Upstream stream failed' });
-      } else {
-        res.destroy();
-      }
-    });
-    nodeStream.pipe(res);
-    return;
+    if (signedUrl) {
+      return res.redirect(302, signedUrl);
+    }
   }
 
   const localStream = createReadStreamForAsset(asset);

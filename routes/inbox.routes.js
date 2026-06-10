@@ -2,18 +2,27 @@ const express = require('express');
 const router = express.Router();
 const inboxController = require('../controllers/inbox.controller');
 const { protect } = require('../middleware/auth');
+const { inboxComposeLimiter, inboxSendLimiter } = require('../middleware/inboxRateLimit');
 
 // List all conversations for the current user
 router.get('/conversations', protect, inboxController.getConversations);
 
+// Inbox unread badge total (Gmail-style received-thread count)
+router.get('/unread-count', protect, inboxController.getUnreadCount);
+
 // Start a new conversation
-router.post('/conversations', protect, inboxController.createConversation);
+router.post('/conversations', protect, inboxComposeLimiter, inboxController.createConversation);
 
 // Get all messages in a conversation
 router.get('/conversations/:conversationId/messages', protect, inboxController.getMessages);
 
 // Send a new message in a conversation
-router.post('/conversations/:conversationId/messages', protect, inboxController.sendMessage);
+router.post(
+  '/conversations/:conversationId/messages',
+  protect,
+  inboxSendLimiter,
+  inboxController.sendMessage
+);
 
 // Mark conversation as read for the current user
 router.post('/conversations/:conversationId/read', protect, inboxController.markAsRead);

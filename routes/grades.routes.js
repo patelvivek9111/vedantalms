@@ -33,6 +33,9 @@ const transcriptLimiter = rateLimit({
 // GET /api/grades/student/course/:courseId
 router.get('/student/course/:courseId', protect, gradesController.getStudentCourseGrade);
 
+// GET /api/grades/courses/averages?courseIds=
+router.get('/courses/averages', protect, gradesController.getCourseClassAveragesBatch);
+
 // GET /api/grades/course/:courseId/average
 router.get('/course/:courseId/average', protect, gradesController.getCourseClassAverage);
 

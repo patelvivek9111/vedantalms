@@ -200,17 +200,17 @@ function buildTeacherTypeGroups(
 
   if (isQuizzesView) {
     if (quizzes.length > 0) {
-      groups.push({ key: 'quizzes', label: 'Quizzes', items: sortItemsByTitle(quizzes) });
+      groups.push({ key: 'quizzes', label: 'Quizzes', items: sortItemsByDueDateDesc(quizzes) });
     }
   } else {
     if (assignments.length > 0) {
-      groups.push({ key: 'assignments', label: 'Assignments', items: sortItemsByTitle(assignments) });
+      groups.push({ key: 'assignments', label: 'Assignments', items: sortItemsByDueDateDesc(assignments) });
     }
     if (discussions.length > 0) {
-      groups.push({ key: 'discussions', label: 'Discussions', items: sortItemsByTitle(discussions) });
+      groups.push({ key: 'discussions', label: 'Discussions', items: sortItemsByDueDateDesc(discussions) });
     }
     if (quizzes.length > 0) {
-      groups.push({ key: 'quizzes', label: 'Quizzes', items: sortItemsByTitle(quizzes) });
+      groups.push({ key: 'quizzes', label: 'Quizzes', items: sortItemsByDueDateDesc(quizzes) });
     }
   }
 
@@ -1070,7 +1070,7 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
               <button
                 type="button"
                 onClick={() => setListViewMode('date')}
-                className={`inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition touch-manipulation sm:px-4 sm:text-sm ${
+                className={`inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition touch-manipulation sm:px-4 sm:text-sm ${
                   listViewMode === 'date'
                     ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200/80 dark:bg-slate-900 dark:text-indigo-300 dark:ring-slate-700'
                     : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
@@ -1082,7 +1082,7 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
               <button
                 type="button"
                 onClick={() => setListViewMode('type')}
-                className={`inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition touch-manipulation sm:px-4 sm:text-sm ${
+                className={`inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition touch-manipulation sm:px-4 sm:text-sm ${
                   listViewMode === 'type'
                     ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200/80 dark:bg-slate-900 dark:text-indigo-300 dark:ring-slate-700'
                     : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'

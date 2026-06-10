@@ -211,7 +211,9 @@ async function validateFileAssetIdsForAttach(fileAssetIds, {
     if (asset.category !== category && category) {
       const allowedStaging =
         asset.category === 'temporary' &&
-        ['submission', 'assignment', 'page', 'announcement', 'syllabus'].includes(category);
+        ['submission', 'assignment', 'page', 'announcement', 'syllabus', 'message', 'discussion'].includes(
+          category
+        );
       if (!allowedStaging) {
         const err = new Error('File asset category mismatch');
         err.statusCode = 400;

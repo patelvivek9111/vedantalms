@@ -29,7 +29,7 @@ describe('matchesInboxFilters', () => {
     expect(runFilter()).toBe(true);
   });
 
-  it('excludes archived/deleted from Inbox', () => {
+  it('excludes archived, deleted, and sent folders from Inbox', () => {
     expect(
       runFilter({
         participants: [{ _id: 'me', folder: 'archived', starred: false }],
@@ -38,6 +38,12 @@ describe('matchesInboxFilters', () => {
     expect(
       runFilter({
         participants: [{ _id: 'me', folder: 'deleted', starred: false }],
+      })
+    ).toBe(false);
+    expect(
+      runFilter({
+        participants: [{ _id: 'me', folder: 'sent', starred: false }],
+        hasReceivedMessage: true,
       })
     ).toBe(false);
   });

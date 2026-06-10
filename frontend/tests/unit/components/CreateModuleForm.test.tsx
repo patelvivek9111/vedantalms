@@ -116,7 +116,7 @@ describe('CreateModuleForm', () => {
     fireEvent.click(submitButton);
 
     await waitFor(() => {
-      expect(screen.getByText('Creating...')).toBeInTheDocument();
+      expect(screen.getByText('Creating…')).toBeInTheDocument();
     });
   });
 });

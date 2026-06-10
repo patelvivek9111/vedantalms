@@ -39,6 +39,8 @@ export interface DataTableProps<T> {
   bulkActionsClassName?: string;
   /** When set, replaces default classes on the scrollable table container (keep overflow in your string if needed) */
   tableContainerClassName?: string;
+  /** Optional card renderer for mobile (< lg). Table is hidden on small screens when set. */
+  renderMobileCard?: (item: T, index: number) => React.ReactNode;
   // Virtual scrolling props
   virtualScrolling?: boolean;
   virtualScrollingThreshold?: number; // Enable virtual scrolling when data exceeds this count
@@ -67,6 +69,7 @@ function DataTable<T extends Record<string, any>>({
   bulkActions,
   bulkActionsClassName = '',
   tableContainerClassName,
+  renderMobileCard,
   virtualScrolling = false,
   virtualScrollingThreshold = 100,
   virtualScrollingHeight = 600,
@@ -162,6 +165,11 @@ function DataTable<T extends Record<string, any>>({
   }, [sortedData, currentPage, itemsPerPage, useVirtualScrolling, virtualScrollRange]);
 
   const totalPages = Math.ceil(sortedData.length / itemsPerPage);
+
+  const mobilePaginatedData = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return sortedData.slice(startIndex, startIndex + itemsPerPage);
+  }, [sortedData, currentPage, itemsPerPage]);
 
   // Handle scroll for virtual scrolling
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
@@ -341,6 +349,19 @@ function DataTable<T extends Record<string, any>>({
         </div>
       )}
 
+      {renderMobileCard && (
+        <div className="space-y-3 lg:hidden">
+          {mobilePaginatedData.map((item, index) => {
+            const actualIndex = (currentPage - 1) * itemsPerPage + index;
+            return (
+              <div key={keyExtractor(item)}>
+                {renderMobileCard(item, actualIndex)}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* Table */}
       <div 
         ref={scrollContainerRef}
@@ -348,7 +369,7 @@ function DataTable<T extends Record<string, any>>({
           tableContainerClassName ??
           `bg-white dark:bg-gray-900 shadow rounded-lg border border-gray-200 dark:border-gray-700 ${
             useVirtualScrolling ? 'overflow-auto' : 'overflow-x-auto'
-          }`
+          } ${renderMobileCard ? 'hidden lg:block' : ''}`
         }
         style={useVirtualScrolling ? { maxHeight: `${virtualScrollingHeight}px` } : {}}
         onScroll={handleScroll}
@@ -487,7 +508,7 @@ function DataTable<T extends Record<string, any>>({
       </div>
 
       {/* Pagination — one row: First · Previous · Page x of y · Next · Last (matches compact LMS control) */}
-      {!useVirtualScrolling && (totalPages > 1 || itemsPerPage < sortedData.length) ? (
+      {(!useVirtualScrolling || renderMobileCard) && (totalPages > 1 || itemsPerPage < sortedData.length) ? (
         <div className="mt-4 flex flex-wrap items-center justify-center gap-2 px-2">
           <button
             type="button"

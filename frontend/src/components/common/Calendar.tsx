@@ -2,14 +2,14 @@ import React, { useEffect, useState, useRef } from 'react';
 // Make sure to run: npm install react-big-calendar date-fns
 import { Calendar, dateFnsLocalizer, Event as RBCEvent, SlotInfo, NavigateAction, Views } from 'react-big-calendar';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
-import { parse, startOfWeek, getDay, format, addMonths, subMonths, getDaysInMonth, startOfMonth, endOfMonth, isSameMonth, isSameDay, addWeeks, subWeeks, startOfDay, endOfDay, eachDayOfInterval, isSameWeek, getWeek } from 'date-fns';
+import { parse, startOfWeek, endOfWeek, getDay, format, addMonths, subMonths, getDaysInMonth, startOfMonth, endOfMonth, isSameMonth, isSameDay, addWeeks, subWeeks, startOfDay, endOfDay, eachDayOfInterval, isSameWeek, getWeek } from 'date-fns';
 import { enUS } from 'date-fns/locale';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCourse } from '../../contexts/CourseContext';
 import api, { getImageUrl } from '../../services/api';
 import { ToDoPanel } from './ToDoPanel';
 import { useNavigate } from 'react-router-dom';
-import { FileText, User, Plus, ChevronDown, Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { FileText, User, Plus, ChevronDown, Calendar as CalendarIcon, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { BurgerMenu } from '../layout/BurgerMenu';
 import DatePicker from './DatePicker';
 import SwipeableContainer from './SwipeableContainer';
@@ -325,6 +325,60 @@ const ColorWheelPicker: React.FC<{
   );
 };
 
+type CalendarOption = { label: string; value: string };
+
+const CalendarFilterRow: React.FC<{
+  opt: CalendarOption;
+  checked: boolean;
+  color: string;
+  inputId: string;
+  colorPickerActive?: boolean;
+  onToggle: () => void;
+  onColorClick: (e: React.MouseEvent) => void;
+  colorDotRef: (el: HTMLButtonElement | null) => void;
+}> = ({
+  opt,
+  checked,
+  color,
+  inputId,
+  colorPickerActive,
+  onToggle,
+  onColorClick,
+  colorDotRef,
+}) => (
+  <div className="flex items-center gap-2.5 px-3 py-2.5 transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/30">
+    <input
+      type="checkbox"
+      id={inputId}
+      name={inputId}
+      checked={checked}
+      onChange={onToggle}
+      className="h-3.5 w-3.5 shrink-0 cursor-pointer rounded border-gray-300 accent-blue-600 touch-manipulation"
+    />
+    <button
+      type="button"
+      ref={colorDotRef}
+      className={`icon-only flex h-7 w-7 shrink-0 items-center justify-center rounded-full p-0 transition-transform hover:scale-105 touch-manipulation ${
+        colorPickerActive ? 'ring-2 ring-blue-500 ring-offset-1 dark:ring-offset-gray-800' : ''
+      }`}
+      onClick={onColorClick}
+      aria-label={`Pick color for ${opt.label}`}
+      title="Change calendar color"
+    >
+      <span
+        className="h-3 w-3 rounded-full ring-1 ring-black/10 dark:ring-white/15"
+        style={{ backgroundColor: color }}
+      />
+    </button>
+    <label
+      htmlFor={inputId}
+      className="min-w-0 flex-1 cursor-pointer text-sm font-medium leading-snug text-slate-800 dark:text-slate-100"
+    >
+      <span className="line-clamp-2">{opt.label}</span>
+    </label>
+  </div>
+);
+
 const CalendarPage: React.FC = () => {
   const { user, logout } = useAuth();
   const { courses } = useCourse();
@@ -428,160 +482,51 @@ const CalendarPage: React.FC = () => {
     );
   };
 
-  // Fetch events for all selected calendars
+  // Fetch events for all selected calendars (single aggregated feed)
   const fetchEvents = async () => {
     if (!selectedCalendars.length || !user) {
       setEvents([]);
       return;
     }
-    let allEvents: RBCEvent[] = [];
-    const globalSeenAssignmentIds = new Set(); // Global deduplication across all courses
-    
-    for (const [idx, calId] of selectedCalendars.entries()) {
-      // If teacher calendar (personal)
-      if (calId === user._id) {
-        try {
-          const res = await api.get('/events?calendar=' + user._id);
-          const data = res.data.data || res.data; // Handle both new and old response formats
-          const calIdx = calendarOptions.findIndex(opt => opt.value === user._id);
-          // If calendar not found in options (shouldn't happen), use 0 as fallback
+
+    try {
+      const calendarIds = selectedCalendars.join(',');
+      const res = await api.get(`/calendar/feed?calendarIds=${encodeURIComponent(calendarIds)}`);
+      const feedEvents = res.data?.data?.events || [];
+      const globalSeenAssignmentIds = new Set<string>();
+
+      const allEvents: RBCEvent[] = feedEvents
+        .filter((event: any) => {
+          if (event.source === 'assignment' || event.type === 'Assignment') {
+            const id = String(event.assignmentId || event._id || '');
+            if (!id || globalSeenAssignmentIds.has(id)) return false;
+            globalSeenAssignmentIds.add(id);
+          }
+          return true;
+        })
+        .map((event: any) => {
+          const calId = event.calendar;
+          const calIdx = calendarOptions.findIndex((opt) => opt.value === calId);
           const colorIdx = calIdx >= 0 ? calIdx : 0;
-          if (Array.isArray(data)) {
-            allEvents.push(...data
-              .filter((event: any) => event.calendar === user._id)
-              .map((event: any) => ({
-                ...event,
-                start: new Date(event.start),
-                end: new Date(event.end),
-                title: event.title,
-                allDay: false,
-                color: getCalendarColor(user._id, colorIdx),
-                resource: { ...event, color: getCalendarColor(user._id, colorIdx) },
-              })));
-          }
-        } catch (error) {
-          }
-        continue;
-      }
-      // Else, course calendar: fetch events for course and assignments as events
-      // Skip course events for admins (should not happen since admins don't have course calendars, but just in case)
-      if (user?.role === 'admin') {
-        continue; // Skip course calendars for admins
-      }
-      try {
-        const res = await api.get('/events?calendar=' + calId);
-        const data = res.data.data || res.data; // Handle both new and old response formats
-        // Use calendarOptions index instead of selectedCalendars index to maintain consistent colors
-        const calIdx = calendarOptions.findIndex(opt => opt.value === calId);
-        // If calendar not found in options (shouldn't happen), use 0 as fallback
-        const colorIdx = calIdx >= 0 ? calIdx : 0;
-        let courseEvents: RBCEvent[] = [];
-        if (Array.isArray(data)) {
-          courseEvents = data
-            .filter((event: any) => event.calendar === calId)
-            .map((event: any) => ({
-              ...event,
-              start: new Date(event.start),
-              end: new Date(event.end),
-              title: event.title,
-              allDay: false,
-              color: getCalendarColor(calId, colorIdx),
-              resource: { ...event, color: getCalendarColor(calId, colorIdx) },
-            }));
-        }
-        
-        // Fetch assignments for all modules in this course
-        let assignmentEvents: RBCEvent[] = [];
-        
+          const isAssignment = event.source === 'assignment' || event.type === 'Assignment';
+          return {
+            _id: event._id,
+            title: event.title,
+            start: new Date(event.start),
+            end: new Date(event.end),
+            type: event.type || 'Event',
+            color: getCalendarColor(calId, colorIdx),
+            allDay: false,
+            resource: isAssignment
+              ? { ...event, readOnly: true, courseId: event.courseId || calId }
+              : { ...event, color: getCalendarColor(calId, colorIdx) },
+          } as RBCEvent;
+        });
 
-        
-        try {
-          const courseObj = courses.find((c: any) => c._id === calId);
-          if (courseObj && Array.isArray((courseObj as any).modules)) {
-            for (const module of (courseObj as any).modules) {
-              try {
-                const response = await api.get(`/assignments/module/${module._id}`);
-                const assignments = response.data;
-                
-                if (Array.isArray(assignments)) {
-                  assignments.forEach((a: any) => {
-                  // Only add if we haven't seen this assignment before globally
-                  if (!globalSeenAssignmentIds.has(a._id)) {
-                    globalSeenAssignmentIds.add(a._id);
-                    
-                    // Use calendarOptions index instead of selectedCalendars index
-                    const calIdxForAssignments = calendarOptions.findIndex(opt => opt.value === calId);
-                    // If calendar not found in options (shouldn't happen), use 0 as fallback
-                    const colorIdxForAssignments = calIdxForAssignments >= 0 ? calIdxForAssignments : 0;
-                    assignmentEvents.push({
-                      _id: a._id,
-                      title: a.title,
-                      start: new Date(a.dueDate),
-                      end: new Date(a.dueDate),
-                      type: 'Assignment',
-                      color: getCalendarColor(calId, colorIdxForAssignments),
-                      allDay: false,
-                      resource: { ...a, readOnly: true, courseId: calId },
-                    } as RBCEvent);
-                  } else {
-                    
-                  }
-                  });
-                }
-              } catch (error) {
-                }
-            }
-          } else {
-            try {
-              const modulesRes = await api.get(`/courses/${calId}/modules`);
-              const modules = modulesRes.data.data || modulesRes.data; // Handle both new and old response formats
-              if (Array.isArray(modules)) {
-                for (const module of modules) {
-                  try {
-                    const response = await api.get(`/assignments/module/${module._id}`);
-                    const assignments = response.data;
-
-                    if (Array.isArray(assignments)) {
-                      assignments.forEach((a: any) => {
-                      // Only add if we haven't seen this assignment before globally
-                      if (!globalSeenAssignmentIds.has(a._id)) {
-                        globalSeenAssignmentIds.add(a._id);
-
-                        // Use calendarOptions index instead of selectedCalendars index
-                        const calIdxForAssignments2 = calendarOptions.findIndex(opt => opt.value === calId);
-                        // If calendar not found in options (shouldn't happen), use 0 as fallback
-                        const colorIdxForAssignments2 = calIdxForAssignments2 >= 0 ? calIdxForAssignments2 : 0;
-                        assignmentEvents.push({
-                          _id: a._id,
-                          title: a.title,
-                          start: new Date(a.dueDate),
-                          end: new Date(a.dueDate),
-                          type: 'Assignment',
-                          color: getCalendarColor(calId, colorIdxForAssignments2),
-                          allDay: false,
-                          resource: { ...a, readOnly: true, courseId: calId },
-                        } as RBCEvent);
-                      } else {
-
-                      }
-                      });
-                    }
-                  } catch (error) {
-                    }
-                }
-              }
-            } catch (error) {
-              }
-          }
-        } catch (e) {
-          }
-        
-
-        allEvents.push(...courseEvents, ...assignmentEvents);
-      } catch (error) {
-        }
+      setEvents(allEvents);
+    } catch {
+      setEvents([]);
     }
-    setEvents(allEvents);
   };
 
   useEffect(() => {
@@ -1224,16 +1169,18 @@ const CalendarPage: React.FC = () => {
         <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
         <div className="relative flex items-center justify-between px-4 py-3">
           <button
+            type="button"
             onClick={() => setShowBurgerMenu(!showBurgerMenu)}
-            className="text-gray-700 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-gray-700 transition-colors hover:bg-gray-100 touch-manipulation dark:text-gray-300 dark:hover:bg-gray-700"
             aria-label="Open account menu"
           >
             <User className="w-6 h-6" />
           </button>
           <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Calendar</h1>
           <button
+            type="button"
             onClick={() => setShowCalendarsModal(true)}
-            className="text-blue-600 dark:text-blue-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-blue-600 transition-colors hover:bg-gray-100 touch-manipulation dark:text-blue-400 dark:hover:bg-gray-700"
             aria-label="Manage calendars"
           >
             <CalendarIcon className="w-6 h-6" />
@@ -1250,9 +1197,10 @@ const CalendarPage: React.FC = () => {
       {/* Mobile View */}
       <div className="lg:hidden pt-20 pb-16 bg-gray-50 dark:bg-gray-900 min-h-screen">
         {/* Calendar Header */}
-        <div className="px-3 py-2.5 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm backdrop-blur-sm bg-white/95 dark:bg-gray-800/95">
-          <div className="flex items-center justify-between">
+        <div className="border-b border-gray-200 bg-white/95 px-3 py-2.5 shadow-sm backdrop-blur-sm dark:border-gray-700 dark:bg-gray-800/95 dark:bg-gray-800">
+          <div className="mb-2 flex items-center justify-between gap-2">
             <button
+              type="button"
               onClick={() => {
                 if (mobileViewMode === 'month') {
                   setSelectedDate(prev => subMonths(prev, 1));
@@ -1260,23 +1208,26 @@ const CalendarPage: React.FC = () => {
                   setSelectedDate(prev => subWeeks(prev, 1));
                 }
               }}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-all active:scale-95 touch-manipulation"
+              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl p-2 transition-all hover:bg-gray-100 active:scale-95 touch-manipulation dark:hover:bg-gray-700"
+              aria-label="Previous period"
             >
-              <span className="text-gray-700 dark:text-gray-300 font-bold text-lg">‹</span>
+              <span className="text-lg font-bold text-gray-700 dark:text-gray-300">‹</span>
             </button>
             <button
+              type="button"
               onClick={() => setMobileViewMode(mobileViewMode === 'month' ? 'week' : 'month')}
-              className="flex items-center gap-1.5 px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-all active:scale-95 touch-manipulation bg-gray-50 dark:bg-gray-700/50"
+              className="flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-gray-50 px-3 py-1.5 transition-all hover:bg-gray-100 active:scale-95 touch-manipulation dark:bg-gray-700/50 dark:hover:bg-gray-700"
+              aria-label={`Switch to ${mobileViewMode === 'month' ? 'week' : 'month'} view`}
             >
               <span className="text-base font-bold text-gray-900 dark:text-gray-100">
-                {format(selectedDate, 'MMMM')}
+                {mobileViewMode === 'week'
+                  ? `${format(startOfWeek(selectedDate, { weekStartsOn: 0 }), 'MMM d')} – ${format(endOfWeek(selectedDate, { weekStartsOn: 0 }), 'MMM d, yyyy')}`
+                  : format(selectedDate, 'MMMM yyyy')}
               </span>
-              <span className="text-base font-semibold text-gray-600 dark:text-gray-400">
-                {format(selectedDate, 'yyyy')}
-              </span>
-              <ChevronDown className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
+              <ChevronDown className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
             </button>
             <button
+              type="button"
               onClick={() => {
                 if (mobileViewMode === 'month') {
                   setSelectedDate(prev => addMonths(prev, 1));
@@ -1284,9 +1235,23 @@ const CalendarPage: React.FC = () => {
                   setSelectedDate(prev => addWeeks(prev, 1));
                 }
               }}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-all active:scale-95 touch-manipulation"
+              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl p-2 transition-all hover:bg-gray-100 active:scale-95 touch-manipulation dark:hover:bg-gray-700"
+              aria-label="Next period"
             >
-              <span className="text-gray-700 dark:text-gray-300 font-bold text-lg">›</span>
+              <span className="text-lg font-bold text-gray-700 dark:text-gray-300">›</span>
+            </button>
+          </div>
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={() => {
+                const today = new Date();
+                setSelectedDate(today);
+                setCurrentDate(today);
+              }}
+              className="min-h-[44px] rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 transition-all hover:bg-blue-100 active:scale-95 touch-manipulation dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
+            >
+              Today
             </button>
           </div>
         </div>
@@ -1405,6 +1370,11 @@ const CalendarPage: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* To Do — mobile parity with desktop sidebar */}
+        <div className="mt-2 bg-white px-3 py-3 shadow-sm dark:bg-gray-800">
+          <ToDoPanel showSupplementarySections={false} />
+        </div>
       </div>
 
       {/* Desktop View */}
@@ -1511,50 +1481,46 @@ const CalendarPage: React.FC = () => {
           </table>
         </div>
         {/* Calendar List */}
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-sm p-4 relative">
-          <div className="max-h-44 overflow-y-auto pr-1">
-            <div className="font-semibold mb-2 text-gray-900 dark:text-gray-100">CALENDARS</div>
-            {calendarOptions.map((opt, idx) => (
-              <div className="flex items-center mb-1" key={opt.value}>
-                <input
-                  type="checkbox"
-                  id={`calendar-checkbox-${opt.value}`}
-                  name={`calendar-checkbox-${opt.value}`}
-                  checked={selectedCalendars.includes(opt.value)}
-                  onChange={() => handleCalendarToggle(opt.value)}
-                  className="mr-2"
-                />
-                <button
-                  type="button"
-                  ref={el => { colorDotRefs.current[opt.value] = el; }}
-                  className="w-3 h-3 rounded-full mr-2 border-2 border-white dark:border-gray-700 shadow focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500"
-                  style={{ background: getCalendarColor(opt.value, idx), outline: calendarColors[opt.value] ? '2px solid #2563eb' : 'none' }}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setColorWheelOpen(opt.value);
-                  }}
-                  aria-label={`Pick color for ${opt.label}`}
-                  title="Change calendar color"
-                />
-                <span className="text-gray-900 dark:text-gray-100">{opt.label}</span>
-              </div>
-            ))}
-            {/* Render the color wheel below the calendar list if open */}
-            {colorWheelOpen && (
-              <div className="flex justify-center mt-4">
-                <ColorWheelPicker
-                  colors={colorPalette}
-                  onSelect={color => {
-                    handleCalendarColorChange(colorWheelOpen, color);
-                    setColorWheelOpen(null);
-                  }}
-                  onClose={() => setColorWheelOpen(null)}
-                  anchorRef={{ current: colorDotRefs.current[colorWheelOpen] ?? null }}
-                />
-              </div>
-            )}
+        <div className="relative overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-200/70 dark:bg-gray-800 dark:ring-gray-700/60">
+          <div className="border-b border-gray-100 px-3 py-2 dark:border-gray-700/80">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              Calendars
+            </p>
           </div>
+          <div className="max-h-44 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-700/50">
+            {calendarOptions.map((opt, idx) => (
+              <CalendarFilterRow
+                key={opt.value}
+                opt={opt}
+                checked={selectedCalendars.includes(opt.value)}
+                color={getCalendarColor(opt.value, idx)}
+                inputId={`calendar-checkbox-${opt.value}`}
+                colorPickerActive={colorWheelOpen === opt.value}
+                onToggle={() => handleCalendarToggle(opt.value)}
+                onColorClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setColorWheelOpen(opt.value);
+                }}
+                colorDotRef={(el) => {
+                  colorDotRefs.current[opt.value] = el;
+                }}
+              />
+            ))}
+          </div>
+          {colorWheelOpen && (
+            <div className="flex justify-center border-t border-gray-100 py-3 dark:border-gray-700/50">
+              <ColorWheelPicker
+                colors={colorPalette}
+                onSelect={(color) => {
+                  handleCalendarColorChange(colorWheelOpen, color);
+                  setColorWheelOpen(null);
+                }}
+                onClose={() => setColorWheelOpen(null)}
+                anchorRef={{ current: colorDotRefs.current[colorWheelOpen] ?? null }}
+              />
+            </div>
+          )}
         </div>
         {/* To-Do Panel below calendar list */}
         <div className="max-h-64 overflow-y-auto pr-1 rounded-2xl">
@@ -1605,81 +1571,72 @@ const CalendarPage: React.FC = () => {
 
       {/* Calendars Modal (Mobile Only) */}
       {showCalendarsModal && (
-        <div className="lg:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50" style={{ bottom: '64px' }} onClick={() => setShowCalendarsModal(false)}>
-          <div 
-            className="absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-800 rounded-t-2xl shadow-2xl flex flex-col border-t border-gray-200 dark:border-gray-700 mx-2 mb-2"
-            style={{ maxHeight: '60vh' }}
+        <div
+          className="lg:hidden fixed inset-x-0 top-0 z-50 bg-black/40 backdrop-blur-sm"
+          style={{ bottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))' }}
+          onClick={() => setShowCalendarsModal(false)}
+        >
+          <div
+            className="absolute bottom-0 left-0 right-0 flex max-h-[65vh] flex-col overflow-hidden rounded-t-2xl border border-gray-200/80 border-b-0 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-800"
             onClick={(e) => e.stopPropagation()}
-            {...(showCalendarsModal ? {
-              onTouchStart: calendarModalSwipe.onTouchStart,
-              onTouchMove: calendarModalSwipe.onTouchMove,
-              onTouchEnd: calendarModalSwipe.onTouchEnd
-            } : {})}
+            {...(showCalendarsModal
+              ? {
+                  onTouchStart: calendarModalSwipe.onTouchStart,
+                  onTouchMove: calendarModalSwipe.onTouchMove,
+                  onTouchEnd: calendarModalSwipe.onTouchEnd,
+                }
+              : {})}
           >
-            {/* Compact Header */}
-            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between z-10 flex-shrink-0">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Calendars</h2>
+            <div className="flex shrink-0 justify-center pt-2.5 pb-1">
+              <span className="h-1 w-10 rounded-full bg-gray-300 dark:bg-gray-600" />
+            </div>
+            <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-4 py-2.5 dark:border-gray-700/80">
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-50">Calendars</h2>
               <button
+                type="button"
                 onClick={() => setShowCalendarsModal(false)}
-                className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all active:scale-95 touch-manipulation"
+                className="icon-only flex h-8 w-8 items-center justify-center rounded-full p-0 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 touch-manipulation dark:hover:bg-slate-700 dark:hover:text-slate-200"
                 aria-label="Close"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <X className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
               </button>
             </div>
-            {/* Compact Content */}
-            <div className="overflow-y-auto flex-1">
-              <div className="px-4 py-3 space-y-2">
+            <div className="flex-1 overflow-y-auto px-3 py-3">
+              <div className="overflow-hidden rounded-xl ring-1 ring-gray-200/70 divide-y divide-gray-100 dark:ring-gray-700/60 dark:divide-gray-700/50">
                 {calendarOptions.map((opt, idx) => (
-                  <div className="flex items-center gap-3 py-2.5 px-2 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/50 active:bg-gray-100 dark:active:bg-gray-700 transition-colors touch-manipulation min-h-[44px]" key={opt.value}>
-                    <label
-                      htmlFor={`mobile-calendar-${opt.value}`}
-                      className="min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer p-2 -ml-2"
-                    >
-                      <input
-                        type="checkbox"
-                        id={`mobile-calendar-${opt.value}`}
-                        checked={selectedCalendars.includes(opt.value)}
-                        onChange={() => handleCalendarToggle(opt.value)}
-                        className="w-4 h-4 rounded border-2 border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 cursor-pointer flex-shrink-0"
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      ref={el => { colorDotRefs.current[opt.value] = el; }}
-                      className="min-h-[44px] min-w-[44px] flex items-center justify-center w-6 h-6 rounded-full border border-white dark:border-gray-800 shadow-sm flex-shrink-0 hover:scale-110 transition-transform active:scale-95"
-                      style={{ background: getCalendarColor(opt.value, idx) }}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setColorWheelOpen(opt.value);
-                      }}
-                      aria-label={`Pick color for ${opt.label}`}
-                    />
-                    <span
-                      className="flex-1 text-gray-900 dark:text-gray-100 text-sm font-medium"
-                    >
-                      {opt.label}
-                    </span>
-                  </div>
+                  <CalendarFilterRow
+                    key={opt.value}
+                    opt={opt}
+                    checked={selectedCalendars.includes(opt.value)}
+                    color={getCalendarColor(opt.value, idx)}
+                    inputId={`mobile-calendar-${opt.value}`}
+                    colorPickerActive={colorWheelOpen === opt.value}
+                    onToggle={() => handleCalendarToggle(opt.value)}
+                    onColorClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setColorWheelOpen(opt.value);
+                    }}
+                    colorDotRef={(el) => {
+                      colorDotRefs.current[opt.value] = el;
+                    }}
+                  />
                 ))}
-                {colorWheelOpen && (
-                  <div className="pt-2 pb-1">
-                    <ColorWheelPicker
-                      colors={colorPalette}
-                      onSelect={color => {
-                        handleCalendarColorChange(colorWheelOpen, color);
-                        setColorWheelOpen(null);
-                      }}
-                      onClose={() => setColorWheelOpen(null)}
-                      anchorRef={{ current: colorDotRefs.current[colorWheelOpen] ?? null }}
-                      positionRight={true}
-                    />
-                  </div>
-                )}
               </div>
+              {colorWheelOpen && (
+                <div className="flex justify-center pt-4">
+                  <ColorWheelPicker
+                    colors={colorPalette}
+                    onSelect={(color) => {
+                      handleCalendarColorChange(colorWheelOpen, color);
+                      setColorWheelOpen(null);
+                    }}
+                    onClose={() => setColorWheelOpen(null)}
+                    anchorRef={{ current: colorDotRefs.current[colorWheelOpen] ?? null }}
+                    positionRight={true}
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>

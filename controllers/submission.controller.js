@@ -6,7 +6,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const Module = require('../models/module.model');
 const { deleteFromCloudinary, extractPublicId, isCloudinaryConfigured } = require('../utils/cloudinary');
-const { createNotification } = require('../routes/notification.routes');
+const { createNotification } = require('../services/notification');
 const gradingPolicySnapshotService = require('../services/gradingPolicySnapshot.service');
 const gradeLifecycleService = require('../services/gradeLifecycle.service');
 const { getSemesterFromCourse } = require('../utils/semesterUtils');
@@ -28,6 +28,43 @@ function getIdempotencyKey(req, prefix) {
   const raw = req.headers['idempotency-key'] || req.headers['x-idempotency-key'];
   if (!raw) return null;
   return `${prefix}:${String(raw).slice(0, 128)}`;
+}
+
+async function resolveAssignmentCourseContext(assignmentId) {
+  const assignmentDoc = await Assignment.findById(assignmentId).select('_id title module').lean();
+  if (!assignmentDoc) return null;
+  if (!assignmentDoc.module) {
+    return {
+      assignmentId: assignmentDoc._id,
+      assignmentTitle: assignmentDoc.title || 'Assignment',
+      courseId: null,
+      instructorId: null,
+      courseCode: null,
+    };
+  }
+
+  const moduleDoc = await Module.findById(assignmentDoc.module).select('course').lean();
+  if (!moduleDoc?.course) {
+    return {
+      assignmentId: assignmentDoc._id,
+      assignmentTitle: assignmentDoc.title || 'Assignment',
+      courseId: null,
+      instructorId: null,
+      courseCode: null,
+    };
+  }
+
+  const courseDoc = await Course.findById(moduleDoc.course)
+    .select('instructor catalog.courseCode')
+    .lean();
+
+  return {
+    assignmentId: assignmentDoc._id,
+    assignmentTitle: assignmentDoc.title || 'Assignment',
+    courseId: courseDoc?._id || moduleDoc.course,
+    instructorId: courseDoc?.instructor || null,
+    courseCode: courseDoc?.catalog?.courseCode || null,
+  };
 }
 
 async function invalidateStudentGradeCacheForSubmission(submission) {
@@ -460,23 +497,63 @@ exports.createSubmission = async (req, res) => {
 
     // Notify teacher about new submission
     try {
-      const assignmentWithCourse = await Assignment.findById(assignment).populate('course', 'instructor');
-      if (assignmentWithCourse && assignmentWithCourse.course && assignmentWithCourse.course.instructor) {
-        const instructorId = assignmentWithCourse.course.instructor._id || assignmentWithCourse.course.instructor;
+      const courseContext = await resolveAssignmentCourseContext(assignment);
+      if (courseContext?.instructorId) {
+        const instructorId = courseContext.instructorId._id || courseContext.instructorId;
         const studentName = `${req.user.firstName} ${req.user.lastName}`;
-        
+
         await createNotification(instructorId, {
           type: 'submission',
           title: 'New Assignment Submission',
-          message: `${studentName} submitted "${assignmentWithCourse.title}"`,
-          link: `/courses/${assignmentWithCourse.course._id}/assignments/${assignment}/grading`,
+          message: `${studentName} submitted "${courseContext.assignmentTitle}"`,
+          link: courseContext.courseId
+            ? `/courses/${courseContext.courseId}/assignments/${assignment}/grading`
+            : null,
           relatedId: finalSubmission._id,
           relatedType: 'submission',
           priority: 'medium'
+        }, {
+          source: 'submission.created',
+          actorId: req.user._id,
+          eventWindow: String(finalSubmission._id),
+          requestId: req.requestId || null,
+        });
+
+        const {
+          recordDomainEvent,
+          DOMAIN_EVENT_TYPES,
+          AGGREGATE_TYPES,
+          AUDIENCE_SCOPES,
+        } = require('../services/domainEvents');
+        void recordDomainEvent({
+          eventType: DOMAIN_EVENT_TYPES.ASSIGNMENT_SUBMITTED,
+          aggregateType: AGGREGATE_TYPES.SUBMISSION,
+          aggregateId: finalSubmission._id,
+          actorId: req.user._id,
+          audienceScope: AUDIENCE_SCOPES.COURSE,
+          correlationId: req.requestId,
+          payload: {
+            assignmentId: String(assignment),
+            courseId: courseContext?.courseId ? String(courseContext.courseId) : null,
+          },
+          metadata: { source: 'submission.controller.submit' },
+        });
+      } else {
+        console.warn('submission_notification_skipped_missing_course_context', {
+          submissionId: String(finalSubmission._id),
+          assignmentId: String(assignment),
+          requestId: req.requestId || null,
+          actorId: String(req.user?._id || ''),
         });
       }
     } catch (notifError) {
-      console.error('Error creating submission notification:', notifError);
+      console.error('submission_notification_create_failed', {
+        error: notifError?.message || String(notifError),
+        submissionId: String(finalSubmission?._id || ''),
+        assignmentId: String(assignment),
+        requestId: req.requestId || null,
+        actorId: String(req.user?._id || ''),
+      });
       // Don't fail the submission if notification fails
     }
 
@@ -1079,9 +1156,7 @@ exports.gradeSubmission = async (req, res) => {
     
     if (submission.teacherApproved) {
       try {
-        const { createNotification } = require('../routes/notification.routes');
-        // Get assignment without populating course (course might not be in schema)
-        const assignmentDoc = await Assignment.findById(submission.assignment);
+        const courseContext = await resolveAssignmentCourseContext(submission.assignment);
         
         // Get student ID - handle both populated and unpopulated cases
         let studentId = null;
@@ -1095,25 +1170,9 @@ exports.gradeSubmission = async (req, res) => {
           const studentName = populatedSubmission.student ? 
             `${populatedSubmission.student.firstName} ${populatedSubmission.student.lastName}` : 'Student';
           const grade = submission.finalGrade || submission.grade || submission.autoGrade || 0;
-          const assignmentTitle = assignmentDoc ? assignmentDoc.title : 'Assignment';
-          
-          // Get course ID and course code from assignment through module (Assignment -> Module -> Course)
-          let courseId = null;
-          let courseCode = null;
-          if (assignmentDoc && assignmentDoc.module) {
-            const Module = require('../models/module.model');
-            const module = await Module.findById(assignmentDoc.module).populate('course');
-            if (module && module.course) {
-              courseId = module.course._id || module.course;
-              
-              // Get course details to extract course code
-              const Course = require('../models/course.model');
-              const courseDoc = await Course.findById(courseId).select('catalog.courseCode');
-              if (courseDoc && courseDoc.catalog && courseDoc.catalog.courseCode) {
-                courseCode = courseDoc.catalog.courseCode;
-              }
-            }
-          }
+          const assignmentTitle = courseContext?.assignmentTitle || 'Assignment';
+          const courseId = courseContext?.courseId || null;
+          const courseCode = courseContext?.courseCode || null;
           
           // Ensure studentId is ObjectId format (not string)
           const mongoose = require('mongoose');
@@ -1132,18 +1191,51 @@ exports.gradeSubmission = async (req, res) => {
             title: 'Assignment Graded',
             message: notificationMessage,
             link: courseId ? 
-              `/courses/${courseId}/assignments/${assignmentDoc._id}` : null,
-            relatedId: assignmentDoc ? assignmentDoc._id : null,
+              `/courses/${courseId}/assignments/${courseContext?.assignmentId || submission.assignment}` : null,
+            relatedId: courseContext?.assignmentId || submission.assignment,
             relatedType: 'assignment',
             priority: 'high'
+          }, {
+            source: 'submission.graded',
+            actorId: req.user._id,
+            eventWindow: `graded:${String(submission._id)}`,
+            requestId: req.requestId || null,
           });
           
           if (notification) {
             notificationCreated = true;
           }
+
+          const {
+            recordDomainEvent,
+            DOMAIN_EVENT_TYPES,
+            AGGREGATE_TYPES,
+            AUDIENCE_SCOPES,
+          } = require('../services/domainEvents');
+          void recordDomainEvent({
+            eventType: DOMAIN_EVENT_TYPES.ASSIGNMENT_GRADED,
+            aggregateType: AGGREGATE_TYPES.SUBMISSION,
+            aggregateId: submission._id,
+            actorId: req.user._id,
+            audienceScope: AUDIENCE_SCOPES.USER,
+            correlationId: req.requestId,
+            payload: {
+              studentId: String(studentObjectId),
+              assignmentId: String(courseContext?.assignmentId || submission.assignment),
+              courseId: courseId ? String(courseId) : null,
+              grade,
+            },
+            metadata: { source: 'submission.controller.grade' },
+          });
         }
       } catch (notifError) {
-        console.error('Error creating grade notification:', notifError);
+        console.error('grade_notification_create_failed', {
+          error: notifError?.message || String(notifError),
+          submissionId: String(submission?._id || ''),
+          assignmentId: String(submission?.assignment || ''),
+          requestId: req.requestId || null,
+          actorId: String(req.user?._id || ''),
+        });
         // Don't fail the grading if notification fails
       }
     }

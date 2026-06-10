@@ -118,28 +118,42 @@ exports.createAnnouncement = async (req, res) => {
 
     // Notify all enrolled students about new announcement
     try {
-      const { createNotification } = require('../routes/notification.routes');
-      const populatedCourse = await Course.findById(courseId).populate('students', '_id');
-      
-      if (populatedCourse && populatedCourse.students) {
-        const studentIds = populatedCourse.students.map(s => s._id || s);
-        
-        // Create notifications for all students (in parallel, but don't wait)
-        Promise.all(studentIds.map(studentId => 
-          createNotification(studentId, {
-            type: 'announcement',
-            title: 'New Announcement',
-            message: `New announcement in ${populatedCourse.title}: "${title}"`,
-            link: `/courses/${courseId}/announcements`,
-            relatedId: announcement._id,
-            relatedType: 'announcement',
-            priority: 'medium'
-          }).catch(err => console.error(`Error notifying student ${studentId}:`, err))
-        )).catch(err => console.error('Error creating announcement notifications:', err));
-      }
+      const { notifyAnnouncementCreated } = require('../services/notification/academicNotificationProducers.service');
+      void notifyAnnouncementCreated({
+        course: courseId,
+        announcement,
+        actor: req.user,
+        requestId: req.requestId || null,
+      }).catch((notifError) => {
+        console.error('Error creating announcement notifications:', notifError);
+      });
     } catch (notifError) {
       console.error('Error creating announcement notifications:', notifError);
-      // Don't fail the announcement creation if notification fails
+    }
+
+    try {
+      const {
+        recordDomainEvent,
+        DOMAIN_EVENT_TYPES,
+        AGGREGATE_TYPES,
+        AUDIENCE_SCOPES,
+      } = require('../services/domainEvents');
+      void recordDomainEvent({
+        eventType: DOMAIN_EVENT_TYPES.ANNOUNCEMENT_CREATED,
+        aggregateType: AGGREGATE_TYPES.ANNOUNCEMENT,
+        aggregateId: announcement._id,
+        actorId: req.user._id,
+        audienceScope: AUDIENCE_SCOPES.COURSE,
+        correlationId: req.requestId,
+        payload: {
+          courseId: String(courseId),
+          title,
+          postTo: postToValue,
+        },
+        metadata: { source: 'announcement.controller.createAnnouncement' },
+      });
+    } catch (domainEventError) {
+      console.error('announcement_domain_event_failed', domainEventError);
     }
 
     res.status(201).json({ success: true, data: announcement });

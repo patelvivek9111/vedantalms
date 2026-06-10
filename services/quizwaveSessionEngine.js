@@ -41,12 +41,34 @@ const getRuntime = (gamePin) => {
 
 const clearTimers = (gamePin) => {
   const rt = runtimeByPin.get(gamePin);
-  if (!rt) return;
-  rt.timeouts.forEach((t) => clearTimeout(t));
-  rt.timeouts = [];
+  if (rt) {
+    rt.timeouts.forEach((t) => clearTimeout(t));
+    rt.timeouts = [];
+  }
+  const { clearQuizwavePhaseJobs, shouldUseDistributedQuizwaveTimers } = require('./quizwaveTimerQueue.service');
+  if (shouldUseDistributedQuizwaveTimers()) {
+    void clearQuizwavePhaseJobs(gamePin);
+  }
 };
 
-const schedule = (gamePin, fn, delayMs) => {
+const schedule = (gamePin, fn, delayMs, timerMeta) => {
+  const {
+    enqueueQuizwavePhaseTransition,
+    shouldUseDistributedQuizwaveTimers,
+  } = require('./quizwaveTimerQueue.service');
+
+  if (shouldUseDistributedQuizwaveTimers() && timerMeta?.sessionId && timerMeta?.currentPhase) {
+    void enqueueQuizwavePhaseTransition({
+      sessionId: timerMeta.sessionId,
+      gamePin,
+      currentPhase: timerMeta.currentPhase,
+      delayMs,
+    }).catch((err) => {
+      console.error('[QuizWave ENGINE] distributed timer enqueue failed', err?.message || err);
+    });
+    return null;
+  }
+
   const rt = getRuntime(gamePin);
   const handle = setTimeout(() => {
     rt.timeouts = rt.timeouts.filter((t) => t !== handle);
@@ -245,29 +267,7 @@ const scheduleNext = (io, sessionId, currentPhase, _durationMs) => {
   }
 
   const run = async () => {
-    const session = await QuizSession.findById(sessionId).populate('quiz');
-    if (!session) return;
-    if (session.phase !== currentPhase) return;
-
-    switch (currentPhase) {
-      case PHASES.QUESTION_ACTIVE:
-        await transitionTo(io, sessionId, PHASES.QUESTION_ACTIVE, PHASES.QUESTION_LOCKED, PHASE_MS.QUESTION_LOCKED);
-        break;
-      case PHASES.QUESTION_LOCKED:
-        await transitionTo(io, sessionId, PHASES.QUESTION_LOCKED, PHASES.ANSWER_REVEAL, PHASE_MS.ANSWER_REVEAL);
-        break;
-      case PHASES.ANSWER_REVEAL:
-        await transitionTo(io, sessionId, PHASES.ANSWER_REVEAL, PHASES.SCOREBOARD, PHASE_MS.SCOREBOARD);
-        break;
-      case PHASES.SCOREBOARD:
-        await advanceOrFinish(io, sessionId);
-        break;
-      case PHASES.TRANSITION:
-        await startQuestion(io, sessionId, session.currentQuestionIndex + 1);
-        break;
-      default:
-        break;
-    }
+    await runScheduledPhaseTransition(io, sessionId, currentPhase);
   };
 
   QuizSession.findById(sessionId)
@@ -275,9 +275,35 @@ const scheduleNext = (io, sessionId, currentPhase, _durationMs) => {
       if (!s?.phaseEndsAt) return;
       const delay = Math.max(0, s.phaseEndsAt.getTime() - Date.now());
       log('TIMER', s.gamePin, currentPhase, `fire in ${delay}ms`);
-      schedule(s.gamePin, run, delay);
+      schedule(s.gamePin, run, delay, { sessionId, currentPhase });
     })
     .catch((err) => console.error('[QuizWave ENGINE] scheduleNext error:', err));
+};
+
+const runScheduledPhaseTransition = async (io, sessionId, currentPhase) => {
+  const session = await QuizSession.findById(sessionId).populate('quiz');
+  if (!session) return;
+  if (session.phase !== currentPhase) return;
+
+  switch (currentPhase) {
+    case PHASES.QUESTION_ACTIVE:
+      await transitionTo(io, sessionId, PHASES.QUESTION_ACTIVE, PHASES.QUESTION_LOCKED, PHASE_MS.QUESTION_LOCKED);
+      break;
+    case PHASES.QUESTION_LOCKED:
+      await transitionTo(io, sessionId, PHASES.QUESTION_LOCKED, PHASES.ANSWER_REVEAL, PHASE_MS.ANSWER_REVEAL);
+      break;
+    case PHASES.ANSWER_REVEAL:
+      await transitionTo(io, sessionId, PHASES.ANSWER_REVEAL, PHASES.SCOREBOARD, PHASE_MS.SCOREBOARD);
+      break;
+    case PHASES.SCOREBOARD:
+      await advanceOrFinish(io, sessionId);
+      break;
+    case PHASES.TRANSITION:
+      await startQuestion(io, sessionId, session.currentQuestionIndex + 1);
+      break;
+    default:
+      break;
+  }
 };
 
 const advanceOrFinish = async (io, sessionId) => {
@@ -451,5 +477,6 @@ module.exports = {
   destroyEngine,
   skipToNextQuestion,
   buildLeaderboard,
-  computeAnswerDistribution
+  computeAnswerDistribution,
+  runScheduledPhaseTransition,
 };

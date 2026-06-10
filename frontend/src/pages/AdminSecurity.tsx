@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { API_URL } from '../config';
+import { MobileAppShell } from '../components/common/MobileAppShell';
 import { 
   Shield, 
   AlertTriangle, 
@@ -109,18 +110,21 @@ export function AdminSecurity() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 dark:border-blue-400"></div>
-      </div>
+      <MobileAppShell title="Security" backButtonPath="/dashboard">
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 dark:border-blue-400"></div>
+        </div>
+      </MobileAppShell>
     );
   }
 
   return (
+    <MobileAppShell title="Security" backButtonPath="/dashboard">
     <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">Security Center</h1>
+          <h1 className="hidden lg:block text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">Security Center</h1>
           <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">Monitor and manage system security</p>
         </div>
         <div className="flex items-center space-x-2 sm:space-x-4">
@@ -255,5 +259,6 @@ export function AdminSecurity() {
         </div>
       </div>
     </div>
+    </MobileAppShell>
   );
 } 

@@ -8,6 +8,7 @@ import { coursePageBodyHtmlClass, sanitizePageHtml } from '../components/pages/P
 import FileAttachmentPanel, { normalizeLegacyFiles } from '../components/files/FileAttachmentPanel';
 import type { NormalizedFile } from '../utils/fileTypes';
 import { API_URL } from '../config';
+import { MobileAppShell } from '../components/common/MobileAppShell';
 
 const PageEditPage: React.FC = () => {
   const { pageId } = useParams<{ pageId: string }>();
@@ -107,13 +108,19 @@ const PageEditPage: React.FC = () => {
     );
   }
 
+  const backPath = courseId ? `/courses/${courseId}/pages` : '/courses';
+
   return (
+    <MobileAppShell title="Edit Page" backButtonPath={backPath}>
     <div className="mx-auto max-w-4xl p-3 sm:p-4 lg:p-6">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 hidden lg:flex items-center justify-between">
         <BackButton />
         {previewToggle}
       </div>
-      <h1 className="text-2xl font-bold mb-4 text-gray-900 dark:text-gray-100">Edit Page</h1>
+      <div className="mb-4 flex lg:hidden items-center justify-end">
+        {previewToggle}
+      </div>
+      <h1 className="hidden lg:block text-2xl font-bold mb-4 text-gray-900 dark:text-gray-100">Edit Page</h1>
       {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
       <form onSubmit={handleSubmit} className="space-y-4">
         {!preview ? (
@@ -150,6 +157,7 @@ const PageEditPage: React.FC = () => {
         </button>
       </form>
     </div>
+    </MobileAppShell>
   );
 };
 

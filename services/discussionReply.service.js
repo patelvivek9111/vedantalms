@@ -505,6 +505,100 @@ async function hasReplyByUser(threadOrId, userId) {
   return (thread?.replies || []).some((reply) => !reply.deletedAt && normalizeId(reply.author) === normalizeId(userId));
 }
 
+/**
+ * Batch variant of hasReplyByUser for planner/todo list filtering (2 queries vs N).
+ * Returns Set of threadId strings where the user has posted (collection or embedded replies).
+ */
+/**
+ * Gradebook-scale batch: which students have replied on which threads (2–3 queries total).
+ * Returns Map<studentId, Set<threadId>>.
+ */
+async function batchStudentDiscussionParticipation(studentIds, threadIds) {
+  const map = new Map();
+  const uniqueStudents = [...new Set(studentIds.map(normalizeId).filter(Boolean))];
+  const uniqueThreads = [...new Set(threadIds.map(normalizeId).filter(Boolean))];
+  for (const sid of uniqueStudents) map.set(sid, new Set());
+  if (!uniqueStudents.length || !uniqueThreads.length) return map;
+
+  const studentOids = uniqueStudents
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+  const threadOids = uniqueThreads
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+  if (!studentOids.length || !threadOids.length) return map;
+
+  const collectionHits = await DiscussionReply.aggregate([
+    {
+      $match: {
+        threadId: { $in: threadOids },
+        authorId: { $in: studentOids },
+        deletedAt: null,
+      },
+    },
+    { $group: { _id: { studentId: '$authorId', threadId: '$threadId' } } },
+  ]);
+  for (const row of collectionHits) {
+    const sid = String(row._id.studentId);
+    map.get(sid)?.add(String(row._id.threadId));
+  }
+
+  const threads = await Thread.find({ _id: { $in: threadOids } }).select('replies').lean();
+  for (const thread of threads) {
+    const tid = String(thread._id);
+    for (const reply of thread.replies || []) {
+      if (reply.deletedAt) continue;
+      const sid = normalizeId(reply.author);
+      map.get(sid)?.add(tid);
+    }
+  }
+
+  return map;
+}
+
+async function batchThreadIdsRepliedByUser(threadIds, userId) {
+  const replied = new Set();
+  const unique = [...new Set(threadIds.map(normalizeId).filter(Boolean))];
+  const uid = normalizeId(userId);
+  if (!unique.length || !uid) return replied;
+
+  const oids = unique
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+  if (!oids.length) return replied;
+
+  const authorOid = mongoose.Types.ObjectId.isValid(uid)
+    ? new mongoose.Types.ObjectId(uid)
+    : uid;
+
+  const collectionHits = await DiscussionReply.aggregate([
+    {
+      $match: {
+        threadId: { $in: oids },
+        authorId: authorOid,
+        deletedAt: null,
+      },
+    },
+    { $group: { _id: '$threadId' } },
+  ]);
+  for (const row of collectionHits) {
+    replied.add(String(row._id));
+  }
+
+  const remaining = oids.filter((oid) => !replied.has(String(oid)));
+  if (!remaining.length) return replied;
+
+  const threads = await Thread.find({ _id: { $in: remaining } }).select('replies').lean();
+  for (const thread of threads) {
+    const hasEmbedded = (thread.replies || []).some(
+      (reply) => !reply.deletedAt && normalizeId(reply.author) === uid
+    );
+    if (hasEmbedded) replied.add(String(thread._id));
+  }
+
+  return replied;
+}
+
 async function populateThreadReplyPage(thread, options = {}) {
   const page = await listRootReplies(thread, options);
   const obj = thread?.toObject ? thread.toObject({ virtuals: true }) : { ...thread };
@@ -600,6 +694,8 @@ module.exports = {
   getReplyOrLegacy,
   hasCollectionReplies,
   hasReplyByUser,
+  batchStudentDiscussionParticipation,
+  batchThreadIdsRepliedByUser,
   hideReply,
   listChildReplies,
   listRootReplies,

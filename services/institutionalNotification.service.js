@@ -1,4 +1,17 @@
 const Notification = require('../models/notification.model');
+const { normalizeNotificationPayload } = require('./notification/notificationPayload');
+
+const VALID_NOTIFICATION_TYPES = new Set([
+  'message',
+  'grade',
+  'announcement',
+  'assignment_due',
+  'assignment_graded',
+  'enrollment',
+  'discussion',
+  'submission',
+  'system',
+]);
 
 const EVENT_COPY = {
   upload_completed: { type: 'course', title: 'Upload complete', tone: 'success' },
@@ -14,16 +27,20 @@ const EVENT_COPY = {
 
 async function notifyUser(userId, eventKey, { message, courseId, assignmentId, link, metadata } = {}) {
   const template = EVENT_COPY[eventKey] || { type: 'course', title: eventKey, tone: 'info' };
-  return Notification.create({
-    user: userId,
-    type: template.type,
+  const type = VALID_NOTIFICATION_TYPES.has(template.type) ? template.type : 'system';
+  const normalized = normalizeNotificationPayload({
+    type,
     title: template.title,
     message: message || template.title,
-    course: courseId,
-    assignment: assignmentId,
     link,
+    courseId,
+    assignmentId,
     metadata: { eventKey, tone: template.tone, ...metadata },
     read: false,
+  });
+  return Notification.create({
+    user: userId,
+    ...normalized,
   });
 }
 

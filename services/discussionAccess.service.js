@@ -269,16 +269,244 @@ function filterDiscussionForStudent(user, thread, options = {}) {
   return obj;
 }
 
+/**
+ * Course-scoped staff recipient IDs for discussion notifications (instructor, admins, TAs).
+ */
+function resolveCourseStaffRecipientIds(course) {
+  if (!course) return [];
+
+  const recipients = [];
+  const instructorId = normalizeId(course.instructor);
+  if (instructorId) recipients.push(instructorId);
+
+  for (const adminId of course.admins || []) {
+    const id = normalizeId(adminId);
+    if (id) recipients.push(id);
+  }
+
+  for (const taId of course.teachingAssistants || []) {
+    const id = normalizeId(taId);
+    if (id) recipients.push(id);
+  }
+
+  return [...new Set(recipients)];
+}
+
+/**
+ * Student recipient IDs for discussion notifications — course-wide or group-scoped.
+ */
+async function resolveDiscussionStudentRecipientIds(thread, course) {
+  if (!course || !thread) return [];
+
+  const { resolveActiveCourseStudentIds } = require('./notification/courseEnrollmentRecipients.service');
+  const enrolledStudentIds = new Set(await resolveActiveCourseStudentIds(course));
+  if (!enrolledStudentIds.size) return [];
+
+  if (!thread.groupSet) {
+    return [...enrolledStudentIds];
+  }
+
+  const groupQuery = { groupSet: thread.groupSet };
+  if (thread.groupId) {
+    groupQuery._id = thread.groupId;
+  }
+
+  const groups = await Group.find(groupQuery).select('members').lean();
+  const memberIds = new Set();
+  for (const group of groups) {
+    for (const memberId of group.members || []) {
+      const id = normalizeId(memberId);
+      if (id && enrolledStudentIds.has(id)) {
+        memberIds.add(id);
+      }
+    }
+  }
+
+  return [...memberIds];
+}
+
+function uniqueNormalizedIds(values) {
+  const set = new Set();
+  for (const value of values) {
+    const id = normalizeId(value);
+    if (id) set.add(id);
+  }
+  return [...set];
+}
+
+function mapByNormalizedId(docs) {
+  const map = new Map();
+  for (const doc of docs || []) {
+    map.set(normalizeId(doc._id || doc), doc);
+  }
+  return map;
+}
+
+function resolveThreadListAccessContext(user, thread, bundle, options = {}) {
+  const { courseById, moduleById, finalizedByCourse, membershipByGroupId, membershipByGroupSet, now } = bundle;
+  const allowArchivedRead = options.allowArchivedRead === true;
+
+  const courseId = normalizeId(thread.course);
+  const course = courseById.get(courseId);
+  if (!course) {
+    throw accessError('Discussion course could not be resolved', 404, 'COURSE_NOT_FOUND');
+  }
+
+  const module = thread.module ? moduleById.get(normalizeId(thread.module)) : null;
+  const groupSet = thread.groupSet || null;
+  const group = thread.groupId ? membershipByGroupId.get(normalizeId(thread.groupId)) || null : null;
+  const finalized = finalizedByCourse.get(courseId) ?? false;
+
+  if (isAdmin(user) || isCourseStaff(user, course)) {
+    return {
+      thread,
+      course,
+      module,
+      groupSet,
+      group,
+      workflowState: discussionWorkflow.deriveDiscussionWorkflowState(thread, { course, module, now, finalized }),
+    };
+  }
+
+  if (!isStudent(user)) {
+    throw accessError('Not authorized for this course discussion', 403, 'COURSE_STAFF_REQUIRED');
+  }
+
+  if (!isEnrolledStudent(user, course)) {
+    throw accessError('Student is not enrolled in this course', 403, 'NOT_ENROLLED');
+  }
+
+  if (course.operationalStatus === 'archived' && !allowArchivedRead) {
+    throw accessError('Course is archived', 403, 'COURSE_ARCHIVED');
+  }
+
+  if (module && module.published === false) {
+    throw accessError('Module is not published', 403, 'MODULE_NOT_PUBLISHED');
+  }
+
+  if (!discussionWorkflow.isDiscussionPublished(thread)) {
+    throw accessError('Discussion is not published', 404, 'DISCUSSION_NOT_PUBLISHED');
+  }
+
+  if (thread.moderationState === 'hidden' || thread.moderation?.state === 'hidden') {
+    throw accessError('Discussion is hidden', 404, 'DISCUSSION_HIDDEN');
+  }
+
+  if (!discussionWorkflow.isDiscussionAvailable(thread, now)) {
+    throw accessError('Discussion is not available yet', 403, 'DISCUSSION_NOT_AVAILABLE', {
+      availableFrom: thread.availableFrom,
+    });
+  }
+
+  if (thread.groupSet) {
+    const groupSetId = normalizeId(thread.groupSet);
+    const hasMembership = thread.groupId
+      ? membershipByGroupId.has(normalizeId(thread.groupId))
+      : membershipByGroupSet.has(groupSetId);
+    if (!hasMembership) {
+      throw accessError('Not authorized to view this group discussion', 403, 'GROUP_DISCUSSION_FORBIDDEN');
+    }
+  }
+
+  return {
+    thread,
+    course,
+    module,
+    groupSet,
+    group,
+    workflowState: discussionWorkflow.deriveDiscussionWorkflowState(thread, { course, module, now, finalized }),
+  };
+}
+
+/**
+ * Batch-load course/module/group context once per list page (avoids N+1 access checks).
+ */
+async function buildThreadListAccessBundle(user, threads, options = {}) {
+  const now = options.now || new Date();
+  if (!threads?.length) {
+    return { entries: [], filteredReasons: {}, filteredCount: 0 };
+  }
+
+  const courseIds = uniqueNormalizedIds(threads.map((t) => t.course));
+  const moduleIds = uniqueNormalizedIds(threads.map((t) => t.module).filter(Boolean));
+  const groupSetIds = uniqueNormalizedIds(threads.map((t) => t.groupSet).filter(Boolean));
+  const threadGroupIds = uniqueNormalizedIds(threads.map((t) => t.groupId).filter(Boolean));
+
+  const [courses, modules, userGroups] = await Promise.all([
+    Course.find({ _id: { $in: courseIds } }).lean(),
+    moduleIds.length ? Module.find({ _id: { $in: moduleIds } }).lean() : Promise.resolve([]),
+    user?._id && (groupSetIds.length || threadGroupIds.length)
+      ? Group.find({
+          members: user._id,
+          $or: [
+            ...(groupSetIds.length ? [{ groupSet: { $in: groupSetIds } }] : []),
+            ...(threadGroupIds.length ? [{ _id: { $in: threadGroupIds } }] : []),
+          ],
+        })
+          .select('_id groupSet')
+          .lean()
+      : Promise.resolve([]),
+  ]);
+
+  const courseById = mapByNormalizedId(courses);
+  const moduleById = mapByNormalizedId(modules);
+  const finalizedByCourse = new Map();
+  await Promise.all(
+    courseIds.map(async (courseId) => {
+      const course = courseById.get(courseId);
+      finalizedByCourse.set(courseId, course ? await discussionWorkflow.isCourseFinalized(course) : false);
+    })
+  );
+
+  const membershipByGroupId = new Map();
+  const membershipByGroupSet = new Map();
+  for (const memberGroup of userGroups) {
+    membershipByGroupId.set(normalizeId(memberGroup._id), memberGroup);
+    membershipByGroupSet.set(normalizeId(memberGroup.groupSet), memberGroup);
+  }
+
+  const bundle = {
+    courseById,
+    moduleById,
+    finalizedByCourse,
+    membershipByGroupId,
+    membershipByGroupSet,
+    now,
+  };
+
+  const entries = [];
+  const filteredReasons = {};
+  let filteredCount = 0;
+
+  for (const thread of threads) {
+    try {
+      const context = resolveThreadListAccessContext(user, thread, bundle, options);
+      entries.push({ thread, context });
+    } catch (error) {
+      if (error.statusCode >= 500) throw error;
+      filteredCount += 1;
+      const code = error.code || 'UNKNOWN';
+      filteredReasons[code] = (filteredReasons[code] || 0) + 1;
+    }
+  }
+
+  return { entries, filteredReasons, filteredCount };
+}
+
 module.exports = {
   assertStudentCanGradeDiscussion,
   assertStudentCanModerateDiscussion,
   assertStudentCanReply,
   assertStudentCanViewDiscussion,
   assertStudentCanViewGroupDiscussion,
+  buildThreadListAccessBundle,
   filterDiscussionForStudent,
   hasUserPosted,
+  resolveDiscussionStudentRecipientIds,
+  resolveCourseStaffRecipientIds,
   isCourseStaff,
   loadDiscussionContext,
   normalizeId,
   paginateReplies,
+  resolveThreadListAccessContext,
 };

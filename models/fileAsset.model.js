@@ -12,6 +12,7 @@ const FILE_CATEGORIES = [
   'syllabus',
   'system',
   'temporary',
+  'message',
 ];
 
 const FILE_VISIBILITY = ['private', 'course', 'institution', 'public'];

@@ -7,6 +7,8 @@ const Course = require('../models/course.model');
 const CourseGradeLifecycle = require('../models/courseGradeLifecycle.model');
 const StudentCourseGradeSnapshot = require('../models/studentCourseGradeSnapshot.model');
 const SystemAuditEvent = require('../models/systemAuditEvent.model');
+const Module = require('../models/module.model');
+const Group = require('../models/Group');
 
 const criticalModels = [
   Message,
@@ -18,6 +20,8 @@ const criticalModels = [
   CourseGradeLifecycle,
   StudentCourseGradeSnapshot,
   SystemAuditEvent,
+  Module,
+  Group,
 ];
 
 const ensureCriticalIndexes = async (logger = console) => {

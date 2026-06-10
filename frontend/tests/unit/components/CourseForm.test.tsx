@@ -1,3 +1,4 @@
+import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter, MemoryRouter, Routes, Route } from 'react-router-dom';
@@ -13,6 +14,10 @@ vi.mock('@/utils/logger', () => ({
   default: {
     error: vi.fn(),
   },
+}));
+
+vi.mock('@/components/common/MobileAppShell', () => ({
+  MobileAppShell: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
 const mockNavigate = vi.fn();

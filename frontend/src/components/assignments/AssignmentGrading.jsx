@@ -16,6 +16,8 @@ import { useSwipeGesture } from '../../hooks/useSwipeGesture';
 import { useOfflineSync } from '../../hooks/useOfflineSync';
 import { offlineStorage } from '../../utils/offlineStorage';
 import { hapticNavigation } from '../../utils/hapticFeedback';
+import { queryClient } from '../../lib/queryClient';
+import { signalNotificationInvalidation } from '../../hooks/notifications/notificationSync';
 
 const AssignmentGrading = () => {
   const { id } = useParams();
@@ -749,10 +751,9 @@ const AssignmentGrading = () => {
       
       setError('');
       
-      // Trigger notification refresh for the student (though this won't work across browsers)
-      window.dispatchEvent(new CustomEvent('notificationCreated', {
-        detail: { userId: studentId }
-      }));
+      if (studentId) {
+        signalNotificationInvalidation(queryClient, String(studentId));
+      }
     } catch (err) {
       // Revert optimistic update
       setSubmissions(prev => {
@@ -1358,7 +1359,7 @@ const AssignmentGrading = () => {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
             {/* Submissions List */}
-            <div className="lg:col-span-1 order-2 lg:order-1">
+            <div className="lg:col-span-1 order-1">
               <div className="flex items-center justify-between mb-3 sm:mb-4">
                 <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100">
                   Submissions
@@ -1393,7 +1394,7 @@ const AssignmentGrading = () => {
                       <button
                         onClick={handleBulkApproveAutoGrades}
                         disabled={isBulkOperating}
-                        className="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="min-h-[44px] px-3 py-2 text-xs sm:text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
                       >
                         Approve Auto-Grades
                       </button>
@@ -1401,7 +1402,7 @@ const AssignmentGrading = () => {
                     <button
                       onClick={() => setShowBulkFeedbackModal(true)}
                       disabled={isBulkOperating}
-                      className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="min-h-[44px] px-3 py-2 text-xs sm:text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
                     >
                       Apply Feedback
                     </button>
@@ -1410,7 +1411,7 @@ const AssignmentGrading = () => {
                         setShowBulkDeleteConfirm(true);
                       }}
                       disabled={isBulkOperating}
-                      className="text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="min-h-[44px] px-3 py-2 text-xs sm:text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
                     >
                       Delete
                     </button>
@@ -1443,7 +1444,7 @@ const AssignmentGrading = () => {
 
             {/* Grading Interface */}
             <div 
-              className="lg:col-span-2 relative"
+              className="lg:col-span-2 order-2 relative"
               {...(submissionSwipeHandlers.enabled ? {
                 onTouchStart: submissionSwipeHandlers.onTouchStart,
                 onTouchMove: submissionSwipeHandlers.onTouchMove,
@@ -1469,7 +1470,7 @@ const AssignmentGrading = () => {
                         <button
                           onClick={navigateToPreviousSubmission}
                           disabled={hasUnsavedChanges}
-                          className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          className="min-h-[44px] min-w-[44px] p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-manipulation"
                           aria-label="Previous submission"
                         >
                           <ChevronLeft className="w-5 h-5" />
@@ -1480,7 +1481,7 @@ const AssignmentGrading = () => {
                         <button
                           onClick={navigateToNextSubmission}
                           disabled={hasUnsavedChanges}
-                          className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          className="min-h-[44px] min-w-[44px] p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-manipulation"
                           aria-label="Next submission"
                         >
                           <ChevronRight className="w-5 h-5" />

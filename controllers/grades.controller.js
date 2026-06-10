@@ -15,7 +15,7 @@ const {
 } = require('../utils/gradeCalculation');
 const { getJson, setJson } = require('../utils/cache');
 const { calculateCourseGradeForStudent } = require('../services/gradeCalculation.service');
-const { computeCourseClassAverage } = require('../services/gradebookData.service');
+const { computeCourseClassAverage, computeCourseClassAverages } = require('../services/gradebookData.service');
 const gradeReleaseService = require('../services/gradeRelease.service');
 const observability = require('../services/workflowObservability.service');
 const discussionGradeVisibility = require('../services/discussionGradeVisibility.service');
@@ -111,11 +111,12 @@ exports.getStudentCourseGrade = async (req, res) => {
 
     // Fetch all graded discussions (threads) for the course
     const threads = await Thread.find({ course: courseId, isGraded: true }).lean();
-    // For each thread, find the student's grade and submission status
+    const threadIds = threads.map((t) => t._id);
+    const repliedThreadIds = await discussionReplyService.batchThreadIdsRepliedByUser(threadIds, studentId);
     const discussionAssignments = [];
     for (const thread of threads) {
       const studentGradeObj = discussionGradeVisibility.discussionGradeForTotals(thread, studentId);
-      const hasSubmitted = await discussionReplyService.hasReplyByUser(thread, studentId);
+      const hasSubmitted = repliedThreadIds.has(String(thread._id));
       discussionAssignments.push({
         _id: thread._id,
         title: thread.title,
@@ -370,6 +371,57 @@ exports.getCourseClassAverage = async (req, res) => {
     res.json(payload);
   } catch (error) {
     console.error('Error calculating class average:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// GET /api/grades/courses/averages?courseIds=id1,id2
+exports.getCourseClassAveragesBatch = async (req, res) => {
+  try {
+    const raw = req.query.courseIds || req.query.ids || '';
+    const courseIds = String(raw)
+      .split(',')
+      .map((id) => id.trim())
+      .filter((id) => mongoose.Types.ObjectId.isValid(id));
+
+    if (!courseIds.length) {
+      return res.status(400).json({ message: 'courseIds query parameter is required' });
+    }
+
+    const maxBatch = parseInt(process.env.GRADES_AVERAGE_BATCH_MAX || '25', 10);
+    if (courseIds.length > maxBatch) {
+      return res.status(400).json({ message: `Maximum ${maxBatch} courseIds per request` });
+    }
+
+    const userId = String(req.user._id);
+    const isAdmin = req.user.role === 'admin';
+
+    if (!isAdmin) {
+      const courses = await Course.find({ _id: { $in: courseIds } }).select('instructor').lean();
+      const authorized = courses.filter((course) => {
+        const instructorId =
+          course.instructor && typeof course.instructor === 'object' && course.instructor._id
+            ? String(course.instructor._id)
+            : String(course.instructor || '');
+        return instructorId === userId;
+      });
+      if (authorized.length !== courseIds.length) {
+        return res.status(403).json({ message: 'Not authorized to view one or more course averages' });
+      }
+    }
+
+    const cacheKey = `grades:course-averages-batch:v1:${userId}:${courseIds.sort().join(',')}`;
+    const cached = await getJson(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+
+    const averages = await computeCourseClassAverages(courseIds);
+    const payload = { averages };
+    await setJson(cacheKey, payload, 45);
+    res.json(payload);
+  } catch (error) {
+    console.error('Error calculating batch class averages:', error);
     res.status(500).json({ message: error.message });
   }
 };

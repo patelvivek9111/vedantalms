@@ -5,6 +5,21 @@ import { createAxiosMock } from './helpers/mockApi'
 // Default axios mock so modules that call axios.create() (e.g. api.ts) do not crash when loaded.
 vi.mock('axios', () => createAxiosMock())
 
+// jsdom does not implement matchMedia (used by GlobalSidebar, RichTextEditor, etc.)
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  value: vi.fn().mockImplementation((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })),
+})
+
 const suppressedWarningPatterns = [
   'React Router Future Flag Warning',
   'Warning: An update to',

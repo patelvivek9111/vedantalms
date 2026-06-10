@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import { API_URL } from '../config';
 import DataTable, { Column } from '../components/common/DataTable';
+import { MobileAppShell } from '../components/common/MobileAppShell';
 import {
   calculateSGPA,
   calculateCGPA,
@@ -202,11 +203,12 @@ const Transcript: React.FC = () => {
   ], []);
 
   return (
+    <MobileAppShell title="Transcript" backButtonPath="/dashboard">
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-4 sm:py-6 lg:py-8 px-2 sm:px-4 lg:px-8">
       <div className="max-w-5xl mx-auto">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 sm:p-6">
           <div className="mb-4 sm:mb-6">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+            <h1 className="hidden lg:block text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
               Unofficial Transcript
             </h1>
             {user && (
@@ -342,6 +344,7 @@ const Transcript: React.FC = () => {
         </div>
       </div>
     </div>
+    </MobileAppShell>
   );
 };
 

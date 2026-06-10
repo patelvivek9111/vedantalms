@@ -344,7 +344,7 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
               <div className="relative" ref={menuRef}>
                 <button
                   onClick={() => setShowMenu(!showMenu)}
-                  className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
+                  className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full p-2 transition-colors duration-200 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 dark:hover:bg-gray-700"
                   title="More options"
                   aria-label={`More options for reply by ${reply.author.firstName} ${reply.author.lastName}`}
                   aria-expanded={showMenu}
@@ -1402,10 +1402,11 @@ const ThreadView: React.FC = () => {
                     </div>
 
                     {isModerator && (
-                      <div className="flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-slate-50/80 p-1 dark:border-slate-700 dark:bg-slate-800/60">
+                      <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-1 rounded-xl border border-slate-200 bg-slate-50/80 p-1 dark:border-slate-700 dark:bg-slate-800/60 sm:w-auto">
                         <button
+                          type="button"
                           onClick={handleTogglePin}
-                          className={`rounded-lg p-2 transition-colors touch-manipulation ${
+                          className={`inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition-colors touch-manipulation ${
                             thread.isPinned
                               ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300'
                               : 'text-slate-500 hover:bg-white hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200'
@@ -1416,8 +1417,9 @@ const ThreadView: React.FC = () => {
                           <Pin className="h-4 w-4" aria-hidden="true" />
                         </button>
                         <button
+                          type="button"
                           onClick={handleToggleLock}
-                          className={`rounded-lg p-2 transition-colors touch-manipulation ${
+                          className={`inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition-colors touch-manipulation ${
                             thread.locked
                               ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200'
                               : 'text-slate-500 hover:bg-white hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200'
@@ -1428,6 +1430,7 @@ const ThreadView: React.FC = () => {
                           <Lock className="h-4 w-4" aria-hidden="true" />
                         </button>
                         <button
+                          type="button"
                           onClick={() => {
                             setIsEditing(true);
                             setEditTitle(thread.title);
@@ -1435,13 +1438,14 @@ const ThreadView: React.FC = () => {
                             setEditThreadAttachments(normalizeLegacyFiles(thread.fileAssets || []));
                             setEditThreadRemoveIds([]);
                           }}
-                          className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-white hover:text-indigo-600 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-indigo-400"
+                          className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-slate-500 transition-colors hover:bg-white hover:text-indigo-600 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-indigo-400"
                           title="Edit thread"
                           aria-label="Edit discussion"
                         >
                           <Edit3 className="h-4 w-4" aria-hidden="true" />
                         </button>
                         <button
+                          type="button"
                           onClick={() => {
                             setEditSettings({
                               isGraded: thread.isGraded || false,
@@ -1455,15 +1459,16 @@ const ThreadView: React.FC = () => {
                             });
                             setShowEditModal(true);
                           }}
-                          className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-white hover:text-indigo-600 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-indigo-400"
+                          className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-slate-500 transition-colors hover:bg-white hover:text-indigo-600 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-indigo-400"
                           title="Edit discussion settings"
                           aria-label="Edit discussion settings"
                         >
                           <Settings className="h-4 w-4" aria-hidden="true" />
                         </button>
                         <button
+                          type="button"
                           onClick={handleDeleteThread}
-                          className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-white hover:text-red-600 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-red-400"
+                          className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-slate-500 transition-colors hover:bg-white hover:text-red-600 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-red-400"
                           title="Delete thread"
                           aria-label="Delete discussion"
                         >
@@ -1543,7 +1548,7 @@ const ThreadView: React.FC = () => {
             </h2>
             <button
               onClick={() => setShowGradingModal(false)}
-              className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
+              className="inline-flex min-h-[44px] min-w-[44px] flex-shrink-0 items-center justify-center rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 focus:outline-none dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-300"
             >
               <X className="w-5 h-5" />
             </button>
@@ -1683,7 +1688,7 @@ const ThreadView: React.FC = () => {
               </h2>
               <button
                 onClick={() => setShowEditModal(false)}
-                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
+                className="inline-flex min-h-[44px] min-w-[44px] flex-shrink-0 items-center justify-center rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 focus:outline-none dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-300"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1874,7 +1879,46 @@ const ThreadView: React.FC = () => {
               {students.length} {students.length === 1 ? 'student' : 'students'}
             </span>
           </div>
-          <div className="overflow-x-auto">
+          <div className="space-y-3 p-4 lg:hidden">
+            {students.map((student) => {
+              const gradeObj = thread.studentGrades.find(g => g.student._id === student._id);
+              return (
+                <div
+                  key={student._id}
+                  className="rounded-xl border border-slate-200 p-4 dark:border-slate-700"
+                >
+                  <div className="mb-3 flex items-center gap-3">
+                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                      {student.firstName} {student.lastName}
+                    </div>
+                  </div>
+                  <div className="mb-3 grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <span className="block text-xs text-slate-500 dark:text-slate-400">Grade</span>
+                      {renderGradeScoreBadge(gradeObj?.grade, thread.totalPoints)}
+                    </div>
+                    <div>
+                      <span className="block text-xs text-slate-500 dark:text-slate-400">Graded by</span>
+                      <span className="text-slate-900 dark:text-slate-100">
+                        {gradeObj?.gradedBy ? `${gradeObj.gradedBy.firstName} ${gradeObj.gradedBy.lastName}` : '—'}
+                      </span>
+                    </div>
+                  </div>
+                  {gradeObj?.feedback && (
+                    <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">{gradeObj.feedback}</p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => openGradingModal(student)}
+                    className="min-h-[44px] w-full rounded-lg bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400"
+                  >
+                    {gradeObj ? 'Edit grade' : 'Add grade'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <div className="hidden overflow-x-auto lg:block">
             <table className="min-w-full">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-800/50">
@@ -1941,8 +1985,9 @@ const ThreadView: React.FC = () => {
                       </td>
                       <td className="whitespace-nowrap px-5 py-4 text-right sm:px-6">
                         <button
+                          type="button"
                           onClick={() => openGradingModal(student)}
-                          className="rounded-lg px-3 py-1.5 text-sm font-medium text-indigo-600 transition hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/40"
+                          className="min-h-[44px] rounded-lg px-3 py-2 text-sm font-medium text-indigo-600 transition hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/40"
                         >
                           {gradeObj ? 'Edit grade' : 'Add grade'}
                         </button>

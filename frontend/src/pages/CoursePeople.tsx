@@ -5,6 +5,7 @@ import api from '../services/api';
 import { getImageUrl } from '../services/api';
 import ConfirmationModal from '../components/common/ConfirmationModal';
 import { toast } from 'react-toastify';
+import { MobileAppShell } from '../components/common/MobileAppShell';
 
 interface Student {
   _id: string;
@@ -124,25 +125,32 @@ const CoursePeople: React.FC = () => {
     }
   };
 
+  const backPath = courseId ? `/courses/${courseId}` : '/courses';
+
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto py-8">
-        <div className="text-center text-gray-900 dark:text-gray-100">Loading...</div>
-      </div>
+      <MobileAppShell title="People" backButtonPath={backPath}>
+        <div className="max-w-4xl mx-auto py-8">
+          <div className="text-center text-gray-900 dark:text-gray-100">Loading...</div>
+        </div>
+      </MobileAppShell>
     );
   }
 
   if (error) {
     return (
-      <div className="max-w-4xl mx-auto py-8">
-        <div className="text-red-500 dark:text-red-400 text-center">{error}</div>
-      </div>
+      <MobileAppShell title="People" backButtonPath={backPath}>
+        <div className="max-w-4xl mx-auto py-8">
+          <div className="text-red-500 dark:text-red-400 text-center">{error}</div>
+        </div>
+      </MobileAppShell>
     );
   }
 
   return (
+    <MobileAppShell title="People" backButtonPath={backPath}>
     <div className="max-w-4xl mx-auto py-4 sm:py-6 lg:py-8 px-2 sm:px-4">
-      <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-6 sm:mb-8">Course People</h1>
+      <h1 className="hidden lg:block text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-6 sm:mb-8">Course People</h1>
 
       {/* Enrollment Requests */}
       {isTeacherOrAdmin && (
@@ -268,6 +276,7 @@ const CoursePeople: React.FC = () => {
         variant="warning"
       />
     </div>
+    </MobileAppShell>
   );
 };
 

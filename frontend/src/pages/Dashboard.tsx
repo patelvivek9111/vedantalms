@@ -6,7 +6,7 @@ import { ToDoPanel } from '../components/common/ToDoPanel';
 import { MoreVertical, Megaphone, FileText, MessageSquare, Palette, BookOpen, File, Settings, Bell, Menu, Folder, HelpCircle, User as UserIcon, LogOut, CheckSquare, ClipboardList, ArrowLeft, Sun, Moon, GripVertical, Search, QrCode } from 'lucide-react';
 import api, { getUserPreferences, updateUserPreferences, getImageUrl, updateUserProfile, uploadProfilePicture, getLoginActivity } from '../services/api';
 import NotificationCenter from '../components/common/NotificationCenter';
-import { NavCustomizationModal, NavItem, ALL_NAV_OPTIONS, DEFAULT_NAV_ITEMS } from '../components/layout/NavCustomizationModal';
+import { NavCustomizationModal, NavItem, ALL_NAV_OPTIONS, getDefaultNavItemIds } from '../components/layout/NavCustomizationModal';
 import { ChangeUserModal } from '../components/modals/ChangeUserModal';
 import { useTheme } from '../contexts/ThemeContext';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
@@ -17,6 +17,8 @@ import { useBottomNavSwipe } from '../hooks/useBottomNavSwipe';
 import ScanCourseQrModal from '../components/course/ScanCourseQrModal';
 import { extractJoinTokenFromQrText } from '../utils/joinCourseToken';
 import { toast } from 'react-toastify';
+import { useNotificationBadge } from '../hooks/notifications/useNotificationBadge';
+import { useUserPreferencesQuery } from '../hooks/useUserPreferencesQuery';
 
 // Earthy tone color palette
 const earthyColors = [
@@ -470,8 +472,11 @@ export function Dashboard() {
   const { handleSwipeLeft, handleSwipeRight, enabled: swipeEnabled } = useBottomNavSwipe();
   
   // State to track user's personal course colors (for students) or course default colors (for teachers)
+  const { data: userPreferences, isLoading: loadingPreferences } = useUserPreferencesQuery(Boolean(user?._id));
   const [userCourseColors, setUserCourseColors] = useState<{ [key: string]: string }>({});
-  const [loadingPreferences, setLoadingPreferences] = useState(true);
+  useEffect(() => {
+    setUserCourseColors(userPreferences?.courseColors || {});
+  }, [userPreferences]);
   const [openColorPicker, setOpenColorPicker] = useState<string | null>(null);
   
   // State to track selected icons for each course (default to first 3)
@@ -482,9 +487,8 @@ export function Dashboard() {
   });
   const [openIconPicker, setOpenIconPicker] = useState<string | null>(null);
   
-  // Notification state
   const [showNotificationCenter, setShowNotificationCenter] = useState(false);
-  const [notificationCount, setNotificationCount] = useState(0);
+  const { unreadCount: notificationCount } = useNotificationBadge();
   
   // Navigation customization state
   const [showNavCustomization, setShowNavCustomization] = useState(false);
@@ -565,61 +569,10 @@ export function Dashboard() {
 
   // Load user preferences on mount and when user changes
   useEffect(() => {
-    const loadUserPreferences = async () => {
-      if (!user) {
-        // Clear preferences when no user
-        setUserCourseColors({});
-        setLoadingPreferences(false);
-        return;
-      }
-      
-      try {
-        setLoadingPreferences(true);
-        const response = await getUserPreferences();
-        if (response.data.success && response.data.preferences?.courseColors) {
-          setUserCourseColors(response.data.preferences.courseColors || {});
-        } else {
-          setUserCourseColors({});
-        }
-      } catch (err) {
-        setUserCourseColors({});
-      } finally {
-        setLoadingPreferences(false);
-      }
-    };
-
-    loadUserPreferences();
-  }, [user?._id]); // Use user._id to ensure it reloads when user changes
-
-  // Fetch notification count
-  useEffect(() => {
-    const fetchNotificationCount = async () => {
-      try {
-        const response = await api.get('/notifications/unread-count');
-        if (response.data.success) {
-          setNotificationCount(response.data.count || 0);
-        }
-      } catch (error) {
-        // Silent fail - notification count is not critical
-      }
-    };
-
-    fetchNotificationCount();
-    
-    // Poll for new notifications every 5 seconds (reduced for testing)
-    const interval = setInterval(fetchNotificationCount, 5000);
-    
-    // Listen for custom events to refresh immediately (though this won't work across browsers)
-    const handleNotificationCreated = () => {
-      fetchNotificationCount();
-    };
-    window.addEventListener('notificationCreated', handleNotificationCreated);
-    
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener('notificationCreated', handleNotificationCreated);
-    };
-  }, []);
+    if (!user) {
+      setOpenColorPicker(null);
+    }
+  }, [user?._id]);
 
   // Fetch course grades when showGrades is enabled
   useEffect(() => {
@@ -645,40 +598,72 @@ export function Dashboard() {
       return next;
     });
 
+    const fetchTeacherAveragesBatch = async () => {
+      try {
+        const response = await api.get(`/grades/courses/averages?courseIds=${courseIds.join(',')}`, {
+          timeout: 120000,
+        });
+        const averages = response.data?.averages || {};
+        if (cancelled) return;
+        setCourseGrades((prev) => {
+          const next = { ...prev };
+          courseIds.forEach((courseId) => {
+            const average = averages[courseId]?.average;
+            const hasAverage =
+              average !== null && average !== undefined && typeof average === 'number' && !isNaN(average);
+            next[courseId] = { grade: hasAverage ? average : null };
+          });
+          return next;
+        });
+      } catch {
+        if (!cancelled) {
+          setCourseGrades((prev) => {
+            const next = { ...prev };
+            courseIds.forEach((courseId) => {
+              next[courseId] = { grade: null };
+            });
+            return next;
+          });
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingGrades((prev) => {
+            const next = { ...prev };
+            courseIds.forEach((courseId) => {
+              next[courseId] = false;
+            });
+            return next;
+          });
+        }
+      }
+    };
+
+    if (isTeacherOrAdmin) {
+      void fetchTeacherAveragesBatch();
+      return () => {
+        cancelled = true;
+      };
+    }
+
     const fetchOne = async (courseId: string) => {
       try {
-        if (isTeacherOrAdmin) {
-          const response = await api.get(`/grades/course/${courseId}/average`, {
-            timeout: 120000,
-          });
-          const average = response.data?.average;
-          const hasAverage =
-            average !== null && average !== undefined && typeof average === 'number' && !isNaN(average);
-          if (!cancelled) {
-            setCourseGrades((prev) => ({
-              ...prev,
-              [courseId]: { grade: hasAverage ? average : null },
-            }));
-          }
-        } else {
-          const response = await api.get(`/grades/student/course/${courseId}`, {
-            timeout: 60000,
-          });
-          const totalPercent = response.data?.totalPercent;
-          const hasGrade =
-            totalPercent !== null &&
-            totalPercent !== undefined &&
-            typeof totalPercent === 'number' &&
-            !isNaN(totalPercent);
-          if (!cancelled) {
-            setCourseGrades((prev) => ({
-              ...prev,
-              [courseId]: {
-                grade: hasGrade ? totalPercent : null,
-                letter: response.data?.letterGrade || '',
-              },
-            }));
-          }
+        const response = await api.get(`/grades/student/course/${courseId}`, {
+          timeout: 60000,
+        });
+        const totalPercent = response.data?.totalPercent;
+        const hasGrade =
+          totalPercent !== null &&
+          totalPercent !== undefined &&
+          typeof totalPercent === 'number' &&
+          !isNaN(totalPercent);
+        if (!cancelled) {
+          setCourseGrades((prev) => ({
+            ...prev,
+            [courseId]: {
+              grade: hasGrade ? totalPercent : null,
+              letter: response.data?.letterGrade || '',
+            },
+          }));
         }
       } catch {
         if (!cancelled) {
@@ -743,7 +728,7 @@ export function Dashboard() {
         return true;
       });
       
-      const defaultItems = DEFAULT_NAV_ITEMS
+      const defaultItems = getDefaultNavItemIds(user?.role)
         .map(id => availableOptions.find(opt => opt.id === id))
         .filter((item): item is NavItem => item !== undefined);
       setCurrentNavItems(defaultItems);
@@ -997,7 +982,7 @@ export function Dashboard() {
                   <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3">
                     <button
                       onClick={() => setBurgerMenuSection(null)}
-                      className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
+                      className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition-colors hover:bg-gray-100 touch-manipulation dark:hover:bg-gray-700"
                       aria-label="Back"
                     >
                       <ArrowLeft className="h-5 w-5 text-gray-600 dark:text-gray-400" />
@@ -1249,7 +1234,11 @@ export function Dashboard() {
               <button
                 onClick={() => setShowNotificationCenter(!showNotificationCenter)}
                 className="relative p-3 bg-white dark:bg-gray-800 rounded-full shadow-md hover:shadow-lg transition-all duration-200 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
-                aria-label="Notifications"
+                aria-label={
+                  notificationCount > 0
+                    ? `Notifications, ${notificationCount} unread`
+                    : 'Notifications'
+                }
               >
                 <Bell className="h-5 w-5 sm:h-6 sm:w-6 text-gray-700 dark:text-gray-300" />
                 {notificationCount > 0 && (

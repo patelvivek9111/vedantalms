@@ -28,22 +28,22 @@ const FileUploadItem: React.FC<FileUploadItemProps> = memo(
         <div className="flex items-center gap-1 shrink-0">
           <FileGovernanceBadge file={item} finalized={finalized} />
           {item.status === 'done' && showPreview && onPreview && (
-            <button type="button" onClick={onPreview} className="p-1 text-indigo-600" aria-label={`Preview ${item.name}`}>
+            <button type="button" onClick={onPreview} className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-indigo-600" aria-label={`Preview ${item.name}`}>
               <Eye className="w-4 h-4" />
             </button>
           )}
           {item.status === 'uploading' && onCancel && (
-            <button type="button" onClick={onCancel} className="text-xs text-gray-500" aria-label="Cancel upload">
+            <button type="button" onClick={onCancel} className="min-h-[44px] rounded-lg px-3 text-xs text-gray-500" aria-label="Cancel upload">
               Cancel
             </button>
           )}
           {item.status === 'error' && onRetry && (
-            <button type="button" onClick={onRetry} className="p-1 text-amber-600" aria-label="Retry upload">
+            <button type="button" onClick={onRetry} className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-amber-600" aria-label="Retry upload">
               <RotateCcw className="w-4 h-4" />
             </button>
           )}
           {onRemove && (
-            <button type="button" onClick={onRemove} className="p-1 text-red-600" aria-label={`Remove ${item.name}`}>
+            <button type="button" onClick={onRemove} className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-red-600" aria-label={`Remove ${item.name}`}>
               <X className="w-4 h-4" />
             </button>
           )}

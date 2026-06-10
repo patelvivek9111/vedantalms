@@ -26,6 +26,7 @@ import { archiveCourse, restoreCourse } from '../services/courseOpsApi';
 import { BurgerMenu } from '../components/layout/BurgerMenu';
 import DataTable, { Column } from '../components/common/DataTable';
 import ConfirmationModal from '../components/common/ConfirmationModal';
+import { attachClassAveragesToCourses } from '../services/gradeAveragesService';
 
 interface Course {
   _id: string;
@@ -71,6 +72,30 @@ export function TeacherCourseOversight() {
   const [archiveTarget, setArchiveTarget] = useState<Course | null>(null);
   const [restoreTarget, setRestoreTarget] = useState<Course | null>(null);
 
+  const mapTeacherCourseRow = (course: any): Course => {
+    let status: 'active' | 'draft' | 'archived' = 'active';
+    if (course.operationalStatus === 'archived') {
+      status = 'archived';
+    } else if (!course.published) {
+      status = 'draft';
+    }
+
+    return {
+      _id: course._id,
+      title: course.title,
+      description: course.description || '',
+      instructor: course.instructor,
+      published: course.published || false,
+      students: course.students || [],
+      enrollmentCount: course.students?.length || 0,
+      classAverage: course.classAverage,
+      catalog: course.catalog,
+      createdAt: course.createdAt,
+      updatedAt: course.updatedAt,
+      status,
+    };
+  };
+
   useEffect(() => {
     const fetchCourses = async () => {
       try {
@@ -84,54 +109,8 @@ export function TeacherCourseOversight() {
           // Process courses to add stats
           const coursesData = response.data.data || response.data;
           const coursesArray = Array.isArray(coursesData) ? coursesData : [];
-          const coursesWithStats = await Promise.all(coursesArray.map(async (course: any) => {
-            try {
-              // Calculate class average
-              let classAverage: number | undefined = undefined;
-              
-              try {
-                const averageResponse = await axios.get(
-                  `${API_URL}/api/grades/course/${course._id}/average`,
-                  { headers }
-                );
-                
-                if (averageResponse.data && averageResponse.data.average !== null && averageResponse.data.average !== undefined) {
-                  classAverage = averageResponse.data.average;
-                }
-              } catch (error) {
-                // Skip if we can't get average (course might have no grades yet)
-                }
-              
-              let status: 'active' | 'draft' | 'archived' = 'active';
-              if (course.operationalStatus === 'archived') {
-                status = 'archived';
-              } else if (!course.published) {
-                status = 'draft';
-              }
-              
-              return {
-                _id: course._id,
-                title: course.title,
-                description: course.description || '',
-                instructor: course.instructor,
-                published: course.published || false,
-                students: course.students || [],
-                enrollmentCount: course.students?.length || 0,
-                classAverage: classAverage,
-                catalog: course.catalog,
-                createdAt: course.createdAt,
-                updatedAt: course.updatedAt,
-                status: status
-              };
-            } catch (error) {
-              return {
-                ...course,
-                enrollmentCount: course.students?.length || 0,
-                classAverage: undefined,
-                status: course.published ? 'active' : 'draft'
-              };
-            }
-          }));
+          const withAverages = await attachClassAveragesToCourses(coursesArray, headers);
+          const coursesWithStats = withAverages.map(mapTeacherCourseRow);
           
           setCourses(coursesWithStats);
           setFilteredCourses(coursesWithStats);
@@ -349,49 +328,8 @@ export function TeacherCourseOversight() {
         if (response.data) {
           const coursesData = response.data.data || response.data;
           const coursesArray = Array.isArray(coursesData) ? coursesData : [];
-          const coursesWithStats = await Promise.all(coursesArray.map(async (course: any) => {
-            try {
-              let classAverage: number | undefined = undefined;
-              try {
-                const averageResponse = await axios.get(
-                  `${API_URL}/api/grades/course/${course._id}/average`,
-                  { headers }
-                );
-                if (averageResponse.data && averageResponse.data.average !== null && averageResponse.data.average !== undefined) {
-                  classAverage = averageResponse.data.average;
-                }
-              } catch (error) {
-                // Skip if we can't get average
-              }
-              
-              let status: 'active' | 'draft' | 'archived' = 'active';
-              if (!course.published) {
-                status = 'draft';
-              }
-              
-              return {
-                _id: course._id,
-                title: course.title,
-                description: course.description || '',
-                instructor: course.instructor,
-                published: course.published || false,
-                students: course.students || [],
-                enrollmentCount: course.students?.length || 0,
-                classAverage: classAverage,
-                catalog: course.catalog,
-                createdAt: course.createdAt,
-                updatedAt: course.updatedAt,
-                status: status
-              };
-            } catch (error) {
-              return {
-                ...course,
-                enrollmentCount: course.students?.length || 0,
-                classAverage: undefined,
-                status: course.published ? 'active' : 'draft'
-              };
-            }
-          }));
+          const withAverages = await attachClassAveragesToCourses(coursesArray, headers);
+          const coursesWithStats = withAverages.map(mapTeacherCourseRow);
           setCourses(coursesWithStats);
           setFilteredCourses(coursesWithStats);
         }
@@ -437,49 +375,8 @@ export function TeacherCourseOversight() {
         if (response.data) {
           const coursesData = response.data.data || response.data;
           const coursesArray = Array.isArray(coursesData) ? coursesData : [];
-          const coursesWithStats = await Promise.all(coursesArray.map(async (course: any) => {
-            try {
-              let classAverage: number | undefined = undefined;
-              try {
-                const averageResponse = await axios.get(
-                  `${API_URL}/api/grades/course/${course._id}/average`,
-                  { headers }
-                );
-                if (averageResponse.data && averageResponse.data.average !== null && averageResponse.data.average !== undefined) {
-                  classAverage = averageResponse.data.average;
-                }
-              } catch (error) {
-                // Skip if we can't get average
-              }
-              
-              let status: 'active' | 'draft' | 'archived' = 'active';
-              if (!course.published) {
-                status = 'draft';
-              }
-              
-              return {
-                _id: course._id,
-                title: course.title,
-                description: course.description || '',
-                instructor: course.instructor,
-                published: course.published || false,
-                students: course.students || [],
-                enrollmentCount: course.students?.length || 0,
-                classAverage: classAverage,
-                catalog: course.catalog,
-                createdAt: course.createdAt,
-                updatedAt: course.updatedAt,
-                status: status
-              };
-            } catch (error) {
-              return {
-                ...course,
-                enrollmentCount: course.students?.length || 0,
-                classAverage: undefined,
-                status: course.published ? 'active' : 'draft'
-              };
-            }
-          }));
+          const withAverages = await attachClassAveragesToCourses(coursesArray, headers);
+          const coursesWithStats = withAverages.map(mapTeacherCourseRow);
           setCourses(coursesWithStats);
           setFilteredCourses(coursesWithStats);
         }

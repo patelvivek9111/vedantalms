@@ -74,6 +74,18 @@ async function scanFile(fileAssetId, options = {}) {
       message: 'Scan queued (dry run)',
     };
   }
+
+  const { shouldUseFileScanQueue, enqueueFileScan } = require('./fileScanQueue.service');
+  if (shouldUseFileScanQueue()) {
+    const result = await enqueueFileScan(fileAssetId, options.audit || {});
+    return {
+      fileAssetId: String(fileAssetId),
+      scanStatus: 'pending',
+      message: result.queued ? 'Scan queued (BullMQ)' : 'Scan queued',
+      jobId: result.jobId || null,
+    };
+  }
+
   scanQueue.push(fileAssetId);
   setImmediate(() => processScanQueue());
   return {

@@ -190,10 +190,12 @@ const QuizBuilder: React.FC<QuizBuilderProps> = ({ courseId, quiz, onClose }) =>
               {quiz ? 'Edit Quiz' : 'Create New Quiz'}
             </h2>
             <button
+              type="button"
               onClick={onClose}
-              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 flex-shrink-0"
+              className="inline-flex min-h-[44px] min-w-[44px] flex-shrink-0 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+              aria-label="Close quiz builder"
             >
-              <X className="w-5 h-5 sm:w-6 sm:h-6" />
+              <X className="h-5 w-5 sm:h-6 sm:w-6" />
             </button>
           </div>
 

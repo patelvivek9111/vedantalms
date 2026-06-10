@@ -13,6 +13,11 @@ const {
   canAmendGrades,
 } = require('../middleware/academicPermissions');
 const academicAuditService = require('./academicAudit.service');
+const {
+  notifyGradesPosted,
+  notifyGradesFinalized,
+  notifyGradesAmended,
+} = require('./notification/academicNotificationProducers.service');
 const crypto = require('crypto');
 
 const FINALIZED_STATUSES = new Set(['FINALIZED', 'AMENDED']);
@@ -104,6 +109,7 @@ async function transitionToPosted(courseId, user, courseDoc) {
     throw lifecycleError('Cannot post grades: course term is already finalized.');
   }
 
+  const alreadyPosted = lifecycle.status === 'POSTED';
   const before = { status: lifecycle.status };
   lifecycle.status = 'POSTED';
   lifecycle.postedAt = new Date();
@@ -119,6 +125,12 @@ async function transitionToPosted(courseId, user, courseDoc) {
     after: { status: 'POSTED', term, year },
     severity: 'info',
   });
+
+  if (!alreadyPosted) {
+    notifyGradesPosted({ course, actor: user }).catch((err) =>
+      console.error('grades.posted notification error:', err)
+    );
+  }
 
   return lifecycle.toObject();
 }
@@ -266,6 +278,10 @@ async function transitionToFinalized(courseId, user) {
     severity: 'critical',
   });
 
+  notifyGradesFinalized({ course, actor: user }).catch((err) =>
+    console.error('grades.finalized notification error:', err)
+  );
+
   return {
     lifecycle: lifecycle.toObject(),
     frozenCount,
@@ -374,6 +390,23 @@ async function transitionToAmended(courseId, user, { reason, ip } = {}) {
     ip,
     metadata: { courseId, term, year, frozenCount },
   });
+
+  const affectedStudentIds = (summary || [])
+    .filter(
+      (row) =>
+        row.beforePercent !== row.afterPercent || row.beforeLetter !== row.afterLetter
+    )
+    .map((row) => row.student);
+
+  if (affectedStudentIds.length) {
+    notifyGradesAmended({
+      course,
+      studentIds: affectedStudentIds,
+      actor: user,
+      reason,
+      amendmentSequence: sequence,
+    }).catch((err) => console.error('grades.amended notification error:', err));
+  }
 
   return {
     amendment: amendment.toObject(),

@@ -241,7 +241,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
   };
 
   const actionButtonClassName =
-    'rounded-md border border-transparent p-1.5 transition-colors touch-manipulation';
+    'inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-transparent p-2 transition-colors touch-manipulation';
 
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900 mb-3 sm:mb-4">
@@ -336,7 +336,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
                           e.stopPropagation();
                           navigate(`/pages/${page._id}/edit`);
                         }}
-                        className="p-1.5 sm:p-1 hover:bg-yellow-100 dark:hover:bg-yellow-900/50 active:bg-yellow-200 dark:active:bg-yellow-900/70 rounded text-yellow-600 dark:text-yellow-400 touch-manipulation"
+                        className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded p-2 text-yellow-600 hover:bg-yellow-100 active:bg-yellow-200 touch-manipulation dark:text-yellow-400 dark:hover:bg-yellow-900/50 dark:active:bg-yellow-900/70"
                         title="Edit Page"
                       >
                         <Pencil className="h-4 w-4 sm:h-4 sm:w-4" />
@@ -346,7 +346,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
                           e.stopPropagation();
                           handleDeletePage(page._id);
                         }}
-                        className="p-1.5 sm:p-1 hover:bg-red-100 dark:hover:bg-red-900/50 active:bg-red-200 dark:active:bg-red-900/70 rounded text-red-600 dark:text-red-400 touch-manipulation"
+                        className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded p-2 text-red-600 hover:bg-red-100 active:bg-red-200 touch-manipulation dark:text-red-400 dark:hover:bg-red-900/50 dark:active:bg-red-900/70"
                         title="Delete Page"
                       >
                         <Trash2 className="h-4 w-4 sm:h-4 sm:w-4" />
@@ -424,7 +424,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
                                 e.stopPropagation();
                                 handleToggleAssignmentPublish(a);
                               }}
-                              className={`p-1.5 sm:p-1 rounded touch-manipulation ${
+                              className={`inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded p-2 touch-manipulation ${
                                 (assignmentPublished[a._id] ?? a.published)
                                   ? 'text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/50 active:bg-green-200 dark:active:bg-green-900/70'
                                   : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 dark:active:bg-gray-600'
@@ -445,7 +445,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
                                 e.stopPropagation();
                                 navigate(`/assignments/${a._id}/edit`);
                               }}
-                              className="p-1.5 sm:p-1 hover:bg-yellow-100 dark:hover:bg-yellow-900/50 active:bg-yellow-200 dark:active:bg-yellow-900/70 rounded text-yellow-600 dark:text-yellow-400 touch-manipulation"
+                              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded p-2 text-yellow-600 hover:bg-yellow-100 active:bg-yellow-200 touch-manipulation dark:text-yellow-400 dark:hover:bg-yellow-900/50 dark:active:bg-yellow-900/70"
                               title="Edit Assignment"
                             >
                               <Pencil className="h-4 w-4 sm:h-4 sm:w-4" />
@@ -455,7 +455,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
                                 e.stopPropagation();
                                 handleDeleteAssignment(a._id);
                               }}
-                              className="p-1.5 sm:p-1 hover:bg-red-100 dark:hover:bg-red-900/50 active:bg-red-200 dark:active:bg-red-900/70 rounded text-red-600 dark:text-red-400 touch-manipulation"
+                              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded p-2 text-red-600 hover:bg-red-100 active:bg-red-200 touch-manipulation dark:text-red-400 dark:hover:bg-red-900/50 dark:active:bg-red-900/70"
                               title="Delete Assignment"
                             >
                               <Trash2 className="h-4 w-4 sm:h-4 sm:w-4" />

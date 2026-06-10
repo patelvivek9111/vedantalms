@@ -1,20 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import NotificationCenter from '@/components/common/NotificationCenter';
-import api from '@/services/api';
+import * as notificationService from '@/services/notificationService';
 
-// Mock dependencies
-vi.mock('@/services/api', () => ({
-  default: {
-    interceptors: {
-      request: { use: vi.fn() },
-      response: { use: vi.fn() },
-    },
-    get: vi.fn(),
-    patch: vi.fn(),
-    delete: vi.fn(),
-  },
+vi.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({ user: { _id: 'user-1' }, token: 'test-token' }),
+}));
+
+vi.mock('@/services/notificationService', () => ({
+  fetchNotificationList: vi.fn(),
+  fetchNotificationUnreadCount: vi.fn(),
+  markNotificationRead: vi.fn(),
+  markAllNotificationsRead: vi.fn(),
+  deleteNotification: vi.fn(),
+}));
+
+vi.mock('@/hooks/notifications/notificationSync', () => ({
+  signalNotificationInvalidation: vi.fn(),
+  invalidateNotificationQueries: vi.fn(),
 }));
 
 const mockNavigate = vi.fn();
@@ -36,10 +41,31 @@ vi.mock('date-fns', () => ({
   formatDistanceToNow: vi.fn((date) => `2 hours ago`),
 }));
 
-const mockedApi = api as any;
+const mockedService = notificationService as unknown as {
+  fetchNotificationList: ReturnType<typeof vi.fn>;
+  fetchNotificationUnreadCount: ReturnType<typeof vi.fn>;
+  markNotificationRead: ReturnType<typeof vi.fn>;
+  markAllNotificationsRead: ReturnType<typeof vi.fn>;
+  deleteNotification: ReturnType<typeof vi.fn>;
+};
+
+function renderNotificationCenter(isOpen: boolean) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <NotificationCenter isOpen={isOpen} onClose={mockOnClose} />
+      </BrowserRouter>
+    </QueryClientProvider>
+  );
+}
+
+const mockOnClose = vi.fn();
 
 describe('NotificationCenter', () => {
-  const mockOnClose = vi.fn();
   const mockNotifications = [
     {
       _id: '1',
@@ -61,7 +87,10 @@ describe('NotificationCenter', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockOnClose.mockClear();
     mockNavigate.mockClear();
+    mockedService.fetchNotificationUnreadCount.mockResolvedValue(0);
+    mockedService.fetchNotificationList.mockResolvedValue({ items: [], unreadCount: 0 });
     Object.defineProperty(document, 'hidden', {
       value: false,
       writable: true,
@@ -70,25 +99,13 @@ describe('NotificationCenter', () => {
   });
 
   it('should not render when closed', () => {
-    const { container } = render(
-      <BrowserRouter>
-        <NotificationCenter isOpen={false} onClose={mockOnClose} />
-      </BrowserRouter>
-    );
+    const { container } = renderNotificationCenter(false);
 
     expect(container.firstChild).toBeNull();
   });
 
   it('should render when open', async () => {
-    mockedApi.get.mockResolvedValue({
-      data: { success: true, data: [], unreadCount: 0 },
-    });
-
-    render(
-      <BrowserRouter>
-        <NotificationCenter isOpen={true} onClose={mockOnClose} />
-      </BrowserRouter>
-    );
+    renderNotificationCenter(true);
 
     await waitFor(() => {
       const notificationsElements = screen.getAllByText(/notifications/i);
@@ -97,15 +114,13 @@ describe('NotificationCenter', () => {
   });
 
   it('should fetch and display notifications', async () => {
-    mockedApi.get.mockResolvedValue({
-      data: { success: true, data: mockNotifications, unreadCount: 1 },
+    mockedService.fetchNotificationList.mockResolvedValue({
+      items: mockNotifications,
+      unreadCount: 1,
     });
+    mockedService.fetchNotificationUnreadCount.mockResolvedValue(1);
 
-    render(
-      <BrowserRouter>
-        <NotificationCenter isOpen={true} onClose={mockOnClose} />
-      </BrowserRouter>
-    );
+    renderNotificationCenter(true);
 
     await waitFor(() => {
       expect(screen.getByText('New Message')).toBeInTheDocument();
@@ -114,16 +129,14 @@ describe('NotificationCenter', () => {
   });
 
   it('should mark notification as read', async () => {
-    mockedApi.get.mockResolvedValue({
-      data: { success: true, data: mockNotifications, unreadCount: 1 },
+    mockedService.fetchNotificationList.mockResolvedValue({
+      items: mockNotifications,
+      unreadCount: 1,
     });
-    mockedApi.patch.mockResolvedValue({ data: { success: true } });
+    mockedService.fetchNotificationUnreadCount.mockResolvedValue(1);
+    mockedService.markNotificationRead.mockResolvedValue({ success: true });
 
-    render(
-      <BrowserRouter>
-        <NotificationCenter isOpen={true} onClose={mockOnClose} />
-      </BrowserRouter>
-    );
+    renderNotificationCenter(true);
 
     await waitFor(() => {
       expect(screen.getByText('New Message')).toBeInTheDocument();
@@ -138,22 +151,20 @@ describe('NotificationCenter', () => {
     if (markReadButton) {
       fireEvent.click(markReadButton);
       await waitFor(() => {
-        expect(mockedApi.patch).toHaveBeenCalledWith('/notifications/1/read');
+        expect(mockedService.markNotificationRead).toHaveBeenCalledWith('1');
       });
     }
   });
 
   it('should mark all as read', async () => {
-    mockedApi.get.mockResolvedValue({
-      data: { success: true, data: mockNotifications, unreadCount: 1 },
+    mockedService.fetchNotificationList.mockResolvedValue({
+      items: mockNotifications,
+      unreadCount: 1,
     });
-    mockedApi.patch.mockResolvedValue({ data: { success: true } });
+    mockedService.fetchNotificationUnreadCount.mockResolvedValue(1);
+    mockedService.markAllNotificationsRead.mockResolvedValue({ success: true });
 
-    render(
-      <BrowserRouter>
-        <NotificationCenter isOpen={true} onClose={mockOnClose} />
-      </BrowserRouter>
-    );
+    renderNotificationCenter(true);
 
     await waitFor(() => {
       expect(screen.getByText('New Message')).toBeInTheDocument();
@@ -163,21 +174,19 @@ describe('NotificationCenter', () => {
     fireEvent.click(markAllButton);
 
     await waitFor(() => {
-      expect(mockedApi.patch).toHaveBeenCalledWith('/notifications/read-all');
+      expect(mockedService.markAllNotificationsRead).toHaveBeenCalled();
     });
   });
 
   it('should delete notification', async () => {
-    mockedApi.get.mockResolvedValue({
-      data: { success: true, data: mockNotifications, unreadCount: 1 },
+    mockedService.fetchNotificationList.mockResolvedValue({
+      items: mockNotifications,
+      unreadCount: 1,
     });
-    mockedApi.delete.mockResolvedValue({ data: { success: true } });
+    mockedService.fetchNotificationUnreadCount.mockResolvedValue(1);
+    mockedService.deleteNotification.mockResolvedValue({ success: true });
 
-    render(
-      <BrowserRouter>
-        <NotificationCenter isOpen={true} onClose={mockOnClose} />
-      </BrowserRouter>
-    );
+    renderNotificationCenter(true);
 
     await waitFor(() => {
       expect(screen.getByText('New Message')).toBeInTheDocument();
@@ -192,21 +201,13 @@ describe('NotificationCenter', () => {
     if (deleteButton) {
       fireEvent.click(deleteButton);
       await waitFor(() => {
-        expect(mockedApi.delete).toHaveBeenCalledWith('/notifications/1');
+        expect(mockedService.deleteNotification).toHaveBeenCalledWith('1');
       });
     }
   });
 
   it('should close on outside click', () => {
-    mockedApi.get.mockResolvedValue({
-      data: { success: true, data: [], unreadCount: 0 },
-    });
-
-    render(
-      <BrowserRouter>
-        <NotificationCenter isOpen={true} onClose={mockOnClose} />
-      </BrowserRouter>
-    );
+    renderNotificationCenter(true);
 
     // Click outside
     fireEvent.mouseDown(document.body);
@@ -215,15 +216,7 @@ describe('NotificationCenter', () => {
   });
 
   it('should close when close button is clicked', () => {
-    mockedApi.get.mockResolvedValue({
-      data: { success: true, data: [], unreadCount: 0 },
-    });
-
-    render(
-      <BrowserRouter>
-        <NotificationCenter isOpen={true} onClose={mockOnClose} />
-      </BrowserRouter>
-    );
+    renderNotificationCenter(true);
 
     // Close button is an X icon without text, find it by its position (last button in header)
     const buttons = screen.getAllByRole('button');
@@ -239,16 +232,14 @@ describe('NotificationCenter', () => {
       link: '/courses/123',
     };
 
-    mockedApi.get.mockResolvedValue({
-      data: { success: true, data: [notificationWithLink], unreadCount: 1 },
+    mockedService.fetchNotificationList.mockResolvedValue({
+      items: [notificationWithLink],
+      unreadCount: 1,
     });
-    mockedApi.patch.mockResolvedValue({ data: { success: true } });
+    mockedService.fetchNotificationUnreadCount.mockResolvedValue(1);
+    mockedService.markNotificationRead.mockResolvedValue({ success: true });
 
-    render(
-      <BrowserRouter>
-        <NotificationCenter isOpen={true} onClose={mockOnClose} />
-      </BrowserRouter>
-    );
+    renderNotificationCenter(true);
 
     await waitFor(() => {
       expect(screen.getByText('New Message')).toBeInTheDocument();
@@ -264,15 +255,7 @@ describe('NotificationCenter', () => {
   });
 
   it('should show empty state when no notifications', async () => {
-    mockedApi.get.mockResolvedValue({
-      data: { success: true, data: [], unreadCount: 0 },
-    });
-
-    render(
-      <BrowserRouter>
-        <NotificationCenter isOpen={true} onClose={mockOnClose} />
-      </BrowserRouter>
-    );
+    renderNotificationCenter(true);
 
     await waitFor(() => {
       expect(screen.getByText(/no notifications/i)).toBeInTheDocument();

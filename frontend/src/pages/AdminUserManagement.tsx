@@ -19,6 +19,7 @@ import { getImageUrl } from '../services/api';
 import axios from 'axios';
 import { API_URL } from '../config';
 import ConfirmationModal from '../components/common/ConfirmationModal';
+import { MobileAppShell } from '../components/common/MobileAppShell';
 
 interface User {
   _id: string;
@@ -223,18 +224,21 @@ export function AdminUserManagement() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-      </div>
+      <MobileAppShell title="Users" backButtonPath="/dashboard">
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        </div>
+      </MobileAppShell>
     );
   }
 
   return (
+    <MobileAppShell title="Users" backButtonPath="/dashboard">
     <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">User Management</h1>
+          <h1 className="hidden lg:block text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">User Management</h1>
           <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">Manage users, roles, and permissions</p>
         </div>
         <div className="flex items-center space-x-2 sm:space-x-4">
@@ -301,8 +305,100 @@ export function AdminUserManagement() {
         </div>
       </div>
 
-      {/* Users Table */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+      {/* Users — mobile cards */}
+      <div className="space-y-3 lg:hidden">
+        {users.map((user) => (
+          <div
+            key={user._id}
+            className="rounded-lg border border-gray-200 bg-white p-4 shadow dark:border-gray-700 dark:bg-gray-800"
+          >
+            <div className="mb-3 flex items-start gap-3">
+              <div className="relative h-10 w-10 flex-shrink-0">
+                {user.profilePicture ? (
+                  <img
+                    className="h-10 w-10 rounded-full border-2 border-gray-200 object-cover dark:border-gray-600"
+                    src={user.profilePicture.startsWith('http')
+                      ? user.profilePicture
+                      : getImageUrl(user.profilePicture)}
+                    alt={`${user.firstName} ${user.lastName}`}
+                  />
+                ) : (
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/50">
+                    <span className="font-semibold text-blue-600 dark:text-blue-300">
+                      {user.firstName.charAt(0)}{user.lastName.charAt(0)}
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="font-medium text-gray-900 dark:text-gray-100">
+                  {user.firstName} {user.lastName}
+                </div>
+                <div className="truncate text-sm text-gray-500 dark:text-gray-400">{user.email}</div>
+              </div>
+            </div>
+            <div className="mb-3 flex flex-wrap gap-2">
+              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(user.role)}`}>
+                {user.role}
+              </span>
+              <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(user.status)}`}>
+                {getStatusIcon(user.status)}
+                {user.status}
+              </span>
+            </div>
+            <div className="mb-3 grid grid-cols-2 gap-2 text-xs text-gray-500 dark:text-gray-400">
+              <div>
+                <span className="block font-medium text-gray-700 dark:text-gray-300">Last login</span>
+                {formatRelativeDate(user.lastLogin)}
+              </div>
+              <div>
+                <span className="block font-medium text-gray-700 dark:text-gray-300">Created</span>
+                {formatDate(user.createdAt)}
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-1 border-t border-gray-100 pt-3 dark:border-gray-700">
+              <button
+                type="button"
+                onClick={() => handleUserAction('edit', user)}
+                className="flex min-h-[44px] min-w-[44px] items-center justify-center text-blue-600 dark:text-blue-400"
+                aria-label="Edit user"
+              >
+                <Edit className="w-5 h-5" />
+              </button>
+              {user.status === 'active' ? (
+                <button
+                  type="button"
+                  onClick={() => handleUserAction('suspend', user)}
+                  className="flex min-h-[44px] min-w-[44px] items-center justify-center text-yellow-600 dark:text-yellow-400"
+                  aria-label="Suspend user"
+                >
+                  <UserX className="w-5 h-5" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleUserAction('activate', user)}
+                  className="flex min-h-[44px] min-w-[44px] items-center justify-center text-green-600 dark:text-green-400"
+                  aria-label="Activate user"
+                >
+                  <UserCheck className="w-5 h-5" />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => handleUserAction('delete', user)}
+                className="flex min-h-[44px] min-w-[44px] items-center justify-center text-red-600 dark:text-red-400"
+                aria-label="Delete user"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Users Table — desktop */}
+      <div className="hidden overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800 lg:block">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-700">
@@ -621,5 +717,6 @@ export function AdminUserManagement() {
         variant="danger"
       />
     </div>
+    </MobileAppShell>
   );
 } 

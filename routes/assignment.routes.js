@@ -28,6 +28,11 @@ router.post('/:id/quiz/start', protect, authorize(['student']), quizAttemptLimit
 router.get('/:id/quiz/attempt', protect, authorize(['student']), quizAttemptLimiter, assignmentController.getTimedQuizAttempt);
 router.post('/:id/quiz/heartbeat', protect, authorize(['student']), quizAttemptLimiter, assignmentController.heartbeatTimedQuizAttempt);
 
+// To-Do routes must be defined above generic /:id routes.
+router.get('/todo/ungraded', protect, getUngradedAssignmentsTodo);
+router.get('/todo/due', protect, getStudentAssignmentsDueThisWeek);
+router.get('/todo/due-all', protect, getAllItemsDueThisWeek);
+
 // Get a single assignment
 router.get('/:id', protect, assignmentController.getAssignment);
 
@@ -48,14 +53,5 @@ router.get('/course/:courseId/group-assignments', protect, assignmentController.
 
 // Get assignment statistics (teacher/admin only)
 router.get('/:id/stats', protect, authorize(['teacher', 'admin']), assignmentController.getAssignmentStats);
-
-// To-Do: Get all assignments with ungraded submissions for the logged-in teacher/admin
-router.get('/todo/ungraded', protect, getUngradedAssignmentsTodo);
-
-// To-Do: Get all assignments due this week for the logged-in student
-router.get('/todo/due', protect, getStudentAssignmentsDueThisWeek);
-
-// To-Do: Get all items due this week for the logged-in student (assignments + discussions)
-router.get('/todo/due-all', protect, getAllItemsDueThisWeek);
 
 module.exports = router; 

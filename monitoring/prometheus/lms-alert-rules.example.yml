@@ -59,3 +59,31 @@ groups:
           severity: warning
         annotations:
           summary: "QuizWave socket handler errors elevated (tune threshold for your traffic)"
+
+      - alert: LMS_PollTrafficHighWithoutWebsocket
+        expr: lms_poll_requests_per_hour_total > 5000 and (lms_messaging_socket_connected + lms_notification_socket_connected) == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High poll traffic with zero websocket connections (P3-2)"
+          description: "Check NOTIFICATION_WEBSOCKET_ENABLED, INBOX_WEBSOCKET_ENABLED, and Redis adapter"
+
+      - alert: LMS_PollPerWsConnectionHigh
+        expr: lms_poll_per_ws_connection_per_hour > 720
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Poll rate exceeds ~720/hr per websocket connection"
+
+  - name: lms_cost_governance
+    interval: 1h
+    rules:
+      - alert: LMS_CostGovernanceRealtimeDegraded
+        expr: lms_cost_governance_realtime_degraded == 1
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Realtime cost efficiency degraded — review /health/ops costGovernance"

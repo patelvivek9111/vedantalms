@@ -28,8 +28,8 @@ describe('PollForm', () => {
       </BrowserRouter>
     );
 
-    expect(screen.getByText('Create New Poll')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/e.g., what type of content/i)).toBeInTheDocument();
+    expect(screen.getByText('Create new poll')).toBeInTheDocument();
+    expect(screen.getByLabelText(/poll title/i)).toBeInTheDocument();
   });
 
   it('should add poll options', () => {
@@ -79,7 +79,7 @@ describe('PollForm', () => {
       </BrowserRouter>
     );
 
-    const titleInput = screen.getByPlaceholderText(/e.g., what type of content/i);
+    const titleInput = screen.getByLabelText(/poll title/i);
     fireEvent.change(titleInput, { target: { value: 'Test Question' } });
 
     // Set required end date (datetime-local)
@@ -130,11 +130,9 @@ describe('PollForm', () => {
       </BrowserRouter>
     );
 
-    const closeButton = screen.queryByText(/close/i) || screen.queryByLabelText(/close/i);
-    if (closeButton) {
-      fireEvent.click(closeButton);
-      expect(mockOnClose).toHaveBeenCalled();
-    }
+    const closeButton = screen.getByRole('button', { name: /^close$/i });
+    fireEvent.click(closeButton);
+    expect(mockOnClose).toHaveBeenCalled();
   });
 });
 

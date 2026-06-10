@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import api from '../services/api';
+import { disconnectMessagingSocket } from '../utils/messagingSocket';
 
 export interface User {
   _id: string;
@@ -179,6 +180,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    disconnectMessagingSocket();
     // Clear all localStorage items related to auth
     localStorage.removeItem('token');
     localStorage.removeItem('user');

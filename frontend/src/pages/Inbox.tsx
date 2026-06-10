@@ -1,66 +1,92 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { fetchConversations, fetchMessages, sendMessage, createConversation, searchUsers, toggleStar, moveConversation, bulkMoveConversations, bulkDeleteForever } from '../services/inboxService';
-import { format, isToday, isYesterday, parseISO } from 'date-fns';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
+import { searchUsers } from '../services/inboxService';
 import api from '../services/api';
-import { getImageUrl } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
-import { Edit, Reply, Archive, Trash2, Search, ChevronLeft, CheckSquare, Paperclip, CheckSquare2, User } from 'lucide-react';
-import RichTextEditor from '../components/common/RichTextEditor';
+import { isInboxWebSocketEnabled } from '../utils/messagingSocket';
+import { User } from 'lucide-react';
 import { BurgerMenu } from '../components/layout/BurgerMenu';
-import { useOnlineStatus, markUserOnline, markUserOffline } from '../hooks/useOnlineStatus';
+import { useOnlineStatus, markUserOnline } from '../hooks/useOnlineStatus';
 import ConfirmationModal from '../components/common/ConfirmationModal';
 import PullToRefresh from '../components/common/PullToRefresh';
 import SwipeableContainer from '../components/common/SwipeableContainer';
 import { useBottomNavSwipe } from '../hooks/useBottomNavSwipe';
 import { matchesInboxFilters } from '../utils/inboxFilters';
-import FileAttachmentPanel from '../components/files/FileAttachmentPanel';
 import type { NormalizedFile } from '../utils/fileTypes';
+import { fileAssetIdsFromFiles } from '../utils/fileTypes';
+import InboxToolbar from '../components/inbox/InboxToolbar';
+import ConversationList from '../components/inbox/ConversationList';
+import MessageThread from '../components/inbox/MessageThread';
+import ComposeModal from '../components/inbox/ComposeModal';
+import { useInboxUrlState } from '../hooks/inbox/useInboxUrlState';
+import { useInboxConversationsQuery } from '../hooks/inbox/useInboxConversationsQuery';
+import { useInboxMessagesQuery } from '../hooks/inbox/useInboxMessagesQuery';
+import { useInboxMutations } from '../hooks/inbox/useInboxMutations';
+import { useInboxRealtime } from '../hooks/inbox/useInboxRealtime';
+import { useInboxInvalidate } from '../hooks/inbox/useInboxInvalidate';
 
-function capitalizeFirst(str: string) {
-  return str.charAt(0).toUpperCase() + str.slice(1);
+const EMPTY_CONVERSATIONS: any[] = [];
+const EMPTY_MESSAGES: any[] = [];
+
+function sameIdList(a: string[], b: string[]) {
+  return a.length === b.length && a.every((id, index) => id === b[index]);
 }
 
-const getInitials = (user: any) => {
-  if (!user) return '?';
-  if (user.firstName && user.lastName) return (user.firstName[0] + user.lastName[0]).toUpperCase();
-  if (user.firstName) return user.firstName[0].toUpperCase();
-  if (user.lastName) return user.lastName[0].toUpperCase();
-  if (user.email) return user.email[0].toUpperCase();
-  return '?';
-};
-
-const getAvatarColor = (id: string) => {
-  // Simple hash to pick a color
-  const colors = [
-    'bg-blue-500', 'bg-green-500', 'bg-pink-500', 'bg-yellow-500', 'bg-purple-500', 'bg-indigo-500', 'bg-red-500', 'bg-teal-500', 'bg-orange-500', 'bg-gray-500'
-  ];
-  let hash = 0;
-  for (let i = 0; i < (id || '').length; i++) {
-    hash = (hash << 5) - hash + id.charCodeAt(i);
-    hash |= 0;
-  }
-  return colors[Math.abs(hash) % colors.length];
-};
-
 const Inbox: React.FC = () => {
-  const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, token } = useAuth();
   const { isUserOnline } = useOnlineStatus(user?._id);
-  const [conversations, setConversations] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedConversation, setSelectedConversation] = useState<any | null>(null);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [messagesLoading, setMessagesLoading] = useState(false);
-  const [messagesError, setMessagesError] = useState<string | null>(null);
+  const currentUserId = user?._id || '';
+
+  const url = useInboxUrlState();
+  const {
+    folder: selectedFolder,
+    course: selectedCourse,
+    conversationId,
+    search,
+    composeOpen: showCompose,
+    setFolder: setSelectedFolder,
+    setCourse: setSelectedCourse,
+    setConversationId,
+    setSearch,
+    setComposeOpen: setShowCompose,
+  } = url;
+
+  const conversationsQuery = useInboxConversationsQuery(currentUserId);
+  const conversations = conversationsQuery.data ?? EMPTY_CONVERSATIONS;
+  const loading = conversationsQuery.isLoading;
+  const conversationsError = conversationsQuery.isError;
+  const refetchConversations = conversationsQuery.refetch;
+
+  const selectedConversation = useMemo(() => {
+    if (!conversationId) return null;
+    return conversations.find((c: any) => c._id === conversationId) ?? null;
+  }, [conversations, conversationId]);
+
+  const messagesQuery = useInboxMessagesQuery(
+    conversationId || undefined,
+    Boolean(conversationId)
+  );
+  const messages = messagesQuery.data ?? EMPTY_MESSAGES;
+  const messagesLoading = messagesQuery.isLoading;
+  const messagesQueryError = messagesQuery.isError;
+
+  const mutations = useInboxMutations(currentUserId);
+  const { invalidateConversations } = useInboxInvalidate(currentUserId);
+  useInboxRealtime({
+    token,
+    conversationId: conversationId || undefined,
+    enabled: isInboxWebSocketEnabled(),
+  });
+
+  const [showBurgerMenu, setShowBurgerMenu] = useState(false);
   const [reply, setReply] = useState('');
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
-  const [showBurgerMenu, setShowBurgerMenu] = useState(false);
+  const [showReplyBox, setShowReplyBox] = useState(false);
+  const [selectedConversations, setSelectedConversations] = useState<string[]>([]);
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isPermanentDelete, setIsPermanentDelete] = useState(false);
 
-  // Compose modal state
-  const [showCompose, setShowCompose] = useState(false);
   const [composeRecipients, setComposeRecipients] = useState<any[]>([]);
   const [composeQuery, setComposeQuery] = useState('');
   const [composeUserResults, setComposeUserResults] = useState<any[]>([]);
@@ -70,72 +96,170 @@ const Inbox: React.FC = () => {
   const [replyAttachments, setReplyAttachments] = useState<NormalizedFile[]>([]);
   const [composeLoading, setComposeLoading] = useState(false);
   const [composeError, setComposeError] = useState<string | null>(null);
-  const [composeCourse, setComposeCourse] = useState<string>('');
+  const [composeCourse, setComposeCourse] = useState('');
   const [composeCourseOptions, setComposeCourseOptions] = useState<any[]>([]);
-  const [composeToDropdown, setComposeToDropdown] = useState(false);
-  const [composeToGroup, setComposeToGroup] = useState<string>('');
+  const [composeToGroup, setComposeToGroup] = useState('');
   const [composeGroupUsers, setComposeGroupUsers] = useState<any[]>([]);
   const composeToDropdownRef = useRef<HTMLDivElement>(null);
   const [composeToInput, setComposeToInput] = useState('');
   const [showGroupDropdown, setShowGroupDropdown] = useState(false);
-  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Add state for send individually checkbox
   const [sendIndividually, setSendIndividually] = useState(false);
-  // Add state for selected conversations
-  const [selectedConversations, setSelectedConversations] = useState<string[]>([]);
-  const [bulkActionLoading, setBulkActionLoading] = useState(false);
-  // Confirmation modal states
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showDeleteForeverConfirm, setShowDeleteForeverConfirm] = useState(false);
-  const [isPermanentDelete, setIsPermanentDelete] = useState(false);
-  // 2. Add showReplyBox state
-  const [showReplyBox, setShowReplyBox] = useState(false);
-
-  // Dummy course options for now
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [courseOptions, setCourseOptions] = useState([{ value: 'all', label: 'All Courses' }]);
-  const [selectedCourse, setSelectedCourse] = useState('all');
-  const folderOptions = [
-    { value: 'inbox', label: 'Inbox' },
-    { value: 'sent', label: 'Sent' },
-    { value: 'archived', label: 'Archived' },
-    { value: 'favorite', label: 'Favorite' },
-    { value: 'deleted', label: 'Deleted' },
-  ];
-  const [selectedFolder, setSelectedFolder] = useState('inbox');
-  const [search, setSearch] = useState('');
-
-  // Use the logged-in user's ID from AuthContext
-  const currentUserId = user?._id || '';
-
   const searchInputRef = useRef<HTMLInputElement>(null);
-  // Add a ref for the reply textarea
-  const replyInputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Icon click handlers
-  const handleReply = () => {
-    if (selectedConversations.length === 0) {
-      alert('Please select conversations to reply to');
-      return;
+  const error = conversationsError ? 'Failed to load conversations' : null;
+  const messagesError = messagesQueryError ? 'Failed to load messages' : null;
+
+  const filteredConversations = useMemo(
+    () =>
+      conversations.filter((conv: any) =>
+        matchesInboxFilters({
+          conversation: conv,
+          currentUserId,
+          selectedCourse,
+          selectedFolder,
+          search,
+          userRole: user?.role,
+        })
+      ),
+    [conversations, currentUserId, selectedCourse, selectedFolder, search, user?.role]
+  );
+
+  const filteredConversationIdSet = useMemo(
+    () => new Set(filteredConversations.map((conv: any) => conv._id)),
+    [filteredConversations]
+  );
+
+  useEffect(() => {
+    setSelectedConversations((prev) => {
+      const next = prev.filter((id) => filteredConversationIdSet.has(id));
+      return sameIdList(prev, next) ? prev : next;
+    });
+  }, [filteredConversationIdSet]);
+
+  const presenceUserKey = useMemo(() => {
+    const ids = new Set<string>();
+    selectedConversation?.participants?.forEach((participant: any) => {
+      if (participant._id && participant._id !== currentUserId) {
+        ids.add(String(participant._id));
+      }
+    });
+    messages.forEach((msg: any) => {
+      if (msg.senderId?._id && msg.senderId._id !== currentUserId) {
+        ids.add(String(msg.senderId._id));
+      }
+    });
+    return Array.from(ids).sort().join(',');
+  }, [selectedConversation, messages, currentUserId]);
+
+  useEffect(() => {
+    if (!presenceUserKey) return;
+    presenceUserKey.split(',').forEach((userId) => markUserOnline(userId));
+  }, [presenceUserKey]);
+
+  const markConversationReadIfNeeded = useCallback(
+    async (conv: any) => {
+      if (!conv?._id || !(conv.unreadCount > 0)) return;
+      try {
+        await mutations.markRead.mutateAsync(conv._id);
+      } catch {
+        /* list will reconcile on next poll */
+      }
+    },
+    [mutations.markRead]
+  );
+
+  const handleSelectConversation = useCallback(
+    async (conv: any) => {
+      setConversationId(conv._id);
+      setShowReplyBox(false);
+      await markConversationReadIfNeeded(conv);
+    },
+    [setConversationId, markConversationReadIfNeeded]
+  );
+
+  useEffect(() => {
+    if (!selectedConversation) return;
+    void markConversationReadIfNeeded(selectedConversation);
+  }, [selectedConversation, markConversationReadIfNeeded]);
+
+  const handleSendReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reply.trim() || !selectedConversation) return;
+    setSending(true);
+    setSendError(null);
+    try {
+      await mutations.sendReply.mutateAsync({
+        conversationId: selectedConversation._id,
+        body: reply,
+        fileAssetIds: fileAssetIdsFromFiles(replyAttachments),
+      });
+      setReplyAttachments([]);
+      setReply('');
+      setShowReplyBox(false);
+    } catch {
+      setSendError('Failed to send message');
+    } finally {
+      setSending(false);
     }
-    // For now, just show an alert - you can implement reply functionality later
-    alert(`Reply to ${selectedConversations.length} conversation(s)`);
+  };
+
+  const handleToggleStar = async (conv: any) => {
+    try {
+      await mutations.starConversation.mutateAsync(conv._id);
+    } catch {
+      /* optional toast */
+    }
   };
 
   const handleArchive = async () => {
+    const isUnarchive = selectedFolder === 'archived';
+    const isRestore = selectedFolder === 'deleted';
+    const movesToInbox = isUnarchive || isRestore;
     if (selectedConversations.length === 0) {
-      alert('Please select conversations to archive');
+      alert(
+        isUnarchive
+          ? 'Please select conversations to unarchive'
+          : isRestore
+            ? 'Please select conversations to restore'
+            : 'Please select conversations to archive'
+      );
       return;
     }
-    
     setBulkActionLoading(true);
     try {
-      await bulkMoveConversations(selectedConversations, 'archived');
-      // Refresh conversations
-      const data = await fetchConversations();
-      setConversations(data);
+      if (movesToInbox) {
+        await mutations.unarchiveConversations.mutateAsync(selectedConversations);
+      } else {
+        await mutations.archiveConversations.mutateAsync(selectedConversations);
+      }
       setSelectedConversations([]);
-    } catch (err) {
-      alert('Failed to archive conversations');
+      if (conversationId && selectedConversations.includes(conversationId)) {
+        setConversationId(null);
+      }
+    } catch {
+      alert(
+        isUnarchive
+          ? 'Failed to unarchive conversations'
+          : isRestore
+            ? 'Failed to restore conversations'
+            : 'Failed to archive conversations'
+      );
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handleRestoreConversation = async () => {
+    if (!conversationId) return;
+    const isRestore = selectedFolder === 'deleted';
+    setBulkActionLoading(true);
+    try {
+      await mutations.unarchiveConversations.mutateAsync([conversationId]);
+      setConversationId(null);
+    } catch {
+      alert(isRestore ? 'Failed to restore conversation' : 'Failed to unarchive conversation');
     } finally {
       setBulkActionLoading(false);
     }
@@ -154,156 +278,26 @@ const Inbox: React.FC = () => {
     setShowDeleteConfirm(false);
     setBulkActionLoading(true);
     try {
-      console.log('Deleting conversations:', selectedConversations);
-      console.log('Selected folder:', selectedFolder);
-      
-      if (isPermanentDelete) {
-        console.log('Calling bulkDeleteForever');
-        await bulkDeleteForever(selectedConversations);
-      } else {
-        console.log('Calling bulkMoveConversations with folder: deleted');
-        await bulkMoveConversations(selectedConversations, 'deleted');
-      }
-      // Refresh conversations
-      const data = await fetchConversations();
-      setConversations(data);
+      await mutations.deleteConversations.mutateAsync({
+        ids: selectedConversations,
+        permanent: isPermanentDelete,
+      });
       setSelectedConversations([]);
+      if (conversationId && selectedConversations.includes(conversationId)) {
+        setConversationId(null);
+      }
     } catch (err: any) {
-      console.error('Delete error:', err);
-      console.error('Error response:', err.response);
-      console.error('Error message:', err.message);
-      const errorMsg = err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to delete conversations';
+      const errorMsg =
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        err.message ||
+        'Failed to delete conversations';
       alert(`Failed to delete conversations: ${errorMsg}`);
     } finally {
       setBulkActionLoading(false);
     }
   };
 
-  const handleDeleteForever = () => {
-    if (selectedConversations.length === 0) {
-      alert('Please select conversations to permanently delete');
-      return;
-    }
-    setShowDeleteForeverConfirm(true);
-  };
-
-  const confirmDeleteForever = async () => {
-    setShowDeleteForeverConfirm(false);
-    setBulkActionLoading(true);
-    try {
-      await bulkDeleteForever(selectedConversations);
-      // Refresh conversations
-      const data = await fetchConversations();
-      setConversations(data);
-      setSelectedConversations([]);
-    } catch (err) {
-      alert('Failed to permanently delete conversations');
-    } finally {
-      setBulkActionLoading(false);
-    }
-  };
-
-  const loadConversations = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await fetchConversations();
-      setConversations(data || []);
-    } catch (err: any) {
-      setError('Failed to load conversations');
-      setConversations([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (currentUserId) {
-      loadConversations();
-    }
-  }, [currentUserId, selectedFolder]);
-
-  // Refresh function for pull-to-refresh
-  const handleRefresh = async () => {
-    await loadConversations();
-  };
-
-  // Swipe navigation for bottom nav
-  const { handleSwipeLeft, handleSwipeRight, enabled: swipeEnabled } = useBottomNavSwipe();
-
-  // Mark conversation participants as online when viewing conversation (for demo)
-  useEffect(() => {
-    if (selectedConversation && selectedConversation.participants) {
-      // Mark all participants except current user as online (for demo)
-      selectedConversation.participants.forEach((participant: any) => {
-        if (participant._id && participant._id !== currentUserId) {
-          markUserOnline(participant._id);
-        }
-      });
-    }
-    
-    // Also mark message senders as online
-    if (messages.length > 0) {
-      messages.forEach((msg: any) => {
-        if (msg.senderId?._id && msg.senderId._id !== currentUserId) {
-          markUserOnline(msg.senderId._id);
-        }
-      });
-    }
-  }, [selectedConversation, messages, currentUserId]);
-
-  // 1. In handleSelectConversation, mark as read if unreadCount > 0
-  const handleSelectConversation = async (conv: any) => {
-    setSelectedConversation(conv);
-    setMessages([]);
-    setMessagesLoading(true);
-    setMessagesError(null);
-    try {
-      // Mark as read if there are unread messages
-      if (conv.unreadCount > 0) {
-        await api.post(`/inbox/conversations/${conv._id}/read`);
-        // Update local state to set unreadCount to 0 for this conversation
-        setConversations(prev => prev.map(c =>
-          c._id === conv._id ? { ...c, unreadCount: 0 } : c
-        ));
-        // Dispatch event to update sidebar unread count
-        window.dispatchEvent(new CustomEvent('inboxMessageRead'));
-      }
-      const msgs = await fetchMessages(conv._id);
-      setMessages(msgs);
-    } catch (err) {
-      setMessagesError('Failed to load messages');
-    } finally {
-      setMessagesLoading(false);
-    }
-  };
-
-  // 3. Only render the reply box if showReplyBox is true
-  const handleSendReply = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!reply.trim() || !selectedConversation) return;
-    setSending(true);
-    setSendError(null);
-    try {
-      await sendMessage(
-        selectedConversation._id,
-        reply,
-        replyAttachments.map((f) => f.url)
-      );
-      setReplyAttachments([]);
-      setReply('');
-      setShowReplyBox(false);
-      // Refresh messages
-      const msgs = await fetchMessages(selectedConversation._id);
-      setMessages(msgs);
-    } catch (err) {
-      setSendError('Failed to send message');
-    } finally {
-      setSending(false);
-    }
-  };
-
-  // Compose modal logic
   useEffect(() => {
     if (composeQuery.length < 2) {
       setComposeUserResults([]);
@@ -312,18 +306,112 @@ const Inbox: React.FC = () => {
     let active = true;
     setComposeError(null);
     searchUsers(composeQuery)
-      .then(users => {
+      .then((users) => {
         if (active) setComposeUserResults(users);
       })
       .catch(() => {
         if (active) setComposeError('Failed to search users');
       });
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [composeQuery]);
 
-  const handleAddRecipient = (user: any) => {
-    if (!composeRecipients.some((u) => u._id === user._id)) {
-      setComposeRecipients([...composeRecipients, user]);
+  useEffect(() => {
+    if (!showCompose) return;
+    api.get('/courses').then((res) => {
+      setComposeCourseOptions(res.data.data || []);
+      if (res.data.data?.length > 0) {
+        setComposeCourse(res.data.data[0]._id);
+      }
+    });
+  }, [showCompose]);
+
+  useEffect(() => {
+    if (!composeToGroup) return;
+    if (user?.role === 'admin') {
+      if (composeToGroup === 'teachers') {
+        api.get('/users/search?role=teacher,admin').then((res) => {
+          setComposeGroupUsers(res.data.data || []);
+        });
+      } else if (composeToGroup === 'students') {
+        api.get('/users/search?role=student').then((res) => {
+          setComposeGroupUsers(res.data.data || []);
+        });
+      } else if (composeToGroup === 'admins') {
+        api.get('/users/search?role=admin').then((res) => {
+          setComposeGroupUsers(res.data.data || []);
+        });
+      }
+    } else {
+      if (!composeCourse) return;
+      if (composeToGroup === 'teachers') {
+        if (user?.role === 'teacher' || user?.role === 'admin') {
+          api.get('/users/search?role=teacher,admin').then((res) => {
+            setComposeGroupUsers(res.data.data || []);
+          });
+        } else {
+          api.get(`/courses/${composeCourse}`).then((res) => {
+            const instructor = res.data.data.instructor ? [res.data.data.instructor] : [];
+            setComposeGroupUsers(instructor);
+          });
+        }
+      } else if (composeToGroup === 'students') {
+        api.get(`/courses/${composeCourse}/students`).then((res) => {
+          setComposeGroupUsers(res.data || []);
+        });
+      } else if (composeToGroup === 'sections') {
+        setComposeGroupUsers([]);
+      }
+    }
+  }, [composeCourse, composeToGroup, user]);
+
+  useEffect(() => {
+    if (composeToInput.length < 2) {
+      setComposeUserResults([]);
+      return;
+    }
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    searchTimeout.current = setTimeout(() => {
+      let roleParam = '';
+      if (user?.role === 'admin') {
+        if (composeToGroup === 'teachers') roleParam = 'teacher,admin';
+        else if (composeToGroup === 'students') roleParam = 'student';
+      } else {
+        if (composeToGroup === 'teachers') {
+          roleParam =
+            user?.role === 'teacher' || user?.role === 'admin' ? 'teacher,admin' : 'teacher';
+        } else if (composeToGroup === 'students') {
+          roleParam = 'student';
+        }
+      }
+      const searchUrl = roleParam
+        ? `/users/search?name=${encodeURIComponent(composeToInput)}&email=${encodeURIComponent(composeToInput)}&role=${roleParam}`
+        : `/users/search?name=${encodeURIComponent(composeToInput)}&email=${encodeURIComponent(composeToInput)}`;
+      api
+        .get(searchUrl)
+        .then((res) => setComposeUserResults(res.data.data || []))
+        .catch(() => setComposeUserResults([]));
+    }, 300);
+    return () => {
+      if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    };
+  }, [composeToInput, composeToGroup, user]);
+
+  useEffect(() => {
+    if (user?.role === 'admin') return;
+    api.get('/courses').then((res) => {
+      const userCourses = (res.data.data || []).map((c: any) => ({
+        value: c._id,
+        label: c.catalog?.courseCode || c.title,
+      }));
+      setCourseOptions([{ value: 'all', label: 'All Courses' }, ...userCourses]);
+    });
+  }, [user]);
+
+  const handleAddRecipient = (recipient: any) => {
+    if (!composeRecipients.some((u) => u._id === recipient._id)) {
+      setComposeRecipients([...composeRecipients, recipient]);
     }
     setComposeQuery('');
     setComposeUserResults([]);
@@ -338,20 +426,18 @@ const Inbox: React.FC = () => {
     setComposeLoading(true);
     setComposeError('');
     try {
-      let recipients = composeRecipients.map(u => u._id);
+      let recipients = composeRecipients.map((u) => u._id);
       if (composeToGroup === 'sections') {
-        // Fetch all students for the course
         const res = await api.get(`/courses/${composeCourse}/students`);
         recipients = Array.isArray(res.data) ? res.data.map((u: any) => u._id) : [];
       }
-      // For admins, course can be empty/null
       await api.post('/inbox/conversations', {
         course: user?.role === 'admin' ? null : composeCourse,
         participantIds: recipients,
         subject: composeSubject,
         body: composeBody,
         sendIndividually,
-        attachments: composeAttachments.map((f) => f.url),
+        fileAssetIds: fileAssetIdsFromFiles(composeAttachments),
       });
       setShowCompose(false);
       setComposeRecipients([]);
@@ -361,7 +447,8 @@ const Inbox: React.FC = () => {
       setComposeToGroup('');
       setComposeGroupUsers([]);
       setComposeCourse('');
-      setSendIndividually(false); // reset
+      setSendIndividually(false);
+      await invalidateConversations();
     } catch (err: any) {
       setComposeError(err.response?.data?.message || 'Failed to send message');
     } finally {
@@ -369,950 +456,189 @@ const Inbox: React.FC = () => {
     }
   };
 
-  // Fetch courses for compose dropdown
-  useEffect(() => {
-    if (!showCompose) return;
-    api.get('/courses').then(res => {
-      setComposeCourseOptions(res.data.data || []);
-      if (res.data.data && res.data.data.length > 0) {
-        setComposeCourse(res.data.data[0]._id);
-      }
-    });
-  }, [showCompose]);
-
-  // Fetch group users when group or course changes
-  useEffect(() => {
-    if (!composeToGroup) return;
-    
-    if (user?.role === 'admin') {
-      // Admin can fetch all users without course requirement
-      if (composeToGroup === 'teachers') {
-        api.get('/users/search?role=teacher,admin').then(res => {
-          setComposeGroupUsers(res.data.data || []);
-        });
-      } else if (composeToGroup === 'students') {
-        api.get('/users/search?role=student').then(res => {
-          setComposeGroupUsers(res.data.data || []);
-        });
-      } else if (composeToGroup === 'admins') {
-        api.get('/users/search?role=admin').then(res => {
-          setComposeGroupUsers(res.data.data || []);
-        });
-      }
-    } else {
-      // Non-admin users require course
-      if (!composeCourse) return;
-      if (composeToGroup === 'teachers') {
-        if (user?.role === 'teacher' || user?.role === 'admin') {
-          // Teachers/Admins see all teachers and admins
-          api.get('/users/search?role=teacher,admin').then(res => {
-            setComposeGroupUsers(res.data.data || []);
-          });
-        } else {
-          // Students see only their course's instructor/admins
-          api.get(`/courses/${composeCourse}`).then(res => {
-            const instructor = res.data.data.instructor ? [res.data.data.instructor] : [];
-            // If course has admins assigned, add them here as well (extend as needed)
-            setComposeGroupUsers(instructor);
-          });
-        }
-      } else if (composeToGroup === 'students') {
-        api.get(`/courses/${composeCourse}/students`).then(res => {
-          setComposeGroupUsers(res.data || []);
-        });
-      } else if (composeToGroup === 'sections') {
-        setComposeGroupUsers([]);
-      }
-    }
-  }, [composeCourse, composeToGroup, user]);
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    if (!composeToDropdown) return;
-    function handleClick(e: MouseEvent) {
-      if (composeToDropdownRef.current && !composeToDropdownRef.current.contains(e.target as Node)) {
-        setComposeToDropdown(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [composeToDropdown]);
-
-  // Search users as user types in To field
-  useEffect(() => {
-    if (composeToInput.length < 2) {
-      setComposeUserResults([]);
-      return;
-    }
-    if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    searchTimeout.current = setTimeout(() => {
-      // If admin, search all users without role filter (unless group is selected)
-      // Otherwise, use role filter based on group selection
-      let roleParam = '';
-      if (user?.role === 'admin') {
-        // Admin can search all users, but respect group selection if set
-        if (composeToGroup === 'teachers') {
-          roleParam = 'teacher,admin';
-        } else if (composeToGroup === 'students') {
-          roleParam = 'student';
-        }
-        // If no group selected, search all users (no role filter)
-      } else {
-        // Non-admin users use existing logic
-        if (composeToGroup === 'teachers') {
-          roleParam = user?.role === 'teacher' || user?.role === 'admin' ? 'teacher,admin' : 'teacher';
-        } else if (composeToGroup === 'students') {
-          roleParam = 'student';
-        }
-      }
-      
-      // Build search URL - if admin and no role filter, search without role param
-      const searchUrl = roleParam 
-        ? `/users/search?name=${encodeURIComponent(composeToInput)}&email=${encodeURIComponent(composeToInput)}&role=${roleParam}`
-        : `/users/search?name=${encodeURIComponent(composeToInput)}&email=${encodeURIComponent(composeToInput)}`;
-      
-      api.get(searchUrl)
-        .then(res => setComposeUserResults(res.data.data || []))
-        .catch(() => setComposeUserResults([]));
-    }, 300);
-    return () => { if (searchTimeout.current) clearTimeout(searchTimeout.current); };
-  }, [composeToInput, composeToGroup, user]);
-
-  // Fetch user-specific courses for the main dropdown - Skip for admins
-  useEffect(() => {
-    if (user?.role === 'admin') {
-      // Admins don't need course options
-      return;
-    }
-    api.get('/courses').then(res => {
-      const userCourses = (res.data.data || []).map((c: any) => ({ 
-        value: c._id, 
-        label: c.catalog?.courseCode || c.title 
-      }));
-      setCourseOptions([{ value: 'all', label: 'All Courses' }, ...userCourses]);
-    });
-  }, [user]);
-
-  // Memoize filteredConversations to prevent infinite loops
-  const filteredConversations = useMemo(() => {
-    return conversations.filter(conv =>
-      matchesInboxFilters({
-        conversation: conv,
-        currentUserId,
-        selectedCourse,
-        selectedFolder,
-        search,
-        userRole: user?.role,
-      })
-    );
-  }, [conversations, selectedCourse, selectedFolder, search, currentUserId, user]);
-
-  useEffect(() => {
-    setSelectedConversations(prev =>
-      prev.filter(id => filteredConversations.some(conv => conv._id === id))
-    );
-  }, [filteredConversations]);
-
-  // Group filtered conversations by date
-  const grouped = groupConversationsByDate(filteredConversations);
-  const dateKeys = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
-
-  // Star toggling
-  const handleToggleStar = async (conv: any) => {
-    try {
-      await toggleStar(conv._id);
-      // Refresh conversations
-      const data = await fetchConversations();
-      setConversations(data);
-    } catch (err) {
-      // Optionally show error
-    }
+  const handleRefresh = async () => {
+    await refetchConversations();
   };
+
+  const { handleSwipeLeft, handleSwipeRight, enabled: swipeEnabled } = useBottomNavSwipe();
 
   return (
     <SwipeableContainer
       onSwipeLeft={swipeEnabled ? handleSwipeLeft : undefined}
       onSwipeRight={swipeEnabled ? handleSwipeRight : undefined}
       enabled={swipeEnabled}
-      preventScrollInterference={true}
-      className="flex flex-col h-full min-h-[80vh] bg-gray-100 dark:bg-gray-900"
+      preventScrollInterference
+      className="flex h-full min-h-[calc(100dvh-4rem-env(safe-area-inset-bottom,0px))] flex-col bg-gray-50 dark:bg-gray-950 lg:min-h-[calc(100dvh-4rem)]"
     >
-      <PullToRefresh onRefresh={handleRefresh} className="flex flex-col h-full min-h-[80vh] bg-gray-100 dark:bg-gray-900">
-        <div className="flex flex-col h-full min-h-[80vh] bg-gray-100 dark:bg-gray-900">
-      {/* Top Navigation Bar (Mobile Only) */}
-      <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm safe-area-inset-top">
-        <div className="relative flex items-center justify-between px-4 py-3">
-          <button
-            onClick={() => setShowBurgerMenu(!showBurgerMenu)}
-            className="text-gray-700 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
-            aria-label="Open account menu"
-          >
-            <User className="w-6 h-6" />
-          </button>
-          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Inbox</h1>
-          <div className="w-10"></div> {/* Spacer for centering */}
-          
-          {/* Burger Menu */}
-          <BurgerMenu
-            showBurgerMenu={showBurgerMenu}
-            setShowBurgerMenu={setShowBurgerMenu}
+      <PullToRefresh
+        onRefresh={handleRefresh}
+        className="flex h-full min-h-0 flex-1 flex-col bg-gray-50 dark:bg-gray-950"
+      >
+        <div className="flex h-full min-h-0 w-full flex-1 flex-col bg-gray-50 dark:bg-gray-950 lg:min-h-[calc(100dvh-4rem)]">
+          {!conversationId && (
+            <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm safe-area-inset-top">
+              <div className="relative flex items-center justify-between px-4 py-3">
+                <button
+                  type="button"
+                  onClick={() => setShowBurgerMenu(!showBurgerMenu)}
+                  className="text-gray-700 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
+                  aria-label="Open account menu"
+                >
+                  <User className="w-6 h-6" />
+                </button>
+                <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Inbox</h1>
+                <div className="w-10" />
+                <BurgerMenu showBurgerMenu={showBurgerMenu} setShowBurgerMenu={setShowBurgerMenu} />
+              </div>
+            </nav>
+          )}
+
+          <div className={conversationId ? 'hidden lg:block' : undefined}>
+          <InboxToolbar
+            userRole={user?.role}
+            courseOptions={courseOptions}
+            selectedCourse={selectedCourse}
+            selectedFolder={selectedFolder}
+            search={search}
+            selectedCount={selectedConversations.length}
+            bulkActionLoading={bulkActionLoading}
+            searchInputRef={searchInputRef}
+            onCourseChange={setSelectedCourse}
+            onFolderChange={setSelectedFolder}
+            onSearchChange={setSearch}
+            onCompose={() => setShowCompose(true)}
+            onArchive={handleArchive}
+            onDelete={handleDelete}
           />
-        </div>
-      </nav>
-      
-      
-      {/* Top Bar */}
-      <div className="flex flex-col gap-3 px-3 sm:px-4 lg:px-6 py-3 border-b bg-white/95 dark:bg-gray-800/95 backdrop-blur border-gray-200 dark:border-gray-700 shadow-sm sticky top-0 lg:sticky z-20 pt-20 lg:pt-3">
-        {/* First Row: Dropdowns */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Course Dropdown - Hide for admins */}
-          {user?.role !== 'admin' && (
-            <div className="relative flex-1 min-w-[120px]">
-              <select
-                id="topbar-course-dropdown"
-                name="topbarCourseDropdown"
-                className="appearance-none h-10 border border-gray-200 dark:border-gray-700 rounded-lg px-3 text-sm bg-white dark:bg-gray-900 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 w-full shadow-sm text-gray-700 dark:text-gray-200"
-                value={selectedCourse}
-                onChange={e => setSelectedCourse(e.target.value)}
-              >
-                {courseOptions.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-[10px]">
-                ▼
-              </span>
-            </div>
-          )}
-          {/* Folder Dropdown */}
-          <div className="relative flex-1 min-w-[100px]">
-            <select
-              id="topbar-folder-dropdown"
-              name="topbarFolderDropdown"
-              className="appearance-none h-10 border border-gray-200 dark:border-gray-700 rounded-lg px-3 text-sm bg-white dark:bg-gray-900 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 w-full shadow-sm text-gray-700 dark:text-gray-200"
-              value={selectedFolder}
-              onChange={e => setSelectedFolder(e.target.value)}
-            >
-              {folderOptions.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-[10px]">
-              ▼
-            </span>
           </div>
-        </div>
-        {/* Second Row: Action Icons and Search */}
-        <div className="flex items-center gap-2">
-          {/* Icon Row */}
-          <div className="flex items-center gap-1 p-1 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 shadow-sm">
-            {/* Compose (modern icon) */}
-            <button
-              className="h-9 w-9 inline-flex items-center justify-center rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400 touch-manipulation transition-colors"
-              title="Compose"
-              aria-label="Compose new message"
-              onClick={() => setShowCompose(true)}
-            >
-              <Edit size={18} aria-hidden="true" />
-            </button>
-            {/* Reply */}
-            <button 
-              className={`h-9 w-9 inline-flex items-center justify-center rounded-lg touch-manipulation transition-colors ${selectedConversations.length > 0 ? 'hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500'}`} 
-              title="Reply" 
-              aria-label={`Reply to ${selectedConversations.length} selected conversation${selectedConversations.length !== 1 ? 's' : ''}`}
-              onClick={handleReply}
-              disabled={selectedConversations.length === 0 || bulkActionLoading}
-            >
-              <Reply size={18} aria-hidden="true" />
-            </button>
-            {/* Archive */}
-            <button 
-              className={`h-9 w-9 inline-flex items-center justify-center rounded-lg touch-manipulation transition-colors ${selectedConversations.length > 0 ? 'hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-600 dark:text-amber-400' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500'}`} 
-              title="Archive" 
-              aria-label={`Archive ${selectedConversations.length} selected conversation${selectedConversations.length !== 1 ? 's' : ''}`}
-              onClick={handleArchive}
-              disabled={selectedConversations.length === 0 || bulkActionLoading}
-            >
-              <Archive size={18} aria-hidden="true" />
-            </button>
-            {/* Delete */}
-            <button 
-              className={`h-9 w-9 inline-flex items-center justify-center rounded-lg touch-manipulation transition-colors ${selectedConversations.length > 0 ? 'hover:bg-red-100 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500'}`} 
-              title="Delete" 
-              aria-label={`Delete ${selectedConversations.length} selected conversation${selectedConversations.length !== 1 ? 's' : ''}`}
-              onClick={handleDelete}
-              disabled={selectedConversations.length === 0 || bulkActionLoading}
-            >
-              <Trash2 size={18} aria-hidden="true" />
-            </button>
-          </div>
-          {/* Search Bar */}
-          <div className="relative flex items-center flex-1 min-w-0">
-            <label htmlFor="inbox-search" className="sr-only">Search conversations</label>
-            <input
-              id="inbox-search"
-              name="search"
-              ref={searchInputRef}
-              className="h-10 border border-gray-200 dark:border-gray-700 rounded-xl pl-10 pr-4 text-sm bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 w-full shadow-sm"
-              type="text"
-              placeholder="Search..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
+
+          <div
+            className={`flex min-h-0 w-full flex-1 flex-col gap-3 px-0 lg:flex-row lg:gap-4 lg:px-6 lg:pb-6 ${conversationId ? 'py-0 lg:pt-4' : 'pt-2 pb-0 lg:pt-4'}`}
+          >
+            <ComposeModal
+              open={showCompose}
+              onClose={() => setShowCompose(false)}
+              user={user}
+              composeCourse={composeCourse}
+              composeCourseOptions={composeCourseOptions}
+              setComposeCourse={setComposeCourse}
+              composeRecipients={composeRecipients}
+              composeToGroup={composeToGroup}
+              composeGroupUsers={composeGroupUsers}
+              composeToInput={composeToInput}
+              composeUserResults={composeUserResults}
+              composeSubject={composeSubject}
+              composeBody={composeBody}
+              composeAttachments={composeAttachments}
+              sendIndividually={sendIndividually}
+              composeLoading={composeLoading}
+              composeError={composeError}
+              showGroupDropdown={showGroupDropdown}
+              composeToDropdownRef={composeToDropdownRef}
+              isUserOnline={isUserOnline}
+              onSubmit={handleCompose}
+              handleAddRecipient={handleAddRecipient}
+              handleRemoveRecipient={handleRemoveRecipient}
+              setComposeToGroup={setComposeToGroup}
+              setComposeGroupUsers={setComposeGroupUsers}
+              setComposeToInput={setComposeToInput}
+              setComposeUserResults={setComposeUserResults}
+              setShowGroupDropdown={setShowGroupDropdown}
+              setComposeSubject={setComposeSubject}
+              setComposeBody={setComposeBody}
+              setComposeAttachments={setComposeAttachments}
+              setSendIndividually={setSendIndividually}
             />
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-              <Search size={16} />
-            </span>
-          </div>
-        </div>
-      </div>
-      {/* Main Content */}
-      <div className="flex flex-col lg:flex-row flex-1 gap-4 lg:gap-6 px-2 sm:px-4 lg:px-6 py-4 lg:py-6">
-        {/* Compose Modal */}
-        {showCompose && (
-          <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-[100] p-2 sm:p-4">
-            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-0 w-full max-w-xl relative border border-gray-200 dark:border-gray-700 max-h-[95vh] overflow-y-auto">
-              <button className="absolute top-2 right-2 sm:top-3 sm:right-3 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 text-xl sm:text-2xl p-1 touch-manipulation" onClick={() => setShowCompose(false)}>&times;</button>
-              <div className="border-b border-gray-200 dark:border-gray-700 px-3 sm:px-4 lg:px-6 py-2.5 sm:py-3 lg:py-4 text-base sm:text-lg lg:text-xl font-semibold text-gray-900 dark:text-gray-100">Compose Message</div>
-              <form onSubmit={handleCompose} className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
-                {/* Course Dropdown - Hide for admins */}
-                {user?.role !== 'admin' && (
-                  <div className="mb-3 sm:mb-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-2">
-                    <label htmlFor="compose-course" className="w-full sm:w-20 text-gray-700 dark:text-gray-300 font-medium text-xs sm:text-sm">Course</label>
-                    <select
-                      id="compose-course"
-                      name="course"
-                      className="border border-gray-200 dark:border-gray-700 rounded px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 flex-1"
-                      value={composeCourse}
-                      onChange={e => { setComposeCourse(e.target.value); setComposeToGroup(''); setComposeGroupUsers([]); }}
-                    >
-                      {composeCourseOptions.map((c: any) => (
-                        <option key={c._id} value={c._id}>{c.title}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                {/* To Field with group selection */}
-                <div className="mb-3 sm:mb-4 flex flex-col sm:flex-row sm:items-center gap-2 relative" ref={composeToDropdownRef}>
-                  <span className="w-full sm:w-20 text-gray-700 dark:text-gray-300 font-medium text-xs sm:text-sm">To</span>
-                  <div className="flex-1 relative">
-                    <div id="compose-to" className="flex items-center border border-gray-200 dark:border-gray-700 rounded px-2 sm:px-3 py-1.5 sm:py-2 bg-white dark:bg-gray-900 cursor-text">
-                      <div className="flex flex-wrap gap-1 flex-1 min-w-0">
-                        {composeToGroup === 'sections' && user?.role !== 'admin' ? (
-                          composeCourse ? (
-                            <span className="bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs flex items-center">
-                              All Students in {composeCourseOptions.find(c => c._id === composeCourse)?.title || 'Course'}
-                              <button type="button" className="ml-1 text-[10px] sm:text-xs text-red-500 dark:text-red-400 touch-manipulation" onClick={e => { e.stopPropagation(); setComposeToGroup(''); setComposeCourse(''); }}>&times;</button>
-                            </span>
-                          ) : (
-                            <span className="text-gray-400 dark:text-gray-500 text-[10px] sm:text-xs">Select a course...</span>
-                          )
-                        ) : (
-                          composeRecipients.map((u) => (
-                            <span key={u._id} className="bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs flex items-center gap-1">
-                              <div className="relative flex-shrink-0">
-                                {u.profilePicture ? (
-                                  <img
-                                    src={u.profilePicture.startsWith('http') ? u.profilePicture : getImageUrl(u.profilePicture)}
-                                    alt={`${u.firstName} ${u.lastName}`}
-                                    className="w-4 h-4 sm:w-5 sm:h-5 rounded-full object-cover border border-blue-300"
-                                    onError={(e) => {
-                                      e.currentTarget.style.display = 'none';
-                                      const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                                      if (fallback) {
-                                        fallback.style.display = 'flex';
-                                      }
-                                    }}
-                                  />
-                                ) : null}
-                                {/* Fallback avatar with initials */}
-                                <div
-                                  className={`w-4 h-4 sm:w-5 sm:h-5 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center text-white text-[8px] sm:text-[10px] font-bold ${
-                                    u.profilePicture ? 'hidden' : 'flex'
-                                  }`}
-                                  style={{
-                                    display: u.profilePicture ? 'none' : 'flex'
-                                  }}
-                                >
-                                  {u.firstName?.charAt(0) || ''}
-                                  {u.lastName?.charAt(0) || ''}
-                                </div>
-                              </div>
-                              <span className="truncate max-w-[80px] sm:max-w-none">{u.firstName} {u.lastName}</span>
-                              {u.role && <span className="text-[8px] sm:text-[10px] opacity-75 hidden sm:inline">({u.role})</span>}
-                              <button type="button" className="ml-0.5 text-[10px] sm:text-xs text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 touch-manipulation" onClick={e => { e.stopPropagation(); handleRemoveRecipient(u._id); }}>&times;</button>
-                            </span>
-                          ))
-                        )}
-                        {/* Searchable input for To field */}
-                        {composeToGroup !== 'sections' && (
-                          <input
-                            type="text"
-                            id="compose-to-input"
-                            name="composeToInput"
-                            className="flex-1 min-w-24 outline-none border-none bg-transparent text-xs sm:text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
-                            placeholder={composeRecipients.length === 0 ? (user?.role === 'admin' ? 'Type name or email to search users...' : 'Type name or email...') : ''}
-                            value={composeToInput}
-                            onChange={e => { setComposeToInput(e.target.value); setShowGroupDropdown(false); }}
-                            onFocus={() => { setShowGroupDropdown(false); }}
-                          />
-                        )}
-                      </div>
-                      {/* Icon to open group dropdown */}
-                      <button
-                        type="button"
-                        className="ml-1 sm:ml-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 touch-manipulation flex-shrink-0"
-                        tabIndex={-1}
-                        aria-label="Choose group"
-                        onClick={e => { e.stopPropagation(); setShowGroupDropdown(v => !v); }}
-                      >
-                        <CheckSquare2 size={18} className="sm:w-5 sm:h-5" />
-                      </button>
-                    </div>
-                    {/* Group dropdown only when icon is clicked - Hide for admins or show modified options */}
-                    {showGroupDropdown && !composeToGroup && (
-                      <div className="absolute left-0 top-12 w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded shadow z-20">
-                        {user?.role === 'admin' ? (
-                          // Admin sees simplified options
-                          <>
-                            <div className="px-4 py-2 text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer" onClick={() => { setComposeToGroup('teachers'); setShowGroupDropdown(false); }}>All Teachers</div>
-                            <div className="px-4 py-2 text-green-600 dark:text-green-400 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer" onClick={() => { setComposeToGroup('students'); setShowGroupDropdown(false); }}>All Students</div>
-                            <div className="px-4 py-2 text-purple-600 dark:text-purple-400 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer" onClick={() => { setComposeToGroup('admins'); setShowGroupDropdown(false); }}>All Admins</div>
-                          </>
-                        ) : (
-                          // Non-admin users see course-based options
-                          <>
-                            <div className="px-4 py-2 text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer" onClick={() => { setComposeToGroup('teachers'); setShowGroupDropdown(false); }}>Teachers</div>
-                            <div className="px-4 py-2 text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer" onClick={() => { setComposeToGroup('students'); setShowGroupDropdown(false); }}>Students</div>
-                            <div className="px-4 py-2 text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer" onClick={() => { setComposeToGroup('sections'); setShowGroupDropdown(false); setComposeCourse(''); }}>Course Sections</div>
-                          </>
-                        )}
-                      </div>
-                    )}
-                    {/* User search results dropdown */}
-                    {composeToInput.length >= 2 && composeUserResults.length > 0 && (
-                      <div className="absolute left-0 top-12 w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded shadow z-20 max-h-48 overflow-y-auto">
-                        {composeUserResults.map((u: any) => (
-                          <div key={u._id} className="px-4 py-2 hover:bg-blue-100 dark:hover:bg-blue-900/50 cursor-pointer flex items-center gap-3" onClick={() => { handleAddRecipient(u); setComposeToInput(''); setComposeUserResults([]); }}>
-                            <div className="relative flex-shrink-0">
-                              <div className={`w-8 h-8 rounded-full overflow-hidden ${u.profilePicture ? '' : 'bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center'} ${isUserOnline(u._id) ? 'online-pulse' : 'border-2 border-transparent'}`}>
-                              {u.profilePicture ? (
-                                <img
-                                  src={u.profilePicture.startsWith('http') ? u.profilePicture : getImageUrl(u.profilePicture)}
-                                  alt={`${u.firstName} ${u.lastName}`}
-                                  className="w-8 h-8 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
-                                  onError={(e) => {
-                                    e.currentTarget.style.display = 'none';
-                                    const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                                    if (fallback) {
-                                      fallback.style.display = 'flex';
-                                    }
-                                  }}
-                                />
-                              ) : null}
-                              {/* Fallback avatar with initials */}
-                              <div
-                                className={`w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold ${
-                                  u.profilePicture ? 'hidden' : 'flex'
-                                }`}
-                                style={{
-                                  display: u.profilePicture ? 'none' : 'flex'
-                                }}
-                              >
-                                {u.firstName?.charAt(0) || ''}
-                                {u.lastName?.charAt(0) || ''}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                                {u.firstName} {u.lastName}
-                              </div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                {u.email} {u.role && `• ${u.role}`}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {/* Dropdown for users in group (for Teachers/Students/Admins) */}
-                    {composeToGroup && composeToGroup !== 'sections' && composeGroupUsers.length > 0 && !composeToInput && (
-                      <div className="absolute left-0 top-12 w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded shadow z-20 max-h-48 overflow-y-auto">
-                        <div className="flex items-center px-2 py-2 border-b border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800" onClick={() => setComposeToGroup('')}>
-                          <ChevronLeft size={18} />
-                          <span className="ml-2 text-gray-600 dark:text-gray-400 text-sm">Back</span>
-                        </div>
-                        {composeGroupUsers.map((u: any) => (
-                          <div key={u._id} className="px-4 py-2 hover:bg-blue-100 dark:hover:bg-blue-900/50 cursor-pointer flex items-center gap-3" onClick={() => { handleAddRecipient(u); setComposeToGroup(''); }}>
-                            <div className="relative flex-shrink-0">
-                              <div className={`w-8 h-8 rounded-full overflow-hidden ${u.profilePicture ? '' : 'bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center'} ${isUserOnline(u._id) ? 'online-pulse' : 'border-2 border-transparent'}`}>
-                              {u.profilePicture ? (
-                                <img
-                                  src={u.profilePicture.startsWith('http') ? u.profilePicture : getImageUrl(u.profilePicture)}
-                                  alt={`${u.firstName} ${u.lastName}`}
-                                  className="w-8 h-8 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
-                                  onError={(e) => {
-                                    e.currentTarget.style.display = 'none';
-                                    const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                                    if (fallback) {
-                                      fallback.style.display = 'flex';
-                                    }
-                                  }}
-                                />
-                              ) : null}
-                              {/* Fallback avatar with initials */}
-                              <div
-                                className={`w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold ${
-                                  u.profilePicture ? 'hidden' : 'flex'
-                                }`}
-                                style={{
-                                  display: u.profilePicture ? 'none' : 'flex'
-                                }}
-                              >
-                                {u.firstName?.charAt(0) || ''}
-                                {u.lastName?.charAt(0) || ''}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                                {u.firstName} {u.lastName}
-                              </div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                {u.email} {u.role && `• ${u.role}`}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {/* Dropdown for course selection when Course Sections is selected - Hide for admins */}
-                    {user?.role !== 'admin' && composeToGroup === 'sections' && !composeCourse && (
-                      <div className="absolute left-0 top-12 w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded shadow z-20 max-h-48 overflow-y-auto">
-                        <div className="flex items-center px-2 py-2 border-b border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800" onClick={() => setComposeToGroup('')}>
-                          <ChevronLeft size={18} />
-                          <span className="ml-2 text-gray-600 dark:text-gray-400 text-sm">Back</span>
-                        </div>
-                        {composeCourseOptions.map((c: any) => (
-                          <div key={c._id} className="px-4 py-2 hover:bg-blue-100 dark:hover:bg-blue-900/50 cursor-pointer text-gray-900 dark:text-gray-100" onClick={() => setComposeCourse(c._id)}>
-                            {c.title}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                {/* Subject */}
-                <div className="mb-3 sm:mb-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-2">
-                  <label htmlFor="compose-subject" className="w-full sm:w-20 text-gray-700 dark:text-gray-300 font-medium text-xs sm:text-sm">Subject</label>
-                  <input
-                    id="compose-subject"
-                    name="subject"
-                    type="text"
-                    className="border border-gray-200 dark:border-gray-700 rounded px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 flex-1"
-                    value={composeSubject}
-                    onChange={e => setComposeSubject(e.target.value)}
-                    disabled={composeLoading}
-                  />
-                </div>
-                {/* Send individually checkbox */}
-                <div className="mb-3 sm:mb-4 flex items-start sm:items-center gap-3 sm:gap-2">
-                  <input
-                    id="send-individually"
-                    name="sendIndividually"
-                    type="checkbox"
-                    className="mt-0.5 sm:mt-0 mr-0 sm:mr-2 w-4 h-4 touch-manipulation"
-                    checked={sendIndividually}
-                    onChange={e => setSendIndividually(e.target.checked)}
-                    disabled={composeLoading}
-                  />
-                  <label htmlFor="send-individually" className="text-gray-700 dark:text-gray-300 text-xs sm:text-sm select-none">
-                    Send an individual message to each recipient
-                  </label>
-                </div>
-                {/* Message */}
-                <div className="mb-3 sm:mb-4">
-                  <label htmlFor="compose-message" className="block text-gray-700 dark:text-gray-300 font-medium mb-1 text-xs sm:text-sm">Message</label>
-                  <textarea
-                    id="compose-message"
-                    name="message"
-                    className="w-full border border-gray-200 dark:border-gray-700 rounded p-2 resize-none bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-xs sm:text-sm"
-                    rows={6}
-                    value={composeBody}
-                    onChange={e => setComposeBody(e.target.value)}
-                    disabled={composeLoading}
-                  />
-                </div>
-                {composeAttachments.length > 0 && (
-                  <FileAttachmentPanel
-                    files={composeAttachments}
-                    onChange={setComposeAttachments}
-                    category="temporary"
-                    className="mb-3"
-                    label="Add more attachments"
-                  />
-                )}
-                <div className="flex items-center justify-between gap-3 sm:gap-2">
-                  {composeAttachments.length === 0 ? (
-                    <FileAttachmentPanel
-                      files={[]}
-                      onChange={setComposeAttachments}
-                      category="temporary"
-                      className="flex-1"
-                      label="Attach files"
-                      multiple
+
+            <ConversationList
+              conversations={conversations}
+              filteredConversations={filteredConversations}
+              loading={loading}
+              error={error}
+              currentUserId={currentUserId}
+              selectedConversationId={conversationId}
+              selectedConversations={selectedConversations}
+              bulkActionLoading={bulkActionLoading}
+              isUserOnline={isUserOnline}
+              onSelectConversation={handleSelectConversation}
+              onToggleStar={handleToggleStar}
+              onSelectionChange={setSelectedConversations}
+            />
+
+            <div
+              className={`flex min-h-[400px] min-w-0 flex-1 flex-col bg-white p-0 dark:bg-gray-800 lg:min-h-0 lg:overflow-hidden lg:rounded-xl lg:border lg:border-gray-200/80 lg:shadow-sm dark:lg:border-gray-700 ${!selectedConversation ? 'hidden lg:flex' : 'flex'}`}
+            >
+              {!selectedConversation && (
+                <div className="flex h-full flex-col items-center justify-center text-gray-400 dark:text-gray-500">
+                  <svg width="96" height="96" fill="none" viewBox="0 0 24 24">
+                    <path
+                      d="M2 6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6Zm2 0 8 7 8-7"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
                     />
-                  ) : (
-                    <span className="text-xs text-gray-500 flex items-center gap-1">
-                      <Paperclip size={14} /> {composeAttachments.length} attached
-                    </span>
-                  )}
-                  <div className="flex gap-3 sm:gap-2">
-                    <button type="button" className="min-h-[44px] px-4 sm:px-4 py-2.5 sm:py-2 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 text-sm sm:text-sm touch-manipulation active:scale-95 transition-transform" onClick={() => setShowCompose(false)} disabled={composeLoading}>Cancel</button>
-                    <button type="submit" className="min-h-[44px] px-4 sm:px-4 py-2.5 sm:py-2 rounded bg-red-600 dark:bg-red-500 text-white hover:bg-red-700 dark:hover:bg-red-600 text-sm sm:text-sm touch-manipulation active:scale-95 transition-transform" disabled={composeLoading || (!composeRecipients.length && (composeToGroup !== 'sections' || !composeCourse)) || !composeSubject.trim() || !composeBody.trim()}>{composeLoading ? 'Sending...' : 'Send'}</button>
+                  </svg>
+                  <div className="mt-4 text-lg text-gray-600 dark:text-gray-400">
+                    No Conversations Selected
                   </div>
                 </div>
-                {composeError && <div className="text-red-500 dark:text-red-400 mt-2">{composeError}</div>}
-              </form>
-            </div>
-          </div>
-        )}
-        {/* Conversation List */}
-        <div className={`w-full lg:w-80 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800 p-0 overflow-y-auto flex flex-col ${selectedConversation ? 'hidden lg:flex' : 'flex'}`}>
-          {/* Header with select all */}
-          {!loading && !error && conversations.length > 0 && (
-            <div className="px-3 sm:px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex items-center">
-              <input
-                type="checkbox"
-                id="select-all-conversations"
-                name="selectAllConversations"
-                checked={selectedConversations.length === filteredConversations.length && filteredConversations.length > 0}
-                onChange={(e) => {
-                  if (e.target.checked) {
-                    setSelectedConversations(filteredConversations.map(conv => conv._id));
-                  } else {
-                    setSelectedConversations([]);
+              )}
+              {selectedConversation && (
+                <MessageThread
+                  conversation={selectedConversation}
+                  messages={messages}
+                  messagesLoading={messagesLoading}
+                  messagesError={messagesError}
+                  currentUserId={currentUserId}
+                  showReplyBox={showReplyBox}
+                  reply={reply}
+                  replyAttachments={replyAttachments}
+                  sending={sending}
+                  sendError={sendError}
+                  isUserOnline={isUserOnline}
+                  onBack={() => setConversationId(null)}
+                  onShowReply={() => setShowReplyBox(true)}
+                  onHideReply={() => setShowReplyBox(false)}
+                  onReplyChange={setReply}
+                  onReplyAttachmentsChange={setReplyAttachments}
+                  onSendReply={handleSendReply}
+                  restoreAction={
+                    selectedFolder === 'archived' || selectedFolder === 'deleted'
+                      ? {
+                          label: selectedFolder === 'deleted' ? 'Restore' : 'Unarchive',
+                          loading: bulkActionLoading,
+                          onRestore: handleRestoreConversation,
+                        }
+                      : undefined
                   }
-                }}
-                className="mr-2 sm:mr-3 accent-blue-600 w-4 h-4 touch-manipulation"
-              />
-              <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                {bulkActionLoading ? (
-                  <span className="text-blue-600 dark:text-blue-400">Processing...</span>
-                ) : (
-                  selectedConversations.length > 0 
-                    ? `${selectedConversations.length} selected` 
-                    : `${filteredConversations.length} conversations`
-                )}
-              </span>
+                />
+              )}
             </div>
-          )}
-          {loading && <div className="p-4 text-gray-600 dark:text-gray-400">Loading...</div>}
-          {error && <div className="p-4 text-red-500 dark:text-red-400">{error}</div>}
-          {!loading && !error && conversations.length === 0 && (
-            <div className="p-4 text-gray-400 dark:text-gray-500">No conversations yet.</div>
-          )}
-          <div className="flex-1 overflow-y-auto">
-            {dateKeys.map(dateKey => (
-              <div key={dateKey}>
-                <div className="px-3 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs text-gray-500 dark:text-gray-300 font-semibold bg-gray-50 dark:bg-gray-900 sticky top-0 z-10 rounded-t-2xl">{formatDateHeader(dateKey)}</div>
-                {grouped[dateKey].map((conv: any) => {
-                  const unread = conv.unreadCount > 0;
-                  const participant = conv.participants.find((p: any) => p._id?.toString() === currentUserId?.toString()) || conv.participants[0];
-                  const starred = participant?.starred;
-                  const otherParticipants = conv.participants.filter((p: any) => p._id?.toString() !== currentUserId?.toString());
-                  const participantNames = otherParticipants.map((p: any) =>
-                    (p.firstName && p.lastName)
-                      ? `${p.firstName} ${p.lastName}`.trim()
-                      : (p.firstName || p.lastName || p.email || 'Unknown')
-                  ).join(', ');
-                  return (
-                    <div
-                      key={conv._id}
-                      className={`flex flex-col px-3 sm:px-4 py-2.5 sm:py-3 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 cursor-pointer transition-all duration-150 active:bg-blue-50 dark:active:bg-blue-900 hover:bg-blue-50 dark:hover:bg-blue-900 ${selectedConversation && selectedConversation._id === conv._id ? 'bg-blue-100 dark:bg-blue-900 border-l-4 border-l-blue-500' : ''}`}
-                      onClick={e => {
-                        if ((e.target as HTMLElement).tagName === 'INPUT') return;
-                        handleSelectConversation(conv);
-                      }}
-                    >
-                      <div className="flex items-center min-h-[24px] gap-3 sm:gap-2">
-                        <input
-                          type="checkbox"
-                          id={`select-conv-${conv._id}`}
-                          name="selectConversation"
-                          checked={selectedConversations.includes(conv._id)}
-                          onChange={e => setSelectedConversations(prev => {
-                            if (e.target.checked) {
-                              return Array.from(new Set([...prev, conv._id]));
-                            } else {
-                              return prev.filter(id => id !== conv._id);
-                            }
-                          })}
-                          className="mr-1.5 sm:mr-2 accent-blue-600 w-4 h-4 touch-manipulation flex-shrink-0"
-                          onClick={e => e.stopPropagation()}
-                        />
-                        {/* Avatar with Online Status */}
-                        <div className="relative flex-shrink-0 mr-1.5 sm:mr-2">
-                          <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white font-bold text-xs sm:text-sm overflow-hidden ${getAvatarColor(conv._id)} ${otherParticipants[0]?._id && isUserOnline(otherParticipants[0]._id) ? 'online-pulse' : 'border-2 border-transparent'}`}>
-                          {otherParticipants[0]?.profilePicture ? (
-                            <img
-                              src={otherParticipants[0].profilePicture.startsWith('http')
-                                ? otherParticipants[0].profilePicture
-                                : getImageUrl(otherParticipants[0].profilePicture)}
-                              alt={participantNames}
-                              className="w-8 h-8 sm:w-10 sm:h-10 object-cover rounded-full"
-                            />
-                          ) : (
-                            getInitials(otherParticipants[0])
-                          )}
-                          </div>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 sm:gap-2">
-                            <span className={`truncate text-xs sm:text-sm font-medium ${unread ? 'font-bold text-blue-900 dark:text-blue-300' : 'text-gray-900 dark:text-gray-100'}`}>{participantNames || 'Unknown'}</span>
-                            {unread && <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-blue-500 dark:bg-blue-400 rounded-full flex-shrink-0"></span>}
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-end ml-auto min-w-[50px] sm:min-w-[60px] flex-shrink-0">
-                          <span className="text-[10px] sm:text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">{conv.lastMessage ? format(new Date(conv.lastMessage.createdAt), 'p') : ''}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center min-h-[22px] mt-1 gap-1.5 sm:gap-2">
-                        <span
-                          className="cursor-pointer flex items-center justify-center transition-colors touch-manipulation flex-shrink-0"
-                          title={starred ? 'Unstar' : 'Star'}
-                          onClick={e => { e.stopPropagation(); handleToggleStar(conv); }}
-                          style={{ width: 16, height: 16 }}
-                        >
-                          <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill={starred ? '#2563eb' : 'none'}
-                            stroke={starred ? '#2563eb' : '#9ca3af'}
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            style={{ display: 'block' }}
-                            className="dark:stroke-blue-400"
-                          >
-                            <polygon
-                              points="12 17.27 18.18 21 16.54 13.97 22 9.24 14.81 8.63 12 2 9.19 8.63 2 9.24 7.46 13.97 5.82 21 12 17.27"
-                              fill={starred ? '#2563eb' : 'none'}
-                              stroke={starred ? '#2563eb' : '#9ca3af'}
-                              className="dark:fill-blue-400 dark:stroke-blue-400"
-                            />
-                          </svg>
-                        </span>
-                        <span className={`truncate flex-1 text-xs sm:text-sm ${unread ? 'font-bold text-blue-900 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'}`}>{conv.subject}</span>
-                        {unread && (
-                          <span className="ml-1 sm:ml-2 bg-blue-500 dark:bg-blue-400 text-white text-[10px] sm:text-xs rounded-full px-1.5 sm:px-2 py-0.5 flex-shrink-0">{conv.unreadCount}</span>
-                        )}
-                      </div>
-                      <div className="truncate text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 mt-0.5 sm:mt-1">
-                        {conv.lastMessage ? (
-                          conv.lastMessage.body.replace(/<[^>]*>/g, '').substring(0, 60) + (conv.lastMessage.body.replace(/<[^>]*>/g, '').length > 60 ? '...' : '')
-                        ) : (
-                          <span className="italic text-gray-400 dark:text-gray-500">No messages</span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
           </div>
-        </div>
-        {/* Message View */}
-        <div className={`flex-1 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800 p-0 flex flex-col min-h-[400px] lg:min-h-[600px] ${!selectedConversation ? 'hidden lg:flex' : 'flex'}`}>
-          {!selectedConversation && (
-            <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500">
-              <svg width="96" height="96" fill="none" viewBox="0 0 24 24"><path d="M2 6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6Zm2 0 8 7 8-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              <div className="mt-4 text-lg text-gray-600 dark:text-gray-400">No Conversations Selected</div>
-            </div>
-          )}
-          {selectedConversation && (
-            <div className="flex flex-col h-full">
-              {/* Sticky Subject Header */}
-              <div className="mb-3 sm:mb-4 border-b border-gray-200 dark:border-gray-700 pb-2 flex items-center justify-between sticky top-0 z-10 bg-white dark:bg-gray-800 rounded-t-2xl shadow-sm px-3 sm:px-4 lg:px-6 pt-3 sm:pt-4 lg:pt-6">
-                <div className="flex items-center gap-3 sm:gap-2 flex-1 min-w-0">
-                  <button
-                    onClick={() => setSelectedConversation(null)}
-                    className="lg:hidden text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 mr-1 sm:mr-2 p-1 touch-manipulation"
-                  >
-                    <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
-                  </button>
-                  <div className="font-bold text-base sm:text-lg lg:text-2xl text-gray-900 dark:text-gray-100 truncate">{selectedConversation.subject}</div>
-                </div>
-              </div>
-              <div className="flex-1 overflow-y-auto px-3 sm:px-4 lg:px-6 pb-4 sm:pb-6">
-                {messagesLoading && <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 py-4">Loading messages...</div>}
-                {messagesError && <div className="text-xs sm:text-sm text-red-500 dark:text-red-400 py-4">{messagesError}</div>}
-                {!messagesLoading && !messagesError && messages.length === 0 && (
-                  <div className="text-xs sm:text-sm text-gray-400 dark:text-gray-500 py-4">No messages yet.</div>
-                )}
-                <div className="space-y-4 sm:space-y-6 mb-4 sm:mb-6">
-                  {messages.map((msg, idx) => {
-                    const hasName = (msg.senderId?.firstName && msg.senderId?.firstName.trim()) || (msg.senderId?.lastName && msg.senderId?.lastName.trim());
-                    const senderName = hasName
-                      ? `${msg.senderId?.firstName || ''} ${msg.senderId?.lastName || ''}`.trim()
-                      : (msg.senderId?.email || 'Unknown User');
-                    const isLast = idx === messages.length - 1;
-                    const isMe = msg.senderId?._id === currentUserId;
-                    return (
-                      <div key={msg._id} className="border-b border-gray-200 dark:border-gray-700 pb-4 sm:pb-6 last:border-b-0">
-                        {/* Email Header */}
-                        <div className="flex items-start justify-between mb-3 sm:mb-4 gap-2">
-                          <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
-                            {/* Avatar with Online Status */}
-                            <div className="relative flex-shrink-0">
-                              <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white font-bold text-sm sm:text-lg overflow-hidden ${getAvatarColor(msg.senderId?._id)} ${isUserOnline(msg.senderId?._id) ? 'online-pulse' : 'border-2 border-transparent'}`}>
-                              {msg.senderId?.profilePicture ? (
-                                <img
-                                  src={msg.senderId.profilePicture.startsWith('http')
-                                    ? msg.senderId.profilePicture
-                                    : getImageUrl(msg.senderId.profilePicture)}
-                                  alt={senderName}
-                                  className="w-8 h-8 sm:w-10 sm:h-10 object-cover rounded-full"
-                                />
-                              ) : (
-                                getInitials(msg.senderId)
-                              )}
-                              </div>
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="font-semibold text-sm sm:text-base text-gray-900 dark:text-gray-100 truncate">
-                                {senderName || 'Unknown User'}
-                              </div>
-                              <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                                {capitalizeFirst(format(new Date(msg.createdAt), "MMM d, yyyy 'at' h:mmaaa"))}
-                              </div>
-                            </div>
-                          </div>
-                          {isMe && (
-                            <span className="text-[10px] sm:text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded flex-shrink-0">
-                              Sent
-                            </span>
-                          )}
-                        </div>
-                        
-                        {/* Email Body */}
-                        <div className="pl-0 sm:pl-13">
-                          <div 
-                            className="text-xs sm:text-sm text-gray-900 dark:text-gray-100 break-words leading-relaxed prose prose-sm max-w-none"
-                            dangerouslySetInnerHTML={{ __html: msg.body }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              {/* Reply Box */}
-              {showReplyBox && (
-                <form className="flex flex-col gap-2 mt-2 px-3 sm:px-4 lg:px-6 pb-3 sm:pb-4 lg:pb-6" onSubmit={handleSendReply}>
-                  <label htmlFor="reply-message" className="sr-only">Reply</label>
-                  <RichTextEditor
-                    id="reply-message"
-                    content={reply}
-                    onChange={setReply}
-                    placeholder="Type your reply..."
-                    className="flex-1 border border-gray-200 dark:border-gray-700 rounded p-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm sm:text-base min-h-[100px] sm:min-h-[120px]"
-                  />
-                  <FileAttachmentPanel
-                    files={replyAttachments}
-                    onChange={setReplyAttachments}
-                    category="inbox"
-                    label="Attach files to reply"
-                    accept="image/*,application/pdf,.doc,.docx"
-                    capture="environment"
-                  />
-                  <div className="flex justify-end gap-2 mt-2">
-                    <button
-                      type="button"
-                      className="px-3 sm:px-4 py-1.5 sm:py-2 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 text-xs sm:text-sm touch-manipulation"
-                      onClick={() => setShowReplyBox(false)}
-                      disabled={sending}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="bg-blue-600 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded disabled:opacity-50 shadow text-xs sm:text-sm touch-manipulation"
-                      disabled={sending || !reply.trim()}
-                    >
-                      {sending ? 'Sending...' : 'Send'}
-                    </button>
-                  </div>
-                </form>
-              )}
-              {!showReplyBox && (
-                <div className="px-3 sm:px-4 lg:px-6 pb-3 sm:pb-4 lg:pb-6 flex justify-end">
-                  <button
-                    onClick={() => setShowReplyBox(true)}
-                    className="inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-xs sm:text-sm leading-4 font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400 touch-manipulation"
-                  >
-                    <Reply className="w-3 h-3 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
-                    Reply
-                  </button>
-                </div>
-              )}
-              {sendError && <div className="text-red-500 dark:text-red-400 mt-2 px-3 sm:px-4 lg:px-6 text-xs sm:text-sm">{sendError}</div>}
-            </div>
-          )}
-        </div>
-      </div>
 
-      {/* Delete Confirmation Modal */}
-      <ConfirmationModal
-        isOpen={showDeleteConfirm}
-        onClose={() => setShowDeleteConfirm(false)}
-        onConfirm={confirmDelete}
-        title={isPermanentDelete ? "Permanently Delete Conversations" : "Delete Conversations"}
-        message={isPermanentDelete 
-          ? `Are you sure you want to permanently delete ${selectedConversations.length} conversation${selectedConversations.length !== 1 ? 's' : ''}? This cannot be undone.`
-          : `Are you sure you want to delete ${selectedConversations.length} conversation${selectedConversations.length !== 1 ? 's' : ''}?`}
-        confirmText="Delete"
-        cancelText="Cancel"
-        variant="danger"
-        isLoading={bulkActionLoading}
-      />
+          <ConfirmationModal
+            isOpen={showDeleteConfirm}
+            onClose={() => setShowDeleteConfirm(false)}
+            onConfirm={confirmDelete}
+            title={
+              isPermanentDelete ? 'Permanently Delete Conversations' : 'Delete Conversations'
+            }
+            message={
+              isPermanentDelete
+                ? `Are you sure you want to permanently delete ${selectedConversations.length} conversation${selectedConversations.length !== 1 ? 's' : ''}? This cannot be undone.`
+                : `Are you sure you want to delete ${selectedConversations.length} conversation${selectedConversations.length !== 1 ? 's' : ''}?`
+            }
+            confirmText="Delete"
+            cancelText="Cancel"
+            variant="danger"
+            isLoading={bulkActionLoading}
+          />
 
-      {/* Delete Forever Confirmation Modal */}
-      <ConfirmationModal
-        isOpen={showDeleteForeverConfirm}
-        onClose={() => setShowDeleteForeverConfirm(false)}
-        onConfirm={confirmDeleteForever}
-        title="Permanently Delete Conversations"
-        message={`Are you sure you want to permanently delete ${selectedConversations.length} conversation${selectedConversations.length !== 1 ? 's' : ''}? This cannot be undone.`}
-        confirmText="Delete Forever"
-        cancelText="Cancel"
-        variant="danger"
-        isLoading={bulkActionLoading}
-      />
         </div>
       </PullToRefresh>
     </SwipeableContainer>
   );
 };
 
-// Helper to group conversations by date
-function groupConversationsByDate(conversations: any[]) {
-  const groups: { [date: string]: any[] } = {};
-  conversations.forEach(conv => {
-    const date = conv.lastMessage ? format(new Date(conv.lastMessage.createdAt), 'yyyy-MM-dd') : 'No Date';
-    if (!groups[date]) groups[date] = [];
-    groups[date].push(conv);
-  });
-  return groups;
-}
-
-// Helper to format date group header
-function formatDateHeader(dateStr: string) {
-  const date = parseISO(dateStr + 'T00:00:00');
-  if (isToday(date)) return 'Today';
-  if (isYesterday(date)) return 'Yesterday';
-  return format(date, 'MMM d, yyyy');
-}
-
-export default Inbox; 
+export default Inbox;

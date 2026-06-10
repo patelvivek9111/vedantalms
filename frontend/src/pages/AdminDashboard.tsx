@@ -21,6 +21,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import { API_URL } from '../config';
+import { MobileAppShell } from '../components/common/MobileAppShell';
 
 /** How often to refresh stats & activity while the dashboard is open */
 const DASHBOARD_POLL_MS = 15_000;
@@ -150,18 +151,21 @@ export function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-      </div>
+      <MobileAppShell title="Admin">
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        </div>
+      </MobileAppShell>
     );
   }
 
   return (
+    <MobileAppShell title="Admin">
     <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">Admin Dashboard</h1>
+          <h1 className="hidden lg:block text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">Admin Dashboard</h1>
           <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">System overview and administrative controls</p>
         </div>
         <div className="flex items-center space-x-4">
@@ -330,5 +334,6 @@ export function AdminDashboard() {
         </div>
       </div>
     </div>
+    </MobileAppShell>
   );
 } 

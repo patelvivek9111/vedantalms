@@ -13,9 +13,15 @@ const discussionParticipation = require('../services/discussionParticipation.ser
 const discussionStatus = require('../services/discussionStatus.service');
 const discussionObservability = require('../services/discussionObservability.service');
 const discussionListDiagnostics = require('../services/discussionListDiagnostics.service');
+const discussionListService = require('../services/discussionList.service');
 const { sanitizeDiscussionHtml } = require('../services/discussionSanitizer.service');
 const DiscussionAuditEvent = require('../models/discussionAuditEvent.model');
 const gradeLifecycleService = require('../services/gradeLifecycle.service');
+const {
+  notifyDiscussionCreated,
+  notifyDiscussionReplyPosted,
+  notifyDiscussionGraded,
+} = require('../services/notification/academicNotificationProducers.service');
 const { getSemesterFromCourse } = require('../utils/semesterUtils');
 
 function parseRemoveFileAssetIds(body = {}) {
@@ -109,9 +115,12 @@ async function serializeThreadForUser(req, thread, context = {}, options = {}) {
     String(pageOptions.limit) === '0'
       ? (thread?.toObject ? thread.toObject({ virtuals: true }) : { ...thread, replies: thread.replies || [] })
       : await discussionReplyService.populateThreadReplyPage(thread, pageOptions);
-  const hasSubmitted = req.user?.role === 'student'
-    ? await discussionReplyService.hasReplyByUser(thread, req.user._id)
-    : undefined;
+  const hasSubmitted =
+    req.user?.role === 'student'
+      ? options.hasSubmittedPrefetched !== undefined
+        ? options.hasSubmittedPrefetched
+        : await discussionReplyService.hasReplyByUser(thread, req.user._id)
+      : undefined;
   const payload = discussionAccess.filterDiscussionForStudent(req.user, threadWithReplies, {
     workflowState: context.workflowState,
     hasSubmitted,
@@ -125,11 +134,19 @@ async function serializeThreadForUser(req, thread, context = {}, options = {}) {
     }
   }
   if (req.user?._id) {
-    payload.currentUserParticipation = await discussionParticipation.getReadState(payload._id, req.user._id);
-    payload.unreadCount = payload.currentUserParticipation.unreadCount || 0;
-    payload.hasPosted = payload.currentUserParticipation.hasPosted || payload.hasSubmitted || false;
-    payload.lastViewedAt = payload.currentUserParticipation.lastViewedAt || null;
-    payload.hasInstructorReply = payload.currentUserParticipation.hasInstructorReply || false;
+    const participationRow = options.batchParticipationLoaded
+      ? options.participationPrefetched || {
+          hasPosted: !!hasSubmitted,
+          unreadCount: 0,
+          lastViewedAt: null,
+          hasInstructorReply: false,
+        }
+      : await discussionParticipation.getReadState(payload._id, req.user._id);
+    payload.currentUserParticipation = participationRow;
+    payload.unreadCount = participationRow.unreadCount || 0;
+    payload.hasPosted = participationRow.hasPosted || payload.hasSubmitted || false;
+    payload.lastViewedAt = participationRow.lastViewedAt || null;
+    payload.hasInstructorReply = participationRow.hasInstructorReply || false;
   }
   const listReplyCountOverride = options.replyCountAggregate;
   if (!payload.repliesHiddenUntilPost && typeof listReplyCountOverride === 'number') {
@@ -155,7 +172,7 @@ async function resolveCourseIdForListDebug(req, routeType, threads) {
   return null;
 }
 
-async function buildFilteredThreadListResponse(req, threads, routeType, { extraGate = null } = {}) {
+async function buildFilteredThreadListResponse(req, threads, routeType, { extraGate = null, listPagination = null } = {}) {
   const debugVisibility = req.query.debugVisibility === 'true';
   const courseIdForDebug = debugVisibility ? await resolveCourseIdForListDebug(req, routeType, threads) : null;
   const courseDoc =
@@ -168,14 +185,25 @@ async function buildFilteredThreadListResponse(req, threads, routeType, { extraG
   const threadIds = threads.map((t) => String(t._id));
   const replyCountsByThread = await discussionReplyService.batchResolveReplyCountsForList(threadIds);
 
-  const filteredReasons = {};
-  let filteredCount = 0;
+  const userId = req.user?._id;
+  let repliedThreadIds = new Set();
+  let participationByThread = new Map();
+  if (userId) {
+    if (req.user.role === 'student') {
+      repliedThreadIds = await discussionReplyService.batchThreadIdsRepliedByUser(threadIds, userId);
+    }
+    participationByThread = await discussionParticipation.summariesForUser(threadIds, userId);
+  }
+
+  const { entries, filteredReasons, filteredCount } = await discussionAccess.buildThreadListAccessBundle(
+    req.user,
+    threads,
+    { allowArchivedRead: true }
+  );
+
   const visibleThreads = [];
-  for (const thread of threads) {
+  for (const { thread, context } of entries) {
     try {
-      const context = await discussionAccess.assertStudentCanViewDiscussion(req.user, thread, {
-        allowArchivedRead: true,
-      });
       if (extraGate) {
         await extraGate(req, thread, context);
       }
@@ -185,13 +213,13 @@ async function buildFilteredThreadListResponse(req, threads, routeType, { extraG
         await serializeThreadForUser(req, thread, context, {
           replies: { limit: 0 },
           replyCountAggregate,
+          batchParticipationLoaded: !!userId,
+          hasSubmittedPrefetched: req.user?.role === 'student' ? repliedThreadIds.has(tid) : undefined,
+          participationPrefetched: participationByThread.get(tid) || null,
         })
       );
     } catch (error) {
       if (error.statusCode >= 500) throw error;
-      filteredCount += 1;
-      const code = error.code || 'UNKNOWN';
-      filteredReasons[code] = (filteredReasons[code] || 0) + 1;
       discussionListDiagnostics.recordThreadFiltered({
         routeType,
         thread,
@@ -203,6 +231,9 @@ async function buildFilteredThreadListResponse(req, threads, routeType, { extraG
   }
 
   const payload = { success: true, data: visibleThreads };
+  if (listPagination) {
+    payload.pagination = listPagination;
+  }
   if (includeDebug) {
     payload.visibilityDebug = {
       visibleCount: visibleThreads.length,
@@ -221,18 +252,15 @@ const isAuthorized = (user, contentAuthor, isTeacher) => {
 // Get all threads for a course
 router.get('/course/:courseId', protect, async (req, res) => {
   try {
-    const threads = await Thread.find({ course: req.params.courseId, deletedAt: null })
-      .select('-replies')
-      .populate('fileAssets', 'originalName mimeType size path')
-      .populate('author', 'firstName lastName role profilePicture')
-      .populate('studentGrades.student', 'firstName lastName')
-      .populate('studentGrades.gradedBy', 'firstName lastName')
-      .populate('groupSet', 'name')
-      .populate('groupId', 'name groupSet')
-      .sort({ lastActivity: -1 });
+    const { threads, pagination } = await discussionListService.fetchCourseThreadList(
+      req.params.courseId,
+      req.query
+    );
 
     setNoStoreThreadListHeaders(res);
-    res.json(await buildFilteredThreadListResponse(req, threads, 'course'));
+    res.json(
+      await buildFilteredThreadListResponse(req, threads, 'course', { listPagination: pagination })
+    );
   } catch (error) {
     sendRouteError(res, error, 'Error fetching course threads');
   }
@@ -241,19 +269,15 @@ router.get('/course/:courseId', protect, async (req, res) => {
 // Get threads for a specific groupset
 router.get('/groupset/:groupSetId', protect, async (req, res) => {
   try {
-    const threads = await Thread.find({ groupSet: req.params.groupSetId, deletedAt: null })
-      .select('-replies')
-      .populate('fileAssets', 'originalName mimeType size path')
-      .populate('author', 'firstName lastName role profilePicture')
-      .populate('studentGrades.student', 'firstName lastName')
-      .populate('studentGrades.gradedBy', 'firstName lastName')
-      .populate('groupSet', 'name')
-      .populate('groupId', 'name groupSet')
-      .sort({ lastActivity: -1 });
+    const { threads, pagination } = await discussionListService.fetchGroupSetThreadList(
+      req.params.groupSetId,
+      req.query
+    );
 
     setNoStoreThreadListHeaders(res);
     res.json(
       await buildFilteredThreadListResponse(req, threads, 'groupset', {
+        listPagination: pagination,
         extraGate: async (r, thread) => {
           await discussionAccess.assertStudentCanViewGroupDiscussion(r.user, thread);
         },
@@ -340,6 +364,13 @@ router.post('/', protect, authorize(['teacher', 'teaching_assistant', 'admin']),
     }
     await recordDiscussionAudit({ req, thread, action: 'discussion_created', after: { title, isGraded } });
     
+    notifyDiscussionCreated({
+      thread,
+      course,
+      actor: req.user,
+      requestId: req.id,
+    }).catch((err) => console.error('discussion.created notification error:', err));
+
     const populatedThread = await populateThread(Thread.findById(thread._id));
 
     res.status(201).json({
@@ -616,6 +647,12 @@ router.post('/:threadId/replies', protect, async (req, res) => {
         action: 'reply_created',
         after: { parentReply: parentReply || null },
       });
+      notifyDiscussionReplyPosted({
+        thread,
+        actor: req.user,
+        requestId: req.id,
+        replyId: newReply._id,
+      }).catch((err) => console.error('discussion.reply notification error:', err));
     }
 
     const updatedThread = await populateThread(Thread.findById(thread._id));
@@ -1020,6 +1057,17 @@ router.post('/:threadId/grade', protect, authorize(['teacher', 'teaching_assista
       before,
       after: { student: studentId, grade, releaseGrade, hideGrade, discussionReleaseMode },
     });
+
+    if (grade !== null && grade !== undefined) {
+      notifyDiscussionGraded({
+        thread,
+        studentId,
+        grade,
+        course: context.course,
+        actor: req.user,
+        requestId: req.id,
+      }).catch((err) => console.error('discussion.graded notification error:', err));
+    }
 
     const updatedThread = await Thread.findById(thread._id)
       .select('-replies')

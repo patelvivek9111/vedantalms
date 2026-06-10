@@ -10,7 +10,12 @@ const { resolveCourseForAssignment, assertCourseFilesMutable } = require('../ser
 const assignmentAccess = require('../services/assignmentAccess.service');
 const timedQuizAttemptService = require('../services/timedQuizAttempt.service');
 const assignmentGroupService = require('../services/assignmentGroup.service');
-const discussionReplyService = require('../services/discussionReply.service');
+const todoQueryService = require('../services/planner/todoQuery.service');
+const {
+  notifyAssignmentCreated,
+  notifyAssignmentUpdated,
+  notifyAssignmentPublished,
+} = require('../services/notification/academicNotificationProducers.service');
 const {
   parseQuizSubmissionMode,
   isPaperUploadQuiz,
@@ -121,6 +126,14 @@ exports.createAssignment = async (req, res) => {
     }
 
     await assignment.save();
+    if (assignment.published) {
+      notifyAssignmentCreated({
+        assignment,
+        course,
+        actor: req.user,
+        requestId: req.id,
+      }).catch((err) => console.error('assignment.created notification error:', err));
+    }
     res.status(201).json(assignment);
   } catch (error) {
     // If there's an error, delete any uploaded files
@@ -427,6 +440,14 @@ exports.updateAssignment = async (req, res) => {
     }
     
     await assignment.save();
+    if (assignment.published) {
+      notifyAssignmentUpdated({
+        assignment,
+        course,
+        actor: req.user,
+        requestId: req.id,
+      }).catch((err) => console.error('assignment.updated notification error:', err));
+    }
     res.json({
       success: true,
       data: assignment,
@@ -513,8 +534,16 @@ exports.toggleAssignmentPublish = async (req, res) => {
     if (!assignment) {
       return res.status(404).json({ success: false, message: 'Assignment not found' });
     }
+    const wasPublished = assignment.published;
     assignment.published = !assignment.published;
     await assignment.save();
+    if (!wasPublished && assignment.published) {
+      notifyAssignmentPublished({
+        assignment,
+        actor: req.user,
+        requestId: req.id,
+      }).catch((err) => console.error('assignment.published notification error:', err));
+    }
     res.json({ success: true, published: assignment.published });
   } catch (err) {
     console.error('Toggle assignment publish error:', err);
@@ -628,35 +657,11 @@ exports.getCourseGroupAssignments = async (req, res) => {
 // Get all assignments with ungraded submissions for the logged-in teacher/admin
 exports.getUngradedAssignmentsTodo = async (req, res) => {
   try {
-    const userId = req.user._id;
     const userRole = req.user.role;
     if (userRole !== 'teacher' && userRole !== 'admin') {
       return res.status(403).json({ message: 'Not authorized' });
     }
-    // 1. Find all courses where the user is the instructor
-    const courses = await require('../models/course.model').find({ instructor: userId });
-    const courseIds = courses.map(c => c._id);
-    // 2. For each course, find all modules
-    const modules = await require('../models/module.model').find({ course: { $in: courseIds } });
-    const moduleIds = modules.map(m => m._id);
-    // 3. For each module, find all assignments
-    const assignments = await require('../models/Assignment').find({ module: { $in: moduleIds } });
-    // 4. For each assignment, count ungraded submissions
-    const results = [];
-    for (const assignment of assignments) {
-      const ungradedCount = await Submission.countDocuments({ assignment: assignment._id, $or: [ { grade: null }, { grade: { $exists: false } } ] });
-      if (ungradedCount > 0) {
-        // Find course for this assignment
-        const module = modules.find(m => m._id.toString() === assignment.module.toString());
-        const course = courses.find(c => c._id.toString() === module.course.toString());
-        results.push({
-          id: assignment._id,
-          title: assignment.title,
-          course: { id: course._id, title: course.title },
-          ungradedCount
-        });
-      }
-    }
+    const results = await todoQueryService.getTeacherUngradedTodoItems(req.user._id);
     res.json(results);
   } catch (err) {
     console.error('Error in getUngradedAssignmentsTodo:', err);
@@ -691,33 +696,8 @@ exports.getStudentAssignmentsDueThisWeek = async (req, res) => {
     
     
     
-    // Filter out assignments already submitted by this student
-    const Submission = require('../models/Submission');
-    const Group = require('../models/Group');
-    
-    // Get individual submissions by this student
-    const individualSubmissions = await Submission.find({ 
-      student: userId,
-      group: { $exists: false }
-    }).distinct('assignment');
-    
-    // Get group submissions where this student is a member
-    const userGroups = await Group.find({ members: userId }).distinct('_id');
-    const groupSubmissions = await Submission.find({ 
-      group: { $in: userGroups }
-    }).distinct('assignment');
-    
-    
-    
-    // Combine all submitted assignment IDs
-    const submittedIds = new Set([
-      ...individualSubmissions.map(id => id.toString()),
-      ...groupSubmissions.map(id => id.toString())
-    ]);
-    
-    
-    
-    const filtered = assignments.filter(a => !submittedIds.has(a._id.toString()));
+    const submittedIds = await todoQueryService.getStudentSubmittedAssignmentIds(userId);
+    const filtered = assignments.filter((a) => !submittedIds.has(a._id.toString()));
     
     
     
@@ -731,90 +711,7 @@ exports.getStudentAssignmentsDueThisWeek = async (req, res) => {
 // Get all items due this week for the current student (assignments + discussions)
 exports.getAllItemsDueThisWeek = async (req, res) => {
   try {
-    const userId = req.user._id;
-    const now = new Date();
-    const weekStart = startOfWeek(now, { weekStartsOn: 1 });
-    const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
-    
-    // Find assignments where dueDate is this week and user is enrolled
-    const assignments = await Assignment.find({
-      dueDate: { $gte: weekStart, $lte: weekEnd },
-      published: true,
-    })
-      .populate({
-        path: 'module',
-        populate: {
-          path: 'course',
-          select: 'title'
-        }
-      })
-      .sort({ dueDate: 1 })
-      .lean();
-    
-    // Find discussions where dueDate is this week and user is enrolled
-    const Thread = require('../models/thread.model');
-    const discussions = await Thread.find({
-      dueDate: { $gte: weekStart, $lte: weekEnd },
-      published: true,
-    })
-      .populate({
-        path: 'module',
-        populate: {
-          path: 'course',
-          select: 'title'
-        }
-      })
-      .populate('course', 'title')
-      .sort({ dueDate: 1 })
-      .lean();
-    
-    // Filter out assignments already submitted by this student
-    const Submission = require('../models/Submission');
-    const Group = require('../models/Group');
-    
-    // Get individual submissions by this student
-    const individualSubmissions = await Submission.find({ 
-      student: userId,
-      group: { $exists: false }
-    }).distinct('assignment');
-    
-    // Get group submissions where this student is a member
-    const userGroups = await Group.find({ members: userId }).distinct('_id');
-    const groupSubmissions = await Submission.find({ 
-      group: { $in: userGroups }
-    }).distinct('assignment');
-    
-    // Combine all submitted assignment IDs
-    const submittedIds = new Set([
-      ...individualSubmissions.map(id => id.toString()),
-      ...groupSubmissions.map(id => id.toString())
-    ]);
-    
-    // Filter out submitted assignments
-    const filteredAssignments = assignments.filter(a => !submittedIds.has(a._id.toString()));
-    
-    // Filter out discussions where student has already posted
-    const filteredDiscussions = [];
-    for (const discussion of discussions) {
-      const hasPosted = await discussionReplyService.hasReplyByUser(discussion, userId);
-      if (!hasPosted) filteredDiscussions.push(discussion);
-    }
-    
-    // Combine and format results
-    const allItems = [
-      ...filteredAssignments.map(item => ({
-        ...item,
-        type: 'assignment',
-        itemType: 'Assignment'
-      })),
-      ...filteredDiscussions.map(item => ({
-        ...item,
-        type: 'discussion',
-        itemType: 'Discussion',
-        module: item.module || { course: item.course }
-      }))
-    ].sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
-    
+    const allItems = await todoQueryService.getStudentDueAllItemsThisWeek(req.user._id);
     res.json(allItems);
   } catch (err) {
     console.error('Error in getAllItemsDueThisWeek:', err);

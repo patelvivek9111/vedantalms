@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import axios from 'axios';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
 import { useGradebookData } from '@/hooks/useGradebookData';
@@ -11,6 +12,7 @@ vi.mock('@/contexts/AuthContext', () => ({
 }));
 
 vi.mock('@/services/inboxService', () => ({
+  fetchInboxUnreadCount: vi.fn().mockResolvedValue(2),
   fetchConversations: vi.fn().mockResolvedValue([
     {
       unreadCount: 2,
@@ -19,6 +21,12 @@ vi.mock('@/services/inboxService', () => ({
     }
   ])
 }));
+
+const queryWrapper = ({ children }: { children: React.ReactNode }) => (
+  <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    {children}
+  </QueryClientProvider>
+);
 
 vi.mock('axios');
 const mockedAxios = axios as any;
@@ -32,7 +40,7 @@ describe('Hooks coverage', () => {
   });
 
   it('useUnreadMessages computes unread count for inbox threads', async () => {
-    const { result } = renderHook(() => useUnreadMessages());
+    const { result } = renderHook(() => useUnreadMessages(), { wrapper: queryWrapper });
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.unreadCount).toBe(2);
   });

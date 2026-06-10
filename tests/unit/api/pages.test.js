@@ -173,18 +173,21 @@ describe('Pages API', () => {
     });
 
     it('should prevent creating page in unauthorized module', async () => {
-      // Clean up any existing test data first
-      await User.deleteMany({ email: 'other-teacher-page@test.com' });
-      await Course.deleteMany({ title: 'Other Course' });
-      await Module.deleteMany({ title: 'Other Module' });
+      const suffix = Date.now();
+      const otherEmail = `other-teacher-page-${suffix}@test.com`;
+      const otherCourseTitle = `Other Course ${suffix}`;
+      const otherModuleTitle = `Other Module ${suffix}`;
 
-      // Create another teacher and course
+      await User.deleteMany({ email: otherEmail });
+      await Course.deleteMany({ title: otherCourseTitle });
+      await Module.deleteMany({ title: otherModuleTitle });
+
       const otherTeacherResponse = await request(app)
         .post('/api/auth/register')
         .send({
           firstName: 'Other',
           lastName: 'Teacher',
-          email: 'other-teacher-page@test.com',
+          email: otherEmail,
           password: 'password123',
           role: 'teacher'
         });
@@ -195,9 +198,9 @@ describe('Pages API', () => {
         .post('/api/courses')
         .set('Authorization', `Bearer ${otherTeacherToken}`)
         .send({
-          title: 'Other Course',
+          title: otherCourseTitle,
           description: 'Other course',
-          code: 'OTH101'
+          code: `OTH${suffix}`
         });
       expect(otherCourseResponse.status).toBe(201);
       const otherCourseId = otherCourseResponse.body.data._id || otherCourseResponse.body.data.id;
@@ -207,13 +210,12 @@ describe('Pages API', () => {
         .set('Authorization', `Bearer ${otherTeacherToken}`)
         .send({
           course: otherCourseId,
-          title: 'Other Module',
+          title: otherModuleTitle,
           description: 'Other module'
         });
       expect(otherModuleResponse.status).toBe(201);
       const otherModuleId = otherModuleResponse.body.data._id || otherModuleResponse.body.data.id;
 
-      // Try to create page in other teacher's module
       const response = await request(app)
         .post('/api/pages')
         .set('Authorization', `Bearer ${teacherToken}`)
@@ -225,10 +227,9 @@ describe('Pages API', () => {
 
       expect(response.status).toBe(403);
 
-      // Cleanup
-      await User.deleteMany({ email: 'other-teacher-page@test.com' });
-      await Course.deleteMany({ title: 'Other Course' });
-      await Module.deleteMany({ title: 'Other Module' });
+      await User.deleteMany({ email: otherEmail });
+      await Course.deleteMany({ title: otherCourseTitle });
+      await Module.deleteMany({ title: otherModuleTitle });
     });
   });
 

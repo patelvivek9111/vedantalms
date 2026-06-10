@@ -146,7 +146,7 @@ const FloatingLabelPasswordInput: React.FC<FloatingLabelPasswordInputProps> = ({
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 focus-visible:outline focus-visible:ring-2 focus-visible:ring-indigo-500/35 dark:hover:bg-slate-800 dark:hover:text-slate-200 dark:focus-visible:ring-indigo-400/40"
+            className="absolute right-2 top-1/2 flex min-h-[44px] min-w-[44px] -translate-y-1/2 items-center justify-center rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 focus-visible:outline focus-visible:ring-2 focus-visible:ring-indigo-500/35 dark:hover:bg-slate-800 dark:hover:text-slate-200 dark:focus-visible:ring-indigo-400/40"
             aria-label={showPassword ? 'Hide password' : 'Show password'}
             tabIndex={-1}
           >

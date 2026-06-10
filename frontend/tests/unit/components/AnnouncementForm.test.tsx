@@ -166,7 +166,7 @@ describe('AnnouncementForm', () => {
       <AnnouncementForm onSubmit={mockOnSubmit} />
     );
 
-    const allowCommentsCheckbox = screen.getByLabelText(/allow users to comment/i);
+    const allowCommentsCheckbox = screen.getByLabelText(/allow comments/i);
     fireEvent.click(allowCommentsCheckbox);
     expect(allowCommentsCheckbox).toBeChecked();
   });

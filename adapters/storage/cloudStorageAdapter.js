@@ -49,10 +49,10 @@ class CloudStorageAdapter {
     }));
   }
 
-  async deleteByUrl(url) {
+  async deleteByUrl(url, resourceType = 'auto') {
     if (url && url.includes('cloudinary.com')) {
       const publicId = extractPublicId(url);
-      if (publicId) await deleteFromCloudinary(publicId);
+      if (publicId) await deleteFromCloudinary(publicId, resourceType);
     }
   }
 

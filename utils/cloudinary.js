@@ -80,7 +80,7 @@ const uploadMultipleToCloudinary = async (files, options = {}) => {
  * @param {String} resourceType - Resource type (image, video, raw)
  * @returns {Promise<Object>} Deletion result
  */
-const deleteFromCloudinary = async (publicId, resourceType = 'image') => {
+const deleteFromCloudinary = async (publicId, resourceType = 'auto') => {
   try {
     const result = await cloudinary.uploader.destroy(publicId, {
       resource_type: resourceType
@@ -99,20 +99,30 @@ const deleteFromCloudinary = async (publicId, resourceType = 'image') => {
  */
 const extractPublicId = (url) => {
   if (!url || typeof url !== 'string') return null;
-  
-  // Cloudinary URL format: https://res.cloudinary.com/{cloud_name}/{resource_type}/upload/v{version}/{public_id}.{format}
-  const match = url.match(/\/v\d+\/(.+)\.(jpg|jpeg|png|gif|pdf|doc|docx|xls|xlsx|txt|csv)/i);
-  if (match && match[1]) {
-    return match[1];
+
+  const versionMatch = url.match(/\/v\d+\/(.+)\.[a-z0-9]+$/i);
+  if (versionMatch && versionMatch[1]) {
+    return versionMatch[1];
   }
-  
-  // Try to extract from path format
+
   const pathMatch = url.match(/\/lms\/(.+)/);
   if (pathMatch && pathMatch[1]) {
-    return `lms/${pathMatch[1]}`;
+    return `lms/${pathMatch[1].replace(/\.[a-z0-9]+$/i, '')}`;
   }
-  
+
   return null;
+};
+
+function getSignedCloudinaryUrl(url, { download = true, resourceType = 'auto' } = {}) {
+  if (!url || !url.includes('cloudinary.com')) return null;
+  const publicId = extractPublicId(url);
+  if (!publicId) return null;
+  return cloudinary.url(publicId, {
+    resource_type: resourceType,
+    secure: true,
+    sign_url: true,
+    ...(download ? { flags: 'attachment' } : {}),
+  });
 };
 
 /**
@@ -132,6 +142,7 @@ module.exports = {
   uploadMultipleToCloudinary,
   deleteFromCloudinary,
   extractPublicId,
+  getSignedCloudinaryUrl,
   isCloudinaryConfigured,
   cloudinary
 };

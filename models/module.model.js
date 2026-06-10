@@ -25,6 +25,8 @@ const moduleSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
+moduleSchema.index({ course: 1, published: 1 });
+
 // Pre-remove hook to clean up assignment references if assignments are deleted
 moduleSchema.pre('remove', async function(next) {
   // Remove all assignments that reference this module

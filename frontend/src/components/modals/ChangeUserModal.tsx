@@ -229,7 +229,7 @@ export const ChangeUserModal: React.FC<ChangeUserModalProps> = ({
           </h2>
           <button
             onClick={onClose}
-            className="p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors touch-manipulation"
+            className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition-colors hover:bg-gray-100 touch-manipulation dark:hover:bg-gray-700"
           >
             <X className="h-5 w-5 text-gray-500 dark:text-gray-400" />
           </button>
@@ -328,7 +328,7 @@ export const ChangeUserModal: React.FC<ChangeUserModalProps> = ({
                               e.stopPropagation();
                               handleRemoveUser(storedUser.email);
                             }}
-                            className="flex-shrink-0 p-1.5 sm:p-1 hover:bg-red-100 dark:hover:bg-red-900/20 rounded transition-colors touch-manipulation"
+                            className="inline-flex min-h-[44px] min-w-[44px] flex-shrink-0 items-center justify-center rounded p-2 transition-colors hover:bg-red-100 touch-manipulation dark:hover:bg-red-900/20"
                             title="Remove user"
                           >
                             <LogOut className="h-4 w-4 text-red-500" />

@@ -45,6 +45,7 @@ async function runMaintenanceBundle({ dryRun = true } = {}) {
   const fileRetention = require('./fileRetention.service');
   summary.retentionPurge = await fileRetention.purgeDeletedFiles({ dryRun, limit: 200 });
   summary.tempUploadRetention = await fileRetention.purgeStaleTemporaryUploads({ dryRun, limit: 200 });
+  summary.supersededVersionPurge = await fileRetention.purgeSupersededFileVersions({ dryRun, limit: 200 });
 
   await academicAuditService.recordAuditEvent({
     actorId: null,

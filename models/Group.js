@@ -43,6 +43,7 @@ const groupSchema = new mongoose.Schema({
 
 // Add index for faster queries (only for groupSet + name combination)
 groupSchema.index({ groupSet: 1, name: 1 }, { unique: true });
+groupSchema.index({ members: 1, course: 1 });
 
 // Generate a unique group ID before saving
 // Temporarily disabled to fix query issues

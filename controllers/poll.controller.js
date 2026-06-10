@@ -132,18 +132,12 @@ const getPollsByCourse = async (req, res) => {
       .populate('createdBy', 'firstName lastName')
       .sort({ createdAt: -1 });
 
-    // Automatically mark expired polls as inactive
     const now = new Date();
-    for (const poll of polls) {
-      if (poll.isActive && poll.isExpired()) {
-        poll.isActive = false;
-        await poll.save();
-      }
-    }
-
-    // For students, only show active polls and hide results until they vote
     const filteredPolls = polls.map(poll => {
       const pollObj = poll.toObject();
+      if (pollObj.isActive && poll.isExpired()) {
+        pollObj.isActive = false;
+      }
       
       if (user.role === 'student') {
         // Check if student has voted

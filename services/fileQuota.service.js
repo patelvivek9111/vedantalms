@@ -1,6 +1,14 @@
+const mongoose = require('mongoose');
 const FileAsset = require('../models/fileAsset.model');
 const SystemSettings = require('../models/systemSettings.model');
 const academicAuditService = require('./academicAudit.service');
+
+function toObjectId(id) {
+  if (!id) return id;
+  if (id instanceof mongoose.Types.ObjectId) return id;
+  const value = String(id);
+  return mongoose.Types.ObjectId.isValid(value) ? new mongoose.Types.ObjectId(value) : id;
+}
 
 const BYTES_PER_GB = 1024 * 1024 * 1024;
 
@@ -17,7 +25,7 @@ async function getQuotaSettings() {
 
 async function getUserStorageBytes(userId) {
   const [row] = await FileAsset.aggregate([
-    { $match: { uploadedBy: userId, isDeleted: false } },
+    { $match: { uploadedBy: toObjectId(userId), isDeleted: false } },
     { $group: { _id: null, total: { $sum: '$size' } } },
   ]);
   return row?.total || 0;
@@ -25,7 +33,7 @@ async function getUserStorageBytes(userId) {
 
 async function getCourseStorageBytes(courseId) {
   const [row] = await FileAsset.aggregate([
-    { $match: { courseId, isDeleted: false } },
+    { $match: { courseId: toObjectId(courseId), isDeleted: false } },
     { $group: { _id: null, total: { $sum: '$size' } } },
   ]);
   return row?.total || 0;

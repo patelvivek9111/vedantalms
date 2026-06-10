@@ -31,8 +31,8 @@ async function purgeDeletedFiles({ dryRun = true, limit = 500, audit = {} } = {}
   const results = { scanned: candidates.length, purged: 0, dryRun };
   for (const asset of candidates) {
     if (dryRun) continue;
-    if (asset.storageKey) {
-      await deleteStoredBlob(asset.storageKey, asset.provider).catch(() => {});
+    if (asset.storageKey || asset.provider === 'cloudinary') {
+      await deleteStoredBlob(asset).catch(() => {});
     }
     await FileAsset.deleteOne({ _id: asset._id });
     results.purged += 1;
@@ -73,8 +73,55 @@ async function purgeStaleTemporaryUploads({ dryRun = true, limit = 200 } = {}) {
   return { candidates: stale.length, dryRun };
 }
 
+/**
+ * Purge non-current file version blobs past retention window (dry-run by default).
+ */
+async function purgeSupersededFileVersions({ dryRun = true, limit = 200, audit = {} } = {}) {
+  const { deletedFileRetentionDays } = await getRetentionSettings();
+  const cutoff = new Date(Date.now() - deletedFileRetentionDays * 24 * 60 * 60 * 1000);
+
+  const candidates = await FileAsset.find({
+    isCurrentVersion: false,
+    supersededBy: { $ne: null },
+    isDeleted: { $ne: true },
+    updatedAt: { $lte: cutoff },
+  })
+    .limit(limit)
+    .lean();
+
+  const results = { scanned: candidates.length, purged: 0, dryRun };
+  for (const asset of candidates) {
+    if (dryRun) continue;
+    if (asset.storageKey || asset.provider === 'cloudinary') {
+      await deleteStoredBlob(asset).catch(() => {});
+    }
+    await FileAsset.updateOne(
+      { _id: asset._id },
+      {
+        $set: {
+          isDeleted: true,
+          deletedAt: new Date(),
+          cleanupState: 'HARD_DELETED',
+        },
+      }
+    );
+    results.purged += 1;
+    await academicAuditService.recordAuditEvent({
+      actorId: audit.actorId,
+      entityType: 'file_asset',
+      entityId: asset._id,
+      action: 'file_superseded_version_purge',
+      severity: 'info',
+      ip: audit.ip,
+      metadata: { reason: 'superseded_retention_expired', supersededBy: String(asset.supersededBy) },
+    }).catch(() => {});
+  }
+  return results;
+}
+
 module.exports = {
   getRetentionSettings,
   purgeDeletedFiles,
   purgeStaleTemporaryUploads,
+  purgeSupersededFileVersions,
 };

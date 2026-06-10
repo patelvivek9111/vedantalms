@@ -415,9 +415,18 @@ exports.getAllUsers = async (req, res) => {
       ];
     }
     
-    const users = await User.find(query)
-      .select('firstName lastName email role createdAt lastLogin profilePicture')
-      .sort({ createdAt: -1 });
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit, 10) || 50));
+    const skip = (page - 1) * limit;
+
+    const [users, total] = await Promise.all([
+      User.find(query)
+        .select('firstName lastName email role createdAt lastLogin profilePicture')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      User.countDocuments(query),
+    ]);
     
     // Get last login dates from LoginActivity for users without lastLogin field
     const userIds = users.map(u => u._id);
@@ -437,18 +446,13 @@ exports.getAllUsers = async (req, res) => {
     });
     
     // Map users to include status and lastLogin (from LoginActivity if not in User model)
-    const usersWithStatus = await Promise.all(users.map(async (user) => {
+    const usersWithStatus = users.map((user) => {
       let lastLoginDate = user.lastLogin ? new Date(user.lastLogin) : null;
-      
-      // If no lastLogin in User model, get from LoginActivity
+
       if (!lastLoginDate) {
         const activityLogin = lastLoginMap.get(user._id.toString());
         if (activityLogin) {
           lastLoginDate = new Date(activityLogin);
-          // Optionally update the User model (non-blocking)
-          User.findByIdAndUpdate(user._id, { lastLogin: activityLogin }).catch(err => 
-            console.error('Error updating lastLogin:', err)
-          );
         }
       }
       
@@ -485,7 +489,7 @@ exports.getAllUsers = async (req, res) => {
         createdAt: user.createdAt,
         profilePicture: user.profilePicture
       };
-    }));
+    });
     
     // Filter by status if provided
     let filteredUsers = usersWithStatus;
@@ -495,7 +499,13 @@ exports.getAllUsers = async (req, res) => {
 
     res.json({
       success: true,
-      data: filteredUsers
+      data: filteredUsers,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit) || 1,
+      },
     });
   } catch (error) {
     console.error('Error fetching users:', error);
@@ -524,43 +534,65 @@ exports.getAllCourses = async (req, res) => {
       ];
     }
     
-    const courses = await Course.find(query)
-      .populate('instructor', 'firstName lastName')
-      .select('title description instructor published students updatedAt createdAt modules catalog')
-      .sort({ updatedAt: -1 });
-    
-    const coursesWithStats = await Promise.all(courses.map(async (course) => {
-      // Get modules for this course
-      const modules = await Module.find({ course: course._id }).select('_id');
-      const moduleIds = modules.map(m => m._id);
-      
-      // Count assignments
-      const assignmentCount = await Assignment.countDocuments({
-        module: { $in: moduleIds }
-      });
-      
-      // Determine status
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit, 10) || 50));
+    const skip = (page - 1) * limit;
+
+    const [courses, total] = await Promise.all([
+      Course.find(query)
+        .populate('instructor', 'firstName lastName')
+        .select('title description instructor published students updatedAt createdAt modules catalog operationalStatus')
+        .sort({ updatedAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Course.countDocuments(query),
+    ]);
+
+    const courseIds = courses.map((course) => course._id);
+    const modules = courseIds.length
+      ? await Module.find({ course: { $in: courseIds } }).select('_id course').lean()
+      : [];
+    const moduleIds = modules.map((m) => m._id);
+    const moduleToCourse = new Map(modules.map((m) => [String(m._id), String(m.course)]));
+    const assignmentCountsByCourse = new Map();
+
+    if (moduleIds.length) {
+      const countsByModule = await Assignment.aggregate([
+        { $match: { module: { $in: moduleIds } } },
+        { $group: { _id: '$module', count: { $sum: 1 } } },
+      ]);
+      for (const row of countsByModule) {
+        const courseId = moduleToCourse.get(String(row._id));
+        if (!courseId) continue;
+        assignmentCountsByCourse.set(
+          courseId,
+          (assignmentCountsByCourse.get(courseId) || 0) + row.count
+        );
+      }
+    }
+
+    const coursesWithStats = courses.map((course) => {
       let status = course.operationalStatus || 'active';
       if (status === 'active' && !course.published) {
         status = 'draft';
       }
-      
+
       return {
         _id: course._id,
         title: course.title,
         description: course.description,
-        instructor: course.instructor 
+        instructor: course.instructor
           ? `${course.instructor.firstName} ${course.instructor.lastName}`
           : 'Unknown',
         published: course.published,
         enrollmentCount: course.students?.length || 0,
-        assignmentCount: assignmentCount,
+        assignmentCount: assignmentCountsByCourse.get(String(course._id)) || 0,
         catalog: course.catalog,
         createdAt: course.createdAt,
         lastUpdated: course.updatedAt,
-        status: status
+        status,
       };
-    }));
+    });
     
     // Filter by status if provided
     let filteredCourses = coursesWithStats;
@@ -570,7 +602,13 @@ exports.getAllCourses = async (req, res) => {
 
     res.json({
       success: true,
-      data: filteredCourses
+      data: filteredCourses,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit) || 1,
+      },
     });
   } catch (error) {
     console.error('Error fetching courses:', error);

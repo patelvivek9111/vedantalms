@@ -31,7 +31,7 @@ const FileAsset = require('../models/fileAsset.model');
 const SystemSettings = require('../models/systemSettings.model');
 const academicAuditService = require('./academicAudit.service');
 const { paths, isPathInside } = require('../config/paths');
-const { createReadStreamForAsset } = require('./fileStorage.service');
+const { createReadStreamForAsset, deleteStoredBlob } = require('./fileStorage.service');
 
 const QUARANTINE_DIR = path.join(paths.uploads, '_blob_quarantine');
 
@@ -62,6 +62,28 @@ async function quarantineBlob(asset, audit = {}) {
     err.statusCode = 423;
     throw err;
   }
+
+  if (asset.provider === 'cloudinary') {
+    await deleteStoredBlob(asset);
+    asset.cleanupState = 'SOFT_DELETED';
+    asset.metadata = {
+      ...(asset.metadata || {}),
+      blobDeletedAt: new Date().toISOString(),
+      restoreEligible: false,
+    };
+    await asset.save();
+    await academicAuditService.recordAuditEvent({
+      actorId: audit.actorId,
+      entityType: 'file_asset',
+      entityId: asset._id,
+      action: 'blob_deleted_remote',
+      severity: 'info',
+      ip: audit.ip,
+      metadata: { provider: 'cloudinary' },
+    }).catch(() => {});
+    return { quarantined: true, remote: true };
+  }
+
   ensureQuarantineDir();
   const stream = createReadStreamForAsset(asset);
   if (!stream?.path) {

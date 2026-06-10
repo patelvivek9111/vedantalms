@@ -57,8 +57,50 @@ const delJson = async (key) => {
   }
 };
 
+const getNumber = async (key) => {
+  const client = getRedisClient();
+  if (!client) return 0;
+  try {
+    const raw = await client.get(key);
+    if (raw == null) return 0;
+    const n = parseInt(raw, 10);
+    return Number.isFinite(n) ? n : 0;
+  } catch {
+    return 0;
+  }
+};
+
+const incr = async (key) => {
+  const client = getRedisClient();
+  if (!client) return 1;
+  try {
+    return await client.incr(key);
+  } catch {
+    return 1;
+  }
+};
+
+/** Increment a counter and set TTL on first increment (sliding window buckets). */
+const incrWithExpire = async (key, ttlSeconds) => {
+  const client = getRedisClient();
+  if (!client) return null;
+  try {
+    const count = await client.incr(key);
+    if (count === 1) {
+      await client.expire(key, ttlSeconds);
+    }
+    return count;
+  } catch {
+    return null;
+  }
+};
+
 module.exports = {
   getJson,
   setJson,
-  delJson
+  delJson,
+  getNumber,
+  incr,
+  incrWithExpire,
+  getRedisClient,
 };

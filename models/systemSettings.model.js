@@ -101,7 +101,30 @@ const systemSettingsSchema = new mongoose.Schema({
       type: Number,
       default: 72
     }
-  }
+  },
+  messaging: {
+    mode: {
+      type: String,
+      enum: ['open', 'course_scoped', 'admin_only'],
+      default: 'course_scoped',
+    },
+    allowStudentToStudent: {
+      type: Boolean,
+      default: false,
+    },
+    allowCrossCourse: {
+      type: Boolean,
+      default: false,
+    },
+    maxRecipientsPerMessage: {
+      type: Number,
+      default: 50,
+    },
+    maxSendIndividuallyBatch: {
+      type: Number,
+      default: 25,
+    },
+  },
 }, {
   timestamps: true
 });

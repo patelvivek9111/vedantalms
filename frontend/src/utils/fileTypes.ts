@@ -29,6 +29,13 @@ export function isMongoObjectId(value: string): boolean {
   return MONGO_OBJECT_ID_RE.test(value);
 }
 
+/** Collect validated file asset IDs from upload panel state for API payloads. */
+export function fileAssetIdsFromFiles(files: NormalizedFile[]): string[] {
+  return files
+    .map((f) => f.fileAssetId)
+    .filter((id): id is string => Boolean(id && isMongoObjectId(id)));
+}
+
 export function extractFileAssetId(url: string): string | null {
   if (!url) return null;
   if (isMongoObjectId(url)) return url;

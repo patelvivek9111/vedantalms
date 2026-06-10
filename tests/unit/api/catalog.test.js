@@ -157,8 +157,9 @@ describe('Catalog API', () => {
       if (response.body.length > 0) {
         const course = response.body.find(c => (c._id || c.id) === courseId);
         if (course) {
-          // Should have students populated for authenticated users
-          expect(course).toHaveProperty('students');
+          expect(course).toHaveProperty('studentCount', 1);
+          expect(course).toHaveProperty('isEnrolled', true);
+          expect(course).not.toHaveProperty('students');
         }
       }
     });
@@ -197,8 +198,9 @@ describe('Catalog API', () => {
       if (response.body.length > 0) {
         const course = response.body.find(c => (c._id || c.id) === courseId);
         if (course) {
-          // Should have enrollmentRequests populated
-          expect(course).toHaveProperty('enrollmentRequests');
+          expect(course).toHaveProperty('hasEnrollmentRequest');
+          expect(typeof course.hasEnrollmentRequest).toBe('boolean');
+          expect(course).not.toHaveProperty('enrollmentRequests');
         }
       }
     });
@@ -212,8 +214,9 @@ describe('Catalog API', () => {
       if (response.body.length > 0) {
         const course = response.body.find(c => (c._id || c.id) === courseId);
         if (course) {
-          // Should have waitlist populated
-          expect(course).toHaveProperty('waitlist');
+          expect(course).toHaveProperty('isOnWaitlist');
+          expect(typeof course.isOnWaitlist).toBe('boolean');
+          expect(course).not.toHaveProperty('waitlist');
         }
       }
     });

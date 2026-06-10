@@ -88,15 +88,43 @@ const CourseStoragePanel: React.FC<CourseStoragePanelProps> = ({ courseId }) => 
   const byCategory = (data.byCategory || []) as Array<{ category: string; bytes: number; count: number }>;
   const largest = (data.largestFiles || []) as Array<{ originalName: string; size: number; category: string }>;
 
+  const totalBytesFromCategories = byCategory.reduce((sum, row) => sum + (Number(row.bytes) || 0), 0);
+  const totalFilesFromCategories = byCategory.reduce((sum, row) => sum + (Number(row.count) || 0), 0);
+  const totalBytes = Number(data.totalBytes) || totalBytesFromCategories;
+  const totalFiles = Number(data.totalFiles) || totalFilesFromCategories;
+  const courseLimit = Number(quota.courseLimit) || 0;
+  const courseUsed = Number(quota.courseUsed) || totalBytes;
+  const percentUsed =
+    quota.percentUsed ??
+    (courseLimit > 0 ? Math.min(100, Math.round((courseUsed / courseLimit) * 100)) : 0);
+
+  const statCards = [
+    {
+      label: 'Total used',
+      value: formatBytes(totalBytes),
+      detail: `${totalFiles} files`,
+    },
+    {
+      label: 'Quota used',
+      value: `${percentUsed}%`,
+      detail: formatBytes(courseUsed),
+    },
+    {
+      label: 'Course limit',
+      value: formatBytes(courseLimit),
+      detail: 'Maximum allowed',
+    },
+  ];
+
   return (
-    <div className="space-y-4 rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="space-y-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Course storage</h3>
         <button
           type="button"
           onClick={requestCourseZip}
           disabled={zipBusy || polling}
-          className="text-xs rounded-md border border-gray-300 dark:border-gray-600 px-2 py-1 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
+          className="min-h-[40px] rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
         >
           {zipBusy || polling ? 'Building ZIP…' : 'Download course ZIP'}
         </button>
@@ -110,60 +138,88 @@ const CourseStoragePanel: React.FC<CourseStoragePanelProps> = ({ courseId }) => 
       {downloadUrl && (
         <button
           type="button"
-          className="text-xs rounded-md bg-indigo-600 text-white px-3 py-1.5"
+          className="min-h-[40px] rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-indigo-700"
           onClick={() => openJobDownload(downloadUrl)}
         >
           Download ZIP file
         </button>
       )}
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-md bg-gray-50 dark:bg-gray-800 p-3">
-          <p className="text-xs text-gray-500">Total used</p>
-          <p className="text-lg font-semibold">{formatBytes(Number(data.totalBytes) || 0)}</p>
-          <p className="text-xs text-gray-500">{Number(data.totalFiles) || 0} files</p>
-        </div>
-        <div className="rounded-md bg-gray-50 dark:bg-gray-800 p-3">
-          <p className="text-xs text-gray-500">Quota used</p>
-          <p className="text-lg font-semibold">{quota.percentUsed ?? 0}%</p>
-        </div>
-        <div className="rounded-md bg-gray-50 dark:bg-gray-800 p-3">
-          <p className="text-xs text-gray-500">Course limit</p>
-          <p className="text-lg font-semibold">{formatBytes(Number(quota.courseLimit) || 0)}</p>
-        </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {statCards.map((card) => (
+          <div
+            key={card.label}
+            className="flex min-h-[5.5rem] flex-col justify-between rounded-lg bg-gray-50 p-3 dark:bg-gray-800"
+          >
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              {card.label}
+            </p>
+            <p className="text-lg font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+              {card.value}
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">{card.detail}</p>
+          </div>
+        ))}
       </div>
       {byCategory.length > 0 && (
         <div>
-          <h4 className="text-sm font-medium mb-2">By category</h4>
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="text-left text-gray-500">
-                <th className="py-1">Category</th>
-                <th>Files</th>
-                <th>Size</th>
-              </tr>
-            </thead>
-            <tbody>
-              {byCategory.map((row) => (
-                <tr key={row.category} className="border-t border-gray-100 dark:border-gray-800">
-                  <td className="py-1">{row.category}</td>
-                  <td>{row.count}</td>
-                  <td>{formatBytes(row.bytes)}</td>
+          <h4 className="mb-2 text-sm font-medium">By category</h4>
+          <div className="space-y-2 md:hidden">
+            {byCategory.map((row) => (
+              <div
+                key={row.category}
+                className="rounded-lg border border-gray-200 p-3 dark:border-gray-700"
+              >
+                <div className="font-medium text-gray-900 dark:text-gray-100">{row.category}</div>
+                <div className="mt-1 flex justify-between text-xs text-gray-600 dark:text-gray-400">
+                  <span>{row.count} files</span>
+                  <span>{formatBytes(row.bytes)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-left text-gray-500">
+                  <th className="py-1">Category</th>
+                  <th>Files</th>
+                  <th>Size</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {byCategory.map((row) => (
+                  <tr key={row.category} className="border-t border-gray-100 dark:border-gray-800">
+                    <td className="py-1">{row.category}</td>
+                    <td>{row.count}</td>
+                    <td>{formatBytes(row.bytes)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
       {largest.length > 0 && (
         <div>
-          <h4 className="text-sm font-medium mb-2">Largest files</h4>
-          <ul className="text-xs space-y-1 text-gray-600 dark:text-gray-400">
+          <h4 className="mb-2 text-sm font-semibold text-gray-900 dark:text-gray-100">Largest files</h4>
+          <div className="overflow-hidden rounded-lg ring-1 ring-gray-200/70 divide-y divide-gray-100 dark:ring-gray-700/60 dark:divide-gray-700/50">
             {largest.slice(0, 5).map((f, i) => (
-              <li key={i} className="truncate">
-                {f.originalName} — {formatBytes(f.size)} ({f.category})
-              </li>
+              <div
+                key={`${f.originalName}-${f.size}-${i}`}
+                className="flex items-center justify-between gap-3 px-3 py-2.5"
+              >
+                <p className="min-w-0 flex-1 truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+                  {f.originalName}
+                </p>
+                <div className="flex shrink-0 items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                  <span className="tabular-nums">{formatBytes(f.size)}</span>
+                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium capitalize text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                    {f.category}
+                  </span>
+                </div>
+              </div>
             ))}
-          </ul>
+          </div>
         </div>
       )}
     </div>

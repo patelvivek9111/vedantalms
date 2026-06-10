@@ -69,7 +69,8 @@ export default defineConfig({
     testTimeout: 30000, // 30 seconds per test
     hookTimeout: 30000, // 30 seconds for hooks
     teardownTimeout: 10000, // 10 seconds for teardown
-    pool: 'forks',
+    // threads avoids fork-pool worker hangs on Windows; isolate keeps file-level separation
+    pool: 'threads',
     isolate: true,
     maxWorkers: 2,
     sequence: {

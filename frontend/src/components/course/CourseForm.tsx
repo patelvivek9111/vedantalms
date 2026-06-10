@@ -9,6 +9,7 @@ import FormFieldGroup from '../common/FormFieldGroup';
 import { useDraftManager } from '../../hooks/useDraftManager';
 import { FormCheckboxOption, FormPageHeader, FormActions } from '../common/FormControls';
 import { FORM_ERROR } from '../common/formStyles';
+import { MobileAppShell } from '../common/MobileAppShell';
 
 interface CourseFormProps {
   mode: 'create' | 'edit';
@@ -259,15 +260,21 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
     }
   };
 
+  const shellTitle = mode === 'create' ? 'Create Course' : 'Edit Course';
+  const backPath = mode === 'edit' && id ? `/courses/${id}` : '/courses';
+
   return (
+    <MobileAppShell title={shellTitle} backButtonPath={backPath}>
     <div className="min-h-screen bg-slate-50/80 px-3 py-4 dark:bg-slate-950 sm:px-4 sm:py-6 lg:px-8">
       <div className="mx-auto max-w-2xl">
-        <FormPageHeader
-          title={mode === 'create' ? 'Create course' : 'Edit course'}
-          subtitle={mode === 'create' ? 'Set up a new course for your students.' : 'Update course details and catalog settings.'}
-          isDraftSaved={mode === 'create' && isDraftSaved}
-          onReset={mode === 'create' ? handleResetForm : undefined}
-        />
+        <div className="hidden lg:block">
+          <FormPageHeader
+            title={mode === 'create' ? 'Create course' : 'Edit course'}
+            subtitle={mode === 'create' ? 'Set up a new course for your students.' : 'Update course details and catalog settings.'}
+            isDraftSaved={mode === 'create' && isDraftSaved}
+            onReset={mode === 'create' ? handleResetForm : undefined}
+          />
+        </div>
 
         {error && (
           <div className={`${FORM_ERROR} mb-6`} role="alert">
@@ -480,6 +487,7 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
         </form>
       </div>
     </div>
+    </MobileAppShell>
   );
 };
 

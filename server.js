@@ -133,6 +133,15 @@ const summarizeLatency = (samples) => {
 };
 
 const { getSocketMetrics, initializeQuizWaveSocket } = require('./socket/quizwave.socket');
+const {
+  initializeMessagingSocket,
+  getMessagingSocketMetrics,
+} = require('./socket/messaging.socket');
+const {
+  initializeNotificationSocket,
+  getNotificationSocketMetrics,
+} = require('./socket/notification.socket');
+const costGovernanceMetrics = require('./services/costGovernanceMetrics.service');
 
 const buildHealthOpsPayload = () => {
   const uptimeSeconds = Math.floor((Date.now() - requestMetrics.startedAt) / 1000);
@@ -140,6 +149,8 @@ const buildHealthOpsPayload = () => {
   const errorRate = requestMetrics.total > 0
     ? Number((((requestMetrics.status4xx + requestMetrics.status5xx) / requestMetrics.total) * 100).toFixed(2))
     : 0;
+  const notificationSocketMetrics = getNotificationSocketMetrics();
+  const messagingSocketMetrics = getMessagingSocketMetrics();
   return {
     status: 'ok',
     uptimeSeconds,
@@ -165,7 +176,13 @@ const buildHealthOpsPayload = () => {
     socketEngine: {
       connectionErrors: socketEngineConnectionErrors
     },
-    socketMetrics: getSocketMetrics()
+    socketMetrics: getSocketMetrics(),
+    messagingSocketMetrics,
+    notificationSocketMetrics,
+    costGovernance: costGovernanceMetrics.buildRealtimeEfficiencySnapshot({
+      notificationSocketMetrics,
+      messagingSocketMetrics,
+    }),
   };
 };
 
@@ -202,6 +219,15 @@ const renderPrometheusMetrics = (payload) => {
   emit('lms_socket_throttled_total', 'gauge', 'QuizWave inbound events rate-limited.', s.throttled ?? 0);
   emit('lms_socket_currently_connected', 'gauge', 'Estimated current QuizWave connections.', s.currentlyConnected ?? 0);
   emit('lms_quizwave_active_sessions', 'gauge', 'QuizWave active session map size.', s.activeSessionCount ?? 0);
+  const msg = payload.messagingSocketMetrics || {};
+  const notif = payload.notificationSocketMetrics || {};
+  const cg = payload.costGovernance || {};
+  const poll = cg.poll?.estimatedPerHour || {};
+  emit('lms_messaging_socket_connected', 'gauge', 'Inbox websocket connections.', msg.currentlyConnected ?? 0);
+  emit('lms_notification_socket_connected', 'gauge', 'Notification websocket connections.', notif.currentlyConnected ?? 0);
+  emit('lms_poll_requests_per_hour_total', 'gauge', 'Estimated badge/list poll requests per hour.', poll.totalPoll ?? 0);
+  emit('lms_poll_per_ws_connection_per_hour', 'gauge', 'Poll per hour divided by total WS connections.', cg.ratios?.pollPerHourPerWsConnection ?? 0);
+  emit('lms_cost_governance_realtime_degraded', 'gauge', '1 if poll/WS efficiency status is degraded.', cg.status === 'degraded' ? 1 : 0);
   return lines.join('\n');
 };
 
@@ -240,6 +266,7 @@ app.use((req, res, next) => {
       statusCode: res.statusCode,
       durationMs: Number(durationMs.toFixed(2))
     }, 'request.completed');
+    costGovernanceMetrics.recordPollRequest(req.method, req.originalUrl || req.url);
   });
   next();
 });
@@ -472,7 +499,9 @@ app.use('/api/grading-policy', require('./routes/gradingPolicy.routes'));
 app.use('/api/groups', require('./routes/groupRoutes'));
 app.use('/api/announcements', require('./routes/announcement.routes'));
 app.use('/api/events', require('./routes/event.routes'));
+app.use('/api/calendar', require('./routes/calendar.routes'));
 app.use('/api/todos', require('./routes/todo.routes'));
+app.use('/api/planner', require('./routes/planner.routes').router);
 app.use('/api/inbox', require('./routes/inbox.routes'));
 app.use('/api', require('./routes/attendance.routes'));
 app.use('/api/polls', require('./routes/poll.routes'));
@@ -696,6 +725,16 @@ app.get('/health/ready', async (req, res) => {
         jobQueueRedisConfigured && process.env.NODE_ENV === 'production'
           ? 'Run npm run worker:grading-jobs alongside the API'
           : null,
+      notificationFanoutWorker:
+        jobQueueRedisConfigured && process.env.NODE_ENV === 'production'
+          ? 'Run npm run worker:notification-fanout for async academic notifications'
+          : null,
+      fileScanWorker:
+        jobQueueRedisConfigured && process.env.NODE_ENV === 'production'
+          ? 'Run npm run worker:file-scan for durable virus scans'
+          : null,
+      nightlyOpsWorker:
+        'Schedule npm run worker:nightly-ops -- --apply via cron (e.g. 03:00 UTC daily)',
       quizwaveCleanup:
         lifecycle.apiSchedulersEnabled
           ? null
@@ -847,6 +886,16 @@ if (process.env.NODE_ENV !== 'test') {
 
   configureSocketRedisAdapter(io);
   initializeQuizWaveSocket(io);
+  initializeMessagingSocket(io.of('/messaging'));
+  initializeNotificationSocket(io.of('/notifications'));
+
+  if (process.env.QUIZWAVE_DISTRIBUTED_TIMERS !== 'false') {
+    const { startQuizwaveTimerWorker } = require('./services/quizwaveTimerQueue.service');
+    const quizwaveTimerWorker = startQuizwaveTimerWorker(io);
+    if (quizwaveTimerWorker) {
+      logger.info('quizwave.distributed_timer_worker.started');
+    }
+  }
 }
 
 let stopCleanupScheduler = null;

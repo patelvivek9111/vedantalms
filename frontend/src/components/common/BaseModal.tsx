@@ -57,6 +57,7 @@ const BaseModal: React.FC<BaseModalProps> = ({
   const previousActiveElement = useRef<HTMLElement | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const TRANSITION_MS = 300;
 
   // Swipe to dismiss (mobile only)
   const handleSwipeDown = () => {
@@ -80,29 +81,24 @@ const BaseModal: React.FC<BaseModalProps> = ({
   // Handle open/close animations
   useEffect(() => {
     if (isOpen) {
-      // Store the previously focused element
       previousActiveElement.current = document.activeElement as HTMLElement;
-      
-      // Prevent body scroll when modal is open
       document.body.style.overflow = 'hidden';
-      
-      // Trigger animation
       setIsVisible(true);
-      requestAnimationFrame(() => {
-        setIsAnimating(true);
-      });
-    } else {
-      setIsAnimating(false);
-      // Allow body scroll when modal is closed
-      document.body.style.overflow = '';
-      
-      // Restore focus to previous element
-      if (previousActiveElement.current) {
-        previousActiveElement.current.focus();
-      }
+      const frame = requestAnimationFrame(() => setIsAnimating(true));
+      return () => {
+        cancelAnimationFrame(frame);
+        document.body.style.overflow = '';
+      };
     }
 
+    setIsAnimating(false);
+    document.body.style.overflow = '';
+    if (previousActiveElement.current) {
+      previousActiveElement.current.focus();
+    }
+    const timer = window.setTimeout(() => setIsVisible(false), TRANSITION_MS);
     return () => {
+      window.clearTimeout(timer);
       document.body.style.overflow = '';
     };
   }, [isOpen]);
@@ -166,8 +162,8 @@ const BaseModal: React.FC<BaseModalProps> = ({
     }
   };
 
-  // Handle animation end
-  const handleAnimationEnd = () => {
+  const handleTransitionEnd = (e: React.TransitionEvent<HTMLDivElement>) => {
+    if (e.target !== overlayRef.current || e.propertyName !== 'opacity') return;
     if (!isOpen) {
       setIsVisible(false);
     }
@@ -178,9 +174,10 @@ const BaseModal: React.FC<BaseModalProps> = ({
   return (
     <div
       ref={overlayRef}
+      onTransitionEnd={handleTransitionEnd}
       className={`fixed inset-0 z-50 overflow-y-auto transition-opacity duration-300 ${
         isAnimating ? 'opacity-100' : 'opacity-0'
-      } ${overlayClassName}`}
+      } ${!isOpen ? 'pointer-events-none' : ''} ${overlayClassName}`}
       onClick={handleOverlayClick}
       role="dialog"
       aria-modal="true"
@@ -204,7 +201,6 @@ const BaseModal: React.FC<BaseModalProps> = ({
               ? 'translate-y-0 opacity-100 scale-100'
               : 'translate-y-4 opacity-0 scale-95'
           } ${className}`}
-          onAnimationEnd={handleAnimationEnd}
           onClick={(e) => e.stopPropagation()}
           {...(swipeEnabled ? {
             onTouchStart: swipeHandlers.onTouchStart,

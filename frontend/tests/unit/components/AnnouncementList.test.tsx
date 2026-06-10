@@ -72,7 +72,7 @@ describe('AnnouncementList', () => {
     );
 
     const announcement = screen.getByText('Test Announcement');
-    fireEvent.click(announcement.closest('li') || announcement);
+    fireEvent.click(announcement.closest('button') || announcement);
 
     expect(mockOnSelect).toHaveBeenCalledWith(mockAnnouncements[0]);
   });

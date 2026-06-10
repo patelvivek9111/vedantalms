@@ -17,6 +17,14 @@ describe('Notifications API', () => {
 
   beforeAll(async () => {
     await waitForMongoConnection(MONGODB_URI);
+
+    // Replace legacy sparse dedupe index (null collisions) with partial unique index.
+    try {
+      await Notification.collection.dropIndex('notification_user_dedupe_unique');
+    } catch (_) {
+      /* index may not exist yet */
+    }
+    await Notification.syncIndexes();
     
     // Clean up test data
     await User.deleteMany({ email: { $in: ['teacher-notif@test.com', 'student-notif@test.com'] } });
@@ -134,6 +142,28 @@ describe('Notifications API', () => {
       expect(response.status).toBe(200);
       expect(response.body.pagination.limit).toBeLessThanOrEqual(100);
     });
+
+    it('should not expose internal dedupeKey in list responses', async () => {
+      await Notification.create({
+        user: studentId,
+        type: 'announcement',
+        title: 'Dedupe test',
+        message: 'Internal key must not leak',
+        read: false,
+        dedupeKey: 'announcement.created:actor:announcement:rel:test',
+      });
+
+      const response = await request(app)
+        .get('/api/notifications')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .query({ type: 'announcement' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.length).toBeGreaterThan(0);
+      for (const item of response.body.data) {
+        expect(item.dedupeKey).toBeUndefined();
+      }
+    });
   });
 
   describe('GET /api/notifications/unread-count', () => {
@@ -174,10 +204,16 @@ describe('Notifications API', () => {
 
   describe('PATCH /api/notifications/:id/read', () => {
     it('should mark notification as read', async () => {
-      if (!notificationId) return;
+      const notification = await Notification.create({
+        user: studentId,
+        type: 'assignment_due',
+        title: 'Mark Read Test',
+        message: 'Unread notification for mark-read test',
+        read: false,
+      });
 
       const response = await request(app)
-        .patch(`/api/notifications/${notificationId}/read`)
+        .patch(`/api/notifications/${notification._id}/read`)
         .set('Authorization', `Bearer ${studentToken}`);
 
       expect(response.status).toBe(200);

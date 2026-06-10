@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Editor } from '@tinymce/tinymce-react';
 
 interface RichTextEditorProps {
@@ -13,7 +13,32 @@ interface RichTextEditorProps {
 const base = import.meta.env.BASE_URL ?? '/';
 const courseHtmlSharedCss = `${base.endsWith('/') ? base : `${base}/`}course-html-shared.css`;
 
-const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, placeholder, className, height, id }) => {
+function useIsMobileEditor() {
+  return useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(max-width: 1023px)').matches;
+  }, []);
+}
+
+const DESKTOP_TOOLBAR =
+  'undo redo | formatselect | bold italic underline backcolor | ' +
+  'alignleft aligncenter alignright alignjustify | ' +
+  'bullist numlist outdent indent | removeformat | help';
+
+const MOBILE_TOOLBAR =
+  'bold italic underline | bullist numlist | link | removeformat';
+
+const RichTextEditor: React.FC<RichTextEditorProps> = ({
+  content,
+  onChange,
+  placeholder,
+  className,
+  height,
+  id,
+}) => {
+  const isMobile = useIsMobileEditor();
+  const editorHeight = height ?? (isMobile ? 180 : 200);
+
   if (typeof window !== 'undefined' && window.localStorage.getItem('lms:e2e:plain-editor') === '1') {
     return (
       <textarea
@@ -23,7 +48,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, plac
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder || 'Write something...'}
         className={`w-full rounded-lg border border-gray-300 bg-white p-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 ${className || ''}`}
-        style={{ minHeight: height || 160 }}
+        style={{ minHeight: editorHeight }}
       />
     );
   }
@@ -35,19 +60,23 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, plac
       onEditorChange={onChange}
       id={id}
       init={{
-        height: height || 200,
+        height: editorHeight,
         menubar: false,
+        mobile: {
+          theme: 'silver',
+          plugins: ['lists', 'link'],
+          toolbar: MOBILE_TOOLBAR,
+        },
         plugins: [
           'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview', 'anchor',
           'searchreplace', 'visualblocks', 'code', 'fullscreen',
-          'insertdatetime', 'media', 'table', 'help', 'wordcount'
+          'insertdatetime', 'media', 'table', 'help', 'wordcount',
         ],
-        toolbar: 'undo redo | formatselect | bold italic underline backcolor | \
-          alignleft aligncenter alignright alignjustify | \
-          bullist numlist outdent indent | removeformat | help',
+        toolbar: isMobile ? MOBILE_TOOLBAR : DESKTOP_TOOLBAR,
+        toolbar_mode: isMobile ? 'scrolling' : 'wrap',
         placeholder: placeholder || 'Write something...',
         content_css: [courseHtmlSharedCss],
-        content_style: 'body { margin: 8px; }'
+        content_style: 'body { margin: 8px; font-size: 16px; }',
       }}
       textareaName="content"
       className={className}

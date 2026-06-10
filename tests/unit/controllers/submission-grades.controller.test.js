@@ -41,7 +41,7 @@ jest.mock('../../../utils/gradeCalculation', () => ({
   EXCUSED_GRADE: 'excused',
 }));
 
-jest.mock('../../../routes/notification.routes', () => ({
+jest.mock('../../../services/notification', () => ({
   createNotification: jest.fn()
 }));
 

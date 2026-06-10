@@ -1,5 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { X, GripVertical, Gauge, ClipboardList, Inbox, User, Calendar, Search, Users, BookOpen } from 'lucide-react';
+import {
+  X,
+  GripVertical,
+  Gauge,
+  ClipboardList,
+  Inbox,
+  User,
+  Calendar,
+  Search,
+  Users,
+  BookOpen,
+  FileText,
+  Shield,
+  Settings,
+} from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 export interface NavItem {
@@ -67,9 +81,62 @@ export const ALL_NAV_OPTIONS: NavItem[] = [
     to: '/teacher/courses',
     activePaths: ['/teacher/courses']
   },
+  {
+    id: 'account',
+    label: 'Account',
+    icon: User,
+    to: '/account',
+    activePaths: ['/account'],
+  },
+  {
+    id: 'report',
+    label: 'Report',
+    icon: FileText,
+    to: '/reports/transcript',
+    activePaths: ['/reports/transcript'],
+  },
+  {
+    id: 'admin-users',
+    label: 'Users',
+    icon: Users,
+    to: '/admin/users',
+    activePaths: ['/admin/users'],
+  },
+  {
+    id: 'admin-courses',
+    label: 'Courses',
+    icon: BookOpen,
+    to: '/admin/courses',
+    activePaths: ['/admin/courses'],
+  },
+  {
+    id: 'admin-settings',
+    label: 'Settings',
+    icon: Settings,
+    to: '/admin/settings',
+    activePaths: ['/admin/settings'],
+  },
+  {
+    id: 'admin-security',
+    label: 'Security',
+    icon: Shield,
+    to: '/admin/security',
+    activePaths: ['/admin/security'],
+  },
 ];
 
-export const DEFAULT_NAV_ITEMS = ['dashboard', 'todo', 'inbox', 'catalog'];
+export const DEFAULT_NAV_ITEMS = ['dashboard', 'inbox', 'calendar', 'groups'];
+
+export function getDefaultNavItemIds(role?: string): string[] {
+  switch (role) {
+    case 'admin':
+      return ['dashboard', 'inbox', 'admin-users', 'admin-settings'];
+    case 'teacher':
+      return ['dashboard', 'inbox', 'calendar', 'catalog'];
+    default:
+      return ['dashboard', 'inbox', 'calendar', 'groups'];
+  }
+}
 
 export const NavCustomizationModal: React.FC<NavCustomizationModalProps> = ({
   isOpen,
@@ -90,9 +157,11 @@ export const NavCustomizationModal: React.FC<NavCustomizationModalProps> = ({
 
   // Filter available options based on user role
   const availableOptions = ALL_NAV_OPTIONS.filter(option => {
-    // Remove account option
-    if (option.id === 'account') {
-      return false;
+    if (option.id === 'report') {
+      return user?.role === 'student';
+    }
+    if (option.id.startsWith('admin-')) {
+      return user?.role === 'admin';
     }
     if (option.id === 'my-course') {
       return user?.role === 'teacher' || user?.role === 'admin';
@@ -168,7 +237,7 @@ export const NavCustomizationModal: React.FC<NavCustomizationModalProps> = ({
   };
 
   const handleReset = () => {
-    const defaultItems = DEFAULT_NAV_ITEMS
+    const defaultItems = getDefaultNavItemIds(user?.role)
       .map(id => availableOptions.find(opt => opt.id === id))
       .filter((item): item is NavItem => item !== undefined);
     setSelectedItems(defaultItems);
@@ -213,7 +282,8 @@ export const NavCustomizationModal: React.FC<NavCustomizationModalProps> = ({
           </h2>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
+            aria-label="Close navigation customization"
           >
             <X className="h-5 w-5 text-gray-500 dark:text-gray-400" />
           </button>
@@ -253,7 +323,7 @@ export const NavCustomizationModal: React.FC<NavCustomizationModalProps> = ({
                     </span>
                     <button
                       onClick={() => handleToggleItem(item)}
-                      className="px-3 py-1 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                      className="min-h-[44px] rounded px-3 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
                     >
                       Remove
                     </button>

@@ -566,7 +566,7 @@ const Groups: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setSearchTerm('')}
-                    className="shrink-0 rounded p-0.5 hover:bg-blue-100/80 dark:hover:bg-blue-900/40"
+                    className="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg p-2 hover:bg-blue-100/80 dark:hover:bg-blue-900/40"
                     aria-label="Remove search filter"
                   >
                     <XCircle className="h-3.5 w-3.5 text-blue-700/70 dark:text-blue-300/80" />
@@ -579,7 +579,7 @@ const Groups: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setCourseFilter('all')}
-                    className="shrink-0 rounded p-0.5 hover:bg-emerald-100/80 dark:hover:bg-emerald-900/40"
+                    className="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg p-2 hover:bg-emerald-100/80 dark:hover:bg-emerald-900/40"
                     aria-label="Remove course filter"
                   >
                     <XCircle className="h-3.5 w-3.5 text-emerald-700/70 dark:text-emerald-300/80" />
@@ -592,7 +592,7 @@ const Groups: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setSelectedMetric(null)}
-                    className="shrink-0 rounded p-0.5 hover:bg-violet-100/80 dark:hover:bg-violet-900/40"
+                    className="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg p-2 hover:bg-violet-100/80 dark:hover:bg-violet-900/40"
                     aria-label="Remove metric filter"
                   >
                     <XCircle className="h-3.5 w-3.5 text-violet-700/70 dark:text-violet-300/80" />

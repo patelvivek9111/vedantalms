@@ -47,7 +47,7 @@ Required qualitative checks:
 
 ## Benchmark Snapshot Rules
 
-Save each certification run as a JSON snapshot under `docs/operations/discussion-benchmark-snapshot.json` or in release evidence storage.
+Run live certification with `node scripts/verify-discussion-production-readiness.js --run-benchmark`, or save benchmark JSON in release evidence storage (not committed to git).
 
 Snapshot must include:
 

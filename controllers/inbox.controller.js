@@ -2,16 +2,39 @@ const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 const ConversationParticipant = require('../models/ConversationParticipant');
 const mongoose = require('mongoose');
-const { getJson, setJson, delJson } = require('../utils/cache');
+const { prepareMessageBody } = require('../services/messageSanitizer.service');
+const {
+  serializeMessageForClient,
+  serializeMessagesPage,
+  serializeConversationList,
+} = require('../services/messageSerializer.service');
+const inboxCache = require('../services/inboxCache.service');
+const participantPolicy = require('../services/participantPolicy.service');
+const messageAttachment = require('../services/messageAttachment.service');
+const inboxUnread = require('../services/inboxUnread.service');
+const messageAudit = require('../services/messageAudit.service');
+const inboxAntiSpam = require('../services/inboxAntiSpam.service');
+const messagingRealtime = require('../services/messagingRealtime.service');
 
-const INBOX_FOLDER_CACHE_KEYS = ['inbox', 'sent', 'archived', 'deleted', 'all'];
-
-const invalidateInboxConversationListCaches = async (userIds) => {
-  const ids = [...new Set((userIds || []).map((id) => (id && id.toString ? id.toString() : String(id))))];
-  await Promise.all(
-    ids.flatMap((idStr) => INBOX_FOLDER_CACHE_KEYS.map((folder) => delJson(`inbox:conversations:${idStr}:${folder}`)))
-  );
-};
+async function respondWithError(res, err, req) {
+  if (err.statusCode === 403 && req) {
+    await messageAudit.recordAccessDenied(req, {
+      conversationId: req.params?.conversationId,
+      reason: err.message,
+      code: err.code,
+    });
+  }
+  if (err.statusCode === 429 && req) {
+    await inboxAntiSpam.handleSpamViolation(req, err);
+  }
+  if (err.statusCode) {
+    return res.status(err.statusCode).json({
+      error: err.message,
+      ...(err.code ? { code: err.code } : {}),
+    });
+  }
+  return res.status(500).json({ error: err.message });
+}
 
 // Helper function to validate ObjectId
 const validateObjectId = (id, paramName = 'ID') => {
@@ -21,15 +44,30 @@ const validateObjectId = (id, paramName = 'ID') => {
   return { valid: true };
 };
 
+async function buildMessageDocumentFields(req, { body, attachments, fileAssetIds, courseId }) {
+  messageAttachment.assertAttachmentInputs({ attachments, fileAssetIds });
+  const prepared = prepareMessageBody(body);
+  const attachmentFields = await messageAttachment.resolveMessageAttachments({
+    user: req.user,
+    courseId: courseId || null,
+    fileAssetIds,
+    legacyAttachments: attachments,
+  });
+  return {
+    ...prepared,
+    ...attachmentFields,
+  };
+}
+
 // List all conversations for the current user
 exports.getConversations = async (req, res) => {
   try {
     const userId = req.user._id;
     const folder = req.query.folder;
-    const cacheKey = `inbox:conversations:${userId}:${folder || 'all'}`;
-    const cached = await getJson(cacheKey);
+    const cacheKey = inboxCache.conversationListKey(userId, folder);
+    const cached = await inboxCache.getJson(cacheKey);
     if (cached) {
-      return res.json(cached);
+      return res.json(serializeConversationList(cached));
     }
     const participantFilter = { userId };
     // Gmail-like behavior: conversation "views" (Inbox/Sent/Favorite) are derived
@@ -50,9 +88,7 @@ exports.getConversations = async (req, res) => {
       .sort({ updatedAt: -1 })
       .lean();
 
-    const participantColl = ConversationParticipant.collection.collectionName;
-
-    const [conversationParticipants, latestMessages, sentMessageConversationIds, receivedMessageConversationIds, unreadAgg] = await Promise.all([
+    const baseQueries = [
       ConversationParticipant.find({ conversationId: { $in: conversationIds } })
         .populate('userId', 'firstName lastName email profilePicture')
         .lean(),
@@ -63,51 +99,15 @@ exports.getConversations = async (req, res) => {
       ]),
       Message.distinct('conversationId', { conversationId: { $in: conversationIds }, senderId: userId }),
       Message.distinct('conversationId', { conversationId: { $in: conversationIds }, senderId: { $ne: userId } }),
-      Message.aggregate([
-        {
-          $match: {
-            conversationId: { $in: conversationIds },
-            senderId: { $ne: userId }
-          }
-        },
-        {
-          $lookup: {
-            from: participantColl,
-            let: { cid: '$conversationId' },
-            pipeline: [
-              {
-                $match: {
-                  $expr: {
-                    $and: [
-                      { $eq: ['$conversationId', '$$cid'] },
-                      { $eq: ['$userId', userId] }
-                    ]
-                  }
-                }
-              },
-              { $project: { lastReadAt: 1, _id: 0 } }
-            ],
-            as: 'me'
-          }
-        },
-        {
-          $addFields: {
-            lastReadAt: { $ifNull: [{ $arrayElemAt: ['$me.lastReadAt', 0] }, new Date(0)] }
-          }
-        },
-        {
-          $match: {
-            $expr: { $gt: ['$createdAt', '$lastReadAt'] }
-          }
-        },
-        {
-          $group: {
-            _id: '$conversationId',
-            count: { $sum: 1 }
-          }
-        }
-      ])
-    ]);
+    ];
+
+    const [conversationParticipants, latestMessages, sentMessageConversationIds, receivedMessageConversationIds] =
+      await Promise.all(baseQueries);
+
+    const unreadByConversation = await inboxUnread.aggregateUnreadByConversation(
+      conversationIds,
+      userId
+    );
 
     const participantByConversation = conversationParticipants.reduce((acc, p) => {
       const key = String(p.conversationId);
@@ -128,10 +128,6 @@ exports.getConversations = async (req, res) => {
       receivedMessageConversationIds.map(id => String(id))
     );
 
-    const unreadByConversation = new Map(
-      unreadAgg.map((item) => [String(item._id), item.count])
-    );
-
     const results = conversations.map((conv) => {
       const key = String(conv._id);
       const convParticipants = participantByConversation[key] || [];
@@ -150,6 +146,9 @@ exports.getConversations = async (req, res) => {
           folder: p.folder,
           starred: p.starred,
           lastReadAt: p.lastReadAt,
+          unreadCount: p.userId?._id?.toString() === userId.toString()
+            ? Math.max(0, p.unreadCount || 0)
+            : undefined,
         })),
         lastMessage: lastMessageByConversation.get(key) || null,
         unreadCount: unreadByConversation.get(key) || 0,
@@ -158,8 +157,9 @@ exports.getConversations = async (req, res) => {
       };
     });
 
-    await setJson(cacheKey, results, 90);
-    res.json(results);
+    const serialized = serializeConversationList(results);
+    await inboxCache.setJson(cacheKey, serialized, 90);
+    res.json(serialized);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -168,8 +168,7 @@ exports.getConversations = async (req, res) => {
 // Start a new conversation
 exports.createConversation = async (req, res) => {
   try {
-    const { subject, participantIds, body, sendIndividually, course, attachments } = req.body;
-    const safeAttachments = Array.isArray(attachments) ? attachments : [];
+    const { subject, participantIds, body, sendIndividually, course, attachments, fileAssetIds } = req.body;
     const userId = req.user._id;
 
     // Validate required fields
@@ -202,6 +201,25 @@ exports.createConversation = async (req, res) => {
     if (course && !mongoose.Types.ObjectId.isValid(course)) {
       return res.status(400).json({ error: 'Invalid course ID' });
     }
+
+    await participantPolicy.assertCanAddParticipants({
+      sender: req.user,
+      participantIds,
+      courseId: course || null,
+      sendIndividually: Boolean(sendIndividually),
+      req,
+    });
+
+    const messageFields = await buildMessageDocumentFields(req, {
+      body,
+      attachments,
+      fileAssetIds,
+      courseId: course || null,
+    });
+
+    const composeBatchSize = sendIndividually ? participantIds.length : 1;
+    await inboxAntiSpam.assertCanCreateConversations(userId, { batchSize: composeBatchSize });
+
     if (sendIndividually) {
       // Create a separate conversation for each recipient
       const results = await Promise.all(participantIds.map(async (recipientId) => {
@@ -226,13 +244,49 @@ exports.createConversation = async (req, res) => {
         const message = await Message.create({
           conversationId: conversation._id,
           senderId: userId,
-          body,
-          attachments: safeAttachments,
+          ...messageFields,
         });
-        return { conversation, message };
+        await inboxUnread.recordMessageSent({
+          conversationId: conversation._id,
+          senderId: userId,
+          messageId: message._id,
+        });
+        if (!inboxUnread.isDenormUnreadEnabled()) {
+          await ConversationParticipant.updateMany(
+            { conversationId: conversation._id, userId: { $ne: userId } },
+            { folder: 'inbox' }
+          );
+        }
+        await inboxCache.invalidateAfterMessageChange(conversation._id, [userId, recipientId]);
+        await messageAudit.recordConversationCreated(req, {
+          conversationId: conversation._id,
+          courseId: course,
+          recipientCount: 1,
+          sendIndividually: true,
+        });
+        await messageAudit.recordMessageSent(req, {
+          conversationId: conversation._id,
+          messageId: message._id,
+          attachmentCount: (messageFields.fileAssetIds || []).length,
+        });
+        await messagingRealtime.notifyMessageNew({
+          conversationId: conversation._id,
+          messageId: message._id,
+          senderId: userId,
+          participantUserIds: [userId, recipientId],
+        });
+        return {
+          conversation,
+          message: serializeMessageForClient(message),
+        };
       }));
-      await invalidateInboxConversationListCaches([userId, ...participantIds]);
-      res.status(201).json({ results });
+      await inboxCache.invalidateConversationLists([userId, ...participantIds]);
+      res.status(201).json({
+        results: results.map((r) => ({
+          conversation: r.conversation,
+          message: r.message,
+        })),
+      });
     } else {
       // Create conversation
       const conversation = await Conversation.create({ subject, course, createdBy: userId });
@@ -250,14 +304,61 @@ exports.createConversation = async (req, res) => {
       const message = await Message.create({
         conversationId: conversation._id,
         senderId: userId,
-        body,
-        attachments: safeAttachments,
+        ...messageFields,
       });
-      await invalidateInboxConversationListCaches([userId, ...participantIds]);
-      res.status(201).json({ conversation, message });
+      await inboxUnread.recordMessageSent({
+        conversationId: conversation._id,
+        senderId: userId,
+        messageId: message._id,
+      });
+      if (!inboxUnread.isDenormUnreadEnabled()) {
+        await ConversationParticipant.updateMany(
+          { conversationId: conversation._id, userId: { $ne: userId } },
+          { folder: 'inbox' }
+        );
+      }
+      await inboxCache.invalidateAfterMessageChange(conversation._id, allParticipantIds);
+      await messageAudit.recordConversationCreated(req, {
+        conversationId: conversation._id,
+        courseId: course,
+        recipientCount: participantIds.length,
+        sendIndividually: false,
+      });
+      await messageAudit.recordMessageSent(req, {
+        conversationId: conversation._id,
+        messageId: message._id,
+        attachmentCount: (messageFields.fileAssetIds || []).length,
+      });
+      await messagingRealtime.notifyMessageNew({
+        conversationId: conversation._id,
+        messageId: message._id,
+        senderId: userId,
+        participantUserIds: allParticipantIds,
+      });
+      res.status(201).json({
+        conversation,
+        message: serializeMessageForClient(message),
+      });
     }
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return respondWithError(res, err, req);
+  }
+};
+
+// Global inbox unread badge total
+exports.getUnreadCount = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const cacheKey = inboxCache.unreadTotalKey(userId);
+    const cached = await inboxCache.getJson(cacheKey);
+    if (cached && typeof cached.count === 'number') {
+      return res.json({ success: true, count: cached.count });
+    }
+    const count = await inboxUnread.getInboxUnreadTotal(userId);
+    await inboxCache.setJson(cacheKey, { count }, 30);
+    res.json({ success: true, count });
+  } catch (err) {
+    return respondWithError(res, err, req);
   }
 };
 
@@ -267,10 +368,15 @@ exports.getMessages = async (req, res) => {
     const { conversationId } = req.params;
     const limit = Math.min(parseInt(req.query.limit || '50', 10), 200);
     const cursor = req.query.cursor;
-    const cacheKey = `inbox:messages:${req.user._id}:${conversationId}:${limit}:${cursor || 'start'}`;
-    const cached = await getJson(cacheKey);
+    const cacheKey = await inboxCache.buildMessageCacheKey(
+      req.user._id,
+      conversationId,
+      limit,
+      cursor
+    );
+    const cached = await inboxCache.getJson(cacheKey);
     if (cached) {
-      return res.json(cached);
+      return res.json(serializeMessagesPage(cached));
     }
     const validation = validateObjectId(conversationId, 'conversation ID');
     if (!validation.valid) {
@@ -278,7 +384,14 @@ exports.getMessages = async (req, res) => {
     }
     // Check if user is a participant
     const participant = await ConversationParticipant.findOne({ conversationId, userId: req.user._id });
-    if (!participant) return res.status(403).json({ error: 'Not a participant' });
+    if (!participant) {
+      await messageAudit.recordAccessDenied(req, {
+        conversationId,
+        reason: 'Not a participant',
+        code: 'NOT_PARTICIPANT',
+      });
+      return res.status(403).json({ error: 'Not a participant' });
+    }
 
     const filter = { conversationId };
     if (cursor) {
@@ -296,8 +409,12 @@ exports.getMessages = async (req, res) => {
     const orderedItems = pageItems.reverse();
     const nextCursor = hasMore ? pageItems[pageItems.length - 1]?.createdAt?.toISOString() : null;
 
-    const payload = { data: orderedItems, nextCursor, hasMore };
-    await setJson(cacheKey, payload, 20);
+    const payload = serializeMessagesPage({
+      data: orderedItems,
+      nextCursor,
+      hasMore,
+    });
+    await inboxCache.setJson(cacheKey, payload, 20);
     res.json(payload);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -312,54 +429,86 @@ exports.sendMessage = async (req, res) => {
     if (!validation.valid) {
       return res.status(400).json({ error: validation.error });
     }
-    const { body, attachments } = req.body;
+    const { body, attachments, fileAssetIds } = req.body;
     if (!body || !body.trim()) {
       return res.status(400).json({ error: 'Message body is required' });
     }
-    
-    // Validate attachments format
-    if (attachments !== undefined && !Array.isArray(attachments)) {
-      return res.status(400).json({ error: 'Attachments must be an array' });
-    }
-    
+
     const userId = req.user._id;
     // Check if user is a participant
     const participant = await ConversationParticipant.findOne({ conversationId, userId });
-    if (!participant) return res.status(403).json({ error: 'Not a participant' });
-    // Create message
-    const message = await Message.create({
-      conversationId,
-      senderId: userId,
-      body,
-      attachments: attachments || []
+    if (!participant) {
+      await messageAudit.recordAccessDenied(req, {
+        conversationId,
+        reason: 'Not a participant',
+        code: 'NOT_PARTICIPANT',
+      });
+      return res.status(403).json({ error: 'Not a participant' });
+    }
+
+    const conversation = await Conversation.findById(conversationId).select('course').lean();
+    await participantPolicy.assertSenderMayParticipateInConversation({
+      sender: req.user,
+      conversation,
+      req,
     });
-    // Update conversation updatedAt
-    await Conversation.findByIdAndUpdate(conversationId, { updatedAt: new Date() });
-    // Update sender's lastReadAt only. Do not force folder to "sent":
-    // Gmail-style behavior keeps a thread in Inbox unless explicitly archived/deleted.
-    await ConversationParticipant.updateOne({ conversationId, userId }, { lastReadAt: new Date() });
-    // Gmail-like behavior: a new incoming message should return the thread to Inbox
-    // for all other participants (even if they had archived it).
-    // Keep lastReadAt unchanged so unread count still reflects unread state.
-    await ConversationParticipant.updateMany(
-      { conversationId, userId: { $ne: userId } },
-      { folder: 'inbox' }
-    );
-    
+
+    const messageFields = await buildMessageDocumentFields(req, {
+      body,
+      attachments,
+      fileAssetIds,
+      courseId: conversation?.course || null,
+    });
+
+    await inboxAntiSpam.assertCanSendMessage(userId, {
+      conversationId,
+      bodyText: messageFields.bodyText,
+    });
+
+    let message;
+    if (inboxUnread.isDenormUnreadEnabled()) {
+      message = await Message.create({
+        conversationId,
+        senderId: userId,
+        ...messageFields,
+      });
+      await Conversation.findByIdAndUpdate(conversationId, { updatedAt: new Date() });
+      await inboxUnread.recordMessageSent({
+        conversationId,
+        senderId: userId,
+        messageId: message._id,
+      });
+    } else {
+      message = await Message.create({
+        conversationId,
+        senderId: userId,
+        ...messageFields,
+      });
+      await Conversation.findByIdAndUpdate(conversationId, { updatedAt: new Date() });
+      await ConversationParticipant.updateOne({ conversationId, userId }, { lastReadAt: new Date() });
+      await ConversationParticipant.updateMany(
+        { conversationId, userId: { $ne: userId } },
+        { folder: 'inbox' }
+      );
+    }
+
+    const affectedUserIds = await ConversationParticipant.distinct('userId', { conversationId });
+
     // Notify other participants about new message
     try {
-      const { createNotification } = require('../routes/notification.routes');
-      const conversation = await Conversation.findById(conversationId);
-      const otherParticipants = await ConversationParticipant.find({ 
-        conversationId, 
-        userId: { $ne: userId } 
+      const { createNotification } = require('../services/notification');
+      const otherParticipants = await ConversationParticipant.find({
+        conversationId,
+        userId: { $ne: userId }
       }).populate('userId', 'firstName lastName');
-      
+
       const senderName = `${req.user.firstName} ${req.user.lastName}`;
-      const messagePreview = body.length > 100 ? body.substring(0, 100) + '...' : body;
-      
-      await Promise.all(otherParticipants.map(participant => 
-        createNotification(participant.userId._id, {
+      const messagePreview = messageFields.bodyText.length > 100
+        ? `${messageFields.bodyText.substring(0, 100)}...`
+        : messageFields.bodyText;
+
+      await Promise.all(otherParticipants.map(p =>
+        createNotification(p.userId._id, {
           type: 'message',
           title: 'New Message',
           message: `${senderName}: ${messagePreview}`,
@@ -367,19 +516,60 @@ exports.sendMessage = async (req, res) => {
           relatedId: message._id,
           relatedType: 'message',
           priority: 'high'
-        }).catch(err => console.error(`Error notifying user ${participant.userId._id}:`, err))
+        }, {
+          source: 'inbox.message',
+          actorId: userId,
+          eventWindow: String(message._id),
+          requestId: req.requestId || null,
+        }).catch(err => console.error(`Error notifying user ${p.userId._id}:`, err))
       ));
     } catch (notifError) {
       console.error('Error creating message notifications:', notifError);
       // Don't fail the message if notification fails
     }
 
-    const affectedUserIds = await ConversationParticipant.distinct('userId', { conversationId });
-    await invalidateInboxConversationListCaches(affectedUserIds);
+    await inboxCache.invalidateAfterMessageChange(conversationId, affectedUserIds);
 
-    res.status(201).json(message);
+    await messageAudit.recordMessageSent(req, {
+      conversationId,
+      messageId: message._id,
+      attachmentCount: (messageFields.fileAssetIds || []).length,
+    });
+
+    await messagingRealtime.notifyMessageNew({
+      conversationId,
+      messageId: message._id,
+      senderId: userId,
+      participantUserIds: affectedUserIds,
+    });
+
+    try {
+      const {
+        recordDomainEvent,
+        DOMAIN_EVENT_TYPES,
+        AGGREGATE_TYPES,
+        AUDIENCE_SCOPES,
+      } = require('../services/domainEvents');
+      void recordDomainEvent({
+        eventType: DOMAIN_EVENT_TYPES.INBOX_MESSAGE_SENT,
+        aggregateType: AGGREGATE_TYPES.MESSAGE,
+        aggregateId: message._id,
+        actorId: userId,
+        audienceScope: AUDIENCE_SCOPES.USER,
+        correlationId: req.requestId,
+        payload: {
+          conversationId: String(conversationId),
+          recipientCount: Math.max(0, (affectedUserIds?.length || 1) - 1),
+        },
+        metadata: { source: 'inbox.controller.sendMessage' },
+      });
+    } catch (domainEventError) {
+      console.error('inbox_domain_event_failed', domainEventError);
+    }
+
+    res.status(201).json(serializeMessageForClient(message));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return respondWithError(res, err, req);
   }
 };
 
@@ -393,10 +583,34 @@ exports.markAsRead = async (req, res) => {
     }
     const userId = req.user._id;
     const participant = await ConversationParticipant.findOne({ conversationId, userId });
-    if (!participant) return res.status(403).json({ error: 'Not a participant' });
-    participant.lastReadAt = new Date();
-    await participant.save();
-    await invalidateInboxConversationListCaches([userId]);
+    if (!participant) {
+      await messageAudit.recordAccessDenied(req, {
+        conversationId,
+        reason: 'Not a participant',
+        code: 'NOT_PARTICIPANT',
+      });
+      return res.status(403).json({ error: 'Not a participant' });
+    }
+
+    if (inboxUnread.isDenormUnreadEnabled()) {
+      await inboxUnread.markConversationRead({ conversationId, userId });
+    } else {
+      participant.lastReadAt = new Date();
+      await participant.save();
+    }
+
+    await messageAudit.recordConversationRead(req, { conversationId });
+
+    const readParticipantIds = await ConversationParticipant.distinct('userId', { conversationId });
+    await messagingRealtime.notifyConversationRead({
+      conversationId,
+      userId,
+      participantUserIds: readParticipantIds,
+    });
+
+    await inboxCache.invalidateConversationLists([userId]);
+    await inboxCache.invalidateMessageCaches(conversationId, [userId]);
+    await inboxCache.invalidateUnreadTotals([userId]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -421,7 +635,8 @@ exports.moveConversation = async (req, res) => {
     if (!participant) return res.status(403).json({ error: 'Not a participant' });
     participant.folder = folder;
     await participant.save();
-    await invalidateInboxConversationListCaches([userId]);
+    await inboxCache.invalidateConversationLists([userId]);
+    await inboxCache.invalidateUnreadTotals([userId]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -437,7 +652,7 @@ exports.toggleStar = async (req, res) => {
     if (!participant) return res.status(403).json({ error: 'Not a participant' });
     participant.starred = !participant.starred;
     await participant.save();
-    await invalidateInboxConversationListCaches([userId]);
+    await inboxCache.invalidateConversationLists([userId]);
     res.json({ starred: participant.starred });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -462,9 +677,11 @@ exports.deleteForever = async (req, res) => {
       await Message.deleteMany({ conversationId });
       await Conversation.deleteOne({ _id: conversationId });
     }
-    await invalidateInboxConversationListCaches(affectedUserIds);
+    await inboxCache.invalidateConversationLists(affectedUserIds);
+    await inboxCache.invalidateMessageCaches(conversationId, affectedUserIds);
+    await inboxCache.invalidateUnreadTotals(affectedUserIds);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-}; 
+};

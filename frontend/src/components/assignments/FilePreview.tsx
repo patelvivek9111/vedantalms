@@ -111,7 +111,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
           {isImage() && (
             <button
               onClick={() => setPreviewOpen(true)}
-              className="p-1.5 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
+              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
               title="Preview"
             >
               <Eye className="w-4 h-4" />
@@ -122,7 +122,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
             download={fileData.name}
             target="_blank"
             rel="noopener noreferrer"
-            className="p-1.5 text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 transition-colors"
+            className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-green-600 transition-colors hover:text-green-800 dark:text-green-400 dark:hover:text-green-300"
             title="Download"
           >
             <Download className="w-4 h-4" />
@@ -130,7 +130,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
           {(showRemove || showClose || showCloseButton) && (onRemove || onClose) && (
             <button
               onClick={handleRemove}
-              className="p-1.5 text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 transition-colors"
+              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-red-600 transition-colors hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
               title={(showClose || showCloseButton) ? "Close" : "Remove"}
             >
               <X className="w-4 h-4" />

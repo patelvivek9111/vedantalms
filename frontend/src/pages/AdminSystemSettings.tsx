@@ -22,6 +22,7 @@ import OpsDashboardPanel from '../components/admin/OpsDashboardPanel';
 import OpsFilesPanel from '../components/admin/OpsFilesPanel';
 import OpsRecoveryPanel from '../components/admin/OpsRecoveryPanel';
 import AdminRecoveryCenter from '../components/admin/AdminRecoveryCenter';
+import { MobileAppShell } from '../components/common/MobileAppShell';
 
 interface SystemConfig {
   general: {
@@ -158,28 +159,33 @@ export function AdminSystemSettings() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 dark:border-blue-400"></div>
-      </div>
+      <MobileAppShell title="Settings" backButtonPath="/dashboard">
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 dark:border-blue-400"></div>
+        </div>
+      </MobileAppShell>
     );
   }
 
   if (!config) {
     return (
-      <div className="p-6">
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-          <p className="text-red-800 dark:text-red-400">Failed to load system settings. Please refresh the page.</p>
+      <MobileAppShell title="Settings" backButtonPath="/dashboard">
+        <div className="p-6">
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+            <p className="text-red-800 dark:text-red-400">Failed to load system settings. Please refresh the page.</p>
+          </div>
         </div>
-      </div>
+      </MobileAppShell>
     );
   }
 
   return (
+    <MobileAppShell title="Settings" backButtonPath="/dashboard">
     <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">System Settings</h1>
+          <h1 className="hidden lg:block text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">System Settings</h1>
           <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">Configure system parameters and preferences</p>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:space-x-3 w-full sm:w-auto">
@@ -207,22 +213,42 @@ export function AdminSystemSettings() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="border-b border-gray-200 dark:border-gray-700">
-        <nav className="-mb-px flex flex-wrap space-x-4 sm:space-x-8 overflow-x-auto">
+      {/* Tabs — mobile select */}
+      <div className="lg:hidden">
+        <label htmlFor="settings-tab-select" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+          Settings section
+        </label>
+        <select
+          id="settings-tab-select"
+          value={activeTab}
+          onChange={(e) => setActiveTab(e.target.value)}
+          className="min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+        >
+          {tabs.map((tab) => (
+            <option key={tab.id} value={tab.id}>
+              {tab.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Tabs — desktop */}
+      <div className="hidden border-b border-gray-200 dark:border-gray-700 lg:block">
+        <nav className="-mb-px flex flex-wrap space-x-8">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
               <button
                 key={tab.id}
+                type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm ${
+                className={`flex min-h-[44px] items-center space-x-2 border-b-2 px-1 py-2 text-sm font-medium ${
                   activeTab === tab.id
-                    ? 'border-blue-500 dark:border-blue-400 text-blue-600 dark:text-blue-400'
-                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+                    ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-300'
                 }`}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className="h-4 w-4" />
                 <span>{tab.label}</span>
               </button>
             );
@@ -552,5 +578,6 @@ export function AdminSystemSettings() {
         )}
       </div>
     </div>
+    </MobileAppShell>
   );
 } 

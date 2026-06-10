@@ -3,9 +3,10 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Gauge, ClipboardList, Inbox, User, Calendar, Search, Users, BookOpen } from 'lucide-react';
 import { useUnreadMessages } from '../../hooks/useUnreadMessages';
 import { useAuth } from '../../contexts/AuthContext';
-import { NavItem, ALL_NAV_OPTIONS, DEFAULT_NAV_ITEMS } from '../layout/NavCustomizationModal';
+import { NavItem, ALL_NAV_OPTIONS, getDefaultNavItemIds } from '../layout/NavCustomizationModal';
 import { hapticNavigation } from '../../utils/hapticFeedback';
 import SwipeableContainer from '../common/SwipeableContainer';
+import { NavCountBadge } from '../common/NavCountBadge';
 
 const BottomNav: React.FC = () => {
   const location = useLocation();
@@ -37,7 +38,10 @@ const BottomNav: React.FC = () => {
           
           // Filter out 'my-course' if user is not a teacher or admin, and filter out 'account'
           const filteredItems = mappedItems.filter((item: NavItem) => {
-            if (item.id === 'account') {
+            if (item.id === 'report' && user?.role !== 'student') {
+              return false;
+            }
+            if (item.id.startsWith('admin-') && user?.role !== 'admin') {
               return false;
             }
             if (item.id === 'my-course' && user?.role !== 'teacher' && user?.role !== 'admin') {
@@ -55,7 +59,7 @@ const BottomNav: React.FC = () => {
         }
       
       // Default items
-      const defaultItems = DEFAULT_NAV_ITEMS
+      const defaultItems = getDefaultNavItemIds(user?.role)
         .map(id => ALL_NAV_OPTIONS.find(opt => opt.id === id))
         .filter((item): item is NavItem => item !== undefined);
       setNavItems(defaultItems);
@@ -85,6 +89,12 @@ const BottomNav: React.FC = () => {
           }).filter((item: NavItem | null): item is NavItem => item !== null);
           
           const filteredItems = mappedItems.filter((item: NavItem) => {
+            if (item.id === 'report' && user?.role !== 'student') {
+              return false;
+            }
+            if (item.id.startsWith('admin-') && user?.role !== 'admin') {
+              return false;
+            }
             if (item.id === 'my-course' && user?.role !== 'teacher' && user?.role !== 'admin') {
               return false;
             }
@@ -162,15 +172,10 @@ const BottomNav: React.FC = () => {
                   : 'text-gray-500 dark:text-gray-400'
               }`}
             >
-              <div className="relative flex items-center justify-center">
-                <Icon className="h-5 w-5 mb-1" />
-                {showBadge && (
-                  <span className={`absolute -top-1 -right-1 ${
-                    badgeCount ? 'bg-red-500 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center' : 
-                    'bg-red-500 rounded-full h-2 w-2'
-                  }`}>
-                    {badgeCount && badgeCount > 9 ? '9+' : badgeCount}
-                  </span>
+              <div className="relative mb-1 inline-flex items-center justify-center">
+                <Icon className="h-5 w-5" />
+                {showBadge && badgeCount != null && (
+                  <NavCountBadge count={badgeCount} variant="light" />
                 )}
               </div>
               <span className="text-[10px] font-medium mt-0.5">{item.label}</span>

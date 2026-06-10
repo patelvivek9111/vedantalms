@@ -149,6 +149,12 @@ async function buildGradebookGrades(course, assignments, studentIds, policyCache
     groupSubs.map((s) => [`${String(s.assignment)}:${String(s.group)}`, s])
   );
 
+  const discussionThreadIds = discussions.map((d) => String(d._id));
+  const discussionParticipationMap =
+    discussionThreadIds.length && studentIds.length
+      ? await discussionReplyService.batchStudentDiscussionParticipation(studentIds, discussionThreadIds)
+      : new Map();
+
   for (const sid of studentIds) {
     const submissionMap = {};
     for (const sub of byStudent.get(sid) || []) {
@@ -176,7 +182,7 @@ async function buildGradebookGrades(course, assignments, studentIds, policyCache
         published: thread.published !== false,
         grade: resolveAssignmentGrade({ discussionGradeRow: studentGradeObj || null }),
         dueDate: thread.dueDate,
-        hasSubmitted: await discussionReplyService.hasReplyByUser(thread, sid),
+        hasSubmitted: discussionParticipationMap.get(sid)?.has(String(thread._id)) || false,
       });
     }
 
@@ -300,6 +306,28 @@ async function computeCourseClassAverage(courseId) {
   };
 }
 
+async function computeCourseClassAverages(courseIds = []) {
+  const uniqueIds = [...new Set((courseIds || []).map(String).filter(Boolean))];
+  const results = {};
+
+  await Promise.all(
+    uniqueIds.map(async (courseId) => {
+      try {
+        results[courseId] = await computeCourseClassAverage(courseId);
+      } catch (error) {
+        results[courseId] = {
+          error: error.message || 'failed',
+          average: null,
+          studentCount: 0,
+          gradedCount: 0,
+        };
+      }
+    })
+  );
+
+  return results;
+}
+
 async function getCourseGradebookPage(courseId, { page = 1, pageSize = 50, policyCache } = {}) {
   const course = await Course.findById(courseId)
     .populate('instructor', 'firstName lastName email')
@@ -395,6 +423,7 @@ module.exports = {
   loadGradebookColumns,
   buildGradebookGrades,
   computeCourseClassAverage,
+  computeCourseClassAverages,
   getCourseGradebookPage,
   getFullGradebookDataset,
   normalizeStudentId,

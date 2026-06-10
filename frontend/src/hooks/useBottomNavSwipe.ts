@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { NavItem, ALL_NAV_OPTIONS, DEFAULT_NAV_ITEMS } from '../components/layout/NavCustomizationModal';
+import { NavItem, ALL_NAV_OPTIONS, getDefaultNavItemIds } from '../components/layout/NavCustomizationModal';
 import { hapticNavigation } from '../utils/hapticFeedback';
 import { useState, useEffect } from 'react';
 
@@ -48,7 +48,7 @@ export const useBottomNavSwipe = () => {
       }
       
       // Default items
-      const defaultItems = DEFAULT_NAV_ITEMS
+      const defaultItems = getDefaultNavItemIds(user?.role)
         .map(id => ALL_NAV_OPTIONS.find(opt => opt.id === id))
         .filter((item): item is NavItem => item !== undefined);
       setNavItems(defaultItems);

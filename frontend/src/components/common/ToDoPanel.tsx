@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
-import api, { getUserPreferences } from '../../services/api';
+import api from '../../services/api';
+import { useUserPreferencesQuery } from '../../hooks/useUserPreferencesQuery';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCourse } from '../../contexts/CourseContext';
 import { startOfWeek, endOfWeek, isWithinInterval, parseISO, format, isToday, isTomorrow, addDays, isAfter, isBefore } from 'date-fns';
@@ -16,9 +17,17 @@ import {
   CheckSquare,
   CircleCheckBig,
   Megaphone,
-  Award
+  Award,
+  Clock,
+  X,
 } from 'lucide-react';
 import { useMobileDevice } from '../../hooks/useMobileDevice';
+import {
+  dismissPlannerItem,
+  fetchPlannerFeed,
+  isPlannerUxEnabled,
+  snoozePlannerItem,
+} from '../../services/plannerUxService';
 
 interface ToDoPanelProps {
   showSupplementarySections?: boolean;
@@ -45,27 +54,37 @@ export const ToDoPanel: React.FC<ToDoPanelProps> = ({ showSupplementarySections 
   const [assessmentLoading, setAssessmentLoading] = useState(false);
   const [assessmentError, setAssessmentError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [plannerFeedItems, setPlannerFeedItems] = useState<any[]>([]);
+  const [plannerFeedLoading, setPlannerFeedLoading] = useState(false);
 
   const isTeacherOrAdmin = user?.role === 'teacher' || user?.role === 'admin';
+  const plannerUxOn = isPlannerUxEnabled();
 
-  // Get user course colors from preferences
-  const [userCourseColors, setUserCourseColors] = useState<{ [key: string]: string }>({});
+  const { data: preferences } = useUserPreferencesQuery(Boolean(user?._id));
+  const userCourseColors = preferences?.courseColors || {};
 
   useEffect(() => {
-    const fetchUserPreferences = async () => {
+    if (!plannerUxOn) return undefined;
+
+    const loadPlannerFeed = async () => {
+      setPlannerFeedLoading(true);
       try {
-        const res = await getUserPreferences();
-        if (res.data?.preferences?.courseColors) {
-          setUserCourseColors(res.data.preferences.courseColors);
-        }
-      } catch (err) {
-        // Ignore errors
+        const { items } = await fetchPlannerFeed();
+        setPlannerFeedItems(Array.isArray(items) ? items : []);
+      } catch {
+        setPlannerFeedItems([]);
+      } finally {
+        setPlannerFeedLoading(false);
       }
     };
-    fetchUserPreferences();
-  }, []);
+
+    loadPlannerFeed();
+    return undefined;
+  }, [plannerUxOn, refreshKey]);
 
   useEffect(() => {
+    if (plannerUxOn) return undefined;
+
     if (isTeacherOrAdmin) {
       const fetchTodo = async () => {
         setTodoLoading(true);
@@ -98,11 +117,11 @@ export const ToDoPanel: React.FC<ToDoPanelProps> = ({ showSupplementarySections 
       };
       fetchStudentDue();
     }
-  }, [isTeacherOrAdmin, refreshKey]);
+  }, [isTeacherOrAdmin, refreshKey, plannerUxOn]);
 
   useEffect(() => {
     const fetchStudentDashboardSections = async () => {
-      if (!showSupplementarySections || isTeacherOrAdmin || !user?._id) return;
+      if (!showSupplementarySections || isTeacherOrAdmin || !user?._id || plannerUxOn) return;
 
       setUpcomingLoading(true);
       setUpcomingError(null);
@@ -310,6 +329,8 @@ export const ToDoPanel: React.FC<ToDoPanelProps> = ({ showSupplementarySections 
   }, [showSupplementarySections, isTeacherOrAdmin, user?._id, courses, studentDueItems]);
 
   useEffect(() => {
+    if (plannerUxOn) return undefined;
+
     const fetchPersonalTodos = async () => {
       setPersonalLoading(true);
       setPersonalError(null);
@@ -324,7 +345,8 @@ export const ToDoPanel: React.FC<ToDoPanelProps> = ({ showSupplementarySections 
       }
     };
     fetchPersonalTodos();
-  }, []);
+    return undefined;
+  }, [plannerUxOn]);
 
   // Listen for assignment submission events to refresh the ToDo panel
   useEffect(() => {
@@ -355,7 +377,57 @@ export const ToDoPanel: React.FC<ToDoPanelProps> = ({ showSupplementarySections 
   };
 
   const refreshToDo = () => {
-    setRefreshKey(prev => prev + 1);
+    setRefreshKey((prev) => prev + 1);
+  };
+
+  const handleDismissPlannerItem = async (itemKey: string) => {
+    try {
+      await dismissPlannerItem(itemKey);
+      refreshToDo();
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const handleSnoozePlannerItem = async (itemKey: string) => {
+    try {
+      await snoozePlannerItem(itemKey, 24);
+      refreshToDo();
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const renderPlannerUxActions = (task: any) => {
+    if (!plannerUxOn || !task.plannerItemKey) return null;
+    return (
+      <div className="flex items-center gap-0.5 flex-shrink-0">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleSnoozePlannerItem(task.plannerItemKey);
+          }}
+          className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-gray-400 hover:text-amber-600 dark:hover:text-amber-400"
+          title="Snooze 24 hours"
+          aria-label="Snooze 24 hours"
+        >
+          <Clock className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleDismissPlannerItem(task.plannerItemKey);
+          }}
+          className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-gray-400 hover:text-red-600 dark:hover:text-red-400"
+          title="Dismiss"
+          aria-label="Dismiss"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+    );
   };
 
   // Filter personalTodos to only show those due this week (Monday to Sunday)
@@ -477,7 +549,11 @@ export const ToDoPanel: React.FC<ToDoPanelProps> = ({ showSupplementarySections 
   };
 
   // Combine all tasks for students
-  const allStudentTasks = studentDueItems.map(item => ({
+  const studentDueSource = plannerUxOn
+    ? plannerFeedItems.filter((item) => item.type === 'assignment' || item.type === 'discussion')
+    : studentDueItems;
+
+  const allStudentTasks = studentDueSource.map(item => ({
     ...item,
     courseId: item.course?._id || item.module?.course?._id,
     courseName: getCourseName(item.course?._id || item.module?.course?._id),
@@ -496,7 +572,11 @@ export const ToDoPanel: React.FC<ToDoPanelProps> = ({ showSupplementarySections 
   });
 
   // Combine teacher tasks
-  const allTeacherTasks = todoAssignments.map(item => ({
+  const teacherTodoSource = plannerUxOn
+    ? plannerFeedItems.filter((item) => item.ungradedCount != null)
+    : todoAssignments;
+
+  const allTeacherTasks = teacherTodoSource.map(item => ({
     ...item,
     courseId: item.course?._id,
     courseName: item.course?.catalog?.courseCode || item.course?.title || 'Unknown Course',
@@ -509,8 +589,29 @@ export const ToDoPanel: React.FC<ToDoPanelProps> = ({ showSupplementarySections 
   }));
 
   // Combine personal todos
+  const personalSource = plannerUxOn
+    ? plannerFeedItems.filter(
+        (item) =>
+          item.type === 'enrollment_request' ||
+          item.type === 'waitlist_promotion' ||
+          item.type === 'general' ||
+          !item.type
+      )
+    : personalTodosThisWeek;
+
+  const plannerWaitlist = personalSource.filter((todo) => todo.type === 'waitlist_promotion');
+  const plannerEnrollment = personalSource.filter(
+    (todo) => todo.type === 'enrollment_request' && todo.action === 'pending'
+  );
+  const plannerRegular = personalSource.filter(
+    (todo) =>
+      todo.type !== 'enrollment_request' &&
+      todo.type !== 'enrollment_summary' &&
+      todo.type !== 'waitlist_promotion'
+  );
+
   const allPersonalTasks = [
-    ...waitlistPromotions.map(todo => ({
+    ...(plannerUxOn ? plannerWaitlist : waitlistPromotions).map(todo => ({
       ...todo,
       courseId: todo.courseId,
       courseName: todo.courseName || 'Course',
@@ -522,7 +623,7 @@ export const ToDoPanel: React.FC<ToDoPanelProps> = ({ showSupplementarySections 
       link: `/courses/${todo.courseId}/students`,
       onClick: () => handleEnrollmentNotificationClick(todo)
     })),
-    ...enrollmentRequests.map(todo => ({
+    ...(plannerUxOn ? plannerEnrollment : enrollmentRequests).map(todo => ({
       ...todo,
       courseId: todo.courseId,
       courseName: todo.courseName || 'Course',
@@ -533,7 +634,7 @@ export const ToDoPanel: React.FC<ToDoPanelProps> = ({ showSupplementarySections 
       color: getCourseColor(todo.courseId),
       link: `/courses/${todo.courseId}/students`
     })),
-    ...regularTodos.map(todo => ({
+    ...(plannerUxOn ? plannerRegular : regularTodos).map(todo => ({
       ...todo,
       courseId: null,
       courseName: 'Personal',
@@ -571,7 +672,11 @@ export const ToDoPanel: React.FC<ToDoPanelProps> = ({ showSupplementarySections 
   if (isMobileDevice) {
     return (
       <div className="w-full">
-        {allTasks.length === 0 ? (
+        {plannerUxOn && plannerFeedLoading ? (
+          <div className="text-center py-12 text-gray-500 dark:text-gray-400 text-sm">
+            Loading planner…
+          </div>
+        ) : allTasks.length === 0 ? (
           <div className="text-center py-12 text-gray-500 dark:text-gray-400 text-sm">
             No tasks to do
           </div>
@@ -579,6 +684,7 @@ export const ToDoPanel: React.FC<ToDoPanelProps> = ({ showSupplementarySections 
           <div className="space-y-0">
             {allTasks.map((task, index) => {
               const IconComponent = task.icon;
+              const plannerActions = renderPlannerUxActions(task);
               return (
                 <div
                   key={task._id || task.id || index}
@@ -617,22 +723,23 @@ export const ToDoPanel: React.FC<ToDoPanelProps> = ({ showSupplementarySections 
                   </div>
 
                   {/* Right action */}
-                  {task.isPersonal ? (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleMarkDone(task._id);
-                      }}
-                      className="p-1 text-gray-400 dark:text-gray-500 hover:text-green-600 dark:hover:text-green-400 transition-colors"
-                      title="Mark as done"
-                      aria-label="Mark as done"
-                    >
-                      <CircleCheckBig className="w-5 h-5 flex-shrink-0" />
-                    </button>
-                  ) : (
-                    <ChevronRight className="w-5 h-5 text-gray-400 dark:text-gray-500 flex-shrink-0" />
-                  )}
+                  {plannerActions ||
+                    (task.isPersonal ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleMarkDone(task._id);
+                        }}
+                        className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-gray-400 transition-colors hover:text-green-600 dark:text-gray-500 dark:hover:text-green-400"
+                        title="Mark as done"
+                        aria-label="Mark as done"
+                      >
+                        <CircleCheckBig className="w-5 h-5 flex-shrink-0" />
+                      </button>
+                    ) : (
+                      <ChevronRight className="w-5 h-5 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                    ))}
                 </div>
               );
             })}
@@ -648,7 +755,11 @@ export const ToDoPanel: React.FC<ToDoPanelProps> = ({ showSupplementarySections 
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-3 border border-gray-200 dark:border-gray-700">
         <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-3">To Do</h2>
       
-        {allTasks.length === 0 ? (
+        {plannerUxOn && plannerFeedLoading ? (
+          <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
+            Loading planner…
+          </div>
+        ) : allTasks.length === 0 ? (
           <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
             No tasks to do
           </div>
@@ -656,6 +767,7 @@ export const ToDoPanel: React.FC<ToDoPanelProps> = ({ showSupplementarySections 
           <div className="space-y-0">
             {allTasks.map((task, index) => {
               const IconComponent = task.icon;
+              const plannerActions = renderPlannerUxActions(task);
               return (
                 <div
                   key={task._id || task.id || index}
@@ -691,22 +803,23 @@ export const ToDoPanel: React.FC<ToDoPanelProps> = ({ showSupplementarySections 
                     </div>
                   </div>
 
-                  {task.isPersonal ? (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleMarkDone(task._id);
-                      }}
-                      className="p-1 text-gray-400 dark:text-gray-500 hover:text-green-600 dark:hover:text-green-400 transition-colors"
-                      title="Mark as done"
-                      aria-label="Mark as done"
-                    >
-                      <CircleCheckBig className="w-4 h-4 flex-shrink-0" />
-                    </button>
-                  ) : (
-                    <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
-                  )}
+                  {plannerActions ||
+                    (task.isPersonal ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleMarkDone(task._id);
+                        }}
+                        className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-gray-400 transition-colors hover:text-green-600 dark:text-gray-500 dark:hover:text-green-400"
+                        title="Mark as done"
+                        aria-label="Mark as done"
+                      >
+                        <CircleCheckBig className="w-4 h-4 flex-shrink-0" />
+                      </button>
+                    ) : (
+                      <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                    ))}
                 </div>
               );
             })}

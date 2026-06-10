@@ -21,6 +21,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useCourse } from '../../contexts/CourseContext';
 import { useUnreadMessages } from '../../hooks/useUnreadMessages';
 import { getImageUrl } from '../../services/api';
+import { NavCountBadge } from '../common/NavCountBadge';
 
 const getNavItems = (userRole: string) => {
   const baseItems = [
@@ -87,9 +88,13 @@ export default function GlobalSidebar() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Close dropdown when clicking outside
+  const prefersFinePointer =
+    typeof window !== 'undefined' &&
+    window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+
+  // Close dropdown when clicking/tapping outside
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setShowCourseDropdown(false);
         if (hideTimeoutRef.current) {
@@ -100,8 +105,10 @@ export default function GlobalSidebar() {
     };
 
     document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside, { passive: true });
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
       if (hideTimeoutRef.current) {
         clearTimeout(hideTimeoutRef.current);
       }
@@ -222,8 +229,8 @@ export default function GlobalSidebar() {
                 key={label} 
                 className="relative w-full" 
                 ref={dropdownRef}
-                onMouseEnter={handleMouseEnter}
-                onMouseLeave={handleMouseLeave}
+                onMouseEnter={prefersFinePointer ? handleMouseEnter : undefined}
+                onMouseLeave={prefersFinePointer ? handleMouseLeave : undefined}
               >
                 <button
                   type="button"
@@ -234,6 +241,8 @@ export default function GlobalSidebar() {
                     }
                     setShowCourseDropdown(!showCourseDropdown);
                   }}
+                  aria-expanded={showCourseDropdown}
+                  aria-haspopup="true"
                   className={`${sidebarNavBase} ${isActive ? sidebarNavActive : sidebarNavInactive}`}
                 >
                   <SidebarActiveRail show={isActive} />
@@ -246,9 +255,9 @@ export default function GlobalSidebar() {
                 {/* Course Dropdown */}
                 {showCourseDropdown && (
                   <div 
-                    className="absolute left-full top-0 ml-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-2 min-w-48 w-auto z-50"
-                    onMouseEnter={handleMouseEnter}
-                    onMouseLeave={handleMouseLeave}
+                    className="absolute left-full top-0 z-50 ml-2 w-auto min-w-48 rounded-lg border border-gray-200 bg-white py-2 shadow-lg dark:border-gray-700 dark:bg-gray-800"
+                    onMouseEnter={prefersFinePointer ? handleMouseEnter : undefined}
+                    onMouseLeave={prefersFinePointer ? handleMouseLeave : undefined}
                   >
                     {(!user || user.role !== 'teacher') && (
                       <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-700">
@@ -265,8 +274,8 @@ export default function GlobalSidebar() {
                           onClick={() => {
                             setShowCourseDropdown(false);
                           }}
-                          className={`block px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
-                            isCurrentCourse ? 'bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+                          className={`flex min-h-[44px] items-center px-3 py-2 text-sm transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 ${
+                            isCurrentCourse ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
                           }`}
                           title={course.title}
                         >
@@ -291,8 +300,8 @@ export default function GlobalSidebar() {
                           onClick={() => {
                             setShowCourseDropdown(false);
                           }}
-                          className={`block px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium ${
-                            location.pathname === '/teacher/courses' ? 'bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+                          className={`flex min-h-[44px] items-center px-3 py-2 text-sm font-medium transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 ${
+                            location.pathname === '/teacher/courses' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
                           }`}
                         >
                           <div className="flex items-center justify-between">
@@ -317,15 +326,14 @@ export default function GlobalSidebar() {
                 key={label}
                 to={to}
                 className={`${sidebarNavBase} ${isActive ? sidebarNavActive : sidebarNavInactive}`}
+                aria-label={
+                  unreadCount > 0 ? `${label}, ${unreadCount} unread` : label
+                }
               >
                 <SidebarActiveRail show={isActive} />
-                <div className="relative">
-                  <Icon className={`mb-1 h-5 w-5 transition-opacity duration-200 ${isActive ? 'opacity-100' : 'opacity-90 group-hover:opacity-100'}`} />
-                  {unreadCount > 0 && (
-                    <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center font-bold">
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </div>
-                  )}
+                <div className="relative mb-1 inline-flex">
+                  <Icon className={`h-5 w-5 transition-opacity duration-200 ${isActive ? 'opacity-100' : 'opacity-90 group-hover:opacity-100'}`} />
+                  <NavCountBadge count={unreadCount} variant="sidebar" />
                 </div>
                 <span className={`text-[11px] font-medium leading-tight tracking-tight ${isActive ? 'font-semibold' : ''}`}>
                   {label}

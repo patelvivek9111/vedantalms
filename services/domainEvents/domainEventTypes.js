@@ -1,0 +1,62 @@
+/**
+ * Canonical domain event type constants (Phase 10 backbone).
+ * Distinct from PR-8 planner/notification contract keys in services/domain/eventTaxonomy.js.
+ */
+
+const DOMAIN_EVENT_TYPES = Object.freeze({
+  ASSIGNMENT_CREATED: 'ASSIGNMENT_CREATED',
+  ASSIGNMENT_UPDATED: 'ASSIGNMENT_UPDATED',
+  ASSIGNMENT_SUBMITTED: 'ASSIGNMENT_SUBMITTED',
+  ASSIGNMENT_GRADED: 'ASSIGNMENT_GRADED',
+
+  DISCUSSION_CREATED: 'DISCUSSION_CREATED',
+  DISCUSSION_REPLY_POSTED: 'DISCUSSION_REPLY_POSTED',
+
+  ANNOUNCEMENT_CREATED: 'ANNOUNCEMENT_CREATED',
+
+  COURSE_ENROLLMENT_REQUESTED: 'COURSE_ENROLLMENT_REQUESTED',
+  COURSE_ENROLLMENT_APPROVED: 'COURSE_ENROLLMENT_APPROVED',
+  COURSE_ENROLLMENT_DENIED: 'COURSE_ENROLLMENT_DENIED',
+
+  INBOX_MESSAGE_SENT: 'INBOX_MESSAGE_SENT',
+
+  MEETING_CREATED: 'MEETING_CREATED',
+  MEETING_UPDATED: 'MEETING_UPDATED',
+  MEETING_CANCELLED: 'MEETING_CANCELLED',
+
+  PLANNER_ITEM_DISMISSED: 'PLANNER_ITEM_DISMISSED',
+  PLANNER_ITEM_SNOOZED: 'PLANNER_ITEM_SNOOZED',
+});
+
+const AGGREGATE_TYPES = Object.freeze({
+  ASSIGNMENT: 'assignment',
+  SUBMISSION: 'submission',
+  DISCUSSION: 'discussion',
+  ANNOUNCEMENT: 'announcement',
+  COURSE: 'course',
+  CONVERSATION: 'conversation',
+  MESSAGE: 'message',
+  MEETING: 'meeting',
+  PLANNER_ITEM: 'planner_item',
+});
+
+const AUDIENCE_SCOPES = Object.freeze({
+  COURSE: 'course',
+  USER: 'user',
+  GROUP: 'group',
+  SYSTEM: 'system',
+});
+
+const KNOWN_EVENT_TYPES = new Set(Object.values(DOMAIN_EVENT_TYPES));
+
+function isKnownEventType(eventType) {
+  return KNOWN_EVENT_TYPES.has(eventType);
+}
+
+module.exports = {
+  DOMAIN_EVENT_TYPES,
+  AGGREGATE_TYPES,
+  AUDIENCE_SCOPES,
+  KNOWN_EVENT_TYPES,
+  isKnownEventType,
+};

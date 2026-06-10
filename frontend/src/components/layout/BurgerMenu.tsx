@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { 
   Menu, ArrowLeft, User as UserIcon, Settings, Megaphone, ClipboardList, 
-  HelpCircle, LogOut, CheckSquare, Sun, Moon 
+  HelpCircle, LogOut, CheckSquare, Sun, Moon, Users, Shield, BookOpen, BarChart3, Gauge
 } from 'lucide-react';
 import { 
   getImageUrl, updateUserProfile, uploadProfilePicture, getUserPreferences, 
@@ -459,7 +459,7 @@ export const BurgerMenu: React.FC<BurgerMenuProps> = ({
           <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3">
             <button
               onClick={() => setBurgerMenuSection(null)}
-              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
+              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition-colors hover:bg-gray-100 touch-manipulation dark:hover:bg-gray-700"
               aria-label="Back"
             >
               <ArrowLeft className="h-5 w-5 text-gray-600 dark:text-gray-400" />
@@ -541,6 +541,38 @@ export const BurgerMenu: React.FC<BurgerMenuProps> = ({
               </div>
             </div>
             
+            {user?.role === 'admin' && (
+              <div className="border-b border-gray-200 py-2 dark:border-gray-700">
+                <div className="px-4 py-2">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    Administration
+                  </div>
+                </div>
+                {[
+                  { label: 'Admin Dashboard', to: '/dashboard', icon: Gauge },
+                  { label: 'User Management', to: '/admin/users', icon: Users },
+                  { label: 'Course Oversight', to: '/admin/courses', icon: BookOpen },
+                  { label: 'Analytics', to: '/admin/analytics', icon: BarChart3 },
+                  { label: 'System Settings', to: '/admin/settings', icon: Settings },
+                  { label: 'Security', to: '/admin/security', icon: Shield },
+                ].map(({ label, to, icon: Icon }) => (
+                  <button
+                    key={to}
+                    type="button"
+                    onClick={() => {
+                      setShowBurgerMenu(false);
+                      setBurgerMenuSection(null);
+                      navigate(to);
+                    }}
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 touch-manipulation dark:text-gray-300 dark:hover:bg-gray-700"
+                  >
+                    <Icon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                    <span>{label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* Account Sections */}
             <div className="py-2">
               <button

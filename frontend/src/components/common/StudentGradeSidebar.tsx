@@ -65,8 +65,9 @@ const StudentGradeSidebar: React.FC<StudentGradeSidebarProps> = ({
         </div>
         <div className="space-y-2">
           <button 
+            type="button"
             onClick={() => setShowWhatIfScores(true)}
-            className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors duration-150 text-xs sm:text-sm font-medium"
+            className="min-h-[44px] w-full rounded border border-gray-300 bg-gray-100 px-3 py-2 text-xs font-medium text-gray-700 transition-colors duration-150 hover:bg-gray-200 sm:text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
           >
             What-If Scores
           </button>
@@ -75,27 +76,48 @@ const StudentGradeSidebar: React.FC<StudentGradeSidebarProps> = ({
         {course.groups && course.groups.length > 0 && (
           <div className="mt-3 sm:mt-4">
             <div className="font-semibold mb-2 text-xs text-gray-700 dark:text-gray-300 uppercase tracking-wide">Assignment Weighting</div>
-            <div className="bg-gray-50 dark:bg-gray-800 rounded p-2 sm:p-3">
-              <table className="min-w-full text-xs">
-                <thead>
-                  <tr className="border-b border-gray-200 dark:border-gray-700">
-                    <th className="px-1 sm:px-2 py-1 text-left font-medium text-gray-700 dark:text-gray-300">Group</th>
-                    <th className="px-1 sm:px-2 py-1 text-right font-medium text-gray-700 dark:text-gray-300">Weight</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {(course.groups || []).map((group: any, idx: number) => (
-                    <tr key={idx} className="hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-150">
-                      <td className="px-1 sm:px-2 py-1 text-left text-gray-600 dark:text-gray-400">{group.name}</td>
-                      <td className="px-1 sm:px-2 py-1 text-right font-semibold text-gray-900 dark:text-gray-100">{group.weight}%</td>
+            <div className="rounded bg-gray-50 p-2 dark:bg-gray-800 sm:p-3">
+              <div className="space-y-2 md:hidden">
+                {(course.groups || []).map((group: any, idx: number) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-900"
+                  >
+                    <span className="text-sm text-gray-700 dark:text-gray-300">{group.name}</span>
+                    <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">{group.weight}%</span>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between rounded-lg border-2 border-gray-300 bg-white px-3 py-2 font-bold dark:border-gray-600 dark:bg-gray-900">
+                  <span className="text-sm text-gray-900 dark:text-gray-100">Total</span>
+                  <span className="text-sm text-gray-900 dark:text-gray-100">
+                    {(course.groups || []).reduce((sum: number, g: any) => sum + Number(g.weight), 0)}%
+                  </span>
+                </div>
+              </div>
+              <div className="hidden overflow-x-auto md:block">
+                <table className="min-w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-gray-200 dark:border-gray-700">
+                      <th className="px-1 py-1 text-left font-medium text-gray-700 dark:text-gray-300 sm:px-2">Group</th>
+                      <th className="px-1 py-1 text-right font-medium text-gray-700 dark:text-gray-300 sm:px-2">Weight</th>
                     </tr>
-                  ))}
-                  <tr className="border-t-2 border-gray-300 dark:border-gray-600 font-bold">
-                    <td className="px-1 sm:px-2 py-1 text-left text-gray-900 dark:text-gray-100">Total</td>
-                    <td className="px-1 sm:px-2 py-1 text-right text-gray-900 dark:text-gray-100">{(course.groups || []).reduce((sum: number, g: any) => sum + Number(g.weight), 0)}%</td>
-                  </tr>
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                    {(course.groups || []).map((group: any, idx: number) => (
+                      <tr key={idx} className="transition-colors duration-150 hover:bg-gray-100 dark:hover:bg-gray-700">
+                        <td className="px-1 py-1 text-left text-gray-600 dark:text-gray-400 sm:px-2">{group.name}</td>
+                        <td className="px-1 py-1 text-right font-semibold text-gray-900 dark:text-gray-100 sm:px-2">{group.weight}%</td>
+                      </tr>
+                    ))}
+                    <tr className="border-t-2 border-gray-300 font-bold dark:border-gray-600">
+                      <td className="px-1 py-1 text-left text-gray-900 dark:text-gray-100 sm:px-2">Total</td>
+                      <td className="px-1 py-1 text-right text-gray-900 dark:text-gray-100 sm:px-2">
+                        {(course.groups || []).reduce((sum: number, g: any) => sum + Number(g.weight), 0)}%
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}

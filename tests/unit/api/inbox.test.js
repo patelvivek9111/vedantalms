@@ -64,6 +64,19 @@ describe('Inbox API', () => {
         code: 'INB101'
       });
     courseId = courseResponse.body.data._id || courseResponse.body.data.id;
+
+    const conversationResponse = await request(app)
+      .post('/api/inbox/conversations')
+      .set('Authorization', `Bearer ${teacherToken}`)
+      .send({
+        subject: 'Shared Inbox Test Conversation',
+        participantIds: [studentId],
+        body: 'Initial shared setup message',
+        sendIndividually: false,
+      });
+    expect(conversationResponse.status).toBe(201);
+    conversationId =
+      conversationResponse.body.conversation._id || conversationResponse.body.conversation.id;
   });
 
   afterAll(async () => {
@@ -345,6 +358,34 @@ describe('Inbox API', () => {
         .send({
           body: 'Test message',
           attachments: 'not-an-array'
+        });
+
+      expect(response.status).toBe(400);
+    });
+
+    it('should reject invalid fileAssetIds format', async () => {
+      if (!conversationId) return;
+
+      const response = await request(app)
+        .post(`/api/inbox/conversations/${conversationId}/messages`)
+        .set('Authorization', `Bearer ${teacherToken}`)
+        .send({
+          body: 'Test message',
+          fileAssetIds: 'not-an-array',
+        });
+
+      expect(response.status).toBe(400);
+    });
+
+    it('should reject invalid file asset references', async () => {
+      if (!conversationId) return;
+
+      const response = await request(app)
+        .post(`/api/inbox/conversations/${conversationId}/messages`)
+        .set('Authorization', `Bearer ${teacherToken}`)
+        .send({
+          body: 'Test message',
+          fileAssetIds: ['507f1f77bcf86cd799439099'],
         });
 
       expect(response.status).toBe(400);

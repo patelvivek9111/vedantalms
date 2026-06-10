@@ -9,10 +9,17 @@ services:
       MONGODB_URI: ${MONGODB_URI}
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://redis:6379
+      REQUIRE_REDIS: 'true'
       REQUIRE_JOB_QUEUE: 'true'
+      NOTIFICATION_FANOUT_QUEUE_ENABLED: 'true'
+      FILE_SCAN_QUEUE_ENABLED: 'true'
+      QUIZWAVE_DISTRIBUTED_TIMERS: 'true'
     depends_on:
       - redis
-  worker:
+    deploy:
+      replicas: 3
+
+  worker-grading:
     build: .
     command: npm run worker:grading-jobs
     environment:
@@ -21,6 +28,36 @@ services:
       REDIS_URL: redis://redis:6379
     depends_on:
       - redis
+
+  worker-notifications:
+    build: .
+    command: npm run worker:notification-fanout
+    environment:
+      NODE_ENV: production
+      MONGODB_URI: ${MONGODB_URI}
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      - redis
+
+  worker-file-scan:
+    build: .
+    command: npm run worker:file-scan
+    environment:
+      NODE_ENV: production
+      MONGODB_URI: ${MONGODB_URI}
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      - redis
+
+  worker-nightly-ops:
+    build: .
+    command: npm run worker:nightly-ops -- --apply
+    environment:
+      NODE_ENV: production
+      MONGODB_URI: ${MONGODB_URI}
+    profiles:
+      - cron
+
   redis:
     image: redis:7-alpine
     ports:

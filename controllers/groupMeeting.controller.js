@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const Group = require('../models/Group');
 const Course = require('../models/course.model');
 const GroupMeeting = require('../models/groupMeeting.model');
-const { createNotification } = require('../routes/notification.routes');
+const { createNotification } = require('../services/notification');
 
 const isValidObjectId = (value) => mongoose.Types.ObjectId.isValid(value);
 
@@ -107,6 +107,27 @@ exports.createCourseMeeting = async (req, res) => {
         )
     );
 
+    try {
+      const {
+        recordDomainEvent,
+        DOMAIN_EVENT_TYPES,
+        AGGREGATE_TYPES,
+        AUDIENCE_SCOPES,
+      } = require('../services/domainEvents');
+      void recordDomainEvent({
+        eventType: DOMAIN_EVENT_TYPES.MEETING_CREATED,
+        aggregateType: AGGREGATE_TYPES.MEETING,
+        aggregateId: meeting._id,
+        actorId: req.user._id,
+        audienceScope: AUDIENCE_SCOPES.COURSE,
+        correlationId: req.requestId,
+        payload: { courseId: String(courseId), groupId: null },
+        metadata: { source: 'groupMeeting.controller.createCourseMeeting' },
+      });
+    } catch (domainEventError) {
+      console.error('meeting_created_domain_event_failed', domainEventError);
+    }
+
     const populated = await GroupMeeting.findById(meeting._id).populate('group', 'name');
     res.status(201).json({ success: true, data: populated });
   } catch (error) {
@@ -146,6 +167,31 @@ exports.updateCourseMeeting = async (req, res) => {
       meeting.cancelledAt = null;
     }
     await meeting.save();
+
+    try {
+      const {
+        recordDomainEvent,
+        DOMAIN_EVENT_TYPES,
+        AGGREGATE_TYPES,
+        AUDIENCE_SCOPES,
+      } = require('../services/domainEvents');
+      const eventType =
+        meeting.status === 'cancelled'
+          ? DOMAIN_EVENT_TYPES.MEETING_CANCELLED
+          : DOMAIN_EVENT_TYPES.MEETING_UPDATED;
+      void recordDomainEvent({
+        eventType,
+        aggregateType: AGGREGATE_TYPES.MEETING,
+        aggregateId: meeting._id,
+        actorId: req.user._id,
+        audienceScope: AUDIENCE_SCOPES.COURSE,
+        correlationId: req.requestId,
+        payload: { courseId: String(courseId), status: meeting.status },
+        metadata: { source: 'groupMeeting.controller.updateCourseMeeting' },
+      });
+    } catch (domainEventError) {
+      console.error('meeting_update_domain_event_failed', domainEventError);
+    }
 
     res.json({ success: true, data: meeting });
   } catch (error) {
@@ -233,6 +279,27 @@ exports.createGroupMeeting = async (req, res) => {
       )
     );
 
+    try {
+      const {
+        recordDomainEvent,
+        DOMAIN_EVENT_TYPES,
+        AGGREGATE_TYPES,
+        AUDIENCE_SCOPES,
+      } = require('../services/domainEvents');
+      void recordDomainEvent({
+        eventType: DOMAIN_EVENT_TYPES.MEETING_CREATED,
+        aggregateType: AGGREGATE_TYPES.MEETING,
+        aggregateId: meeting._id,
+        actorId: req.user._id,
+        audienceScope: AUDIENCE_SCOPES.GROUP,
+        correlationId: req.requestId,
+        payload: { courseId: String(group.course), groupId: String(group._id) },
+        metadata: { source: 'groupMeeting.controller.createGroupMeeting' },
+      });
+    } catch (domainEventError) {
+      console.error('group_meeting_created_domain_event_failed', domainEventError);
+    }
+
     res.status(201).json({ success: true, data: meeting });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -287,6 +354,34 @@ exports.updateGroupMeeting = async (req, res) => {
           })
         )
     );
+
+    try {
+      const {
+        recordDomainEvent,
+        DOMAIN_EVENT_TYPES,
+        AGGREGATE_TYPES,
+        AUDIENCE_SCOPES,
+      } = require('../services/domainEvents');
+      const eventType = isCancelled
+        ? DOMAIN_EVENT_TYPES.MEETING_CANCELLED
+        : DOMAIN_EVENT_TYPES.MEETING_UPDATED;
+      void recordDomainEvent({
+        eventType,
+        aggregateType: AGGREGATE_TYPES.MEETING,
+        aggregateId: meeting._id,
+        actorId: req.user._id,
+        audienceScope: AUDIENCE_SCOPES.GROUP,
+        correlationId: req.requestId,
+        payload: {
+          courseId: String(group.course),
+          groupId: String(group._id),
+          status: meeting.status,
+        },
+        metadata: { source: 'groupMeeting.controller.updateGroupMeeting' },
+      });
+    } catch (domainEventError) {
+      console.error('group_meeting_update_domain_event_failed', domainEventError);
+    }
 
     res.json({ success: true, data: meeting });
   } catch (error) {

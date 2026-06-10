@@ -36,7 +36,6 @@ describe('Service coverage', () => {
     expect(mockedApi.get).toHaveBeenCalledWith('/inbox/conversations', { params: undefined });
     expect(mockedApi.post).toHaveBeenCalledWith('/inbox/conversations/conv-1/messages', {
       body: 'hello',
-      attachments: [],
     });
   });
 
