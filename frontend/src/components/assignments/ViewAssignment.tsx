@@ -1237,7 +1237,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
             <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Attachments</h3>
             <FileAttachmentChips
               files={
-                (assignment as { attachmentFiles?: unknown[] }).attachmentFiles ||
+                (assignment as { attachmentFiles?: Array<string | Record<string, unknown>> }).attachmentFiles ||
                 assignment.attachments ||
                 assignment.fileAssets
               }

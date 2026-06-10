@@ -55,7 +55,7 @@ function InfoTile({
   label,
   value,
 }: {
-  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number | string }>;
   label: string;
   value: string;
 }) {

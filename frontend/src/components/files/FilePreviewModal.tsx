@@ -28,6 +28,25 @@ interface FilePreviewModalProps {
   onClose: () => void;
 }
 
+type FileApiResponse<T> = {
+  data?: {
+    success?: boolean;
+    data?: T;
+  };
+} | null;
+
+type FileMetadata = {
+  originalName?: string;
+  mimeType?: string;
+  size?: number;
+};
+
+type FilePreviewData = {
+  streamUrl?: string;
+  thumbnailUrl?: string;
+  previewCorrupted?: boolean;
+};
+
 const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, open, onClose }) => {
   const { downloadFile, error: downloadError, clearError } = useFileDownload();
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -62,14 +81,16 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, open, onClose
     setAccessError('');
 
     const skipServerPreview = isDocxFile({ name: file.name, mimeType: file.mimeType });
-    const fetches: [Promise<unknown>, Promise<unknown>?] = [
-      api.get(`/files/${fileAssetId}/metadata`).catch(() => null),
-    ];
-    if (!skipServerPreview) {
-      fetches.push(api.get(`/files/${fileAssetId}/preview`).catch(() => null));
-    }
+    const metaPromise = api
+      .get(`/files/${fileAssetId}/metadata`)
+      .catch(() => null) as Promise<FileApiResponse<FileMetadata>>;
+    const previewPromise = skipServerPreview
+      ? Promise.resolve(null)
+      : (api
+          .get(`/files/${fileAssetId}/preview`)
+          .catch(() => null) as Promise<FileApiResponse<FilePreviewData>>);
 
-    Promise.all(fetches)
+    Promise.all([metaPromise, previewPromise])
       .then(([metaRes, previewRes]) => {
         let next = { ...base };
         if (metaRes?.data?.success && metaRes.data.data) {
@@ -87,7 +108,7 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, open, onClose
         if (clientDocx) {
           setPreviewStreamUrl(buildStreamUrl(fileAssetId));
           setPreviewCorrupted(false);
-        } else if (previewRes?.data?.success) {
+        } else if (previewRes?.data?.success && previewRes.data.data) {
           const d = previewRes.data.data;
           setPreviewStreamUrl(d.streamUrl || d.thumbnailUrl || buildStreamUrl(fileAssetId));
           setPreviewCorrupted(Boolean(d.previewCorrupted));
@@ -110,11 +131,11 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, open, onClose
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
-  const display = resolvedFile || file;
+  const previewFile = resolvedFile || file;
   const fileAssetId =
-    display?.fileAssetId || (display?.url ? extractFileAssetId(display.url) : null) || undefined;
-  const kind = display
-    ? detectPreviewKind({ name: display.name, mimeType: display.mimeType })
+    previewFile?.fileAssetId || (previewFile?.url ? extractFileAssetId(previewFile.url) : null) || undefined;
+  const kind = previewFile
+    ? detectPreviewKind({ name: previewFile.name, mimeType: previewFile.mimeType })
     : ('unsupported' as const);
   const needsBlob =
     open &&
@@ -127,6 +148,8 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, open, onClose
   );
 
   if (!open || !file) return null;
+
+  const display = resolvedFile || file;
 
   return (
     <BaseModal

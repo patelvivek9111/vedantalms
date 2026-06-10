@@ -18,7 +18,11 @@ export async function fetchOpsFiles() {
 export interface RecoverySummary {
   dryRun?: boolean;
   orphanCandidates?: unknown[];
-  orphanReport?: { candidateCount?: number };
+  orphanReport?: {
+    candidateCount?: number;
+    candidates?: unknown[];
+    summary?: { candidateCount?: number };
+  };
   failedJobs?: unknown[];
   fileMetrics?: Record<string, unknown>;
 }

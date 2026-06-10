@@ -54,8 +54,9 @@ const CourseCopyModal: React.FC<CourseCopyModalProps> = ({
   };
 
   React.useEffect(() => {
-    if (job?.status === 'completed' && job.result?.newCourseId) {
-      onSuccess(job.result.newCourseId);
+    const copyResult = job?.result as { newCourseId?: string } | undefined;
+    if (job?.status === 'completed' && copyResult?.newCourseId) {
+      onSuccess(copyResult.newCourseId);
       onClose();
     }
     if (job?.status === 'failed') {

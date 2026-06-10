@@ -14,6 +14,12 @@ export type MessagingSocketPayload = {
 };
 
 export type MessagingSocketEvent = {
-  type: keyof typeof MESSAGING_SOCKET_EVENTS | 'message:new' | 'conversation:updated' | 'unread:changed';
+  type:
+    | keyof typeof MESSAGING_SOCKET_EVENTS
+    | 'message:new'
+    | 'conversation:updated'
+    | 'unread:changed'
+    | 'connect'
+    | 'disconnect';
   payload: MessagingSocketPayload;
 };

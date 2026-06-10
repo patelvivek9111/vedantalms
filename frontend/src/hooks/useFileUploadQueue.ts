@@ -88,7 +88,7 @@ export function useFileUploadQueue(options: UseFileUploadQueueOptions = {}) {
           name: i.name,
           size: i.size,
           mimeType: i.mimeType,
-          status: i.status,
+          status: i.status || 'queued',
           error: i.error,
         })),
       };
@@ -151,9 +151,7 @@ export function useFileUploadQueue(options: UseFileUploadQueueOptions = {}) {
       armStallTimer(item.id);
 
       const existingCp = uploadRecoveryManager.matchFileToCheckpoint(item.file, persistKey);
-      const chunkOpts = existingCp
-        ? { ...uploadRecoveryManager.toChunkOptions(existingCp), ...options }
-        : options;
+      const resumeOpts = existingCp ? uploadRecoveryManager.toChunkOptions(existingCp) : {};
 
       const saveProgress = (pct: number, bytesPerSecond?: number) => {
         clearStallTimer(item.id);
@@ -171,8 +169,8 @@ export function useFileUploadQueue(options: UseFileUploadQueueOptions = {}) {
               courseId: options.courseId,
               assignmentId: options.assignmentId,
               chunkConcurrency,
-              uploadId: chunkOpts.uploadId,
-              receivedChunks: chunkOpts.receivedChunks,
+              uploadId: resumeOpts.uploadId,
+              receivedChunks: resumeOpts.receivedChunks,
               signal: controller.signal,
               onProgress: (pct, meta) => saveProgress(pct, meta?.bytesPerSecond),
               onCheckpoint: ({ uploadId, totalChunks, receivedChunks }) => {

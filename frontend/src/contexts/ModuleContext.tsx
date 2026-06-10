@@ -8,6 +8,7 @@ export interface Page {
   module: string;
   content: string;
   attachments: string[];
+  fileAssets?: Array<string | Record<string, unknown>>;
   createdAt: string;
   updatedAt: string;
 }

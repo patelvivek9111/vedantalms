@@ -39,8 +39,8 @@ const FileVersionHistory: React.FC<FileVersionHistoryProps> = ({ fileAssetId, fi
       try {
         const data = await fetchFileVersions(fileAssetId);
         if (!cancelled) {
-          setCurrent((data?.current as VersionRow) || null);
-          setVersions((data?.versions as VersionRow[]) || []);
+          setCurrent((data?.current as unknown as VersionRow) || null);
+          setVersions((data?.versions as unknown as VersionRow[]) || []);
         }
       } catch {
         if (!cancelled) {
