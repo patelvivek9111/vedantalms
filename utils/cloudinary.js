@@ -74,6 +74,52 @@ const uploadMultipleToCloudinary = async (files, options = {}) => {
   return Promise.all(uploadPromises);
 };
 
+const uploadBufferToCloudinary = async (buffer, options = {}) => {
+  const uploadOptions = {
+    folder: options.folder || 'lms',
+    resource_type: options.resource_type || 'auto',
+    overwrite: options.overwrite !== false,
+    ...options,
+  };
+  if (options.public_id) {
+    uploadOptions.public_id = options.public_id;
+  }
+
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(uploadOptions, (err, result) => {
+      if (err) return reject(err);
+      resolve({
+        url: result.secure_url,
+        public_id: result.public_id,
+        format: result.format,
+        bytes: result.bytes,
+        resource_type: result.resource_type,
+      });
+    });
+    stream.end(buffer);
+  });
+};
+
+/**
+ * Delete all preview artifacts for a file asset from Cloudinary.
+ */
+const deletePreviewFolder = async (fileAssetId) => {
+  if (!isCloudinaryConfigured() || !fileAssetId) return;
+  try {
+    await cloudinary.api.delete_resources_by_prefix(`lms/previews/${fileAssetId}`, {
+      resource_type: 'image',
+    });
+    await cloudinary.api.delete_resources_by_prefix(`lms/previews/${fileAssetId}`, {
+      resource_type: 'raw',
+    });
+    await cloudinary.api.delete_resources_by_prefix(`lms/previews/${fileAssetId}`, {
+      resource_type: 'video',
+    });
+  } catch (error) {
+    console.warn('Cloudinary preview cleanup warning:', error.message);
+  }
+};
+
 /**
  * Delete file from Cloudinary
  * @param {String} publicId - Cloudinary public_id
@@ -139,8 +185,10 @@ const isCloudinaryConfigured = () => {
 
 module.exports = {
   uploadToCloudinary,
+  uploadBufferToCloudinary,
   uploadMultipleToCloudinary,
   deleteFromCloudinary,
+  deletePreviewFolder,
   extractPublicId,
   getSignedCloudinaryUrl,
   isCloudinaryConfigured,

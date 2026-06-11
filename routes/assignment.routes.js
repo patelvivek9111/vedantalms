@@ -33,6 +33,9 @@ router.get('/todo/ungraded', protect, getUngradedAssignmentsTodo);
 router.get('/todo/due', protect, getStudentAssignmentsDueThisWeek);
 router.get('/todo/due-all', protect, getAllItemsDueThisWeek);
 
+// Bulk metadata for dashboard widgets (must stay above /:id)
+router.get('/metadata/bulk', protect, assignmentController.getAssignmentMetadataBulk);
+
 // Get a single assignment
 router.get('/:id', protect, assignmentController.getAssignment);
 

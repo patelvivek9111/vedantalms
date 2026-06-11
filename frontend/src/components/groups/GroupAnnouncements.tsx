@@ -257,7 +257,7 @@ const GroupAnnouncements: React.FC<GroupAnnouncementsProps> = ({ courseId, group
   };
 
   return (
-    <div className={`w-full h-full overflow-y-auto ${isMobileDevice ? 'pb-20' : ''}`}>
+    <div className={`w-full overflow-visible lg:h-full lg:overflow-y-auto ${isMobileDevice ? 'pb-20' : ''}`}>
       {/* Header - Mobile Optimized */}
       <div className={`bg-white dark:bg-gray-800 ${isMobileDevice ? 'p-3 mb-3 border-b' : 'p-4 sm:p-6 mb-4 sm:mb-6'} border-gray-200 dark:border-gray-700`}>
         <h2 className={`${isMobileDevice ? 'text-lg' : 'text-xl sm:text-2xl'} font-bold text-gray-900 dark:text-gray-100`}>

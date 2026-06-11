@@ -1,60 +1,106 @@
 version: '3.8'
+# Production stack for ~2500 concurrent users.
+# Requires .env with MONGODB_URI, JWT_SECRET, CLOUDINARY_* credentials.
+#
+# Scale API: docker compose -f docker-compose.prod.yml up -d --scale api=8
 services:
   api:
     build: .
     ports:
       - '5000:5000'
+    env_file:
+      - .env
     environment:
       NODE_ENV: production
-      MONGODB_URI: ${MONGODB_URI}
-      JWT_SECRET: ${JWT_SECRET}
-      REDIS_URL: redis://redis:6379
       REQUIRE_REDIS: 'true'
       REQUIRE_JOB_QUEUE: 'true'
+      FORCE_OBJECT_STORAGE: 'true'
+      STORAGE_PROVIDER: cloudinary
+      PREVIEW_STORAGE: cloudinary
       NOTIFICATION_FANOUT_QUEUE_ENABLED: 'true'
       FILE_SCAN_QUEUE_ENABLED: 'true'
       QUIZWAVE_DISTRIBUTED_TIMERS: 'true'
+      PLANNER_UX_ENABLED: 'true'
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - lms-job-exports:/app/uploads/job-exports
+      - lms-institution-exports:/app/uploads/exports/institution
+      - lms-grade-archives:/app/uploads/archives/grade-snapshots
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     deploy:
       replicas: 3
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          "node -e \"require('http').get('http://127.0.0.1:5000/health/ready',(r)=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))\"",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
 
   worker-grading:
     build: .
     command: npm run worker:grading-jobs
+    env_file:
+      - .env
     environment:
       NODE_ENV: production
-      MONGODB_URI: ${MONGODB_URI}
       REDIS_URL: redis://redis:6379
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
 
   worker-notifications:
     build: .
     command: npm run worker:notification-fanout
+    env_file:
+      - .env
     environment:
       NODE_ENV: production
-      MONGODB_URI: ${MONGODB_URI}
       REDIS_URL: redis://redis:6379
+      NOTIFICATION_FANOUT_QUEUE_ENABLED: 'true'
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
 
   worker-file-scan:
     build: .
     command: npm run worker:file-scan
+    env_file:
+      - .env
     environment:
       NODE_ENV: production
-      MONGODB_URI: ${MONGODB_URI}
       REDIS_URL: redis://redis:6379
+      FILE_SCAN_QUEUE_ENABLED: 'true'
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
+
+  worker-file-maintenance:
+    build: .
+    command: npm run worker:file-maintenance
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      REDIS_URL: redis://redis:6379
+      FORCE_OBJECT_STORAGE: 'true'
+      PREVIEW_STORAGE: cloudinary
+    depends_on:
+      redis:
+        condition: service_healthy
 
   worker-nightly-ops:
     build: .
     command: npm run worker:nightly-ops -- --apply
+    env_file:
+      - .env
     environment:
       NODE_ENV: production
-      MONGODB_URI: ${MONGODB_URI}
     profiles:
       - cron
 
@@ -62,3 +108,13 @@ services:
     image: redis:7-alpine
     ports:
       - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  lms-job-exports:
+  lms-institution-exports:
+  lms-grade-archives:

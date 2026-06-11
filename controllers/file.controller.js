@@ -12,6 +12,22 @@ const { ZIP_DIR } = require('../services/bulkDownload.service');
 const { isPathInside } = require('../config/paths');
 const { getSignedCloudinaryUrl } = require('../utils/cloudinary');
 
+function redirectToRemotePreview(res, url, { download = false } = {}) {
+  const signed = getSignedCloudinaryUrl(url, { download, resourceType: 'auto' });
+  return res.redirect(302, signed || url);
+}
+
+function pipeLocalPreviewFile(res, filePath, contentType) {
+  res.setHeader('Content-Type', contentType);
+  res.setHeader('Cache-Control', 'private, max-age=3600');
+  const stream = fs.createReadStream(filePath);
+  stream.on('error', () => {
+    if (!res.headersSent) res.status(404).json({ success: false, message: 'Preview unavailable' });
+    else res.destroy();
+  });
+  stream.pipe(res);
+}
+
 exports.getFileMetadata = async (req, res) => {
   try {
     const { id } = req.params;
@@ -152,6 +168,8 @@ exports.streamFile = async (req, res) => {
     if (!user) {
       return res.status(401).json({ success: false, message: 'Authentication required' });
     }
+    const fileDownloadGovernance = require('../services/fileDownloadGovernance.service');
+    await fileDownloadGovernance.assertStreamRateLimit(user, id, { ip: req.ip });
     if (token && !fileAccessService.verifyFileDownloadToken(id, user._id, token)) {
       return res.status(403).json({ success: false, message: 'Invalid or expired download token' });
     }
@@ -288,18 +306,14 @@ exports.streamPreviewThumbnail = async (req, res) => {
     const { asset } = await fileAccessService.assertCanAccessFileAsset(req.user, id, { ip: req.ip });
     const previewJob = require('../services/filePreviewJob.service');
     const manifest = await previewJob.getPreviewManifest(id);
-    const filePath = previewJob.resolveSecurePreviewPath(manifest, 'thumbnail');
-    if (!filePath) {
+    const ref = previewJob.resolveSecurePreviewRef(manifest, 'thumbnail');
+    if (!ref) {
       return res.status(404).json({ success: false, message: 'Preview not available' });
     }
-    res.setHeader('Content-Type', asset.mimeType || 'application/octet-stream');
-    res.setHeader('Cache-Control', 'private, max-age=3600');
-    const stream = fs.createReadStream(filePath);
-    stream.on('error', () => {
-      if (!res.headersSent) res.status(404).json({ success: false, message: 'Preview unavailable' });
-      else res.destroy();
-    });
-    stream.pipe(res);
+    if (ref.type === 'remote') {
+      return redirectToRemotePreview(res, ref.url, { download: false });
+    }
+    pipeLocalPreviewFile(res, ref.path, asset.mimeType || 'application/octet-stream');
   } catch (error) {
     if (!res.headersSent) res.status(error.statusCode || 500).json({ success: false, message: error.message });
   }
@@ -311,20 +325,16 @@ exports.streamPreviewContent = async (req, res) => {
     await fileAccessService.assertCanAccessFileAsset(req.user, id, { ip: req.ip });
     const previewJob = require('../services/filePreviewJob.service');
     const manifest = await previewJob.getPreviewManifest(id);
-    const filePath = previewJob.resolveSecurePreviewPath(manifest, 'pdf');
-    if (!filePath) {
+    const ref = previewJob.resolveSecurePreviewRef(manifest, 'content');
+    if (!ref) {
       return res.status(404).json({ success: false, message: 'Preview content not available' });
     }
-    const ext = require('path').extname(filePath).toLowerCase();
+    if (ref.type === 'remote') {
+      return redirectToRemotePreview(res, ref.url, { download: false });
+    }
+    const ext = require('path').extname(ref.path).toLowerCase();
     const type = ext === '.pdf' ? 'application/pdf' : 'text/plain; charset=utf-8';
-    res.setHeader('Content-Type', type);
-    res.setHeader('Cache-Control', 'private, max-age=3600');
-    const stream = fs.createReadStream(filePath);
-    stream.on('error', () => {
-      if (!res.headersSent) res.status(404).json({ success: false, message: 'Preview content unavailable' });
-      else res.destroy();
-    });
-    stream.pipe(res);
+    pipeLocalPreviewFile(res, ref.path, type);
   } catch (error) {
     if (!res.headersSent) res.status(error.statusCode || 500).json({ success: false, message: error.message });
   }

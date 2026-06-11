@@ -5,13 +5,13 @@ import { API_URL } from '../../config';
 import ReactMarkdown from 'react-markdown';
 import { format } from 'date-fns';
 import { safeFormatDate } from '../../utils/dateUtils';
-import { Lock, Unlock, HelpCircle, CheckCircle, Circle, Bookmark, BarChart3, Edit, Eye, X, Download } from 'lucide-react';
-import FilePreview from './FilePreview';
+import { Lock, Unlock, HelpCircle, CheckCircle, Circle, Bookmark, BarChart3, Edit, Eye, X, Download, Calendar, Clock } from 'lucide-react';
+import FilePreviewModal from '../files/FilePreviewModal';
+import { normalizeLegacyFiles, type NormalizedFile } from '../../utils/fileTypes';
 import AssignmentFileUploadSection from './AssignmentFileUploadSection';
 import { isPaperUploadQuiz } from '../../utils/quizSubmissionMode';
 import FileAttachmentChips from '../files/FileAttachmentChips';
-import type { NormalizedFile } from '../../utils/fileTypes';
-import { fetchCourseLifecycle } from '../../services/gradingApi';
+import { fetchCourseLifecycleStatus } from '../../services/gradingApi';
 import ScrollableQuizSidebar from './ScrollableQuizSidebar';
 import logger from '../../utils/logger';
 import ConfirmationModal from '../common/ConfirmationModal';
@@ -58,6 +58,7 @@ interface Assignment {
   availableFrom?: string;
   questions?: Question[];
   attachments?: string[];
+  attachmentFiles?: Array<Record<string, unknown>>;
   fileAssets?: Array<string | Record<string, unknown>>;
   published?: boolean;
   totalPoints?: number;
@@ -116,9 +117,9 @@ interface UploadedFile {
   size?: number;
 }
 
-interface PreviewFile {
-  url: string;
-  name: string;
+function toPreviewFile(file: string | Record<string, unknown>): NormalizedFile {
+  const [normalized] = normalizeLegacyFiles([file]);
+  return normalized || { name: 'attachment', url: '', status: 'done' };
 }
 
 interface QuestionStat {
@@ -147,6 +148,165 @@ interface SubmissionStats {
 }
 
 type Answers = Record<number, string | Record<number, string>>;
+
+function getAnswerForQuestion(
+  answers: Answers,
+  questionIndex: number
+): string | Record<number, string> | undefined {
+  const key = questionIndex.toString();
+  if (answers[questionIndex] !== undefined) return answers[questionIndex];
+  if ((answers as Record<string, string | Record<number, string>>)[key] !== undefined) {
+    return (answers as Record<string, string | Record<number, string>>)[key];
+  }
+  return undefined;
+}
+
+function formatTextAnswer(value: string | Record<number, string> | undefined): string {
+  if (value == null) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return String(value);
+  return '';
+}
+
+function isTextLikeQuestion(q: Question): boolean {
+  const isMultipleChoice =
+    q.type === 'multiple-choice' && q.options && Array.isArray(q.options) && q.options.length > 0;
+  const isMatching =
+    q.type === 'matching' && q.leftItems && Array.isArray(q.leftItems) && q.leftItems.length > 0;
+  return !isMultipleChoice && !isMatching;
+}
+
+function parseStoredAnswer(
+  answer: unknown,
+  questionType?: string
+): string | Record<number, string> {
+  if (typeof answer === 'object' && answer !== null && !Array.isArray(answer)) {
+    return answer as Record<number, string>;
+  }
+  if (typeof answer === 'number') return String(answer);
+  if (typeof answer !== 'string') return answer != null ? String(answer) : '';
+  if (questionType === 'matching' || answer.trimStart().startsWith('{')) {
+    try {
+      const parsed = JSON.parse(answer);
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+        return parsed as Record<number, string>;
+      }
+    } catch {
+      // plain text
+    }
+  }
+  return answer;
+}
+
+function parseSubmissionAnswers(raw: unknown, questions?: Question[]): Answers {
+  const parsed: Answers = {};
+  if (!raw) return parsed;
+
+  const entries: [string, unknown][] = [];
+  if (raw instanceof Map) {
+    raw.forEach((value, key) => entries.push([String(key), value]));
+  } else if (typeof raw === 'object') {
+    Object.entries(raw as Record<string, unknown>).forEach(([key, value]) => entries.push([key, value]));
+  }
+
+  entries.forEach(([questionIndex, answer]) => {
+    const idx = Number(questionIndex);
+    parsed[idx] = parseStoredAnswer(answer, questions?.[idx]?.type);
+  });
+
+  return parsed;
+}
+
+function getAssignmentMaxPoints(assignment: Assignment): number {
+  const fromQuestions = assignment.questions?.reduce((sum, q) => sum + (q.points || 0), 0) ?? 0;
+  if (fromQuestions > 0) return fromQuestions;
+  return assignment.totalPoints ?? 0;
+}
+
+function resolveSubmissionEarnedPoints(submission: Submission): number | null {
+  if (submission.gradeVisibility?.scoreVisible === false) return null;
+  if (submission.gradeVisibility?.mode === 'hidden') return null;
+  if (typeof submission.finalGrade === 'number') return submission.finalGrade;
+  if (typeof submission.grade === 'number') return submission.grade;
+  if (submission.autoGraded && typeof submission.autoGrade === 'number') return submission.autoGrade;
+  return null;
+}
+
+function formatPointsValue(value: number): string {
+  const num = Number(value);
+  if (Number.isInteger(num)) return String(num);
+  return num.toFixed(2).replace(/\.?0+$/, '');
+}
+
+function getAssignmentGradeScore(
+  submission: Submission | null,
+  assignment: Assignment
+): { earned: number; maxPoints: number } | null {
+  if (!submission) return null;
+  const earned = resolveSubmissionEarnedPoints(submission);
+  if (earned === null) return null;
+  const maxPoints = getAssignmentMaxPoints(assignment);
+  if (maxPoints <= 0) return null;
+  return { earned, maxPoints };
+}
+
+function AssignmentGradeBadge({
+  score,
+  compact = false,
+}: {
+  score: { earned: number; maxPoints: number };
+  compact?: boolean;
+}) {
+  const earned = formatPointsValue(score.earned);
+  const max = formatPointsValue(score.maxPoints);
+  const isPerfect = score.maxPoints > 0 && score.earned >= score.maxPoints;
+
+  if (compact) {
+    return (
+      <div
+        className="inline-flex items-baseline gap-0.5 rounded-lg bg-emerald-50 px-2.5 py-1 ring-1 ring-emerald-200/70 dark:bg-emerald-950/50 dark:ring-emerald-800/60"
+        title={`Score: ${earned} / ${max} pts`}
+      >
+        <span className="text-xs font-bold tabular-nums text-emerald-700 dark:text-emerald-300">{earned}</span>
+        <span className="text-[10px] font-medium text-emerald-600/70 dark:text-emerald-400/70">/{max}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex shrink-0 items-center gap-3 rounded-xl border border-slate-200/90 bg-gradient-to-br from-slate-50 to-white px-4 py-3 shadow-sm dark:border-slate-700/80 dark:from-slate-900/80 dark:to-slate-900/40">
+      <div
+        className={`flex h-11 w-11 items-center justify-center rounded-xl ${
+          isPerfect
+            ? 'bg-emerald-100 ring-1 ring-emerald-200/80 dark:bg-emerald-900/40 dark:ring-emerald-800/60'
+            : 'bg-indigo-100 ring-1 ring-indigo-200/80 dark:bg-indigo-900/40 dark:ring-indigo-800/60'
+        }`}
+      >
+        <CheckCircle
+          className={`h-5 w-5 ${
+            isPerfect ? 'text-emerald-600 dark:text-emerald-400' : 'text-indigo-600 dark:text-indigo-400'
+          }`}
+          aria-hidden
+        />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          Your score
+        </p>
+        <p className="mt-0.5 tabular-nums leading-none">
+          <span
+            className={`text-2xl font-bold ${
+              isPerfect ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-900 dark:text-white'
+            }`}
+          >
+            {earned}
+          </span>
+          <span className="ml-1.5 text-sm font-medium text-slate-500 dark:text-slate-400">/ {max} pts</span>
+        </p>
+      </div>
+    </div>
+  );
+}
 
 // Fisher-Yates shuffle algorithm for proper randomization
 const shuffleArray = <T,>(array: T[]): T[] => {
@@ -193,12 +353,9 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
   const [showUploadSection, setShowUploadSection] = useState<boolean>(false);
   const [shuffledOptions, setShuffledOptions] = useState<Record<number, Question['rightItems']>>({});
-  const [previewFile, setPreviewFile] = useState<PreviewFile | null>(null);
+  const [previewModalFile, setPreviewModalFile] = useState<NormalizedFile | null>(null);
   const [hasAutoSubmitted, setHasAutoSubmitted] = useState<boolean>(false);
   const handleSubmitRef = useRef<(() => Promise<void>) | null>(null);
-  
-  // Course-level grade data (student header badge)
-  const [studentCourseGrade, setStudentCourseGrade] = useState<number | null>(null); // For students
 
   // Teacher analytics state
   const [submissionStats, setSubmissionStats] = useState<SubmissionStats>({
@@ -492,19 +649,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
               hasSubmission = true;
               setSubmission(submissionRes.data);
               if (submissionRes.data?.answers) {
-                // Parse answers back to proper format
-                const parsedAnswers: Record<string, string | Record<number, string>> = {};
-                Object.keys(submissionRes.data.answers).forEach(questionIndex => {
-                  const answer = submissionRes.data.answers[questionIndex];
-                  try {
-                    // Try to parse as JSON for matching questions
-                    parsedAnswers[questionIndex] = JSON.parse(answer);
-                  } catch (e) {
-                    // If parsing fails, it's a regular string answer
-                    parsedAnswers[questionIndex] = answer;
-                  }
-                });
-                setAnswers(parsedAnswers);
+                setAnswers(parseSubmissionAnswers(submissionRes.data.answers, assignmentData.questions));
               }
             }
           } catch (err) {
@@ -563,16 +708,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
             const first = submissionList[0] || null;
             setSubmission(first);
             if (first?.answers) {
-              const parsedAnswers: Record<string, string | Record<number, string>> = {};
-              Object.keys(first.answers).forEach((questionIndex) => {
-                const answer = first.answers[questionIndex];
-                try {
-                  parsedAnswers[questionIndex] = JSON.parse(answer);
-                } catch {
-                  parsedAnswers[questionIndex] = answer;
-                }
-              });
-              setAnswers(parsedAnswers);
+              setAnswers(parseSubmissionAnswers(first.answers, assignmentData.questions));
             }
           } catch (err) {
             setSubmission(null);
@@ -601,43 +737,13 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
     }
   }, [assignment, isInstructor, studentPreviewMode]);
 
-  // Fetch course-level grade data
-  useEffect(() => {
-    const fetchCourseGradeData = async () => {
-      if (!courseId) {
-        return;
-      }
-      
-      if (!user) {
-        return;
-      }
-
-      try {
-        if (isStudent) {
-          // Fetch student's overall course grade
-          try {
-            const response = await api.get(`/grades/student/course/${courseId}`);
-            if (response.data && response.data.totalPercent !== null && response.data.totalPercent !== undefined) {
-              setStudentCourseGrade(response.data.totalPercent);
-            }
-          } catch (err: any) {
-            // Error fetching student course grade
-          }
-        }
-      } catch (err) {
-        logger.error('Error fetching course grade data', err instanceof Error ? err : new Error(String(err)));
-      }
-    };
-
-    fetchCourseGradeData();
-  }, [courseId, user, isStudent]);
-
   useEffect(() => {
     if (!courseId) return;
-    fetchCourseLifecycle(courseId)
+    fetchCourseLifecycleStatus(courseId)
       .then((res) => {
-        const status = res?.data?.lifecycle?.status ?? res?.lifecycle?.status;
-        if (status === 'FINALIZED') setCourseFinalized(true);
+        const status = res?.data?.status;
+        const finalized = res?.data?.finalized === true || status === 'FINALIZED';
+        setCourseFinalized(finalized);
       })
       .catch(() => {});
   }, [courseId]);
@@ -984,6 +1090,8 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
       (Boolean(assignment.allowStudentUploads) &&
         !assignment.isGradedQuiz &&
         assignment.group !== 'Quizzes'));
+  const assignmentGradeScore =
+    isStudent && submission ? getAssignmentGradeScore(submission, assignment) : null;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -996,40 +1104,46 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
             ariaLabel="Go back"
           />
           <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100 truncate px-2 flex-1 text-center">{assignment.title}</h1>
-          {/* Grade badge - mobile - student course grade only */}
-          {isStudent && studentCourseGrade !== null && (
-            <div className="px-2 py-1 bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-full">
-              <span className="text-xs font-semibold text-green-800 dark:text-green-200">
-                {studentCourseGrade.toFixed(2)}%
-              </span>
-            </div>
+          {isStudent && assignmentGradeScore && (
+            <AssignmentGradeBadge score={assignmentGradeScore} compact />
           )}
-          <div className="w-10"></div> {/* Spacer for centering */}
+          <div className="w-10 flex-shrink-0" aria-hidden />
         </div>
       </nav>
 
       <div className="w-full px-2 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8 pt-16 lg:pt-4 max-w-full overflow-x-hidden">
-        <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 shadow rounded-lg p-2 sm:p-4 lg:p-6 max-w-full overflow-hidden">
-          <div className="flex flex-col sm:flex-row justify-between items-start gap-4 max-w-full">
+        <div className="bg-white dark:bg-gray-800 shadow-sm ring-1 ring-slate-200/80 dark:ring-slate-700/80 rounded-xl p-4 sm:p-6 max-w-full overflow-hidden">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between max-w-full">
             <div className="flex-1 min-w-0 w-full max-w-full">
-              <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="hidden lg:block text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 dark:text-gray-100 break-words">{assignment.title}</h1>
-                {isStudent && studentCourseGrade !== null && (
-                  <div className="px-3 py-1 bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-full">
-                    <span className="text-xs sm:text-sm font-semibold text-green-800 dark:text-green-200">
-                      Grade: {studentCourseGrade.toFixed(2)}%
+              <div className="flex flex-col gap-4 border-b border-slate-200/80 pb-5 dark:border-slate-700/80 sm:flex-row sm:items-start sm:justify-between sm:border-b-0 sm:pb-0">
+                <div className="min-w-0 flex-1">
+                  <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white break-words sm:text-3xl">
+                    {assignment.title}
+                  </h1>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100/90 px-2.5 py-1.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200/80 dark:bg-slate-800/80 dark:text-slate-300 dark:ring-slate-700/80">
+                      <Calendar className="h-3.5 w-3.5 shrink-0 text-slate-400 dark:text-slate-500" aria-hidden />
+                      <span>Due {safeFormatDate(assignment.dueDate, 'MMM d, yyyy, h:mm a')}</span>
                     </span>
+                    {activeSubmission && (
+                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-800/60">
+                        <Clock className="h-3.5 w-3.5 shrink-0 text-emerald-500 dark:text-emerald-400" aria-hidden />
+                        <span>Submitted {safeFormatDate(activeSubmission.submittedAt, 'MMM d, yyyy, h:mm a')}</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {isStudent && assignmentGradeScore && (
+                  <div className="hidden sm:block">
+                    <AssignmentGradeBadge score={assignmentGradeScore} />
                   </div>
                 )}
               </div>
-              {/* Show assignment title on mobile/tablet (hidden on desktop where it's in the flex above) */}
-              <h1 className="lg:hidden text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 dark:text-gray-100 break-words mt-2">{assignment.title}</h1>
-            <p className="mt-1 text-xs sm:text-sm text-gray-500 dark:text-gray-400 dark:text-gray-400">
-              <span className="block sm:inline">Due: {safeFormatDate(assignment.dueDate, 'MMM d, yyyy, h:mm a')}</span>
-              {activeSubmission && (
-                <span className="block sm:inline sm:ml-4 mt-1 sm:mt-0 text-green-600 dark:text-green-400 dark:text-green-400">Submitted: {safeFormatDate(activeSubmission.submittedAt, 'MMM d, yyyy, h:mm a')}</span>
+              {isStudent && assignmentGradeScore && (
+                <div className="mt-4 sm:hidden">
+                  <AssignmentGradeBadge score={assignmentGradeScore} />
+                </div>
               )}
-            </p>
             {/* Show feedback if student and feedback exists */}
             {isStudent && submission && typeof submission.feedback === 'string' && submission.feedback.trim() !== '' && (
               <div className="mt-4 bg-gradient-to-r from-yellow-50 to-yellow-50/50 dark:from-yellow-900/30 dark:to-yellow-900/10 border-l-4 border-yellow-400 dark:border-yellow-500 shadow-sm sm:shadow-md rounded-lg p-3 sm:p-4 overflow-hidden max-w-full transition-all duration-200">
@@ -1069,7 +1183,8 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                         </div>
                         <div className="flex items-center space-x-3 sm:ml-2 flex-shrink-0 self-start sm:self-center pl-11 sm:pl-0">
                           <button
-                            onClick={() => setPreviewFile({ url: fileUrl, name: fileName })}
+                            type="button"
+                            onClick={() => setPreviewModalFile(toPreviewFile(file))}
                             className="flex items-center space-x-1.5 px-3 py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors duration-200 flex-shrink-0 active:scale-95"
                             title="Preview file"
                           >
@@ -1158,7 +1273,8 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                         </div>
                         <div className="flex items-center space-x-3 sm:ml-2 flex-shrink-0 self-start sm:self-center pl-11 sm:pl-0">
                           <button
-                            onClick={() => setPreviewFile({ url: fileUrl, name: fileName })}
+                            type="button"
+                            onClick={() => setPreviewModalFile(toPreviewFile(file))}
                             className="flex items-center space-x-1.5 px-3 py-2 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 flex-shrink-0 active:scale-95"
                             title="Preview file"
                           >
@@ -1180,20 +1296,6 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                     );
                   })}
                 </div>
-                
-                {/* File Preview Modal for submitted files */}
-                {previewFile && previewFile.url && (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-sm" onClick={() => setPreviewFile(null)}>
-                    <div className="relative max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-auto rounded-lg shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                      <FilePreview
-                        fileUrl={previewFile.url || ''}
-                        fileName={previewFile.name || ''}
-                        onClose={() => setPreviewFile(null)}
-                        showCloseButton={true}
-                      />
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
@@ -1236,11 +1338,11 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
           <div className="mt-6">
             <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Attachments</h3>
             <FileAttachmentChips
-              files={
-                (assignment as { attachmentFiles?: Array<string | Record<string, unknown>> }).attachmentFiles ||
-                assignment.attachments ||
-                assignment.fileAssets
-              }
+              attachmentSources={{
+                attachmentFiles: assignment.attachmentFiles,
+                attachments: assignment.attachments,
+                fileAssets: assignment.fileAssets,
+              }}
               className="mt-2"
             />
           </div>
@@ -1575,6 +1677,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
             !showStudentExperience ||
             !activeSubmission ||
             effectivePastDue ||
+            (isStudent && !!activeSubmission) ||
             (activeSubmission?.showCorrectAnswers || assignment.showCorrectAnswers ||
               activeSubmission?.showStudentAnswers || assignment.showStudentAnswers);
 
@@ -1645,9 +1748,8 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                               {activeSubmission && isStudent ? (
                                 <div className="p-4 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md">
                                   <p className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
-                                    {typeof answers[currentQuestion] === 'string' && answers[currentQuestion] 
-                                      ? answers[currentQuestion] 
-                                      : 'No answer provided'}
+                                    {formatTextAnswer(getAnswerForQuestion(answers, currentQuestion)) ||
+                                      'No answer provided'}
                                   </p>
                                 </div>
                               ) : (
@@ -1655,7 +1757,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                   id={`question-${currentQuestion}-answer`}
                                   name={`question-${currentQuestion}-answer`}
                                   className="w-full min-h-[120px] sm:min-h-[128px] p-3 sm:p-4 border-2 border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 resize-y text-sm sm:text-base"
-                                  value={typeof answers[currentQuestion] === 'string' ? answers[currentQuestion] : ''}
+                                  value={formatTextAnswer(getAnswerForQuestion(answers, currentQuestion))}
                                   onChange={(e) => handleAnswerChange(currentQuestion, e.target.value)}
                                   placeholder="Enter your answer here..."
                                   rows={5}
@@ -2332,21 +2434,30 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                             </div>
                           )}
                           
-                          {question.type === 'text' && (
+                          {isTextLikeQuestion(question) && (
                             <div className="mt-4">
                               <label htmlFor={`question-${index}-answer`} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                 Your Answer:
                               </label>
-                              <textarea
-                                id={`question-${index}-answer`}
-                                name={`question-${index}-answer`}
-                                className="w-full min-h-[120px] sm:min-h-[128px] p-3 sm:p-4 border-2 border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 resize-y text-sm sm:text-base"
-                                value={typeof answers[index] === 'string' ? answers[index] : ''}
-                                onChange={(e) => !activeSubmission && showStudentExperience && handleAnswerChange(index, e.target.value)}
-                                placeholder={showStudentExperience ? "Enter your answer here..." : "Student's answer will appear here"}
-                                disabled={!!activeSubmission || !canInteractAsStudent}
-                                rows={5}
-                              />
+                              {activeSubmission && isStudent ? (
+                                <div className="p-4 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md">
+                                  <p className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
+                                    {formatTextAnswer(getAnswerForQuestion(answers, index)) ||
+                                      'No answer provided'}
+                                  </p>
+                                </div>
+                              ) : (
+                                <textarea
+                                  id={`question-${index}-answer`}
+                                  name={`question-${index}-answer`}
+                                  className="w-full min-h-[120px] sm:min-h-[128px] p-3 sm:p-4 border-2 border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 resize-y text-sm sm:text-base"
+                                  value={formatTextAnswer(getAnswerForQuestion(answers, index))}
+                                  onChange={(e) => !activeSubmission && showStudentExperience && handleAnswerChange(index, e.target.value)}
+                                  placeholder={showStudentExperience ? "Enter your answer here..." : "Student's answer will appear here"}
+                                  disabled={!!activeSubmission || !canInteractAsStudent}
+                                  rows={5}
+                                />
+                              )}
                             </div>
                           )}
                           
@@ -2607,6 +2718,12 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
 
         </div>
       </div>
+
+      <FilePreviewModal
+        file={previewModalFile}
+        open={!!previewModalFile}
+        onClose={() => setPreviewModalFile(null)}
+      />
 
       {/* Delete Assignment Confirmation Modal */}
       <ConfirmationModal

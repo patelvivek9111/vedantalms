@@ -4,12 +4,12 @@ const FileAsset = require('../models/fileAsset.model');
 const PreviewManifest = require('../models/previewManifest.model');
 const academicAuditService = require('./academicAudit.service');
 const { readStoredContent } = require('./fileStorage.service');
-const { paths, isPathInside } = require('../config/paths');
+const previewStorage = require('./previewStorage.service');
 
-const PREVIEW_DIR = path.join(paths.uploads, '_previews');
+const PREVIEW_DIR = previewStorage.PREVIEW_DIR;
 
 function ensurePreviewDir() {
-  if (!fs.existsSync(PREVIEW_DIR)) fs.mkdirSync(PREVIEW_DIR, { recursive: true });
+  previewStorage.ensurePreviewDir();
 }
 
 function detectPreviewKind(mime, name) {
@@ -70,18 +70,8 @@ async function extractOfficeMetadata(buf, ext) {
 
 const MAX_PREVIEW_REGEN = 5;
 
-function invalidatePreviewCache(fileAssetId) {
-  const prefix = String(fileAssetId);
-  if (!fs.existsSync(PREVIEW_DIR)) return;
-  for (const name of fs.readdirSync(PREVIEW_DIR)) {
-    if (name.startsWith(prefix)) {
-      try {
-        fs.unlinkSync(path.join(PREVIEW_DIR, name));
-      } catch {
-        /* ignore */
-      }
-    }
-  }
+async function invalidatePreviewCache(fileAssetId) {
+  return previewStorage.invalidatePreviewCache(fileAssetId);
 }
 
 function tryVideoPosterFrame(buf, assetId, ext) {
@@ -125,7 +115,7 @@ async function processPreviewJob(fileAssetId, options = {}) {
 
   const existing = await PreviewManifest.findOne({ fileAssetId });
   const regenAttempts = (existing?.previewRegenerationAttempts || 0) + (options.regenerate ? 1 : 0);
-  if (options.regenerate) invalidatePreviewCache(fileAssetId);
+  if (options.regenerate) await invalidatePreviewCache(fileAssetId);
   if (regenAttempts > MAX_PREVIEW_REGEN) {
     await upsertManifest(fileAssetId, {
       status: 'failed',
@@ -156,46 +146,77 @@ async function processPreviewJob(fileAssetId, options = {}) {
     }
 
     if (kind === 'image') {
-      const thumbPath = path.join(PREVIEW_DIR, `${asset._id}-thumb.bin`);
-      fs.writeFileSync(thumbPath, buf);
-      out.previews.thumbnail = thumbPath;
-      out.previews.optimized = thumbPath;
+      const thumbRef = await previewStorage.storePreviewArtifact({
+        assetId: asset._id,
+        suffix: 'thumb',
+        buffer: buf,
+        resourceType: 'image',
+      });
+      out.previews.thumbnail = thumbRef;
+      out.previews.optimized = thumbRef;
     } else if (kind === 'pdf') {
-      const pdfCopy = path.join(PREVIEW_DIR, `${asset._id}.pdf`);
-      fs.writeFileSync(pdfCopy, buf);
-      out.previews.pdf = pdfCopy;
+      const pdfRef = await previewStorage.storePreviewArtifact({
+        assetId: asset._id,
+        suffix: 'preview',
+        buffer: buf,
+        resourceType: 'raw',
+      });
+      out.previews.pdf = pdfRef;
       const thumbBuf = tryGeneratePdfThumbnail(buf, asset._id);
       if (thumbBuf) {
-        const thumbPath = path.join(PREVIEW_DIR, `${asset._id}-pdf-thumb.png`);
-        fs.writeFileSync(thumbPath, thumbBuf);
-        out.previews.thumbnail = thumbPath;
+        const thumbRef = await previewStorage.storePreviewArtifact({
+          assetId: asset._id,
+          suffix: 'pdf-thumb',
+          buffer: thumbBuf,
+          resourceType: 'image',
+        });
+        out.previews.thumbnail = thumbRef;
       } else {
-        out.previews.thumbnail = pdfCopy;
+        out.previews.thumbnail = pdfRef;
       }
     } else if (kind === 'video') {
       const ext = path.extname(asset.originalName || '') || '.mp4';
       const posterPath = tryVideoPosterFrame(buf, asset._id, ext);
       if (posterPath) {
-        out.previews.poster = posterPath;
-        out.previews.thumbnail = posterPath;
+        const posterBuf = fs.readFileSync(posterPath);
+        const posterRef = await previewStorage.storePreviewArtifact({
+          assetId: asset._id,
+          suffix: 'poster',
+          buffer: posterBuf,
+          resourceType: 'image',
+        });
+        out.previews.poster = posterRef;
+        out.previews.thumbnail = posterRef;
+        if (!previewStorage.useCloudPreviewStorage()) {
+          try {
+            fs.unlinkSync(posterPath);
+          } catch {
+            /* ignore */
+          }
+        }
       } else {
-        const posterMetaPath = path.join(PREVIEW_DIR, `${asset._id}-video-meta.json`);
-        const durationSec = Math.max(1, Math.round(buf.length / 50000));
-        fs.writeFileSync(
-          posterMetaPath,
-          JSON.stringify({ durationSec, posterAvailable: false, note: 'metadata_only' })
-        );
-        out.previews.poster = posterMetaPath;
+        const posterMetaRef = await previewStorage.storePreviewJson({
+          assetId: asset._id,
+          suffix: 'video-meta',
+          data: { durationSec: Math.max(1, Math.round(buf.length / 50000)), posterAvailable: false, note: 'metadata_only' },
+        });
+        out.previews.poster = posterMetaRef;
       }
     } else if (kind === 'audio') {
       waveformMetadata = { durationSec: Math.max(1, Math.round(buf.length / 16000)), sampleCount: 64 };
-      const wavePath = path.join(PREVIEW_DIR, `${asset._id}-waveform.json`);
-      fs.writeFileSync(wavePath, JSON.stringify(waveformMetadata));
-      out.previews.waveform = wavePath;
+      const waveRef = await previewStorage.storePreviewJson({
+        assetId: asset._id,
+        suffix: 'waveform',
+        data: waveformMetadata,
+      });
+      out.previews.waveform = waveRef;
     } else if (kind === 'text') {
-      const textPath = path.join(PREVIEW_DIR, `${asset._id}-preview.txt`);
-      fs.writeFileSync(textPath, buf.slice(0, 100000).toString('utf8'));
-      out.previews.text = textPath;
+      const textRef = await previewStorage.storePreviewText({
+        assetId: asset._id,
+        suffix: 'preview',
+        text: buf.slice(0, 100000).toString('utf8'),
+      });
+      out.previews.text = textRef;
     } else if (kind === 'office') {
       const ext = path.extname(asset.originalName || '').toLowerCase();
       if (clientDocx) {
@@ -203,9 +224,12 @@ async function processPreviewJob(fileAssetId, options = {}) {
       } else {
         officeMetadata = await extractOfficeMetadata(buf, ext);
         if (ext === '.pptx' || ext === '.xlsx') {
-          const textPath = path.join(PREVIEW_DIR, `${asset._id}-office.txt`);
-          fs.writeFileSync(textPath, `[${ext} metadata preview]`.slice(0, 50000));
-          out.previews.text = textPath;
+          const textRef = await previewStorage.storePreviewText({
+            assetId: asset._id,
+            suffix: 'office',
+            text: `[${ext} metadata preview]`.slice(0, 50000),
+          });
+          out.previews.text = textRef;
         } else {
           out.status = 'unsupported';
         }
@@ -272,12 +296,12 @@ async function getPreviewManifest(fileAssetId) {
 }
 
 function resolveSecurePreviewPath(manifest, kind = 'thumbnail') {
-  if (!manifest) return null;
-  const p = kind === 'pdf' ? manifest.previewPath : manifest.thumbnailPath || manifest.previewPath;
-  if (!p || !fs.existsSync(p)) return null;
-  const resolved = path.resolve(p);
-  if (!isPathInside(paths.uploads, resolved)) return null;
-  return p;
+  const ref = previewStorage.resolveSecurePreviewRef(manifest, kind);
+  return ref?.type === 'local' ? ref.path : null;
+}
+
+function resolveSecurePreviewRef(manifest, kind = 'thumbnail') {
+  return previewStorage.resolveSecurePreviewRef(manifest, kind);
 }
 
 function queuePreviewGeneration(fileAssetId, user) {
@@ -294,6 +318,7 @@ module.exports = {
   processPreviewJob,
   getPreviewManifest,
   resolveSecurePreviewPath,
+  resolveSecurePreviewRef,
   queuePreviewGeneration,
   queuePreviewRegeneration,
   detectPreviewKind,

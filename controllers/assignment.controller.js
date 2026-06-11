@@ -248,7 +248,15 @@ exports.getAssignment = async (req, res) => {
     }
     payload.attachments = fileAssetService.enrichLegacyFileUrls(payload.attachments, req.user._id);
     const FileAsset = require('../models/fileAsset.model');
-    const ids = (payload.fileAssets || []).map((id) => String(id));
+    const idsFromAssets = (payload.fileAssets || []).map((id) => String(id));
+    const idsFromUrls = (payload.attachments || [])
+      .filter((url) => typeof url === 'string')
+      .map((url) => {
+        const match = url.match(/\/api\/files\/([a-f0-9]{24})\//i);
+        return match ? match[1] : null;
+      })
+      .filter(Boolean);
+    const ids = [...new Set([...idsFromAssets, ...idsFromUrls])];
     if (ids.length) {
       const assets = await FileAsset.find({ _id: { $in: ids }, isDeleted: { $ne: true } }).lean();
       const byId = new Map(assets.map((a) => [String(a._id), a]));
@@ -261,7 +269,54 @@ exports.getAssignment = async (req, res) => {
     }
     res.json(payload);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(error.statusCode || 500).json({
+      message: error.message,
+      code: error.code,
+      details: error.details,
+    });
+  }
+};
+
+// Lightweight metadata for dashboard widgets (e.g. To Do assessment updates)
+exports.getAssignmentMetadataBulk = async (req, res) => {
+  try {
+    const rawIds = req.query.ids;
+    const ids = (Array.isArray(rawIds) ? rawIds : String(rawIds || '').split(','))
+      .map((id) => String(id).trim())
+      .filter(Boolean)
+      .slice(0, 50);
+
+    const data = {};
+
+    await Promise.all(
+      ids.map(async (id) => {
+        try {
+          const assignment = await Assignment.findById(id).select(
+            'totalPoints title published module groupSet isGroupAssignment availableFrom'
+          );
+
+          if (!assignment) {
+            data[id] = { totalPoints: null };
+            return;
+          }
+
+          await assignmentAccess.assertStudentCanViewAssignment(req.user, assignment);
+          data[id] = {
+            totalPoints: typeof assignment.totalPoints === 'number' ? assignment.totalPoints : null,
+            title: assignment.title || null,
+          };
+        } catch {
+          data[id] = { totalPoints: null };
+        }
+      })
+    );
+
+    res.json({ success: true, data });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      message: error.message,
+      code: error.code,
+    });
   }
 };
 

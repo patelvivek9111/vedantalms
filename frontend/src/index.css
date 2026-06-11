@@ -439,6 +439,11 @@ input[type="datetime-local"]::-webkit-outer-spin-button {
     -webkit-overflow-scrolling: touch;
     overflow-scrolling: touch;
   }
+
+  #main-content {
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 /* Prevent zoom on input focus for iOS (skip .compact-control — toolbar fields sized to match tabs) */

@@ -60,6 +60,77 @@ export async function refreshDownloadToken(fileAssetId: string) {
   return res.data?.data as { token: string; downloadUrl: string; expiresAt: string };
 }
 
+type CachedDownloadToken = {
+  token: string;
+  downloadUrl: string;
+  expiresAtMs: number;
+};
+
+const downloadTokenCache = new Map<string, CachedDownloadToken>();
+const pendingTokenRequests = new Map<string, Promise<{ token: string; downloadUrl: string; expiresAt: string } | null>>();
+const TOKEN_REFRESH_BUFFER_MS = 60_000;
+
+function downloadTokenCacheKey(fileAssetId: string): string {
+  const userKey = localStorage.getItem('token')?.slice(-16) || 'anon';
+  return `${userKey}:${fileAssetId}`;
+}
+
+/** Reuse a cached download token when still valid to cut preview API load. */
+export async function getDownloadToken(
+  fileAssetId: string
+): Promise<{ token: string; downloadUrl: string; expiresAt: string } | null> {
+  const key = downloadTokenCacheKey(fileAssetId);
+  const cached = downloadTokenCache.get(key);
+  const now = Date.now();
+  if (cached && cached.expiresAtMs - TOKEN_REFRESH_BUFFER_MS > now) {
+    return {
+      token: cached.token,
+      downloadUrl: cached.downloadUrl,
+      expiresAt: new Date(cached.expiresAtMs).toISOString(),
+    };
+  }
+
+  const pending = pendingTokenRequests.get(key);
+  if (pending) return pending;
+
+  const request = (async () => {
+    try {
+      const refreshed = await refreshDownloadToken(fileAssetId);
+      if (refreshed?.token) {
+        const expiresAtMs = refreshed.expiresAt
+          ? new Date(refreshed.expiresAt).getTime()
+          : now + 55 * 60 * 1000;
+        if (Number.isFinite(expiresAtMs)) {
+          downloadTokenCache.set(key, {
+            token: refreshed.token,
+            downloadUrl: refreshed.downloadUrl,
+            expiresAtMs,
+          });
+        }
+      }
+      return refreshed ?? null;
+    } catch {
+      return null;
+    } finally {
+      pendingTokenRequests.delete(key);
+    }
+  })();
+
+  pendingTokenRequests.set(key, request);
+  return request;
+}
+
+export function clearDownloadTokenCache(): void {
+  downloadTokenCache.clear();
+  pendingTokenRequests.clear();
+}
+
+/** Follow CDN/storage redirects without leaking LMS auth headers. */
+async function fetchRedirectTarget(location: string): Promise<Response> {
+  const url = location.startsWith('http') ? location : resolveSecureFileUrl(location);
+  return fetch(url);
+}
+
 /** Fetch a protected file path with Bearer auth (+ optional download token). */
 export async function fetchAuthenticatedFile(
   fileAssetId: string,
@@ -68,7 +139,7 @@ export async function fetchAuthenticatedFile(
   const suffix = resourcePath.replace(/^\//, '');
   let path = `/api/files/${fileAssetId}/${suffix}`;
   try {
-    const refreshed = await refreshDownloadToken(fileAssetId);
+    const refreshed = await getDownloadToken(fileAssetId);
     if (refreshed?.token) {
       path += `${path.includes('?') ? '&' : '?'}token=${encodeURIComponent(refreshed.token)}`;
     }
@@ -77,9 +148,20 @@ export async function fetchAuthenticatedFile(
   }
   const target = resolveSecureFileUrl(path);
   const authToken = localStorage.getItem('token');
-  return fetch(target, {
+  const res = await fetch(target, {
     headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+    redirect: 'manual',
   });
+
+  // Stream/download endpoints may 302 to Cloudinary — fetch signed URL without Authorization.
+  if (res.status >= 300 && res.status < 400) {
+    const location = res.headers.get('Location');
+    if (location) {
+      return fetchRedirectTarget(location);
+    }
+  }
+
+  return res;
 }
 
 export async function fetchAuthenticatedFileBlob(

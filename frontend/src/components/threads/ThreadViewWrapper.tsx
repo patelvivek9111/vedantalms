@@ -137,7 +137,7 @@ const ThreadViewWrapper: React.FC = () => {
         />
 
         <div
-          className={`w-full flex-1 overflow-auto print:pt-0 ${isMobileMenuOpen && isMobileDevice ? 'overflow-hidden lg:overflow-auto' : ''}`}
+          className={`w-full flex-1 overflow-visible print:pt-0 lg:overflow-auto ${isMobileMenuOpen && isMobileDevice ? 'overflow-hidden lg:overflow-auto' : ''}`}
         >
           <div className="container mx-auto px-4 pb-6 pt-2 print:px-0 print:py-0 lg:pt-3">
             <div className="mb-3 lg:hidden">

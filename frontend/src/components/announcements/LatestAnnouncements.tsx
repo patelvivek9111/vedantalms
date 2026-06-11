@@ -158,26 +158,26 @@ const LatestAnnouncements: React.FC<LatestAnnouncementsProps> = ({
 
   return (
     <>
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg p-4 sm:p-6 border border-gray-100 dark:border-gray-700">
-        <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
-          <div className="p-1.5 sm:p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg">
-            <MessageSquare className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+      <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-gray-200/70 dark:bg-gray-900 dark:ring-gray-700/60">
+        <div className="flex items-center gap-2 border-b border-gray-100 px-4 py-4 dark:border-gray-800 sm:gap-3 sm:px-6 sm:py-5">
+          <div className="rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 p-2">
+            <MessageSquare className="h-5 w-5 text-white sm:h-6 sm:w-6" />
           </div>
           <div>
-            <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white sm:text-xl">
               Latest Announcements
             </h3>
-            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
               Stay updated with recent course announcements
             </p>
           </div>
         </div>
         
-        <div className="space-y-3 sm:space-y-4">
+        <div>
           {announcements.map((announcement, index) => (
             <div
               key={announcement._id}
-              className="group relative bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-xl p-4 sm:p-5 border border-gray-200 dark:border-gray-700 hover:shadow-lg hover:border-blue-200 dark:hover:border-blue-700 transition-all duration-200 cursor-pointer"
+              className="group cursor-pointer border-b border-gray-100 px-4 py-4 transition-colors last:border-b-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/60 sm:px-6 sm:py-5"
               onClick={() => handleAnnouncementClick(announcement)}
             >
               {/* Priority indicator for first announcement */}

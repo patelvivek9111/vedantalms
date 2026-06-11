@@ -1,41 +1,94 @@
-const SystemAuditEvent = require('../models/systemAuditEvent.model');
 const academicAuditService = require('./academicAudit.service');
+const { incrWithExpire, getRedisClient } = require('../utils/cache');
 
 const downloadCounts = new Map();
+const streamCounts = new Map();
 const WINDOW_MS = 60 * 1000;
+const WINDOW_SEC = 60;
 const DEFAULT_MAX_PER_WINDOW = parseInt(process.env.FILE_DOWNLOAD_RATE_LIMIT || '60', 10);
+const DEFAULT_STREAM_MAX_PER_WINDOW = parseInt(process.env.FILE_STREAM_RATE_LIMIT || '120', 10);
 
 function rateLimitKey(userId, fileAssetId) {
   return `${userId}:${fileAssetId}`;
+}
+
+function redisRateLimitKey(action, userId, fileAssetId) {
+  return `file:${action}:${userId}:${fileAssetId}`;
+}
+
+async function assertRateLimitInMap(counts, user, fileAssetId, maxPerWindow, action, audit = {}) {
+  if (!user?._id) return;
+
+  const redisKey = redisRateLimitKey(action, user._id, fileAssetId);
+  if (getRedisClient()) {
+    const count = await incrWithExpire(redisKey, WINDOW_SEC);
+    if (count !== null && count > maxPerWindow) {
+      await academicAuditService.recordAuditEvent({
+        actorId: user._id,
+        entityType: 'file_asset',
+        entityId: fileAssetId,
+        action,
+        severity: 'critical',
+        ip: audit.ip,
+        metadata: { count, windowMs: WINDOW_MS, maxPerWindow, backend: 'redis' },
+      }).catch(() => {});
+      const err = new Error('File access rate limit exceeded');
+      err.statusCode = 429;
+      throw err;
+    }
+    return;
+  }
+
+  const key = rateLimitKey(user._id, fileAssetId);
+  const now = Date.now();
+  let bucket = counts.get(key);
+  if (!bucket || now - bucket.start > WINDOW_MS) {
+    bucket = { start: now, count: 0 };
+    counts.set(key, bucket);
+  }
+  bucket.count += 1;
+  if (bucket.count > maxPerWindow) {
+    await academicAuditService.recordAuditEvent({
+      actorId: user._id,
+      entityType: 'file_asset',
+      entityId: fileAssetId,
+      action,
+      severity: 'critical',
+      ip: audit.ip,
+      metadata: { count: bucket.count, windowMs: WINDOW_MS, maxPerWindow, backend: 'memory' },
+    }).catch(() => {});
+    const err = new Error('File access rate limit exceeded');
+    err.statusCode = 429;
+    throw err;
+  }
 }
 
 /**
  * Per-user per-file download rate limit (U35F).
  */
 async function assertDownloadRateLimit(user, fileAssetId, audit = {}) {
-  if (!user?._id) return;
-  const key = rateLimitKey(user._id, fileAssetId);
-  const now = Date.now();
-  let bucket = downloadCounts.get(key);
-  if (!bucket || now - bucket.start > WINDOW_MS) {
-    bucket = { start: now, count: 0 };
-    downloadCounts.set(key, bucket);
-  }
-  bucket.count += 1;
-  if (bucket.count > DEFAULT_MAX_PER_WINDOW) {
-    await academicAuditService.recordAuditEvent({
-      actorId: user._id,
-      entityType: 'file_asset',
-      entityId: fileAssetId,
-      action: 'suspicious_mass_download',
-      severity: 'critical',
-      ip: audit.ip,
-      metadata: { count: bucket.count, windowMs: WINDOW_MS },
-    }).catch(() => {});
-    const err = new Error('Download rate limit exceeded');
-    err.statusCode = 429;
-    throw err;
-  }
+  return assertRateLimitInMap(
+    downloadCounts,
+    user,
+    fileAssetId,
+    DEFAULT_MAX_PER_WINDOW,
+    'suspicious_mass_download',
+    audit
+  );
+}
+
+/**
+ * Per-user per-file stream/preview rate limit (lighter cap than bulk download).
+ */
+async function assertStreamRateLimit(user, fileAssetId, audit = {}) {
+  return assertRateLimitInMap(
+    streamCounts,
+    user,
+    fileAssetId,
+    DEFAULT_STREAM_MAX_PER_WINDOW,
+    'suspicious_mass_stream',
+    audit
+  );
 }
 
 /**
@@ -97,6 +150,7 @@ function attachWatermarkMetadata(asset, user) {
 
 module.exports = {
   assertDownloadRateLimit,
+  assertStreamRateLimit,
   recordGeographicAccess,
   createExpiringShareLink,
   revokeTemporaryAccess,

@@ -3,12 +3,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useCourse } from '../contexts/CourseContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ToDoPanel } from '../components/common/ToDoPanel';
-import { MoreVertical, Megaphone, FileText, MessageSquare, Palette, BookOpen, File, Settings, Bell, Menu, Folder, HelpCircle, User as UserIcon, LogOut, CheckSquare, ClipboardList, ArrowLeft, Sun, Moon, GripVertical, Search, QrCode } from 'lucide-react';
-import api, { getUserPreferences, updateUserPreferences, getImageUrl, updateUserProfile, uploadProfilePicture, getLoginActivity } from '../services/api';
+import { MoreVertical, Megaphone, MessageSquare, Palette, BookOpen, File, Settings, Bell, Folder, GripVertical, Search, QrCode } from 'lucide-react';
+import api, { updateUserPreferences } from '../services/api';
 import NotificationCenter from '../components/common/NotificationCenter';
+import MobileTopNav from '../components/common/MobileTopNav';
+import { BurgerMenu } from '../components/layout/BurgerMenu';
 import { NavCustomizationModal, NavItem, ALL_NAV_OPTIONS, getDefaultNavItemIds } from '../components/layout/NavCustomizationModal';
-import { ChangeUserModal } from '../components/modals/ChangeUserModal';
-import { useTheme } from '../contexts/ThemeContext';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { CourseCardSkeleton } from '../components/common/SkeletonLoader';
 import PullToRefresh from '../components/common/PullToRefresh';
@@ -18,7 +18,8 @@ import ScanCourseQrModal from '../components/course/ScanCourseQrModal';
 import { extractJoinTokenFromQrText } from '../utils/joinCourseToken';
 import { toast } from 'react-toastify';
 import { useNotificationBadge } from '../hooks/notifications/useNotificationBadge';
-import { useUserPreferencesQuery } from '../hooks/useUserPreferencesQuery';
+import { useUserPreferencesQuery, userPreferencesQueryKey } from '../hooks/useUserPreferencesQuery';
+import { useQueryClient } from '@tanstack/react-query';
 
 // Earthy tone color palette
 const earthyColors = [
@@ -42,409 +43,19 @@ const availableIcons = [
   { id: 'discussions', name: 'Discussions', icon: MessageSquare, color: 'text-gray-600' }
 ];
 
-// Inline Section Components for Burger Menu
-function ProfileSectionInline() {
-  const { user, setUser } = useAuth() as any;
-  const [editMode, setEditMode] = useState(false);
-  const [firstName, setFirstName] = useState(user?.firstName || '');
-  const [lastName, setLastName] = useState(user?.lastName || '');
-  const [bio, setBio] = useState(user?.bio || '');
-  const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
+const BTN_PRIMARY =
+  'inline-flex h-10 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 text-[11px] font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 sm:text-xs lg:px-4 lg:text-sm';
+const BTN_SECONDARY =
+  'inline-flex h-10 items-center justify-center rounded-lg border border-gray-200 bg-white px-3 text-[11px] font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:text-xs lg:px-4 lg:text-sm';
+const SECTION_TITLE =
+  'text-xs font-semibold text-gray-900 dark:text-gray-100 lg:text-xl lg:font-semibold lg:text-gray-700 dark:lg:text-gray-300';
+const ITEM_CARD =
+  'overflow-hidden rounded-lg border border-gray-200/90 bg-white dark:border-gray-700 dark:bg-gray-800';
 
-  useEffect(() => {
-    setFirstName(user?.firstName || '');
-    setLastName(user?.lastName || '');
-    setBio(user?.bio || '');
-  }, [user]);
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      const res = await updateUserProfile({ firstName, lastName, bio });
-      if (res.data && res.data.user) {
-        setUser(res.data.user);
-      }
-      setEditMode(false);
-    } catch (err: any) {
-      alert('Failed to update profile');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleProfilePictureChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-    const file = e.target.files[0];
-    setUploading(true);
-    try {
-      const res = await uploadProfilePicture(file);
-      if (res.data && res.data.user) {
-        setUser(res.data.user);
-      }
-    } catch (err) {
-      alert('Failed to upload profile picture');
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <div className="relative">
-          {user?.profilePicture ? (
-            <img
-              src={user.profilePicture.startsWith('http') ? user.profilePicture : getImageUrl(user.profilePicture)}
-              alt="Profile"
-              className="w-16 h-16 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600"
-            />
-          ) : (
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-lg font-bold">
-              {user?.firstName?.charAt(0) || ''}{user?.lastName?.charAt(0) || 'U'}
-            </div>
-          )}
-          <label className="absolute bottom-0 right-0 bg-white dark:bg-gray-800 rounded-full p-1 shadow cursor-pointer border border-gray-300 dark:border-gray-600">
-            <input type="file" accept="image/*" className="hidden" onChange={handleProfilePictureChange} disabled={uploading} />
-            <span className="text-xs">{uploading ? '...' : '✏️'}</span>
-          </label>
-        </div>
-        <div>
-          <div className="font-semibold text-gray-900 dark:text-gray-100">{user?.firstName} {user?.lastName}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">{user?.email}</div>
-        </div>
-      </div>
-      {editMode ? (
-        <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="space-y-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">First Name</label>
-            <input type="text" className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-gray-800" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Last Name</label>
-            <input type="text" className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-gray-800" value={lastName} onChange={(e) => setLastName(e.target.value)} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Bio</label>
-            <textarea rows={3} className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-gray-800" value={bio} onChange={(e) => setBio(e.target.value)} />
-          </div>
-          <div className="flex gap-2">
-            <button type="button" onClick={() => setEditMode(false)} className="flex-1 px-3 py-2 bg-gray-200 dark:bg-gray-700 rounded text-sm">Cancel</button>
-            <button type="submit" disabled={saving} className="flex-1 px-3 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded text-sm">{saving ? 'Saving...' : 'Save'}</button>
-          </div>
-        </form>
-      ) : (
-        <div className="space-y-2 text-sm">
-          <div><span className="font-medium">Name:</span> {user?.firstName} {user?.lastName}</div>
-          <div><span className="font-medium">Email:</span> {user?.email}</div>
-          <div><span className="font-medium">Bio:</span> {user?.bio || '(not set)'}</div>
-          <button onClick={() => setEditMode(true)} className="w-full mt-3 px-3 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded text-sm">Edit Profile</button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function SettingsSectionInline() {
-  const { theme, setTheme } = useTheme();
-  const [prefs, setPrefs] = useState({ theme: 'light', showOnlineStatus: true });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-
-  useEffect(() => {
-    getUserPreferences().then(res => {
-      if (res.data && res.data.preferences) {
-        setPrefs({ 
-          theme: res.data.preferences.theme || 'light',
-          showOnlineStatus: res.data.preferences.showOnlineStatus !== undefined ? res.data.preferences.showOnlineStatus : true
-        });
-      }
-    });
-  }, []);
-
-  const handleThemeChange = async (newTheme: 'light' | 'dark') => {
-    const newPrefs = { ...prefs, theme: newTheme };
-    setPrefs(newPrefs);
-    setTheme(newTheme);
-    setSaving(true);
-    setError(null);
-    setSuccess(false);
-    try {
-      await updateUserPreferences(newPrefs);
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 2000);
-    } catch {
-      setError('Failed to save preferences');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleShowOnlineStatusChange = async (showOnlineStatus: boolean) => {
-    const newPrefs = { ...prefs, showOnlineStatus };
-    setPrefs(newPrefs);
-    setSaving(true);
-    setError(null);
-    setSuccess(false);
-    try {
-      await updateUserPreferences(newPrefs);
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 2000);
-    } catch {
-      setError('Failed to save preferences');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <div>
-        <h3 className="text-sm font-semibold mb-3 text-gray-900 dark:text-gray-100">Theme</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <button
-            type="button"
-            onClick={() => handleThemeChange('light')}
-            disabled={saving}
-            className={`relative p-4 rounded-lg border-2 transition-all ${
-              prefs.theme === 'light'
-                ? 'border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20'
-                : 'border-gray-200 dark:border-gray-700'
-            } ${saving ? 'opacity-50' : ''}`}
-          >
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-12 h-12 rounded-lg bg-white border-2 border-gray-200 shadow-sm flex items-center justify-center">
-                <Sun className="w-6 h-6 text-yellow-500" />
-              </div>
-            </div>
-            {prefs.theme === 'light' && (
-              <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
-                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={() => handleThemeChange('dark')}
-            disabled={saving}
-            className={`relative p-4 rounded-lg border-2 transition-all ${
-              prefs.theme === 'dark'
-                ? 'border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20'
-                : 'border-gray-200 dark:border-gray-700'
-            } ${saving ? 'opacity-50' : ''}`}
-          >
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-12 h-12 rounded-lg bg-gray-800 border-2 border-gray-700 shadow-sm flex items-center justify-center">
-                <Moon className="w-6 h-6 text-blue-300" />
-              </div>
-            </div>
-            {prefs.theme === 'dark' && (
-              <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
-                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-            )}
-          </button>
-        </div>
-        {error && <div className="text-red-600 dark:text-red-400 text-xs mt-2">{error}</div>}
-        {success && <div className="text-green-600 dark:text-green-400 text-xs mt-2">Theme saved!</div>}
-      </div>
-      
-      {/* Online Status Toggle */}
-      <div>
-        <h3 className="text-sm font-semibold mb-3 text-gray-900 dark:text-gray-100">Privacy</h3>
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-0.5">Show Online Status</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Allow others to see when you're online</div>
-            </div>
-            <button
-              type="button"
-              onClick={() => handleShowOnlineStatusChange(!prefs.showOnlineStatus)}
-              disabled={saving}
-              className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                prefs.showOnlineStatus ? 'bg-green-500 dark:bg-green-600' : 'bg-gray-300 dark:bg-gray-600'
-              } ${saving ? 'opacity-50 cursor-not-allowed' : ''}`}
-              role="switch"
-              aria-checked={prefs.showOnlineStatus}
-            >
-              <span
-                className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                  prefs.showOnlineStatus ? 'translate-x-5' : 'translate-x-0'
-                }`}
-              />
-            </button>
-          </div>
-        </div>
-        {error && <div className="text-red-600 dark:text-red-400 text-xs mt-2">{error}</div>}
-        {success && <div className="text-green-600 dark:text-green-400 text-xs mt-2">Preferences saved!</div>}
-      </div>
-    </div>
-  );
-}
-
-function NotificationsSectionInline() {
-  const [preferences, setPreferences] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-
-  useEffect(() => {
-    fetchPreferences();
-  }, []);
-
-  const fetchPreferences = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get('/notifications/preferences');
-      if (response.data.success) {
-        setPreferences(response.data.data);
-      }
-    } catch (err) {
-      setError('Failed to load notification preferences');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleToggle = async (category: string, key: string, value: boolean) => {
-    if (!preferences) return;
-    const updated = {
-      ...preferences,
-      [category]: { ...preferences[category], [key]: value }
-    };
-    setPreferences(updated);
-    try {
-      setSaving(true);
-      setError(null);
-      await api.put('/notifications/preferences', updated);
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
-    } catch (err) {
-      setError('Failed to save preferences');
-      setPreferences(preferences);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const categories = [
-    { key: 'academic', label: 'Academic Updates', types: ['grades', 'assignmentsDue', 'assignmentsGraded', 'submissions'] },
-    { key: 'communication', label: 'Communication', types: ['messages', 'announcements', 'discussions'] },
-    { key: 'administrative', label: 'Administrative', types: ['enrollments', 'system'] }
-  ];
-
-  if (loading) return <div className="text-sm text-gray-500">Loading...</div>;
-  if (!preferences) return <div className="text-sm text-red-500">Failed to load</div>;
-
-  return (
-    <div className="space-y-4">
-      {error && <div className="text-red-600 dark:text-red-400 text-xs bg-red-50 dark:bg-red-900/20 p-2 rounded">{error}</div>}
-      {success && <div className="text-green-600 dark:text-green-400 text-xs bg-green-50 dark:bg-green-900/20 p-2 rounded">Saved!</div>}
-      {categories.map((category) => {
-        const allEmailEnabled = category.types.every(key => preferences.email[key]);
-        const allInAppEnabled = category.types.every(key => preferences.inApp[key]);
-        const handleCategoryToggle = async (channel: 'email' | 'inApp', enabled: boolean) => {
-          const updated = {
-            ...preferences,
-            [channel]: { ...preferences[channel], ...category.types.reduce((acc, key) => { acc[key] = enabled; return acc; }, {} as any) }
-          };
-          setPreferences(updated);
-          try {
-            setSaving(true);
-            await api.put('/notifications/preferences', updated);
-            setSuccess(true);
-            setTimeout(() => setSuccess(false), 3000);
-          } catch (err) {
-            setError('Failed to save');
-            setPreferences(preferences);
-          } finally {
-            setSaving(false);
-          }
-        };
-        return (
-          <div key={category.key} className="border-b border-gray-200 dark:border-gray-700 pb-4 last:border-0 last:pb-0">
-            <div className="font-semibold text-sm mb-2">{category.label}</div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Email</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" checked={allEmailEnabled} onChange={(e) => handleCategoryToggle('email', e.target.checked)} className="sr-only peer" />
-                  <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-blue-600 dark:bg-gray-700 dark:peer-checked:bg-blue-500 after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
-                </label>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">In-App</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" checked={allInAppEnabled} onChange={(e) => handleCategoryToggle('inApp', e.target.checked)} className="sr-only peer" />
-                  <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-blue-600 dark:bg-gray-700 dark:peer-checked:bg-blue-500 after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
-                </label>
-              </div>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function ActivitySectionInline() {
-  const [activities, setActivities] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchActivities = async () => {
-      try {
-        setLoading(true);
-        const response = await getLoginActivity(1, 10, 30);
-        if (response.data && response.data.success) {
-          setActivities(response.data.data || []);
-        }
-      } catch (err) {
-        setError('Failed to load activities');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchActivities();
-  }, []);
-
-  if (loading) return <div className="text-sm text-gray-500">Loading...</div>;
-  if (error) return <div className="text-sm text-red-500">{error}</div>;
-  if (activities.length === 0) return <div className="text-sm text-gray-500">No recent activity</div>;
-
-  return (
-    <div className="space-y-3">
-      {activities.map((activity, index) => (
-        <div key={activity._id || index} className="border-b border-gray-200 dark:border-gray-700 pb-3 last:border-0">
-          <div className="flex justify-between items-start mb-1">
-            <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-              {new Date(activity.timestamp).toLocaleString()}
-            </div>
-            <span className={`text-xs px-2 py-1 rounded ${activity.success ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>
-              {activity.success ? 'Success' : 'Failed'}
-            </span>
-          </div>
-          <div className="text-xs text-gray-600 dark:text-gray-400">
-            <div>IP: {activity.ipAddress}</div>
-            <div>Device: {activity.userAgent?.substring(0, 50)}...</div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 export function Dashboard() {
   const courseContext = useCourse();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   
   // Safety check - ensure context is available
@@ -461,7 +72,8 @@ export function Dashboard() {
     );
   }
   
-  const { courses, loading, error, updateCourse, getCourses } = courseContext;
+  const { courses, loading, error, updateCourseDefaultColor, getCourses } = courseContext;
+  const queryClient = useQueryClient();
 
   // Refresh function for pull-to-refresh
   const handleRefresh = async () => {
@@ -471,12 +83,9 @@ export function Dashboard() {
   // Swipe navigation for bottom nav
   const { handleSwipeLeft, handleSwipeRight, enabled: swipeEnabled } = useBottomNavSwipe();
   
-  // State to track user's personal course colors (for students) or course default colors (for teachers)
-  const { data: userPreferences, isLoading: loadingPreferences } = useUserPreferencesQuery(Boolean(user?._id));
-  const [userCourseColors, setUserCourseColors] = useState<{ [key: string]: string }>({});
-  useEffect(() => {
-    setUserCourseColors(userPreferences?.courseColors || {});
-  }, [userPreferences]);
+  // User course color preferences (students only — sourced from React Query, not duplicated local state)
+  const { data: userPreferences } = useUserPreferencesQuery(Boolean(user?._id));
+  const userCourseColors = userPreferences?.courseColors ?? {};
   const [openColorPicker, setOpenColorPicker] = useState<string | null>(null);
   
   // State to track selected icons for each course (default to first 3)
@@ -493,8 +102,6 @@ export function Dashboard() {
   // Navigation customization state
   const [showNavCustomization, setShowNavCustomization] = useState(false);
   const [showBurgerMenu, setShowBurgerMenu] = useState(false);
-  const [burgerMenuSection, setBurgerMenuSection] = useState<string | null>(null); // 'profile' | 'settings' | 'notifications' | 'activity' | null
-  const [showChangeUserModal, setShowChangeUserModal] = useState(false);
   const [currentNavItems, setCurrentNavItems] = useState<NavItem[]>([]);
   const [showGrades, setShowGrades] = useState(() => {
     const saved = localStorage.getItem('showGrades');
@@ -526,21 +133,21 @@ export function Dashboard() {
       grade !== null && grade !== undefined && typeof grade === 'number' && !isNaN(grade);
 
     return (
-      <div className="absolute top-3 left-3 z-10">
+      <div className="absolute left-2 top-2 z-10 lg:left-3 lg:top-3">
         {loadingGrades[courseId] || !gradeLoaded ? (
-          <div className="rounded bg-white/90 px-1.5 py-0.5 text-[11px] font-medium text-gray-500 backdrop-blur-sm dark:bg-gray-900/90 dark:text-gray-400">
+          <div className="rounded-md bg-white/90 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 backdrop-blur-sm dark:bg-gray-900/90 dark:text-gray-400 lg:text-[11px]">
             …
           </div>
         ) : hasGrade ? (
           <div
-            className="rounded bg-white/90 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-gray-900 shadow-sm backdrop-blur-sm dark:bg-gray-900/90 dark:text-gray-100"
+            className="rounded-md bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-gray-900 shadow-sm backdrop-blur-sm dark:bg-gray-900/90 dark:text-gray-100 lg:text-[11px]"
             title={!isTeacherOrAdmin && gradeEntry?.letter ? gradeEntry.letter : undefined}
           >
             {grade!.toFixed(2)}%
           </div>
         ) : (
           <div
-            className="rounded bg-white/90 px-1.5 py-0.5 text-[11px] font-medium text-gray-500 shadow-sm backdrop-blur-sm dark:bg-gray-900/90 dark:text-gray-400"
+            className="rounded-md bg-white/90 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 shadow-sm backdrop-blur-sm dark:bg-gray-900/90 dark:text-gray-400 lg:text-[11px]"
             title={
               isTeacherOrAdmin
                 ? 'No student grades recorded yet for this course'
@@ -849,22 +456,34 @@ export function Dashboard() {
   const handleColorChange = async (courseId: string, color: string) => {
     try {
       if (isTeacherOrAdmin) {
-        // Teacher/Admin: Update course's defaultColor
-        await updateCourse(courseId, undefined, undefined, undefined, color);
-        // Refresh courses to get updated defaultColor
-        await getCourses();
+        await updateCourseDefaultColor(courseId, color);
       } else {
-        // Student: Update user's personal course color preference
-    const newColors = {
+        const newColors = {
           ...userCourseColors,
-      [courseId]: color
-    };
-        setUserCourseColors(newColors);
-        await updateUserPreferences({ courseColors: newColors });
+          [courseId]: color,
+        };
+
+        queryClient.setQueryData(userPreferencesQueryKey, (old: Record<string, unknown> | undefined) => ({
+          ...(old ?? {}),
+          courseColors: newColors,
+        }));
+
+        const response = await updateUserPreferences({ courseColors: newColors });
+        const savedColors = response.data?.preferences?.courseColors;
+        if (savedColors) {
+          queryClient.setQueryData(userPreferencesQueryKey, (old: Record<string, unknown> | undefined) => ({
+            ...(old ?? {}),
+            ...response.data.preferences,
+            courseColors: savedColors,
+          }));
+        }
       }
-    setOpenColorPicker(null);
+      setOpenColorPicker(null);
     } catch (err) {
-      // Optionally show an error message to the user
+      if (!isTeacherOrAdmin) {
+        await queryClient.invalidateQueries({ queryKey: userPreferencesQueryKey });
+      }
+      toast.error('Failed to update course color');
     }
   };
 
@@ -921,7 +540,7 @@ export function Dashboard() {
     return (
       <button 
         key={iconId}
-        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+        className="rounded-lg p-1.5 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 lg:rounded-full lg:p-2"
         aria-label={`Go to ${iconConfig.name} for this course`}
         onClick={(e) => {
           e.stopPropagation();
@@ -944,274 +563,28 @@ export function Dashboard() {
           }
         }}
       >
-        <IconComponent className="h-5 w-5 text-gray-600 dark:text-gray-400" aria-hidden="true" />
+        <IconComponent className="h-4 w-4 text-gray-500 dark:text-gray-400 lg:h-5 lg:w-5" aria-hidden="true" />
       </button>
     );
   };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Top Navigation Bar (Mobile Only) */}
-      <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm safe-area-inset-top">
-        <div className="relative flex items-center justify-between px-4 py-3">
-          <button
-            onClick={() => setShowBurgerMenu(!showBurgerMenu)}
-            className="text-gray-700 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
-            aria-label="Open account menu"
-          >
-            <UserIcon className="w-6 h-6" />
-          </button>
-          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Dashboard</h1>
-          <div className="w-10"></div> {/* Spacer for centering */}
-          
-          {/* Burger Menu Dropdown */}
-          {showBurgerMenu && (
-            <>
-              {/* Overlay */}
-              <div
-                className="fixed inset-0 bg-black bg-opacity-50 z-[151]"
-                onClick={() => {
-                  setShowBurgerMenu(false);
-                  setBurgerMenuSection(null);
-                }}
-              />
-              {/* Menu - Centered */}
-              <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 w-[calc(100vw-2rem)] max-w-md max-h-[85vh] overflow-y-auto z-[152]">
-                {/* Back Button (when viewing a section) */}
-                {burgerMenuSection && (
-                  <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3">
-                    <button
-                      onClick={() => setBurgerMenuSection(null)}
-                      className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition-colors hover:bg-gray-100 touch-manipulation dark:hover:bg-gray-700"
-                      aria-label="Back"
-                    >
-                      <ArrowLeft className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-                    </button>
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                      {burgerMenuSection === 'profile' && 'Profile'}
-                      {burgerMenuSection === 'settings' && 'Settings'}
-                      {burgerMenuSection === 'notifications' && 'Notifications'}
-                      {burgerMenuSection === 'activity' && 'Recent Login Activity'}
-                    </h2>
-                  </div>
-                )}
-
-                {/* Main Menu View */}
-                {!burgerMenuSection && (
-                  <>
-                    {/* Profile Information */}
-                    <div className="px-4 py-4 border-b border-gray-200 dark:border-gray-700">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="relative flex-shrink-0">
-                          {user?.profilePicture ? (
-                            <img
-                              src={user.profilePicture.startsWith('http') 
-                                ? user.profilePicture 
-                                : getImageUrl(user.profilePicture)}
-                              alt={`${user.firstName} ${user.lastName}`}
-                              className="w-14 h-14 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600"
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                                const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                                if (fallback) {
-                                  fallback.style.display = 'flex';
-                                }
-                              }}
-                            />
-                          ) : null}
-                          {/* Fallback avatar */}
-                          <div
-                            className={`w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-lg font-bold ${
-                              user?.profilePicture ? 'hidden' : 'flex'
-                            }`}
-                            style={{
-                              display: user?.profilePicture ? 'none' : 'flex'
-                            }}
-                          >
-                            {user?.firstName?.charAt(0) || ''}{user?.lastName?.charAt(0) || 'U'}
-                          </div>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-gray-900 dark:text-gray-100 text-base truncate">
-                            {user?.firstName} {user?.lastName}
-                          </div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                            {user?.email}
-                          </div>
-                          {user?.role && (
-                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 capitalize">
-                              {user.role}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      {/* Profile Details */}
-                      <div className="space-y-2 text-sm">
-                        <div>
-                          <span className="font-medium text-gray-700 dark:text-gray-300">Name:</span>{' '}
-                          <span className="text-gray-600 dark:text-gray-400">{user?.firstName} {user?.lastName}</span>
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-700 dark:text-gray-300">Email:</span>{' '}
-                          <span className="text-gray-600 dark:text-gray-400 break-all">{user?.email}</span>
-                        </div>
-                        {user?.bio && (
-                          <div>
-                            <span className="font-medium text-gray-700 dark:text-gray-300">Bio:</span>{' '}
-                            <span className="text-gray-600 dark:text-gray-400">{user.bio}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    
-                    {/* Account Sections */}
-                    <div className="py-2">
-                      <button
-                        onClick={() => setBurgerMenuSection('profile')}
-                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3 touch-manipulation"
-                      >
-                        <UserIcon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                        <span>Profile</span>
-                      </button>
-                      <button
-                        onClick={() => setBurgerMenuSection('settings')}
-                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3 touch-manipulation"
-                      >
-                        <Settings className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                        <span>Settings</span>
-                      </button>
-                      <button
-                        onClick={() => setBurgerMenuSection('notifications')}
-                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3 touch-manipulation"
-                      >
-                        <Megaphone className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                        <span>Notifications</span>
-                      </button>
-                      <button
-                        onClick={() => setBurgerMenuSection('activity')}
-                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3 touch-manipulation"
-                      >
-                        <ClipboardList className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                        <span>Recent Login Activity</span>
-                      </button>
-                    </div>
-                    
-                    {/* Separator */}
-                    <div className="border-t border-gray-200 dark:border-gray-700"></div>
-                    
-                    {/* Options Section */}
-                    <div className="py-2">
-                      <div className="px-4 py-2">
-                        <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
-                          Options
-                        </div>
-                      </div>
-                      {/* Show Grades Toggle */}
-                      <div className="px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer touch-manipulation"
-                        onClick={() => {
-                          const newValue = !showGrades;
-                          setShowGrades(newValue);
-                          localStorage.setItem('showGrades', JSON.stringify(newValue));
-                        }}
-                      >
-                        <div className="flex items-center gap-3">
-                          <CheckSquare className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                          <span className="text-sm text-gray-700 dark:text-gray-300">Show Grades</span>
-                        </div>
-                        <div
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                            showGrades ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
-                          }`}
-                        >
-                          <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ease-in-out ${
-                              showGrades ? 'translate-x-6' : 'translate-x-1'
-                            }`}
-                          />
-                        </div>
-                      </div>
-                      {/* Customize Navigation */}
-                      <button
-                        onClick={() => {
-                          setShowBurgerMenu(false);
-                          setBurgerMenuSection(null);
-                          setShowNavCustomization(true);
-                        }}
-                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3 touch-manipulation"
-                      >
-                        <Settings className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                        <span>Customize Navigation</span>
-                      </button>
-                    </div>
-                    
-                    {/* Separator */}
-                    <div className="border-t border-gray-200 dark:border-gray-700"></div>
-                    
-                    {/* Other Options */}
-                    <div className="py-2">
-                      <button
-                        onClick={() => {
-                          setShowBurgerMenu(false);
-                          setBurgerMenuSection(null);
-                        }}
-                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3 touch-manipulation"
-                      >
-                        <HelpCircle className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                        <span>Help</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowBurgerMenu(false);
-                          setBurgerMenuSection(null);
-                          setShowChangeUserModal(true);
-                        }}
-                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3 touch-manipulation"
-                      >
-                        <UserIcon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                        <span>Change User</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowBurgerMenu(false);
-                          setBurgerMenuSection(null);
-                          logout();
-                          navigate('/login');
-                        }}
-                        className="w-full text-left px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3 touch-manipulation"
-                      >
-                        <LogOut className="h-5 w-5" />
-                        <span>Log Out</span>
-                      </button>
-                    </div>
-                  </>
-                )}
-
-                {/* Section Content Views */}
-                {burgerMenuSection === 'profile' && (
-                  <div className="p-4">
-                    <ProfileSectionInline />
-                  </div>
-                )}
-                {burgerMenuSection === 'settings' && (
-                  <div className="p-4">
-                    <SettingsSectionInline />
-                  </div>
-                )}
-                {burgerMenuSection === 'notifications' && (
-                  <div className="p-4">
-                    <NotificationsSectionInline />
-                  </div>
-                )}
-                {burgerMenuSection === 'activity' && (
-                  <div className="p-4">
-                    <ActivitySectionInline />
-                  </div>
-                )}
-              </div>
-          </>
-          )}
-        </div>
-      </nav>
+      <MobileTopNav
+        title="Dashboard"
+        leftAction="user"
+        onLeftActionClick={() => setShowBurgerMenu(true)}
+      />
+      <BurgerMenu
+        showBurgerMenu={showBurgerMenu}
+        setShowBurgerMenu={setShowBurgerMenu}
+        showNavCustomization={showNavCustomization}
+        setShowNavCustomization={setShowNavCustomization}
+        showGrades={showGrades}
+        setShowGrades={setShowGrades}
+        currentNavItems={currentNavItems}
+        setCurrentNavItems={setCurrentNavItems}
+      />
 
       <SwipeableContainer
         onSwipeLeft={swipeEnabled ? handleSwipeLeft : undefined}
@@ -1221,13 +594,15 @@ export function Dashboard() {
         className="min-h-screen"
       >
         <PullToRefresh onRefresh={handleRefresh} className="min-h-screen">
-          <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-8 flex flex-col lg:flex-row gap-4 lg:gap-8 lg:pt-8 pt-20">
+          <div className="container mx-auto flex flex-col gap-4 px-4 py-3 pt-20 lg:flex-row lg:gap-8 lg:px-6 lg:py-8 lg:pt-8">
           {/* Main dashboard content */}
           <div className="flex-1">
-          <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row justify-between items-start gap-4">
+          <div className="mb-4 flex flex-col justify-between gap-3 sm:mb-8 sm:flex-row sm:items-start lg:gap-4">
             <div className="lg:ml-0">
-              <h1 className="hidden lg:block text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-800 dark:text-gray-100 mb-2">Dashboard</h1>
-              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">Welcome back, {user?.firstName}!</p>
+              <h1 className="mb-2 hidden text-2xl font-bold text-gray-800 dark:text-gray-100 sm:text-3xl lg:block lg:text-4xl">Dashboard</h1>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 sm:text-xs lg:text-base lg:text-gray-600">
+                Welcome back, {user?.firstName}!
+              </p>
             </div>
             {/* Notification Bell - Hidden on mobile */}
             <div className="relative hidden lg:block">
@@ -1255,87 +630,62 @@ export function Dashboard() {
             onClose={() => setShowNotificationCenter(false)}
           />
         {/* Published Courses Section */}
-        <div className="mb-6 sm:mb-8">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-3">
+        <div className="mb-4 sm:mb-8">
+          <div className="mb-3 flex flex-col justify-between gap-2 sm:mb-6 sm:flex-row sm:items-center sm:gap-3">
             {isTeacherOrAdmin ? (
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-700 dark:text-gray-300">Published Courses ({publishedCourses.length})</h2>
+              <h2 className={SECTION_TITLE}>Published Courses ({publishedCourses.length})</h2>
             ) : (
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-700 dark:text-gray-300">My Courses</h2>
+              <h2 className={SECTION_TITLE}>My Courses</h2>
             )}
             {isTeacherOrAdmin ? (
-              <Link
-                to="/courses/create"
-                className="bg-blue-500 dark:bg-blue-600 hover:bg-blue-600 dark:hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors text-sm sm:text-base w-full sm:w-auto text-center"
-              >
+              <Link to="/courses/create" className={`${BTN_PRIMARY} w-full sm:w-auto`}>
                 Create Course
               </Link>
             ) : user?.role === 'student' ? (
               <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:justify-end">
-                <button
-                  type="button"
-                  onClick={() => setShowCourseQrScanner(true)}
-                  className="inline-flex items-center justify-center gap-2 rounded-md bg-violet-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-violet-700 sm:text-base"
-                >
-                  <QrCode className="h-4 w-4 shrink-0" />
+                <button type="button" onClick={() => setShowCourseQrScanner(true)} className={BTN_PRIMARY}>
+                  <QrCode className="h-3.5 w-3.5 shrink-0" />
                   Join with QR
                 </button>
-                <Link
-                  to="/join-course"
-                  className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-center text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 sm:text-base"
-                >
+                <Link to="/join-course" className={`${BTN_SECONDARY} w-full sm:w-auto`}>
                   Enter join code
                 </Link>
               </div>
             ) : null}
           </div>
           {publishedCourses.length === 0 ? (
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-8 sm:p-12">
-              <div className="text-center">
-                <div className="mx-auto w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mb-4">
-                  <BookOpen className="w-8 h-8 text-gray-400 dark:text-gray-500" />
-                </div>
-                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                  {isTeacherOrAdmin ? 'No Published Courses Yet' : 'No Courses Enrolled'}
-                </h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-6 text-sm sm:text-base">
-                  {isTeacherOrAdmin 
-                    ? 'Get started by creating your first course or publishing an existing one.'
-                    : 'Browse the catalog to find and enroll in courses that interest you.'}
-                </p>
-                <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
-                  {isTeacherOrAdmin ? (
-                    <Link
-                      to="/courses/create"
-                      className="inline-flex items-center justify-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors text-sm sm:text-base"
-                    >
-                      Create Your First Course
+            <div className={`${ITEM_CARD} py-8 text-center lg:p-12`}>
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 lg:mb-4 lg:h-16 lg:w-16">
+                <BookOpen className="h-6 w-6 text-gray-400 dark:text-gray-500 lg:h-8 lg:w-8" />
+              </div>
+              <h3 className="mb-1 text-xs font-semibold text-gray-900 dark:text-gray-100 lg:mb-2 lg:text-xl">
+                {isTeacherOrAdmin ? 'No Published Courses Yet' : 'No Courses Enrolled'}
+              </h3>
+              <p className="mb-4 text-[11px] leading-relaxed text-gray-500 dark:text-gray-400 lg:mb-6 lg:text-base">
+                {isTeacherOrAdmin
+                  ? 'Get started by creating your first course or publishing an existing one.'
+                  : 'Browse the catalog to find and enroll in courses that interest you.'}
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row sm:justify-center lg:gap-3">
+                {isTeacherOrAdmin ? (
+                  <Link to="/courses/create" className={BTN_PRIMARY}>
+                    Create Your First Course
+                  </Link>
+                ) : (
+                  <>
+                    <button type="button" onClick={() => setShowCourseQrScanner(true)} className={BTN_PRIMARY}>
+                      <QrCode className="h-3.5 w-3.5 shrink-0" />
+                      Join with QR
+                    </button>
+                    <Link to="/catalog" className={BTN_PRIMARY}>
+                      <Search className="h-3.5 w-3.5 shrink-0" />
+                      Browse Catalog
                     </Link>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => setShowCourseQrScanner(true)}
-                        className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-violet-600 hover:bg-violet-700 text-white font-medium rounded-lg transition-colors text-sm sm:text-base"
-                      >
-                        <QrCode className="h-4 w-4 shrink-0" />
-                        Join with QR
-                      </button>
-                      <Link
-                        to="/catalog"
-                        className="inline-flex items-center justify-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors text-sm sm:text-base"
-                      >
-                        <Search className="w-4 h-4 mr-2" />
-                        Browse Course Catalog
-                      </Link>
-                      <Link
-                        to="/join-course"
-                        className="inline-flex items-center justify-center px-6 py-3 rounded-lg border border-slate-300 bg-white font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 text-sm sm:text-base"
-                      >
-                        Enter join code
-                      </Link>
-                    </>
-                  )}
-                </div>
+                    <Link to="/join-course" className={BTN_SECONDARY}>
+                      Enter join code
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
           ) : (
@@ -1345,7 +695,7 @@ export function Dashboard() {
                   <div 
                     {...provided.droppableProps}
                     ref={provided.innerRef}
-                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"
+                    className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 lg:gap-6"
                   >
                     {publishedCourses.map((course, index) => (
                       <Draggable key={course._id} draggableId={course._id} index={index}>
@@ -1353,7 +703,7 @@ export function Dashboard() {
                           <div
                             ref={provided.innerRef}
                             {...provided.draggableProps}
-                            className={`bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-visible cursor-pointer hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 sm:ml-4 border border-gray-100 dark:border-gray-700 group ${
+                            className={`${ITEM_CARD} group cursor-pointer overflow-visible shadow-sm transition-all sm:ml-4 lg:rounded-xl lg:shadow-lg lg:hover:-translate-y-0.5 lg:hover:shadow-xl ${
                               snapshot.isDragging ? 'opacity-75 shadow-2xl' : ''
                             }`}
                   onClick={() => handleCardClick(course._id)}
@@ -1361,7 +711,7 @@ export function Dashboard() {
                 >
                   {/* Top section - Dynamic color */}
                   <div 
-                    className="h-32 sm:h-48 relative"
+                    className="relative h-24 sm:h-32 lg:h-48"
                     style={{ backgroundColor: getCourseColor(course._id) }}
                   >
                     {/* Drag Handle - Bottom Left (visible on hover) */}
@@ -1388,7 +738,7 @@ export function Dashboard() {
                         </div>
                       </div>
                     )}
-                    <div className="absolute top-3 right-3">
+                    <div className="absolute right-2 top-2 lg:right-3 lg:top-3">
                       <div className="relative">
                         <button
                           onClick={(e) => {
@@ -1396,9 +746,9 @@ export function Dashboard() {
                             setOpenColorPicker(openColorPicker === course._id ? null : course._id);
                             setOpenIconPicker(null);
                           }}
-                          className="p-1 hover:bg-white/20 rounded transition-colors"
+                          className="rounded-md p-1 transition-colors hover:bg-white/20"
                         >
-                          <MoreVertical className="h-5 w-5 text-white" />
+                          <MoreVertical className="h-4 w-4 text-white lg:h-5 lg:w-5" />
                         </button>
                         
                         {/* Color picker dropdown */}
@@ -1504,25 +854,23 @@ export function Dashboard() {
                   </div>
                   
                   {/* Bottom section - White */}
-                  <div className="p-4 sm:p-6">
-                    <div className="mb-2">
-                      <h2 
-                        className="font-bold text-base sm:text-lg mb-1 line-clamp-2"
+                  <div className="p-3 lg:p-6">
+                    <div className="mb-1.5 lg:mb-2">
+                      <h2
+                        className="mb-0.5 line-clamp-2 text-[13px] font-semibold lg:mb-1 lg:text-lg"
                         style={{ color: getCourseColor(course._id) }}
                       >
                         {course.catalog?.courseCode || course.title}
                       </h2>
-                      <p className="text-gray-500 dark:text-gray-400 text-xs sm:text-sm line-clamp-1">
+                      <p className="line-clamp-1 text-[10px] text-gray-500 dark:text-gray-400 sm:text-[11px] lg:text-sm">
                         Instructor: {course.instructor.firstName} {course.instructor.lastName}
                       </p>
                     </div>
-                    
-                    {/* Action icons */}
-                    <div className="flex justify-between items-center mt-3 sm:mt-4">
+
+                    <div className="mt-2 flex items-center justify-between lg:mt-4">
                       {getCourseIcons(course._id).map((iconId) => renderActionIcon(iconId, course._id))}
-                      {/* Add empty divs to maintain spacing if less than 3 icons */}
                       {Array.from({ length: 3 - getCourseIcons(course._id).length }).map((_, index) => (
-                        <div key={index} className="w-9 h-9"></div>
+                        <div key={index} className="h-7 w-7 lg:h-9 lg:w-9" />
                       ))}
                     </div>
                   </div>
@@ -1540,7 +888,7 @@ export function Dashboard() {
         {/* Unpublished Courses Section (hide for students) */}
         {isTeacherOrAdmin && (
           <div>
-            <h2 className="text-lg sm:text-xl font-semibold text-gray-700 dark:text-gray-300 mb-4 sm:mb-6">Unpublished Courses ({unpublishedCourses.length})</h2>
+            <h2 className={`${SECTION_TITLE} mb-3 sm:mb-6`}>Unpublished Courses ({unpublishedCourses.length})</h2>
             {unpublishedCourses.length === 0 ? (
               <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-8 sm:p-12">
                 <div className="text-center">
@@ -1750,11 +1098,6 @@ export function Dashboard() {
       currentItems={currentNavItems}
     />
 
-    {/* Change User Modal */}
-    <ChangeUserModal
-      isOpen={showChangeUserModal}
-      onClose={() => setShowChangeUserModal(false)}
-    />
   </div>
   );
 } 

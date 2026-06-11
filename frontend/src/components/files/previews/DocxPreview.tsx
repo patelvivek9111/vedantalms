@@ -6,8 +6,9 @@ import { fetchAuthenticatedFileBlob } from '../../../services/fileUploadApi';
 import { fileAccessErrorMessage } from '../../../utils/fileTypes';
 
 interface DocxPreviewProps {
-  fileAssetId: string;
+  fileAssetId?: string;
   fileName: string;
+  directUrl?: string;
 }
 
 const ZOOM_MIN = 0.4;
@@ -32,7 +33,7 @@ function zoomHostStyle(zoom: number): React.CSSProperties {
 /**
  * Renders the actual .docx layout (pages, tables, images) in the browser via docx-preview.
  */
-const DocxPreview: React.FC<DocxPreviewProps> = ({ fileAssetId, fileName }) => {
+const DocxPreview: React.FC<DocxPreviewProps> = ({ fileAssetId, fileName, directUrl }) => {
   const bodyRef = useRef<HTMLDivElement>(null);
   const styleRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
@@ -42,13 +43,18 @@ const DocxPreview: React.FC<DocxPreviewProps> = ({ fileAssetId, fileName }) => {
 
   useEffect(() => {
     setZoom(ZOOM_DEFAULT);
-  }, [fileAssetId]);
+  }, [fileAssetId, directUrl]);
 
   useEffect(() => {
     let cancelled = false;
     const body = bodyRef.current;
     const style = styleRef.current;
     if (!body || !style) return;
+    if (!fileAssetId && !directUrl) {
+      setError('Unable to load this document preview.');
+      setLoading(false);
+      return;
+    }
 
     (async () => {
       setLoading(true);
@@ -57,7 +63,9 @@ const DocxPreview: React.FC<DocxPreviewProps> = ({ fileAssetId, fileName }) => {
       style.innerHTML = '';
 
       try {
-        const blob = await fetchAuthenticatedFileBlob(fileAssetId, 'stream');
+        const blob = directUrl
+          ? await (await fetch(directUrl)).blob()
+          : await fetchAuthenticatedFileBlob(fileAssetId as string, 'stream');
         if (cancelled) return;
 
         await renderAsync(blob, body, style, {
@@ -91,7 +99,7 @@ const DocxPreview: React.FC<DocxPreviewProps> = ({ fileAssetId, fileName }) => {
       if (bodyRef.current) bodyRef.current.innerHTML = '';
       if (styleRef.current) styleRef.current.innerHTML = '';
     };
-  }, [fileAssetId, reloadKey]);
+  }, [fileAssetId, directUrl, reloadKey]);
 
   if (error) {
     return (

@@ -39,6 +39,11 @@ export async function saveInstitutionGradingPolicy(policy: GradingPolicyConfig) 
   return res.data;
 }
 
+export async function fetchCourseLifecycleStatus(courseId: string) {
+  const res = await api.get(`/grades/course/${courseId}/lifecycle/status`);
+  return res.data;
+}
+
 export async function fetchCourseLifecycle(courseId: string) {
   const res = await api.get(`/grades/course/${courseId}/lifecycle`);
   return res.data;

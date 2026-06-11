@@ -17,8 +17,23 @@ function validateStartupEnv() {
     if (!process.env.MONGODB_URI) {
       errors.push('MONGODB_URI is required in production');
     }
-    if (process.env.REQUIRE_JOB_QUEUE === 'true' && !process.env.REDIS_URL) {
-      errors.push('REDIS_URL is required when REQUIRE_JOB_QUEUE=true');
+    if (process.env.REQUIRE_REDIS === 'true' && !process.env.REDIS_URL) {
+      errors.push('REDIS_URL is required when REQUIRE_REDIS=true');
+    }
+    if (process.env.FORCE_OBJECT_STORAGE === 'true') {
+      const { isCloudinaryConfigured } = require('../utils/cloudinary');
+      if (!isCloudinaryConfigured()) {
+        errors.push('FORCE_OBJECT_STORAGE=true but Cloudinary credentials are missing');
+      }
+    }
+    if ((process.env.STORAGE_PROVIDER || 'auto') === 'local') {
+      warnings.push('STORAGE_PROVIDER=local in production — use cloudinary for 2500+ concurrent users');
+    }
+    if (process.env.PREVIEW_STORAGE === 'cloudinary') {
+      const { isCloudinaryConfigured } = require('../utils/cloudinary');
+      if (!isCloudinaryConfigured()) {
+        errors.push('PREVIEW_STORAGE=cloudinary but Cloudinary credentials are missing');
+      }
     }
   }
 

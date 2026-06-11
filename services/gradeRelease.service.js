@@ -57,10 +57,19 @@ function resolveStudentGradeVisibility(submission, assignment) {
   };
 }
 
+function mapFieldToObject(value) {
+  if (value instanceof Map) return Object.fromEntries(value);
+  if (value && typeof value === 'object') return { ...value };
+  return value;
+}
+
 function redactSubmissionForStudent(submission, assignment) {
   if (!submission) return submission;
   const visibility = resolveStudentGradeVisibility(submission, assignment);
   const payload = submission.toObject ? submission.toObject() : { ...submission };
+  payload.answers = mapFieldToObject(payload.answers);
+  payload.autoQuestionGrades = mapFieldToObject(payload.autoQuestionGrades);
+  payload.questionGrades = mapFieldToObject(payload.questionGrades);
   payload.gradeVisibility = visibility;
 
   if (!visibility.scoreVisible) {

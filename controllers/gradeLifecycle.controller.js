@@ -2,7 +2,33 @@ const Course = require('../models/course.model');
 const gradeLifecycleService = require('../services/gradeLifecycle.service');
 const academicAuditService = require('../services/academicAudit.service');
 const { getSemesterFromCourse } = require('../utils/semesterUtils');
-const { canGradeDraft, canPostGrades } = require('../middleware/academicPermissions');
+const { canGradeDraft, canPostGrades, canViewCourseGrades } = require('../middleware/academicPermissions');
+
+/** Read-only lifecycle status for enrolled students and grading staff. */
+exports.getCourseGradeLifecycleStatus = async (req, res) => {
+  try {
+    const course = req.course;
+    if (!course) {
+      return res.status(404).json({ success: false, message: 'Course not found' });
+    }
+    if (!canViewCourseGrades(req.user, course)) {
+      return res.status(403).json({ success: false, message: 'Not authorized to view course grade status' });
+    }
+
+    const lifecycle = await gradeLifecycleService.getOrCreateLifecycle(course);
+    const status = lifecycle?.status || 'DRAFT';
+
+    res.json({
+      success: true,
+      data: {
+        status,
+        finalized: gradeLifecycleService.FINALIZED_STATUSES.has(status),
+      },
+    });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ success: false, message: error.message });
+  }
+};
 
 exports.getCourseGradeLifecycle = async (req, res) => {
   try {

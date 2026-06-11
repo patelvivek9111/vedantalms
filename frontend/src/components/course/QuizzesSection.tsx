@@ -55,44 +55,37 @@ const QuizzesSection: React.FC<QuizzesSectionProps> = ({
   });
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-md dark:border-gray-700 dark:bg-gray-900">
-        <div className="space-y-5">
-          {(isInstructor || isAdmin) && (
-            <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50/80 p-3 dark:border-gray-700 dark:bg-gray-800/70">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Create and manage quizzes for this course</p>
-              {modules.length > 0 ? (
-                <button
-                  onClick={() => navigate(`/modules/${modules[0]._id}/assignments/create?isGradedQuiz=true`)}
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
-                >
-                  + Create Quiz
-                </button>
-              ) : (
-                <div className="rounded-lg bg-gray-100 px-3 py-2 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-300">
-                  Create a module first to add quizzes
-                </div>
-              )}
-            </div>
-          )}
-          {/* Render quizzes using AssignmentList */}
-          {discussionsLoading ? (
-            <div className="py-8 text-center text-gray-500 dark:text-gray-400">Loading quizzes...</div>
-          ) : modules.length > 0 ? (
-            <AssignmentList
-              assignments={deduplicatedQuizzes}
-              userRole={user?.role}
-              studentSubmissions={user?.role === 'student' ? studentSubmissions : undefined}
-              studentId={user?._id}
-              submissionMap={user?.role === 'student' ? submissionMap : undefined}
-              courseId={course?._id}
-              isQuizzesView={true}
-            />
+    <div className="space-y-4">
+      {(isInstructor || isAdmin) && (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-gray-500 dark:text-gray-400">Create and manage quizzes for this course</p>
+          {modules.length > 0 ? (
+            <button
+              onClick={() => navigate(`/modules/${modules[0]._id}/assignments/create?isGradedQuiz=true`)}
+              className="shrink-0 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+            >
+              + Create Quiz
+            </button>
           ) : (
-            <div className="py-8 text-center text-gray-500 dark:text-gray-400">No modules available. Please create a module to add quizzes.</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400">Create a module first to add quizzes</div>
           )}
         </div>
-      </div>
+      )}
+      {discussionsLoading ? (
+        <div className="py-8 text-center text-gray-500 dark:text-gray-400">Loading quizzes...</div>
+      ) : modules.length > 0 ? (
+        <AssignmentList
+          assignments={deduplicatedQuizzes}
+          userRole={user?.role}
+          studentSubmissions={user?.role === 'student' ? studentSubmissions : undefined}
+          studentId={user?._id}
+          submissionMap={user?.role === 'student' ? submissionMap : undefined}
+          courseId={course?._id}
+          isQuizzesView={true}
+        />
+      ) : (
+        <div className="py-8 text-center text-gray-500 dark:text-gray-400">No modules available. Please create a module to add quizzes.</div>
+      )}
     </div>
   );
 };

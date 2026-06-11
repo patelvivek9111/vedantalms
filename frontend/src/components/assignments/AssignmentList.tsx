@@ -135,7 +135,7 @@ function renderStudentPointsDisplay(earned: number | null, totalPoints: number):
 
   return (
     <span
-      className="inline-flex items-baseline gap-px rounded-md bg-slate-100/90 px-1.5 py-0.5 tabular-nums dark:bg-slate-800/80"
+      className="inline-flex items-baseline gap-px whitespace-nowrap rounded-md bg-slate-100/90 px-1.5 py-0.5 tabular-nums dark:bg-slate-800/80"
       aria-label={
         hasGrade
           ? `${earnedDisplay} out of ${total} points`
@@ -1143,10 +1143,11 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
               const isExpanded = isStudentViewer ? expandedStudentSections[group.key] !== false : true;
               return (
               <div key={group.key || group.label || 'by-due-date'}>
+                <div className="overflow-hidden rounded-xl bg-white ring-1 ring-slate-200/70 dark:bg-slate-950 dark:ring-slate-700/60">
                 {isStudentViewer && group.label ? (
                   <button
                     type="button"
-                    className="flex w-full items-center gap-2 border border-b-0 border-slate-200 bg-slate-100 px-3 py-2.5 text-left transition hover:bg-slate-200/80 dark:border-slate-700 dark:bg-slate-800/80 dark:hover:bg-slate-800"
+                    className="flex w-full items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2.5 text-left transition hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/50 dark:hover:bg-slate-800"
                     onClick={() => toggleStudentSection(group.key)}
                     aria-expanded={isExpanded}
                   >
@@ -1160,14 +1161,13 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
                     </span>
                   </button>
                 ) : isTeacherOrAdmin && listViewMode === 'type' && group.label ? (
-                  <div className="border border-b-0 border-slate-200 bg-slate-100 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800/80">
+                  <div className="border-b border-slate-200 bg-slate-50 px-4 py-2.5 dark:border-slate-800 dark:bg-slate-800/50">
                     <span className="text-sm font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200">
                       {group.label}
                     </span>
                   </div>
                 ) : null}
                 {(!isStudentViewer || isExpanded) && (
-                <div className={`border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950 ${showGroupHeaders && group.label ? 'border-t-0' : 'border-y'}`}>
                   <ul className="divide-y divide-slate-200 dark:divide-slate-800">
                     {group.items.map(item => {
                       const dueDate = item.dueDate ? new Date(item.dueDate) : null;
@@ -1208,40 +1208,32 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
                           ) : null}
                           <button
                             type="button"
-                            className="flex min-w-0 flex-1 items-center gap-4 px-1 py-4 text-left transition hover:bg-slate-50/80 sm:px-2 dark:hover:bg-slate-900/80"
+                            className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3.5 text-left transition hover:bg-slate-50/80 sm:gap-4 sm:px-5 dark:hover:bg-slate-900/80"
                             onClick={e => handleRowClick(item, e)}
                           >
-                            <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center text-slate-600 dark:text-slate-400">
+                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100/80 text-slate-600 dark:bg-slate-800/60 dark:text-slate-400">
                               {rowIcon}
                             </span>
                             <span className="min-w-0 flex-1">
-                              <span className="block text-[0.95rem] font-semibold leading-snug text-slate-900 dark:text-slate-50 sm:text-base">
+                              <span className="block truncate text-[0.95rem] font-semibold leading-snug text-slate-900 dark:text-slate-50 sm:text-base">
                                 {item.title}
                               </span>
-                              <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-                                {isStudentViewer ? (
-                                  <>
-                                    {dateMetaParts.map((part, i) => (
-                                      <React.Fragment key={`${item._id}-meta-${i}`}>
-                                        {i > 0 ? (
-                                          <span className="text-slate-300 dark:text-slate-600" aria-hidden>
-                                            |
-                                          </span>
-                                        ) : null}
-                                        <span>{renderMetaPartContent(part)}</span>
-                                      </React.Fragment>
-                                    ))}
-                                    {showStudentPoints ? (
-                                      <>
+                              {isStudentViewer ? (
+                                <span className="mt-0.5 block text-sm text-slate-600 dark:text-slate-400">
+                                  {dateMetaParts.map((part, i) => (
+                                    <React.Fragment key={`${item._id}-meta-${i}`}>
+                                      {i > 0 ? (
                                         <span className="text-slate-300 dark:text-slate-600" aria-hidden>
-                                          |
+                                          {' '}|{' '}
                                         </span>
-                                        {renderStudentPointsDisplay(earned, item.totalPoints)}
-                                      </>
-                                    ) : null}
-                                  </>
-                                ) : (
-                                  dateMetaParts.map((part, i) => (
+                                      ) : null}
+                                      <span>{renderMetaPartContent(part)}</span>
+                                    </React.Fragment>
+                                  ))}
+                                </span>
+                              ) : (
+                                <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+                                  {dateMetaParts.map((part, i) => (
                                     <React.Fragment key={`${item._id}-date-${i}`}>
                                       {i > 0 ? (
                                         <span className="text-slate-300 dark:text-slate-600" aria-hidden>
@@ -1250,10 +1242,15 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
                                       ) : null}
                                       <span>{renderMetaPartContent(part)}</span>
                                     </React.Fragment>
-                                  ))
-                                )}
-                              </span>
+                                  ))}
+                                </span>
+                              )}
                             </span>
+                            {showStudentPoints ? (
+                              <span className="shrink-0 pl-2 sm:min-w-[5.75rem] sm:text-right">
+                                {renderStudentPointsDisplay(earned, item.totalPoints)}
+                              </span>
+                            ) : null}
                           </button>
                           {isTeacherOrAdmin ? (
                             <div
@@ -1274,14 +1271,14 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
                       );
                     })}
                   </ul>
-                </div>
                 )}
+                </div>
               </div>
             );
             })}
           </div>
         ) : (
-          <div className="border border-slate-200 bg-white py-12 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400">
+          <div className="rounded-xl bg-white py-12 text-center text-sm text-slate-500 ring-1 ring-slate-200/70 dark:bg-slate-950 dark:text-slate-400 dark:ring-slate-700/60">
             No {isQuizzesView ? 'quizzes' : 'assignments'} found
           </div>
         ))}

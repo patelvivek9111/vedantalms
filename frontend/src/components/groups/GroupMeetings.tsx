@@ -244,7 +244,7 @@ const GroupMeetings: React.FC = () => {
   );
 
   return (
-    <div className="w-full h-full overflow-y-auto pb-20 lg:pb-0">
+    <div className="w-full overflow-visible pb-20 lg:h-full lg:overflow-y-auto lg:pb-0">
       <div className="bg-white dark:bg-gray-800 p-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between gap-3">
           <div>

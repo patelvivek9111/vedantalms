@@ -60,15 +60,13 @@ function InfoTile({
   value: string;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200/80 bg-gradient-to-br from-slate-50/90 to-white px-4 py-3 shadow-sm dark:border-slate-700/80 dark:from-slate-800/50 dark:to-slate-900/40">
-      <div className="flex items-start gap-3">
-        <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-slate-500 shadow-sm ring-1 ring-slate-200/80 dark:bg-slate-800 dark:text-slate-400 dark:ring-slate-600">
-          <Icon className="h-4 w-4" strokeWidth={2} aria-hidden />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">{label}</p>
-          <p className="mt-1 text-sm font-semibold leading-snug text-slate-900 dark:text-slate-100">{value}</p>
-        </div>
+    <div className="flex items-start gap-3 py-2">
+      <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+        <Icon className="h-4 w-4" strokeWidth={2} aria-hidden />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">{label}</p>
+        <p className="mt-1 text-sm font-semibold leading-snug text-slate-900 dark:text-slate-100">{value}</p>
       </div>
     </div>
   );
@@ -365,7 +363,7 @@ const SyllabusSection: React.FC<SyllabusSectionProps> = ({
                 <span className="h-px flex-1 bg-gradient-to-r from-slate-200 to-transparent dark:from-slate-700" aria-hidden />
               </div>
               <div
-                className="prose prose-slate max-w-none rounded-xl border border-slate-200/80 bg-white px-5 py-6 shadow-sm prose-headings:tracking-tight prose-a:text-blue-600 dark:prose-invert dark:border-slate-700 dark:bg-slate-900/50 sm:px-6"
+                className="prose prose-slate max-w-none prose-headings:tracking-tight prose-a:text-blue-600 dark:prose-invert"
                 dangerouslySetInnerHTML={{ __html: course.catalog.syllabusContent }}
               />
             </section>
@@ -379,15 +377,13 @@ const SyllabusSection: React.FC<SyllabusSectionProps> = ({
                 </h3>
                 <span className="h-px flex-1 bg-gradient-to-r from-slate-200 to-transparent dark:from-slate-700" aria-hidden />
               </div>
-              <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 dark:border-slate-700 dark:bg-slate-800/30 sm:p-5">
-                <FileAttachmentChips
-                  files={course.catalog.syllabusFiles.map((file: { name?: string; url?: string; fileAssetId?: string }) => ({
-                    name: file.name,
-                    url: file.url?.startsWith('http') ? file.url : `${API_URL}${file.url}`,
-                    fileAssetId: file.fileAssetId,
-                  }))}
-                />
-              </div>
+              <FileAttachmentChips
+                files={course.catalog.syllabusFiles.map((file: { name?: string; url?: string; fileAssetId?: string }) => ({
+                  name: file.name,
+                  url: file.url?.startsWith('http') ? file.url : `${API_URL}${file.url}`,
+                  fileAssetId: file.fileAssetId,
+                }))}
+              />
             </section>
           )}
         </div>

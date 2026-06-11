@@ -41,7 +41,7 @@ const AnnouncementList: React.FC<AnnouncementListProps> = ({ announcements, onSe
     );
   }
   return (
-    <ul className="space-y-3">
+    <ul className="divide-y divide-slate-200 overflow-hidden rounded-xl bg-white ring-1 ring-slate-200/70 dark:divide-slate-800 dark:bg-slate-900 dark:ring-slate-700/60">
       {items.map(a => {
         const plain = String(a.body ?? '').replace(/<[^>]+>/g, '');
         const preview =
@@ -52,7 +52,7 @@ const AnnouncementList: React.FC<AnnouncementListProps> = ({ announcements, onSe
           <li key={a._id}>
             <button
               type="button"
-              className="group flex w-full items-start gap-4 rounded-2xl border border-slate-200/80 bg-white p-4 text-left shadow-sm transition hover:border-indigo-200 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-800 sm:p-5"
+              className="group flex w-full items-start gap-4 px-4 py-4 text-left transition hover:bg-slate-50 dark:hover:bg-slate-800/60 sm:px-5 sm:py-5"
               onClick={() => onSelect?.(a)}
             >
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-950/40">

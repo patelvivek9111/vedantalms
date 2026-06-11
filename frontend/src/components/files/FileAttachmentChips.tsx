@@ -9,10 +9,19 @@ import FilePreviewModal from './FilePreviewModal';
 
 interface FileAttachmentChipsProps {
   files?: Array<string | Record<string, unknown>>;
+  attachmentSources?: {
+    attachmentFiles?: Array<Record<string, unknown>>;
+    attachments?: Array<string | Record<string, unknown>>;
+    fileAssets?: Array<string | Record<string, unknown>>;
+  };
   className?: string;
 }
 
-function normalizeChipFiles(files: FileAttachmentChipsProps['files']): NormalizedFile[] {
+function normalizeChipFiles(props: FileAttachmentChipsProps): NormalizedFile[] {
+  if (props.attachmentSources) {
+    return normalizeAttachmentSources(props.attachmentSources);
+  }
+  const files = props.files;
   if (!files?.length) return [];
   const first = files[0];
   if (typeof first === 'object' && first !== null && ('originalName' in first || 'fileAssetId' in first)) {
@@ -23,8 +32,12 @@ function normalizeChipFiles(files: FileAttachmentChipsProps['files']): Normalize
   return normalizeLegacyFiles(files as Array<string | Record<string, unknown>>);
 }
 
-const FileAttachmentChips: React.FC<FileAttachmentChipsProps> = ({ files = [], className = '' }) => {
-  const normalized = normalizeChipFiles(files);
+const FileAttachmentChips: React.FC<FileAttachmentChipsProps> = ({
+  files = [],
+  attachmentSources,
+  className = '',
+}) => {
+  const normalized = normalizeChipFiles({ files, attachmentSources });
   const [preview, setPreview] = useState<NormalizedFile | null>(null);
 
   const openPreview = (file: NormalizedFile) => {

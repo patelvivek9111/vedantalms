@@ -26,6 +26,7 @@ import {
 import { BurgerMenu } from '../components/layout/BurgerMenu';
 import SwipeableContainer from '../components/common/SwipeableContainer';
 import { useBottomNavSwipe } from '../hooks/useBottomNavSwipe';
+import GroupCard from '../components/groups/GroupCard';
 
 interface Group {
   _id: string;
@@ -712,109 +713,56 @@ const Groups: React.FC = () => {
           }>
           {filteredData.map((item) => {
             const group = item as Group;
-            return (
-            <div 
-              key={group._id} 
-                className={`cursor-pointer overflow-hidden rounded-xl border border-gray-200/90 bg-white shadow-sm transition-shadow duration-200 hover:border-gray-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-900/40 dark:hover:border-gray-600 ${
-                  viewMode === 'list' ? 'flex items-center' : ''
-                }`}
-              onClick={() => navigate(`/groups/${group._id}`)}
-            >
-                {viewMode === 'grid' ? (
-                  <>
-              {/* Top section - Course color */}
-              <div 
-                className="h-20 relative"
-                style={{ backgroundColor: getCourseColor(group.course?._id || 'default') }}
+            return viewMode === 'grid' ? (
+              <GroupCard
+                key={group._id}
+                group={group}
+                subtitle={group.course?.title || 'Unknown Course'}
+                accentColor={getCourseColor(group.course?._id || 'default')}
+                onClick={() => navigate(`/groups/${group._id}`)}
+              />
+            ) : (
+              <div
+                key={group._id}
+                className="flex cursor-pointer items-center overflow-hidden rounded-xl border border-gray-200/90 bg-white shadow-sm transition-shadow duration-200 hover:border-gray-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-900/40 dark:hover:border-gray-600"
+                onClick={() => navigate(`/groups/${group._id}`)}
               >
-                <div className="absolute top-2 right-2">
-                  <div className="w-5 h-5 bg-white/20 rounded-full flex items-center justify-center">
-                    <Users className="h-3 w-3 text-white" />
-                  </div>
-                </div>
-              </div>
-              
-              {/* Bottom section - White */}
-              <div className="p-4">
-                <div className="mb-3">
-                  <h3 
-                    className="font-bold text-base mb-1"
-                    style={{ color: getCourseColor(group.course?._id || 'default') }}
-                  >
-                    {group.name}
-                  </h3>
-                  <p className="text-gray-500 dark:text-gray-400 text-xs">
-                    {group.course?.title || 'Unknown Course'}
-                  </p>
-                </div>
-                
-                {/* Members section */}
-                {group.members && group.members.length > 0 && (
-                  <div className="mb-3">
-                    <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
-                      Members ({group.members.length})
-                    </p>
-                    <div className="flex flex-wrap gap-1">
-                      {group.members.slice(0, 2).map((member, index) => (
-                        <span key={index} className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
-                          {member.firstName} {member.lastName}
-                        </span>
-                      ))}
-                      {group.members.length > 2 && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
-                          +{group.members.length - 2} more
-                        </span>
+                <div className="flex-1 p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <h3
+                        className="text-base font-bold"
+                        style={{ color: getCourseColor(group.course?._id || 'default') }}
+                      >
+                        {group.name}
+                      </h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {group.course?.title || 'Unknown Course'}
+                      </p>
+                      {group.members && group.members.length > 0 && (
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          {group.members.length} member{group.members.length !== 1 ? 's' : ''}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center space-x-4">
+                      {group.leader && (
+                        <div className="text-right">
+                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                            {group.leader.firstName} {group.leader.lastName}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Leader</p>
+                        </div>
+                      )}
+                      {group.members && group.members.length > 0 && (
+                        <div className="text-right">
+                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{group.members.length}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Members</p>
+                        </div>
                       )}
                     </div>
                   </div>
-                )}
-                
-                {/* Leader section */}
-                {group.leader && (
-                  <div className="mb-3">
-                    <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Leader</p>
-                    <p className="text-xs text-gray-700 dark:text-gray-300 font-medium">{group.leader.firstName} {group.leader.lastName}</p>
-                  </div>
-                )}
-                    </div>
-                  </>
-                ) : (
-                  // List view
-                  <div className="flex-1 p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <h3 
-                          className="font-bold text-base"
-                          style={{ color: getCourseColor(group.course?._id || 'default') }}
-                        >
-                          {group.name}
-                        </h3>
-                        <p className="text-gray-500 dark:text-gray-400 text-sm">
-                          {group.course?.title || 'Unknown Course'}
-                        </p>
-                        {group.members && group.members.length > 0 && (
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            {group.members.length} member{group.members.length !== 1 ? 's' : ''}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center space-x-4">
-                        {group.leader && (
-                          <div className="text-right">
-                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{group.leader.firstName} {group.leader.lastName}</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">Leader</p>
-                          </div>
-                        )}
-                        {group.members && group.members.length > 0 && (
-                          <div className="text-right">
-                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{group.members.length}</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">Members</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
+                </div>
               </div>
             );
           })}

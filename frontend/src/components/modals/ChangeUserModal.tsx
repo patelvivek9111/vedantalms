@@ -1,9 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { X, User as UserIcon, Plus, LogOut, Check } from 'lucide-react';
+import { X, Plus, LogOut, Check } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getImageUrl } from '../../services/api';
 import api from '../../services/api';
-import { useNavigate } from 'react-router-dom';
+
+const SECTION_LABEL =
+  'mb-1.5 block text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400';
+const ITEM_CARD =
+  'flex items-center gap-2.5 rounded-lg border border-gray-200/90 bg-white px-2.5 py-2 transition-colors dark:border-gray-700 dark:bg-gray-800 sm:gap-3 sm:px-3 sm:py-2.5';
+const CONTROL =
+  'compact-control h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-[11px] text-gray-900 transition-colors dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 sm:text-xs';
+const CONTROL_FOCUS =
+  'focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:border-blue-500 dark:focus:ring-blue-900/40';
 
 interface StoredUser {
   _id: string;
@@ -220,121 +228,123 @@ export const ChangeUserModal: React.FC<ChangeUserModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-[200] flex items-center justify-center p-3 sm:p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
-          <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100">
-            Change User
-          </h2>
+    <div
+      className="fixed inset-0 z-[200] flex items-end justify-center bg-black/40 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+      onClick={onClose}
+    >
+      <div
+        className="flex max-h-[90vh] w-full flex-col overflow-hidden rounded-t-xl border border-gray-200/90 bg-white dark:border-gray-700 dark:bg-gray-800 sm:max-w-md sm:rounded-xl sm:shadow-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-gray-700/60">
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Change User</h2>
           <button
+            type="button"
             onClick={onClose}
-            className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition-colors hover:bg-gray-100 touch-manipulation dark:hover:bg-gray-700"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+            aria-label="Close change user"
           >
-            <X className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+            <X className="h-4 w-4" strokeWidth={2} />
           </button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4">
-          {/* Available Roles/Users Section */}
+        <div className="flex-1 space-y-4 overflow-y-auto px-4 py-3">
           <div>
-            <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-              Available Users
-            </h3>
-            
+            <h3 className={SECTION_LABEL}>Available Users</h3>
+
             {storedUsers.length === 0 ? (
-              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                <p className="text-sm">No users available. Add a user to switch accounts.</p>
-              </div>
+              <p className="py-6 text-center text-[11px] text-gray-500 dark:text-gray-400">
+                No users available. Add a user to switch accounts.
+              </p>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {storedUsers.map((storedUser) => {
                   const isCurrent = isCurrentUser(storedUser.email);
                   return (
                     <div
                       key={storedUser.email}
-                      className={`relative p-3 sm:p-4 rounded-lg border-2 transition-all cursor-pointer touch-manipulation ${
+                      role="button"
+                      tabIndex={isCurrent ? -1 : 0}
+                      className={`${ITEM_CARD} ${
                         isCurrent
-                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-gray-50 dark:bg-gray-700/50'
+                          ? 'border-blue-500 bg-blue-50/80 ring-2 ring-blue-100 dark:border-blue-400 dark:bg-blue-950/30 dark:ring-blue-900/40'
+                          : 'cursor-pointer hover:border-gray-300 dark:hover:border-gray-600'
                       }`}
                       onClick={() => !isCurrent && handleSwitchUser(storedUser)}
+                      onKeyDown={(e) => {
+                        if (!isCurrent && (e.key === 'Enter' || e.key === ' ')) {
+                          e.preventDefault();
+                          handleSwitchUser(storedUser);
+                        }
+                      }}
                     >
-                      <div className="flex items-center gap-2 sm:gap-3">
-                        {/* Avatar */}
-                        <div className="relative flex-shrink-0">
-                          {storedUser.profilePicture && storedUser.profilePicture.trim() !== '' ? (
-                            <>
+                      <div className="relative shrink-0">
+                        {storedUser.profilePicture && storedUser.profilePicture.trim() !== '' ? (
+                          <>
                             <img
-                              src={storedUser.profilePicture.startsWith('http')
-                                ? storedUser.profilePicture
-                                : getImageUrl(storedUser.profilePicture)}
+                              src={
+                                storedUser.profilePicture.startsWith('http')
+                                  ? storedUser.profilePicture
+                                  : getImageUrl(storedUser.profilePicture)
+                              }
                               alt={`${storedUser.firstName} ${storedUser.lastName}`}
-                                className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600"
+                              className="h-9 w-9 rounded-full border border-gray-200 object-cover dark:border-gray-600"
                               onError={(e) => {
-                                  const target = e.currentTarget;
-                                  target.style.display = 'none';
-                                  const fallback = target.nextElementSibling as HTMLElement;
-                                if (fallback) {
-                                  fallback.style.display = 'flex';
-                                }
+                                const target = e.currentTarget;
+                                target.style.display = 'none';
+                                const fallback = target.nextElementSibling as HTMLElement;
+                                if (fallback) fallback.style.display = 'flex';
                               }}
                             />
-                              {/* Fallback avatar (shown only if image fails to load) */}
-                          <div
-                                className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full ${getRoleColor(storedUser.role)} flex items-center justify-center text-white text-sm sm:text-base font-bold hidden`}
-                              >
-                                {storedUser.firstName?.charAt(0) || ''}{storedUser.lastName?.charAt(0) || 'U'}
-                              </div>
-                            </>
-                          ) : (
                             <div
-                              className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full ${getRoleColor(storedUser.role)} flex items-center justify-center text-white text-sm sm:text-base font-bold`}
-                          >
-                            {storedUser.firstName?.charAt(0) || ''}{storedUser.lastName?.charAt(0) || 'U'}
-                          </div>
-                          )}
-                        </div>
-
-                        {/* User Info */}
-                        <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-gray-900 dark:text-gray-100 text-sm sm:text-base">
-                            {storedUser.firstName} {storedUser.lastName}
-                          </div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                            {storedUser.email}
-                          </div>
-                          {isCurrent && (
-                            <div className="text-xs text-blue-600 dark:text-blue-400 font-medium mt-1">
-                              Current User
+                              className={`hidden h-9 w-9 rounded-full ${getRoleColor(storedUser.role)} items-center justify-center text-[11px] font-bold text-white`}
+                            >
+                              {storedUser.firstName?.charAt(0) || ''}
+                              {storedUser.lastName?.charAt(0) || 'U'}
                             </div>
-                          )}
-                        </div>
-
-                        {/* Current User Indicator */}
-                        {isCurrent && (
-                          <div className="flex-shrink-0">
-                            <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-blue-500 flex items-center justify-center">
-                              <Check className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Remove Button (only if not current user) */}
-                        {!isCurrent && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRemoveUser(storedUser.email);
-                            }}
-                            className="inline-flex min-h-[44px] min-w-[44px] flex-shrink-0 items-center justify-center rounded p-2 transition-colors hover:bg-red-100 touch-manipulation dark:hover:bg-red-900/20"
-                            title="Remove user"
+                          </>
+                        ) : (
+                          <div
+                            className={`flex h-9 w-9 items-center justify-center rounded-full ${getRoleColor(storedUser.role)} text-[11px] font-bold text-white`}
                           >
-                            <LogOut className="h-4 w-4 text-red-500" />
-                          </button>
+                            {storedUser.firstName?.charAt(0) || ''}
+                            {storedUser.lastName?.charAt(0) || 'U'}
+                          </div>
                         )}
                       </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-[11px] font-semibold text-gray-900 dark:text-gray-100 sm:text-xs">
+                          {storedUser.firstName} {storedUser.lastName}
+                        </div>
+                        <div className="truncate text-[10px] text-gray-500 dark:text-gray-400 sm:text-[11px]">
+                          {storedUser.email}
+                        </div>
+                        {isCurrent && (
+                          <div className="mt-0.5 text-[10px] font-medium text-blue-600 dark:text-blue-400">
+                            Current User
+                          </div>
+                        )}
+                      </div>
+
+                      {isCurrent ? (
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 dark:bg-blue-500">
+                          <Check className="h-3 w-3 text-white" strokeWidth={3} />
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveUser(storedUser.email);
+                          }}
+                          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400"
+                          title="Remove user"
+                          aria-label={`Remove ${storedUser.firstName} ${storedUser.lastName}`}
+                        >
+                          <LogOut className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                     </div>
                   );
                 })}
@@ -342,53 +352,47 @@ export const ChangeUserModal: React.FC<ChangeUserModalProps> = ({
             )}
           </div>
 
-          {/* Add User Section */}
           {!showAddUser ? (
             <button
+              type="button"
               onClick={() => setShowAddUser(true)}
-              className="w-full p-3 sm:p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 transition-colors flex items-center justify-center gap-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 touch-manipulation"
+              className="flex h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-gray-300 text-[11px] font-medium text-gray-600 transition-colors hover:border-blue-400 hover:text-blue-600 dark:border-gray-600 dark:text-gray-400 dark:hover:border-blue-500 dark:hover:text-blue-400 sm:text-xs"
             >
-              <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
-              <span className="font-medium text-sm sm:text-base">Add Another User</span>
+              <Plus className="h-3.5 w-3.5" />
+              Add Another User
             </button>
           ) : (
-            <div className="p-3 sm:p-4 border-2 border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-700/30">
-              <h4 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-gray-100 mb-2 sm:mb-3">
+            <div className="overflow-hidden rounded-lg border border-gray-200/90 bg-gray-50/80 p-3 dark:border-gray-700 dark:bg-gray-800/50 sm:p-3.5">
+              <h4 className="mb-2 text-[11px] font-semibold text-gray-900 dark:text-gray-100 sm:text-xs">
                 Login as Another User
               </h4>
-              <form onSubmit={handleAddUser} className="space-y-3">
-                <div>
-                  <input
-                    type="email"
-                    placeholder="Email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <input
-                    type="password"
-                    placeholder="Password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+              <form onSubmit={handleAddUser} className="space-y-2">
+                <input
+                  type="email"
+                  placeholder="Email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className={`${CONTROL} ${CONTROL_FOCUS}`}
+                />
+                <input
+                  type="password"
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className={`${CONTROL} ${CONTROL_FOCUS}`}
+                />
                 {error && (
-                  <div className="text-sm text-red-600 dark:text-red-400">
-                    {error}
-                  </div>
+                  <p className="text-[11px] text-red-600 dark:text-red-400">{error}</p>
                 )}
-                <div className="flex flex-col sm:flex-row gap-2">
+                <div className="flex gap-2 pt-1">
                   <button
                     type="submit"
                     disabled={loading}
-                    className="flex-1 px-4 py-2 text-sm sm:text-base bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors touch-manipulation"
+                    className="h-10 flex-1 rounded-lg bg-blue-600 text-[11px] font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:text-xs"
                   >
-                    {loading ? 'Logging in...' : 'Login'}
+                    {loading ? 'Logging in…' : 'Login'}
                   </button>
                   <button
                     type="button"
@@ -398,7 +402,7 @@ export const ChangeUserModal: React.FC<ChangeUserModalProps> = ({
                       setPassword('');
                       setError('');
                     }}
-                    className="w-full sm:w-auto px-4 py-2 text-sm sm:text-base border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
+                    className="h-10 rounded-lg border border-gray-200 px-3 text-[11px] font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 sm:text-xs"
                   >
                     Cancel
                   </button>

@@ -209,16 +209,14 @@ const CourseDiscussions: React.FC<CourseDiscussionsProps> = ({
   };
 
   const renderThreadCard = (thread: Thread, pinned: boolean) => {
-    const surface = pinned
-      ? 'border-slate-200/90 border-l-[3px] border-l-blue-600 bg-white dark:border-slate-700/80 dark:border-l-blue-500 dark:bg-slate-900/60'
-      : 'border-slate-200/90 bg-white dark:border-slate-700/80 dark:bg-slate-900/60';
-
     return (
       <button
         type="button"
         key={thread._id}
         onClick={() => handleThreadClick(thread._id)}
-        className={`group relative w-full overflow-hidden rounded-2xl border text-left shadow-sm shadow-slate-200/30 transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md hover:shadow-slate-900/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/80 focus-visible:ring-offset-2 dark:shadow-none dark:hover:border-slate-600 dark:hover:shadow-lg dark:hover:shadow-black/20 dark:focus-visible:ring-offset-slate-950 ${surface} p-4 sm:p-5`}
+        className={`group relative w-full border-b border-slate-200/80 px-4 py-4 text-left transition-colors last:border-b-0 hover:bg-slate-50/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500/80 dark:border-slate-800 dark:hover:bg-slate-800/40 sm:px-5 sm:py-5 ${
+          pinned ? 'border-l-[3px] border-l-blue-600 bg-blue-50/30 dark:border-l-blue-500 dark:bg-blue-950/20' : ''
+        }`}
         aria-label={`Open ${pinned ? 'pinned ' : ''}discussion ${thread.title}`}
       >
         <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
@@ -298,16 +296,16 @@ const CourseDiscussions: React.FC<CourseDiscussionsProps> = ({
           modules={modules}
         />
       ) : (
-        <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-b from-white to-slate-50/80 p-4 shadow-sm shadow-slate-200/40 dark:border-slate-800 dark:from-slate-900 dark:to-slate-950/80 dark:shadow-none sm:p-6">
+        <div className="space-y-6">
           {canManageCourseDiscussions && (
-            <div className="mb-6 flex flex-col gap-3 rounded-xl border border-slate-200/70 bg-white/80 p-4 shadow-sm backdrop-blur-sm dark:border-slate-700 dark:bg-slate-800/50 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm font-medium leading-relaxed text-slate-600 dark:text-slate-300">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
                 Create and manage discussion threads for this course
               </p>
               <button
                 type="button"
                 onClick={handleCreateThread}
-                className="inline-flex shrink-0 items-center justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
+                className="inline-flex shrink-0 items-center justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
               >
                 + Create New Thread
               </button>
@@ -356,7 +354,9 @@ const CourseDiscussions: React.FC<CourseDiscussionsProps> = ({
                   </h3>
                   <span className="h-px flex-1 bg-gradient-to-r from-slate-200 to-transparent dark:from-slate-700" aria-hidden />
                 </div>
-                <div className="space-y-3">{threads.filter((t) => t.isPinned).map((thread) => renderThreadCard(thread, true))}</div>
+                <div className="overflow-hidden rounded-xl bg-white ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-700/60">
+                  {threads.filter((t) => t.isPinned).map((thread) => renderThreadCard(thread, true))}
+                </div>
               </section>
             )}
 
@@ -371,7 +371,9 @@ const CourseDiscussions: React.FC<CourseDiscussionsProps> = ({
                   </h3>
                   <span className="h-px flex-1 bg-gradient-to-r from-slate-200 to-transparent dark:from-slate-700" aria-hidden />
                 </div>
-                <div className="space-y-3">{threads.filter((t) => !t.isPinned).map((thread) => renderThreadCard(thread, false))}</div>
+                <div className="overflow-hidden rounded-xl bg-white ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-700/60">
+                  {threads.filter((t) => !t.isPinned).map((thread) => renderThreadCard(thread, false))}
+                </div>
               </section>
             )}
           </div>

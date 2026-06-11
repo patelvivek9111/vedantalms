@@ -32,6 +32,8 @@ services:
       FILE_SCAN_QUEUE_ENABLED: 'true'
       QUIZWAVE_DISTRIBUTED_TIMERS: 'false'
       PLANNER_UX_ENABLED: 'true'
+      FORCE_OBJECT_STORAGE: 'true'
+      PREVIEW_STORAGE: 'cloudinary'
       DISABLE_RATE_LIMIT: 'true'
     depends_on:
       redis:

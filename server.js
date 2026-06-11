@@ -353,6 +353,11 @@ const validateProductionSetup = () => {
     console.error('❌ Production startup blocked: FORCE_OBJECT_STORAGE=true but Cloudinary credentials are missing');
     process.exit(1);
   }
+
+  if (process.env.PREVIEW_STORAGE === 'cloudinary' && !isCloudinaryConfigured()) {
+    console.error('❌ Production startup blocked: PREVIEW_STORAGE=cloudinary but Cloudinary credentials are missing');
+    process.exit(1);
+  }
 };
 validateProductionSetup();
 

@@ -379,6 +379,10 @@ const Attendance: React.FC = () => {
         );
         setIsInstructor(isUserInstructor);
 
+        if (isUserInstructor || user?.role === 'admin') {
+          fetchAttendancePercentages();
+        }
+
         // Fetch attendance data for the current date
         const currentDate = new Date().toISOString().split('T')[0];
         setSelectedDate(currentDate);
@@ -437,7 +441,6 @@ const Attendance: React.FC = () => {
       };
 
       fetchData();
-      fetchAttendancePercentages();
     }, [courseId, user]);
 
 
@@ -901,8 +904,9 @@ const Attendance: React.FC = () => {
   // State for attendance percentages
   const [attendancePercentages, setAttendancePercentages] = useState<Record<string, { percentage: number }>>({});
 
-  // Fetch attendance percentages
+  // Fetch attendance percentages (instructors/admins only)
   const fetchAttendancePercentages = async () => {
+    if (user?.role !== 'teacher' && user?.role !== 'admin') return;
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
@@ -910,8 +914,9 @@ const Attendance: React.FC = () => {
       const headers = { Authorization: `Bearer ${token}` };
       const response = await axios.get(`${API_URL}/api/courses/${courseId}/attendance/percentages`, { headers });
       setAttendancePercentages(response.data);
-    } catch (error) {
-      }
+    } catch {
+      // instructor-only endpoint
+    }
   };
 
   // Calculate individual student attendance percentage

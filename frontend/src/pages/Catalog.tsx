@@ -1,13 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-toastify';
 import api from '../services/api';
-import { Search, Filter, BookOpen, User, Users } from 'lucide-react';
-import { BurgerMenu } from '../components/layout/BurgerMenu';
+import { Search, Filter, BookOpen, User, Users, ChevronDown } from 'lucide-react';
 import ConfirmationModal from '../components/common/ConfirmationModal';
 import SwipeableContainer from '../components/common/SwipeableContainer';
+import { MobileAppShell } from '../components/common/MobileAppShell';
 import { useBottomNavSwipe } from '../hooks/useBottomNavSwipe';
+
+/** Match InboxToolbar control sizing */
+const CONTROL =
+  'h-10 rounded-lg border border-gray-200 transition-colors dark:border-gray-700';
+const CONTROL_TEXT =
+  'text-[10px] font-medium text-gray-600 sm:text-[11px] dark:text-gray-300';
+const DESKTOP_CONTROL_TEXT = 'lg:text-xs lg:font-medium lg:text-gray-600 dark:lg:text-gray-300';
+const CONTROL_FOCUS =
+  'focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:border-blue-500 dark:focus:ring-blue-900/40';
 
 interface Course {
   _id: string;
@@ -40,15 +48,13 @@ interface Course {
 }
 
 const Catalog: React.FC = () => {
-  const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('');
   const [showFilters, setShowFilters] = useState(false);
-  const [showBurgerMenu, setShowBurgerMenu] = useState(false);
 
   // Swipe navigation for bottom nav
   const { handleSwipeLeft, handleSwipeRight, enabled: swipeEnabled } = useBottomNavSwipe();
@@ -137,29 +143,132 @@ const Catalog: React.FC = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 dark:border-blue-400"></div>
+  const catalogContent = loading ? (
+    <div className="flex items-center justify-center py-16">
+      <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent dark:border-blue-400" />
+    </div>
+  ) : error ? (
+    <div className="py-8 text-center">
+      <p className="mb-3 text-[11px] text-red-600 dark:text-red-400 sm:text-xs">{error}</p>
+      <button
+        type="button"
+        onClick={fetchCatalog}
+        className={`${CONTROL} ${CONTROL_TEXT} ${DESKTOP_CONTROL_TEXT} ${CONTROL_FOCUS} inline-flex items-center bg-blue-600 px-4 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600`}
+      >
+        Try Again
+      </button>
+    </div>
+  ) : (
+    <>
+      <div className="space-y-1 lg:mb-4">
+        <h1 className="hidden text-2xl font-bold text-gray-900 dark:text-gray-100 lg:block">
+          Course Catalog
+        </h1>
+        <p className="text-[10px] leading-relaxed text-gray-500 dark:text-gray-400 sm:text-[11px] lg:text-sm lg:text-gray-600">
+          Browse and discover courses available at your institution
+        </p>
       </div>
-    );
-  }
 
-  if (error) {
-    return (
-      <div className="text-center py-8">
-        <div className="text-red-600 dark:text-red-400 mb-4">{error}</div>
-        <div className="space-y-2">
-          <button 
-            onClick={fetchCatalog}
-            className="px-4 py-2 bg-blue-500 dark:bg-blue-600 text-white rounded hover:bg-blue-600 dark:hover:bg-blue-700 mr-2"
+      <div className="space-y-2">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center">
+          <div className="relative min-w-0 flex-1">
+            <label htmlFor="catalog-search" className="sr-only">
+              Search courses
+            </label>
+            <Search
+              size={14}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
+              aria-hidden
+            />
+            <input
+              id="catalog-search"
+              type="search"
+              placeholder="Search courses by title, code, or instructor"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className={`compact-control ${CONTROL} ${CONTROL_TEXT} ${DESKTOP_CONTROL_TEXT} ${CONTROL_FOCUS} w-full bg-gray-50 pl-9 pr-3 text-gray-900 placeholder:font-normal placeholder:text-[10px] placeholder:text-gray-400 focus:bg-white sm:placeholder:text-[11px] dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:bg-gray-800`}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowFilters(!showFilters)}
+            className={`compact-control ${CONTROL} ${CONTROL_TEXT} ${DESKTOP_CONTROL_TEXT} inline-flex w-full items-center justify-center gap-1.5 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700/80 md:w-auto md:shrink-0 md:px-4 ${showFilters ? 'border-blue-400 ring-2 ring-blue-100 dark:border-blue-500 dark:ring-blue-900/40' : ''}`}
+            aria-expanded={showFilters}
           >
-            Try Again
+            <Filter size={14} strokeWidth={2} aria-hidden />
+            Filters
           </button>
         </div>
+
+        {showFilters && (
+          <div className="rounded-lg border border-gray-200/90 bg-white p-2.5 dark:border-gray-700 dark:bg-gray-800 sm:p-3">
+            <label htmlFor="catalog-subject-select" className="sr-only">
+              Subject
+            </label>
+            <div className="relative">
+              <select
+                id="catalog-subject-select"
+                value={selectedSubject}
+                onChange={(e) => setSelectedSubject(e.target.value)}
+                className={`compact-control ${CONTROL} ${CONTROL_TEXT} ${DESKTOP_CONTROL_TEXT} ${CONTROL_FOCUS} w-full appearance-none bg-white px-3 pr-9 dark:bg-gray-800`}
+              >
+                <option value="">All Subjects</option>
+                {subjects.map((subject) => (
+                  <option key={subject} value={subject}>
+                    {subject}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                size={14}
+                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
+                aria-hidden
+              />
+            </div>
+          </div>
+        )}
       </div>
-    );
-  }
+
+      {(searchTerm || selectedSubject) && (
+        <p className="text-[10px] text-gray-500 dark:text-gray-400 sm:text-[11px]">
+          Showing {filteredCourses.length} of {courses.length} courses
+        </p>
+      )}
+
+      {!searchTerm && !selectedSubject ? (
+        <div className="rounded-lg border border-gray-200/90 bg-white py-10 text-center dark:border-gray-700 dark:bg-gray-800">
+          <BookOpen className="mx-auto mb-2.5 h-8 w-8 text-gray-300 dark:text-gray-600" strokeWidth={1.5} />
+          <h3 className="text-[11px] font-semibold text-gray-900 dark:text-gray-100 sm:text-xs">
+            Search for courses
+          </h3>
+          <p className="mx-auto mt-1 max-w-xs px-4 text-[10px] leading-relaxed text-gray-500 dark:text-gray-400 sm:text-[11px]">
+            Enter a search term or select a filter to browse available courses
+          </p>
+        </div>
+      ) : filteredCourses.length === 0 ? (
+        <div className="rounded-lg border border-gray-200/90 bg-white py-10 text-center dark:border-gray-700 dark:bg-gray-800">
+          <BookOpen className="mx-auto mb-2.5 h-8 w-8 text-gray-300 dark:text-gray-600" strokeWidth={1.5} />
+          <h3 className="text-[11px] font-semibold text-gray-900 dark:text-gray-100 sm:text-xs">
+            No courses found
+          </h3>
+          <p className="mt-1 text-[10px] text-gray-500 dark:text-gray-400 sm:text-[11px]">
+            Try adjusting your search criteria or filters
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2 sm:space-y-3">
+          {filteredCourses.map((course) => (
+            <CourseListItem
+              key={course._id}
+              course={course}
+              onEnroll={handleEnrollment}
+              onUnenroll={handleUnenrollment}
+            />
+          ))}
+        </div>
+      )}
+    </>
+  );
 
   return (
     <SwipeableContainer
@@ -169,119 +278,11 @@ const Catalog: React.FC = () => {
       preventScrollInterference={true}
       className="min-h-screen bg-gray-50 dark:bg-gray-900"
     >
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        {/* Top Navigation Bar (Mobile Only) */}
-        <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
-        <div className="relative flex items-center justify-between px-4 py-3">
-          <button
-            onClick={() => setShowBurgerMenu(!showBurgerMenu)}
-            className="text-gray-700 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
-            aria-label="Open account menu"
-          >
-            <User className="w-6 h-6" />
-          </button>
-          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Catalog</h1>
-          <div className="w-10"></div> {/* Spacer for centering */}
-          
-          {/* Burger Menu */}
-          <BurgerMenu
-            showBurgerMenu={showBurgerMenu}
-            setShowBurgerMenu={setShowBurgerMenu}
-          />
+      <MobileAppShell title="Catalog">
+        <div className="mx-auto w-full max-w-7xl space-y-2 px-4 py-3 sm:space-y-3 lg:space-y-4 lg:p-6">
+          {catalogContent}
         </div>
-      </nav>
-      
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 pt-20 lg:pt-4">
-        <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <div className="mb-6 sm:mb-8">
-            <h1 className="hidden lg:block text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">Course Catalog</h1>
-            <p className="hidden lg:block text-sm sm:text-base text-gray-600 dark:text-gray-400">Browse and discover courses available at your institution</p>
-            <p className="lg:hidden text-sm text-gray-600 dark:text-gray-400 mt-2">Browse and discover courses available at your institution</p>
-          </div>
-
-        {/* Search and Filters */}
-        <div className="mb-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            {/* Search Bar */}
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Search courses by title, course code, description, or instructor..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
-              />
-            </div>
-
-            {/* Filter Toggle */}
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center gap-2 px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-            >
-              <Filter className="w-5 h-5" />
-              Filters
-            </button>
-          </div>
-
-          {/* Filter Options */}
-          {showFilters && (
-            <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                             <div>
-                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Subject</label>
-                 <select
-                   value={selectedSubject}
-                   onChange={(e) => setSelectedSubject(e.target.value)}
-                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
-                 >
-                   <option value="">All Subjects</option>
-                   {subjects.map(subject => (
-                     <option key={subject} value={subject}>{subject}</option>
-                   ))}
-                 </select>
-               </div>
-            </div>
-          )}
-        </div>
-
-        {/* Results Count */}
-        {(searchTerm || selectedSubject) && (
-          <div className="mb-6">
-            <p className="text-gray-600 dark:text-gray-400">
-              Showing {filteredCourses.length} of {courses.length} courses
-            </p>
-          </div>
-        )}
-
-        {/* Course List */}
-        {!searchTerm && !selectedSubject ? (
-          <div className="text-center py-12">
-            <BookOpen className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Search for courses</h3>
-            <p className="text-gray-500 dark:text-gray-400">Enter a search term or select a filter to browse available courses</p>
-          </div>
-        ) : filteredCourses.length === 0 ? (
-          <div className="text-center py-12">
-            <BookOpen className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No courses found</h3>
-            <p className="text-gray-500 dark:text-gray-400">Try adjusting your search criteria or filters</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {filteredCourses.map(course => (
-              <CourseListItem
-                key={course._id}
-                course={course}
-                onEnroll={handleEnrollment}
-                onUnenroll={handleUnenrollment}
-              />
-            ))}
-          </div>
-        )}
-        </div>
-      </div>
-      </div>
+      </MobileAppShell>
     </SwipeableContainer>
   );
 };
@@ -353,104 +354,92 @@ const CourseListItem: React.FC<CourseListItemProps> = ({ course, onEnroll, onUne
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-700">
-      {/* Compact View */}
-      <div 
-        className="p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+    <div className="overflow-hidden rounded-lg border border-gray-200/90 bg-white dark:border-gray-700 dark:bg-gray-800">
+      <div
+        className="cursor-pointer p-3 transition-colors hover:bg-gray-50 active:bg-gray-50 dark:hover:bg-gray-700/40 sm:p-4"
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            {/* Course Icon */}
-            <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <BookOpen className="w-5 h-5 text-white" />
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex min-w-0 flex-1 items-start gap-2.5 sm:gap-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-950/50 sm:h-9 sm:w-9">
+              <BookOpen className="h-4 w-4 text-blue-600 dark:text-blue-400" strokeWidth={2} />
             </div>
 
-            {/* Course Info */}
-            <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100">{course.catalog?.courseCode || course.title}</h3>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <h3 className="text-[11px] font-semibold text-gray-900 dark:text-gray-100 sm:text-sm">
+                  {course.catalog?.courseCode || course.title}
+                </h3>
                 {course.catalog?.subject && (
-                  <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 text-xs rounded-full">
+                  <span className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
                     {course.catalog.subject}
                   </span>
                 )}
               </div>
-              
-              <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
-                <div className="flex items-center">
-                  <User className="w-4 h-4 mr-1" />
-                  <span>{course.instructor.firstName} {course.instructor.lastName}</span>
-                </div>
-                {course.catalog?.creditHours && (
-                  <div className="flex items-center">
-                    <BookOpen className="w-4 h-4 mr-1" />
-                    <span>{course.catalog.creditHours} {course.catalog.creditHours === 1 ? 'Credit' : 'Credits'}</span>
-                  </div>
-                )}
-                <div className="flex items-center">
-                  <Users className="w-4 h-4 mr-1" />
-                  <span className={isCapacityOverridden ? 'text-orange-600 dark:text-orange-400 font-medium' : ''}>
-                    {enrollmentText}
-                    {isCapacityOverridden && ' (Over Capacity)'}
-                  </span>
-                </div>
-                {isEnrolled() && (
-                  <div className="flex items-center">
-                    <span className="px-2 py-1 bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 text-xs rounded-full font-medium">
-                      ✓ Enrolled
-                    </span>
-                  </div>
-                )}
 
-                {isOnWaitlist() && (
-                  <div className="flex items-center">
-                    <span className="px-2 py-1 bg-orange-100 dark:bg-orange-900/50 text-orange-800 dark:text-orange-200 text-xs rounded-full font-medium">
-                      📋 Waitlist Position {getWaitlistPosition()}
-                    </span>
-                  </div>
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-gray-500 dark:text-gray-400 sm:text-[11px]">
+                <span className="inline-flex items-center gap-0.5">
+                  <User className="h-3 w-3 shrink-0" />
+                  {course.instructor.firstName} {course.instructor.lastName}
+                </span>
+                {course.catalog?.creditHours && (
+                  <span className="inline-flex items-center gap-0.5">
+                    <BookOpen className="h-3 w-3 shrink-0" />
+                    {course.catalog.creditHours} {course.catalog.creditHours === 1 ? 'cr' : 'crs'}
+                  </span>
                 )}
-                {isCourseFull() && !isOnWaitlist() && (
-                  <div className="flex items-center">
-                    <span className="px-2 py-1 bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200 text-xs rounded-full font-medium">
-                      🚫 Course Full
-                    </span>
-                  </div>
+                <span className={`inline-flex items-center gap-0.5 ${isCapacityOverridden ? 'font-medium text-orange-600 dark:text-orange-400' : ''}`}>
+                  <Users className="h-3 w-3 shrink-0" />
+                  {enrollmentText}
+                  {isCapacityOverridden && ' (over)'}
+                </span>
+              </div>
+
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {isEnrolled() && (
+                  <span className="rounded-full bg-green-50 px-1.5 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-950/40 dark:text-green-300">
+                    Enrolled
+                  </span>
+                )}
+                {isOnWaitlist() && (
+                  <span className="rounded-full bg-orange-50 px-1.5 py-0.5 text-[10px] font-medium text-orange-700 dark:bg-orange-950/40 dark:text-orange-300">
+                    Waitlist #{getWaitlistPosition()}
+                  </span>
+                )}
+                {isCourseFull() && !isOnWaitlist() && !isEnrolled() && (
+                  <span className="rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-700 dark:bg-red-950/40 dark:text-red-300">
+                    Full
+                  </span>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Expand/Collapse Icon */}
-          <div className="flex-shrink-0">
-            <svg
-              className={`w-5 h-5 text-gray-400 dark:text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </div>
+          <ChevronDown
+            size={14}
+            className={`mt-0.5 shrink-0 text-gray-400 transition-transform dark:text-gray-500 ${isExpanded ? 'rotate-180' : ''}`}
+            aria-hidden
+          />
         </div>
       </div>
 
-      {/* Expanded Details */}
       {isExpanded && (
-        <div className="border-t border-gray-200 dark:border-gray-700 p-6 bg-gray-50 dark:bg-gray-900">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Course Description */}
+        <div className="border-t border-gray-100 bg-gray-50/80 p-3 dark:border-gray-700/60 dark:bg-gray-900/50 sm:p-4 lg:p-6">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
             <div>
-              <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">Course Description</h4>
-              <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">
+              <h4 className="mb-1.5 text-[11px] font-semibold text-gray-900 dark:text-gray-100 sm:text-xs">
+                Course Description
+              </h4>
+              <p className="text-[10px] leading-relaxed text-gray-600 dark:text-gray-400 sm:text-[11px]">
                 {course.catalog?.description || course.description}
               </p>
             </div>
 
-            {/* Course Details */}
             <div>
-              <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">Course Details</h4>
-              <div className="space-y-2 text-sm">
+              <h4 className="mb-1.5 text-[11px] font-semibold text-gray-900 dark:text-gray-100 sm:text-xs">
+                Course Details
+              </h4>
+              <div className="space-y-1.5 text-[10px] sm:text-[11px]">
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-400">Instructor:</span>
                   <span className="font-medium text-gray-900 dark:text-gray-100">{course.instructor.firstName} {course.instructor.lastName}</span>
@@ -496,15 +485,14 @@ const CourseListItem: React.FC<CourseListItemProps> = ({ course, onEnroll, onUne
             </div>
           </div>
 
-          {/* Tags */}
           {course.catalog?.tags && course.catalog.tags.length > 0 && (
-            <div className="mt-4">
-              <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">Tags</h4>
+            <div className="mt-3">
+              <h4 className="mb-1.5 text-[11px] font-semibold text-gray-900 dark:text-gray-100 sm:text-xs">Tags</h4>
               <div className="flex flex-wrap gap-1">
                 {course.catalog.tags.map((tag, index) => (
                   <span
                     key={index}
-                    className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs rounded-full"
+                    className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-600 dark:bg-gray-700 dark:text-gray-300"
                   >
                     {tag}
                   </span>
@@ -513,41 +501,57 @@ const CourseListItem: React.FC<CourseListItemProps> = ({ course, onEnroll, onUne
             </div>
           )}
 
-          {/* Enrollment Action */}
-          <div className="mt-6 flex justify-end">
+          <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
             {isEnrolled() ? (
-              <div className="flex items-center space-x-3">
-                <span className="text-green-600 dark:text-green-400 font-medium">✓ Enrolled</span>
+              <>
+                <span className="text-[10px] font-medium text-green-600 dark:text-green-400 sm:text-[11px]">
+                  Enrolled
+                </span>
                 <button
-                  onClick={() => setShowUnenrollConfirm(true)}
-                  className="px-6 py-2 bg-red-600 dark:bg-red-500 text-white rounded-lg hover:bg-red-700 dark:hover:bg-red-600 transition-colors font-medium"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowUnenrollConfirm(true);
+                  }}
+                  className={`${CONTROL} ${CONTROL_TEXT} ${DESKTOP_CONTROL_TEXT} bg-red-600 px-4 text-white hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600`}
                 >
                   Unenroll
                 </button>
-              </div>
+              </>
             ) : isOnWaitlist() ? (
-              <div className="flex items-center space-x-3">
-                <span className="text-orange-600 dark:text-orange-400 font-medium">📋 Waitlist Position {getWaitlistPosition()}</span>
+              <>
+                <span className="text-[10px] font-medium text-orange-600 dark:text-orange-400 sm:text-[11px]">
+                  Waitlist #{getWaitlistPosition()}
+                </span>
                 <button
+                  type="button"
                   disabled
-                  className="px-6 py-2 bg-gray-400 dark:bg-gray-600 text-white rounded-lg cursor-not-allowed transition-colors font-medium"
+                  className={`${CONTROL} ${CONTROL_TEXT} cursor-not-allowed bg-gray-300 text-gray-500 dark:bg-gray-600 dark:text-gray-400`}
                 >
                   On Waitlist
                 </button>
-              </div>
+              </>
             ) : canEnroll() ? (
               <button
-                onClick={handleEnroll}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleEnroll();
+                }}
                 disabled={isEnrolling}
-                className={`px-6 py-2 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium ${
-                  isCourseFull() 
-                    ? 'bg-orange-600 dark:bg-orange-500 hover:bg-orange-700 dark:hover:bg-orange-600' 
-                    : 'bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600'
+                className={`${CONTROL} ${CONTROL_TEXT} ${DESKTOP_CONTROL_TEXT} px-4 text-white disabled:cursor-not-allowed disabled:opacity-50 ${
+                  isCourseFull()
+                    ? 'bg-orange-600 hover:bg-orange-700 dark:bg-orange-500 dark:hover:bg-orange-600'
+                    : 'bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600'
                 }`}
               >
-                {isEnrolling ? 'Processing...' : 
-                  isCourseFull() && user?.role === 'teacher' ? 'Enroll (Override Capacity)' :
-                  isCourseFull() ? 'Join Waitlist' : 'Enroll'}
+                {isEnrolling
+                  ? 'Processing…'
+                  : isCourseFull() && user?.role === 'teacher'
+                    ? 'Enroll (override)'
+                    : isCourseFull()
+                      ? 'Join waitlist'
+                      : 'Enroll'}
               </button>
             ) : null}
           </div>

@@ -1,6 +1,8 @@
 jest.mock('../../models/Assignment', () => ({ findById: jest.fn() }));
 jest.mock('../../models/module.model', () => ({ findById: jest.fn() }));
 jest.mock('../../models/GroupSet', () => ({ findById: jest.fn() }));
+jest.mock('../../models/Submission', () => ({ findOne: jest.fn() }));
+jest.mock('../../models/Group', () => ({ findOne: jest.fn() }));
 jest.mock('../../services/gradeLifecycle.service', () => ({
   getLifecycle: jest.fn(),
   FINALIZED_STATUSES: new Set(['FINALIZED', 'AMENDED']),
@@ -8,6 +10,8 @@ jest.mock('../../services/gradeLifecycle.service', () => ({
 
 const Assignment = require('../../models/Assignment');
 const Module = require('../../models/module.model');
+const Submission = require('../../models/Submission');
+const Group = require('../../models/Group');
 const gradeLifecycleService = require('../../services/gradeLifecycle.service');
 const access = require('../../services/assignmentAccess.service');
 
@@ -58,6 +62,8 @@ function mockContext({ modulePublished = true, assignmentPublished = true, avail
 describe('assignment access policy', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    Submission.findOne.mockReturnValue({ select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(null) }) });
+    Group.findOne.mockReturnValue({ select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(null) }) });
   });
 
   it.each([
@@ -149,6 +155,20 @@ describe('assignment access policy', () => {
     await expect(access.assertStudentCanViewAssignment(student, 'copied-assignment', { now })).rejects.toMatchObject({
       code: 'ASSIGNMENT_NOT_AVAILABLE',
       details: expect.objectContaining({ availableFrom: '2026-02-01T00:00:00.000Z' }),
+    });
+  });
+
+  it('allows students with graded submissions to view unpublished assignments', async () => {
+    mockContext({ modulePublished: false, assignmentPublished: false });
+    Submission.findOne.mockReturnValueOnce({
+      select: jest.fn().mockReturnValue({
+        lean: jest.fn().mockResolvedValue({ _id: 'submission1' }),
+      }),
+    });
+
+    await expect(access.assertStudentCanViewAssignment(student, 'assignment1', { now })).resolves.toMatchObject({
+      assignment: expect.objectContaining({ _id: 'assignment1' }),
+      gradedAccess: true,
     });
   });
 });

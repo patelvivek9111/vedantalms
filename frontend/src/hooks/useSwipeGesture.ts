@@ -46,12 +46,22 @@ export const useSwipeGesture = (options: SwipeGestureOptions = {}): SwipeGesture
 
   const onTouchMove = useCallback((e: React.TouchEvent) => {
     if (!enabled || !touchStart.current) return;
-    
+
+    const touch = e.touches[0];
+    const deltaX = Math.abs(touch.clientX - touchStart.current.x);
+    const deltaY = Math.abs(touch.clientY - touchStart.current.y);
+
+    // Vertical scroll should win; stop tracking horizontal swipes once the gesture is clearly vertical.
+    if (deltaY > deltaX && deltaY > 10) {
+      touchStart.current = null;
+      touchMove.current = null;
+      return;
+    }
+
     if (preventDefault) {
       e.preventDefault();
     }
     
-    const touch = e.touches[0];
     touchMove.current = {
       x: touch.clientX,
       y: touch.clientY,

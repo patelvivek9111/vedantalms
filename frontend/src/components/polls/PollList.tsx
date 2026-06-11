@@ -180,11 +180,11 @@ const PollList: React.FC<PollListProps> = ({ courseId }) => {
   return (
     <div className="space-y-4 sm:space-y-6">
       {isInstructor && !showCreateModal && !editingPoll && (
-        <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50/80 p-3 dark:border-gray-700 dark:bg-gray-800/70">
-          <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Create and manage polls for this course</p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-gray-500 dark:text-gray-400">Create and manage polls for this course</p>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+            className="shrink-0 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
           >
             + Create Poll
           </button>
@@ -245,9 +245,9 @@ const PollList: React.FC<PollListProps> = ({ courseId }) => {
               >
                 ← Back to polls
               </button>
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
+              <div className="overflow-hidden rounded-xl bg-white ring-1 ring-gray-200/70 dark:bg-gray-900 dark:ring-gray-700/60">
                 {/* Poll Header */}
-                <div className="p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700">
+                <div className="border-b border-gray-100 p-4 dark:border-gray-800 sm:p-6">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-start gap-3 sm:gap-0">
                     <div className="flex-1 min-w-0 w-full sm:w-auto">
                       <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
@@ -429,14 +429,14 @@ const PollList: React.FC<PollListProps> = ({ courseId }) => {
           );
         })()
       ) : (
-        <div className="space-y-3">
+        <div className="divide-y divide-gray-100 overflow-hidden rounded-xl bg-white ring-1 ring-gray-200/70 dark:divide-gray-800 dark:bg-gray-900 dark:ring-gray-700/60">
           {polls.map((poll) => {
             const status = getPollStatus(poll);
             return (
               <button
                 key={poll._id}
                 onClick={() => setSelectedPollId(poll._id)}
-                className="w-full rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm transition-all hover:border-gray-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 dark:hover:border-gray-600"
+                className="w-full px-4 py-4 text-left transition hover:bg-gray-50 dark:hover:bg-gray-800/60 sm:px-5"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">

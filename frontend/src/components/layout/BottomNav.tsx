@@ -168,7 +168,7 @@ const BottomNav: React.FC = () => {
               onClick={() => hapticNavigation()}
               className={`flex flex-col items-center justify-center flex-1 h-full relative transition-colors min-h-[44px] min-w-[44px] px-2 py-2 touch-manipulation ${
                 active
-                  ? 'text-red-600 dark:text-red-400'
+                  ? 'text-blue-600 dark:text-blue-400'
                   : 'text-gray-500 dark:text-gray-400'
               }`}
             >

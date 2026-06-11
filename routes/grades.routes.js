@@ -56,6 +56,13 @@ router.post(
 
 // Grade lifecycle (Wave A + B)
 router.get(
+  '/course/:courseId/lifecycle/status',
+  protect,
+  loadCourse,
+  gradeLifecycleController.getCourseGradeLifecycleStatus
+);
+
+router.get(
   '/course/:courseId/lifecycle',
   protect,
   loadCourse,

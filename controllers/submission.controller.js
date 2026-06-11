@@ -1343,7 +1343,7 @@ exports.getStudentSubmission = async (req, res) => {
     }
 
     const payload = gradeReleaseService.redactSubmissionForStudent(submission, assignment);
-    payload.files = fileAssetService.enrichLegacyFileUrls(payload.files, req.user._id);
+    payload.files = await buildClientFileList(submission);
     res.json(payload);
   } catch (error) {
     res.status(500).json({ message: error.message });

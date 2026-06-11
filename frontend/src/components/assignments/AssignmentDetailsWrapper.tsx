@@ -109,7 +109,7 @@ const AssignmentDetailsWrapper: React.FC = () => {
       />
 
       <div
-        className={`flex-1 overflow-auto w-full ${isMobileMenuOpen && isMobileDevice ? 'overflow-hidden lg:overflow-auto' : ''}`}
+        className={`flex-1 w-full overflow-visible lg:overflow-auto ${isMobileMenuOpen && isMobileDevice ? 'overflow-hidden lg:overflow-auto' : ''}`}
       >
         <div className="container mx-auto px-4 pb-6 pt-2 lg:pt-3">
           <div className="mb-3 lg:hidden">

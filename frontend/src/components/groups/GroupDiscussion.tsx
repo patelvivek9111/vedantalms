@@ -277,7 +277,7 @@ const GroupDiscussion: React.FC = () => {
   }
 
   return (
-    <div className={`w-full h-full overflow-y-auto ${isMobileDevice ? 'pb-20' : ''}`}>
+    <div className={`w-full overflow-visible lg:h-full lg:overflow-y-auto ${isMobileDevice ? 'pb-20' : ''}`}>
       {/* Header - Mobile Optimized */}
       <div className={`bg-white dark:bg-gray-800 ${isMobileDevice ? 'p-3 mb-3' : 'p-4 sm:p-6 mb-4 sm:mb-6'} border-b border-gray-200 dark:border-gray-700`}>
         <div className="flex flex-col gap-3">
@@ -356,14 +356,14 @@ const GroupDiscussion: React.FC = () => {
                   <h3 className={`${isMobileDevice ? 'text-xs' : 'text-sm'} font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wide px-3`}>Pinned Threads</h3>
                   <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-600 to-transparent"></div>
                 </div>
-                <div className={`${isMobileDevice ? 'space-y-3 px-4' : 'space-y-4'}`}>
+                <div className="overflow-hidden rounded-xl bg-white ring-1 ring-gray-200/70 dark:bg-gray-900 dark:ring-gray-700/60">
                   {threads
                     .filter(thread => thread.isPinned)
                     .map((thread) => (
                       <div
                         key={thread._id}
                         onClick={() => handleThreadClick(thread._id)}
-                        className={`${isMobileDevice ? 'p-3' : 'p-5'} bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-800/50 border-2 border-yellow-300 dark:border-yellow-700 rounded-xl hover:shadow-xl transition-all cursor-pointer relative hover:border-yellow-400 dark:hover:border-yellow-600 active:scale-[0.98] group touch-manipulation`}
+                        className={`${isMobileDevice ? 'px-4 py-3' : 'px-5 py-4'} relative cursor-pointer border-b border-gray-100 border-l-[3px] border-l-yellow-500 bg-yellow-50/30 transition-colors last:border-b-0 hover:bg-yellow-50/50 dark:border-gray-800 dark:border-l-yellow-600 dark:bg-yellow-950/10 dark:hover:bg-yellow-950/20 group touch-manipulation`}
                       >
                         <div className={`absolute ${isMobileDevice ? 'top-2 right-2' : 'top-3 right-3'} text-yellow-500 dark:text-yellow-400 group-hover:scale-110 transition-transform`}>
                           <svg className={`${isMobileDevice ? 'w-4 h-4' : 'w-5 h-5'}`} fill="currentColor" viewBox="0 0 20 20">
@@ -494,14 +494,14 @@ const GroupDiscussion: React.FC = () => {
                   <h3 className={`${isMobileDevice ? 'text-xs' : 'text-sm'} font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wide px-3`}>All Threads</h3>
                   <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-600 to-transparent"></div>
                 </div>
-                <div className={`${isMobileDevice ? 'space-y-3 px-4' : 'space-y-4'}`}>
+                <div className="overflow-hidden rounded-xl bg-white ring-1 ring-gray-200/70 dark:bg-gray-900 dark:ring-gray-700/60">
                   {threads
                     .filter(thread => !thread.isPinned)
                     .map((thread) => (
                       <div
                         key={thread._id}
                         onClick={() => handleThreadClick(thread._id)}
-                        className={`${isMobileDevice ? 'p-3' : 'p-5'} bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl hover:shadow-xl transition-all cursor-pointer hover:border-blue-300 dark:hover:border-blue-600 active:scale-[0.98] group touch-manipulation`}
+                        className={`${isMobileDevice ? 'px-4 py-3' : 'px-5 py-4'} cursor-pointer border-b border-gray-100 transition-colors last:border-b-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/60 group touch-manipulation`}
                       >
                         <div className={`${isMobileDevice ? 'flex flex-col gap-2' : 'flex justify-between items-start'}`}>
                           <div className="flex-1 min-w-0">

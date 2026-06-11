@@ -238,7 +238,7 @@ const CourseMeetingsSection: React.FC<CourseMeetingsSectionProps> = ({ courseId,
   );
 
   return (
-    <div className="w-full h-full overflow-y-auto pb-20 lg:pb-0">
+    <div className="w-full overflow-visible pb-20 lg:h-full lg:overflow-y-auto lg:pb-0">
       <div className="space-y-4">
         <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900 sm:p-5">
           <div className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50/80 p-3 dark:border-gray-700 dark:bg-gray-800/70">

@@ -1076,7 +1076,7 @@ const CourseDetail: React.FC = () => {
 
       {/* Main Content Area */}
       <div 
-        className={`flex-1 overflow-auto w-full ${isMobileMenuOpen ? 'lg:overflow-auto overflow-hidden' : ''}`}
+        className={`flex-1 w-full overflow-visible lg:overflow-auto ${isMobileMenuOpen ? 'lg:overflow-auto overflow-hidden' : ''}`}
         {...(sectionSwipeHandlers.enabled ? {
           onTouchStart: sectionSwipeHandlers.onTouchStart,
           onTouchMove: sectionSwipeHandlers.onTouchMove,

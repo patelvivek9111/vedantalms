@@ -120,11 +120,14 @@ export function dedupeFileNames(files: File[]): File[] {
 
 export function mapUploadResponse(file: Record<string, unknown>): NormalizedFile {
   const url = String(file.path || file.url || '');
-  const id = file.fileAssetId || file._id || extractFileAssetId(url) || file.filename;
+  const extractedId = extractFileAssetId(url);
+  const rawId = file.fileAssetId || file._id || extractedId;
+  const id =
+    rawId && isMongoObjectId(String(rawId)) ? String(rawId) : extractedId || undefined;
   return {
-    fileAssetId: String(id || ''),
+    fileAssetId: id,
     name: String(file.originalname || file.originalName || file.name || 'file'),
-    url: url || (id ? buildSecureDownloadPath(String(id)) : ''),
+    url: url || (id ? buildSecureDownloadPath(id) : ''),
     size: typeof file.size === 'number' ? file.size : undefined,
     mimeType: typeof file.mimeType === 'string' ? file.mimeType : undefined,
     status: 'done',

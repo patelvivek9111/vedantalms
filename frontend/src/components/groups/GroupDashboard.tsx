@@ -242,7 +242,7 @@ export default function GroupDashboard() {
           canSwitchGroup={isInstructor || isAdmin}
         />
 
-        <div className={`w-full flex-1 overflow-auto ${isMobileMenuOpen ? 'overflow-hidden lg:overflow-auto' : ''}`}>
+        <div className={`w-full flex-1 overflow-visible lg:overflow-auto ${isMobileMenuOpen ? 'overflow-hidden lg:overflow-auto' : ''}`}>
           <div className="container mx-auto px-4 pb-6 pt-2 lg:pt-3">
             {isAssignments && (
               <div className="space-y-3 sm:space-y-6">

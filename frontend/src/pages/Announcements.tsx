@@ -310,9 +310,8 @@ const Announcements: React.FC<AnnouncementsProps> = ({ courseId }) => {
 
   return (
     <div className="space-y-6">
-      <div className={`${FORM_SHELL} p-4 sm:p-6`}>
         {(user?.role === 'teacher' || user?.role === 'admin') && !selectedAnnouncement && !showCreate && (
-          <div className="mb-6 flex flex-col gap-3 rounded-xl border border-slate-200/80 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-800/40 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Course announcements</p>
               <p className="text-sm text-slate-500 dark:text-slate-400">Share updates with everyone in the class.</p>
@@ -469,7 +468,6 @@ const Announcements: React.FC<AnnouncementsProps> = ({ courseId }) => {
         ) : (
           <AnnouncementList announcements={announcements} onSelect={setSelectedAnnouncement} />
         )}
-      </div>
 
       {/* Delete Announcement Confirmation Modal */}
       <ConfirmationModal

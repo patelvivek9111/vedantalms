@@ -1,6 +1,8 @@
 const Assignment = require('../models/Assignment');
 const Module = require('../models/module.model');
 const GroupSet = require('../models/GroupSet');
+const Submission = require('../models/Submission');
+const Group = require('../models/Group');
 const gradeLifecycleService = require('./gradeLifecycle.service');
 const { getSemesterFromCourse } = require('../utils/semesterUtils');
 const {
@@ -106,6 +108,58 @@ async function assertCourseAllowsSubmission(course) {
   }
 }
 
+const GRADED_SUBMISSION_FILTER = {
+  gradeHidden: { $ne: true },
+  $or: [
+    { finalGrade: { $exists: true, $ne: null } },
+    { grade: { $exists: true, $ne: null } },
+    { autoGrade: { $exists: true, $ne: null } },
+    { gradedAt: { $exists: true, $ne: null } },
+  ],
+};
+
+async function studentHasGradedSubmission(userId, assignment) {
+  const assignmentId = normalizeId(assignment);
+  const studentObjectId = normalizeId(userId);
+
+  const directSubmission = await Submission.findOne({
+    assignment: assignmentId,
+    student: studentObjectId,
+    ...GRADED_SUBMISSION_FILTER,
+  })
+    .select('_id')
+    .lean();
+
+  if (directSubmission) {
+    return true;
+  }
+
+  if (!assignment?.isGroupAssignment || !assignment.groupSet) {
+    return false;
+  }
+
+  const group = await Group.findOne({
+    groupSet: normalizeId(assignment.groupSet),
+    members: studentObjectId,
+  })
+    .select('_id')
+    .lean();
+
+  if (!group) {
+    return false;
+  }
+
+  const groupSubmission = await Submission.findOne({
+    assignment: assignmentId,
+    group: group._id,
+    ...GRADED_SUBMISSION_FILTER,
+  })
+    .select('_id')
+    .lean();
+
+  return Boolean(groupSubmission);
+}
+
 async function assertStudentCanViewAssignment(user, assignmentOrId, options = {}) {
   const context = await loadAssignmentContext(assignmentOrId);
   const { assignment, module, course } = context;
@@ -129,7 +183,16 @@ async function assertStudentCanViewAssignment(user, assignmentOrId, options = {}
   }
 
   assertStudentEnrollment(user, course);
-  assertPublishedVisibility({ assignment, module }, options.now || new Date());
+
+  try {
+    assertPublishedVisibility({ assignment, module }, options.now || new Date());
+  } catch (visibilityError) {
+    if (await studentHasGradedSubmission(user._id, assignment)) {
+      return { ...context, previewMetadata: null, gradedAccess: true };
+    }
+    throw visibilityError;
+  }
+
   return { ...context, previewMetadata: null };
 }
 
@@ -159,4 +222,5 @@ module.exports = {
   assertStudentCanViewAssignment,
   assertStudentCanSubmitAssignment,
   loadAssignmentContext,
+  studentHasGradedSubmission,
 };

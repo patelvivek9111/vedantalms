@@ -4,8 +4,13 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { 
   Menu, ArrowLeft, User as UserIcon, Settings, Megaphone, ClipboardList, 
-  HelpCircle, LogOut, CheckSquare, Sun, Moon, Users, Shield, BookOpen, BarChart3, Gauge
+  HelpCircle, LogOut, CheckSquare, Sun, Moon, Users, Shield, BookOpen, BarChart3, Gauge, Check
 } from 'lucide-react';
+
+const SECTION_LABEL =
+  'mb-1.5 block text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400';
+const SETTINGS_CARD =
+  'overflow-hidden rounded-lg border border-gray-200/90 bg-white dark:border-gray-700 dark:bg-gray-800';
 import { 
   getImageUrl, updateUserProfile, uploadProfilePicture, getUserPreferences, 
   updateUserPreferences, getLoginActivity 
@@ -181,91 +186,88 @@ function SettingsSectionInline() {
     }
   };
 
+  const themeOptionClass = (selected: boolean) =>
+    `relative flex h-14 items-center justify-center rounded-lg border transition-colors ${
+      selected
+        ? 'border-blue-500 bg-blue-50/80 ring-2 ring-blue-100 dark:border-blue-400 dark:bg-blue-950/30 dark:ring-blue-900/40'
+        : 'border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/30'
+    } ${saving ? 'opacity-50' : ''}`;
+
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-sm font-semibold mb-3 text-gray-900 dark:text-gray-100">Theme</h3>
-        <div className="grid grid-cols-2 gap-4">
+        <h3 className={SECTION_LABEL}>Theme</h3>
+        <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
             onClick={() => handleThemeChange('light')}
             disabled={saving}
-            className={`relative p-4 rounded-lg border-2 transition-all ${
-              prefs.theme === 'light'
-                ? 'border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20'
-                : 'border-gray-200 dark:border-gray-700'
-            } ${saving ? 'opacity-50' : ''}`}
+            className={themeOptionClass(prefs.theme === 'light')}
+            aria-pressed={prefs.theme === 'light'}
           >
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-12 h-12 rounded-lg bg-white border-2 border-gray-200 shadow-sm flex items-center justify-center">
-                <Sun className="w-6 h-6 text-yellow-500" />
-              </div>
+            <div className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 bg-white shadow-sm dark:border-gray-600">
+              <Sun className="h-4 w-4 text-amber-500" />
             </div>
             {prefs.theme === 'light' && (
-              <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
-                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
+              <span className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 dark:bg-blue-500">
+                <Check className="h-2.5 w-2.5 text-white" strokeWidth={3} />
+              </span>
             )}
           </button>
           <button
             type="button"
             onClick={() => handleThemeChange('dark')}
             disabled={saving}
-            className={`relative p-4 rounded-lg border-2 transition-all ${
-              prefs.theme === 'dark'
-                ? 'border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20'
-                : 'border-gray-200 dark:border-gray-700'
-            } ${saving ? 'opacity-50' : ''}`}
+            className={themeOptionClass(prefs.theme === 'dark')}
+            aria-pressed={prefs.theme === 'dark'}
           >
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-12 h-12 rounded-lg bg-gray-800 border-2 border-gray-700 shadow-sm flex items-center justify-center">
-                <Moon className="w-6 h-6 text-blue-300" />
-              </div>
+            <div className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-700 bg-gray-800 shadow-sm">
+              <Moon className="h-4 w-4 text-blue-300" />
             </div>
             {prefs.theme === 'dark' && (
-              <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
-                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
+              <span className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 dark:bg-blue-500">
+                <Check className="h-2.5 w-2.5 text-white" strokeWidth={3} />
+              </span>
             )}
           </button>
         </div>
-        {error && <div className="text-red-600 dark:text-red-400 text-xs mt-2">{error}</div>}
-        {success && <div className="text-green-600 dark:text-green-400 text-xs mt-2">Theme saved!</div>}
+        {error && <p className="mt-2 text-[11px] text-red-600 dark:text-red-400">{error}</p>}
+        {success && <p className="mt-2 text-[11px] text-blue-600 dark:text-blue-400">Theme saved</p>}
       </div>
-      
-      {/* Online Status Toggle */}
+
       <div>
-        <h3 className="text-sm font-semibold mb-3 text-gray-900 dark:text-gray-100">Privacy</h3>
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-0.5">Show Online Status</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Allow others to see when you're online</div>
+        <h3 className={SECTION_LABEL}>Privacy</h3>
+        <div className={`${SETTINGS_CARD} px-3 py-2.5 sm:px-4 sm:py-3`}>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="text-[11px] font-semibold text-gray-900 dark:text-gray-100 sm:text-xs">
+                Show Online Status
+              </div>
+              <div className="text-[10px] leading-relaxed text-gray-500 dark:text-gray-400 sm:text-[11px]">
+                Allow others to see when you&apos;re online
+              </div>
             </div>
             <button
               type="button"
               onClick={() => handleShowOnlineStatusChange(!prefs.showOnlineStatus)}
               disabled={saving}
-              className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                prefs.showOnlineStatus ? 'bg-green-500 dark:bg-green-600' : 'bg-gray-300 dark:bg-gray-600'
-              } ${saving ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className={`relative h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30 ${
+                prefs.showOnlineStatus ? 'bg-blue-600 dark:bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'
+              } ${saving ? 'cursor-not-allowed opacity-50' : ''}`}
               role="switch"
               aria-checked={prefs.showOnlineStatus}
             >
               <span
-                className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                className={`pointer-events-none absolute top-1 left-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ease-in-out ${
                   prefs.showOnlineStatus ? 'translate-x-5' : 'translate-x-0'
                 }`}
               />
             </button>
           </div>
         </div>
-        {error && <div className="text-red-600 dark:text-red-400 text-xs mt-2">{error}</div>}
-        {success && <div className="text-green-600 dark:text-green-400 text-xs mt-2">Preferences saved!</div>}
+        {success && !error && (
+          <p className="mt-2 text-[11px] text-blue-600 dark:text-blue-400">Preferences saved</p>
+        )}
       </div>
     </div>
   );
@@ -399,28 +401,57 @@ function ActivitySectionInline() {
     fetchActivities();
   }, []);
 
-  if (loading) return <div className="text-sm text-gray-500">Loading...</div>;
-  if (error) return <div className="text-sm text-red-500">{error}</div>;
-  if (activities.length === 0) return <div className="text-sm text-gray-500">No recent activity</div>;
+  if (loading) {
+    return <p className="py-4 text-center text-[11px] text-gray-500 dark:text-gray-400">Loading…</p>;
+  }
+  if (error) {
+    return <p className="py-4 text-center text-[11px] text-red-600 dark:text-red-400">{error}</p>;
+  }
+  if (activities.length === 0) {
+    return <p className="py-4 text-center text-[11px] text-gray-500 dark:text-gray-400">No recent activity</p>;
+  }
 
   return (
-    <div className="space-y-3">
-      {activities.map((activity, index) => (
-        <div key={activity._id || index} className="border-b border-gray-200 dark:border-gray-700 pb-3 last:border-0">
-          <div className="flex justify-between items-start mb-1">
-            <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-              {new Date(activity.timestamp).toLocaleString()}
+    <div className="space-y-1.5">
+      {activities.map((activity, index) => {
+        const device = activity.userAgent || 'Unknown device';
+        const deviceLabel = device.length > 48 ? `${device.slice(0, 48)}…` : device;
+
+        return (
+          <div
+            key={activity._id || index}
+            className={`${SETTINGS_CARD} px-3 py-2.5 sm:px-3.5 sm:py-3`}
+          >
+            <div className="mb-1 flex items-start justify-between gap-2">
+              <time
+                dateTime={activity.timestamp}
+                className="text-[11px] font-semibold text-gray-900 dark:text-gray-100 sm:text-xs"
+              >
+                {new Date(activity.timestamp).toLocaleString()}
+              </time>
+              <span
+                className={`shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-medium ${
+                  activity.success
+                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
+                    : 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400'
+                }`}
+              >
+                {activity.success ? 'Success' : 'Failed'}
+              </span>
             </div>
-            <span className={`text-xs px-2 py-1 rounded ${activity.success ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>
-              {activity.success ? 'Success' : 'Failed'}
-            </span>
+            <div className="space-y-0.5 text-[10px] leading-relaxed text-gray-500 dark:text-gray-400 sm:text-[11px]">
+              <p>
+                <span className="font-medium text-gray-600 dark:text-gray-300">IP</span>{' '}
+                {activity.ipAddress || '—'}
+              </p>
+              <p className="truncate" title={device}>
+                <span className="font-medium text-gray-600 dark:text-gray-300">Device</span>{' '}
+                {deviceLabel}
+              </p>
+            </div>
           </div>
-          <div className="text-xs text-gray-600 dark:text-gray-400">
-            <div>IP: {activity.ipAddress}</div>
-            <div>Device: {activity.userAgent?.substring(0, 50)}...</div>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -456,15 +487,16 @@ export const BurgerMenu: React.FC<BurgerMenuProps> = ({
       <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 w-[calc(100vw-2rem)] max-w-md max-h-[85vh] overflow-y-auto z-[152]">
         {/* Back Button (when viewing a section) */}
         {burgerMenuSection && (
-          <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3">
+          <div className="flex items-center gap-2 border-b border-gray-100 px-4 py-3 dark:border-gray-700/60">
             <button
+              type="button"
               onClick={() => setBurgerMenuSection(null)}
-              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition-colors hover:bg-gray-100 touch-manipulation dark:hover:bg-gray-700"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
               aria-label="Back"
             >
-              <ArrowLeft className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+              <ArrowLeft className="h-4 w-4" strokeWidth={2} />
             </button>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
               {burgerMenuSection === 'profile' && 'Profile'}
               {burgerMenuSection === 'settings' && 'Settings'}
               {burgerMenuSection === 'notifications' && 'Notifications'}
@@ -706,7 +738,7 @@ export const BurgerMenu: React.FC<BurgerMenuProps> = ({
           </div>
         )}
         {burgerMenuSection === 'settings' && (
-          <div className="p-4">
+          <div className="px-4 py-3">
             <SettingsSectionInline />
           </div>
         )}
@@ -716,7 +748,7 @@ export const BurgerMenu: React.FC<BurgerMenuProps> = ({
           </div>
         )}
         {burgerMenuSection === 'activity' && (
-          <div className="p-4">
+          <div className="px-4 py-3">
             <ActivitySectionInline />
           </div>
         )}

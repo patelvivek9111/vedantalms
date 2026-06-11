@@ -6,6 +6,7 @@ import {
   detectPreviewKind,
   extractFileAssetId,
   buildSecureStreamPath,
+  isMongoObjectId,
   type NormalizedFile,
 } from '../../utils/fileTypes';
 import UnsupportedFileBanner from './UnsupportedFileBanner';
@@ -47,6 +48,23 @@ type FilePreviewData = {
   previewCorrupted?: boolean;
 };
 
+function resolveSecureAssetId(file: NormalizedFile): string | null {
+  const candidates = [file.fileAssetId, extractFileAssetId(file.url || '')];
+  for (const candidate of candidates) {
+    if (candidate && isMongoObjectId(String(candidate))) {
+      return String(candidate);
+    }
+  }
+  return null;
+}
+
+function resolveLegacyDirectUrl(file: NormalizedFile, secureAssetId: string | null): string | null {
+  if (secureAssetId) return null;
+  const url = file.url || '';
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  return null;
+}
+
 const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, open, onClose }) => {
   const { downloadFile, error: downloadError, clearError } = useFileDownload();
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -55,22 +73,36 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, open, onClose
   const [previewCorrupted, setPreviewCorrupted] = useState(false);
   const [resolvedFile, setResolvedFile] = useState<NormalizedFile | null>(null);
   const [accessError, setAccessError] = useState('');
+  const [legacyBlobUrl, setLegacyBlobUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open || !file) {
       setPreviewStreamUrl(null);
       setResolvedFile(null);
       setAccessError('');
+      setLegacyBlobUrl(null);
       return;
     }
 
-    const fileAssetId = file.fileAssetId || extractFileAssetId(file.url);
-    if (!fileAssetId) {
+    const secureAssetId = resolveSecureAssetId(file);
+    const legacyDirectUrl = resolveLegacyDirectUrl(file, secureAssetId);
+
+    if (!secureAssetId && !legacyDirectUrl) {
       setAccessError('This attachment has no secure file reference. Re-upload the file or contact your instructor.');
       setResolvedFile(file);
       return;
     }
 
+    if (!secureAssetId && legacyDirectUrl) {
+      setResolvedFile({ ...file, url: legacyDirectUrl });
+      setPreviewStreamUrl(legacyDirectUrl);
+      setPreviewCorrupted(false);
+      setPreviewLoading(false);
+      setAccessError('');
+      return;
+    }
+
+    const fileAssetId = secureAssetId as string;
     const base: NormalizedFile = {
       ...file,
       fileAssetId,
@@ -122,6 +154,58 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, open, onClose
       .finally(() => setPreviewLoading(false));
   }, [open, file]);
 
+  const previewFile = resolvedFile || file;
+  const secureAssetId =
+    previewFile ? resolveSecureAssetId(previewFile) : null;
+  const legacyDirectUrl = previewFile
+    ? resolveLegacyDirectUrl(previewFile, secureAssetId)
+    : null;
+  const fileAssetId = secureAssetId || undefined;
+  const kind = previewFile
+    ? detectPreviewKind({ name: previewFile.name, mimeType: previewFile.mimeType })
+    : ('unsupported' as const);
+  const needsBlob =
+    open &&
+    (Boolean(fileAssetId) || Boolean(legacyDirectUrl)) &&
+    (kind === 'pdf' || kind === 'image' || kind === 'video' || kind === 'audio');
+  const { blobUrl, loading: blobLoading, error: blobError } = useAuthenticatedFileBlob(
+    fileAssetId,
+    needsBlob && Boolean(fileAssetId),
+    'stream'
+  );
+
+  useEffect(() => {
+    if (!open || !legacyDirectUrl || !needsBlob || fileAssetId) {
+      setLegacyBlobUrl(null);
+      return;
+    }
+
+    let revoked: string | null = null;
+    setLegacyBlobUrl(null);
+
+    fetch(legacyDirectUrl)
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`File fetch failed (${res.status})`);
+        }
+        return res.blob();
+      })
+      .then((blob) => {
+        revoked = URL.createObjectURL(blob);
+        setLegacyBlobUrl(revoked);
+      })
+      .catch(() => {
+        setAccessError('Unable to load this file preview. Try downloading the file instead.');
+      });
+
+    return () => {
+      if (revoked) URL.revokeObjectURL(revoked);
+    };
+  }, [open, legacyDirectUrl, needsBlob, fileAssetId]);
+
+  const effectiveBlobUrl = blobUrl || legacyBlobUrl;
+  const isBlobLoading = fileAssetId ? blobLoading : needsBlob && !legacyBlobUrl && !accessError;
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -130,22 +214,6 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, open, onClose
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
-
-  const previewFile = resolvedFile || file;
-  const fileAssetId =
-    previewFile?.fileAssetId || (previewFile?.url ? extractFileAssetId(previewFile.url) : null) || undefined;
-  const kind = previewFile
-    ? detectPreviewKind({ name: previewFile.name, mimeType: previewFile.mimeType })
-    : ('unsupported' as const);
-  const needsBlob =
-    open &&
-    Boolean(fileAssetId) &&
-    (kind === 'pdf' || kind === 'image' || kind === 'video' || kind === 'audio');
-  const { blobUrl, loading: blobLoading, error: blobError } = useAuthenticatedFileBlob(
-    fileAssetId,
-    needsBlob,
-    'stream'
-  );
 
   if (!open || !file) return null;
 
@@ -163,9 +231,13 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, open, onClose
         <button
           type="button"
           className="inline-flex items-center gap-1 text-sm text-indigo-600 dark:text-indigo-400 disabled:opacity-50"
-          disabled={!fileAssetId}
+          disabled={!fileAssetId && !legacyDirectUrl}
           onClick={() => {
-            if (fileAssetId) void downloadFile(display.url, display.name, fileAssetId);
+            if (fileAssetId) {
+              void downloadFile(display.url, display.name, fileAssetId);
+            } else if (legacyDirectUrl) {
+              window.open(legacyDirectUrl, '_blank', 'noopener,noreferrer');
+            }
           }}
         >
           <Download className="w-4 h-4" /> Download
@@ -189,7 +261,7 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, open, onClose
         }}
       />
 
-      {(previewLoading || blobLoading) && (
+      {(previewLoading || isBlobLoading) && (
         <p className="text-sm text-gray-500 mb-2">Loading preview…</p>
       )}
       {previewCorrupted && (
@@ -198,42 +270,46 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, open, onClose
         </p>
       )}
 
-      {!fileAssetId ? (
+      {!fileAssetId && !legacyDirectUrl ? (
         <UnsupportedFileBanner />
       ) : kind === 'image' ? (
-        blobUrl ? (
-          <ImagePreview url={blobUrl} alt={display.name} />
+        effectiveBlobUrl ? (
+          <ImagePreview url={effectiveBlobUrl} alt={display.name} />
         ) : (
           <LoadingInline label="Loading image…" />
         )
       ) : kind === 'pdf' ? (
-        blobUrl ? (
-          <PdfPreview url={blobUrl} title={display.name} />
+        effectiveBlobUrl ? (
+          <PdfPreview url={effectiveBlobUrl} title={display.name} />
         ) : (
           <LoadingInline label="Loading PDF…" />
         )
-      ) : kind === 'office' && fileAssetId && isDocxFile(display) ? (
-        <DocxPreview fileAssetId={fileAssetId} fileName={display.name} />
+      ) : kind === 'office' && isDocxFile(display) && (fileAssetId || legacyDirectUrl) ? (
+        <DocxPreview
+          fileAssetId={fileAssetId}
+          fileName={display.name}
+          directUrl={legacyDirectUrl || undefined}
+        />
       ) : kind === 'office' && fileAssetId ? (
         <OfficePreview fileAssetId={fileAssetId} fileName={display.name} />
       ) : kind === 'text' && fileAssetId ? (
         <TextPreview fileAssetId={fileAssetId} fallbackUrl={previewStreamUrl || undefined} />
       ) : kind === 'audio' ? (
-        blobUrl ? (
-          <MediaPreview url={blobUrl} kind="audio" title={display.name} />
+        effectiveBlobUrl ? (
+          <MediaPreview url={effectiveBlobUrl} kind="audio" title={display.name} />
         ) : (
           <LoadingInline label="Loading audio…" />
         )
       ) : kind === 'video' ? (
-        blobUrl ? (
-          <MediaPreview url={blobUrl} kind="video" title={display.name} />
+        effectiveBlobUrl ? (
+          <MediaPreview url={effectiveBlobUrl} kind="video" title={display.name} />
         ) : (
           <LoadingInline label="Loading video…" />
         )
       ) : (
         <div className="space-y-3">
           <UnsupportedFileBanner />
-          {(kind === 'unsupported' && fileAssetId) && (
+          {(kind === 'unsupported' && (fileAssetId || legacyDirectUrl)) && (
             <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
               <button
                 type="button"

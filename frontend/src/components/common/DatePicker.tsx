@@ -6,6 +6,7 @@ interface DatePickerProps extends Omit<React.InputHTMLAttributes<HTMLInputElemen
   error?: string;
   helperText?: string;
   showTime?: boolean;
+  compact?: boolean;
 }
 
 const DatePicker: React.FC<DatePickerProps> = ({
@@ -13,6 +14,7 @@ const DatePicker: React.FC<DatePickerProps> = ({
   error,
   helperText,
   showTime = false,
+  compact = false,
   value,
   onChange,
   onFocus,
@@ -98,7 +100,11 @@ const DatePicker: React.FC<DatePickerProps> = ({
       <label
         id={labelId}
         htmlFor={inputId}
-        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+        className={
+          compact
+            ? 'mb-1.5 block text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400'
+            : 'mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300'
+        }
       >
         {label}
         {props.required && <span className="text-red-500 ml-1" aria-label="required">*</span>}
@@ -120,18 +126,22 @@ const DatePicker: React.FC<DatePickerProps> = ({
           aria-invalid={error ? 'true' : 'false'}
           aria-required={props.required ? 'true' : undefined}
           className={`
-            w-full min-h-[48px] px-4 sm:px-3 py-3 sm:py-2.5 pr-12 sm:pr-10 border rounded-md 
-            bg-white dark:bg-gray-900 
-            text-gray-900 dark:text-gray-100 text-base
-            focus:outline-none focus:ring-2 
-            transition-all duration-200
+            w-full border bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100
+            focus:outline-none focus:ring-2 transition-all duration-200
             [&::-webkit-calendar-picker-indicator]:hidden
             [&::-webkit-calendar-picker-indicator]:appearance-none
             [&::-webkit-inner-spin-button]:hidden
             [&::-webkit-outer-spin-button]:hidden
-            ${error 
-              ? 'border-red-500 dark:border-red-500 focus:ring-red-500 dark:focus:ring-red-500' 
-              : 'border-gray-300 dark:border-gray-700 focus:ring-blue-500 dark:focus:ring-blue-400'
+            ${
+              compact
+                ? 'compact-control h-10 min-h-0 rounded-lg px-3 pr-10 text-[10px] font-medium sm:text-[11px]'
+                : 'min-h-[48px] rounded-md px-4 py-3 pr-12 text-base sm:px-3 sm:py-2.5 sm:pr-10'
+            }
+            ${error
+              ? 'border-red-500 dark:border-red-500 focus:ring-red-500 dark:focus:ring-red-500'
+              : compact
+                ? 'border-gray-200 focus:border-blue-400 focus:ring-blue-100 dark:border-gray-700 dark:focus:border-blue-500 dark:focus:ring-blue-900/40'
+                : 'border-gray-300 dark:border-gray-700 focus:ring-blue-500 dark:focus:ring-blue-400'
             }
             ${className}
           `}
@@ -149,7 +159,10 @@ const DatePicker: React.FC<DatePickerProps> = ({
           aria-label="Open date picker"
           tabIndex={-1}
         >
-          <Calendar className="w-5 h-5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300" aria-hidden="true" />
+          <Calendar
+            className={`text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 ${compact ? 'h-3.5 w-3.5' : 'h-5 w-5'}`}
+            aria-hidden="true"
+          />
         </button>
       </div>
       

@@ -16,6 +16,17 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
+const CONTROL =
+  'h-10 rounded-lg border border-gray-200 transition-colors dark:border-gray-700';
+const CONTROL_TEXT =
+  'text-[10px] font-medium text-gray-600 sm:text-[11px] dark:text-gray-300';
+const CONTROL_FOCUS =
+  'focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:border-blue-500 dark:focus:ring-blue-900/40';
+const SECTION_LABEL =
+  'mb-1.5 block text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400';
+const ITEM_CARD =
+  'flex items-center gap-2 rounded-lg border border-gray-200/90 bg-white px-2.5 py-2 transition-colors dark:border-gray-700 dark:bg-gray-800 sm:gap-2.5 sm:px-3';
+
 export interface NavItem {
   id: string;
   label: string;
@@ -272,31 +283,39 @@ export const NavCustomizationModal: React.FC<NavCustomizationModalProps> = ({
 
   if (!isOpen) return null;
 
+  const unselectedOptions = availableOptions.filter(
+    (option) => !selectedItems.some((selected) => selected.id === option.id)
+  );
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-[200] flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+    <div
+      className="fixed inset-0 z-[200] flex items-end justify-center bg-black/40 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+      onClick={onClose}
+    >
+      <div
+        className="flex max-h-[90vh] w-full flex-col overflow-hidden rounded-t-xl border border-gray-200/90 bg-white dark:border-gray-700 dark:bg-gray-800 sm:max-w-md sm:rounded-xl sm:shadow-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-gray-700/60">
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
             Customize Navigation
           </h2>
           <button
+            type="button"
             onClick={onClose}
-            className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
             aria-label="Close navigation customization"
           >
-            <X className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+            <X className="h-4 w-4" strokeWidth={2} />
           </button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {/* Selected Items (Draggable) */}
+        <div className="flex-1 space-y-4 overflow-y-auto px-4 py-3">
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+            <h3 className={SECTION_LABEL}>
               Bottom Navigation ({selectedItems.length}/4)
             </h3>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {selectedItems.map((item, index) => {
                 const Icon = item.icon;
                 return (
@@ -312,18 +331,23 @@ export const NavCustomizationModal: React.FC<NavCustomizationModalProps> = ({
                         setDragOverIndex(null);
                       }
                     }}
-                    className={`flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-move transition-all ${
-                      dragOverIndex === index ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20' : ''
-                    } ${draggedItem?.id === item.id ? 'opacity-50' : 'hover:bg-gray-100 dark:hover:bg-gray-600'}`}
+                    className={`${ITEM_CARD} min-h-10 cursor-move ${
+                      dragOverIndex === index
+                        ? 'border-blue-400 bg-blue-50/80 ring-2 ring-blue-100 dark:border-blue-500 dark:bg-blue-950/30 dark:ring-blue-900/40'
+                        : 'hover:bg-gray-50 dark:hover:bg-gray-700/30'
+                    } ${draggedItem?.id === item.id ? 'opacity-50' : ''}`}
                   >
-                    <GripVertical className="h-5 w-5 text-gray-400 dark:text-gray-500 flex-shrink-0" />
-                    <Icon className="h-5 w-5 text-gray-600 dark:text-gray-400 flex-shrink-0" />
-                    <span className="flex-1 text-sm font-medium text-gray-900 dark:text-gray-100">
+                    <GripVertical className="h-4 w-4 shrink-0 text-gray-300 dark:text-gray-600" />
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-gray-50 dark:bg-gray-900/60">
+                      <Icon className="h-3.5 w-3.5 text-gray-600 dark:text-gray-300" />
+                    </div>
+                    <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-gray-900 dark:text-gray-100 sm:text-xs">
                       {item.label}
                     </span>
                     <button
+                      type="button"
                       onClick={() => handleToggleItem(item)}
-                      className="min-h-[44px] rounded px-3 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                      className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-medium text-blue-600 transition-colors hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/40 sm:text-[11px]`}
                     >
                       Remove
                     </button>
@@ -331,70 +355,78 @@ export const NavCustomizationModal: React.FC<NavCustomizationModalProps> = ({
                 );
               })}
               {selectedItems.length === 0 && (
-                <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-                  No items selected. Please add at least one item.
-                </p>
+                <div className={`${ITEM_CARD} justify-center py-6`}>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 sm:text-xs">
+                    Add at least one item below.
+                  </p>
+                </div>
               )}
             </div>
           </div>
 
-          {/* Available Options */}
-          <div>
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-              Available Options
-            </h3>
-            <div className="space-y-2">
-              {availableOptions
-                .filter(option => !selectedItems.some(selected => selected.id === option.id))
-                .map(option => {
+          {unselectedOptions.length > 0 && (
+            <div>
+              <h3 className={SECTION_LABEL}>Available Options</h3>
+              <div className="space-y-1.5">
+                {unselectedOptions.map((option) => {
                   const Icon = option.icon;
                   const isDisabled = selectedItems.length >= 4;
                   return (
                     <button
                       key={option.id}
+                      type="button"
                       onClick={() => handleToggleItem(option)}
                       disabled={isDisabled}
-                      className={`w-full flex items-center gap-3 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg transition-all ${
+                      className={`${ITEM_CARD} w-full ${
                         isDisabled
-                          ? 'opacity-50 cursor-not-allowed'
-                          : 'hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer'
+                          ? 'cursor-not-allowed opacity-50'
+                          : 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/30'
                       }`}
                     >
-                      <Icon className="h-5 w-5 text-gray-600 dark:text-gray-400 flex-shrink-0" />
-                      <span className="flex-1 text-left text-sm font-medium text-gray-900 dark:text-gray-100">
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-gray-50 dark:bg-gray-900/60">
+                        <Icon className="h-3.5 w-3.5 text-gray-600 dark:text-gray-300" />
+                      </div>
+                      <span className="min-w-0 flex-1 truncate text-left text-[11px] font-semibold text-gray-900 dark:text-gray-100 sm:text-xs">
                         {option.label}
                       </span>
-                      {isDisabled && (
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          Max 4 items
+                      {isDisabled ? (
+                        <span className="shrink-0 text-[10px] text-gray-400 dark:text-gray-500">
+                          Max 4
+                        </span>
+                      ) : (
+                        <span className="shrink-0 text-[10px] font-medium text-blue-600 dark:text-blue-400 sm:text-[11px]">
+                          Add
                         </span>
                       )}
                     </button>
                   );
                 })}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between p-4 border-t border-gray-200 dark:border-gray-700 gap-3">
+        <div className="flex shrink-0 flex-col gap-2 border-t border-gray-100 px-4 py-3 dark:border-gray-700/60 sm:flex-row sm:items-center sm:justify-between">
           <button
+            type="button"
             onClick={handleReset}
-            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            className={`${CONTROL} ${CONTROL_TEXT} w-full bg-white px-3 hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 sm:w-auto`}
           >
             Reset to Default
           </button>
-          <div className="flex gap-3">
+          <div className="flex gap-2">
             <button
+              type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              className={`${CONTROL} ${CONTROL_TEXT} ${CONTROL_FOCUS} flex-1 bg-white px-4 hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 sm:flex-none`}
             >
               Cancel
             </button>
             <button
+              type="button"
               onClick={handleSave}
               disabled={selectedItems.length === 0}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-lg transition-colors"
+              className={`${CONTROL} flex-1 px-4 text-[11px] font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600 sm:flex-none sm:text-xs`}
             >
               Save
             </button>

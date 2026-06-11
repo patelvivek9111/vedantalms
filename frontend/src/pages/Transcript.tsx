@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import { API_URL } from '../config';
 import DataTable, { Column } from '../components/common/DataTable';
 import { MobileAppShell } from '../components/common/MobileAppShell';
+import { FORM_ERROR } from '../components/common/formStyles';
 import {
   calculateSGPA,
   calculateCGPA,
@@ -11,6 +13,42 @@ import {
   calculateOverallGPA,
   getIndianGradePoints,
 } from '../utils/transcriptGpa';
+
+const panelClass =
+  'overflow-hidden rounded-lg border border-gray-200/90 bg-white dark:border-gray-700 dark:bg-gray-800';
+const panelHeaderClass =
+  'border-b border-gray-100 px-3 py-2.5 dark:border-gray-700/60 sm:px-4 sm:py-3';
+
+/** Match InboxToolbar control sizing */
+const CONTROL =
+  'h-10 rounded-lg border border-gray-200 transition-colors dark:border-gray-700';
+const CONTROL_TEXT =
+  'text-[10px] font-medium text-gray-600 sm:text-[11px] dark:text-gray-300';
+const DESKTOP_CONTROL_TEXT = 'lg:text-xs lg:font-medium lg:text-gray-600 dark:lg:text-gray-300';
+const CONTROL_FOCUS =
+  'focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:border-blue-500 dark:focus:ring-blue-900/40';
+
+function StatCard({
+  label,
+  value,
+  sublabel,
+  valueClassName = 'text-gray-900 dark:text-gray-100',
+  className = '',
+}: {
+  label: string;
+  value: string | number;
+  sublabel?: string;
+  valueClassName?: string;
+  className?: string;
+}) {
+  return (
+    <div className={`rounded-lg border border-gray-200/80 bg-gray-50/80 p-2.5 dark:border-gray-700/60 dark:bg-gray-900/40 sm:p-3 ${className}`}>
+      <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 sm:text-[11px]">{label}</p>
+      <p className={`mt-0.5 text-base font-bold tabular-nums sm:text-lg ${valueClassName}`}>{value}</p>
+      {sublabel && <p className="mt-0.5 text-[10px] text-gray-400 dark:text-gray-500">{sublabel}</p>}
+    </div>
+  );
+}
 
 interface CourseGrade {
   courseId: string;
@@ -202,148 +240,180 @@ const Transcript: React.FC = () => {
     }
   ], []);
 
-  return (
-    <MobileAppShell title="Transcript" backButtonPath="/dashboard">
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-4 sm:py-6 lg:py-8 px-2 sm:px-4 lg:px-8">
-      <div className="max-w-5xl mx-auto">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 sm:p-6">
-          <div className="mb-4 sm:mb-6">
-            <h1 className="hidden lg:block text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-              Unofficial Transcript
-            </h1>
-            {user && (
-              <p className="text-gray-600 dark:text-gray-400">
-                {user.firstName} {user.lastName} - {user.email}
-              </p>
-            )}
-            <p className="mt-2 text-xs text-gray-500 dark:text-gray-500">
-              Unofficial copy for your records. Official grades appear after your institution posts and finalizes the term.
-            </p>
-          </div>
-
-          {/* Semester Selector */}
-          <div className="mb-4 sm:mb-6">
-            <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Select Semester
-            </label>
-            <select
-              value={selectedSemester ? `${selectedSemester.term}-${selectedSemester.year}` : ''}
-              onChange={(e) => {
-                const [term, year] = e.target.value.split('-');
-                setSelectedSemester({ term, year: parseInt(year) });
-              }}
-              className="block w-full max-w-xs rounded-md border-gray-300 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 text-sm"
-            >
-              <option value="">Select a semester</option>
-              {availableSemesters.map((semester, index) => (
-                <option key={index} value={`${semester.term}-${semester.year}`}>
-                  {semester.term} {semester.year}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {error && (
-            <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-              <p className="text-red-800 dark:text-red-200">{error}</p>
-            </div>
-          )}
-
-          {/* Overall CGPA Section - Always visible if data is available */}
-          {allCoursesData && allCoursesData.courses.length > 0 && (
-            <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 rounded-lg border-2 border-purple-200 dark:border-purple-800">
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100 mb-3 sm:mb-4">
-                Overall Academic Performance
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-                <div className="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4 shadow-sm">
-                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-1">CGPA</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-purple-600 dark:text-purple-400">
-                    {formatGPA(calculateCGPA(allCoursesData.courses))}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">(10-point scale)</p>
-                </div>
-                <div className="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4 shadow-sm">
-                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-1">Overall GPA</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-indigo-600 dark:text-indigo-400">
-                    {formatGPA(calculateOverallGPA(allCoursesData.courses))}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">(4-point scale)</p>
-                </div>
-                <div className="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4 shadow-sm">
-                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-1">Total Credits</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-indigo-600 dark:text-indigo-400">
-                    {allCoursesData.totalCredits}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {!selectedSemester && (
-            <div className="text-center py-12">
-              <p className="text-gray-500 dark:text-gray-400 text-lg">
-                Please select a semester to view your transcript
-              </p>
-            </div>
-          )}
-
-          {loading && (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 dark:border-indigo-400 mx-auto"></div>
-              <p className="mt-2 text-gray-600 dark:text-gray-400">Loading transcript...</p>
-            </div>
-          )}
-
-          {!loading && transcriptData && selectedSemester && (
-            <>
-              {/* Semester Performance Section */}
-              <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
-                <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                  {selectedSemester.term} {selectedSemester.year}
-                </h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mt-3 sm:mt-4">
-                  <div>
-                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">SGPA</p>
-                    <p className="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-                      {formatGPA(calculateSGPA(transcriptData.courses))}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">(10-point scale)</p>
-                  </div>
-                  <div>
-                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Semester GPA</p>
-                    <p className="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-                      {formatGPA(calculateSemesterGPA(transcriptData.courses))}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">(4-point scale)</p>
-                  </div>
-                  <div>
-                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Semester Credits</p>
-                    <p className="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-                      {transcriptData.courses.reduce((sum, course) => sum + (course.creditHours || 0), 0)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {transcriptData.courses.length === 0 ? (
-                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                  <p>No courses found for {selectedSemester.term} {selectedSemester.year}</p>
-                </div>
-              ) : (
-                <DataTable<CourseGrade>
-                  data={transcriptData.courses}
-                  columns={transcriptColumns}
-                  keyExtractor={(course) => course.courseId}
-                  emptyMessage={`No courses found for ${selectedSemester.term} ${selectedSemester.year}`}
-                  pageSize={25}
-                />
-              )}
-            </>
-          )}
+  const renderCourseMobileCard = (course: CourseGrade) => (
+    <div className={`${panelClass} p-3`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400">
+            {course.courseCode || 'N/A'}
+          </p>
+          <p className="mt-0.5 text-[11px] font-semibold leading-snug text-gray-900 dark:text-gray-100 sm:text-xs">
+            {course.courseTitle}
+          </p>
         </div>
+        <span className="shrink-0 text-[11px] font-bold text-blue-600 dark:text-blue-400 sm:text-xs">
+          {course.letterGrade}
+        </span>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-1">
+        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+          {course.creditHours || 0} credits
+        </span>
+        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+          {course.finalGrade.toFixed(2)}%
+        </span>
+        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+          {getIndianGradePoints(course.letterGrade).toFixed(1)} pts
+        </span>
       </div>
     </div>
+  );
+
+  return (
+    <MobileAppShell title="Transcript" backButtonPath="/dashboard">
+      <div className="mx-auto w-full max-w-5xl space-y-2 px-4 py-3 sm:space-y-4 lg:p-6">
+        <div className="space-y-1">
+          <h1 className="hidden text-2xl font-bold text-gray-900 dark:text-gray-100 lg:block">
+            Unofficial Transcript
+          </h1>
+          {user && (
+            <>
+              <p className="text-[11px] font-semibold text-gray-900 dark:text-gray-100 sm:text-xs">
+                {user.firstName} {user.lastName}
+              </p>
+              <p className="text-[10px] text-gray-500 dark:text-gray-400 sm:text-[11px]">{user.email}</p>
+            </>
+          )}
+          <p className="pt-0.5 text-[10px] leading-relaxed text-gray-500 dark:text-gray-400 sm:text-[11px]">
+            Unofficial copy for your records. Official grades appear after your institution posts and finalizes the term.
+          </p>
+        </div>
+
+        <div className="relative">
+          <label htmlFor="transcript-semester-select" className="sr-only">
+            Select Semester
+          </label>
+          <select
+            id="transcript-semester-select"
+            value={selectedSemester ? `${selectedSemester.term}-${selectedSemester.year}` : ''}
+            onChange={(e) => {
+              const [term, year] = e.target.value.split('-');
+              setSelectedSemester({ term, year: parseInt(year) });
+            }}
+            className={`compact-control ${CONTROL} ${CONTROL_TEXT} ${DESKTOP_CONTROL_TEXT} ${CONTROL_FOCUS} w-full cursor-pointer appearance-none bg-white px-3 pr-9 dark:bg-gray-800`}
+          >
+            <option value="">Select a semester</option>
+            {availableSemesters.map((semester, index) => (
+              <option key={index} value={`${semester.term}-${semester.year}`}>
+                {semester.term} {semester.year}
+              </option>
+            ))}
+          </select>
+          <ChevronDown
+            size={14}
+            className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
+            aria-hidden
+          />
+        </div>
+
+        {error && (
+          <div className={FORM_ERROR}>
+            <p>{error}</p>
+          </div>
+        )}
+
+        {allCoursesData && allCoursesData.courses.length > 0 && (
+          <div className={panelClass}>
+            <div className={panelHeaderClass}>
+              <h2 className="text-[11px] font-semibold text-gray-900 dark:text-gray-100 sm:text-xs">
+                Overall Academic Performance
+              </h2>
+            </div>
+            <div className="grid grid-cols-2 gap-2 p-2.5 sm:grid-cols-3 sm:gap-3 sm:p-3">
+              <StatCard
+                label="CGPA"
+                value={formatGPA(calculateCGPA(allCoursesData.courses))}
+                sublabel="10-point scale"
+                valueClassName="text-blue-600 dark:text-blue-400"
+              />
+              <StatCard
+                label="Overall GPA"
+                value={formatGPA(calculateOverallGPA(allCoursesData.courses))}
+                sublabel="4-point scale"
+                valueClassName="text-blue-600 dark:text-blue-400"
+              />
+              <StatCard
+                label="Total Credits"
+                value={allCoursesData.totalCredits}
+                valueClassName="text-gray-900 dark:text-gray-100"
+                className="col-span-2 sm:col-span-1"
+              />
+            </div>
+          </div>
+        )}
+
+        {!selectedSemester && (
+          <div className={`${panelClass} py-8 text-center`}>
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 sm:text-xs">
+              Select a semester to view your transcript
+            </p>
+          </div>
+        )}
+
+        {loading && (
+          <div className={`${panelClass} py-8 text-center`}>
+            <div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent dark:border-blue-400" />
+            <p className="mt-2.5 text-[11px] text-gray-500 dark:text-gray-400 sm:text-xs">Loading transcript…</p>
+          </div>
+        )}
+
+        {!loading && transcriptData && selectedSemester && (
+          <>
+            <div className={panelClass}>
+              <div className={panelHeaderClass}>
+                <h2 className="text-[11px] font-semibold text-gray-900 dark:text-gray-100 sm:text-xs">
+                  {selectedSemester.term} {selectedSemester.year}
+                </h2>
+              </div>
+              <div className="grid grid-cols-2 gap-2 p-2.5 sm:grid-cols-3 sm:gap-3 sm:p-3">
+                <StatCard
+                  label="SGPA"
+                  value={formatGPA(calculateSGPA(transcriptData.courses))}
+                  sublabel="10-point scale"
+                  valueClassName="text-blue-600 dark:text-blue-400"
+                />
+                <StatCard
+                  label="Semester GPA"
+                  value={formatGPA(calculateSemesterGPA(transcriptData.courses))}
+                  sublabel="4-point scale"
+                  valueClassName="text-blue-600 dark:text-blue-400"
+                />
+                <StatCard
+                  label="Semester Credits"
+                  value={transcriptData.courses.reduce((sum, course) => sum + (course.creditHours || 0), 0)}
+                  valueClassName="text-gray-900 dark:text-gray-100"
+                  className="col-span-2 sm:col-span-1"
+                />
+              </div>
+            </div>
+
+            {transcriptData.courses.length === 0 ? (
+              <div className={`${panelClass} py-8 text-center text-[11px] text-gray-500 dark:text-gray-400 sm:text-xs`}>
+                No courses found for {selectedSemester.term} {selectedSemester.year}
+              </div>
+            ) : (
+              <DataTable<CourseGrade>
+                data={transcriptData.courses}
+                columns={transcriptColumns}
+                keyExtractor={(course) => course.courseId}
+                emptyMessage={`No courses found for ${selectedSemester.term} ${selectedSemester.year}`}
+                pageSize={25}
+                renderMobileCard={renderCourseMobileCard}
+              />
+            )}
+          </>
+        )}
+      </div>
     </MobileAppShell>
   );
 };

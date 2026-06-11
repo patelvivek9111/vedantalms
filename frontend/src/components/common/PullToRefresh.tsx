@@ -1,5 +1,8 @@
 import React, { useState, useRef, useEffect, ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
+import { isAtScrollTop, isElementScrollable } from '../../utils/scrollPosition';
+
+export { getEffectiveScrollTop } from '../../utils/scrollPosition';
 
 interface PullToRefreshProps {
   onRefresh: () => Promise<void> | void;
@@ -26,11 +29,38 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
   const [canRefresh, setCanRefresh] = useState(false);
-  
+
   const containerRef = useRef<HTMLDivElement>(null);
   const touchStartY = useRef<number>(0);
-  const scrollTop = useRef<number>(0);
   const isDragging = useRef<boolean>(false);
+  const isRefreshingRef = useRef(false);
+  const canRefreshRef = useRef(false);
+  const onRefreshRef = useRef(onRefresh);
+  const [usesInternalScroll, setUsesInternalScroll] = useState(false);
+
+  useEffect(() => {
+    onRefreshRef.current = onRefresh;
+  }, [onRefresh]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const updateScrollMode = () => {
+      setUsesInternalScroll(isElementScrollable(container));
+    };
+
+    updateScrollMode();
+
+    if (typeof ResizeObserver === 'undefined') {
+      return;
+    }
+
+    const observer = new ResizeObserver(updateScrollMode);
+    observer.observe(container);
+
+    return () => observer.disconnect();
+  }, [children]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -39,13 +69,11 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({
     const handleTouchStart = (e: TouchEvent) => {
       const touch = e.touches[0];
       touchStartY.current = touch.clientY;
-      scrollTop.current = container.scrollTop;
       isDragging.current = false;
     };
 
     const handleTouchMove = (e: TouchEvent) => {
-      if (isRefreshing) {
-        // Only preventDefault if event is cancelable
+      if (isRefreshingRef.current) {
         if (e.cancelable) {
           e.preventDefault();
         }
@@ -54,58 +82,58 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({
 
       const touch = e.touches[0];
       const deltaY = touch.clientY - touchStartY.current;
-      
-      // Update scroll position
-      scrollTop.current = container.scrollTop;
-      
-      // Only allow pull-to-refresh if scrolled to top and pulling down
-      if (scrollTop.current <= 0 && deltaY > 0) {
+      const atTop = isAtScrollTop(e.target);
+
+      // Only allow pull-to-refresh when actually at the top and pulling down
+      if (atTop && deltaY > 0) {
         isDragging.current = true;
-        // Only preventDefault if event is cancelable and we're actually pulling (not just starting)
-        // This prevents the warning when scrolling is already in progress
         if (e.cancelable && deltaY > 10) {
           e.preventDefault();
         }
-        
-        // Calculate pull distance with resistance
-        const resistance = 0.5; // Resistance factor for smoother feel
+
+        const resistance = 0.5;
         const distance = Math.min(deltaY * resistance, threshold * 1.5);
-        
+        const refreshReady = distance >= threshold;
+
         setPullDistance(distance);
         setIsPulling(distance > 0);
-        setCanRefresh(distance >= threshold);
-      } else if (scrollTop.current > 0 || deltaY <= 0) {
-        // Reset if scrolled down or swiping up
+        setCanRefresh(refreshReady);
+        canRefreshRef.current = refreshReady;
+      } else if (!atTop || deltaY <= 0) {
         isDragging.current = false;
         setPullDistance(0);
         setIsPulling(false);
         setCanRefresh(false);
+        canRefreshRef.current = false;
       }
     };
 
     const handleTouchEnd = async () => {
-      if (isRefreshing) return;
+      if (isRefreshingRef.current) return;
 
-      if (canRefresh && isDragging.current) {
+      if (canRefreshRef.current && isDragging.current) {
+        isRefreshingRef.current = true;
         setIsRefreshing(true);
         setIsPulling(false);
         setPullDistance(0);
         setCanRefresh(false);
-        
+        canRefreshRef.current = false;
+
         try {
-          await onRefresh();
+          await onRefreshRef.current();
         } catch (error) {
           console.error('Error refreshing:', error);
         } finally {
+          isRefreshingRef.current = false;
           setIsRefreshing(false);
         }
       } else {
-        // Reset if not refreshing
         setPullDistance(0);
         setIsPulling(false);
         setCanRefresh(false);
+        canRefreshRef.current = false;
       }
-      
+
       isDragging.current = false;
     };
 
@@ -120,15 +148,13 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({
       container.removeEventListener('touchend', handleTouchEnd);
       container.removeEventListener('touchcancel', handleTouchEnd);
     };
-  }, [disabled, isRefreshing, canRefresh, threshold, onRefresh]);
+  }, [disabled, threshold]);
 
-  // Calculate rotation for arrow icon
   const arrowRotation = Math.min((pullDistance / threshold) * 180, 180);
   const opacity = Math.min(pullDistance / threshold, 1);
 
   return (
     <div className={`relative ${className}`}>
-      {/* Pull to refresh indicator */}
       {(isPulling || isRefreshing) && (
         <div
           className="absolute top-0 left-0 right-0 flex items-center justify-center z-50 bg-white dark:bg-gray-800 transition-all duration-200"
@@ -171,11 +197,10 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({
           </div>
         </div>
       )}
-      
-      {/* Content container */}
+
       <div
         ref={containerRef}
-        className="overflow-auto"
+        className={usesInternalScroll ? 'min-h-0 overflow-auto touch-pan-y' : 'touch-pan-y'}
         style={{
           transform: isPulling && !isRefreshing ? `translateY(${Math.min(pullDistance, threshold * 1.5)}px)` : 'translateY(0)',
           transition: isRefreshing ? 'transform 0.3s ease-out' : 'none'
@@ -188,4 +213,3 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({
 };
 
 export default PullToRefresh;
-

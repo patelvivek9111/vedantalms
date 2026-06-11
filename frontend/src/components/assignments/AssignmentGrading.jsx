@@ -131,6 +131,15 @@ const AssignmentGrading = () => {
     
     const deltaX = touch.clientX - swipeStartRef.current.x;
     const deltaY = Math.abs(touch.clientY - swipeStartRef.current.y);
+
+    // Let vertical scrolling win once the gesture is clearly vertical.
+    if (deltaY > Math.abs(deltaX) && deltaY > 10) {
+      setIsSwiping(false);
+      setSwipeProgress(0);
+      swipeStartRef.current = null;
+      swipeCurrentRef.current = null;
+      return;
+    }
     
     // Only show progress for horizontal swipes
     if (Math.abs(deltaX) > deltaY && Math.abs(deltaX) > 10) {

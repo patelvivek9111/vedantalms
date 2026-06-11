@@ -52,6 +52,7 @@ interface CourseContextType {
   error: string | null;
   createCourse: (title: string, description: string, catalogData?: any, semesterData?: any) => Promise<void>;
   updateCourse: (id: string, title?: string, description?: string, catalogData?: any, semesterData?: any, defaultColor?: string) => Promise<void>;
+  updateCourseDefaultColor: (id: string, defaultColor: string) => Promise<void>;
   deleteCourse: (id: string) => Promise<void>;
   enrollStudent: (courseId: string, studentId: string) => Promise<void>;
   unenrollStudent: (courseId: string, studentId: string) => Promise<void>;
@@ -156,6 +157,24 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  const updateCourseDefaultColor = async (id: string, defaultColor: string) => {
+    try {
+      setError(null);
+      const response = await api.put(`/courses/${id}`, { defaultColor });
+      if (response.data.success) {
+        setCourses((prev) =>
+          prev.map((course) => (course._id === id ? response.data.data : course))
+        );
+      } else {
+        setError(response.data.message || 'Failed to update course color');
+        throw new Error(response.data.message || 'Failed to update course color');
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Error updating course color');
+      throw err;
+    }
+  };
+
   const deleteCourse = async (id: string) => {
     try {
       setLoading(true);
@@ -236,6 +255,7 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         error,
         createCourse,
         updateCourse,
+        updateCourseDefaultColor,
         deleteCourse,
         enrollStudent,
         unenrollStudent,
@@ -260,6 +280,7 @@ export const useCourse = () => {
       error: null,
       createCourse: async () => {},
       updateCourse: async () => {},
+      updateCourseDefaultColor: async () => {},
       deleteCourse: async () => {},
       enrollStudent: async () => {},
       unenrollStudent: async () => {},

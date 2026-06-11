@@ -9,10 +9,25 @@ import { useCourse } from '../../contexts/CourseContext';
 import api, { getImageUrl } from '../../services/api';
 import { ToDoPanel } from './ToDoPanel';
 import { useNavigate } from 'react-router-dom';
-import { FileText, User, Plus, ChevronDown, Calendar as CalendarIcon, ChevronLeft, ChevronRight, X } from 'lucide-react';
-import { BurgerMenu } from '../layout/BurgerMenu';
+import { FileText, Plus, ChevronDown, Calendar as CalendarIcon, ChevronLeft, ChevronRight, X, Check } from 'lucide-react';
 import DatePicker from './DatePicker';
 import SwipeableContainer from './SwipeableContainer';
+import { MobileAppShell } from './MobileAppShell';
+import { FORM_ERROR } from './formStyles';
+
+/** Match InboxToolbar control sizing */
+const CONTROL =
+  'h-10 rounded-lg border border-gray-200 transition-colors dark:border-gray-700';
+const CONTROL_TEXT =
+  'text-[10px] font-medium text-gray-600 sm:text-[11px] dark:text-gray-300';
+const CONTROL_FOCUS =
+  'focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:border-blue-500 dark:focus:ring-blue-900/40';
+const ICON_BTN =
+  'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition-colors hover:bg-gray-50 active:bg-gray-100 touch-manipulation dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700/80';
+const FORM_LABEL =
+  'mb-1.5 block text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400';
+const FIELD_CLASS = `compact-control ${CONTROL} ${CONTROL_TEXT} ${CONTROL_FOCUS} w-full bg-white px-3 text-gray-900 placeholder:font-normal placeholder:text-gray-400 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500`;
+const SELECT_CLASS = `${FIELD_CLASS} appearance-none pr-9`;
 import { useBottomNavSwipe } from '../../hooks/useBottomNavSwipe';
 import { useSwipeGesture } from '../../hooks/useSwipeGesture';
 import { hapticNavigation } from '../../utils/hapticFeedback';
@@ -225,102 +240,81 @@ const CustomEvent: React.FC<{ event: RBCEvent }> = ({ event }) => {
   );
 };
 
-// 20 light color palette
+// Professional calendar palette (Google Calendar–inspired)
 const colorPalette = [
-  '#FFB3BA', '#FFDFBA', '#FFFFBA', '#BAFFC9', '#BAE1FF',
-  '#b5ead7', '#c7ceea', '#f3b0c3', '#f6dfeb', '#d0f4de',
-  '#f7d6e0', '#e2f0cb', '#b2f7ef', '#f6eac2', '#f9f9c5',
-  '#e4c1f9', '#a9def9', '#e2f0cb', '#fdffb6', '#caffbf'
+  '#7986CB', '#33B679', '#8E24AA', '#E67C73', '#F6BF26',
+  '#F4511E', '#039BE5', '#3F51B5', '#0B8043', '#D50000',
+  '#616161', '#AD1457', '#009688', '#5C6BC0', '#7CB342',
+  '#FF7043', '#26A69A', '#AB47BC', '#42A5F5', '#78909C',
 ];
 
-// ColorWheelPicker component
-const ColorWheelPicker: React.FC<{
+const CalendarColorPicker: React.FC<{
   colors: string[];
+  selectedColor?: string;
   onSelect: (color: string) => void;
   onClose: () => void;
-  anchorRef: React.RefObject<HTMLButtonElement>;
-  positionRight?: boolean; // For mobile view to position on right side
-}> = ({ colors, onSelect, onClose, anchorRef, positionRight = false }) => {
+}> = ({ colors, selectedColor, onSelect, onClose }) => {
   const pickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        pickerRef.current &&
-        !pickerRef.current.contains(event.target as Node) &&
-        (!anchorRef.current || !anchorRef.current.contains(event.target as Node))
-      ) {
+    function handleClickOutside(event: MouseEvent | TouchEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
         onClose();
       }
     }
-    // Use a small delay to prevent immediate closing when opening
     const timeoutId = setTimeout(() => {
       document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('touchstart', handleClickOutside as any);
+      document.addEventListener('touchstart', handleClickOutside);
     }, 100);
     return () => {
       clearTimeout(timeoutId);
       document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside as any);
+      document.removeEventListener('touchstart', handleClickOutside);
     };
-  }, [onClose, anchorRef]);
-
-  // Position the wheel near the anchor
-  const [style, setStyle] = useState<React.CSSProperties>({});
-  useEffect(() => {
-    if (anchorRef.current && pickerRef.current) {
-      const rect = anchorRef.current.getBoundingClientRect();
-      // Smaller wheel for mobile view
-      const wheelSize = positionRight ? 80 : 112; // 40 * 2 for mobile, 56 * 2 for desktop
-      if (positionRight) {
-        // Position all the way to the right edge of the screen
-        setStyle({
-          position: 'fixed',
-          top: rect.top + (rect.height / 2) - (wheelSize / 2),
-          right: 16, // 16px padding from right edge
-          zIndex: 9999,
-        });
-      } else {
-        // Default: position below the anchor
-        setStyle({
-          position: 'fixed',
-          top: rect.bottom + 8,
-          left: rect.left - 40,
-          zIndex: 9999,
-        });
-      }
-    }
-  }, [anchorRef, positionRight]);
-
-  // Arrange colors in a wheel - smaller for mobile
-  const radius = positionRight ? 32 : 48;
-  const center = positionRight ? 40 : 56;
-  const circleRadius = positionRight ? 10 : 14;
-  const angleStep = (2 * Math.PI) / colors.length;
+  }, [onClose]);
 
   return (
-    <div ref={pickerRef} style={style} className="bg-white dark:bg-gray-800 rounded-full shadow-lg p-2 border border-gray-200 dark:border-gray-700" >
-      <svg width={center * 2} height={center * 2} style={{ display: 'block' }}>
-        {colors.map((color, i) => {
-          const angle = i * angleStep - Math.PI / 2;
-          const x = center + radius * Math.cos(angle);
-          const y = center + radius * Math.sin(angle);
+    <div
+      ref={pickerRef}
+      className="w-full max-w-[240px] rounded-xl border border-slate-200/80 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900"
+      role="dialog"
+      aria-label="Choose calendar color"
+    >
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          Calendar color
+        </span>
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex h-6 w-6 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+          aria-label="Close color picker"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <div className="grid grid-cols-5 gap-2.5">
+        {colors.map((color) => {
+          const isSelected = selectedColor?.toLowerCase() === color.toLowerCase();
           return (
-            <circle
-              key={color + '-' + i}
-              cx={x}
-              cy={y}
-              r={circleRadius}
-              fill={color}
-              stroke="#fff"
-              strokeWidth={positionRight ? 1.5 : 2}
-              className="dark:stroke-gray-700"
-              style={{ cursor: 'pointer', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.08))' }}
+            <button
+              key={color}
+              type="button"
               onClick={() => onSelect(color)}
-            />
+              className={`relative h-8 w-8 rounded-full transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
+                isSelected ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-900' : 'ring-1 ring-black/10 dark:ring-white/15'
+              }`}
+              style={{ backgroundColor: color }}
+              aria-label={`Select color ${color}`}
+              aria-pressed={isSelected}
+            >
+              {isSelected && (
+                <Check className="absolute inset-0 m-auto h-4 w-4 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]" strokeWidth={3} />
+              )}
+            </button>
           );
         })}
-      </svg>
+      </div>
     </div>
   );
 };
@@ -335,7 +329,6 @@ const CalendarFilterRow: React.FC<{
   colorPickerActive?: boolean;
   onToggle: () => void;
   onColorClick: (e: React.MouseEvent) => void;
-  colorDotRef: (el: HTMLButtonElement | null) => void;
 }> = ({
   opt,
   checked,
@@ -344,7 +337,6 @@ const CalendarFilterRow: React.FC<{
   colorPickerActive,
   onToggle,
   onColorClick,
-  colorDotRef,
 }) => (
   <div className="flex items-center gap-2.5 px-3 py-2.5 transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/30">
     <input
@@ -357,7 +349,6 @@ const CalendarFilterRow: React.FC<{
     />
     <button
       type="button"
-      ref={colorDotRef}
       className={`icon-only flex h-7 w-7 shrink-0 items-center justify-center rounded-full p-0 transition-transform hover:scale-105 touch-manipulation ${
         colorPickerActive ? 'ring-2 ring-blue-500 ring-offset-1 dark:ring-offset-gray-800' : ''
       }`}
@@ -396,11 +387,7 @@ const CalendarPage: React.FC = () => {
   const [calendarColors, setCalendarColors] = useState<Record<string, string>>({});
   // For color wheel popover
   const [colorWheelOpen, setColorWheelOpen] = useState<string | null>(null); // calendarId or null
-  const colorDotRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const navigate = useNavigate();
-  // Mobile view state
-  const [showBurgerMenu, setShowBurgerMenu] = useState(false);
-
   // Swipe navigation for bottom nav
   const { handleSwipeLeft, handleSwipeRight, enabled: swipeEnabled } = useBottomNavSwipe();
   const [mobileViewMode, setMobileViewMode] = useState<'week' | 'month'>('month');
@@ -856,235 +843,241 @@ const CalendarPage: React.FC = () => {
     };
 
     return (
-      <div 
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] lg:flex lg:items-center lg:justify-center lg:p-4 animate-in fade-in duration-200"
+      <div
+        className="fixed inset-0 z-[200] bg-black/40 backdrop-blur-sm lg:flex lg:items-center lg:justify-center lg:p-4"
         onClick={() => { setModalOpen(false); setEditingEvent(null); }}
       >
         <form
-          className="bg-white dark:bg-gray-800 w-full h-full flex flex-col shadow-2xl lg:h-auto lg:max-w-lg lg:max-h-[90vh] lg:rounded-2xl animate-in slide-in-from-bottom-full duration-300 lg:slide-in-from-bottom-0"
+          className="flex h-full w-full flex-col bg-white dark:bg-gray-800 lg:h-auto lg:max-h-[90vh] lg:max-w-md lg:overflow-hidden lg:rounded-xl lg:border lg:border-gray-200/90 lg:shadow-lg dark:lg:border-gray-700"
           onSubmit={handleLocalSubmit}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Mobile Header - Sticky with gradient */}
-          <div className="flex justify-between items-center px-4 py-3 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-800 dark:to-gray-800 border-b border-gray-200/50 dark:border-gray-700 flex-shrink-0 lg:px-6 lg:py-4 lg:bg-white lg:dark:bg-gray-800">
-            <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 lg:text-lg">{isEdit ? 'Edit Event' : 'Create Event'}</h2>
-            <button 
-              type="button" 
-              className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 text-xl w-8 h-8 flex items-center justify-center rounded-full transition-all touch-manipulation active:scale-95 lg:text-2xl lg:w-auto lg:h-auto" 
-              onClick={() => { setModalOpen(false); setEditingEvent(null); }}
-            >
-              &times;
-            </button>
+          <div className="shrink-0 border-b border-gray-100 px-4 py-3 dark:border-gray-700/60">
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              {isEdit ? 'Edit Event' : 'Create Event'}
+            </h2>
           </div>
 
-          {/* Scrollable Content */}
-          <div className="flex-1 overflow-y-auto px-4 py-3 bg-gray-50/50 dark:bg-gray-900/50 lg:px-6 lg:py-4 lg:bg-white lg:dark:bg-gray-800">
-            {/* Tabs */}
-            <div className="flex gap-1.5 mb-4 overflow-x-auto -mx-4 px-4 pb-2 lg:mx-0 lg:px-0 lg:border-b lg:border-gray-200 lg:dark:border-gray-700">
-              {eventTypes.map(tab => (
-                <button
-                  key={tab.value}
-                  type="button"
-                  className={`px-3 py-2 font-semibold whitespace-nowrap flex-shrink-0 touch-manipulation text-xs rounded-lg transition-all active:scale-95 lg:px-4 lg:py-2 lg:text-sm lg:rounded-none lg:border-b-4 ${
-                    activeTab === tab.value 
-                      ? 'bg-blue-600 dark:bg-blue-500 text-white lg:bg-transparent lg:shadow-none lg:border-purple-600 dark:lg:border-purple-400 lg:text-purple-700 dark:lg:text-purple-300' 
-                      : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 lg:border-0 lg:hover:bg-transparent'
-                  }`}
-                  onClick={() => {
-                    setActiveTab(tab.value);
-                    setEditingEvent(editingEvent ? { ...editingEvent, type: tab.value } : null);
-                    if (!colorManuallySet) {
-                      setLocalColor(lightColors[tab.value] || lightColors.Default);
-                    }
-                  }}
-                >
-                  {tab.label}
-                </button>
-              ))}
+          <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
+            <div
+              className={`${CONTROL} flex gap-0.5 bg-gray-100 p-0.5 dark:bg-gray-800`}
+              role="tablist"
+              aria-label="Event type"
+            >
+              {eventTypes.map((tab) => {
+                const active = activeTab === tab.value;
+                return (
+                  <button
+                    key={tab.value}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    className={`flex h-8 min-w-0 flex-1 items-center justify-center truncate rounded-md px-1 text-[10px] font-medium transition-colors touch-manipulation sm:text-[11px] ${
+                      active
+                        ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-gray-50'
+                        : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                    }`}
+                    onClick={() => {
+                      setActiveTab(tab.value);
+                      setEditingEvent(editingEvent ? { ...editingEvent, type: tab.value } : null);
+                      if (!colorManuallySet) {
+                        setLocalColor(lightColors[tab.value] || lightColors.Default);
+                      }
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
             </div>
 
-            {/* Title Field */}
-            <div className="mb-4">
-              <label htmlFor="event-title" className="block text-xs font-semibold mb-1.5 text-gray-700 dark:text-gray-300 lg:text-sm lg:mb-1">
+            <div>
+              <label htmlFor="event-title" className={FORM_LABEL}>
                 Title <span className="text-red-500">*</span>
               </label>
               <input
                 id="event-title"
                 name="title"
-                className="border-2 border-gray-200 dark:border-gray-700 p-2.5 w-full rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm lg:p-2 lg:text-sm"
+                className={FIELD_CLASS}
                 placeholder="Enter event title"
                 type="text"
                 value={localTitle}
-                onChange={e => setLocalTitle(e.target.value)}
+                onChange={(e) => setLocalTitle(e.target.value)}
                 required
               />
             </div>
 
-            {/* Color Picker - Only for non-ToDo */}
             {activeTab !== 'My To Do' && (
-              <div className="mb-4">
-                <label htmlFor="event-color" className="block text-xs font-semibold mb-2 text-gray-700 dark:text-gray-300 lg:text-sm lg:mb-1">Color</label>
+              <div>
+                <label htmlFor="event-color" className={FORM_LABEL}>Color</label>
                 <div className="flex items-center gap-2">
-                  <div className="relative flex-shrink-0">
-                    <input
-                      id="event-color"
-                      name="color"
-                      type="color"
-                      className="w-10 h-10 p-0 border-2 border-gray-200 dark:border-gray-600 rounded-lg bg-transparent cursor-pointer touch-manipulation lg:w-10 lg:h-10"
-                      value={localColor}
-                      onChange={e => { setLocalColor(e.target.value); setColorManuallySet(true); }}
-                      style={{ background: 'none' }}
-                    />
-                  </div>
+                  <input
+                    id="event-color"
+                    name="color"
+                    type="color"
+                    className="h-10 w-10 shrink-0 cursor-pointer rounded-lg border border-gray-200 bg-transparent p-1 touch-manipulation dark:border-gray-700"
+                    value={localColor}
+                    onChange={(e) => { setLocalColor(e.target.value); setColorManuallySet(true); }}
+                  />
                   <button
                     type="button"
-                    className="flex-1 px-3 py-2 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 rounded-lg text-xs font-medium text-gray-700 dark:text-gray-300 touch-manipulation transition-all active:scale-95 shadow-sm lg:px-3 lg:py-1 lg:text-sm"
+                    className={`${FIELD_CLASS} flex-1 text-left`}
                     onClick={() => {
                       const randomColor = colorPalette[Math.floor(Math.random() * colorPalette.length)];
                       setLocalColor(randomColor);
                       setColorManuallySet(true);
                     }}
                   >
-                    🎲 Random
+                    Random color
                   </button>
                 </div>
               </div>
             )}
 
-            {/* Date Field */}
-            <div className="mb-4">
-              <DatePicker
-                id="event-date"
-                name="date"
-                label="Date"
-                required
-                value={localDate}
-                onChange={e => setLocalDate(e.target.value)}
-              />
-            </div>
+            <DatePicker
+              id="event-date"
+              name="date"
+              label="Date"
+              required
+              compact
+              value={localDate}
+              onChange={(e) => setLocalDate(e.target.value)}
+            />
 
-            {/* Time Fields - Only for non-ToDo */}
             {activeTab !== 'My To Do' && (
-              <div className="mb-4">
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div>
-                    <label htmlFor="event-time-from" className="block text-xs font-semibold mb-1.5 text-gray-700 dark:text-gray-300 lg:text-sm lg:mb-1">
-                      From <span className="text-red-500">*</span>
-                    </label>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label htmlFor="event-time-from" className={FORM_LABEL}>
+                    From <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
                     <select
                       id="event-time-from"
                       name="startTime"
-                      className="border-2 border-gray-200 dark:border-gray-700 p-2.5 w-full rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm lg:p-2 lg:text-sm"
+                      className={SELECT_CLASS}
                       value={localStartTime}
-                      onChange={e => setLocalStartTime(e.target.value)}
+                      onChange={(e) => setLocalStartTime(e.target.value)}
                       required
                     >
-                      {timeOptions.map(opt => (
+                      {timeOptions.map((opt) => (
                         <option key={opt} value={opt}>{opt}</option>
                       ))}
                     </select>
+                    <ChevronDown
+                      size={14}
+                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                      aria-hidden
+                    />
                   </div>
-                  <div>
-                    <label htmlFor="event-time-to" className="block text-xs font-semibold mb-1.5 text-gray-700 dark:text-gray-300 lg:text-sm lg:mb-1">
-                      To <span className="text-red-500">*</span>
-                    </label>
+                </div>
+                <div>
+                  <label htmlFor="event-time-to" className={FORM_LABEL}>
+                    To <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
                     <select
                       id="event-time-to"
                       name="endTime"
-                      className="border-2 border-gray-200 dark:border-gray-700 p-2.5 w-full rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm lg:p-2 lg:text-sm"
+                      className={SELECT_CLASS}
                       value={localEndTime}
-                      onChange={e => setLocalEndTime(e.target.value)}
+                      onChange={(e) => setLocalEndTime(e.target.value)}
                       required
                     >
-                      {timeOptions.map(opt => (
+                      {timeOptions.map((opt) => (
                         <option key={opt} value={opt}>{opt}</option>
                       ))}
                     </select>
+                    <ChevronDown
+                      size={14}
+                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                      aria-hidden
+                    />
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Error Message */}
             {error && (
-              <div className="mb-3 p-2.5 bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800 rounded-lg shadow-sm">
-                <div className="text-red-600 dark:text-red-400 text-xs font-medium flex items-center gap-1.5">
-                  <span>⚠️</span>
-                  <span>{error}</span>
-                </div>
+              <div className={`${FORM_ERROR} text-[11px] sm:text-xs`}>
+                {error}
               </div>
             )}
 
-            {/* Location Field - Only for non-ToDo */}
             {activeTab !== 'My To Do' && (
-              <div className="mb-4">
-                <label htmlFor="event-location" className="block text-xs font-semibold mb-1.5 text-gray-700 dark:text-gray-300 lg:text-sm lg:mb-1">Location</label>
+              <div>
+                <label htmlFor="event-location" className={FORM_LABEL}>Location</label>
                 <input
                   id="event-location"
                   name="location"
-                  className="border-2 border-gray-200 dark:border-gray-700 p-2.5 w-full rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm lg:p-2 lg:text-sm"
+                  className={FIELD_CLASS}
                   placeholder="Add location (optional)"
                   type="text"
                   value={localLocation}
-                  onChange={e => setLocalLocation(e.target.value)}
+                  onChange={(e) => setLocalLocation(e.target.value)}
                 />
               </div>
             )}
 
-            {/* Calendar Select - Only for non-ToDo and teachers/admins */}
             {activeTab !== 'My To Do' && isTeacherOrAdmin && (
-              <div className="mb-4">
-                <label htmlFor="event-calendar" className="block text-xs font-semibold mb-1.5 text-gray-700 dark:text-gray-300 lg:text-sm lg:mb-1">
+              <div>
+                <label htmlFor="event-calendar" className={FORM_LABEL}>
                   Calendar <span className="text-red-500">*</span>
                 </label>
-                <select
-                  id="event-calendar"
-                  name="calendar"
-                  className="border-2 border-gray-200 dark:border-gray-700 p-2.5 w-full rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm lg:p-2 lg:text-sm"
-                  value={localCalendar}
-                  onChange={e => {
-                    setLocalCalendar(e.target.value);
-                    if (!colorManuallySet) {
-                      const calIdx = calendarOptions.findIndex(opt => opt.value === e.target.value);
-                      setLocalColor(getCalendarColor(e.target.value, calIdx));
-                    }
-                  }}
-                  required
-                >
-                  {calendarOptions.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <select
+                    id="event-calendar"
+                    name="calendar"
+                    className={SELECT_CLASS}
+                    value={localCalendar}
+                    onChange={(e) => {
+                      setLocalCalendar(e.target.value);
+                      if (!colorManuallySet) {
+                        const calIdx = calendarOptions.findIndex((opt) => opt.value === e.target.value);
+                        setLocalColor(getCalendarColor(e.target.value, calIdx));
+                      }
+                    }}
+                    required
+                  >
+                    {calendarOptions.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                  <ChevronDown
+                    size={14}
+                    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                    aria-hidden
+                  />
+                </div>
               </div>
             )}
           </div>
 
-          {/* Footer - Sticky */}
-          <div className="flex justify-between items-center px-4 py-3 bg-white dark:bg-gray-800 border-t-2 border-gray-100 dark:border-gray-700 gap-2 flex-shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] lg:px-6 lg:py-4 lg:mt-6 lg:border-t-0 lg:shadow-none">
-            <button 
-              type="button" 
-              className="bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 text-xs font-medium touch-manipulation flex-1 transition-all active:scale-95 shadow-sm lg:flex-none lg:px-4 lg:py-2 lg:text-sm"
+          <div className="flex shrink-0 items-center justify-between gap-2 border-t border-gray-100 px-4 py-3 dark:border-gray-700/60">
+            <button
+              type="button"
+              className={`${CONTROL} ${CONTROL_TEXT} ${CONTROL_FOCUS} bg-white px-4 hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700`}
+              onClick={() => { setModalOpen(false); setEditingEvent(null); }}
             >
-              More Options
+              Cancel
             </button>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
               {(() => {
                 const canDelete = isEdit && (isTeacherOrAdmin || (user && editingEvent?.calendar === user._id));
                 return canDelete ? (
                   <button
                     type="button"
-                    className="bg-red-500 dark:bg-red-600 hover:bg-red-600 dark:hover:bg-red-700 text-white px-3 py-2 rounded-lg text-xs font-semibold touch-manipulation transition-all active:scale-95 shadow-lg shadow-red-500/30 lg:px-4 lg:py-2 lg:text-sm lg:shadow-none"
+                    className={`${CONTROL} ${CONTROL_TEXT} bg-red-600 px-4 text-white hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600`}
                     onClick={handleDelete}
                   >
                     Delete
                   </button>
                 ) : null;
               })()}
-              <button 
-                type="submit" 
-                className="bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-bold touch-manipulation transition-all active:scale-95 lg:px-4 lg:py-2 lg:text-sm"
+              <button
+                type="submit"
+                className={`${CONTROL} px-4 text-[11px] font-semibold text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 sm:text-xs`}
               >
-                ✓ {isEdit ? 'Save Changes' : 'Create Event'}
+                {isEdit ? 'Save' : 'Create'}
               </button>
             </div>
           </div>
@@ -1164,218 +1157,200 @@ const CalendarPage: React.FC = () => {
       preventScrollInterference={true}
       className="min-h-screen bg-gray-50 dark:bg-gray-900"
     >
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        {/* Mobile Top Navigation */}
-        <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
-        <div className="relative flex items-center justify-between px-4 py-3">
-          <button
-            type="button"
-            onClick={() => setShowBurgerMenu(!showBurgerMenu)}
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-gray-700 transition-colors hover:bg-gray-100 touch-manipulation dark:text-gray-300 dark:hover:bg-gray-700"
-            aria-label="Open account menu"
-          >
-            <User className="w-6 h-6" />
-          </button>
-          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Calendar</h1>
+      <MobileAppShell
+        title="Calendar"
+        customRightAction={
           <button
             type="button"
             onClick={() => setShowCalendarsModal(true)}
             className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-blue-600 transition-colors hover:bg-gray-100 touch-manipulation dark:text-blue-400 dark:hover:bg-gray-700"
             aria-label="Manage calendars"
           >
-            <CalendarIcon className="w-6 h-6" />
+            <CalendarIcon className="h-5 w-5" strokeWidth={2} />
           </button>
-          
-          {/* Burger Menu */}
-          <BurgerMenu
-            showBurgerMenu={showBurgerMenu}
-            setShowBurgerMenu={setShowBurgerMenu}
-          />
-        </div>
-      </nav>
-
+        }
+      >
       {/* Mobile View */}
-      <div className="lg:hidden pt-20 pb-16 bg-gray-50 dark:bg-gray-900 min-h-screen">
-        {/* Calendar Header */}
-        <div className="border-b border-gray-200 bg-white/95 px-3 py-2.5 shadow-sm backdrop-blur-sm dark:border-gray-700 dark:bg-gray-800/95 dark:bg-gray-800">
-          <div className="mb-2 flex items-center justify-between gap-2">
+      <div className="lg:hidden">
+        <div className="space-y-2 px-4 py-3">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => {
                 if (mobileViewMode === 'month') {
-                  setSelectedDate(prev => subMonths(prev, 1));
+                  setSelectedDate((prev) => subMonths(prev, 1));
                 } else {
-                  setSelectedDate(prev => subWeeks(prev, 1));
+                  setSelectedDate((prev) => subWeeks(prev, 1));
                 }
               }}
-              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl p-2 transition-all hover:bg-gray-100 active:scale-95 touch-manipulation dark:hover:bg-gray-700"
+              className={ICON_BTN}
               aria-label="Previous period"
             >
-              <span className="text-lg font-bold text-gray-700 dark:text-gray-300">‹</span>
+              <ChevronLeft className="h-4 w-4" strokeWidth={2} />
             </button>
             <button
               type="button"
               onClick={() => setMobileViewMode(mobileViewMode === 'month' ? 'week' : 'month')}
-              className="flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-gray-50 px-3 py-1.5 transition-all hover:bg-gray-100 active:scale-95 touch-manipulation dark:bg-gray-700/50 dark:hover:bg-gray-700"
+              className={`compact-control ${CONTROL} ${CONTROL_TEXT} ${CONTROL_FOCUS} flex flex-1 items-center justify-center gap-1 bg-white dark:bg-gray-800`}
               aria-label={`Switch to ${mobileViewMode === 'month' ? 'week' : 'month'} view`}
             >
-              <span className="text-base font-bold text-gray-900 dark:text-gray-100">
+              <span className="truncate text-[11px] font-semibold text-gray-900 dark:text-gray-100">
                 {mobileViewMode === 'week'
-                  ? `${format(startOfWeek(selectedDate, { weekStartsOn: 0 }), 'MMM d')} – ${format(endOfWeek(selectedDate, { weekStartsOn: 0 }), 'MMM d, yyyy')}`
+                  ? `${format(startOfWeek(selectedDate, { weekStartsOn: 0 }), 'MMM d')} – ${format(endOfWeek(selectedDate, { weekStartsOn: 0 }), 'MMM d')}`
                   : format(selectedDate, 'MMMM yyyy')}
               </span>
-              <ChevronDown className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
+              <ChevronDown size={14} className="shrink-0 text-gray-400" aria-hidden />
             </button>
             <button
               type="button"
               onClick={() => {
                 if (mobileViewMode === 'month') {
-                  setSelectedDate(prev => addMonths(prev, 1));
+                  setSelectedDate((prev) => addMonths(prev, 1));
                 } else {
-                  setSelectedDate(prev => addWeeks(prev, 1));
+                  setSelectedDate((prev) => addWeeks(prev, 1));
                 }
               }}
-              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl p-2 transition-all hover:bg-gray-100 active:scale-95 touch-manipulation dark:hover:bg-gray-700"
+              className={ICON_BTN}
               aria-label="Next period"
             >
-              <span className="text-lg font-bold text-gray-700 dark:text-gray-300">›</span>
+              <ChevronRight className="h-4 w-4" strokeWidth={2} />
             </button>
           </div>
-          <div className="flex justify-center">
-            <button
-              type="button"
-              onClick={() => {
-                const today = new Date();
-                setSelectedDate(today);
-                setCurrentDate(today);
-              }}
-              className="min-h-[44px] rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 transition-all hover:bg-blue-100 active:scale-95 touch-manipulation dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
-            >
-              Today
-            </button>
-          </div>
-        </div>
 
-        {/* Calendar Grid */}
-        <div className="bg-white dark:bg-gray-800 px-3 py-3 shadow-sm">
-          {/* Day headers */}
-          <div className="grid grid-cols-7 gap-1 mb-2">
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, idx) => (
-              <div key={day} className="text-center text-xs font-bold text-gray-600 dark:text-gray-400 py-1 uppercase tracking-wide">
-                {day.substring(0, 3)}
-              </div>
-            ))}
+          <button
+            type="button"
+            onClick={() => {
+              const today = new Date();
+              setSelectedDate(today);
+              setCurrentDate(today);
+            }}
+            className={`compact-control ${CONTROL} ${CONTROL_TEXT} ${CONTROL_FOCUS} w-full bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60`}
+          >
+            Today
+          </button>
+
+          <div className="overflow-hidden rounded-lg border border-gray-200/90 bg-white dark:border-gray-700 dark:bg-gray-800">
+            <div className="grid grid-cols-7 border-b border-gray-100 px-1 py-1.5 dark:border-gray-700/60">
+              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, idx) => (
+                <div
+                  key={`${day}-${idx}`}
+                  className="text-center text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500"
+                >
+                  {day}
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-0.5 p-1.5">
+              {calendarGrid.map((week, weekIdx) => (
+                <div key={weekIdx} className="grid grid-cols-7 gap-0.5">
+                  {week.map((date, dayIdx) => {
+                    const isSelected = isSameDay(date, selectedDate);
+                    const isCurrentMonth = isSameMonth(date, selectedDate);
+                    const isToday = isSameDay(date, new Date());
+                    const dayEvents = getEventsForDate(date);
+                    const hasEvents = dayEvents.length > 0;
+
+                    return (
+                      <button
+                        key={dayIdx}
+                        type="button"
+                        onClick={() => setSelectedDate(date)}
+                        className={`relative flex aspect-square flex-col items-center justify-center rounded-lg touch-manipulation transition-colors ${
+                          isSelected
+                            ? 'bg-blue-600 text-white dark:bg-blue-500'
+                            : isToday
+                              ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300'
+                              : isCurrentMonth
+                                ? 'text-gray-900 hover:bg-gray-50 dark:text-gray-100 dark:hover:bg-gray-700/40'
+                                : 'text-gray-300 dark:text-gray-600'
+                        }`}
+                      >
+                        <span className={`text-[11px] font-medium ${isSelected ? 'font-semibold' : ''}`}>
+                          {format(date, 'd')}
+                        </span>
+                        {hasEvents && (
+                          <div className="absolute bottom-1 flex gap-0.5">
+                            {dayEvents.slice(0, 3).map((_, dotIdx) => (
+                              <div
+                                key={dotIdx}
+                                className={`h-1 w-1 rounded-full ${
+                                  isSelected ? 'bg-white/90' : 'bg-blue-500 dark:bg-blue-400'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
           </div>
-          
-          {/* Calendar days */}
-          <div className="space-y-1">
-            {calendarGrid.map((week, weekIdx) => (
-              <div key={weekIdx} className="grid grid-cols-7 gap-1.5">
-                {week.map((date, dayIdx) => {
-                  const isSelected = isSameDay(date, selectedDate);
-                  const isCurrentMonth = isSameMonth(date, selectedDate);
-                  const isToday = isSameDay(date, new Date());
-                  const dayEvents = getEventsForDate(date);
-                  const hasEvents = dayEvents.length > 0;
-                  
+
+          <div className="overflow-hidden rounded-lg border border-gray-200/90 bg-white dark:border-gray-700 dark:bg-gray-800">
+            <div className="border-b border-gray-100 px-3 py-2 dark:border-gray-700/60">
+              <h3 className="text-[11px] font-semibold text-gray-900 dark:text-gray-100">
+                {format(selectedDate, 'EEEE, MMM d')}
+              </h3>
+            </div>
+            {selectedDateEvents.length === 0 ? (
+              <div className="py-8 text-center">
+                <CalendarIcon className="mx-auto mb-2 h-7 w-7 text-gray-300 dark:text-gray-600" strokeWidth={1.5} />
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 sm:text-[11px]">No events scheduled</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-100 dark:divide-gray-700/60">
+                {selectedDateEvents.map((event, idx) => {
+                  const eventColor =
+                    (event as any).color || (event.resource && event.resource.color) || '#93c5fd';
                   return (
                     <button
-                      key={dayIdx}
-                      onClick={() => setSelectedDate(date)}
-                      className={`
-                        relative aspect-square flex flex-col items-center justify-center rounded-2xl transition-all duration-200 touch-manipulation
-                        ${isSelected 
-                          ? 'bg-gradient-to-br from-blue-600 to-blue-500 dark:from-blue-500 dark:to-blue-600 text-white shadow-xl scale-105 ring-2 ring-blue-200 dark:ring-blue-800 ring-offset-2' 
-                          : isCurrentMonth 
-                            ? isToday
-                              ? 'bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-900/30 dark:to-blue-800/20 text-blue-700 dark:text-blue-300 border-2 border-blue-300 dark:border-blue-700 font-bold shadow-md'
-                              : 'text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700/50 active:scale-95 hover:shadow-sm'
-                            : 'text-gray-300 dark:text-gray-600 opacity-50'
-                        }
-                      `}
+                      key={idx}
+                      type="button"
+                      onClick={() => handleSelectEvent(event)}
+                      className="flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-gray-50 active:bg-gray-50 dark:hover:bg-gray-700/30"
                     >
-                      <span className={`text-sm font-semibold ${isSelected ? 'text-white' : isToday ? 'text-blue-700 dark:text-blue-300' : ''}`}>
-                        {format(date, 'd')}
-                      </span>
-                      {hasEvents && !isSelected && (
-                        <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex gap-0.5">
-                          {dayEvents.slice(0, 3).map((_, idx) => (
-                            <div key={idx} className="w-1 h-1 bg-blue-500 dark:bg-blue-400 rounded-full"></div>
-                          ))}
-                          {dayEvents.length > 3 && (
-                            <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
-                          )}
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Events List */}
-        <div className="px-3 py-3 bg-white dark:bg-gray-800 mt-2 shadow-sm">
-          <h3 className="text-base font-bold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-1.5">
-            <span>{format(selectedDate, 'EEEE')}</span>
-            <span className="text-gray-400 dark:text-gray-500">•</span>
-            <span className="text-gray-600 dark:text-gray-400 font-semibold">{format(selectedDate, 'MMMM d')}</span>
-          </h3>
-          {selectedDateEvents.length === 0 ? (
-            <div className="text-center py-8">
-              <div className="text-gray-400 dark:text-gray-500 text-3xl mb-2">📅</div>
-              <div className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                No events scheduled
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {selectedDateEvents.map((event, idx) => {
-                const eventColor = (event as any).color || (event.resource && event.resource.color) || '#93c5fd';
-                const isAssignment = event.resource?.type === 'Assignment';
-                return (
-                  <div
-                    key={idx}
-                    onClick={() => handleSelectEvent(event)}
-                    className="group flex items-start gap-3 p-3 rounded-xl hover:bg-gradient-to-r hover:from-gray-50 hover:to-transparent dark:hover:from-gray-700/30 dark:hover:to-transparent transition-all cursor-pointer border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 active:scale-[0.98]"
-                  >
-                    <div 
-                      className="w-3 h-3 rounded-full flex-shrink-0 mt-1 shadow-sm ring-1 ring-white dark:ring-gray-800"
-                      style={{ backgroundColor: eventColor }}
-                    ></div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold text-gray-900 dark:text-gray-100 truncate mb-0.5">
-                        {typeof event.title === 'string' ? event.title : 'Untitled Event'}
-                      </div>
-                      {event.start && (() => {
-                        const startDate = event.start instanceof Date ? event.start : new Date(event.start);
-                        const endDate = event.end ? (event.end instanceof Date ? event.end : new Date(event.end)) : null;
-                        return (
-                          <div className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                            <span>🕐</span>
-                            <span>
+                      <span
+                        className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
+                        style={{ backgroundColor: eventColor }}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[11px] font-semibold text-gray-900 dark:text-gray-100 sm:text-xs">
+                          {typeof event.title === 'string' ? event.title : 'Untitled Event'}
+                        </span>
+                        {event.start && (() => {
+                          const startDate =
+                            event.start instanceof Date ? event.start : new Date(event.start);
+                          const endDate = event.end
+                            ? event.end instanceof Date
+                              ? event.end
+                              : new Date(event.end)
+                            : null;
+                          return (
+                            <span className="mt-0.5 block text-[10px] text-gray-500 dark:text-gray-400">
                               {format(startDate, 'h:mm a')}
                               {endDate && startDate.getTime() !== endDate.getTime() && (
                                 <> – {format(endDate, 'h:mm a')}</>
                               )}
                             </span>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+                          );
+                        })()}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
-        {/* To Do — mobile parity with desktop sidebar */}
-        <div className="mt-2 bg-white px-3 py-3 shadow-sm dark:bg-gray-800">
-          <ToDoPanel showSupplementarySections={false} />
+          <div className="overflow-hidden rounded-lg border border-gray-200/90 bg-white dark:border-gray-700 dark:bg-gray-800">
+            <ToDoPanel />
+          </div>
         </div>
       </div>
+      </MobileAppShell>
 
       {/* Desktop View */}
       <div className="hidden lg:flex p-8 gap-6 calendar-modern">
@@ -1502,29 +1477,29 @@ const CalendarPage: React.FC = () => {
                   e.stopPropagation();
                   setColorWheelOpen(opt.value);
                 }}
-                colorDotRef={(el) => {
-                  colorDotRefs.current[opt.value] = el;
-                }}
               />
             ))}
           </div>
           {colorWheelOpen && (
-            <div className="flex justify-center border-t border-gray-100 py-3 dark:border-gray-700/50">
-              <ColorWheelPicker
+            <div className="border-t border-gray-100 px-3 py-3 dark:border-gray-700/50">
+              <CalendarColorPicker
                 colors={colorPalette}
+                selectedColor={getCalendarColor(
+                  colorWheelOpen,
+                  calendarOptions.findIndex((opt) => opt.value === colorWheelOpen)
+                )}
                 onSelect={(color) => {
                   handleCalendarColorChange(colorWheelOpen, color);
                   setColorWheelOpen(null);
                 }}
                 onClose={() => setColorWheelOpen(null)}
-                anchorRef={{ current: colorDotRefs.current[colorWheelOpen] ?? null }}
               />
             </div>
           )}
         </div>
         {/* To-Do Panel below calendar list */}
         <div className="max-h-64 overflow-y-auto pr-1 rounded-2xl">
-          <ToDoPanel showSupplementarySections={false} />
+          <ToDoPanel />
         </div>
       </div>
       </div>
@@ -1561,11 +1536,11 @@ const CalendarPage: React.FC = () => {
             setActiveTab('Event');
             setModalOpen(true);
           }}
-          className="lg:hidden fixed bottom-20 right-3 w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-500 dark:from-blue-500 dark:to-blue-600 text-white rounded-xl shadow-lg hover:shadow-blue-500/50 hover:from-blue-700 hover:to-blue-600 dark:hover:from-blue-600 dark:hover:to-blue-700 active:scale-95 transition-all flex items-center justify-center z-[100] touch-manipulation"
+          className="lg:hidden fixed bottom-20 right-4 z-[100] inline-flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm transition-colors hover:bg-blue-700 active:bg-blue-800 touch-manipulation dark:bg-blue-500 dark:hover:bg-blue-600"
           aria-label="Create event"
           type="button"
         >
-          <Plus className="w-5 h-5" strokeWidth={2.5} />
+          <Plus className="h-4 w-4" strokeWidth={2.5} />
         </button>
       )}
 
@@ -1617,23 +1592,22 @@ const CalendarPage: React.FC = () => {
                       e.stopPropagation();
                       setColorWheelOpen(opt.value);
                     }}
-                    colorDotRef={(el) => {
-                      colorDotRefs.current[opt.value] = el;
-                    }}
                   />
                 ))}
               </div>
               {colorWheelOpen && (
-                <div className="flex justify-center pt-4">
-                  <ColorWheelPicker
+                <div className="pt-4">
+                  <CalendarColorPicker
                     colors={colorPalette}
+                    selectedColor={getCalendarColor(
+                      colorWheelOpen,
+                      calendarOptions.findIndex((opt) => opt.value === colorWheelOpen)
+                    )}
                     onSelect={(color) => {
                       handleCalendarColorChange(colorWheelOpen, color);
                       setColorWheelOpen(null);
                     }}
                     onClose={() => setColorWheelOpen(null)}
-                    anchorRef={{ current: colorDotRefs.current[colorWheelOpen] ?? null }}
-                    positionRight={true}
                   />
                 </div>
               )}
@@ -1642,8 +1616,6 @@ const CalendarPage: React.FC = () => {
         </div>
       )}
 
-      {/* Change User Modal */}
-      </div>
     </SwipeableContainer>
   );
 };
