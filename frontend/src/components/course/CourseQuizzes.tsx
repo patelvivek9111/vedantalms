@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import AssignmentList from '../assignments/AssignmentList';
+import { SectionDividerHeading } from '../common/SectionDividerHeading';
 
 interface CourseQuizzesProps {
   course: {
@@ -65,8 +66,7 @@ const CourseQuizzes: React.FC<CourseQuizzesProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">Quizzes</h2>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
         {(isInstructor || isAdmin) && (
           modules.length > 0 ? (
             <button
@@ -83,15 +83,18 @@ const CourseQuizzes: React.FC<CourseQuizzesProps> = ({
       {discussionsLoading ? (
         <div className="py-8 text-center text-gray-500 dark:text-gray-400">Loading quizzes...</div>
       ) : modules.length > 0 ? (
-        <AssignmentList
-          assignments={deduplicatedQuizzes}
-          userRole={user?.role}
-          studentSubmissions={user?.role === 'student' ? studentSubmissions : undefined}
-          studentId={user?._id}
-          submissionMap={user?.role === 'student' ? submissionMap : undefined}
-          courseId={course?._id}
-          isQuizzesView={true}
-        />
+        <section aria-labelledby="quizzes-heading">
+          <SectionDividerHeading id="quizzes-heading">Quizzes</SectionDividerHeading>
+          <AssignmentList
+            assignments={deduplicatedQuizzes}
+            userRole={user?.role}
+            studentSubmissions={user?.role === 'student' ? studentSubmissions : undefined}
+            studentId={user?._id}
+            submissionMap={user?.role === 'student' ? submissionMap : undefined}
+            courseId={course?._id}
+            isQuizzesView={true}
+          />
+        </section>
       ) : (
         <div className="py-8 text-center text-gray-500 dark:text-gray-400">No modules available. Please create a module to add quizzes.</div>
       )}

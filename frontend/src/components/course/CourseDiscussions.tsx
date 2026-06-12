@@ -9,6 +9,7 @@ import axios from 'axios';
 import { deriveDiscussionWorkflowState } from '../../utils/discussionWorkflowStatus';
 import { resolveDiscussionStatus, type DiscussionStatus } from '../../utils/discussionStatus';
 import { Pin, MessageCircle, Clock } from 'lucide-react';
+import { SectionDividerHeading } from '../common/SectionDividerHeading';
 
 interface Thread {
   _id: string;
@@ -345,15 +346,7 @@ const CourseDiscussions: React.FC<CourseDiscussionsProps> = ({
           <div className="space-y-8">
             {threads.filter((thread) => thread.isPinned).length > 0 && (
               <section aria-labelledby="pinned-discussions-heading">
-                <div className="mb-4 flex items-center gap-3">
-                  <h3
-                    id="pinned-discussions-heading"
-                    className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
-                  >
-                    Pinned threads
-                  </h3>
-                  <span className="h-px flex-1 bg-gradient-to-r from-slate-200 to-transparent dark:from-slate-700" aria-hidden />
-                </div>
+                <SectionDividerHeading id="pinned-discussions-heading">Pinned threads</SectionDividerHeading>
                 <div className="overflow-hidden rounded-xl bg-white ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-700/60">
                   {threads.filter((t) => t.isPinned).map((thread) => renderThreadCard(thread, true))}
                 </div>
@@ -361,16 +354,8 @@ const CourseDiscussions: React.FC<CourseDiscussionsProps> = ({
             )}
 
             {threads.filter((thread) => !thread.isPinned).length > 0 && (
-              <section aria-labelledby="all-discussions-heading">
-                <div className="mb-4 flex items-center gap-3">
-                  <h3
-                    id="all-discussions-heading"
-                    className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
-                  >
-                    All threads
-                  </h3>
-                  <span className="h-px flex-1 bg-gradient-to-r from-slate-200 to-transparent dark:from-slate-700" aria-hidden />
-                </div>
+              <section aria-labelledby="threads-heading">
+                <SectionDividerHeading id="threads-heading">Threads</SectionDividerHeading>
                 <div className="overflow-hidden rounded-xl bg-white ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-700/60">
                   {threads.filter((t) => !t.isPinned).map((thread) => renderThreadCard(thread, false))}
                 </div>

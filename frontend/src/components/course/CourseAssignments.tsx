@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import AssignmentList from '../assignments/AssignmentList';
+import { SectionDividerHeading } from '../common/SectionDividerHeading';
 
 interface CourseAssignmentsProps {
   course: {
@@ -100,7 +101,9 @@ const CourseAssignments: React.FC<CourseAssignmentsProps> = ({
       {discussionsLoading ? (
         <div className="py-8 text-center text-gray-500 dark:text-gray-400">Loading discussions...</div>
       ) : modules.length > 0 ? (
-        <AssignmentList
+        <section aria-labelledby="assignments-heading">
+          <SectionDividerHeading id="assignments-heading">Assignments</SectionDividerHeading>
+          <AssignmentList
           assignments={deduplicatedList}
           userRole={user?.role}
           studentSubmissions={user?.role === 'student' ? studentSubmissions : undefined}
@@ -108,6 +111,7 @@ const CourseAssignments: React.FC<CourseAssignmentsProps> = ({
           submissionMap={user?.role === 'student' ? submissionMap : undefined}
           courseId={course?._id}
         />
+        </section>
       ) : (
         <div className="py-8 text-center text-gray-500 dark:text-gray-400">No modules available. Please create a module to add assignments.</div>
       )}

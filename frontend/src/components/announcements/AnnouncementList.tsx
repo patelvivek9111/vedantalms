@@ -2,6 +2,7 @@ import React from 'react';
 import { Megaphone, ChevronRight } from 'lucide-react';
 import FileAttachmentChips from '../files/FileAttachmentChips';
 import { formatAnnouncementDate } from './announcementUi';
+import { SectionDividerHeading } from '../common/SectionDividerHeading';
 
 export interface Announcement {
   _id: string;
@@ -41,7 +42,9 @@ const AnnouncementList: React.FC<AnnouncementListProps> = ({ announcements, onSe
     );
   }
   return (
-    <ul className="divide-y divide-slate-200 overflow-hidden rounded-xl bg-white ring-1 ring-slate-200/70 dark:divide-slate-800 dark:bg-slate-900 dark:ring-slate-700/60">
+    <section aria-labelledby="announcements-heading">
+      <SectionDividerHeading id="announcements-heading">Announcements</SectionDividerHeading>
+      <ul className="divide-y divide-slate-200 overflow-hidden rounded-xl bg-white ring-1 ring-slate-200/70 dark:divide-slate-800 dark:bg-slate-900 dark:ring-slate-700/60">
       {items.map(a => {
         const plain = String(a.body ?? '').replace(/<[^>]+>/g, '');
         const preview =
@@ -87,7 +90,8 @@ const AnnouncementList: React.FC<AnnouncementListProps> = ({ announcements, onSe
           </li>
         );
       })}
-    </ul>
+      </ul>
+    </section>
   );
 };
 

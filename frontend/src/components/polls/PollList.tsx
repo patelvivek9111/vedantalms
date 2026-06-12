@@ -17,6 +17,7 @@ import {
 import PollForm from './PollForm';
 import PollVote from './PollVote';
 import ConfirmationModal from '../common/ConfirmationModal';
+import { SectionDividerHeading } from '../common/SectionDividerHeading';
 
 interface Poll {
   _id: string;
@@ -429,7 +430,9 @@ const PollList: React.FC<PollListProps> = ({ courseId }) => {
           );
         })()
       ) : (
-        <div className="divide-y divide-gray-100 overflow-hidden rounded-xl bg-white ring-1 ring-gray-200/70 dark:divide-gray-800 dark:bg-gray-900 dark:ring-gray-700/60">
+        <section aria-labelledby="polls-heading">
+          <SectionDividerHeading id="polls-heading">Polls</SectionDividerHeading>
+          <div className="divide-y divide-gray-100 overflow-hidden rounded-xl bg-white ring-1 ring-gray-200/70 dark:divide-gray-800 dark:bg-gray-900 dark:ring-gray-700/60">
           {polls.map((poll) => {
             const status = getPollStatus(poll);
             return (
@@ -460,7 +463,8 @@ const PollList: React.FC<PollListProps> = ({ courseId }) => {
               </button>
             );
           })}
-        </div>
+          </div>
+        </section>
       )}
         </>
       )}

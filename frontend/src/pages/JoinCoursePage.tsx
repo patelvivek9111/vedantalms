@@ -6,6 +6,9 @@ import { Loader2, CheckCircle2, XCircle, Clock, ListOrdered, Info, KeyRound } fr
 import { API_URL } from '../config';
 import { useCourse } from '../contexts/CourseContext';
 import { parseJoinCredential } from '../utils/joinCourseToken';
+import { MobileAppShell } from '../components/common/MobileAppShell';
+import SwipeableContainer from '../components/common/SwipeableContainer';
+import { useBottomNavSwipe } from '../hooks/useBottomNavSwipe';
 
 type JoinPhase =
   | 'idle'
@@ -18,6 +21,19 @@ type JoinPhase =
 
 const QR_DUPLICATE_STATES = ['already_pending', 'already_waitlist', 'already_enrolled'] as const;
 type QrDuplicateState = (typeof QR_DUPLICATE_STATES)[number];
+
+const SECTION_LABEL =
+  'mb-1 block text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400';
+const ITEM_CARD =
+  'overflow-hidden rounded-lg border border-gray-200/90 bg-white dark:border-gray-700 dark:bg-gray-800';
+const CONTROL =
+  'compact-control h-10 w-full rounded-lg border border-gray-200 bg-white px-3 font-mono text-[11px] uppercase tracking-wide text-gray-900 transition-colors dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 sm:text-xs';
+const CONTROL_FOCUS =
+  'focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:border-blue-500 dark:focus:ring-blue-900/40';
+const BTN_PRIMARY =
+  'inline-flex h-10 w-full items-center justify-center rounded-lg bg-blue-600 text-[11px] font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600 sm:text-xs';
+const BTN_SECONDARY =
+  'inline-flex h-10 w-full items-center justify-center rounded-lg border border-gray-200 bg-white text-[11px] font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:text-xs';
 
 function headlineForJoinState(state: string): string {
   switch (state) {
@@ -36,6 +52,7 @@ const JoinCoursePage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { getCourses } = useCourse();
+  const { handleSwipeLeft, handleSwipeRight, enabled: swipeEnabled } = useBottomNavSwipe();
   const [manualCode, setManualCode] = useState('');
   const [phase, setPhase] = useState<JoinPhase>('idle');
   const [message, setMessage] = useState('');
@@ -134,140 +151,143 @@ const JoinCoursePage: React.FC = () => {
     phase !== 'done_enrolled' &&
     phase !== 'info_join_state';
 
-  return (
-    <div className="min-h-[calc(100vh-4rem)] bg-gradient-to-b from-slate-50 via-white to-slate-50/80 px-4 py-10 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-      <div className="mx-auto max-w-md">
-        <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-          Enrollment
-        </p>
-        <h1 className="text-balance text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50 sm:text-3xl">
-          Join a course
-        </h1>
-        <p className="mt-3 text-pretty text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-          Enter the <span className="font-semibold text-slate-800 dark:text-slate-200">8-character join code</span> your
+  const content = (
+    <div className="mx-auto w-full max-w-md space-y-3">
+      <div>
+        <p className={SECTION_LABEL}>Enrollment</p>
+        <h1 className="hidden text-2xl font-bold text-gray-900 dark:text-gray-100 lg:block">Join a course</h1>
+        <p className="text-[10px] leading-relaxed text-gray-500 dark:text-gray-400 sm:text-[11px] lg:mt-2 lg:text-sm lg:text-gray-600">
+          Enter the <span className="font-medium text-gray-700 dark:text-gray-300">8-character join code</span> your
           instructor shared (often next to a QR on the course materials). Scanning the QR may open this page for you
           automatically. When seats are open, your instructor approves new students before enrollment is final. If the
           course is full, you&apos;ll be placed on the waitlist—same as joining from the catalog.
         </p>
       </div>
 
-      <div className="mx-auto mt-8 max-w-md space-y-6">
       {phase === 'loading' && (
-        <div className="flex items-center gap-3 rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-          <Loader2 className="h-8 w-8 shrink-0 animate-spin text-blue-600" aria-hidden />
-          <span className="text-slate-800 dark:text-slate-200">Joining course…</span>
+        <div className={`${ITEM_CARD} flex items-center gap-2.5 px-3 py-3`}>
+          <Loader2 className="h-5 w-5 shrink-0 animate-spin text-blue-600 dark:text-blue-400" aria-hidden />
+          <span className="text-[11px] font-medium text-gray-900 dark:text-gray-100 sm:text-xs">Joining course…</span>
         </div>
       )}
 
       {phase === 'done_enrolled' && (
-        <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-6 dark:border-emerald-900 dark:bg-emerald-950/30">
-          <CheckCircle2 className="h-8 w-8 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
-          <div>
-            <div className="font-semibold text-emerald-900 dark:text-emerald-100">You&apos;re enrolled</div>
-            <p className="mt-1 text-sm text-emerald-800 dark:text-emerald-200">{message}</p>
-            <p className="mt-2 text-xs text-emerald-700 dark:text-emerald-300">Redirecting…</p>
+        <div className="rounded-lg border border-emerald-200/90 bg-emerald-50/80 px-3 py-3 dark:border-emerald-900/50 dark:bg-emerald-950/30">
+          <div className="flex items-start gap-2.5">
+            <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
+            <div>
+              <div className="text-[11px] font-semibold text-emerald-900 dark:text-emerald-100 sm:text-xs">
+                You&apos;re enrolled
+              </div>
+              <p className="mt-0.5 text-[10px] leading-relaxed text-emerald-800 dark:text-emerald-200 sm:text-[11px]">
+                {message}
+              </p>
+              <p className="mt-1 text-[10px] text-emerald-700 dark:text-emerald-300">Redirecting…</p>
+            </div>
           </div>
         </div>
       )}
 
       {phase === 'done_awaiting' && (
-        <div className="flex flex-col gap-4 rounded-xl border border-blue-200 bg-blue-50/90 p-6 dark:border-blue-900 dark:bg-blue-950/30">
-          <div className="flex items-start gap-3">
-            <Clock className="h-8 w-8 shrink-0 text-blue-600 dark:text-blue-400" aria-hidden />
+        <div className="space-y-2 rounded-lg border border-blue-200/90 bg-blue-50/80 px-3 py-3 dark:border-blue-900/50 dark:bg-blue-950/30">
+          <div className="flex items-start gap-2.5">
+            <Clock className="h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" aria-hidden />
             <div>
-              <div className="font-semibold text-blue-950 dark:text-blue-100">Request received</div>
-              <p className="mt-1 text-base font-medium text-blue-900 dark:text-blue-50">{courseTitle}</p>
-              <p className="mt-2 text-sm leading-relaxed text-blue-900/90 dark:text-blue-100/90">
+              <div className="text-[11px] font-semibold text-blue-950 dark:text-blue-100 sm:text-xs">
+                Request received
+              </div>
+              <p className="mt-0.5 text-[11px] font-medium text-blue-900 dark:text-blue-50">{courseTitle}</p>
+              <p className="mt-1 text-[10px] leading-relaxed text-blue-900/90 dark:text-blue-100/90 sm:text-[11px]">
                 {message || 'Please wait for your instructor to approve your enrollment. You are not enrolled yet.'}
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate('/dashboard', { replace: true })}
-            className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 dark:hover:bg-blue-500"
-          >
+          <button type="button" onClick={() => navigate('/dashboard', { replace: true })} className={BTN_PRIMARY}>
             Back to dashboard
           </button>
         </div>
       )}
 
       {phase === 'done_waitlist' && (
-        <div className="flex flex-col gap-4 rounded-xl border border-amber-200 bg-amber-50/90 p-6 dark:border-amber-900 dark:bg-amber-950/25">
-          <div className="flex items-start gap-3">
-            <ListOrdered className="h-8 w-8 shrink-0 text-amber-700 dark:text-amber-400" aria-hidden />
+        <div className="space-y-2 rounded-lg border border-amber-200/90 bg-amber-50/80 px-3 py-3 dark:border-amber-900/50 dark:bg-amber-950/25">
+          <div className="flex items-start gap-2.5">
+            <ListOrdered className="h-5 w-5 shrink-0 text-amber-700 dark:text-amber-400" aria-hidden />
             <div>
-              <div className="font-semibold text-amber-950 dark:text-amber-100">On the waitlist</div>
-              <p className="mt-1 text-base font-medium text-amber-900 dark:text-amber-50">{courseTitle}</p>
+              <div className="text-[11px] font-semibold text-amber-950 dark:text-amber-100 sm:text-xs">
+                On the waitlist
+              </div>
+              <p className="mt-0.5 text-[11px] font-medium text-amber-900 dark:text-amber-50">{courseTitle}</p>
               {waitlistPosition != null && (
-                <p className="mt-1 text-sm font-medium text-amber-900 dark:text-amber-200">Position {waitlistPosition}</p>
+                <p className="mt-0.5 text-[10px] font-medium text-amber-900 dark:text-amber-200 sm:text-[11px]">
+                  Position {waitlistPosition}
+                </p>
               )}
-              <p className="mt-2 text-sm leading-relaxed text-amber-900/90 dark:text-amber-100/90">
+              <p className="mt-1 text-[10px] leading-relaxed text-amber-900/90 dark:text-amber-100/90 sm:text-[11px]">
                 {message || 'The course is full. Please wait while your instructor manages the waitlist.'}
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate('/dashboard', { replace: true })}
-            className="w-full rounded-lg bg-amber-700 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-amber-800 dark:bg-amber-600 dark:hover:bg-amber-500"
-          >
+          <button type="button" onClick={() => navigate('/dashboard', { replace: true })} className={BTN_PRIMARY}>
             Back to dashboard
           </button>
         </div>
       )}
 
       {phase === 'info_join_state' && joinStateKind && (
-        <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-slate-50 p-6 dark:border-slate-600 dark:bg-slate-800/80">
-          <div className="flex items-start gap-3">
-            <Info className="h-8 w-8 shrink-0 text-slate-600 dark:text-slate-300" aria-hidden />
+        <div className={`${ITEM_CARD} space-y-2 px-3 py-3`}>
+          <div className="flex items-start gap-2.5">
+            <Info className="h-5 w-5 shrink-0 text-gray-500 dark:text-gray-400" aria-hidden />
             <div>
-              <div className="font-semibold text-slate-900 dark:text-slate-100">{headlineForJoinState(joinStateKind)}</div>
-              <p className="mt-2 text-sm leading-relaxed text-slate-700 dark:text-slate-300">{message}</p>
+              <div className="text-[11px] font-semibold text-gray-900 dark:text-gray-100 sm:text-xs">
+                {headlineForJoinState(joinStateKind)}
+              </div>
+              <p className="mt-1 text-[10px] leading-relaxed text-gray-600 dark:text-gray-400 sm:text-[11px]">
+                {message}
+              </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate('/dashboard', { replace: true })}
-            className="w-full rounded-lg bg-slate-800 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-900 dark:bg-slate-600 dark:hover:bg-slate-500"
-          >
+          <button type="button" onClick={() => navigate('/dashboard', { replace: true })} className={BTN_SECONDARY}>
             Back to dashboard
           </button>
         </div>
       )}
 
       {phase === 'error' && (
-        <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-6 dark:border-red-900 dark:bg-red-950/30">
-          <XCircle className="h-8 w-8 shrink-0 text-red-600 dark:text-red-400" aria-hidden />
-          <div>
-            <div className="font-semibold text-red-900 dark:text-red-100">Could not join</div>
-            <p className="mt-1 text-sm text-red-800 dark:text-red-200">{message}</p>
-            <button
-              type="button"
-              onClick={() => navigate('/dashboard')}
-              className="mt-4 text-sm font-medium text-blue-700 underline dark:text-blue-400"
-            >
-              Back to dashboard
-            </button>
+        <div className="rounded-lg border border-red-200/90 bg-red-50/80 px-3 py-3 dark:border-red-900/50 dark:bg-red-950/30">
+          <div className="flex items-start gap-2.5">
+            <XCircle className="h-5 w-5 shrink-0 text-red-600 dark:text-red-400" aria-hidden />
+            <div>
+              <div className="text-[11px] font-semibold text-red-900 dark:text-red-100 sm:text-xs">Could not join</div>
+              <p className="mt-0.5 text-[10px] leading-relaxed text-red-800 dark:text-red-200 sm:text-[11px]">
+                {message}
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate('/dashboard')}
+                className="mt-2 text-[10px] font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 sm:text-[11px]"
+              >
+                Back to dashboard
+              </button>
+            </div>
           </div>
         </div>
       )}
 
       {showManualForm && (
-        <form
-          onSubmit={onSubmitManual}
-          className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-lg shadow-slate-200/50 ring-1 ring-slate-900/5 dark:border-slate-700 dark:bg-slate-900 dark:shadow-none dark:ring-white/10"
-        >
-          <div className="flex gap-4 p-6 sm:p-7">
+        <form onSubmit={onSubmitManual} className={`${ITEM_CARD} px-3 py-3`}>
+          <div className="flex gap-2.5">
             <div
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-950/40 sm:h-12 sm:w-12 sm:rounded-2xl"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-950/40"
               aria-hidden
             >
-              <KeyRound className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+              <KeyRound className="h-4 w-4 text-blue-600 dark:text-blue-400" />
             </div>
-            <div className="min-w-0 flex-1 space-y-5">
+            <div className="min-w-0 flex-1 space-y-2">
               <div>
-                <label htmlFor="join-course-credential" className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                <label
+                  htmlFor="join-course-credential"
+                  className="text-[11px] font-semibold text-gray-900 dark:text-gray-100 sm:text-xs"
+                >
                   Join code
                 </label>
                 <input
@@ -281,23 +301,32 @@ const JoinCoursePage: React.FC = () => {
                   inputMode="text"
                   value={manualCode}
                   onChange={(e) => setManualCode(e.target.value)}
-                  className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 font-mono text-base text-slate-900 shadow-inner shadow-slate-900/5 placeholder:font-sans placeholder:text-sm placeholder:tracking-normal placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/15 dark:border-slate-600 dark:bg-slate-950/50 dark:text-slate-100 dark:placeholder:text-slate-500"
+                  className={`${CONTROL} ${CONTROL_FOCUS} mt-1.5 placeholder:font-sans placeholder:normal-case placeholder:tracking-normal placeholder:text-[10px] placeholder:text-gray-400 dark:placeholder:text-gray-500`}
                   placeholder="e.g. F4KH9P2N"
                 />
               </div>
-              <button
-                type="submit"
-                disabled={phase === 'loading' || !manualCode.trim()}
-                className="flex h-12 w-full items-center justify-center rounded-xl bg-indigo-600 text-sm font-semibold text-white shadow-md shadow-indigo-600/25 transition hover:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:pointer-events-none disabled:opacity-45 dark:shadow-indigo-900/40 dark:hover:bg-indigo-500"
-              >
+              <button type="submit" disabled={phase === 'loading' || !manualCode.trim()} className={BTN_PRIMARY}>
                 {phase === 'loading' ? 'Joining…' : 'Join course'}
               </button>
             </div>
           </div>
         </form>
       )}
-      </div>
     </div>
+  );
+
+  return (
+    <SwipeableContainer
+      onSwipeLeft={swipeEnabled ? handleSwipeLeft : undefined}
+      onSwipeRight={swipeEnabled ? handleSwipeRight : undefined}
+      enabled={swipeEnabled}
+      preventScrollInterference={true}
+      className="min-h-screen bg-gray-50 dark:bg-gray-900"
+    >
+      <MobileAppShell title="Join Course" backButtonPath="/dashboard" backButtonLabel="Back to dashboard">
+        <div className="px-4 py-3 lg:p-6">{content}</div>
+      </MobileAppShell>
+    </SwipeableContainer>
   );
 };
 

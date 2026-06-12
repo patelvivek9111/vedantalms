@@ -491,7 +491,7 @@ const GroupDiscussion: React.FC = () => {
               <div>
                 <div className={`flex items-center gap-2 ${isMobileDevice ? 'mb-3 px-4' : 'mb-4'}`}>
                   <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-600 to-transparent"></div>
-                  <h3 className={`${isMobileDevice ? 'text-xs' : 'text-sm'} font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wide px-3`}>All Threads</h3>
+                  <h3 className={`${isMobileDevice ? 'text-xs' : 'text-sm'} font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wide px-3`}>Threads</h3>
                   <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-600 to-transparent"></div>
                 </div>
                 <div className="overflow-hidden rounded-xl bg-white ring-1 ring-gray-200/70 dark:bg-gray-900 dark:ring-gray-700/60">

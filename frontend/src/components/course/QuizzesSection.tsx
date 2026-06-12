@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import AssignmentList from '../assignments/AssignmentList';
+import { SectionDividerHeading } from '../common/SectionDividerHeading';
 
 interface QuizzesSectionProps {
   modules: any[];
@@ -74,7 +75,9 @@ const QuizzesSection: React.FC<QuizzesSectionProps> = ({
       {discussionsLoading ? (
         <div className="py-8 text-center text-gray-500 dark:text-gray-400">Loading quizzes...</div>
       ) : modules.length > 0 ? (
-        <AssignmentList
+        <section aria-labelledby="quizzes-heading">
+          <SectionDividerHeading id="quizzes-heading">Quizzes</SectionDividerHeading>
+          <AssignmentList
           assignments={deduplicatedQuizzes}
           userRole={user?.role}
           studentSubmissions={user?.role === 'student' ? studentSubmissions : undefined}
@@ -83,6 +86,7 @@ const QuizzesSection: React.FC<QuizzesSectionProps> = ({
           courseId={course?._id}
           isQuizzesView={true}
         />
+        </section>
       ) : (
         <div className="py-8 text-center text-gray-500 dark:text-gray-400">No modules available. Please create a module to add quizzes.</div>
       )}

@@ -18,6 +18,7 @@ import {
 import api from '../../services/api';
 import { NavCustomizationModal, NavItem } from '../layout/NavCustomizationModal';
 import { ChangeUserModal } from '../modals/ChangeUserModal';
+import { NotificationPreferencesPanel } from '../notifications/NotificationPreferencesPanel';
 
 interface BurgerMenuProps {
   showBurgerMenu: boolean;
@@ -269,112 +270,6 @@ function SettingsSectionInline() {
           <p className="mt-2 text-[11px] text-blue-600 dark:text-blue-400">Preferences saved</p>
         )}
       </div>
-    </div>
-  );
-}
-
-function NotificationsSectionInline() {
-  const [preferences, setPreferences] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-
-  useEffect(() => {
-    fetchPreferences();
-  }, []);
-
-  const fetchPreferences = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get('/notifications/preferences');
-      if (response.data.success) {
-        setPreferences(response.data.data);
-      }
-    } catch (err) {
-      setError('Failed to load notification preferences');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleToggle = async (category: string, key: string, value: boolean) => {
-    if (!preferences) return;
-    const updated = {
-      ...preferences,
-      [category]: { ...preferences[category], [key]: value }
-    };
-    setPreferences(updated);
-    try {
-      setSaving(true);
-      setError(null);
-      await api.put('/notifications/preferences', updated);
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
-    } catch (err) {
-      setError('Failed to save preferences');
-      setPreferences(preferences);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const categories = [
-    { key: 'academic', label: 'Academic Updates', types: ['grades', 'assignmentsDue', 'assignmentsGraded', 'submissions'] },
-    { key: 'communication', label: 'Communication', types: ['messages', 'announcements', 'discussions'] },
-    { key: 'administrative', label: 'Administrative', types: ['enrollments', 'system'] }
-  ];
-
-  if (loading) return <div className="text-sm text-gray-500">Loading...</div>;
-  if (!preferences) return <div className="text-sm text-red-500">Failed to load</div>;
-
-  return (
-    <div className="space-y-4">
-      {error && <div className="text-red-600 dark:text-red-400 text-xs bg-red-50 dark:bg-red-900/20 p-2 rounded">{error}</div>}
-      {success && <div className="text-green-600 dark:text-green-400 text-xs bg-green-50 dark:bg-green-900/20 p-2 rounded">Saved!</div>}
-      {categories.map((category) => {
-        const allEmailEnabled = category.types.every(key => preferences.email[key]);
-        const allInAppEnabled = category.types.every(key => preferences.inApp[key]);
-        const handleCategoryToggle = async (channel: 'email' | 'inApp', enabled: boolean) => {
-          const updated = {
-            ...preferences,
-            [channel]: { ...preferences[channel], ...category.types.reduce((acc, key) => { acc[key] = enabled; return acc; }, {} as any) }
-          };
-          setPreferences(updated);
-          try {
-            setSaving(true);
-            await api.put('/notifications/preferences', updated);
-            setSuccess(true);
-            setTimeout(() => setSuccess(false), 3000);
-          } catch (err) {
-            setError('Failed to save');
-            setPreferences(preferences);
-          } finally {
-            setSaving(false);
-          }
-        };
-        return (
-          <div key={category.key} className="border-b border-gray-200 dark:border-gray-700 pb-4 last:border-0 last:pb-0">
-            <div className="font-semibold text-sm mb-2">{category.label}</div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Email</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" checked={allEmailEnabled} onChange={(e) => handleCategoryToggle('email', e.target.checked)} className="sr-only peer" />
-                  <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-blue-600 dark:bg-gray-700 dark:peer-checked:bg-blue-500 after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
-                </label>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">In-App</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" checked={allInAppEnabled} onChange={(e) => handleCategoryToggle('inApp', e.target.checked)} className="sr-only peer" />
-                  <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-blue-600 dark:bg-gray-700 dark:peer-checked:bg-blue-500 after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
-                </label>
-              </div>
-            </div>
-          </div>
-        );
-      })}
     </div>
   );
 }
@@ -743,8 +638,8 @@ export const BurgerMenu: React.FC<BurgerMenuProps> = ({
           </div>
         )}
         {burgerMenuSection === 'notifications' && (
-          <div className="p-4">
-            <NotificationsSectionInline />
+          <div className="px-4 py-3">
+            <NotificationPreferencesPanel compact showHeading={false} />
           </div>
         )}
         {burgerMenuSection === 'activity' && (

@@ -3,6 +3,7 @@ import { useModule } from '../../contexts/ModuleContext';
 import { useAuth } from '../../contexts/AuthContext';
 import ModuleCard from '../modules/ModuleCard';
 import CreateModuleForm from '../modules/CreateModuleForm';
+import { SectionDividerHeading } from '../common/SectionDividerHeading';
 
 interface ModuleListProps {
   courseId: string;
@@ -89,7 +90,9 @@ const ModuleList: React.FC<ModuleListProps> = ({ courseId, prefetchedModules }) 
           <p className="text-sm mt-2">Modules will appear here once they are created.</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <section aria-labelledby="modules-heading">
+          <SectionDividerHeading id="modules-heading">Modules</SectionDividerHeading>
+          <div className="space-y-3">
           {modules.map((module) => (
             <ModuleCard
               key={module._id}
@@ -97,7 +100,8 @@ const ModuleList: React.FC<ModuleListProps> = ({ courseId, prefetchedModules }) 
               onAddPage={() => {}} // This is now handled within ModuleCard
             />
           ))}
-        </div>
+          </div>
+        </section>
       )}
     </div>
   );

@@ -4,6 +4,7 @@ import { ModuleProvider } from '../../contexts/ModuleContext';
 import { API_URL } from '../../config';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
+import { SectionDividerHeading } from '../common/SectionDividerHeading';
 
 interface Module {
   _id: string;
@@ -88,7 +89,9 @@ const CoursePages: React.FC<CoursePagesProps> = ({ courseId, modules, isInstruct
           ) : pages.length === 0 ? (
             <div className="py-12 text-center text-gray-500 dark:text-gray-400">No pages available for this course.</div>
           ) : (
-            <ul className="divide-y divide-gray-100 overflow-hidden rounded-xl bg-white ring-1 ring-gray-200/70 dark:divide-gray-800 dark:bg-gray-900 dark:ring-gray-700/60">
+            <section aria-labelledby="pages-heading">
+              <SectionDividerHeading id="pages-heading">Pages</SectionDividerHeading>
+              <ul className="divide-y divide-gray-100 overflow-hidden rounded-xl bg-white ring-1 ring-gray-200/70 dark:divide-gray-800 dark:bg-gray-900 dark:ring-gray-700/60">
               {pages.map(page => (
                 <li
                   key={page._id}
@@ -108,7 +111,8 @@ const CoursePages: React.FC<CoursePagesProps> = ({ courseId, modules, isInstruct
                   </Link>
                 </li>
               ))}
-            </ul>
+              </ul>
+            </section>
           )}
         </>
       )}

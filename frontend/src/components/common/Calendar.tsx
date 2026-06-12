@@ -1157,6 +1157,8 @@ const CalendarPage: React.FC = () => {
       preventScrollInterference={true}
       className="min-h-screen bg-gray-50 dark:bg-gray-900"
     >
+      {/* Mobile-only shell — hidden on lg+ so desktop calendar is not pushed below the viewport */}
+      <div className="lg:hidden">
       <MobileAppShell
         title="Calendar"
         customRightAction={
@@ -1170,8 +1172,6 @@ const CalendarPage: React.FC = () => {
           </button>
         }
       >
-      {/* Mobile View */}
-      <div className="lg:hidden">
         <div className="space-y-2 px-4 py-3">
           <div className="flex items-center gap-2">
             <button
@@ -1349,11 +1349,11 @@ const CalendarPage: React.FC = () => {
             <ToDoPanel />
           </div>
         </div>
-      </div>
       </MobileAppShell>
+      </div>
 
       {/* Desktop View */}
-      <div className="hidden lg:flex p-8 gap-6 calendar-modern">
+      <div className="hidden lg:flex min-h-[calc(100dvh-2.5rem)] w-full p-6 xl:p-8 gap-6 calendar-modern">
       {/* Main Calendar */}
       <div className="flex-1">
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
