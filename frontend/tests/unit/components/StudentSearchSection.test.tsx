@@ -28,7 +28,7 @@ describe('StudentSearchSection replacement coverage', () => {
       />
     );
 
-    expect(screen.getByText('Add Students')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Add students' })).toBeInTheDocument();
     fireEvent.click(screen.getByText('Add'));
     expect(handleEnroll).toHaveBeenCalledWith('s1');
   });

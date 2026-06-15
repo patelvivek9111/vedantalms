@@ -399,7 +399,7 @@ function AppContent() {
           <Route
             path="/admin/users"
             element={
-              <PrivateRoute>
+              <PrivateRoute allowedRoles={['admin']}>
                 {withRouteLoader(<AdminUserManagement />)}
               </PrivateRoute>
             }
@@ -407,7 +407,7 @@ function AppContent() {
           <Route
             path="/admin/courses"
             element={
-              <PrivateRoute>
+              <PrivateRoute allowedRoles={['admin']}>
                 {withRouteLoader(<AdminCourseOversight />)}
               </PrivateRoute>
             }
@@ -423,7 +423,7 @@ function AppContent() {
           <Route
             path="/admin/analytics"
             element={
-              <PrivateRoute>
+              <PrivateRoute allowedRoles={['admin']}>
                 {withRouteLoader(<AdminAnalytics />)}
               </PrivateRoute>
             }
@@ -431,7 +431,7 @@ function AppContent() {
           <Route
             path="/admin/settings"
             element={
-              <PrivateRoute>
+              <PrivateRoute allowedRoles={['admin']}>
                 {withRouteLoader(<AdminSystemSettings />)}
               </PrivateRoute>
             }
@@ -439,7 +439,7 @@ function AppContent() {
           <Route
             path="/admin/security"
             element={
-              <PrivateRoute>
+              <PrivateRoute allowedRoles={['admin']}>
                 {withRouteLoader(<AdminSecurity />)}
               </PrivateRoute>
             }
@@ -447,7 +447,7 @@ function AppContent() {
           <Route
             path="/admin/backup"
             element={
-              <PrivateRoute>
+              <PrivateRoute allowedRoles={['admin']}>
                 <div className="p-6">
                   <h1 className="text-3xl font-bold text-gray-900">Backup & Recovery</h1>
                   <p className="text-gray-600">System backup and recovery management</p>

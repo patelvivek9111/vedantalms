@@ -91,7 +91,7 @@ describe('CourseAssignments', () => {
       </BrowserRouter>
     );
 
-    expect(screen.getByText('Assignments')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Assignments', level: 2 })).toBeInTheDocument();
   });
 
   it('should show create button for instructors', () => {
