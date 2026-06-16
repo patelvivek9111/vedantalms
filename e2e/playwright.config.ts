@@ -4,8 +4,8 @@ import fs from 'fs';
 
 const e2eEnvLocal = path.join(__dirname, '.env.local');
 const frontendDir = path.join(__dirname, '..', 'frontend');
-const frontendBaseURL = process.env.E2E_BASE_URL || 'http://localhost:5173';
-const frontendPort = new URL(frontendBaseURL).port || '5173';
+const frontendBaseURL = process.env.E2E_BASE_URL || 'http://localhost:3000';
+const frontendPort = new URL(frontendBaseURL).port || '3000';
 if (fs.existsSync(e2eEnvLocal)) {
   for (const line of fs.readFileSync(e2eEnvLocal, 'utf8').split(/\r?\n/)) {
     const trimmed = line.trim();
@@ -24,7 +24,7 @@ export default defineConfig({
   testDir: './specs',
   timeout: 90_000,
   use: {
-    baseURL: process.env.E2E_BASE_URL || 'http://localhost:5173',
+    baseURL: process.env.E2E_BASE_URL || 'http://localhost:3000',
     trace: 'on-first-retry',
   },
   projects: [

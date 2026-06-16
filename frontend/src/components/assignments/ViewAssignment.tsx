@@ -13,6 +13,11 @@ import { isPaperUploadQuiz } from '../../utils/quizSubmissionMode';
 import FileAttachmentChips from '../files/FileAttachmentChips';
 import { fetchCourseLifecycleStatus } from '../../services/gradingApi';
 import ScrollableQuizSidebar from './ScrollableQuizSidebar';
+import MobileQuizChrome, {
+  MobileQuizProgress,
+  MobileQuestionPills,
+} from './MobileQuizChrome';
+import TimedQuizStartScreen from './TimedQuizStartScreen';
 import logger from '../../utils/logger';
 import ConfirmationModal from '../common/ConfirmationModal';
 import BackButton from '../common/BackButton';
@@ -78,6 +83,20 @@ interface Assignment {
   createdBy?: {
     _id: string;
   };
+}
+
+function isQuizAssignment(assignment: Pick<Assignment, 'isGradedQuiz' | 'group'>): boolean {
+  if (assignment.isGradedQuiz === true) return true;
+  const group = (assignment.group || '').trim().toLowerCase();
+  return group === 'quizzes' || group.includes('quiz');
+}
+
+function courseWorkListPath(
+  courseId: string | undefined,
+  assignment: Pick<Assignment, 'isGradedQuiz' | 'group'>
+): string {
+  if (!courseId) return '/dashboard';
+  return `/courses/${courseId}/${isQuizAssignment(assignment) ? 'quizzes' : 'assignments'}`;
 }
 
 interface Submission {
@@ -338,6 +357,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
   const [user, setUser] = useState<User | null>(null);
   const [answers, setAnswers] = useState<Answers>({});
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [isStartingQuiz, setIsStartingQuiz] = useState<boolean>(false);
   const [studentGroupId, setStudentGroupId] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState<boolean>(false);
   const [currentQuestion, setCurrentQuestion] = useState<number>(0);
@@ -352,6 +372,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
   const [showTimer, setShowTimer] = useState<boolean>(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
   const [showUploadSection, setShowUploadSection] = useState<boolean>(false);
+  const [showQuestionPicker, setShowQuestionPicker] = useState<boolean>(false);
   const [shuffledOptions, setShuffledOptions] = useState<Record<number, Question['rightItems']>>({});
   const [previewModalFile, setPreviewModalFile] = useState<NormalizedFile | null>(null);
   const [hasAutoSubmitted, setHasAutoSubmitted] = useState<boolean>(false);
@@ -831,6 +852,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
 
   const startQuiz = async () => {
     if (assignment?.isTimedQuiz && assignment?.quizTimeLimit && user?._id) {
+      setIsStartingQuiz(true);
       try {
         const res = await api.post(`/assignments/${id}/quiz/start`, {
           groupId: studentGroupId || undefined,
@@ -842,6 +864,8 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
         setTimeLeft(typeof attempt?.remainingSeconds === 'number' ? attempt.remainingSeconds : (assignment.quizTimeLimit || 0) * 60);
       } catch (err: any) {
         setError(err.response?.data?.message || 'Unable to start timed quiz.');
+      } finally {
+        setIsStartingQuiz(false);
       }
     }
   };
@@ -1092,16 +1116,53 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
         assignment.group !== 'Quizzes'));
   const assignmentGradeScore =
     isStudent && submission ? getAssignmentGradeScore(submission, assignment) : null;
+  const isScrollableQuiz = assignment.displayMode !== 'single';
+  const isQuizTakingMode =
+    isStudent &&
+    !activeSubmission &&
+    !effectivePastDue &&
+    canShowQuestionPanel &&
+    canInteractAsStudent &&
+    !!assignment.questions?.length &&
+    (!assignment.isTimedQuiz || quizStarted);
+  const showMobileQuizChrome = isQuizTakingMode;
+  const showTimedQuizStartScreen =
+    showTimedQuizChrome &&
+    !!assignment.quizTimeLimit &&
+    canInteractAsStudent &&
+    !activeSubmission &&
+    !quizStarted;
+  const showMobileQuizLayout = showMobileQuizChrome || showTimedQuizStartScreen;
+  const timedQuizTotalPoints =
+    assignment.questions?.reduce((sum, q) => sum + (q.points || 0), 0) ?? assignment.totalPoints ?? 0;
+  const isQuiz = isQuizAssignment(assignment);
+  const listFallbackPath = courseWorkListPath(courseId, assignment);
+  const showStudentSubmitButton =
+    isStudent && !activeSubmission && (!assignment.isTimedQuiz || quizStarted);
+  const showMobileAssignmentSubmitBar = showStudentSubmitButton && !showMobileQuizChrome;
+  const hasAssignmentInfoContent =
+    !!activeSubmission ||
+    !!assignmentGradeScore ||
+    (isStudent && typeof submission?.feedback === 'string' && submission.feedback.trim() !== '') ||
+    (isStudent && (submission?.teacherFeedbackFiles?.length ?? 0) > 0) ||
+    (isStudent && submission?.gradeVisibility?.mode === 'hidden') ||
+    (isStudent && !!submission?.autoGraded) ||
+    (isStudent && (submission?.files?.length ?? 0) > 0) ||
+    isInstructor ||
+    (isCreator && !viewAsStudent);
+  const hideAssignmentInfoOnMobile = showMobileQuizLayout || !hasAssignmentInfoContent;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       {/* Top Navigation Bar (Mobile Only) */}
       <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
         <div className="relative flex items-center justify-between px-4 py-3 gap-2">
           <BackButton 
-            fallbackPath={courseId ? `/courses/${courseId}/assignments` : '/dashboard'}
+            fallbackPath={listFallbackPath}
+            useFallbackPath
+            alwaysShow
             className="flex-shrink-0"
-            ariaLabel="Go back"
+            ariaLabel={isQuiz ? 'Go back to quizzes' : 'Go back to assignments'}
           />
           <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100 truncate px-2 flex-1 text-center">{assignment.title}</h1>
           {isStudent && assignmentGradeScore && (
@@ -1111,17 +1172,17 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
         </div>
       </nav>
 
-      <div className="w-full px-2 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8 pt-16 lg:pt-4 max-w-full overflow-x-hidden">
-        <div className="bg-white dark:bg-gray-800 shadow-sm ring-1 ring-slate-200/80 dark:ring-slate-700/80 rounded-xl p-4 sm:p-6 max-w-full overflow-hidden">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between max-w-full">
+      <div className={`w-full px-0 sm:px-4 lg:px-8 py-2 sm:py-6 lg:py-8 ${showMobileQuizLayout ? 'pt-[calc(3.5rem+1.25rem)] pb-2' : 'pt-[calc(3.5rem+1.25rem)]'} lg:pt-4 max-w-full overflow-x-hidden ${showMobileQuizLayout ? 'mobile-quiz-chrome-clearance' : 'mobile-bottom-nav-clearance'}`}>
+        <div className={`bg-white dark:bg-slate-900 sm:shadow-sm sm:ring-1 sm:ring-slate-200/80 dark:sm:ring-slate-700/80 sm:rounded-2xl max-w-full overflow-hidden ${hideAssignmentInfoOnMobile ? 'hidden sm:block sm:p-6' : 'p-3 sm:p-6'}`}>
+          <div className="flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-start sm:justify-between max-w-full">
             <div className="flex-1 min-w-0 w-full max-w-full">
-              <div className="flex flex-col gap-4 border-b border-slate-200/80 pb-5 dark:border-slate-700/80 sm:flex-row sm:items-start sm:justify-between sm:border-b-0 sm:pb-0">
+              <div className={`flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-start sm:justify-between sm:border-b-0 sm:pb-0 ${showMobileQuizLayout || !activeSubmission ? 'hidden sm:flex' : 'border-b border-slate-200/80 pb-4 dark:border-slate-700/80'}`}>
                 <div className="min-w-0 flex-1">
-                  <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white break-words sm:text-3xl">
+                  <h1 className="hidden sm:block text-2xl font-bold tracking-tight text-slate-900 dark:text-white break-words sm:text-3xl">
                     {assignment.title}
                   </h1>
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100/90 px-2.5 py-1.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200/80 dark:bg-slate-800/80 dark:text-slate-300 dark:ring-slate-700/80">
+                  <div className={`mt-0 flex flex-wrap items-center gap-2 sm:mt-3 ${showMobileQuizLayout ? 'hidden sm:flex' : ''}`}>
+                    <span className="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-slate-100/90 px-2.5 py-1.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200/80 dark:bg-slate-800/80 dark:text-slate-300 dark:ring-slate-700/80">
                       <Calendar className="h-3.5 w-3.5 shrink-0 text-slate-400 dark:text-slate-500" aria-hidden />
                       <span>Due {safeFormatDate(assignment.dueDate, 'MMM d, yyyy, h:mm a')}</span>
                     </span>
@@ -1301,12 +1362,12 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
 
 
           </div>
-          <div className="flex space-x-2">
-            {isStudent && !activeSubmission && (!assignment.isTimedQuiz || quizStarted) && (
+          <div className={`flex space-x-2 ${isQuizTakingMode ? 'hidden sm:flex' : ''}`}>
+            {showStudentSubmitButton && (
               <button
                 onClick={handleSubmit}
                 disabled={isSubmitting}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 dark:bg-indigo-500 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600 dark:hover:bg-indigo-600 dark:bg-indigo-500"
+                className="hidden sm:inline-flex min-h-[44px] items-center rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-600"
               >
                 {isSubmitting ? 'Submitting...' : 'Submit Assignment'}
               </button>
@@ -1330,6 +1391,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
               </button>
             )}
           </div>
+        </div>
         </div>
 
 
@@ -1399,23 +1461,16 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
         )}
 
         {/* Timed quiz start screen — students only (not teacher preview) */}
-        {showTimedQuizChrome && assignment.quizTimeLimit && canInteractAsStudent && !activeSubmission && !quizStarted && (
-          <div className="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-            <div className="text-center">
-              <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-2">Timed Quiz</h3>
-              <p className="text-blue-700 dark:text-blue-300 mb-4">
-                This quiz has a time limit of {assignment.quizTimeLimit} minutes.
-                Once you start, the timer will begin and cannot be paused.
-              </p>
-              <button
-                type="button"
-                onClick={startQuiz}
-                className="inline-flex items-center px-6 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600"
-              >
-                Start Quiz
-              </button>
-            </div>
-          </div>
+        {showTimedQuizStartScreen && (
+          <TimedQuizStartScreen
+            quizTimeLimit={assignment.quizTimeLimit!}
+            questionCount={assignment.questions?.length ?? 0}
+            totalPoints={timedQuizTotalPoints}
+            dueDate={assignment.dueDate}
+            displayMode={assignment.displayMode === 'scrollable' ? 'scrollable' : 'single'}
+            onStart={startQuiz}
+            isStarting={isStartingQuiz}
+          />
         )}
 
         {/* Teacher Analytics Dashboard - Always show for teachers */}
@@ -1682,47 +1737,68 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
               activeSubmission?.showStudentAnswers || assignment.showStudentAnswers);
 
           return (
-            <div className="mt-8">
+            <div className={hideAssignmentInfoOnMobile ? 'mt-3 lg:mt-8' : 'mt-8'}>
               {/* Show questions for students, but not in teacher dashboard */}
               {canShowQuestionPanel && shouldShowQuestions ? (
                 canInteractAsStudent && !activeSubmission && assignment.displayMode === 'single' ? (
                 // Student answering view with sidebar (single question mode)
-                <div className="flex gap-6">
+                <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
                   {/* Main content area */}
-                  <div className="flex-1">
+                  <div className="min-w-0 flex-1">
+                    {showMobileQuizChrome && assignment.questions && (
+                      <div className="mb-3 mt-2 space-y-3 px-3 sm:mt-0 sm:px-0">
+                        <MobileQuizProgress
+                          answeredCount={answeredQuestions.size}
+                          totalQuestions={assignment.questions.length}
+                          currentQuestion={currentQuestion}
+                          mode="single"
+                          timeLeft={timeLeft}
+                          showTimer={showTimedQuizChrome && showTimer && quizStarted}
+                          formatTime={formatTime}
+                        />
+                        <MobileQuestionPills
+                          totalQuestions={assignment.questions.length}
+                          currentQuestion={currentQuestion}
+                          answeredQuestions={answeredQuestions}
+                          markedQuestions={markedQuestions}
+                          onSelectQuestion={navigateToQuestion}
+                        />
+                      </div>
+                    )}
                     {!showUploadSection ? (
                       // Questions view
-                      <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 dark:border-gray-700 rounded-lg p-6 shadow-sm">
-                        <div className="bg-gray-100 dark:bg-gray-700 dark:bg-gray-700 rounded-lg p-3 mb-4">
-                          <div className="flex justify-between items-center">
-                            <div className="flex items-center space-x-3">
-                              <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 dark:text-gray-100">
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-6">
+                        <div className="mb-4 rounded-xl bg-slate-100 p-3 dark:bg-slate-800">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 sm:gap-3">
+                              <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
                                 Question {currentQuestion + 1}
                               </h3>
                               <button
+                                type="button"
                                 onClick={() => toggleMarkQuestion(currentQuestion)}
-                                className={`p-1 rounded border ${
+                                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border transition ${
                                   markedQuestions.has(currentQuestion)
-                                    ? 'bg-yellow-100 dark:bg-yellow-900/50 border-yellow-300 dark:border-yellow-700 text-yellow-700 dark:text-yellow-300'
-                                    : 'bg-gray-100 dark:bg-gray-700 dark:bg-gray-600 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-50 dark:bg-gray-7000'
+                                    ? 'border-amber-300 bg-amber-50 text-amber-600 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-400'
+                                    : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
                                 }`}
+                                aria-label={markedQuestions.has(currentQuestion) ? 'Remove bookmark' : 'Bookmark question'}
                               >
-                                {markedQuestions.has(currentQuestion) ? (
-                                  <Bookmark className="h-3 w-3 fill-current" />
-                                ) : (
-                                  <Bookmark className="h-3 w-3" />
-                                )}
+                                <Bookmark
+                                  size={18}
+                                  strokeWidth={2}
+                                  className={`shrink-0 ${markedQuestions.has(currentQuestion) ? 'fill-current' : ''}`}
+                                />
                               </button>
                             </div>
-                            <span className="text-base font-semibold text-gray-900 dark:text-gray-100 dark:text-gray-100">
+                            <span className="text-sm font-semibold text-slate-700 dark:text-slate-200 sm:text-base">
                               {assignment.questions[currentQuestion].points} pts
                             </span>
                           </div>
                         </div>
-                        <div className="border-b border-gray-200 dark:border-gray-700 dark:border-gray-700 mb-4"></div>
                         
                         <div className="mb-6">
-                          <p className="text-lg text-gray-900 dark:text-gray-100 dark:text-gray-100 leading-relaxed">{assignment.questions[currentQuestion].text}</p>
+                          <p className="text-base leading-relaxed text-slate-900 dark:text-slate-100 sm:text-lg">{assignment.questions[currentQuestion].text}</p>
                         </div>
                         
                         {/* Text input area - ALWAYS show for questions that are NOT multiple-choice or matching */}
@@ -1769,9 +1845,9 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                         })()}
                         
                         {assignment.questions[currentQuestion].type === 'multiple-choice' && assignment.questions[currentQuestion].options && (
-                          <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                          <div className="space-y-2 sm:space-y-0 sm:divide-y sm:divide-slate-200 dark:sm:divide-slate-700">
                             {assignment.questions[currentQuestion].options?.map((option, optionIndex) => (
-                              <div key={optionIndex} className="relative py-2">
+                              <div key={optionIndex} className="sm:relative sm:py-2">
                                 <input
                                   type="radio"
                                   id={`question-${currentQuestion}-option-${optionIndex}`}
@@ -1781,20 +1857,24 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                   onChange={(e) => handleAnswerChange(currentQuestion, e.target.value)}
                                   className="sr-only"
                                 />
-                                <label 
-                                  htmlFor={`question-${currentQuestion}-option-${optionIndex}`} 
-                                  className="flex items-center space-x-3 cursor-pointer"
+                                <label
+                                  htmlFor={`question-${currentQuestion}-option-${optionIndex}`}
+                                  className={`flex min-h-[52px] cursor-pointer items-center gap-3 rounded-xl border-2 px-4 py-3 transition active:scale-[0.99] sm:min-h-0 sm:rounded-none sm:border-0 sm:px-0 sm:py-2 ${
+                                    answers[currentQuestion] === option.text
+                                      ? 'border-indigo-500 bg-indigo-50 dark:border-indigo-400 dark:bg-indigo-950/40'
+                                      : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600'
+                                  }`}
                                 >
-                                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                                  <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
                                     answers[currentQuestion] === option.text
                                       ? 'border-indigo-500 bg-indigo-500'
-                                      : 'border-gray-300 bg-white dark:bg-gray-800'
+                                      : 'border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-900'
                                   }`}>
                                     {answers[currentQuestion] === option.text && (
-                                      <div className="w-2 h-2 rounded-full bg-white dark:bg-gray-800"></div>
+                                      <div className="h-2 w-2 rounded-full bg-white dark:bg-slate-900" />
                                     )}
                                   </div>
-                                  <span className="text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">{option.text}</span>
+                                  <span className="text-sm text-slate-900 dark:text-slate-100 sm:text-base">{option.text}</span>
                                 </label>
                               </div>
                             ))}
@@ -1943,7 +2023,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                           </div>
                         )}
                         
-                        <div className="flex justify-between mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+                        <div className="mt-8 hidden border-t border-slate-200 pt-6 lg:flex lg:justify-between dark:border-slate-700">
                           <button
                             onClick={() => navigateToQuestion(0)}
                             className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:bg-gray-700"
@@ -1981,7 +2061,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                         finalized={courseFinalized}
                         disabled={viewAsStudent}
                       />
-                        <div className="flex justify-between mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+                        <div className="mt-8 hidden border-t border-slate-200 pt-6 lg:flex lg:justify-between dark:border-slate-700">
                           <button
                             onClick={() => navigateToQuestion(0)}
                             className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
@@ -2012,8 +2092,8 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                     )}
                   </div>
                   
-                  {/* Sidebar */}
-                  <div className="w-80 bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                  {/* Sidebar — desktop only */}
+                  <div className="hidden w-80 shrink-0 rounded-lg bg-slate-50 p-4 dark:bg-slate-800 lg:block">
                     <div className="mb-4">
                       <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Questions</h4>
                       <div className="space-y-2 max-h-64 overflow-y-auto">
@@ -2112,11 +2192,26 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                 </div>
               ) : (
                 // Teacher/Admin view, submitted view, or scrollable mode - show all questions
-                <div className="flex gap-6 items-start">
+                <div className="flex flex-col gap-4 lg:flex-row lg:gap-6 lg:items-start">
                   {/* Main content area */}
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold mb-4">Questions</h3>
-                    <div className="space-y-6">
+                  <div className="min-w-0 flex-1">
+                    {showMobileQuizChrome && (
+                      <div className="mb-4 mt-2 lg:mt-0">
+                        <MobileQuizProgress
+                        answeredCount={answeredQuestions.size}
+                        totalQuestions={assignment.questions.length}
+                        currentQuestion={currentQuestion}
+                        mode="scrollable"
+                        timeLeft={timeLeft}
+                        showTimer={showTimedQuizChrome && showTimer && quizStarted}
+                        formatTime={formatTime}
+                      />
+                      </div>
+                    )}
+                    <h3 className="mb-3 hidden text-lg font-semibold text-slate-900 dark:text-slate-100 sm:mb-4 sm:block">
+                      Questions
+                    </h3>
+                    <div className="space-y-4 sm:space-y-6">
                                               {assignment.questions.map((question, index) => {
                         // Check if this is a submitted quiz and we should show feedback
                         const isQuiz = assignment.isGradedQuiz || assignment.group === 'Quizzes';
@@ -2181,9 +2276,9 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
 
                                                   
                                                   return (
-                            <div key={question.id || question._id || index} className={`bg-white dark:bg-gray-800 border-2 rounded-lg p-4 sm:p-6 shadow-sm ${
+                            <div key={question.id || question._id || index} className={`rounded-2xl border bg-white p-4 shadow-sm dark:bg-slate-900 sm:p-6 sm:shadow-md ${
                               isTeacherDashboard 
-                                ? 'border-blue-400 bg-blue-50 shadow-blue-100' 
+                                ? 'border-blue-400 bg-blue-50 shadow-blue-100 dark:bg-blue-950/30' 
                                 : (() => {
                                     // Determine feedback mode for border colors
                                     const showFullFeedbackForBorder = activeSubmission && activeSubmission.autoGraded;
@@ -2245,13 +2340,17 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                         return isCorrect ? 'border-green-500 dark:border-green-400' : 'border-gray-300 dark:border-gray-600';
                                       }
                                     }
-                                    return 'border-gray-200 dark:border-gray-700';
+                                    return 'border-slate-200/90 dark:border-slate-700/80';
                                   })()
                             }`}>
-                          <div className={`rounded-lg p-3 sm:p-4 mb-3 ${isTeacherDashboard ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-gray-100 dark:bg-gray-700'}`}>
-                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-0">
-                              <div className="flex items-center space-x-2 sm:space-x-3">
-                                <h4 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-100">Question {index + 1}</h4>
+                          <div className="mb-3 flex items-center justify-between gap-2 sm:mb-4 sm:rounded-xl sm:bg-slate-50 sm:p-3 dark:sm:bg-slate-800/60">
+                            <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                              <span className="inline-flex shrink-0 items-center rounded-lg bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">
+                                Q{index + 1}
+                              </span>
+                              <h4 className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100 sm:text-base">
+                                Question {index + 1}
+                              </h4>
                                 {isTeacherDashboard && (
                                   <span className="px-3 py-1 text-xs font-medium bg-blue-500 text-white rounded-full font-bold">
                                     TEACHER PREVIEW
@@ -2259,22 +2358,24 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                 )}
                                 {canInteractAsStudent && !activeSubmission && (
                                   <button
+                                    type="button"
                                     onClick={() => toggleMarkQuestion(index)}
-                                    className={`p-1 rounded border ${
+                                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border transition ${
                                       markedQuestions.has(index)
-                                        ? 'bg-yellow-100 border-yellow-300 text-yellow-700'
-                                        : 'bg-gray-100 dark:bg-gray-700 border-gray-300 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
+                                        ? 'border-amber-300 bg-amber-50 text-amber-600 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-400'
+                                        : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
                                     }`}
+                                    aria-label={markedQuestions.has(index) ? 'Remove bookmark' : 'Bookmark question'}
                                   >
-                                    {markedQuestions.has(index) ? (
-                                      <Bookmark className="h-3 w-3 fill-current" />
-                                    ) : (
-                                      <Bookmark className="h-3 w-3" />
-                                    )}
+                                    <Bookmark
+                                      size={18}
+                                      strokeWidth={2}
+                                      className={`shrink-0 ${markedQuestions.has(index) ? 'fill-current' : ''}`}
+                                    />
                                   </button>
                                 )}
                               </div>
-                              <div className="flex items-center space-x-2">
+                              <div className="flex shrink-0 items-center">
                                 {activeSubmission && activeSubmission.autoGraded && (question.type === 'multiple-choice' || question.type === 'matching') ? (
                                   (() => {
                                     const autoGrade = activeSubmission.autoQuestionGrades instanceof Map 
@@ -2299,14 +2400,11 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                 )}
                               </div>
                             </div>
-                          </div>
-                          <div className="border-b border-gray-200 dark:border-gray-700 mb-3"></div>
-                          
                           <div className="mb-4">
-                            <p className="text-base sm:text-lg text-gray-900 dark:text-gray-100 leading-relaxed">{question.text}</p>
+                            <p className="text-base font-medium leading-relaxed text-slate-900 dark:text-slate-100 sm:text-lg">{question.text}</p>
 
                             {question.type === 'multiple-choice' && (
-                              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">Select the correct answer.</p>
+                              <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Select the correct answer.</p>
                             )}
                           </div>
                           
@@ -2394,9 +2492,9 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                               
                               {/* Show regular multiple-choice interface for non-submitted or non-auto-graded assignments */}
                               {(!activeSubmission || (!activeSubmission.autoGraded && !(activeSubmission.showCorrectAnswers || assignment.showCorrectAnswers || activeSubmission.showStudentAnswers || assignment.showStudentAnswers))) && (
-                                <div className="divide-y divide-gray-200">
+                                <div className="space-y-2">
                                   {question.options.map((option, optionIndex) => (
-                                    <div key={optionIndex} className="relative py-2">
+                                    <div key={optionIndex} className="relative">
                                       <input
                                         type="radio"
                                         id={`question-${index}-option-${optionIndex}`}
@@ -2409,21 +2507,25 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                       />
                                       <label 
                                         htmlFor={`question-${index}-option-${optionIndex}`} 
-                                        className={`flex items-center space-x-3 cursor-pointer ${(!!activeSubmission || !canInteractAsStudent) ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                      >
-                                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                                        className={`flex min-h-[48px] cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 transition-colors touch-manipulation sm:px-4 ${
                                           answers[index] === option.text
-                                            ? 'border-indigo-500 bg-indigo-500'
-                                            : 'border-gray-300 bg-white dark:bg-gray-800'
+                                            ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-500/20 dark:border-indigo-400 dark:bg-indigo-950/40'
+                                            : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600'
+                                        } ${(!!activeSubmission || !canInteractAsStudent) ? 'cursor-not-allowed opacity-60' : ''}`}
+                                      >
+                                        <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
+                                          answers[index] === option.text
+                                            ? 'border-indigo-600 bg-indigo-600 dark:border-indigo-400 dark:bg-indigo-500'
+                                            : 'border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-900'
                                         }`}>
                                           {answers[index] === option.text && (
-                                            <div className="w-2 h-2 rounded-full bg-white dark:bg-gray-800"></div>
+                                            <div className="h-2 w-2 rounded-full bg-white" />
                                           )}
                                         </div>
-                                        <span className="text-sm text-gray-900 dark:text-gray-100 dark:text-gray-100">{option.text}</span>
+                                        <span className="text-sm leading-snug text-slate-900 dark:text-slate-100">{option.text}</span>
                                         {isTeacherDashboard && option.isCorrect && (
-                                          <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                            Correct Answer
+                                          <span className="ml-auto inline-flex shrink-0 items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+                                            Correct
                                           </span>
                                         )}
                                       </label>
@@ -2674,13 +2776,13 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                       />
                     )}
 
-                    {/* Submit button for scrollable mode */}
+                    {/* Submit button for scrollable mode — desktop only; mobile uses inline bar at page end */}
                     {isStudent && !activeSubmission && !effectivePastDue && assignment.displayMode === 'scrollable' && (
-                      <div className="mt-8">
+                      <div className="mt-8 hidden lg:block">
                         <button
                           onClick={handleSubmit}
                           disabled={isSubmitting}
-                          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600"
+                          className="inline-flex min-h-[44px] items-center rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-600"
                         >
                           {isSubmitting ? 'Submitting...' : 'Submit Assignment'}
                         </button>
@@ -2693,6 +2795,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                   
                   {/* Sidebar for scrollable mode - only show for students answering */}
                   {canInteractAsStudent && !activeSubmission && (
+                    <div className="hidden w-80 shrink-0 lg:block">
                     <ScrollableQuizSidebar
                       totalQuestions={assignment.questions.length}
                       questions={assignment.questions}
@@ -2708,6 +2811,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                       quizTimeLimit={assignment.quizTimeLimit}
                       onStartQuiz={startQuiz}
                     />
+                    </div>
                   )}
                 </div>
               )
@@ -2716,8 +2820,39 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
           );
         })()}
 
-        </div>
+        {showMobileAssignmentSubmitBar && (
+          <div className="mt-6 px-3 pb-4 lg:hidden">
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 active:scale-[0.99] disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+            >
+              {isSubmitting ? 'Submitting...' : 'Submit Assignment'}
+            </button>
+          </div>
+        )}
+
       </div>
+
+      {showMobileQuizChrome && (
+        <MobileQuizChrome
+          mode={isScrollableQuiz ? 'scrollable' : 'single'}
+          currentQuestion={currentQuestion}
+          totalQuestions={assignment.questions?.length ?? 0}
+          questions={assignment.questions ?? []}
+          answeredQuestions={answeredQuestions}
+          markedQuestions={markedQuestions}
+          isSubmitting={isSubmitting}
+          showQuestionPicker={showQuestionPicker}
+          onOpenQuestionPicker={() => setShowQuestionPicker(true)}
+          onCloseQuestionPicker={() => setShowQuestionPicker(false)}
+          onSelectQuestion={navigateToQuestion}
+          onPrev={prevQuestion}
+          onNext={nextQuestion}
+          onSubmit={handleSubmit}
+        />
+      )}
 
       <FilePreviewModal
         file={previewModalFile}

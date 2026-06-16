@@ -1,12 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { useCourse } from '../../contexts/CourseContext';
 import axios from 'axios';
 import { API_URL } from '../../config';
 import ViewAssignment from './ViewAssignment';
 import Breadcrumb from '../common/Breadcrumb';
-import MobileNavigation from '../course/MobileNavigation';
 import CourseSidebar from '../course/CourseSidebar';
 import { useSidebarConfig } from '../../hooks/useSidebarConfig';
 import { useCourseShellMobile } from '../../hooks/useCourseShellMobile';
@@ -15,11 +13,9 @@ const AssignmentViewWrapper: React.FC = () => {
   const { id: assignmentId } = useParams<{ id: string }>();
   const location = useLocation();
   const { user } = useAuth();
-  const { courses } = useCourse();
   const [course, setCourse] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [showCourseDropdown, setShowCourseDropdown] = useState(false);
   const isMobileDevice = useCourseShellMobile();
 
   const { filteredNavigationItems } = useSidebarConfig({ course, user });
@@ -120,19 +116,6 @@ const AssignmentViewWrapper: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <MobileNavigation
-        className="print:hidden"
-        isMobileDevice={isMobileDevice}
-        course={course}
-        showCourseDropdown={showCourseDropdown}
-        setShowCourseDropdown={setShowCourseDropdown}
-        user={user}
-        courses={courses}
-        courseId={cid}
-        isMobileMenuOpen={isMobileMenuOpen}
-        setIsMobileMenuOpen={setIsMobileMenuOpen}
-      />
-
       <div className="sticky top-0 z-[35] mx-auto hidden w-full max-w-7xl bg-gray-50 px-4 pt-2 dark:bg-gray-900 lg:block print:hidden">
         <div className="flex flex-col">
           <div className="pb-3">
@@ -152,7 +135,7 @@ const AssignmentViewWrapper: React.FC = () => {
         </div>
       </div>
 
-      <div className={`mx-auto flex w-full max-w-7xl print:block ${isMobileDevice ? 'flex-col pt-16' : 'flex-row'}`}>
+      <div className={`mx-auto flex w-full max-w-7xl print:block ${isMobileDevice ? 'flex-col' : 'flex-row'}`}>
         {isMobileMenuOpen && isMobileDevice && (
           <div
             className="print:hidden fixed inset-0 z-[90] bg-black bg-opacity-50 lg:hidden"

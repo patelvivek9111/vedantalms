@@ -31,6 +31,8 @@ import {
 import ConfirmationModal from '../common/ConfirmationModal';
 import PullToRefresh from '../common/PullToRefresh';
 import DiscussionReplyComposer from '../discussions/DiscussionReplyComposer';
+import BackButton from '../common/BackButton';
+import { useMobileLayout } from '../../hooks/useMobileLayout';
 import FileAttachmentChips from '../files/FileAttachmentChips';
 import FileAttachmentPanel, { normalizeLegacyFiles } from '../files/FileAttachmentPanel';
 import type { NormalizedFile } from '../../utils/fileTypes';
@@ -215,6 +217,7 @@ interface ReplyComponentProps {
   courseArchived?: boolean;
   canPostDiscussion?: boolean;
   isSubmittingReply?: boolean;
+  replyError?: string | null;
 }
 
 const ReplyComponent: React.FC<ReplyComponentProps> = ({
@@ -242,7 +245,10 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
   courseArchived,
   canPostDiscussion = true,
   isSubmittingReply,
+  replyError,
 }) => {
+  const isMobileLayout = useMobileLayout();
+  const composerRef = useRef<HTMLDivElement>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(reply.content);
   const [editAttachments, setEditAttachments] = useState<NormalizedFile[]>([]);
@@ -270,6 +276,12 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showMenu]);
+
+  useEffect(() => {
+    if (isReplying && composerRef.current) {
+      composerRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [isReplying]);
 
   const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -302,13 +314,19 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
   return (
     <div
       style={{
-        marginLeft: `${Math.min(level * 32, 96)}px`,
+        marginLeft: isMobileLayout
+          ? `${Math.min(level * 12, 36)}px`
+          : `${Math.min(level * 32, 96)}px`,
       }}
-      className="mb-6"
+      className="mb-4 lg:mb-6"
       role="article"
       aria-label={`Reply by ${reply.author.firstName} ${reply.author.lastName}, level ${level + 1}`}
     >
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow duration-200 overflow-hidden">
+              <div className={`bg-white dark:bg-gray-800 rounded-2xl shadow-sm border overflow-hidden transition-shadow duration-200 hover:shadow-md ${
+                isReplying
+                  ? 'border-indigo-300 ring-2 ring-indigo-500/30 dark:border-indigo-600'
+                  : 'border-gray-100 dark:border-gray-700'
+              }`}>
           <div className="p-4">
           {/* Header */}
           <div className="flex items-start justify-between mb-4">
@@ -471,22 +489,22 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
               )}
               
               {/* Reply button */}
-              <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-gray-700">
-                <div className="flex items-center space-x-4">
+              <div className="flex flex-col gap-3 border-t border-slate-100 pt-3 dark:border-slate-700 sm:flex-row sm:items-center sm:justify-between sm:pt-4">
+                <div className="flex flex-wrap items-center gap-3 sm:gap-4">
                   <button
                     onClick={() => onReply(reply._id)}
                     disabled={!canPostDiscussion}
-                    className="flex items-center space-x-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition-colors"
+                    className="inline-flex min-h-[44px] items-center gap-2 rounded-lg px-2 text-sm font-medium text-indigo-600 transition-colors hover:text-indigo-700 disabled:opacity-50 dark:text-indigo-400 dark:hover:text-indigo-300"
                     aria-label={`Reply to ${reply.author.firstName} ${reply.author.lastName}`}
                   >
-                    <Reply className="w-4 h-4" aria-hidden="true" />
+                    <Reply className="h-4 w-4 shrink-0" aria-hidden="true" />
                     <span>Reply</span>
                   </button>
                   
                   {allowLikes && (
                     <button
                       onClick={() => onLike(reply._id)}
-                      className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 font-medium transition-colors"
+                      className="inline-flex min-h-[44px] items-center gap-2 rounded-lg px-2 text-sm font-medium text-slate-600 transition-colors hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400"
                       aria-label={`Like reply by ${reply.author.firstName} ${reply.author.lastName}; ${reply.likes?.length || 0} likes`}
                     >
                       <Heart 
@@ -518,12 +536,12 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
         </div>
       </div>
 
-      {/* Nested reply form */}
+      {/* Inline reply form — appears directly under the reply being answered */}
       {isReplying && (
-        <div className="mt-3 ml-6">
-          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800 p-4">
-            <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-4 flex items-center space-x-2">
-              <Reply className="w-4 h-4" />
+        <div ref={composerRef} className="mt-3 mb-4 min-w-0 lg:mb-0">
+          <div className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50/90 p-3 dark:border-slate-700 dark:bg-slate-800/50 sm:p-4">
+            <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
+              <Reply className="h-4 w-4 shrink-0" />
               <span>Reply to {reply.author.firstName}</span>
             </h4>
             <DiscussionReplyComposer
@@ -540,8 +558,15 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
                 onAttachmentsChange([]);
               }}
               isSubmitting={isSubmittingReply || isSubmitting}
-              compact
+              submitLabel="Post reply"
+              layout={isMobileLayout ? 'inline' : 'default'}
+              compact={!isMobileLayout}
             />
+            {replyError && (
+              <p className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200" role="alert">
+                {replyError}
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -565,6 +590,7 @@ const ThreadView: React.FC = () => {
   const { courseId, threadId, groupId } = useParams<{ courseId?: string; threadId: string; groupId?: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const isMobileLayout = useMobileLayout();
   const [thread, setThread] = useState<Thread | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1070,8 +1096,16 @@ const ThreadView: React.FC = () => {
   };
 
   const handleReplyClick = (replyId: string) => {
-    setReplyingTo(replyId);
+    setReplyError(null);
+    setReplyingTo((prev) => (prev === replyId ? null : replyId));
+    setShowReplyEditor(false);
   };
+
+  const discussionsFallbackPath = groupId
+    ? `/groups/${groupId}/discussion`
+    : resolvedCourseId || courseId
+      ? `/courses/${resolvedCourseId || courseId}/discussions`
+      : '/dashboard';
 
   const handleGradeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1239,6 +1273,7 @@ const ThreadView: React.FC = () => {
           courseArchived={courseArchived}
           canPostDiscussion={canPostDiscussion}
           isSubmittingReply={isSubmitting}
+          replyError={replyingTo === reply._id ? replyError : null}
         />
         {replyMap.get(reply._id) && renderReplies(replyMap.get(reply._id)!, level + 1, onEdit, onDelete)}
         {lazyChildren[reply._id] && renderReplies(lazyChildren[reply._id], level + 1, onEdit, onDelete)}
@@ -1246,9 +1281,26 @@ const ThreadView: React.FC = () => {
     ));
   };
 
+  const mobileThreadNavTop = groupId ? 'top-16' : 'top-0';
+
   return (
-    <PullToRefresh onRefresh={handleRefresh} className="min-h-screen bg-slate-50/80 dark:bg-slate-950">
-      <div className="mx-auto max-w-4xl space-y-5 px-3 py-4 sm:space-y-6 sm:px-4 sm:py-6">
+    <PullToRefresh onRefresh={handleRefresh} className="min-h-screen bg-slate-50 dark:bg-slate-950">
+      <nav className={`lg:hidden fixed left-0 right-0 z-[150] border-b border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900 ${mobileThreadNavTop}`}>
+        <div className="relative flex items-center justify-between gap-2 px-4 py-3">
+          <BackButton
+            fallbackPath={discussionsFallbackPath}
+            alwaysShow
+            className="flex-shrink-0"
+            ariaLabel="Go back to discussions"
+          />
+          <h1 className="flex-1 truncate px-2 text-center text-base font-semibold text-slate-900 dark:text-slate-100">
+            {thread.title}
+          </h1>
+          <div className="w-10 flex-shrink-0" aria-hidden />
+        </div>
+      </nav>
+
+      <div className="mx-auto max-w-4xl space-y-4 px-3 py-3 pt-14 sm:space-y-6 sm:px-4 sm:py-6 lg:space-y-6 lg:px-4 lg:pt-0">
       {/* Main Thread Card */}
       <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
         {/* Status strip */}
@@ -1494,15 +1546,19 @@ const ThreadView: React.FC = () => {
                     </div>
                   )}
 
-                  {canPostDiscussion && !hasPosted && (!showReplyEditor ? (
+                  {canPostDiscussion && !hasPosted && !showReplyEditor && (
                     <button
-                      onClick={() => setShowReplyEditor(true)}
-                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3.5 text-base font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:bg-indigo-500 dark:hover:bg-indigo-600 touch-manipulation"
+                      onClick={() => {
+                        setShowReplyEditor(true);
+                        setReplyingTo(null);
+                      }}
+                      className="flex w-full min-h-[48px] items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3.5 text-base font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:bg-indigo-500 dark:hover:bg-indigo-600 touch-manipulation"
                     >
                       <MessageSquare className="h-5 w-5" aria-hidden="true" />
                       <span>Start the discussion</span>
                     </button>
-                  ) : (
+                  )}
+                  {canPostDiscussion && showReplyEditor ? (
                     <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-800/50 sm:p-5">
                       <h3 className="mb-4 flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-100 sm:text-lg">
                         <MessageSquare className="h-5 w-5" aria-hidden="true" />
@@ -1525,6 +1581,7 @@ const ThreadView: React.FC = () => {
                           }
                         }}
                         isSubmitting={isSubmitting}
+                        layout={isMobileLayout ? 'inline' : 'default'}
                       />
                       {replyError && (
                         <p className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200" role="alert">
@@ -1532,7 +1589,7 @@ const ThreadView: React.FC = () => {
                         </p>
                       )}
                     </div>
-                  ))}
+                  ) : null}
                 </>
               )}
         </div>
@@ -2001,19 +2058,8 @@ const ThreadView: React.FC = () => {
         </div>
       )}
 
-      {/* Replies Section */}
-      <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800 sm:px-6">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Replies</h2>
-          <div className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-            <MessageSquare className="h-4 w-4" />
-            <span>{rootReplies.length} {rootReplies.length === 1 ? 'reply' : 'replies'}</span>
-          </div>
-        </div>
-        <div className="px-4 py-5 sm:px-6 sm:py-6">
-          {renderReplies(rootReplies, 0, handleEditReply, handleDeleteReply)}
-        </div>
-      </div>
+      {/* Replies list — no outer card; each reply is its own card */}
+      {renderReplies(rootReplies, 0, handleEditReply, handleDeleteReply)}
 
       {/* Delete Thread Confirmation Modal */}
       <ConfirmationModal

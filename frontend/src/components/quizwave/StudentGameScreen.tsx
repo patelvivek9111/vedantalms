@@ -8,6 +8,7 @@ import { QuizWaveGameSnapshot, isRevealPhase } from '../../types/quizwaveGameSta
 import { useQuizWavePhaseTimer } from '../../hooks/useQuizWavePhaseTimer';
 import StudentAnswerFeedbackView from './StudentAnswerFeedbackView';
 import StudentGameResults from './StudentGameResults';
+import QuizWaveImmersiveShell from './QuizWaveImmersiveShell';
 import type { QuizWavePlayerResult } from '../../types/quizwaveScoring';
 import type { QuizWaveGameSummary } from '../../types/quizwaveGameState';
 
@@ -240,7 +241,7 @@ const StudentGameScreen: React.FC = () => {
 
   if (phase === 'LOBBY' || session?.status === 'waiting') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-500 via-purple-600 to-pink-500 flex items-center justify-center p-4">
+      <QuizWaveImmersiveShell className="min-h-full bg-gradient-to-br from-blue-500 via-purple-600 to-pink-500 flex items-center justify-center p-4">
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 sm:p-8 text-center w-full max-w-md">
           <div className="animate-spin rounded-full h-12 w-12 sm:h-16 sm:w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
           <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
@@ -250,37 +251,39 @@ const StudentGameScreen: React.FC = () => {
             The teacher will begin the quiz shortly
           </p>
         </div>
-      </div>
+      </QuizWaveImmersiveShell>
     );
   }
 
   if (phase === 'FINISHED' || session?.status === 'ended') {
     if (leaderboard.length === 0) {
       return (
-        <div className="min-h-screen bg-[#46178f] flex items-center justify-center">
+        <QuizWaveImmersiveShell className="min-h-full bg-[#46178f] flex items-center justify-center">
           <div className="text-center text-white">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4" />
             <p className="text-lg">Loading your results…</p>
           </div>
-        </div>
+        </QuizWaveImmersiveShell>
       );
     }
 
     return (
-      <StudentGameResults
+      <QuizWaveImmersiveShell>
+        <StudentGameResults
         nickname={nickname}
         leaderboard={leaderboard}
         gameSummary={gameSummary ?? gameSnapshot?.gameSummary}
         onDone={() => navigate('/quizwave/join')}
-      />
+        />
+      </QuizWaveImmersiveShell>
     );
   }
 
   if (!currentQuestion) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-500 via-purple-600 to-pink-500 flex items-center justify-center">
+      <QuizWaveImmersiveShell className="min-h-full bg-gradient-to-br from-blue-500 via-purple-600 to-pink-500 flex items-center justify-center">
         <div className="text-white text-xl">Syncing game...</div>
-      </div>
+      </QuizWaveImmersiveShell>
     );
   }
 
@@ -298,18 +301,20 @@ const StudentGameScreen: React.FC = () => {
     const questionNumber = (currentQuestion.questionIndex ?? 0) + 1;
     const totalQuestions = gameSnapshot?.totalQuestions ?? session?.quiz?.questions?.length ?? 1;
     return (
-      <StudentAnswerFeedbackView
-        result={answerResult}
-        pin={pin!}
-        questionNumber={questionNumber}
-        totalQuestions={totalQuestions}
-        isLoading={!answerResult}
-      />
+      <QuizWaveImmersiveShell>
+        <StudentAnswerFeedbackView
+          result={answerResult}
+          pin={pin!}
+          questionNumber={questionNumber}
+          totalQuestions={totalQuestions}
+          isLoading={!answerResult}
+        />
+      </QuizWaveImmersiveShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-500 via-purple-600 to-pink-500 flex flex-col">
+    <QuizWaveImmersiveShell className="min-h-full bg-gradient-to-br from-blue-500 via-purple-600 to-pink-500 flex flex-col">
       <div className="bg-white/10 backdrop-blur-lg p-3 sm:p-4 flex justify-end items-center">
         <div className="text-white text-xs sm:text-sm">{nickname}</div>
         {phase === 'QUESTION_ACTIVE' && (
@@ -363,7 +368,7 @@ const StudentGameScreen: React.FC = () => {
 
         </div>
       </div>
-    </div>
+    </QuizWaveImmersiveShell>
   );
 };
 

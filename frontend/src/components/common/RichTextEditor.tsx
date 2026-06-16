@@ -8,6 +8,8 @@ interface RichTextEditorProps {
   className?: string;
   height?: number;
   id?: string;
+  /** Polished toolbar for discussion/message composers */
+  variant?: 'default' | 'composer';
 }
 
 const base = import.meta.env.BASE_URL ?? '/';
@@ -28,6 +30,9 @@ const DESKTOP_TOOLBAR =
 const MOBILE_TOOLBAR =
   'bold italic underline | bullist numlist | link | removeformat';
 
+const COMPOSER_TOOLBAR =
+  'undo redo | bold italic underline strikethrough | bullist numlist blockquote | link | removeformat';
+
 const RichTextEditor: React.FC<RichTextEditorProps> = ({
   content,
   onChange,
@@ -35,9 +40,16 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   className,
   height,
   id,
+  variant = 'default',
 }) => {
   const isMobile = useIsMobileEditor();
+  const isComposer = variant === 'composer';
   const editorHeight = height ?? (isMobile ? 180 : 200);
+  const toolbar = isComposer
+    ? COMPOSER_TOOLBAR
+    : isMobile
+      ? MOBILE_TOOLBAR
+      : DESKTOP_TOOLBAR;
 
   if (typeof window !== 'undefined' && window.localStorage.getItem('lms:e2e:plain-editor') === '1') {
     return (
@@ -53,7 +65,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     );
   }
 
-  return (
+  const editor = (
     <Editor
       apiKey="gdng5aigkhrb5lsxhh4j8u2s4elts687j9k2uzu63l6zd4gw"
       value={content}
@@ -61,27 +73,45 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
       id={id}
       init={{
         height: editorHeight,
+        width: '100%',
+        autoresize_bottom_margin: 0,
         menubar: false,
+        branding: false,
+        promotion: false,
+        statusbar: !isComposer,
+        resize: isComposer ? false : true,
         mobile: {
           theme: 'silver',
-          plugins: ['lists', 'link'],
-          toolbar: MOBILE_TOOLBAR,
+          plugins: isComposer ? ['lists', 'link', 'autolink'] : ['lists', 'link'],
+          toolbar,
         },
-        plugins: [
-          'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview', 'anchor',
-          'searchreplace', 'visualblocks', 'code', 'fullscreen',
-          'insertdatetime', 'media', 'table', 'help', 'wordcount',
-        ],
-        toolbar: isMobile ? MOBILE_TOOLBAR : DESKTOP_TOOLBAR,
-        toolbar_mode: isMobile ? 'scrolling' : 'wrap',
+        plugins: isComposer
+          ? ['lists', 'link', 'autolink', 'wordcount']
+          : [
+              'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview', 'anchor',
+              'searchreplace', 'visualblocks', 'code', 'fullscreen',
+              'insertdatetime', 'media', 'table', 'help', 'wordcount',
+            ],
+        toolbar,
+        toolbar_mode: isMobile || isComposer ? 'scrolling' : 'wrap',
+        toolbar_sticky: isComposer,
         placeholder: placeholder || 'Write something...',
         content_css: [courseHtmlSharedCss],
-        content_style: 'body { margin: 8px; font-size: 16px; }',
+        content_style:
+          'body { margin: 10px 12px; font-size: 16px; line-height: 1.55; color: #0f172a; }',
+        link_default_target: '_blank',
+        link_assume_external_targets: true,
       }}
       textareaName="content"
       className={className}
     />
   );
+
+  if (isComposer) {
+    return <div className="rich-text-editor--composer w-full min-w-0 max-w-full">{editor}</div>;
+  }
+
+  return editor;
 };
 
 export default RichTextEditor;

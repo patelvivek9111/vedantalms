@@ -89,12 +89,42 @@ describe('AnnouncementForm', () => {
       <AnnouncementForm onSubmit={mockOnSubmit} />
     );
 
-    const submitButton = screen.getByRole('button', { name: /save/i });
-    fireEvent.click(submitButton);
+    const form = document.querySelector('form')!;
+    fireEvent.submit(form);
 
-    // Form should prevent submission without title (HTML5 validation)
     await waitFor(() => {
       expect(mockOnSubmit).not.toHaveBeenCalled();
+      expect(screen.getByText('Topic title is required')).toBeInTheDocument();
+      expect(screen.getByText('Announcement content is required')).toBeInTheDocument();
+    });
+  });
+
+  it('should block submit when title is present but body is empty', async () => {
+    render(
+      <AnnouncementForm onSubmit={mockOnSubmit} />
+    );
+
+    fireEvent.change(screen.getByLabelText(/topic title/i), { target: { value: 'Title only' } });
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+
+    await waitFor(() => {
+      expect(mockOnSubmit).not.toHaveBeenCalled();
+      expect(screen.getByText('Announcement content is required')).toBeInTheDocument();
+    });
+  });
+
+  it('should reject whitespace-only HTML body', async () => {
+    render(
+      <AnnouncementForm onSubmit={mockOnSubmit} />
+    );
+
+    fireEvent.change(screen.getByLabelText(/topic title/i), { target: { value: 'Title' } });
+    fireEvent.change(screen.getByTestId('rich-text-editor'), { target: { value: '<p><br></p>' } });
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+
+    await waitFor(() => {
+      expect(mockOnSubmit).not.toHaveBeenCalled();
+      expect(screen.getByText('Announcement content is required')).toBeInTheDocument();
     });
   });
 

@@ -420,6 +420,25 @@ input[type="datetime-local"]::-webkit-outer-spin-button {
   padding-right: env(safe-area-inset-right);
 }
 
+/* Keep scrollable content and form actions above the fixed mobile bottom nav (h-16). */
+@media (max-width: 1023px) {
+  .mobile-bottom-nav-clearance {
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .mobile-quiz-chrome-clearance {
+    padding-bottom: calc(8.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .mobile-assignment-submit-clearance {
+    padding-bottom: calc(8.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  #main-content {
+    scroll-padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 /* Mobile-specific optimizations */
 @media (max-width: 640px) {
   /* Prevent text size adjustment on iOS */
@@ -574,4 +593,76 @@ input[type="datetime-local"]::-webkit-outer-spin-button {
   max-width: 100%;
   padding: 1rem 1.25rem;
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.1);
+}
+
+/* Discussion reply composer — polished TinyMCE chrome */
+.rich-text-editor--composer {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  contain: inline-size;
+  isolation: isolate;
+}
+
+.rich-text-editor--composer .tox-tinymce {
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+.rich-text-editor--composer .tox-editor-header {
+  border-bottom: 1px solid rgb(226 232 240) !important;
+  background: linear-gradient(180deg, rgb(248 250 252) 0%, rgb(241 245 249) 100%) !important;
+  box-shadow: none !important;
+  padding: 4px 6px !important;
+}
+
+.dark .rich-text-editor--composer .tox-editor-header {
+  border-bottom-color: rgb(51 65 85) !important;
+  background: linear-gradient(180deg, rgb(30 41 59) 0%, rgb(15 23 42) 100%) !important;
+}
+
+.rich-text-editor--composer .tox-toolbar-overlord,
+.rich-text-editor--composer .tox-toolbar__primary {
+  background: transparent !important;
+}
+
+.rich-text-editor--composer .tox-toolbar__group {
+  padding: 0 2px !important;
+}
+
+.rich-text-editor--composer .tox-tbtn {
+  border-radius: 6px !important;
+  margin: 0 1px !important;
+}
+
+.rich-text-editor--composer .tox-tbtn:hover {
+  background: rgb(226 232 240) !important;
+}
+
+.dark .rich-text-editor--composer .tox-tbtn:hover {
+  background: rgb(51 65 85) !important;
+}
+
+.rich-text-editor--composer .tox-tbtn--enabled,
+.rich-text-editor--composer .tox-tbtn--enabled:hover {
+  background: rgb(224 231 255) !important;
+  color: rgb(67 56 202) !important;
+}
+
+.dark .rich-text-editor--composer .tox-tbtn--enabled,
+.dark .rich-text-editor--composer .tox-tbtn--enabled:hover {
+  background: rgb(49 46 129 / 0.45) !important;
+  color: rgb(165 180 252) !important;
+}
+
+.rich-text-editor--composer .tox-edit-area::before {
+  border: none !important;
+}
+
+.rich-text-editor--composer .tox-statusbar {
+  display: none !important;
 }

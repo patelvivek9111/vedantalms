@@ -108,8 +108,9 @@ const CreateAssignmentWrapper: React.FC = () => {
           <div className="mb-3 lg:hidden">
             <BackButton
               fallbackPath={course?._id ? `/courses/${course._id}/assignments` : '/dashboard'}
+              alwaysShow
               className="inline-flex"
-              ariaLabel="Go back"
+              ariaLabel="Go back to assignments"
             />
           </div>
           {course && (

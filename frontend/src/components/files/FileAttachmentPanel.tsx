@@ -46,7 +46,7 @@ const FileAttachmentPanel: React.FC<FileAttachmentPanelProps> = ({
   confirmReplace = false,
   showVersionHistory = false,
   versionHistoryAssetId,
-  label = 'Drop files here or browse',
+  label = 'Choose files to attach',
   accept,
   multiple = true,
   className = '',
@@ -226,18 +226,20 @@ const FileAttachmentPanel: React.FC<FileAttachmentPanelProps> = ({
         />
       )}
 
-      <div className="mt-4">
-        <FileUploadList
-          items={displayItems}
-          finalized={finalized}
-          onPreview={(f) => setPreview(f)}
-          onRemove={handleRemove}
-          onRetry={retry}
-          onCancel={cancel}
-          onReorder={!finalized && !disabled ? handleReorder : undefined}
-          reorderableCount={files.length}
-        />
-      </div>
+      {displayItems.length > 0 && (
+        <div className="mt-3">
+          <FileUploadList
+            items={displayItems}
+            finalized={finalized}
+            onPreview={(f) => setPreview(f)}
+            onRemove={handleRemove}
+            onRetry={retry}
+            onCancel={cancel}
+            onReorder={!finalized && !disabled ? handleReorder : undefined}
+            reorderableCount={files.length}
+          />
+        </div>
+      )}
 
       {showVersionHistory && <FileVersionHistory fileAssetId={historyId} finalized={finalized} />}
 

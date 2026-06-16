@@ -269,7 +269,7 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
 
   if (!session) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-50 dark:bg-slate-950">
+      <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-50 dark:bg-slate-950 lg:left-20">
         <div className="text-center">
           <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600 dark:border-indigo-800 dark:border-t-indigo-400" />
           <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">Loading session…</p>
@@ -641,7 +641,7 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
   // Full screen while quiz is running or showing results reveal
   if (isQuizActive || isEnded) {
     return (
-      <div className="fixed inset-0 left-0 z-[60] flex h-full flex-col overflow-hidden bg-slate-100/90 dark:bg-slate-950 lg:left-20">
+      <div className="fixed inset-0 left-0 z-[110] flex h-full flex-col overflow-hidden bg-slate-100/90 dark:bg-slate-950 lg:left-20">
         <div className="min-h-0 flex-1 overflow-hidden">{quizContent}</div>
       </div>
     );

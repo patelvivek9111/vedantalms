@@ -243,7 +243,7 @@ export default function GroupDashboard() {
         />
 
         <div className={`w-full flex-1 overflow-visible lg:overflow-auto ${isMobileMenuOpen ? 'overflow-hidden lg:overflow-auto' : ''}`}>
-          <div className="container mx-auto px-4 pb-6 pt-2 lg:pt-3">
+          <div className={`container mx-auto pb-6 ${isViewingThread ? 'px-0 pt-0' : 'px-4 pt-2'} lg:pt-3`}>
             {isAssignments && (
               <div className="space-y-3 sm:space-y-6">
                 <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 dark:border-slate-700 dark:bg-slate-900">

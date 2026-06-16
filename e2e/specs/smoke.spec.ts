@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const frontendURL = process.env.E2E_BASE_URL || 'http://localhost:3001';
+const frontendURL = process.env.E2E_BASE_URL || 'http://localhost:3000';
 
 async function isFrontendReachable(request: import('@playwright/test').APIRequestContext) {
   try {

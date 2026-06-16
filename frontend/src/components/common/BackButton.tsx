@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useNavigationHistory } from '../../hooks/useNavigationHistory';
 import { ArrowLeft } from 'lucide-react';
 import { hapticNavigation } from '../../utils/hapticFeedback';
@@ -20,6 +21,12 @@ interface BackButtonProps {
    * @default false
    */
   alwaysShow?: boolean;
+
+  /**
+   * Always navigate to fallbackPath instead of browser history stack
+   * @default false
+   */
+  useFallbackPath?: boolean;
   
   /**
    * Custom label for accessibility
@@ -37,12 +44,18 @@ const BackButton: React.FC<BackButtonProps> = ({
   fallbackPath = '/dashboard',
   className = '',
   alwaysShow = false,
+  useFallbackPath = false,
   ariaLabel = 'Go back',
 }) => {
+  const navigate = useNavigate();
   const { goBack, hasHistory } = useNavigationHistory();
 
   const handleBack = () => {
     hapticNavigation();
+    if (useFallbackPath) {
+      navigate(fallbackPath);
+      return;
+    }
     goBack(fallbackPath);
   };
 

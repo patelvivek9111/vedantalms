@@ -34,7 +34,7 @@ const ScrollableQuizSidebar: React.FC<ScrollableQuizSidebarProps> = ({
   onStartQuiz,
 }) => {
   return (
-    <div className="w-80 bg-gray-50 dark:bg-gray-700 rounded-lg p-4 self-start">
+    <div className="w-80 shrink-0 self-start rounded-2xl border border-slate-200/80 bg-slate-50 p-4 dark:border-slate-700/80 dark:bg-slate-800/60">
       <div className="mb-4">
         <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Questions</h4>
         <div className="space-y-2 max-h-64 overflow-y-auto">

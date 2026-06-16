@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogIn, Gamepad2 } from 'lucide-react';
+import QuizWaveImmersiveShell from './QuizWaveImmersiveShell';
 
 const StudentJoinScreen: React.FC = () => {
   const navigate = useNavigate();
@@ -28,7 +29,7 @@ const StudentJoinScreen: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-500 via-purple-600 to-pink-500 flex items-center justify-center p-2 sm:p-4">
+    <QuizWaveImmersiveShell className="min-h-full bg-gradient-to-br from-blue-500 via-purple-600 to-pink-500 flex items-center justify-center p-2 sm:p-4 mobile-bottom-nav-clearance lg:!pb-4">
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-4 sm:p-6 lg:p-8 w-full max-w-md">
         <div className="text-center mb-6 sm:mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full mb-3 sm:mb-4">
@@ -93,7 +94,7 @@ const StudentJoinScreen: React.FC = () => {
           </button>
         </form>
       </div>
-    </div>
+    </QuizWaveImmersiveShell>
   );
 };
 

@@ -38,7 +38,7 @@ export function MobileAppShell({
         showBurgerMenu={showBurgerMenu}
         setShowBurgerMenu={setShowBurgerMenu}
       />
-      <div className={`pt-20 lg:pt-0 pb-20 lg:pb-0 ${contentClassName}`}>{children}</div>
+      <div className={`pt-20 lg:pt-0 mobile-bottom-nav-clearance lg:!pb-0 ${contentClassName}`}>{children}</div>
     </div>
   );
 }

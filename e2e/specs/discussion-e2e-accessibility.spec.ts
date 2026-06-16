@@ -241,7 +241,7 @@ test.describe('discussion E2E and accessibility certification', () => {
 
     await gotoThread(page);
     await expect.poll(() => api.requests.some((request) => request.path === '/threads/thread1/mark-read')).toBe(true);
-    await expect(page.getByText('You have not posted yet')).toBeVisible();
+    await expect(page.getByText('Not posted yet')).toBeVisible();
     await expect(page.getByText('Instructor replied')).toBeVisible();
     await expect(page.getByText('Grade hidden')).toBeVisible();
     await expect(page.getByText('Replies are hidden until you post your first reply.')).toBeVisible();
@@ -314,7 +314,9 @@ test.describe('discussion E2E and accessibility certification', () => {
     await page.getByLabel(/grade \(out of 10\)/i).fill('9');
     await page.getByLabel(/feedback/i).fill('Strong participation');
     await page.getByRole('button', { name: /submit grade/i }).click();
-    await expect(page.getByText('9 / 10')).toBeVisible();
+    const gradeBadge = page.locator('.tabular-nums').first();
+    await expect(gradeBadge).toContainText('9');
+    await expect(gradeBadge).toContainText('10');
 
     await page.unroute('**/api/**');
     await seedSession(page, 'student');
@@ -328,7 +330,7 @@ test.describe('discussion E2E and accessibility certification', () => {
     });
     await gotoThread(page);
     await expect(page.getByText('Grade hidden')).toBeVisible();
-    await expect(page.getByText('9 / 10')).toHaveCount(0);
+    await expect(page.locator('.tabular-nums').filter({ hasText: '9' })).toHaveCount(0);
   });
 
   test('archived, finalized, module-hidden, and group-isolated states deny restricted student actions', async ({ page }) => {

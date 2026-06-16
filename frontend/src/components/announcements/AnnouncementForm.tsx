@@ -7,10 +7,11 @@ import DatePicker from '../common/DatePicker';
 import FormFieldGroup from '../common/FormFieldGroup';
 import { useDraftManager } from '../../hooks/useDraftManager';
 import { FormCheckboxOption, FormPageHeader, FormActions } from '../common/FormControls';
-import { FORM_SHELL } from '../common/formStyles';
+import { FORM_SHELL, FORM_ERROR } from '../common/formStyles';
 import ConfirmationModal from '../common/ConfirmationModal';
 import FileAttachmentPanel from '../files/FileAttachmentPanel';
 import type { NormalizedFile } from '../../utils/fileTypes';
+import { stripHtmlToText } from '../../utils/htmlUtils';
 
 interface AnnouncementFormProps {
   onSubmit: (data: FormData) => void;
@@ -150,6 +151,19 @@ const AnnouncementForm: React.FC<AnnouncementFormProps> = ({ onSubmit, loading, 
     return true;
   };
 
+  const validateBody = (value: string) => {
+    if (!stripHtmlToText(value)) {
+      setFieldErrors((prev) => ({ ...prev, body: 'Announcement content is required' }));
+      return false;
+    }
+    setFieldErrors((prev) => {
+      const newErrors = { ...prev };
+      delete newErrors.body;
+      return newErrors;
+    });
+    return true;
+  };
+
   const validateDelayedUntil = () => {
     if (options.delayPosting && !delayedUntil) {
       setFieldErrors(prev => ({ ...prev, delayedUntil: 'Release date and time is required when delay posting is enabled' }));
@@ -171,9 +185,10 @@ const AnnouncementForm: React.FC<AnnouncementFormProps> = ({ onSubmit, loading, 
     e.preventDefault();
     
     const isTitleValid = validateTitle(title);
+    const isBodyValid = validateBody(body);
     const isDelayedUntilValid = validateDelayedUntil();
-    
-    if (!isTitleValid || !isDelayedUntilValid) {
+
+    if (!isTitleValid || !isBodyValid || !isDelayedUntilValid) {
       return;
     }
 
@@ -227,10 +242,28 @@ const AnnouncementForm: React.FC<AnnouncementFormProps> = ({ onSubmit, loading, 
           maxLength={200}
         />
         <div>
-          <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label
+            htmlFor="announcement-body"
+            className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300"
+          >
             Content
           </label>
-          <RichTextEditor content={body} onChange={setBody} />
+          <RichTextEditor
+            id="announcement-body"
+            content={body}
+            placeholder="Write announcement content..."
+            onChange={(value) => {
+              setBody(value);
+              if (fieldErrors.body) {
+                validateBody(value);
+              }
+            }}
+          />
+          {fieldErrors.body && (
+            <p id="announcement-body-error" className={`${FORM_ERROR} mt-2`} role="alert">
+              {fieldErrors.body}
+            </p>
+          )}
         </div>
       </FormFieldGroup>
 

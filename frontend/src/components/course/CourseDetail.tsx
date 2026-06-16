@@ -1083,7 +1083,7 @@ const CourseDetail: React.FC = () => {
           onTouchEnd: sectionSwipeHandlers.onTouchEnd
         } : {})}
       >
-        <div className="container mx-auto px-4 pb-6 pt-2 lg:pt-3">
+        <div className="container mx-auto px-4 pb-6 pt-2 lg:pt-3 mobile-bottom-nav-clearance lg:!pb-6">
           {renderContent()}
         </div>
       </div>

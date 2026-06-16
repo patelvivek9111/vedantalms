@@ -1,6 +1,6 @@
 import React, { Suspense } from 'react';
 import { lazyWithRetry } from './utils/lazyWithRetry';
-import { Routes, Route, Navigate, useParams } from 'react-router-dom';
+import { Routes, Route, Navigate, useParams, useLocation, Link } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { CourseProvider } from './contexts/CourseContext';
 import { ModuleProvider } from './contexts/ModuleContext';
@@ -100,6 +100,23 @@ function Unauthorized() {
   );
 }
 
+function NotFound() {
+  return (
+    <div className="min-h-[50vh] flex items-center justify-center px-4">
+      <div className="text-center">
+        <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100">404</h1>
+        <p className="mt-2 text-gray-600 dark:text-gray-400">This page does not exist.</p>
+        <Link
+          to="/dashboard"
+          className="mt-6 inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+        >
+          Back to dashboard
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 
 function AnnouncementsWrapper() {
   const { courseId } = useParams<{ courseId: string }>();
@@ -126,7 +143,9 @@ const withRouteLoader = (node: React.ReactNode) => (
 function AppContent() {
   const { user, loading, token } = useAuth();
   const { offline } = useNetworkStatus();
+  const location = useLocation();
   const isAuthenticated = !!user;
+  const hideMobileBottomNav = location.pathname.startsWith('/quizwave');
 
   useMessagingSocketConnection(user?._id, token);
   useNotificationSocketConnection(user?._id, token);
@@ -147,7 +166,7 @@ function AppContent() {
       {isAuthenticated && <SkipToMain />}
       {isAuthenticated && offline && <NetworkOfflineBanner />}
       {isAuthenticated && <GlobalSidebar />}
-      {isAuthenticated && <BottomNav />}
+      {isAuthenticated && !hideMobileBottomNav && <BottomNav />}
       <main
         id="main-content"
         tabIndex={-1}
@@ -490,6 +509,7 @@ function AppContent() {
               </PrivateRoute>
             }
           />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
       <ToastContainer

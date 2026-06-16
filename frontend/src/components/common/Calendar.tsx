@@ -1344,10 +1344,6 @@ const CalendarPage: React.FC = () => {
               </div>
             )}
           </div>
-
-          <div className="overflow-hidden rounded-lg border border-gray-200/90 bg-white dark:border-gray-700 dark:bg-gray-800">
-            <ToDoPanel />
-          </div>
         </div>
       </MobileAppShell>
       </div>
@@ -1536,11 +1532,11 @@ const CalendarPage: React.FC = () => {
             setActiveTab('Event');
             setModalOpen(true);
           }}
-          className="lg:hidden fixed bottom-20 right-4 z-[100] inline-flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm transition-colors hover:bg-blue-700 active:bg-blue-800 touch-manipulation dark:bg-blue-500 dark:hover:bg-blue-600"
+          className="lg:hidden fixed bottom-20 right-4 z-[100] inline-flex h-14 w-14 items-center justify-center rounded-xl bg-blue-600 p-0 text-white shadow-lg transition-colors hover:bg-blue-700 active:bg-blue-800 touch-manipulation dark:bg-blue-500 dark:hover:bg-blue-600"
           aria-label="Create event"
           type="button"
         >
-          <Plus className="h-4 w-4" strokeWidth={2.5} />
+          <Plus className="h-7 w-7" strokeWidth={3} />
         </button>
       )}
 
