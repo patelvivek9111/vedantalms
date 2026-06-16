@@ -98,7 +98,7 @@ const TimedQuizStartScreen: React.FC<TimedQuizStartScreenProps> = ({
         </div>
       </div>
 
-      <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] left-0 right-0 z-[140] border-t border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-950 sm:hidden">
+      <div className="mobile-keyboard-dismiss fixed bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] left-0 right-0 z-[140] border-t border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-950 sm:hidden">
         <button
           type="button"
           onClick={onStart}

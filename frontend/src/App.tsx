@@ -38,6 +38,7 @@ import { QueryProvider } from './providers/QueryProvider';
 import SkipToMain from './design-system/SkipToMain';
 import NetworkOfflineBanner from './design-system/NetworkOfflineBanner';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
+import { useVirtualKeyboard } from './hooks/useVirtualKeyboard';
 import { useMessagingSocketConnection } from './hooks/inbox/useMessagingSocketConnection';
 import { useNotificationSocketConnection } from './hooks/notifications/useNotificationSocketConnection';
 import { useNotificationCrossTabSync } from './hooks/notifications/useNotificationCrossTabSync';
@@ -150,6 +151,7 @@ function AppContent() {
   useMessagingSocketConnection(user?._id, token);
   useNotificationSocketConnection(user?._id, token);
   useNotificationCrossTabSync(user?._id);
+  useVirtualKeyboard();
 
   if (loading) {
     return <AppLoadingSkeleton />;

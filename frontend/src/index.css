@@ -466,7 +466,7 @@ input[type="datetime-local"]::-webkit-outer-spin-button {
 }
 
 /* Prevent zoom on input focus for iOS (skip .compact-control — toolbar fields sized to match tabs) */
-@media screen and (max-width: 640px) {
+@media screen and (max-width: 1023px) {
   input[type="text"]:not(.compact-control),
   input[type="email"]:not(.compact-control),
   input[type="password"]:not(.compact-control),
@@ -475,8 +475,28 @@ input[type="datetime-local"]::-webkit-outer-spin-button {
   input[type="url"]:not(.compact-control),
   input[type="search"]:not(.compact-control),
   textarea:not(.compact-control),
-  select:not(.compact-control) {
+  select:not(.compact-control),
+  [contenteditable="true"]:not(.compact-control) {
     font-size: 16px !important; /* Prevents iOS zoom on focus */
+  }
+
+  /* Hide fixed bottom chrome while the virtual keyboard is open */
+  html.keyboard-open .mobile-keyboard-dismiss {
+    display: none !important;
+  }
+
+  html.keyboard-open .mobile-keyboard-dismiss.max-lg\:sticky {
+    position: static !important;
+  }
+
+  html.keyboard-open #main-content {
+    padding-bottom: 0 !important;
+  }
+
+  html.keyboard-open .mobile-bottom-nav-clearance,
+  html.keyboard-open .mobile-quiz-chrome-clearance,
+  html.keyboard-open .mobile-assignment-submit-clearance {
+    padding-bottom: 1rem !important;
   }
 }
 

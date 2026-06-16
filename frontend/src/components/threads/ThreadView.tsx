@@ -1282,6 +1282,9 @@ const ThreadView: React.FC = () => {
   };
 
   const mobileThreadNavTop = groupId ? 'top-16' : 'top-0';
+  const mobileThreadContentTop = groupId
+    ? 'pt-[calc(7.5rem+1.25rem)]'
+    : 'pt-[calc(3.5rem+1.25rem)]';
 
   return (
     <PullToRefresh onRefresh={handleRefresh} className="min-h-screen bg-slate-50 dark:bg-slate-950">
@@ -1300,7 +1303,7 @@ const ThreadView: React.FC = () => {
         </div>
       </nav>
 
-      <div className="mx-auto max-w-4xl space-y-4 px-3 py-3 pt-14 sm:space-y-6 sm:px-4 sm:py-6 lg:space-y-6 lg:px-4 lg:pt-0">
+      <div className={`mx-auto max-w-4xl space-y-4 px-3 py-3 sm:space-y-6 sm:px-4 sm:py-6 lg:space-y-6 lg:px-4 lg:pt-0 ${mobileThreadContentTop}`}>
       {/* Main Thread Card */}
       <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
         {/* Status strip */}
@@ -1410,7 +1413,7 @@ const ThreadView: React.FC = () => {
                 <>
                   <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0 flex-1">
-                      <h1 className="break-words text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50 sm:text-3xl">
+                      <h1 className="hidden break-words text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50 sm:block sm:text-3xl">
                         {thread.title}
                       </h1>
                       <div className="mt-4 flex items-center gap-3">

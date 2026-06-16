@@ -92,7 +92,7 @@ const EXPECTED = [
     model: 'Submission',
     path: '../models/Submission',
     indexes: [
-      { keys: { assignment: 1, student: 1 } },
+      { keys: { assignment: 1, student: 1, group: 1 } },
       { keys: { student: 1, submittedAt: -1 } },
     ],
   },
