@@ -16,9 +16,20 @@ const api = axios.create({
   },
 });
 
+/** Strip a leading /api when baseURL already ends with /api (avoids /api/api/... in production). */
+export const normalizeApiInstancePath = (url: string | undefined, baseURL: string | undefined): string | undefined => {
+  if (!url || /^https?:\/\//i.test(url)) return url;
+  const base = (baseURL || '').replace(/\/$/, '');
+  if (base.endsWith('/api') && url.startsWith('/api/')) {
+    return url.slice(4) || '/';
+  }
+  return url;
+};
+
 // Add a request interceptor to add the auth token to requests
 api.interceptors.request.use(
   (config) => {
+    config.url = normalizeApiInstancePath(config.url, config.baseURL);
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;

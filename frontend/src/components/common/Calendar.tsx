@@ -1532,7 +1532,7 @@ const CalendarPage: React.FC = () => {
             setActiveTab('Event');
             setModalOpen(true);
           }}
-          className="lg:hidden fixed bottom-20 right-4 z-[100] inline-flex h-14 w-14 items-center justify-center rounded-xl bg-blue-600 p-0 text-white shadow-lg transition-colors hover:bg-blue-700 active:bg-blue-800 touch-manipulation dark:bg-blue-500 dark:hover:bg-blue-600"
+          className="mobile-fixed-chrome lg:hidden fixed bottom-20 right-4 z-[100] inline-flex h-14 w-14 items-center justify-center rounded-xl bg-blue-600 p-0 text-white shadow-lg transition-colors hover:bg-blue-700 active:bg-blue-800 touch-manipulation dark:bg-blue-500 dark:hover:bg-blue-600"
           aria-label="Create event"
           type="button"
         >

@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { API_URL } from '../../config';
 import { Plus, Users, Trash2, Edit2, UserPlus, Shuffle, MessageSquare, Activity, ChevronDown, ChevronUp } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -145,7 +143,7 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
       if (groupStructure === 'byGroupCount') payload.groupCount = groupCount;
       if (groupStructure === 'byStudentsPerGroup') payload.studentsPerGroup = studentsPerGroup;
       const response = await api.post(
-        `${API_URL}/api/groups/sets`,
+        `/groups/sets`,
         payload,
         {
           headers: { Authorization: `Bearer ${token}` }
@@ -188,7 +186,7 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
     try {
       const token = localStorage.getItem('token');
       const response = await api.post(
-        `${API_URL}/api/groups/sets/${selectedSet._id}/groups`,
+        `/groups/sets/${selectedSet._id}/groups`,
         payload,
         {
           headers: { Authorization: `Bearer ${token}` }
@@ -211,7 +209,7 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
     try {
       const token = localStorage.getItem('token');
       const response = await api.post(
-        `${API_URL}/api/groups/sets/${selectedSet._id}/auto-split`,
+        `/groups/sets/${selectedSet._id}/auto-split`,
         {
           groupSize,
           students: students.map(s => s._id)
@@ -253,7 +251,7 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
     try {
       const token = localStorage.getItem('token');
       const response = await api.put(
-        `${API_URL}/api/groups/${selectedGroup._id}`,
+        `/groups/${selectedGroup._id}`,
         {
           name: newGroupName,
           leader: selectedStudents[0],
@@ -277,7 +275,7 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
     try {
       const token = localStorage.getItem('token');
       await api.post(
-        `${API_URL}/api/groups/${selectedGroup._id}/message`,
+        `/groups/${selectedGroup._id}/message`,
         {
           subject: messageSubject,
           content: messageContent
@@ -299,7 +297,7 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
     try {
       const token = localStorage.getItem('token');
       const response = await api.get(
-        `${API_URL}/api/groups/${groupId}/activity`,
+        `/groups/${groupId}/activity`,
         {
           headers: { Authorization: `Bearer ${token}` }
         }
@@ -367,7 +365,7 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
           if (sourceGroup && sourceGroup._id !== destGroupId) {
             const newSourceMembers = updatedGroups.find(g => g._id === sourceGroup._id)?.members.map(m => m._id) || [];
             await api.put(
-              `${API_URL}/api/groups/${sourceGroup._id}`,
+              `/groups/${sourceGroup._id}`,
               {
                 members: newSourceMembers,
                 leader: newSourceMembers[0] || null
@@ -380,7 +378,7 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
           // Update destination group
           const newDestMembers = updatedGroups.find(g => g._id === destGroupId)?.members.map(m => m._id) || [];
           await api.put(
-            `${API_URL}/api/groups/${destGroupId}`,
+            `/groups/${destGroupId}`,
             {
               members: newDestMembers,
               leader: newDestMembers[0] || null

@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { formatDistanceToNow, format } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
 import api, { getImageUrl } from '../../services/api';
-import { API_URL } from '../../config';
 import RichTextEditor from '../common/RichTextEditor';
 import { 
   MessageSquare, 
@@ -846,7 +845,7 @@ const ThreadView: React.FC = () => {
       const token = localStorage.getItem('token');
       const fileAssetIds = composerFiles.map((f) => f.fileAssetId).filter(Boolean);
       const response = await api.post(
-        `${API_URL}/api/threads/${thread._id}/replies`,
+        `/threads/${thread._id}/replies`,
         { 
           content: replyContent,
           parentReply: parentReply || null,
@@ -888,7 +887,7 @@ const ThreadView: React.FC = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await api.post(
-        `${API_URL}/api/threads/${thread._id}/replies/${replyId}/like`,
+        `/threads/${thread._id}/replies/${replyId}/like`,
         {},
         {
           headers: { Authorization: `Bearer ${token}` }
@@ -911,7 +910,7 @@ const ThreadView: React.FC = () => {
       const token = localStorage.getItem('token');
       const fileAssetIds = editThreadAttachments.map((f) => f.fileAssetId).filter(Boolean);
       const response = await api.put(
-        `${API_URL}/api/threads/${thread._id}`,
+        `/threads/${thread._id}`,
         {
           title: editTitle,
           content: editContent,
@@ -944,7 +943,7 @@ const ThreadView: React.FC = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await api.delete(
-        `${API_URL}/api/threads/${thread._id}`,
+        `/threads/${thread._id}`,
         {
           headers: { Authorization: `Bearer ${token}` }
         }
@@ -963,7 +962,7 @@ const ThreadView: React.FC = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await api.patch(
-        `${API_URL}/api/threads/${thread._id}/pin`,
+        `/threads/${thread._id}/pin`,
         {},
         {
           headers: { Authorization: `Bearer ${token}` }
@@ -983,7 +982,7 @@ const ThreadView: React.FC = () => {
       const token = localStorage.getItem('token');
       const endpoint = thread.locked ? 'unlock' : 'lock';
       const response = await api.post(
-        `${API_URL}/api/threads/${thread._id}/${endpoint}`,
+        `/threads/${thread._id}/${endpoint}`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -1004,7 +1003,7 @@ const ThreadView: React.FC = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await api.put(
-        `${API_URL}/api/threads/${thread._id}/replies/${replyId}`,
+        `/threads/${thread._id}/replies/${replyId}`,
         payload,
         {
           headers: { Authorization: `Bearer ${token}` }
@@ -1025,7 +1024,7 @@ const ThreadView: React.FC = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await api.delete(
-        `${API_URL}/api/threads/${thread._id}/replies/${replyId}`,
+        `/threads/${thread._id}/replies/${replyId}`,
         {
           headers: { Authorization: `Bearer ${token}` }
         }
@@ -1054,7 +1053,7 @@ const ThreadView: React.FC = () => {
     if (!isModerator) return;
     const token = localStorage.getItem('token');
     const response = await api.post(
-      `${API_URL}/api/replies/${replyId}/hide`,
+      `/replies/${replyId}/hide`,
       {},
       { headers: { Authorization: `Bearer ${token}` } }
     );
@@ -1067,7 +1066,7 @@ const ThreadView: React.FC = () => {
     if (!isModerator) return;
     const token = localStorage.getItem('token');
     const response = await api.post(
-      `${API_URL}/api/replies/${replyId}/restore`,
+      `/replies/${replyId}/restore`,
       {},
       { headers: { Authorization: `Bearer ${token}` } }
     );
@@ -1117,7 +1116,7 @@ const ThreadView: React.FC = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await api.post(
-        `${API_URL}/api/threads/${thread._id}/grade`,
+        `/threads/${thread._id}/grade`,
         {
           studentId: selectedStudent._id,
           grade: parseFloat(grade),
@@ -1161,7 +1160,7 @@ const ThreadView: React.FC = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await api.put(
-        `${API_URL}/api/threads/${thread._id}`,
+        `/threads/${thread._id}`,
         {
           ...editSettings,
           dueDate: editSettings.dueDate || null,

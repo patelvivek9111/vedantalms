@@ -233,7 +233,7 @@ const MobileQuizChrome: React.FC<MobileQuizChromeProps> = ({
         onSelectQuestion={onSelectQuestion}
       />
 
-      <div className="mobile-keyboard-dismiss fixed bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] left-0 right-0 z-[140] border-t border-slate-200/90 bg-white px-3 py-3 dark:border-slate-700/90 dark:bg-slate-950 lg:hidden">
+      <div className="mobile-fixed-chrome mobile-quiz-action-bar fixed bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] left-0 right-0 z-[140] border-t border-slate-200/90 bg-white px-3 py-3 dark:border-slate-700/90 dark:bg-slate-950 lg:hidden">
         {mode === 'scrollable' ? (
           <button
             type="button"

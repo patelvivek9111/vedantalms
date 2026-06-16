@@ -35,6 +35,9 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
     'top-left': 'top-20 left-3'
   };
 
+  const isBottomPosition = position === 'bottom-right' || position === 'bottom-left';
+  const chromeClass = isBottomPosition ? 'mobile-fixed-chrome' : '';
+
   const actionPositionClasses = {
     'bottom-right': 'bottom-24 right-3',
     'bottom-left': 'bottom-24 left-3',
@@ -63,7 +66,7 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
       <button
         onClick={() => !disabled && actions[0].onClick()}
         disabled={disabled || actions[0].disabled}
-        className={`lg:hidden fixed ${positionClasses[position]} w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-500 dark:from-blue-500 dark:to-blue-600 text-white rounded-xl shadow-lg hover:shadow-blue-500/50 hover:from-blue-700 hover:to-blue-600 dark:hover:from-blue-600 dark:hover:to-blue-700 active:scale-95 transition-all flex items-center justify-center z-[100] touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+        className={`${chromeClass} lg:hidden fixed ${positionClasses[position]} w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-500 dark:from-blue-500 dark:to-blue-600 text-white rounded-xl shadow-lg hover:shadow-blue-500/50 hover:from-blue-700 hover:to-blue-600 dark:hover:from-blue-600 dark:hover:to-blue-700 active:scale-95 transition-all flex items-center justify-center z-[100] touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
         aria-label={actions[0].label || ariaLabel}
         type="button"
       >
@@ -73,7 +76,7 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
   }
 
   return (
-    <div className={`lg:hidden fixed ${positionClasses[position]} z-[100]`}>
+    <div className={`${chromeClass} lg:hidden fixed ${positionClasses[position]} z-[100]`}>
       {/* Action Buttons */}
       {isOpen && (
         <div className={`absolute ${actionPositionClasses[position]} flex flex-col-reverse gap-3 mb-3`}>

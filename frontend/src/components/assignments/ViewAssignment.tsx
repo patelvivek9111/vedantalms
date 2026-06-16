@@ -1832,7 +1832,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                 <textarea
                                   id={`question-${currentQuestion}-answer`}
                                   name={`question-${currentQuestion}-answer`}
-                                  className="w-full min-h-[120px] sm:min-h-[128px] p-3 sm:p-4 border-2 border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-800 text-[16px] leading-normal text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 resize-y sm:text-base"
+                                  className="w-full min-h-[120px] sm:min-h-[128px] p-3 sm:p-4 border-2 border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 resize-y text-sm sm:text-base"
                                   value={formatTextAnswer(getAnswerForQuestion(answers, currentQuestion))}
                                   onChange={(e) => handleAnswerChange(currentQuestion, e.target.value)}
                                   placeholder="Enter your answer here..."
@@ -2552,7 +2552,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                 <textarea
                                   id={`question-${index}-answer`}
                                   name={`question-${index}-answer`}
-                                  className="w-full min-h-[120px] sm:min-h-[128px] p-3 sm:p-4 border-2 border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-800 text-[16px] leading-normal text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 resize-y sm:text-base"
+                                  className="w-full min-h-[120px] sm:min-h-[128px] p-3 sm:p-4 border-2 border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 resize-y text-sm sm:text-base"
                                   value={formatTextAnswer(getAnswerForQuestion(answers, index))}
                                   onChange={(e) => !activeSubmission && showStudentExperience && handleAnswerChange(index, e.target.value)}
                                   placeholder={showStudentExperience ? "Enter your answer here..." : "Student's answer will appear here"}

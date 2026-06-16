@@ -100,7 +100,7 @@ export function FormNavBar({
   children: React.ReactNode;
 }) {
   return (
-    <div className="mobile-keyboard-dismiss mt-8 flex flex-col gap-3 border-t border-slate-200 pt-6 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between max-lg:sticky max-lg:bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] max-lg:z-30 max-lg:-mx-4 max-lg:px-4 max-lg:pb-3 max-lg:bg-white/95 max-lg:backdrop-blur-sm max-lg:dark:bg-gray-900/95">
+    <div className="mobile-sticky-form-actions mt-8 flex flex-col gap-3 border-t border-slate-200 pt-6 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between max-lg:sticky max-lg:bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] max-lg:z-30 max-lg:-mx-4 max-lg:px-4 max-lg:pb-3 max-lg:bg-white/95 max-lg:backdrop-blur-sm max-lg:dark:bg-gray-900/95">
       {onBack ? (
         <button type="button" onClick={onBack} className={`${BTN_SECONDARY} w-full sm:w-auto`}>
           Back
