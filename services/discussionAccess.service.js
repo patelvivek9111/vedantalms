@@ -180,6 +180,16 @@ async function assertStudentCanReply(user, threadOrId, options = {}) {
   };
 }
 
+/** Authors may edit/delete existing replies while the discussion is locked; lock only blocks new posts. */
+async function assertStudentCanModifyOwnReply(user, threadOrId, options = {}) {
+  const context = await assertStudentCanViewDiscussion(user, threadOrId, options);
+  const { thread } = context;
+  if (thread.settings?.allowComments === false && isStudent(user)) {
+    throw accessError('Comments are disabled for this discussion', 403, 'COMMENTS_DISABLED');
+  }
+  return context;
+}
+
 async function assertStudentCanGradeDiscussion(user, threadOrId) {
   return assertStaffCanAct(user, threadOrId, 'DISCUSSION_GRADE_NOT_AUTHORIZED');
 }
@@ -191,6 +201,13 @@ async function assertStudentCanModerateDiscussion(user, threadOrId) {
 function hasUserPosted(thread, user) {
   const userId = normalizeId(user);
   return (thread?.replies || []).some((reply) => !reply.deletedAt && normalizeId(reply.author) === userId);
+}
+
+function userOwnsReply(foundReply, user) {
+  if (!foundReply?.reply || !user) return false;
+  const { reply, source } = foundReply;
+  const authorRef = source === 'collection' ? reply.authorId : reply.author;
+  return normalizeId(user) === normalizeId(authorRef);
 }
 
 function redactDeletedReply(reply) {
@@ -496,6 +513,7 @@ async function buildThreadListAccessBundle(user, threads, options = {}) {
 module.exports = {
   assertStudentCanGradeDiscussion,
   assertStudentCanModerateDiscussion,
+  assertStudentCanModifyOwnReply,
   assertStudentCanReply,
   assertStudentCanViewDiscussion,
   assertStudentCanViewGroupDiscussion,
@@ -506,6 +524,7 @@ module.exports = {
   resolveCourseStaffRecipientIds,
   isCourseStaff,
   loadDiscussionContext,
+  userOwnsReply,
   normalizeId,
   paginateReplies,
   resolveThreadListAccessContext,

@@ -23,6 +23,7 @@ import { useInboxMessagesQuery } from '../hooks/inbox/useInboxMessagesQuery';
 import { useInboxMutations } from '../hooks/inbox/useInboxMutations';
 import { useInboxRealtime } from '../hooks/inbox/useInboxRealtime';
 import { useInboxInvalidate } from '../hooks/inbox/useInboxInvalidate';
+import { buildForwardSubject, buildForwardBody } from '../components/inbox/inboxUtils';
 
 const EMPTY_CONVERSATIONS: any[] = [];
 const EMPTY_MESSAGES: any[] = [];
@@ -203,6 +204,25 @@ const Inbox: React.FC = () => {
     } finally {
       setSending(false);
     }
+  };
+
+  const handleForward = () => {
+    if (!selectedConversation || messages.length === 0) return;
+    setShowReplyBox(false);
+    setComposeRecipients([]);
+    setComposeToGroup('');
+    setComposeGroupUsers([]);
+    setComposeToInput('');
+    setComposeUserResults([]);
+    setComposeAttachments([]);
+    setSendIndividually(false);
+    setComposeError(null);
+    setComposeSubject(buildForwardSubject(selectedConversation.subject || ''));
+    setComposeBody(buildForwardBody(messages, selectedConversation));
+    if (selectedConversation.course) {
+      setComposeCourse(String(selectedConversation.course));
+    }
+    setShowCompose(true);
   };
 
   const handleToggleStar = async (conv: any) => {
@@ -600,6 +620,8 @@ const Inbox: React.FC = () => {
                   onBack={() => setConversationId(null)}
                   onShowReply={() => setShowReplyBox(true)}
                   onHideReply={() => setShowReplyBox(false)}
+                  onForward={handleForward}
+                  canForward={!messagesLoading && messages.length > 0}
                   onReplyChange={setReply}
                   onReplyAttachmentsChange={setReplyAttachments}
                   onSendReply={handleSendReply}

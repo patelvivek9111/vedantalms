@@ -511,6 +511,8 @@ export function AdminCourseOversight() {
             <button
               onClick={() => handleCourseAction('unpublish', course)}
               className="text-yellow-600 dark:text-yellow-400 hover:text-yellow-900 dark:hover:text-yellow-300"
+              title="Unpublish course"
+              aria-label="Unpublish course"
             >
               <EyeOff className="w-4 h-4" />
             </button>
@@ -518,6 +520,8 @@ export function AdminCourseOversight() {
             <button
               onClick={() => handleCourseAction('publish', course)}
               className="text-green-600 dark:text-green-400 hover:text-green-900 dark:hover:text-green-300"
+              title="Publish course"
+              aria-label="Publish course"
             >
               <Eye className="w-4 h-4" />
             </button>
@@ -525,6 +529,8 @@ export function AdminCourseOversight() {
           <button
             onClick={() => handleCourseAction('delete', course)}
             className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
+            title="Delete course"
+            aria-label="Delete course"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -653,7 +659,11 @@ export function AdminCourseOversight() {
           </div>
 
           <div className="flex items-end">
-            <button className="w-full bg-blue-600 dark:bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors">
+            <button
+              type="button"
+              onClick={() => navigate('/courses/create')}
+              className="w-full bg-blue-600 dark:bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
+            >
               Create Course
             </button>
           </div>

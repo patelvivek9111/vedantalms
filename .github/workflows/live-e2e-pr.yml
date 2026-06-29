@@ -1,0 +1,62 @@
+name: Live E2E (PR smoke)
+
+on:
+  pull_request:
+    paths:
+      - 'frontend/src/**'
+      - 'routes/**'
+      - 'services/**'
+      - 'controllers/**'
+      - 'models/**'
+      - 'e2e/**'
+      - 'scripts/seedVisualE2e.js'
+      - 'scripts/seedUploadE2e.js'
+      - 'scripts/seedGrade8MathIndiaDemo.js'
+      - '.github/workflows/live-e2e-pr.yml'
+  workflow_dispatch:
+
+jobs:
+  live-e2e-pr-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+    env:
+      MONGODB_URI: mongodb://127.0.0.1:27017/lms-live-e2e-pr
+      JWT_SECRET: ci-live-e2e-pr-jwt-secret
+      DEMO_STUDENT_PASSWORD: VedantaDemo8!
+      E2E_API_URL: http://127.0.0.1:5000
+      E2E_BASE_URL: http://127.0.0.1:3000
+      CI: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npm ci
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+      - run: npm run seed:e2e:visual
+      - run: npm start &
+        env:
+          PORT: 5000
+      - name: Wait for API
+        run: |
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:5000/api/auth/login -o /dev/null 2>/dev/null && exit 0
+            sleep 2
+          done
+          exit 1
+      - name: PR live smoke (fast subset)
+        run: npm run test:e2e:live:pr
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: live-e2e-pr-artifacts
+          path: test-results/
+          if-no-files-found: ignore

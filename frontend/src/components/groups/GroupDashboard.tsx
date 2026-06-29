@@ -60,6 +60,7 @@ export default function GroupDashboard() {
     lastSegment === 'home' || lastSegment === groupId || !lastSegment || groupIndex === pathSegments.length - 1;
   const isDiscussion = lastSegment === 'discussion' && !isViewingThread;
   const isPeople = lastSegment === 'people';
+  const isMeetings = lastSegment === 'meetings';
 
   useEffect(() => {
     async function fetchGroup() {
@@ -291,7 +292,7 @@ export default function GroupDashboard() {
             {isAnnouncements && groupSetId && courseId && (
               <GroupAnnouncements groupSetId={groupSetId} courseId={courseId} />
             )}
-            {(isViewingPage || isViewingThread || isHome || isDiscussion || isPeople) && (
+            {(isViewingPage || isViewingThread || isHome || isDiscussion || isPeople || isMeetings) && (
               <Outlet context={outletContext} />
             )}
           </div>

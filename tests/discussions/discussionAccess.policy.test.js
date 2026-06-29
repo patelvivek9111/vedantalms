@@ -167,6 +167,16 @@ describe('discussion access policy', () => {
     });
   });
 
+  it('allows students to modify their own existing replies on locked discussions', async () => {
+    mockContext();
+    await expect(
+      access.assertStudentCanModifyOwnReply(student, thread({ locked: true }), { now })
+    ).resolves.toBeTruthy();
+    await expect(access.assertStudentCanReply(student, thread({ locked: true }), { now })).rejects.toMatchObject({
+      code: 'DISCUSSION_LOCKED',
+    });
+  });
+
   it('filters require-post-first replies and student grade rows', () => {
     const discussion = thread({
       settings: { requirePostBeforeSee: true, allowComments: true },
@@ -177,5 +187,35 @@ describe('discussion access policy', () => {
     expect(payload.replies).toEqual([]);
     expect(payload.replyCount).toBe(0);
     expect(payload.studentGrades).toEqual([]);
+  });
+
+  it('recognizes reply ownership when author is a populated user object', () => {
+    expect(
+      access.userOwnsReply(
+        {
+          source: 'collection',
+          reply: { authorId: { _id: 'student1', firstName: 'Sam' } },
+        },
+        student
+      )
+    ).toBe(true);
+    expect(
+      access.userOwnsReply(
+        {
+          source: 'legacy',
+          reply: { author: { _id: 'student1', firstName: 'Sam' } },
+        },
+        student
+      )
+    ).toBe(true);
+    expect(
+      access.userOwnsReply(
+        {
+          source: 'legacy',
+          reply: { author: 'student2' },
+        },
+        student
+      )
+    ).toBe(false);
   });
 });

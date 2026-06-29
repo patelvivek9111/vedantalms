@@ -31,18 +31,31 @@ async function recordReplyModeration({ req, thread, replyId, action, after = {} 
   }).catch(() => {});
 }
 
+function setNoStoreDiscussionHeaders(res) {
+  res.set('Cache-Control', 'private, no-store, must-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Vary', 'Authorization');
+}
+
 router.get('/:replyId/children', protect, async (req, res) => {
   const startedAt = Date.now();
   try {
-    const reply = await discussionReplyService.getReplyById(req.params.replyId);
-    if (!reply) {
+    let thread = null;
+    const collectionReply = await discussionReplyService.getReplyById(req.params.replyId);
+    if (collectionReply) {
+      thread = await Thread.findById(collectionReply.threadId);
+    } else {
+      thread = await Thread.findOne({ 'replies._id': req.params.replyId });
+    }
+    if (!thread) {
       return res.status(404).json({ success: false, message: 'Reply not found' });
     }
 
-    const thread = await Thread.findById(reply.threadId);
-    if (!thread) {
-      return res.status(404).json({ success: false, message: 'Thread not found' });
+    const resolved = await discussionReplyService.getReplyOrLegacy(thread, req.params.replyId);
+    if (!resolved) {
+      return res.status(404).json({ success: false, message: 'Reply not found' });
     }
+
     await discussionAccess.assertStudentCanViewDiscussion(req.user, thread, { allowArchivedRead: true });
 
     if (
@@ -71,6 +84,7 @@ router.get('/:replyId/children', protect, async (req, res) => {
       source: page.source,
       durationMs: Date.now() - startedAt,
     });
+    setNoStoreDiscussionHeaders(res);
     res.json({
       success: true,
       data: page.replies,

@@ -331,7 +331,7 @@ async function computeCourseClassAverages(courseIds = []) {
 async function getCourseGradebookPage(courseId, { page = 1, pageSize = 50, policyCache } = {}) {
   const course = await Course.findById(courseId)
     .populate('instructor', 'firstName lastName email')
-    .populate('students', 'firstName lastName email')
+    .populate('students', 'firstName lastName email profilePicture')
     .lean();
   if (!course) {
     const err = new Error('Course not found');
@@ -392,7 +392,7 @@ async function getCourseGradebookPage(courseId, { page = 1, pageSize = 50, polic
 async function getFullGradebookDataset(courseId, policyCache) {
   const course = await Course.findById(courseId)
     .populate('instructor', 'firstName lastName email')
-    .populate('students', 'firstName lastName email')
+    .populate('students', 'firstName lastName email profilePicture')
     .lean();
   if (!course) throw new Error('Course not found');
 

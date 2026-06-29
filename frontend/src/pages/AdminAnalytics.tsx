@@ -74,6 +74,34 @@ export function AdminAnalytics() {
     fetchAnalytics();
   }, [timeRange]);
 
+  const handleExportReport = () => {
+    const esc = (v: unknown) => {
+      const s = String(v ?? '');
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const rows: string[][] = [['Section', 'Label', 'Metric', 'Value']];
+    analyticsData.userGrowth.forEach((m) => rows.push(['User Growth', m.month, 'Users', String(m.users)]));
+    analyticsData.courseEngagement.forEach((c) =>
+      rows.push(['Course Engagement', c.course, 'Students', String(c.students)], ['Course Engagement', c.course, 'Assignments', String(c.assignments)])
+    );
+    analyticsData.topCourses.forEach((c) =>
+      rows.push(['Top Courses', c.name, 'Enrollment', String(c.enrollment)], ['Top Courses', c.name, 'Completion', String(c.completion)])
+    );
+    analyticsData.systemUsage.forEach((u) =>
+      rows.push(['System Usage', new Date(u.date).toLocaleDateString(), 'Active Users', String(u.activeUsers)])
+    );
+    const csv = rows.map((r) => r.map(esc).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `analytics-report-${timeRange}-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const getMetricColor = (metric: string) => {
     switch (metric) {
       case 'users': return 'text-blue-600';
@@ -122,7 +150,11 @@ export function AdminAnalytics() {
             <option value="90d">Last 90 days</option>
             <option value="1y">Last year</option>
           </select>
-          <button className="w-full sm:w-auto flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors text-sm sm:text-base">
+          <button
+            type="button"
+            onClick={handleExportReport}
+            className="w-full sm:w-auto flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors text-sm sm:text-base"
+          >
             <Download className="w-4 h-4" />
             <span>Export Report</span>
           </button>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Gauge, ClipboardList, Inbox, User, Calendar, Search, Users, BookOpen } from 'lucide-react';
 import { useUnreadMessages } from '../../hooks/useUnreadMessages';
@@ -152,9 +153,15 @@ const BottomNav: React.FC = () => {
     return null;
   }
 
-  return (
-    <nav className="mobile-fixed-chrome print:hidden lg:hidden fixed bottom-0 left-0 right-0 z-[100] bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700" aria-label="Mobile primary navigation">
-      <div className="flex items-center justify-around h-16 px-2">
+  const nav = (
+    <nav
+      className="mobile-fixed-chrome print:hidden lg:hidden fixed inset-x-0 bottom-0 z-[100] w-screen max-w-[100vw] box-border border-t border-gray-200 bg-white dark:border-slate-800 dark:bg-slate-950"
+      style={{
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+      }}
+      aria-label="Mobile primary navigation"
+    >
+      <div className="flex h-16 items-center justify-around px-2">
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item);
@@ -183,12 +190,10 @@ const BottomNav: React.FC = () => {
           );
         })}
       </div>
-      <div
-        className="bg-white dark:bg-gray-900 h-[env(safe-area-inset-bottom,0px)]"
-        aria-hidden="true"
-      />
     </nav>
   );
+
+  return typeof document !== 'undefined' ? createPortal(nav, document.body) : nav;
 };
 
 export default BottomNav;

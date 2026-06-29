@@ -32,6 +32,9 @@ pids
 *.seed
 *.pid.lock
 
+# Jest in-memory Mongo URI (written by tests/globalSetup.js)
+tests/.mongo-memory-uri
+
 # Coverage directory used by tools like istanbul
 coverage/
 *.lcov
@@ -125,3 +128,7 @@ blob-report/
 /check-*.js
 /create-*.js
 /recreate-*.js
+
+# Captured test/stdout dumps at repo root
+/*-results.txt
+/test-api-results.txt

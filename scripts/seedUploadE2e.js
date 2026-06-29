@@ -35,7 +35,7 @@ const USERS = {
 };
 
 const COURSE_TITLE = 'Upload E2E Harness Course';
-const E2E_ENV_PATH = path.join(__dirname, '..', 'e2e', '.env.local');
+const { writeE2eEnvLocal } = require('./writeE2eEnvLocal');
 
 async function upsertUser(def) {
   let user = await User.findOne({ email: def.email });
@@ -126,24 +126,24 @@ async function main() {
     process.env.E2E_BASE_URL || process.env.VITE_DEV_URL || 'http://localhost:3001';
   const apiURL = process.env.E2E_API_URL || 'http://localhost:5000';
 
-  const envLines = [
-    `E2E_API_URL=${apiURL}`,
-    `E2E_BASE_URL=${baseURL}`,
-    `E2E_TEACHER_EMAIL=${teacher.email}`,
-    `E2E_TEACHER_PASSWORD=${PASSWORD}`,
-    `E2E_STUDENT_EMAIL=${student.email}`,
-    `E2E_STUDENT_PASSWORD=${PASSWORD}`,
-    `E2E_ADMIN_EMAIL=${admin.email}`,
-    `E2E_ADMIN_PASSWORD=${PASSWORD}`,
-    `E2E_COURSE_ID=${course._id.toString()}`,
-    `E2E_PAGE_EDIT_URL=${baseURL}/pages/${page._id.toString()}/edit`,
-    `E2E_DELETED_FILE_ID=${deletedFile._id.toString()}`,
-  ];
+  const envLines = {
+    E2E_API_URL: apiURL,
+    E2E_BASE_URL: baseURL,
+    E2E_TEACHER_EMAIL: teacher.email,
+    E2E_TEACHER_PASSWORD: PASSWORD,
+    E2E_STUDENT_EMAIL: student.email,
+    E2E_STUDENT_PASSWORD: PASSWORD,
+    E2E_ADMIN_EMAIL: admin.email,
+    E2E_ADMIN_PASSWORD: PASSWORD,
+    E2E_COURSE_ID: course._id.toString(),
+    E2E_PAGE_EDIT_URL: `${baseURL}/pages/${page._id.toString()}/edit`,
+    E2E_DELETED_FILE_ID: deletedFile._id.toString(),
+  };
 
-  fs.writeFileSync(E2E_ENV_PATH, `${envLines.join('\n')}\n`, 'utf8');
+  const envFile = writeE2eEnvLocal(envLines);
 
   const summary = {
-    envFile: E2E_ENV_PATH,
+    envFile,
     courseId: course._id.toString(),
     pageEditUrl: `${baseURL}/pages/${page._id.toString()}/edit`,
     deletedFileId: deletedFile._id.toString(),

@@ -1,23 +1,14 @@
 const request = require('supertest');
-const mongoose = require('mongoose');
 const app = require('../../../server');
-const { waitForMongoConnection } = require('../../helpers');
-
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/lms-test';
 
 describe('QuizWave API', () => {
-  beforeAll(async () => {
-    await waitForMongoConnection(MONGODB_URI);
-  });
-
-  afterAll(async () => {
-    if (mongoose.connection.readyState !== 0) {
-      await mongoose.connection.close();
-    }
-  });
-
   describe('QuizWave endpoints', () => {
-    it('should have quizwave routes defined', () => {
+    it('requires auth for course quiz routes', async () => {
+      const res = await request(app).get('/api/quizwave/courses/507f1f77bcf86cd799439011');
+      expect(res.status).toBe(401);
+    });
+
+    it('create/list flows are covered in routeGaps.api.test.js', () => {
       expect(app).toBeDefined();
     });
   });

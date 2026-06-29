@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { BookOpen, MessageCircle, Award, ArrowRight } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { InteractiveEyes } from '../components/common/InteractiveEyes';
 import FloatingLabelInput from '../components/common/FloatingLabelInput';
 import FloatingLabelPasswordInput from '../components/common/FloatingLabelPasswordInput';
+import { loginRedirectPath } from '../utils/loginRedirect';
 
 export function Login() {
   const [email, setEmail] = useState('');
@@ -19,15 +20,17 @@ export function Login() {
   const { login, user } = useAuth();
   const logoFallbackUsed = useRef(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirectTo = loginRedirectPath(location.state);
   const primaryLogo = `${import.meta.env.BASE_URL}assets/Vedanta_logo1.png`;
   const fallbackLogo = `${import.meta.env.BASE_URL}assets/Vedanta_logo.png`;
   const [logoSrc, setLogoSrc] = useState(primaryLogo);
 
   useEffect(() => {
     if (user) {
-      navigate('/dashboard', { replace: true });
+      navigate(redirectTo, { replace: true });
     }
-  }, [user, navigate]);
+  }, [user, navigate, redirectTo]);
 
   useEffect(() => {
     setEmail('');
@@ -96,7 +99,7 @@ export function Login() {
     setIsLoading(true);
     try {
       await login(email, password);
-      navigate('/dashboard', { replace: true });
+      navigate(redirectTo, { replace: true });
     } catch (err: unknown) {
       const axiosMsg =
         err &&

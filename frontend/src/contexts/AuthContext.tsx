@@ -56,11 +56,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser(null);
           }
         })
-        .catch(() => {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          setToken(null);
-          setUser(null);
+        .catch((err: { response?: { status?: number } }) => {
+          // Network failures should not sign the user out; only explicit 401s.
+          if (err.response?.status === 401) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            setToken(null);
+            setUser(null);
+          }
         })
         .finally(() => {
           setLoading(false);

@@ -115,8 +115,8 @@ const AssignmentViewWrapper: React.FC = () => {
   const courseLabel = course.catalog?.courseCode || course.title || 'Course';
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="sticky top-0 z-[35] mx-auto hidden w-full max-w-7xl bg-gray-50 px-4 pt-2 dark:bg-gray-900 lg:block print:hidden">
+    <div className="min-h-screen w-full bg-slate-50 dark:bg-slate-950">
+      <div className="sticky top-0 z-[35] mx-auto hidden w-full max-w-7xl bg-slate-50 px-4 pt-2 dark:bg-slate-950 lg:block print:hidden">
         <div className="flex flex-col">
           <div className="pb-3">
             <Breadcrumb
@@ -135,7 +135,7 @@ const AssignmentViewWrapper: React.FC = () => {
         </div>
       </div>
 
-      <div className={`mx-auto flex w-full max-w-7xl print:block ${isMobileDevice ? 'flex-col' : 'flex-row'}`}>
+      <div className={`flex w-full lg:mx-auto lg:max-w-7xl print:block ${isMobileDevice ? 'flex-col' : 'flex-row'}`}>
         {isMobileMenuOpen && isMobileDevice && (
           <div
             className="print:hidden fixed inset-0 z-[90] bg-black bg-opacity-50 lg:hidden"
@@ -157,7 +157,7 @@ const AssignmentViewWrapper: React.FC = () => {
         <div
           className={`w-full flex-1 overflow-visible print:pt-0 lg:overflow-auto ${isMobileMenuOpen && isMobileDevice ? 'overflow-hidden lg:overflow-auto' : ''}`}
         >
-          <div className="container mx-auto px-4 pb-6 pt-2 print:px-0 print:py-0 lg:pt-3">
+          <div className="w-full px-3 pb-6 pt-2 sm:container sm:mx-auto sm:px-4 print:px-0 print:py-0 lg:pt-3">
             <ViewAssignment courseId={cid} />
           </div>
         </div>

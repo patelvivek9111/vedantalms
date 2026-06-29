@@ -1,6 +1,6 @@
 import React from 'react';
 import { format } from 'date-fns';
-import { ChevronLeft, Reply, ArchiveRestore } from 'lucide-react';
+import { ChevronLeft, Reply, Forward, ArchiveRestore } from 'lucide-react';
 import { getImageUrl } from '../../services/api';
 import RichTextEditor from '../common/RichTextEditor';
 import FileAttachmentPanel from '../files/FileAttachmentPanel';
@@ -30,6 +30,8 @@ type MessageThreadProps = {
   onBack: () => void;
   onShowReply: () => void;
   onHideReply: () => void;
+  onForward: () => void;
+  canForward: boolean;
   onReplyChange: (value: string) => void;
   onReplyAttachmentsChange: (files: NormalizedFile[]) => void;
   onSendReply: (e: React.FormEvent) => void;
@@ -55,6 +57,8 @@ const MessageThread: React.FC<MessageThreadProps> = ({
   onBack,
   onShowReply,
   onHideReply,
+  onForward,
+  canForward,
   onReplyChange,
   onReplyAttachmentsChange,
   onSendReply,
@@ -227,6 +231,15 @@ const MessageThread: React.FC<MessageThreadProps> = ({
               {restoreAction.loading ? `${restoreAction.label}…` : restoreAction.label}
             </button>
           )}
+          <button
+            type="button"
+            onClick={onForward}
+            disabled={!canForward}
+            className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium leading-4 text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 touch-manipulation disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 sm:py-2 sm:text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:focus:ring-blue-400"
+          >
+            <Forward className="mr-1.5 h-3 w-3 sm:mr-2 sm:h-4 sm:w-4" />
+            Forward
+          </button>
           <button
             type="button"
             onClick={onShowReply}

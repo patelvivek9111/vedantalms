@@ -1,7 +1,7 @@
 import React, { useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronDown } from 'lucide-react';
-import { getImageUrl } from '../../services/api';
+import ProfileImage from '../common/ProfileImage';
 import { TableRowSkeleton } from '../common/SkeletonLoader';
 import { useVirtualWindow } from '../../hooks/useVirtualWindow';
 import GradebookTableToolbar from '../../features/gradebook/GradebookTableToolbar';
@@ -305,26 +305,12 @@ const GradebookView: React.FC<GradebookViewProps> = ({
                 className="flex items-center space-x-3 p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                 onClick={toggleStudent}
               >
-                <div className="relative">
-                  {student.profilePicture ? (
-                    <img
-                      src={student.profilePicture.startsWith('http') ? student.profilePicture : getImageUrl(student.profilePicture)}
-                      alt={`${student.firstName} ${student.lastName}`}
-                      className="w-10 h-10 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                        const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                        if (fallback) fallback.style.display = 'flex';
-                      }}
-                    />
-                  ) : null}
-                  <div 
-                    className={`w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-sm font-bold ${student.profilePicture ? 'hidden' : ''}`}
-                    style={{ display: student.profilePicture ? 'none' : 'flex' }}
-                  >
-                    {student.firstName.charAt(0)}{student.lastName.charAt(0)}
-                  </div>
-                </div>
+                <ProfileImage
+                  firstName={student.firstName}
+                  lastName={student.lastName}
+                  profilePicture={student.profilePicture}
+                  size="md"
+                />
                 <div className="flex-1">
                   <h3 className="font-semibold text-gray-900 dark:text-gray-100">{student.firstName} {student.lastName}</h3>
                   <div className="text-sm">
@@ -514,32 +500,12 @@ const GradebookView: React.FC<GradebookViewProps> = ({
                       {/* Sticky first column body */}
                       <td className={`px-6 py-4 border-r border-gray-200 dark:border-gray-600 text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer font-medium whitespace-nowrap sticky left-0 z-[5] ${stickyBg} transition-colors duration-150`} style={{ boxShadow: '2px 0 8px -4px rgba(0,0,0,0.1)' }}>
                         <div className="flex items-center space-x-3">
-                          <div className="relative">
-                            {student.profilePicture ? (
-                              <img
-                                src={student.profilePicture.startsWith('http')
-                                  ? student.profilePicture
-                                  : getImageUrl(student.profilePicture)}
-                                alt={`${student.firstName} ${student.lastName}`}
-                                className="w-8 h-8 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600"
-                                onError={(e) => {
-                                  // Hide the failed image and show fallback
-                                  e.currentTarget.style.display = 'none';
-                                  const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                                  if (fallback) {
-                                    fallback.style.display = 'flex';
-                                  }
-                                }}
-                              />
-                            ) : null}
-                            {/* Fallback avatar - always present but hidden when image loads */}
-                            <div 
-                              className={`w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-sm font-bold ${student.profilePicture ? 'hidden' : ''}`}
-                              style={{ display: student.profilePicture ? 'none' : 'flex' }}
-                            >
-                              {student.firstName.charAt(0)}{student.lastName.charAt(0)}
-                            </div>
-                          </div>
+                          <ProfileImage
+                            firstName={student.firstName}
+                            lastName={student.lastName}
+                            profilePicture={student.profilePicture}
+                            size="sm"
+                          />
                           <span>{student.firstName} {student.lastName}</span>
                         </div>
                       </td>

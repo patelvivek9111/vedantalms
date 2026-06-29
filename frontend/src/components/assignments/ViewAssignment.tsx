@@ -21,6 +21,7 @@ import TimedQuizStartScreen from './TimedQuizStartScreen';
 import logger from '../../utils/logger';
 import ConfirmationModal from '../common/ConfirmationModal';
 import BackButton from '../common/BackButton';
+import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 
 interface ViewAssignmentProps {
   courseId?: string;
@@ -789,6 +790,22 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
     }
   }, [answers, assignment?.questions]);
 
+  // Warn before leaving (refresh / browser back / tab close) while a quiz attempt
+  // is in progress with at least one answer entered and nothing submitted yet.
+  const quizExitGuardActive = Boolean(
+    assignment &&
+      isQuizAssignment(assignment) &&
+      user?.role === 'student' &&
+      !viewAsStudent &&
+      !submission &&
+      !isSubmitting &&
+      answeredQuestions.size > 0
+  );
+  useUnsavedChangesGuard(
+    quizExitGuardActive,
+    'You have an in-progress quiz attempt. If you leave now, your unsaved answers may be lost.'
+  );
+
   // Timer logic for timed quizzes
   useEffect(() => {
     if (assignment?.isTimedQuiz && assignment?.quizTimeLimit && user?.role === 'student' && !submission) {
@@ -1153,7 +1170,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
   const hideAssignmentInfoOnMobile = showMobileQuizLayout || !hasAssignmentInfoContent;
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="min-h-screen w-full bg-slate-50 dark:bg-slate-950">
       {/* Top Navigation Bar (Mobile Only) */}
       <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
         <div className="relative flex items-center justify-between px-4 py-3 gap-2">
@@ -1746,7 +1763,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                   {/* Main content area */}
                   <div className="min-w-0 flex-1">
                     {showMobileQuizChrome && assignment.questions && (
-                      <div className="mb-3 mt-2 space-y-3 px-3 sm:mt-0 sm:px-0">
+                      <div className="mb-3 mt-2 space-y-3 sm:mt-0">
                         <MobileQuizProgress
                           answeredCount={answeredQuestions.size}
                           totalQuestions={assignment.questions.length}
@@ -2821,7 +2838,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
         })()}
 
         {showMobileAssignmentSubmitBar && (
-          <div className="mt-6 px-3 pb-4 lg:hidden">
+          <div className="mt-6 px-0 pb-4 lg:hidden">
             <button
               type="button"
               onClick={handleSubmit}

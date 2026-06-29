@@ -111,6 +111,20 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
+    // Block suspended accounts (credentials are valid, but access is revoked)
+    if (user.accountStatus === 'suspended') {
+      await LoginActivity.create({
+        userId: user._id,
+        ipAddress: req.ip || req.connection.remoteAddress,
+        userAgent: req.get('User-Agent') || 'Unknown',
+        success: false,
+        failureReason: 'Account suspended'
+      });
+      return res
+        .status(403)
+        .json({ message: 'Your account has been suspended. Please contact an administrator.' });
+    }
+
     // Log successful login
     await LoginActivity.create({
       userId: user._id,

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import { formatDistanceToNow, format } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
@@ -38,6 +39,44 @@ import type { NormalizedFile } from '../../utils/fileTypes';
 import { deriveDiscussionWorkflowState, sanitizeDiscussionHtml } from '../../utils/discussionWorkflowStatus';
 import { resolveDiscussionStatus, type DiscussionStatus } from '../../utils/discussionStatus';
 import { normalizeMongoIdRef } from '../../utils/mongoId';
+
+function normalizeThreadPayload(threadData: Thread): Thread {
+  return {
+    ...threadData,
+    replies: visibleReplies(Array.isArray(threadData.replies) ? threadData.replies : []),
+  };
+}
+
+function normalizeReplyParentId(parent: Reply['parentReply'] | string | null | undefined): string | null {
+  if (parent == null) return null;
+  return normalizeMongoIdRef(parent);
+}
+
+function dedupeRepliesById(replies: Reply[]): Reply[] {
+  const seen = new Set<string>();
+  return replies.filter((reply) => {
+    const id = normalizeMongoIdRef(reply._id);
+    if (!id || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+}
+
+function isReplyVisible(reply: Reply): boolean {
+  return !reply?.isDeleted && !('deletedAt' in reply && (reply as Reply & { deletedAt?: string | null }).deletedAt) && reply.content !== '[deleted]';
+}
+
+function visibleReplies(replies: Reply[]): Reply[] {
+  return dedupeRepliesById(replies).filter(isReplyVisible);
+}
+
+function getApiErrorMessage(error: unknown, fallback: string): string {
+  if (typeof error === 'object' && error && 'response' in error) {
+    const message = (error as { response?: { data?: { message?: string } } }).response?.data?.message;
+    if (message) return message;
+  }
+  return fallback;
+}
 
 function formatDiscussionDue(d: Date): string {
   return format(d, "MMM d 'at' h:mmaaa");
@@ -103,19 +142,48 @@ interface Reply {
   grade?: number;
   feedback?: string;
   likes?: Array<{
-    user: {
+    user: string | {
       _id: string;
-      firstName: string;
-      lastName: string;
+      firstName?: string;
+      lastName?: string;
     };
     likedAt: string;
   }>;
+  likeCount?: number;
   fileAssets?: Array<string | Record<string, unknown>>;
   childCount?: number;
   moderationState?: 'active' | 'hidden' | 'flagged' | 'archived';
   hiddenByModerator?: boolean;
   isHidden?: boolean;
   isDeleted?: boolean;
+  editHistory?: Array<{ editedAt: string; editedBy?: string }>;
+}
+
+function isReplyEdited(reply: Reply): boolean {
+  if (Array.isArray(reply.editHistory) && reply.editHistory.length > 0) return true;
+  const created = Date.parse(reply.createdAt);
+  const updated = Date.parse(reply.updatedAt);
+  return Number.isFinite(created) && Number.isFinite(updated) && updated - created > 1000;
+}
+
+function replyTimestampLabel(reply: Reply): string {
+  const when = isReplyEdited(reply) ? reply.updatedAt : reply.createdAt;
+  return formatDistanceToNow(new Date(when), { addSuffix: true });
+}
+
+function replyLikeCount(reply: Reply): number {
+  if (Array.isArray(reply.likes) && reply.likes.length > 0) return reply.likes.length;
+  return Number(reply.likeCount) || 0;
+}
+
+function isReplyLikedByUser(reply: Reply, userId: string | null | undefined): boolean {
+  const uid = normalizeMongoIdRef(userId);
+  if (!uid || !Array.isArray(reply.likes)) return false;
+  return reply.likes.some((like) => normalizeMongoIdRef(like.user) === uid);
+}
+
+function isOwnReply(reply: Reply, userId: string | null | undefined): boolean {
+  return normalizeMongoIdRef(userId) === normalizeMongoIdRef(reply.author?._id);
 }
 
 interface StudentGrade {
@@ -217,6 +285,8 @@ interface ReplyComponentProps {
   canPostDiscussion?: boolean;
   isSubmittingReply?: boolean;
   replyError?: string | null;
+  allowDelete?: boolean;
+  allowReply?: boolean;
 }
 
 const ReplyComponent: React.FC<ReplyComponentProps> = ({
@@ -245,6 +315,8 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
   canPostDiscussion = true,
   isSubmittingReply,
   replyError,
+  allowDelete = false,
+  allowReply = false,
 }) => {
   const isMobileLayout = useMobileLayout();
   const composerRef = useRef<HTMLDivElement>(null);
@@ -257,9 +329,16 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
   const menuRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
   const [showDeleteReplyConfirm, setShowDeleteReplyConfirm] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const replyIsVisible = isReplyVisible(reply);
+  const ownReply = isOwnReply(reply, user?._id);
+  const likedByCurrentUser = isReplyLikedByUser(reply, user?._id);
+  const likeCount = replyLikeCount(reply);
 
   const isModerator = ['teacher', 'teaching_assistant', 'admin'].includes(user?.role || '');
-  const isAuthorOrTeacher = String(user?._id) === String(reply.author._id) || isModerator;
+  const isAuthorOrTeacher =
+    normalizeMongoIdRef(user?._id) === normalizeMongoIdRef(reply.author?._id) || isModerator;
   const replyHidden = reply.isHidden || reply.moderationState === 'hidden';
 
   useEffect(() => {
@@ -282,17 +361,25 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
     }
   }, [isReplying]);
 
+  useEffect(() => {
+    if (!isEditing) {
+      setEditContent(reply.content);
+    }
+  }, [reply.content, reply.updatedAt, isEditing]);
+
   const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editContent.trim()) return;
     setIsSubmitting(true);
+    setActionError(null);
     try {
       const fileAssetIds = editAttachments.map((f) => f.fileAssetId).filter(Boolean) as string[];
       await onEdit(reply._id, { content: editContent, fileAssetIds, removeFileAssetIds: editRemoveIds });
       setIsEditing(false);
       setEditRemoveIds([]);
     } catch (error) {
-      } finally {
+      setActionError(getApiErrorMessage(error, 'Could not save your edit. Please refresh and try again.'));
+    } finally {
       setIsSubmitting(false);
     }
   };
@@ -303,9 +390,11 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
 
   const confirmDelete = async () => {
     setShowDeleteReplyConfirm(false);
-      try {
-        await onDelete(reply._id);
-      } catch (error) {
+    setActionError(null);
+    try {
+      await onDelete(reply._id);
+    } catch (error) {
+      setActionError(getApiErrorMessage(error, 'Could not delete this reply. Please refresh and try again.'));
     }
   };
 
@@ -350,14 +439,17 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
                   </span>
 
                 </div>
-                <div className="flex items-center space-x-1 text-sm text-gray-500 dark:text-gray-400">
+                <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5 text-sm text-gray-500 dark:text-gray-400">
                   <Clock className="w-3 h-3" aria-hidden="true" />
-                  <span>{formatDistanceToNow(new Date(reply.createdAt), { addSuffix: true })}</span>
+                  {isReplyEdited(reply) && (
+                    <span className="italic text-gray-400 dark:text-gray-500">(edited)</span>
+                  )}
+                  <span>{replyTimestampLabel(reply)}</span>
                 </div>
               </div>
             </div>
             
-            {isAuthorOrTeacher && (
+            {isAuthorOrTeacher && replyIsVisible && (
               <div className="relative" ref={menuRef}>
                 <button
                   onClick={() => setShowMenu(!showMenu)}
@@ -385,17 +477,19 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
                       <Edit3 className="w-4 h-4" aria-hidden="true" />
                       <span>Edit</span>
                     </button>
-                    <button
-                      role="menuitem"
-                      onClick={() => {
-                        handleDelete();
-                        setShowMenu(false);
-                      }}
-                      className="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/50 flex items-center space-x-2"
-                    >
-                      <Trash2 className="w-4 h-4" aria-hidden="true" />
-                      <span>Delete</span>
-                    </button>
+                    {allowDelete && (
+                      <button
+                        role="menuitem"
+                        onClick={() => {
+                          handleDelete();
+                          setShowMenu(false);
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/50 flex items-center space-x-2"
+                      >
+                        <Trash2 className="w-4 h-4" aria-hidden="true" />
+                        <span>Delete</span>
+                      </button>
+                    )}
                     {isModerator && !replyHidden && (
                       <button
                         role="menuitem"
@@ -473,7 +567,7 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
             </form>
           ) : (
             <>
-              {replyHidden || reply.isDeleted ? (
+              {replyHidden || !replyIsVisible ? (
                 <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300" role="status">
                   {replyHidden ? 'This reply is hidden by a moderator.' : 'This reply was deleted.'}
                 </div>
@@ -490,32 +584,44 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
               {/* Reply button */}
               <div className="flex flex-col gap-3 border-t border-slate-100 pt-3 dark:border-slate-700 sm:flex-row sm:items-center sm:justify-between sm:pt-4">
                 <div className="flex flex-wrap items-center gap-3 sm:gap-4">
-                  <button
-                    onClick={() => onReply(reply._id)}
-                    disabled={!canPostDiscussion}
-                    className="inline-flex min-h-[44px] items-center gap-2 rounded-lg px-2 text-sm font-medium text-indigo-600 transition-colors hover:text-indigo-700 disabled:opacity-50 dark:text-indigo-400 dark:hover:text-indigo-300"
-                    aria-label={`Reply to ${reply.author.firstName} ${reply.author.lastName}`}
-                  >
-                    <Reply className="h-4 w-4 shrink-0" aria-hidden="true" />
-                    <span>Reply</span>
-                  </button>
+                  {allowReply && (
+                    <button
+                      onClick={() => onReply(reply._id)}
+                      disabled={!canPostDiscussion}
+                      className="inline-flex min-h-[44px] items-center gap-2 rounded-lg px-2 text-sm font-medium text-indigo-600 transition-colors hover:text-indigo-700 disabled:opacity-50 dark:text-indigo-400 dark:hover:text-indigo-300"
+                      aria-label={`Reply to ${reply.author.firstName} ${reply.author.lastName}`}
+                    >
+                      <Reply className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      <span>Reply</span>
+                    </button>
+                  )}
                   
                   {allowLikes && (
-                    <button
-                      onClick={() => onLike(reply._id)}
-                      className="inline-flex min-h-[44px] items-center gap-2 rounded-lg px-2 text-sm font-medium text-slate-600 transition-colors hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400"
-                      aria-label={`Like reply by ${reply.author.firstName} ${reply.author.lastName}; ${reply.likes?.length || 0} likes`}
-                    >
-                      <Heart 
-                        className={`w-4 h-4 ${
-                          reply.likes?.some(like => like.user._id === user?._id) 
-                            ? 'fill-red-500 text-red-500' 
-                            : ''
-                        }`} 
-                        aria-hidden="true"
-                      />
-                      <span>{reply.likes?.length || 0}</span>
-                    </button>
+                    ownReply ? (
+                      <span
+                        className="inline-flex min-h-[44px] items-center gap-2 rounded-lg px-2 text-sm font-medium text-slate-500 dark:text-slate-500"
+                        aria-label={`${likeCount} likes on your reply`}
+                      >
+                        <Heart className="h-4 w-4 shrink-0" aria-hidden="true" />
+                        <span>{likeCount}</span>
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => onLike(reply._id)}
+                        className="inline-flex min-h-[44px] items-center gap-2 rounded-lg px-2 text-sm font-medium text-slate-600 transition-colors hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400"
+                        aria-label={`Like reply by ${reply.author.firstName} ${reply.author.lastName}; ${likeCount} likes`}
+                        aria-pressed={likedByCurrentUser}
+                      >
+                        <Heart
+                          className={`h-4 w-4 shrink-0 ${
+                            likedByCurrentUser ? 'fill-red-500 text-red-500' : ''
+                          }`}
+                          aria-hidden="true"
+                        />
+                        <span>{likeCount}</span>
+                      </button>
+                    )
                   )}
                   {(reply.childCount || 0) > loadedChildCount && (
                     <button
@@ -568,6 +674,12 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
             )}
           </div>
         </div>
+      )}
+
+      {actionError && (
+        <p className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200" role="alert">
+          {actionError}
+        </p>
       )}
 
       {/* Delete Reply Confirmation Modal */}
@@ -739,23 +851,14 @@ const ThreadView: React.FC = () => {
           });
           if (participantRes.data.success) {
             const threadData = participantRes.data.data;
-            setThread({
-              ...threadData,
-              replies: Array.isArray(threadData.replies) ? threadData.replies : []
-            });
+            setThread(normalizeThreadPayload(threadData));
           } else {
             const threadData = threadRes.data.data;
-            setThread({
-              ...threadData,
-              replies: Array.isArray(threadData.replies) ? threadData.replies : []
-            });
+            setThread(normalizeThreadPayload(threadData));
           }
         } else {
           const threadData = threadRes.data.data;
-          setThread({
-            ...threadData,
-            replies: Array.isArray(threadData.replies) ? threadData.replies : []
-          });
+          setThread(normalizeThreadPayload(threadData));
         }
       } else {
         setError('Failed to load thread');
@@ -828,6 +931,81 @@ const ThreadView: React.FC = () => {
     };
   }, []);
 
+  const fetchChildReplies = async (replyId: string): Promise<Reply[]> => {
+    const token = localStorage.getItem('token');
+    const response = await api.get(`/replies/${replyId}/children`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (response.data.success) {
+      return visibleReplies(response.data.data || []);
+    }
+    return [];
+  };
+
+  const applyThreadUpdate = async (threadData: Thread) => {
+    const nextThread = normalizeThreadPayload(threadData);
+    setThread(nextThread);
+    const parents = nextThread.replies.filter((reply) => (reply.childCount || 0) > 0);
+    if (!parents.length) {
+      setLazyChildren({});
+      return;
+    }
+    const updates: Record<string, Reply[]> = {};
+    await Promise.all(
+      parents.map(async (reply) => {
+        const parentId = normalizeMongoIdRef(reply._id);
+        if (!parentId) return;
+        try {
+          updates[parentId] = await fetchChildReplies(parentId);
+        } catch {
+          updates[parentId] = [];
+        }
+      })
+    );
+    setLazyChildren(updates);
+  };
+
+  const nestedPreloadKey =
+    thread?.replies?.map((reply) => `${normalizeMongoIdRef(reply._id)}:${reply.childCount || 0}`).join('|') ?? '';
+
+  useEffect(() => {
+    setLazyChildren({});
+    setLoadingChildren({});
+  }, [threadId]);
+
+  useEffect(() => {
+    if (!thread?._id || !thread.replies?.length) return;
+    let cancelled = false;
+
+    const preloadNestedReplies = async () => {
+      const parents = thread.replies.filter((reply) => (reply.childCount || 0) > 0);
+      if (!parents.length) return;
+
+      const updates: Record<string, Reply[]> = {};
+      await Promise.all(
+        parents.map(async (reply) => {
+          const parentId = normalizeMongoIdRef(reply._id);
+          if (!parentId) return;
+          try {
+            const children = await fetchChildReplies(parentId);
+            if (children.length) updates[parentId] = children;
+          } catch {
+            // Preload is best-effort; manual expand still works.
+          }
+        })
+      );
+
+      if (!cancelled && Object.keys(updates).length) {
+        setLazyChildren((prev) => ({ ...prev, ...updates }));
+      }
+    };
+
+    preloadNestedReplies();
+    return () => {
+      cancelled = true;
+    };
+  }, [thread?._id, nestedPreloadKey]);
+
   const handleSubmitReply = async (e: React.FormEvent, parentReply: string | null = null) => {
     e.preventDefault();
     if (!canPostDiscussion) return;
@@ -858,7 +1036,37 @@ const ThreadView: React.FC = () => {
       );
 
       if (response.data.success) {
-        setThread(response.data.data);
+        const parentId = parentReply ? normalizeMongoIdRef(parentReply) : null;
+        let nextThread = normalizeThreadPayload(response.data.data);
+
+        if (parentId) {
+          let childReplies: Reply[] = [];
+          try {
+            childReplies = await fetchChildReplies(parentId);
+          } catch {
+            // Fall back to merging createdReply when child refresh fails.
+          }
+          if (!childReplies.length && response.data.createdReply) {
+            childReplies = dedupeRepliesById([
+              ...(lazyChildren[parentId] || []),
+              response.data.createdReply as Reply,
+            ]);
+          }
+          setLazyChildren((prev) => ({
+            ...prev,
+            [parentId]: childReplies,
+          }));
+          nextThread = {
+            ...nextThread,
+            replies: nextThread.replies.map((reply) =>
+              normalizeMongoIdRef(reply._id) === parentId
+                ? { ...reply, childCount: Math.max(reply.childCount || 0, childReplies.length) }
+                : reply
+            ),
+          };
+        }
+
+        setThread(nextThread);
         setReplyContent('');
         setComposerAttachments(composerKey, []);
         setReplyingTo(null);
@@ -895,10 +1103,11 @@ const ThreadView: React.FC = () => {
       );
 
       if (response.data.success) {
-        setThread(response.data.data);
+        await applyThreadUpdate(response.data.data);
       }
-    } catch (error) {
-      }
+    } catch {
+      // Like errors are non-blocking; thread refresh on next load will reconcile counts.
+    }
   };
 
   const handleEditThread = async (e: React.FormEvent) => {
@@ -923,7 +1132,7 @@ const ThreadView: React.FC = () => {
       );
 
       if (response.data.success) {
-        setThread(response.data.data);
+        setThread(normalizeThreadPayload(response.data.data));
         setIsEditing(false);
       }
     } catch (error) {
@@ -970,7 +1179,7 @@ const ThreadView: React.FC = () => {
       );
 
       if (response.data.success) {
-        setThread(response.data.data);
+        setThread(normalizeThreadPayload(response.data.data));
       }
     } catch (error) {
       }
@@ -987,7 +1196,7 @@ const ThreadView: React.FC = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (response.data.success) {
-        setThread(response.data.data);
+        setThread(normalizeThreadPayload(response.data.data));
       }
     } catch {
       // Moderator action errors are surfaced by the existing refresh/error flow.
@@ -1011,7 +1220,7 @@ const ThreadView: React.FC = () => {
       );
 
       if (response.data.success) {
-        setThread(response.data.data);
+        await applyThreadUpdate(response.data.data);
       }
     } catch (error) {
       throw error;
@@ -1031,15 +1240,27 @@ const ThreadView: React.FC = () => {
       );
 
       if (response.data.success) {
-        const threadData = response.data.data;
-        setThread({
-          ...threadData,
-          replies: Array.isArray(threadData.replies) ? threadData.replies : []
-        });
-        const replies = Array.isArray(threadData.replies) ? threadData.replies : [];
-        const hasUserReplies = replies.some(
-          (reply: Reply) => reply.author._id === user?._id
+        await applyThreadUpdate(response.data.data);
+        const deletedId = normalizeMongoIdRef(replyId);
+        if (deletedId) {
+          setLazyChildren((prev) => {
+            const next: Record<string, Reply[]> = {};
+            for (const [parentId, children] of Object.entries(prev)) {
+              const filtered = visibleReplies(children).filter(
+                (reply) => normalizeMongoIdRef(reply._id) !== deletedId
+              );
+              if (filtered.length) next[parentId] = filtered;
+            }
+            return next;
+          });
+        }
+        const replies = Array.isArray(response.data.data.replies) ? response.data.data.replies : [];
+        const nestedUserReplies = Object.values(lazyChildren).flat().some(
+          (reply) => normalizeMongoIdRef(reply.author?._id) === normalizeMongoIdRef(user?._id)
         );
+        const hasUserReplies =
+          nestedUserReplies ||
+          replies.some((reply: Reply) => normalizeMongoIdRef(reply.author?._id) === normalizeMongoIdRef(user?._id));
         if (!hasUserReplies) {
           setShowReplyEditor(false);
         }
@@ -1076,21 +1297,17 @@ const ThreadView: React.FC = () => {
   };
 
   const handleLoadChildren = async (replyId: string) => {
-    if (loadingChildren[replyId]) return;
-    setLoadingChildren((prev) => ({ ...prev, [replyId]: true }));
+    const parentId = normalizeMongoIdRef(replyId);
+    if (!parentId || loadingChildren[parentId]) return;
+    setLoadingChildren((prev) => ({ ...prev, [parentId]: true }));
     try {
-      const token = localStorage.getItem('token');
-      const response = await api.get(`/replies/${replyId}/children`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (response.data.success) {
-        setLazyChildren((prev) => ({
-          ...prev,
-          [replyId]: response.data.data || [],
-        }));
-      }
+      const children = await fetchChildReplies(parentId);
+      setLazyChildren((prev) => ({
+        ...prev,
+        [parentId]: children,
+      }));
     } finally {
-      setLoadingChildren((prev) => ({ ...prev, [replyId]: false }));
+      setLoadingChildren((prev) => ({ ...prev, [parentId]: false }));
     }
   };
 
@@ -1128,7 +1345,7 @@ const ThreadView: React.FC = () => {
       );
 
       if (response.data.success) {
-        setThread(response.data.data);
+        setThread(normalizeThreadPayload(response.data.data));
         setShowGradingModal(false);
         setSelectedStudent(null);
         setGrade('');
@@ -1177,7 +1394,7 @@ const ThreadView: React.FC = () => {
       );
 
       if (response.data.success) {
-        setThread(response.data.data);
+        setThread(normalizeThreadPayload(response.data.data));
         setShowEditModal(false);
       }
     } catch (err) {
@@ -1220,11 +1437,12 @@ const ThreadView: React.FC = () => {
 
   const replies = Array.isArray(thread.replies) ? thread.replies : [];
   replies.forEach(reply => {
-    if (reply.parentReply) {
-      if (!replyMap.has(reply.parentReply)) {
-        replyMap.set(reply.parentReply, []);
+    const parentId = normalizeReplyParentId(reply.parentReply);
+    if (parentId) {
+      if (!replyMap.has(parentId)) {
+        replyMap.set(parentId, []);
       }
-      replyMap.get(reply.parentReply)?.push(reply);
+      replyMap.get(parentId)?.push(reply);
     } else {
       rootReplies.push(reply);
     }
@@ -1232,7 +1450,7 @@ const ThreadView: React.FC = () => {
 
   // Check if the user has already replied to the main post
   const hasUserMainReply = replies.some(
-    (reply) => reply.parentReply === null && reply.author._id === user?._id
+    (reply) => !normalizeReplyParentId(reply.parentReply) && reply.author._id === user?._id
   );
   const discussionStatus = resolveDiscussionStatus(thread);
   const unreadCount = thread.unreadCount ?? thread.currentUserParticipation?.unreadCount ?? 0;
@@ -1245,7 +1463,10 @@ const ThreadView: React.FC = () => {
     onEdit: (replyId: string, payload: { content: string; fileAssetIds: string[]; removeFileAssetIds: string[] }) => Promise<void>,
     onDelete: (replyId: string) => Promise<void>
   ) => {
-    return replies.map(reply => (
+    return visibleReplies(replies).map(reply => {
+      const replyKey = normalizeMongoIdRef(reply._id);
+      const nestedChildren = lazyChildren[replyKey];
+      return (
       <React.Fragment key={reply._id}>
         <ReplyComponent
           reply={reply}
@@ -1253,7 +1474,9 @@ const ThreadView: React.FC = () => {
           level={level}
           onEdit={onEdit}
           onDelete={onDelete}
-          canModify={user?._id === reply.author._id || isModerator}
+          canModify={normalizeMongoIdRef(user?._id) === normalizeMongoIdRef(reply.author?._id) || isModerator}
+          allowDelete={level > 0}
+          allowReply={level === 0}
           threadId={thread._id}
           isReplying={replyingTo === reply._id}
           onSubmitReply={handleSubmitReply}
@@ -1264,7 +1487,7 @@ const ThreadView: React.FC = () => {
           onHide={handleHideReply}
           onRestore={handleRestoreReply}
           onLoadChildren={handleLoadChildren}
-          loadedChildCount={(replyMap.get(reply._id)?.length || 0) + (lazyChildren[reply._id]?.length || 0)}
+          loadedChildCount={(replyMap.get(replyKey)?.length || 0) + (nestedChildren?.length || 0)}
           allowLikes={thread.settings?.allowLikes !== false}
           replyAttachmentFiles={getComposerAttachments(`reply-${reply._id}`)}
           onAttachmentsChange={(files) => setComposerAttachments(`reply-${reply._id}`, files)}
@@ -1274,35 +1497,44 @@ const ThreadView: React.FC = () => {
           isSubmittingReply={isSubmitting}
           replyError={replyingTo === reply._id ? replyError : null}
         />
-        {replyMap.get(reply._id) && renderReplies(replyMap.get(reply._id)!, level + 1, onEdit, onDelete)}
-        {lazyChildren[reply._id] && renderReplies(lazyChildren[reply._id], level + 1, onEdit, onDelete)}
+        {replyMap.get(replyKey) && renderReplies(replyMap.get(replyKey)!, level + 1, onEdit, onDelete)}
+        {nestedChildren?.length ? renderReplies(nestedChildren, level + 1, onEdit, onDelete) : null}
       </React.Fragment>
-    ));
+    );
+    });
   };
 
   const mobileThreadNavTop = groupId ? 'top-16' : 'top-0';
   const mobileThreadContentTop = groupId
-    ? 'pt-[calc(7.5rem+1.25rem)]'
-    : 'pt-[calc(3.5rem+1.25rem)]';
+    ? 'pt-[calc(7.5rem+2rem+env(safe-area-inset-top,0px))]'
+    : 'pt-[calc(3.5rem+2rem+env(safe-area-inset-top,0px))]';
+
+  const mobileThreadNav = (
+    <nav
+      className={`lg:hidden fixed inset-x-0 z-[150] w-screen max-w-[100vw] border-b border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800 ${mobileThreadNavTop}`}
+      style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+      aria-label="Discussion navigation"
+    >
+      <div className="relative flex items-center justify-between gap-2 px-4 py-3">
+        <BackButton
+          fallbackPath={discussionsFallbackPath}
+          alwaysShow
+          className="flex-shrink-0"
+          ariaLabel="Go back to discussions"
+        />
+        <h1 className="flex-1 truncate px-2 text-center text-base font-semibold text-gray-800 dark:text-gray-100">
+          {thread.title}
+        </h1>
+        <div className="w-10 flex-shrink-0" aria-hidden />
+      </div>
+    </nav>
+  );
 
   return (
-    <PullToRefresh onRefresh={handleRefresh} className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <nav className={`lg:hidden fixed left-0 right-0 z-[150] border-b border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900 ${mobileThreadNavTop}`}>
-        <div className="relative flex items-center justify-between gap-2 px-4 py-3">
-          <BackButton
-            fallbackPath={discussionsFallbackPath}
-            alwaysShow
-            className="flex-shrink-0"
-            ariaLabel="Go back to discussions"
-          />
-          <h1 className="flex-1 truncate px-2 text-center text-base font-semibold text-slate-900 dark:text-slate-100">
-            {thread.title}
-          </h1>
-          <div className="w-10 flex-shrink-0" aria-hidden />
-        </div>
-      </nav>
+    <PullToRefresh onRefresh={handleRefresh} className="min-h-dvh w-full bg-slate-50 dark:bg-slate-950">
+      {typeof document !== 'undefined' ? createPortal(mobileThreadNav, document.body) : mobileThreadNav}
 
-      <div className={`mx-auto max-w-4xl space-y-4 px-3 py-3 sm:space-y-6 sm:px-4 sm:py-6 lg:space-y-6 lg:px-4 lg:pt-0 ${mobileThreadContentTop}`}>
+      <div className={`w-full space-y-4 px-0 py-3 sm:mx-auto sm:max-w-4xl sm:space-y-6 sm:px-4 sm:py-6 lg:space-y-6 lg:px-4 lg:pt-0 ${mobileThreadContentTop}`}>
       {/* Main Thread Card */}
       <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
         {/* Status strip */}
@@ -1459,6 +1691,7 @@ const ThreadView: React.FC = () => {
                       <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-1 rounded-xl border border-slate-200 bg-slate-50/80 p-1 dark:border-slate-700 dark:bg-slate-800/60 sm:w-auto">
                         <button
                           type="button"
+                          data-regression-id="thread-pin-toggle"
                           onClick={handleTogglePin}
                           className={`inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition-colors touch-manipulation ${
                             thread.isPinned
@@ -1472,6 +1705,7 @@ const ThreadView: React.FC = () => {
                         </button>
                         <button
                           type="button"
+                          data-regression-id="thread-lock-toggle"
                           onClick={handleToggleLock}
                           className={`inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition-colors touch-manipulation ${
                             thread.locked

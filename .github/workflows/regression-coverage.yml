@@ -1,0 +1,77 @@
+name: Regression Coverage
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1' # Weekly Monday 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  inventory-report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - name: Regression inventory score (logic + UI + depth)
+        run: npm run regression:inventory
+
+  backend-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: Backend test coverage
+        run: npm run test:coverage
+      - name: Upload backend coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: coverage/
+
+  frontend-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+        working-directory: frontend
+      - run: npm ci
+      - name: Frontend test coverage
+        run: npm run test:coverage:frontend
+      - name: Upload frontend coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/
+
+  # Strict gate enforces 100% logic + UI + depth (write-flow journeys). See §20/§21.
+  inventory-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npm ci
+        working-directory: frontend
+      - name: Inventory 100% gate (logic + UI + depth)
+        run: npm run regression:inventory:strict
+      - name: Inventory logic tests
+        run: npm test -- tests/regression/inventory-logic.test.js
+      - name: Inventory UI tests
+        run: npm run test:coverage:frontend -- tests/regression/inventory-ui.test.tsx
+        working-directory: frontend

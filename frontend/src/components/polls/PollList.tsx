@@ -58,6 +58,7 @@ const PollList: React.FC<PollListProps> = ({ courseId }) => {
   const [selectedPollId, setSelectedPollId] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [pollToDelete, setPollToDelete] = useState<string | null>(null);
+  const [closingPoll, setClosingPoll] = useState<string | null>(null);
 
   const isInstructor = user?.role === 'teacher' || user?.role === 'admin';
 
@@ -100,6 +101,23 @@ const PollList: React.FC<PollListProps> = ({ courseId }) => {
       setError(err.response?.data?.message || 'Failed to delete poll');
     } finally {
       setDeletingPoll(null);
+    }
+  };
+
+  const handleClosePoll = async (pollId: string) => {
+    try {
+      setClosingPoll(pollId);
+      const token = localStorage.getItem('token');
+      await axios.put(`${API_URL}/api/polls/${pollId}`, { isActive: false }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setPolls(polls.map(poll =>
+        poll._id === pollId ? { ...poll, isActive: false } : poll
+      ));
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to close poll');
+    } finally {
+      setClosingPoll(null);
     }
   };
 
@@ -298,6 +316,21 @@ const PollList: React.FC<PollListProps> = ({ courseId }) => {
                         >
                           {selectedPoll.resultsVisible ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" aria-hidden="true" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5" aria-hidden="true" />}
                         </button>
+                        {selectedPoll.isActive && (
+                          <button
+                            onClick={() => handleClosePoll(selectedPoll._id)}
+                            disabled={closingPoll === selectedPoll._id}
+                            className="p-2 sm:p-2 text-amber-500 hover:text-amber-700 transition-colors disabled:opacity-50"
+                            title="Close poll"
+                            aria-label={`Close poll: ${selectedPoll.title}`}
+                          >
+                            {closingPoll === selectedPoll._id ? (
+                              <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-amber-500"></div>
+                            ) : (
+                              <Clock className="w-4 h-4 sm:w-5 sm:h-5" aria-hidden="true" />
+                            )}
+                          </button>
+                        )}
                         <button
                           onClick={() => setEditingPoll(selectedPoll)}
                           className="p-2 sm:p-2 text-blue-500 hover:text-blue-700 transition-colors"

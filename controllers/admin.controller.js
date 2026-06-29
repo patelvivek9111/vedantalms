@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const User = require('../models/user.model');
 const Course = require('../models/course.model');
 const Assignment = require('../models/Assignment');
@@ -421,7 +422,7 @@ exports.getAllUsers = async (req, res) => {
 
     const [users, total] = await Promise.all([
       User.find(query)
-        .select('firstName lastName email role createdAt lastLogin profilePicture')
+        .select('firstName lastName email role accountStatus createdAt lastLogin profilePicture')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),
@@ -477,6 +478,11 @@ exports.getAllUsers = async (req, res) => {
         }
         // If created recently (within 30 days), keep as active
       }
+
+      // An explicit admin suspension overrides the login-recency heuristic.
+      if (user.accountStatus === 'suspended') {
+        status = 'suspended';
+      }
       
       return {
         _id: user._id,
@@ -513,6 +519,158 @@ exports.getAllUsers = async (req, res) => {
       success: false,
       message: 'Failed to fetch users',
       error: error.message
+    });
+  }
+};
+
+// Delete a user (admin only). Guards: cannot delete self; cannot remove the last admin.
+exports.deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid user ID format' });
+    }
+
+    const requesterId = req.user._id ? req.user._id.toString() : String(req.user.id);
+    if (id === requesterId) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'You cannot delete your own account' });
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (user.role === 'admin') {
+      const adminCount = await User.countDocuments({ role: 'admin' });
+      if (adminCount <= 1) {
+        return res
+          .status(400)
+          .json({ success: false, message: 'Cannot delete the last remaining admin account' });
+      }
+    }
+
+    await User.deleteOne({ _id: id });
+
+    return res.json({
+      success: true,
+      message: 'User deleted successfully',
+      data: { _id: id },
+    });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to delete user',
+      error: error.message,
+    });
+  }
+};
+
+// Update a user's profile fields (admin only): firstName, lastName, email, role.
+// Account status is managed separately via updateUserStatus.
+exports.updateUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid user ID format' });
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const { firstName, lastName, email, role } = req.body;
+
+    if (role && !['student', 'teacher', 'admin'].includes(role)) {
+      return res.status(400).json({ success: false, message: 'Invalid role' });
+    }
+    // Guard: don't demote the last remaining admin.
+    if (role && role !== 'admin' && user.role === 'admin') {
+      const adminCount = await User.countDocuments({ role: 'admin' });
+      if (adminCount <= 1) {
+        return res
+          .status(400)
+          .json({ success: false, message: 'Cannot change the role of the last remaining admin account' });
+      }
+    }
+
+    if (typeof email === 'string' && email.trim()) {
+      const normalized = email.trim().toLowerCase();
+      if (normalized !== String(user.email).toLowerCase()) {
+        const existing = await User.findOne({ email: normalized, _id: { $ne: id } });
+        if (existing) {
+          return res.status(409).json({ success: false, message: 'Email already in use' });
+        }
+        user.email = normalized;
+      }
+    }
+    if (typeof firstName === 'string' && firstName.trim()) user.firstName = firstName.trim();
+    if (typeof lastName === 'string' && lastName.trim()) user.lastName = lastName.trim();
+    if (role) user.role = role;
+
+    await user.save();
+
+    const safe = user.toObject();
+    delete safe.password;
+
+    return res.json({ success: true, message: 'User updated', data: safe });
+  } catch (error) {
+    console.error('Error updating user:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update user',
+      error: error.message,
+    });
+  }
+};
+
+// Suspend or reactivate a user (admin only). Guard: cannot suspend yourself.
+exports.updateUserStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid user ID format' });
+    }
+    if (!['active', 'suspended'].includes(status)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "status must be 'active' or 'suspended'" });
+    }
+
+    const requesterId = req.user._id ? req.user._id.toString() : String(req.user.id);
+    if (id === requesterId && status === 'suspended') {
+      return res
+        .status(400)
+        .json({ success: false, message: 'You cannot suspend your own account' });
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    user.accountStatus = status;
+    await user.save();
+
+    return res.json({
+      success: true,
+      message: status === 'suspended' ? 'User suspended' : 'User reactivated',
+      data: { _id: id, accountStatus: status },
+    });
+  } catch (error) {
+    console.error('Error updating user status:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update user status',
+      error: error.message,
     });
   }
 };

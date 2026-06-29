@@ -11,13 +11,16 @@ function shapeCatalogCourse(course, userId) {
   const uid = userId ? String(userId) : null;
 
   doc.studentCount = studentIds.length;
+  doc.waitlistCount = (doc.waitlist || []).length;
   doc.isEnrolled = uid ? studentIds.includes(uid) : false;
   doc.hasEnrollmentRequest = uid
     ? (doc.enrollmentRequests || []).some((req) => normalizeId(req.student) === uid)
     : false;
-  doc.isOnWaitlist = uid
-    ? (doc.waitlist || []).some((entry) => normalizeId(entry.student) === uid)
-    : false;
+  const waitlistEntry = uid
+    ? (doc.waitlist || []).find((entry) => normalizeId(entry.student) === uid)
+    : null;
+  doc.isOnWaitlist = Boolean(waitlistEntry);
+  doc.waitlistPosition = waitlistEntry?.position ?? null;
 
   delete doc.students;
   delete doc.enrollmentRequests;

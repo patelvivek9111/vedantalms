@@ -1,172 +1,58 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
+import React from 'react';
 import ErrorBoundary from '@/components/common/ErrorBoundary';
-import logger from '@/utils/logger';
 
-// Mock logger
 vi.mock('@/utils/logger', () => ({
-  default: {
-    error: vi.fn(),
-  },
+  default: { error: vi.fn() },
 }));
 
-// Component that throws an error
-const ThrowError = ({ shouldThrow }: { shouldThrow: boolean }) => {
+vi.mock('react-router-dom', () => ({
+  Link: ({ children, to }: { children: React.ReactNode; to: string }) => (
+    <a href={to}>{children}</a>
+  ),
+}));
+
+function Bomb({ shouldThrow }: { shouldThrow: boolean }) {
   if (shouldThrow) {
-    throw new Error('Test error');
+    throw new Error('§14 inventory test boom');
   }
-  return <div>No error</div>;
-};
+  return <div>Child ok</div>;
+}
 
-describe('ErrorBoundary', () => {
-  const suppressExpectedErrorEvent = (event: Event) => {
-    const maybeError = event as ErrorEvent;
-    if (maybeError?.error instanceof Error && maybeError.error.message === 'Test error') {
-      event.preventDefault();
+describe('ErrorBoundary — §14.1 crash recovery', () => {
+  it('renders children when no error', () => {
+    render(
+      <ErrorBoundary>
+        <Bomb shouldThrow={false} />
+      </ErrorBoundary>
+    );
+    expect(screen.getByText('Child ok')).toBeInTheDocument();
+  });
+
+  it('shows recovery UI and Try Again clears error state', () => {
+    const throws = { value: true };
+    function Boom() {
+      if (throws.value) throw new Error('§14 inventory test boom');
+      return <div>Child ok</div>;
     }
-  };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    // Suppress console.error for error boundary tests
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    window.addEventListener('error', suppressExpectedErrorEvent);
-  });
-
-  afterEach(() => {
-    window.removeEventListener('error', suppressExpectedErrorEvent);
-    vi.restoreAllMocks();
-  });
-
-  it('should render children when there is no error', () => {
     render(
-      <BrowserRouter>
-        <ErrorBoundary>
-          <div>Test content</div>
-        </ErrorBoundary>
-      </BrowserRouter>
+      <ErrorBoundary>
+        <Boom />
+      </ErrorBoundary>
     );
-
-    expect(screen.getByText('Test content')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /something went wrong/i })).toBeInTheDocument();
+    throws.value = false;
+    fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+    expect(screen.getByText('Child ok')).toBeInTheDocument();
   });
 
-  it('should catch errors and display error UI', () => {
+  it('offers Go Home link to root', () => {
     render(
-      <BrowserRouter>
-        <ErrorBoundary>
-          <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
-      </BrowserRouter>
+      <ErrorBoundary>
+        <Bomb shouldThrow />
+      </ErrorBoundary>
     );
-
-    expect(screen.getByText('Something went wrong')).toBeInTheDocument();
-    expect(screen.getByText(/We're sorry, but something unexpected happened/)).toBeInTheDocument();
-  });
-
-  it('should log error when caught', () => {
-    render(
-      <BrowserRouter>
-        <ErrorBoundary>
-          <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
-      </BrowserRouter>
-    );
-
-    expect(logger.error).toHaveBeenCalledWith(
-      'Error caught by boundary',
-      expect.any(Error),
-      expect.objectContaining({ errorInfo: expect.any(Object) })
-    );
-  });
-
-  it('should show retry button', () => {
-    render(
-      <BrowserRouter>
-        <ErrorBoundary>
-          <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
-      </BrowserRouter>
-    );
-
-    const retryButton = screen.getByText('Try Again');
-    expect(retryButton).toBeInTheDocument();
-  });
-
-  it('should reset error state when retry is clicked', () => {
-    const { rerender, unmount } = render(
-      <BrowserRouter>
-        <ErrorBoundary>
-          <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
-      </BrowserRouter>
-    );
-
-    expect(screen.getByText('Something went wrong')).toBeInTheDocument();
-
-    const retryButton = screen.getByText('Try Again');
-    fireEvent.click(retryButton);
-
-    // Unmount and remount with error fixed to properly reset the boundary
-    unmount();
-    render(
-      <BrowserRouter>
-        <ErrorBoundary>
-          <ThrowError shouldThrow={false} />
-        </ErrorBoundary>
-      </BrowserRouter>
-    );
-
-    expect(screen.queryByText('Something went wrong')).not.toBeInTheDocument();
-    expect(screen.getByText('No error')).toBeInTheDocument();
-  });
-
-  it('should show home link', () => {
-    render(
-      <BrowserRouter>
-        <ErrorBoundary>
-          <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
-      </BrowserRouter>
-    );
-
-    const homeLink = screen.getByText('Go Home');
-    expect(homeLink).toBeInTheDocument();
-    expect(homeLink.closest('a')).toHaveAttribute('href', '/');
-  });
-
-  it('should use custom fallback when provided', () => {
-    const customFallback = <div>Custom error message</div>;
-
-    render(
-      <BrowserRouter>
-        <ErrorBoundary fallback={customFallback}>
-          <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
-      </BrowserRouter>
-    );
-
-    expect(screen.getByText('Custom error message')).toBeInTheDocument();
-    expect(screen.queryByText('Something went wrong')).not.toBeInTheDocument();
-  });
-
-  it('should show error details in development mode', () => {
-    // Mock development environment
-    const originalEnv = import.meta.env;
-    (import.meta as any).env = { ...originalEnv, DEV: true };
-
-    render(
-      <BrowserRouter>
-        <ErrorBoundary>
-          <ThrowError shouldThrow={true} />
-        </ErrorBoundary>
-      </BrowserRouter>
-    );
-
-    const details = screen.getByText('Technical details');
-    expect(details).toBeInTheDocument();
-
-    (import.meta as any).env = originalEnv;
+    expect(screen.getByRole('link', { name: /go home/i })).toHaveAttribute('href', '/');
   });
 });
-

@@ -42,6 +42,7 @@ import { useNetworkStatus } from './hooks/useNetworkStatus';
 import { useMessagingSocketConnection } from './hooks/inbox/useMessagingSocketConnection';
 import { useNotificationSocketConnection } from './hooks/notifications/useNotificationSocketConnection';
 import { useNotificationCrossTabSync } from './hooks/notifications/useNotificationCrossTabSync';
+import { loginRedirectPath } from './utils/loginRedirect';
 const AdminDashboard = lazyWithRetry(() => import('./pages/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 const AdminUserManagement = lazyWithRetry(() => import('./pages/AdminUserManagement').then(m => ({ default: m.AdminUserManagement })));
 const AdminAnalytics = lazyWithRetry(() => import('./pages/AdminAnalytics').then(m => ({ default: m.AdminAnalytics })));
@@ -141,12 +142,21 @@ const withRouteLoader = (node: React.ReactNode) => (
   <Suspense fallback={<AppLoadingSkeleton />}>{node}</Suspense>
 );
 
+function LoginRoute() {
+  const { user } = useAuth();
+  const location = useLocation();
+  if (user) {
+    return <Navigate to={loginRedirectPath(location.state)} replace />;
+  }
+  return <Login />;
+}
+
 function AppContent() {
   const { user, loading, token } = useAuth();
   const { offline } = useNetworkStatus();
   const location = useLocation();
   const isAuthenticated = !!user;
-  const hideMobileBottomNav = location.pathname.startsWith('/quizwave');
+  const hideMobileBottomNav = /\/quizwave(\/|$)/.test(location.pathname);
 
   useMessagingSocketConnection(user?._id, token);
   useNotificationSocketConnection(user?._id, token);
@@ -161,7 +171,7 @@ function AppContent() {
     <div
       className={
         isAuthenticated
-          ? 'min-h-dvh bg-gray-100 dark:bg-gray-900 dark:text-white'
+          ? 'min-h-dvh bg-gray-100 dark:bg-slate-950 dark:text-white'
           : 'flex min-h-dvh flex-col bg-slate-50 dark:bg-slate-950 dark:text-slate-100'
       }
     >
@@ -181,7 +191,7 @@ function AppContent() {
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
-          <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} />
+          <Route path="/login" element={<LoginRoute />} />
           <Route path="/signup" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Signup />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
           

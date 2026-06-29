@@ -6,6 +6,9 @@ const {
   getRecentActivity,
   getAnalytics,
   getAllUsers,
+  updateUser,
+  deleteUser,
+  updateUserStatus,
   getAllCourses,
   getSecurityStats,
   getSecurityEvents,
@@ -19,6 +22,9 @@ router.get('/stats', protect, authorize('admin'), getSystemStats);
 router.get('/activity', protect, authorize('admin'), getRecentActivity);
 router.get('/analytics', protect, authorize('admin'), getAnalytics);
 router.get('/users', protect, authorize('admin'), getAllUsers);
+router.put('/users/:id', protect, authorize('admin'), updateUser);
+router.delete('/users/:id', protect, authorize('admin'), deleteUser);
+router.patch('/users/:id/status', protect, authorize('admin'), updateUserStatus);
 router.get('/courses', protect, authorize('admin'), getAllCourses);
 router.get('/security/stats', protect, authorize('admin'), getSecurityStats);
 router.get('/security/events', protect, authorize('admin'), getSecurityEvents);

@@ -39,6 +39,11 @@ const userSchema = new mongoose.Schema({
     ],
     default: 'student',
   },
+  accountStatus: {
+    type: String,
+    enum: ['active', 'suspended'],
+    default: 'active',
+  },
   bio: {
     type: String,
     default: '',

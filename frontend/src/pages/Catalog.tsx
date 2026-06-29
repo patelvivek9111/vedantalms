@@ -42,9 +42,16 @@ interface Course {
     allowTeacherEnrollment: boolean;
   };
   published: boolean;
-  students: any[];
+  /** Legacy shape (pre-browse); browse API omits these and sends flags below */
+  students?: any[];
   enrollmentRequests?: any[];
   waitlist?: any[];
+  studentCount?: number;
+  waitlistCount?: number;
+  isEnrolled?: boolean;
+  isOnWaitlist?: boolean;
+  hasEnrollmentRequest?: boolean;
+  waitlistPosition?: number | null;
 }
 
 const Catalog: React.FC = () => {
@@ -309,38 +316,43 @@ const CourseListItem: React.FC<CourseListItemProps> = ({ course, onEnroll, onUne
     }
   };
 
-  const currentEnrollment = course.students?.length || 0;
+  const currentEnrollment =
+    course.studentCount ?? course.students?.length ?? 0;
   const maxStudents = course.catalog?.maxStudents || 0;
   const enrollmentText = maxStudents > 0 ? `${currentEnrollment}/${maxStudents}` : `${currentEnrollment} enrolled`;
   
   // Check if capacity is overridden (more students than max capacity)
   const isCapacityOverridden = maxStudents > 0 && currentEnrollment > maxStudents;
   
-  // Check if user is already enrolled
+  const userMatchesId = (id: unknown) =>
+    user && String((id as { _id?: string })?._id ?? id) === String(user._id);
+
+  // Check if user is already enrolled (browse API sets isEnrolled; legacy routes may still send students[])
   const isEnrolled = () => {
+    if (course.isEnrolled != null) return course.isEnrolled;
     if (!user) return false;
-    return course.students?.some((student: any) => student._id === user._id) || false;
+    return course.students?.some((student: any) => userMatchesId(student)) || false;
   };
-
-
 
   // Check if user is on waitlist
   const isOnWaitlist = () => {
+    if (course.isOnWaitlist != null) return course.isOnWaitlist;
     if (!user) return false;
-    return course.waitlist?.some((entry: any) => entry.student._id === user._id) || false;
+    return course.waitlist?.some((entry: any) => userMatchesId(entry.student)) || false;
   };
 
   // Get user's waitlist position
   const getWaitlistPosition = () => {
+    if (course.waitlistPosition != null) return course.waitlistPosition;
     if (!user) return null;
-    const waitlistEntry = course.waitlist?.find((entry: any) => entry.student._id === user._id);
+    const waitlistEntry = course.waitlist?.find((entry: any) => userMatchesId(entry.student));
     return waitlistEntry ? waitlistEntry.position : null;
   };
 
   // Check if course is full
   const isCourseFull = () => {
-    const maxStudents = course.catalog?.maxStudents || 0;
-    return maxStudents > 0 && (course.students?.length || 0) >= maxStudents;
+    const max = course.catalog?.maxStudents || 0;
+    return max > 0 && currentEnrollment >= max;
   };
 
   // Check if user can enroll
@@ -457,10 +469,12 @@ const CourseListItem: React.FC<CourseListItemProps> = ({ course, onEnroll, onUne
                     {isCapacityOverridden && ' (Over Capacity)'}
                   </span>
                 </div>
-                {isCourseFull() && course.waitlist && course.waitlist.length > 0 && (
+                {isCourseFull() && (course.waitlistCount ?? course.waitlist?.length ?? 0) > 0 && (
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Waitlist:</span>
-                    <span className="font-medium text-orange-600 dark:text-orange-400">{course.waitlist.length} students waiting</span>
+                    <span className="font-medium text-orange-600 dark:text-orange-400">
+                      {course.waitlistCount ?? course.waitlist?.length ?? 0} students waiting
+                    </span>
                   </div>
                 )}
                 {course.catalog?.prerequisites && course.catalog.prerequisites.length > 0 && (

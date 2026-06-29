@@ -1,0 +1,1778 @@
+{
+  "$schema": "./regression-inventory.schema.json",
+  "version": 1,
+  "description": "Master registry for 100% logic + UI coverage. Set logic.status and ui.status to 'covered' only when tests exist.",
+  "items": [
+    {
+      "id": "auth.login",
+      "area": "auth",
+      "name": "Login API + validation",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "e2e": [
+          "e2e/specs/smoke.spec.ts"
+        ],
+        "regressionId": "auth-login",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ]
+      }
+    },
+    {
+      "id": "auth.signup",
+      "area": "auth",
+      "name": "Signup",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "auth-signup",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "auth.logout",
+      "area": "auth",
+      "name": "Logout",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "e2e": [
+          "e2e/specs/smoke.spec.ts"
+        ],
+        "regressionId": "auth-logout",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ]
+      }
+    },
+    {
+      "id": "auth.session-expiry",
+      "area": "auth",
+      "name": "401 redirects to login",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "auth-401",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "account.profile",
+      "area": "account",
+      "name": "Profile save + avatar",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "account-profile",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "account.settings-theme",
+      "area": "account",
+      "name": "Theme toggle persist",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "account-theme",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "account.notifications",
+      "area": "account",
+      "name": "Notification preferences",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "account-notifications",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "account.login-activity",
+      "area": "account",
+      "name": "Login activity list",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "account-activity",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "course.create",
+      "area": "course",
+      "name": "Create course",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "course-create",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "course.edit",
+      "area": "course",
+      "name": "Edit course",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "course-edit",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "course.copy",
+      "area": "course",
+      "name": "Copy course",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "course-copy",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "course.enrollment-waitlist",
+      "area": "course",
+      "name": "Waitlist approve/deny",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "course-waitlist",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "course.unenroll",
+      "area": "course",
+      "name": "Unenroll student",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "course-unenroll",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "course.sidebar-customize",
+      "area": "course",
+      "name": "Customize navigation tabs",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "course-sidebar-config",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "course.role-nav-guard",
+      "area": "course",
+      "name": "Student gradebook / teacher grades redirect",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "course-nav-guard",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "module.crud",
+      "area": "modules",
+      "name": "Module create edit delete",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "module-crud",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "module.reorder",
+      "area": "modules",
+      "name": "Module item reorder",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "module-reorder",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "page.crud",
+      "area": "pages",
+      "name": "Page create edit view",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "page-crud",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "assignment.create-wizard",
+      "area": "assignments",
+      "name": "Assignment create wizard",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "assignment-create",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "assignment.submit-text",
+      "area": "assignments",
+      "name": "Online text submission",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "assignment-submit-text",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "assignment.submit-file",
+      "area": "assignments",
+      "name": "File submission",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "assignment-submit-file",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "assignment.question-mcq",
+      "area": "assignments",
+      "name": "Auto-grade multiple choice",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "quiz-mcq",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "assignment.question-matching",
+      "area": "assignments",
+      "name": "Auto-grade matching",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "quiz-matching",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "assignment.question-text",
+      "area": "assignments",
+      "name": "Manual grade text question",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "quiz-text",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "assignment.timed-quiz",
+      "area": "assignments",
+      "name": "Timed quiz start and submit",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "e2e": [
+          "e2e/specs/timed-quiz-race.spec.ts"
+        ],
+        "regressionId": "quiz-timed",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ]
+      }
+    },
+    {
+      "id": "assignment.manual-grade-ui",
+      "area": "assignments",
+      "name": "Teacher manual grade UI",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "assignment-grade-ui",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "assignment.release-grades",
+      "area": "assignments",
+      "name": "Release grades to students",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "assignment-release",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "assignment.mobile-chrome",
+      "area": "assignments",
+      "name": "Mobile quiz/assignment layout",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "assignment-mobile",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "grading.policy-modal",
+      "area": "grading",
+      "name": "Grading policy modal save preview",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "grading-policy-modal",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "grading.gradebook-cells",
+      "area": "grading",
+      "name": "Gradebook inline cell edit",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "gradebook-cell",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "grading.export-excel",
+      "area": "grading",
+      "name": "Gradebook Excel export",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "gradebook-export",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "grading.ferpa",
+      "area": "grading",
+      "name": "Student cannot see others grades",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "grading-ferpa",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "grading.transcript",
+      "area": "grading",
+      "name": "Transcript recompute",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "transcript",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "grading.async-jobs",
+      "area": "grading",
+      "name": "Async grading export jobs",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "grading-jobs",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "discussion.post-main",
+      "area": "discussions",
+      "name": "Post main reply",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "discussion-post-main",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "discussion.reply-to-main",
+      "area": "discussions",
+      "name": "Reply to main post only",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "discussion-reply-main",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "discussion.no-reply-nested",
+      "area": "discussions",
+      "name": "No reply button on nested",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "discussion-no-nested-reply",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "discussion.edit-main",
+      "area": "discussions",
+      "name": "Edit main post no delete",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "discussion-edit-main",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "discussion.edit-delete-nested",
+      "area": "discussions",
+      "name": "Edit delete nested reply",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "discussion-edit-nested",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "discussion.like-others",
+      "area": "discussions",
+      "name": "Like others posts",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "discussion-like",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "discussion.no-self-like",
+      "area": "discussions",
+      "name": "Block self-like",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "discussion-no-self-like",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "discussion.soft-delete-list",
+      "area": "discussions",
+      "name": "Deleted replies hidden from lists",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "discussion-delete-list",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "discussion.refresh-persist",
+      "area": "discussions",
+      "name": "Replies persist after refresh",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "discussion-refresh",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "discussion.legacy-collection-merge",
+      "area": "discussions",
+      "name": "Mixed legacy and collection replies",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "discussion-mixed",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "discussion.require-post-first",
+      "area": "discussions",
+      "name": "requirePostBeforeSee hides replies",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "e2e": [
+          "e2e/specs/discussion-e2e-accessibility.spec.ts"
+        ],
+        "regressionId": "discussion-require-post",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ]
+      }
+    },
+    {
+      "id": "discussion.locked-edit-own",
+      "area": "discussions",
+      "name": "Edit own reply when locked",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "discussion-locked-edit",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "discussion.manual-grade",
+      "area": "discussions",
+      "name": "Discussion manual grade release",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "discussion-grade",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "discussion.moderation-hide",
+      "area": "discussions",
+      "name": "Moderator hide restore",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "e2e": [
+          "e2e/specs/discussion-e2e-accessibility.spec.ts"
+        ],
+        "regressionId": "discussion-mod-hide",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ]
+      }
+    },
+    {
+      "id": "announcement.body-required",
+      "area": "announcements",
+      "name": "Empty body validation",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "e2e": [
+          "e2e/specs/regression-checklist.spec.ts"
+        ],
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "regressionId": "announcement-body"
+      }
+    },
+    {
+      "id": "announcement.attachment-preview",
+      "area": "announcements",
+      "name": "Attachment upload preview",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "e2e": [
+          "e2e/specs/regression-checklist.spec.ts"
+        ],
+        "regressionId": "announcement-file",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ]
+      }
+    },
+    {
+      "id": "announcement.crud",
+      "area": "announcements",
+      "name": "Create edit delete",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "announcement-crud",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "poll.crud-vote",
+      "area": "polls",
+      "name": "Poll create vote close",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "poll-vote",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "group.isolation",
+      "area": "groups",
+      "name": "Group discussion isolation",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "group-discussion",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "group.assign-members",
+      "area": "groups",
+      "name": "Auto/manual group assign",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "group-assign",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "inbox.compose",
+      "area": "inbox",
+      "name": "Compose and send",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "inbox-compose",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "inbox.attachments",
+      "area": "inbox",
+      "name": "Message attachments",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "inbox-attach",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "inbox.realtime",
+      "area": "inbox",
+      "name": "Socket message delivery",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "inbox-socket",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "inbox.pull-refresh",
+      "area": "inbox",
+      "name": "Pull to refresh",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "e2e": [
+          "e2e/specs/regression-checklist.spec.ts"
+        ],
+        "regressionId": "inbox-ptr",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ]
+      }
+    },
+    {
+      "id": "calendar.crud",
+      "area": "calendar",
+      "name": "Calendar event CRUD",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "e2e": [
+          "e2e/specs/regression-checklist.spec.ts"
+        ],
+        "regressionId": "calendar-event",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ]
+      }
+    },
+    {
+      "id": "todo.planner",
+      "area": "todo",
+      "name": "To-do planner tasks",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "todo-page",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "attendance.mark",
+      "area": "attendance",
+      "name": "Mark attendance save",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "attendance-mark",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "files.upload-ferpa",
+      "area": "files",
+      "name": "File upload FERPA access",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "file-upload",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "files.chunk-resume",
+      "area": "files",
+      "name": "Chunk upload resume",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "file-chunk",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "files.preview",
+      "area": "files",
+      "name": "File preview modal",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "file-preview",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "files.recovery",
+      "area": "files",
+      "name": "File recovery policy",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "file-recovery",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "admin.users",
+      "area": "admin",
+      "name": "Admin user management",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "admin-users",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "admin.route-guard",
+      "area": "admin",
+      "name": "Teacher blocked from admin",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "admin-guard",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "quizwave.host-join",
+      "area": "quizwave",
+      "name": "Host and join lobby",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "quizwave-lobby",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "quizwave.play-round",
+      "area": "quizwave",
+      "name": "Full play round",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "quizwave-play",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "meetings.zoho",
+      "area": "meetings",
+      "name": "Zoho connect schedule",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "meetings-zoho",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "shell.offline-banner",
+      "area": "shell",
+      "name": "Offline banner",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "e2e": [
+          "e2e/specs/offline-banner.spec.ts"
+        ],
+        "regressionId": "shell-offline",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ]
+      }
+    },
+    {
+      "id": "shell.change-user",
+      "area": "shell",
+      "name": "Change user modal",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "shell-change-user",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "shell.notification-panel",
+      "area": "shell",
+      "name": "Notification bell panel",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "shell-notifications",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "shell.mobile-bottom-nav",
+      "area": "shell",
+      "name": "Mobile bottom navigation",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "regressionId": "shell-bottom-nav",
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "catalog.enroll",
+      "area": "catalog",
+      "name": "Catalog search enroll",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "regressionId": "catalog-enroll",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ],
+        "e2e": [
+          "e2e/specs/regression-inventory-ui.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "join.qr",
+      "area": "join",
+      "name": "Join course QR modal",
+      "logic": {
+        "status": "covered",
+        "tests": [
+          "tests/regression/inventory-logic.test.js"
+        ]
+      },
+      "ui": {
+        "status": "covered",
+        "e2e": [
+          "e2e/specs/regression-checklist.spec.ts"
+        ],
+        "regressionId": "join-qr",
+        "tests": [
+          "frontend/tests/regression/inventory-ui.test.tsx"
+        ]
+      }
+    },
+    {
+      "id": "writeflow.discussions",
+      "area": "discussions",
+      "name": "Discussion write journeys (create / pin / lock / grade)",
+      "depth": {
+        "status": "covered",
+        "journeys": ["create thread", "pin/unpin", "lock→student read-only", "graded add-grade"],
+        "tests": ["e2e/specs/regression-interactions/discussions.spec.ts"]
+      }
+    },
+    {
+      "id": "writeflow.assignments",
+      "area": "assignments",
+      "name": "Assignment write journeys (update / unpublish / delete)",
+      "depth": {
+        "status": "covered",
+        "journeys": ["edit-wizard update", "bulk unpublish", "bulk delete + confirm"],
+        "tests": ["e2e/specs/regression-interactions/assignments.spec.ts"]
+      }
+    },
+    {
+      "id": "writeflow.grading",
+      "area": "grading",
+      "name": "Grading write journeys (delete submission; release/cell via grading-ui-live)",
+      "depth": {
+        "status": "covered",
+        "journeys": ["delete submission + confirm", "save & release (grading-ui-live G7)", "gradebook cell edit (G8)"],
+        "tests": [
+          "e2e/specs/regression-interactions/grading.spec.ts",
+          "e2e/specs/grading-ui-live.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "writeflow.announcements",
+      "area": "announcements",
+      "name": "Announcement write journeys (edit / delete; create via forms-live)",
+      "depth": {
+        "status": "covered",
+        "journeys": ["edit via UI", "delete + confirm", "create (forms-live)"],
+        "tests": [
+          "e2e/specs/regression-interactions/announcements.spec.ts",
+          "e2e/specs/forms-live.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "writeflow.people",
+      "area": "people",
+      "name": "Enrollment write journeys (deny; add/remove/approve via roster-live)",
+      "depth": {
+        "status": "covered",
+        "journeys": ["deny pending request", "approve pending/waitlist (roster-live)", "add/remove (roster-live)"],
+        "tests": [
+          "e2e/specs/regression-interactions/people.spec.ts",
+          "e2e/specs/roster-live.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "writeflow.admin",
+      "area": "admin",
+      "name": "Admin write journeys (create / delete / suspend user)",
+      "depth": {
+        "status": "covered",
+        "journeys": [
+          "create user via modal → register API",
+          "delete user via confirm → DELETE /api/admin/users/:id persists",
+          "suspend + reactivate via row actions → PATCH /api/admin/users/:id/status; suspended login blocked (403)"
+        ],
+        "tests": ["e2e/specs/regression-interactions/admin.spec.ts"]
+      }
+    },
+    {
+      "id": "writeflow.quizwave",
+      "area": "quizwave",
+      "name": "QuizWave write journeys (builder create / delete)",
+      "depth": {
+        "status": "covered",
+        "journeys": ["builder Save Quiz create", "delete + confirm"],
+        "tests": ["e2e/specs/regression-interactions/quizwave.spec.ts"]
+      }
+    },
+    {
+      "id": "writeflow.polls",
+      "area": "polls",
+      "name": "Poll write journeys (student vote / delete)",
+      "depth": {
+        "status": "covered",
+        "journeys": ["student vote → results", "delete + confirm"],
+        "tests": ["e2e/specs/regression-interactions/polls.spec.ts"]
+      }
+    },
+    {
+      "id": "writeflow.groups",
+      "area": "groups",
+      "name": "Group write journeys (create group set; drag-and-drop member assign)",
+      "depth": {
+        "status": "covered",
+        "journeys": [
+          "create group set via modal",
+          "drag student from sidebar into group (@hello-pangea/dnd) → PUT /api/groups/:id persists"
+        ],
+        "tests": [
+          "e2e/specs/regression-interactions/groups.spec.ts",
+          "e2e/specs/regression-interactions/groups-dnd.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "writeflow.course-management",
+      "area": "course",
+      "name": "Course management write journeys (copy / archive / restore / delete)",
+      "depth": {
+        "status": "covered",
+        "journeys": [
+          "copy course (sync) via modal → new course persisted",
+          "archive via confirm modal → operationalStatus archived",
+          "restore via confirm modal → operationalStatus active",
+          "delete via confirm modal (admin oversight) → DELETE /api/courses/:id (admin-only) → 404"
+        ],
+        "tests": ["e2e/specs/regression-interactions/course-ops.spec.ts"]
+      }
+    },
+    {
+      "id": "writeflow.admin-course-create",
+      "area": "admin",
+      "name": "Admin create-course write journey (wired Create Course button)",
+      "depth": {
+        "status": "covered",
+        "journeys": [
+          "/admin/courses Create Course → /courses/create form → POST /api/courses persists"
+        ],
+        "tests": ["e2e/specs/regression-interactions/course-create.spec.ts"]
+      }
+    },
+    {
+      "id": "writeflow.admin-settings",
+      "area": "admin",
+      "name": "Admin system settings write journey (save + restore)",
+      "depth": {
+        "status": "covered",
+        "journeys": [
+          "edit Site Name → Save Changes → PUT /api/admin/settings persists; reload-verified; restored"
+        ],
+        "tests": ["e2e/specs/regression-interactions/settings-admin.spec.ts"]
+      }
+    },
+    {
+      "id": "writeflow.admin-recovery",
+      "area": "admin",
+      "name": "Admin file recovery center write journey (preview + restore)",
+      "depth": {
+        "status": "covered",
+        "journeys": [
+          "open Settings → Operations → File Recovery Center",
+          "preview restore (dry run) on a soft-deleted file",
+          "restore file → POST /api/ops/recovery/files/:id/restore → leaves deleted list"
+        ],
+        "tests": ["e2e/specs/regression-interactions/recovery-admin.spec.ts"]
+      }
+    },
+    {
+      "id": "writeflow.enrollment-qr",
+      "area": "join",
+      "name": "QR / join-code enrollment write journey (manual code + camera modal)",
+      "depth": {
+        "status": "covered",
+        "journeys": [
+          "manual join code at /join-course → POST /api/courses/enroll-by-qr → request/enroll registered",
+          "camera scanner modal renders with getUserMedia stubbed"
+        ],
+        "tests": ["e2e/specs/regression-interactions/qr-enroll.spec.ts"]
+      }
+    }
+  ]
+}

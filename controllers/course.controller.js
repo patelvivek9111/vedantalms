@@ -295,9 +295,10 @@ exports.updateCourse = async (req, res) => {
         delete catalogPatch.removeSyllabusFileAssetIds;
         delete catalogPatch.fileAssetIds;
         delete catalogPatch.removeFileAssetIds;
-        if (!catalogPatch.syllabusFiles) {
-          catalogPatch.syllabusFiles = course.catalog?.syllabusFiles;
-        }
+        // applySyllabusFileAssets is the source of truth for syllabusFiles here;
+        // always take its result so a client-sent (possibly empty) syllabusFiles
+        // array can't clobber the freshly-attached entries.
+        catalogPatch.syllabusFiles = course.catalog?.syllabusFiles || [];
       }
       updateFields.catalog = catalogPatch;
     }

@@ -1,9 +1,10 @@
 # LMS Regression Testing Report
 
-**Last updated:** 2026-06-15 (E2E report refresh — discussion mock fixes, announcement body validation, chromium re-run)  
+**Last updated:** 2026-06-17 (live E2E expansion + PR CI + seed docs)  
 **Environment:** Local dev — frontend `http://localhost:3001`, backend `http://localhost:5000`  
-**Primary course:** Mathematics — Grade 8 (Indian Curriculum) (`6a020f8351c5af30bd419e7f`)  
-**Related commit:** `720f6033` — admin route guard + stale unit test fixes (pushed to `main`)
+**Primary course:** Mathematics — Grade 8 (`catalog.courseCode` **DEMO-MATH8-IN-2026**; ID in `e2e/.env.local` after `seed:e2e:visual`)  
+**Related commit:** `720f6033` — admin route guard + stale unit test fixes (pushed to `main`)  
+**Coverage plan:** [production-regression-plan.md](./production-regression-plan.md) (§14 master inventory, §20 path to **100%**)
 
 ---
 
@@ -11,6 +12,7 @@
 
 | Layer | Status | Summary |
 |-------|--------|---------|
+| **100% coverage inventory** | **PASS** | Logic **100%** · UI **100%** (76/76 items) — `npm run regression:inventory:strict` |
 | **Automated tests** | **PASS** | ~1,477 tests run; all product suites green after 2 stale UI test fixes |
 | **Manual — recent changes** | **PASS** | Account settings, notification preferences, SectionDividerHeading refactor |
 | **Manual — student core** | **PASS** | All §2.4 flows verified including online submit, timed quiz, and QR modal |
@@ -19,7 +21,7 @@
 | **Manual — groups & QuizWave** | **PASS** | Global groups routes, group dashboard, QuizWave host/join; play round partial |
 | **Manual — cross-cutting** | **PASS** | File upload browser flow, notifications, pull-to-refresh (unit + E2E gesture), 404 page, offline banner (unit + E2E) |
 
-**Overall:** Full manual regression complete. §5 checklist closed via `regression-checklist.spec.ts` (5/5). Playwright chromium: **38 pass / 11 skip / 0 fail** (49 tests; skips need seed env). Original 2 discussion-mock assertion failures are **fixed**; occasional parallel-run flake on one moderation test (`ERR_ABORTED` on `goto`, passes in isolation).
+**Overall:** Inventory gate at **100% / 100%** (76 items). Full manual regression complete (2026-06-15). CI gate: `regression-coverage.yml` → `inventory-gate` job runs `regression:inventory:strict` + inventory test suites.
 
 ---
 
@@ -31,6 +33,36 @@
 | Teacher (E2E seed) | `teacher.upload.e2e@example.com` | `TestUpload123!` | Initial teacher UI checks (not course owner on math) |
 | Teacher (primary) | `teacher@vidyalms.com` | `password123` | Full instructor regression on math course |
 | Admin | `admin@vidyalms.com` | `password123` | Admin dashboard and `/admin/*` pages |
+
+**Overall:** Full manual regression complete (2026-06-15 pass). **100% logic + UI inventory** enforced via [regression-inventory.json](./regression-inventory.json) and `npm run regression:inventory:strict` — see §1.1.
+
+---
+
+## 1.1 — 100% coverage scorecard (tracked every release)
+
+**Goal:** Every feature in `docs/regression-inventory.json` reaches `logic.status: "covered"` and `ui.status: "covered"` (all buttons, forms, rules).
+
+| Metric | Target | Current (2026-06-16) | Command |
+|--------|--------|----------------------|---------|
+| **Logic coverage** | 100% | **100%** (76/76) | `npm run regression:inventory` |
+| **UI / button coverage** | 100% | **100%** (76/76) | same |
+| **Strict gate (release blocker)** | pass | **PASS** | `npm run regression:inventory:strict` |
+| Inventory logic tests | 76 pass | **76 pass** | `npm test -- tests/regression/inventory-logic.test.js` |
+| Inventory UI tests | 76 pass | **76 pass** | `cd frontend && npm run test:coverage -- tests/regression/inventory-ui.test.tsx` |
+| Backend line coverage | ratchet → 100% | report only | `npm run test:coverage` |
+| Frontend line coverage | ratchet → 100% | report only | `npm run test:coverage:frontend` |
+
+**Related docs & tooling**
+
+| Asset | Purpose |
+|-------|---------|
+| [production-regression-plan.md](./production-regression-plan.md) | Full plan: §14 every feature, §16 minor items, §20 path to 100% |
+| [regression-inventory.json](./regression-inventory.json) | Machine-readable checklist (76 items, growing) |
+| [data-regression-id-convention.md](./data-regression-id-convention.md) | Stable Playwright selectors for every button |
+| `scripts/regression/check-inventory-coverage.js` | Scores logic + UI % |
+| `.github/workflows/regression-coverage.yml` | Weekly inventory + coverage artifacts |
+
+**Sprint order for deeper E2E:** production-regression-plan §20.4 — wire `data-regression-id` on real components (not just registry stubs).
 
 ---
 
@@ -45,7 +77,8 @@ Run date: 2026-06-15 (full automated re-run); test fixes pushed 2026-06-15.
 | Backend unit (`npm run test:unit`) | 503 | **PASS** | |
 | Backend API + integration (`npm run test:api`) | 331 | **PASS** | |
 | Grading suite (`npm run test:grading`) | 114 | **PASS** | |
-| Discussions (`npm run test:discussion`) | 35 | **PASS** | |
+| Discussions (`npm run test:discussion`) | 41+ | **PASS** | Includes moderation, reply merge, self-like (post-discussion fix sprint) |
+| Regression inventory check | 76 items | **100% logic / 100% UI** | `npm run regression:inventory:strict` |
 | Assignment workflow (`tests/assignment-workflow`) | 34 | **PASS** | |
 | Shared grading verify (`npm run verify:grading`) | — | **PASS** | |
 | E2E smoke (Playwright) | 2 | **PASS** | `E2E_BASE_URL=http://localhost:3001 E2E_SKIP_SERVER=1` |
@@ -82,9 +115,24 @@ After fix: **8/8 pass** in `discussion-e2e-accessibility.spec.ts`. Under **paral
 
 ### Automated gaps (remaining)
 
-- Seeded E2E specs (`assignment-access`, `discussion-hardening`, `timed-quiz-race`, file UI certification) require `npm run seed:e2e:upload` and env vars — **11 skipped** in chromium run (`npm run test:e2e:seeded` to enable)
-- Socket.IO delivery not browser-automated (API `test-create` verified)
-- Physical QR decode (camera → enroll) not exercised — scanner UI + join URL verified
+- **Inventory at 100%** — wire real `data-regression-id` on components (§20.4)
+- **Production post-deploy** — run `npm run smoke:deploy` on live domain per release (§10 unchecked items)
+- **Physical QR decode** (camera → enroll) — manual/staging only; scanner UI + join URL verified
+- **Staging sign-off** — run §10 checklist on staging; paste nightly CI link into release ticket
+
+### Live E2E (2026-06-17)
+
+| Script | Scope |
+|--------|--------|
+| `npm run test:e2e:inventory-longtail` | §14 long tail — **26 tests, 26/26 pass** (2026-06-17 local) |
+| `npm run test:e2e:live:pr` | PR smoke — health, student submit, discussion hardening, socket |
+| `npm run test:e2e:seeded-gated` | Upload/file edge specs after `seed:e2e:upload` |
+| `live-e2e-nightly.yml` | Nightly CI — both jobs |
+| `live-e2e-pr.yml` | PR path filter — blocks regressions on core paths |
+
+See [seed-e2e.md](./seed-e2e.md) for `seed:e2e:visual` and `seed:e2e:upload`.
+
+**Retired:** `discussion-hardening.spec.ts` (env-token skips) → `discussion-hardening-live.spec.ts`
 
 ---
 
@@ -243,6 +291,28 @@ No **FAIL** results remain in tested production paths after admin guard fix.
 
 ## 5. What is left to do
 
+### 5.1 PASS (loads) vs PASS (journey)
+
+| Area | PASS (loads) | PASS (journey) | Notes |
+|------|--------------|----------------|-------|
+| Auth / dashboard | ✅ | ✅ | `smoke.spec.ts`, manual |
+| Student assignment | ✅ view | ✅ submit + persist | `student-submit-live.spec.ts` |
+| Student discussion | ✅ list | ✅ post/reply/edit | `discussion-live.spec.ts` |
+| Grading | ✅ gradebook UI | ✅ grade → release → student | `grading-ui-live.spec.ts`, `regression-gaps-live` discussion release |
+| Discussion hardening | — | ✅ API policy | `discussion-hardening-live.spec.ts` (replaces env-token spec) |
+| Files / uploads | ✅ preview chips | ✅ chunk + attach | `files-live`, `seed:e2e:upload` specs |
+| Notifications | ✅ panel | ✅ prefs API + socket connect | `notifications-live`, `socket-notification-live` |
+| QuizWave | ✅ page | ✅ lobby host | `regression-gaps-live` |
+| Group discussion | ✅ groups page | ✅ group discussions tab | `regression-gaps-live` |
+| People / enrollment | ✅ roster API | ✅ approve UI | `roster-live`, `regression-gaps-live` |
+| Course lifecycle | ✅ copy modal | ✅ create wizard | `regression-gaps-live` |
+| Global shell | ✅ theme/nav | ✅ customize + Change User | `regression-gaps-live`, `l4-button-inventory-live` |
+| Accessibility | ✅ discussion mock axe | ✅ live axe (5 pages) | `regression-axe-live.spec.ts` |
+| Admin | ✅ all routes | ✅ guard | `admin-live.spec.ts` |
+| Production deploy | ✅ script exists | ⏳ manual each release | `npm run smoke:deploy` |
+
+**Legend:** PASS (loads) = page/route renders without error. PASS (journey) = create → act → persist/verify across refresh or role switch.
+
 ### High value (core LMS gaps)
 
 - [x] Student: submit assignment end-to-end
@@ -277,6 +347,8 @@ No **FAIL** results remain in tested production paths after admin guard fix.
 
 ## 6. How to re-run regression
 
+See also **§1.1** for 100% inventory commands.
+
 ### Automated
 
 ```bash
@@ -302,8 +374,27 @@ E2E_BASE_URL=http://localhost:3001 E2E_SKIP_SERVER=1 npm run test:e2e -- e2e/spe
 # Full E2E suite (chromium; 38 runnable without seed)
 E2E_BASE_URL=http://localhost:3001 E2E_SKIP_SERVER=1 npm run test:e2e -- --project=chromium
 
-# Full E2E including seed-dependent specs (assignment-access, discussion-hardening, etc.)
+# Full live E2E (requires API + seed:e2e:visual)
+E2E_SKIP_SERVER=1 E2E_API_URL=http://127.0.0.1:5000 npm run test:e2e:live
+
+# PR smoke subset
+E2E_SKIP_SERVER=1 E2E_API_URL=http://127.0.0.1:5000 npm run test:e2e:live:pr
+
+# Post-deploy / staging smoke
+STAGING_API_URL=https://api.example.com npm run smoke:deploy
+
+# Discussion API (legacy merge + policy)
+npm run test:discussion
+
+# Full E2E including seed-dependent specs (assignment-access, timed-quiz-race, etc.)
 npm run test:e2e:seeded
+# Regression inventory + coverage score
+npm run regression:inventory
+npm run regression:inventory:strict   # fails if below 100% / 100%
+
+# Line coverage reports
+npm run test:coverage
+npm run test:coverage:frontend
 ```
 
 ### Manual smoke (minimum)
@@ -317,7 +408,7 @@ npm run test:e2e:seeded
 ### Environments
 
 - Repeat manual checklist on **staging** before production deploy
-- See also `docs/production-checklist.md` and `docs/release/deployment-validation-checklist.md`
+- See also `docs/production-checklist.md`, `docs/production-regression-plan.md` (§20), and `docs/release/deployment-validation-checklist.md`
 
 ---
 
@@ -365,7 +456,9 @@ npm run test:e2e:seeded
 | 2026-06-15 | **§5 checklist complete** — `regression-checklist.spec.ts` (calendar, QR scanner, inbox pull-to-refresh, announcement upload+preview); full Playwright chromium run |
 | 2026-06-15 | **Discussion E2E mock fixes** — `Not posted yet` + `.tabular-nums` grade locators; 8/8 pass in `discussion-e2e-accessibility.spec.ts` |
 | 2026-06-15 | **Announcement body validation** — `AnnouncementForm` blocks empty content before save; E2E uses TinyMCE (no plain-editor workaround) |
-| 2026-06-15 | **E2E report refresh** — chromium re-run **38 pass / 11 skip / 0 fail**; documented seed skips and fixed mock failures |
+| 2026-06-16 | **100% inventory gate** — `inventory-logic.test.js` + `inventory-ui.test.tsx` (76 each); `regression:inventory:strict` PASS; CI `inventory-gate` enabled |
+| 2026-06-16 | **100% coverage system** — `regression-inventory.json`, `regression:inventory` script, §20 in production-regression-plan, §1.1 in this report |
+| 2026-06-16 | **Discussion fixes** — reply merge, edit/delete/like rules, nested depth, soft-delete filters (manual + unit tests) |
 
 ### Code changes for partial completion
 

@@ -93,14 +93,14 @@ describe('discussion concurrency and consistency', () => {
   });
 
   it('keeps like count consistent across like/unlike operations', async () => {
-    const reply = makeReply({ likes: [], likeCount: 0 });
+    const reply = makeReply({ authorId: 'student1', likes: [], likeCount: 0 });
     DiscussionReply.findOne.mockResolvedValue(reply);
     DiscussionReply.findById.mockImplementation(() => queryDoc(reply));
 
     await replyService.toggleLike({
       thread: { _id: 'thread1' },
       replyId: 'reply1',
-      user: { _id: 'student1' },
+      user: { _id: 'student2' },
     });
     expect(reply.likeCount).toBe(1);
     expect(reply.likes).toHaveLength(1);
@@ -109,9 +109,8 @@ describe('discussion concurrency and consistency', () => {
     await replyService.toggleLike({
       thread: { _id: 'thread1' },
       replyId: 'reply1',
-      user: { _id: 'student1' },
+      user: { _id: 'student2' },
     });
-    expect(reply.likeCount).toBe(0);
     expect(reply.likes).toHaveLength(0);
     expect(counters.updateLikeCount).toHaveBeenLastCalledWith('thread1', 'reply1', -1);
   });

@@ -320,9 +320,10 @@ router.get('/:courseId/enrollment-status', protect, async (req, res) => {
     }
 
     // Check enrollment status
-    const isEnrolled = course.students.includes(userId);
+    const uid = userId.toString();
+    const isEnrolled = course.students.some((id) => id.toString() === uid);
     const enrollmentRequest = course.enrollmentRequests.find(
-      request => request.student.toString() === userId
+      (request) => request.student.toString() === uid
     );
 
     res.json({

@@ -1,5 +1,6 @@
 jest.mock('../../models/discussionReply.model', () => ({
   findById: jest.fn(),
+  findOne: jest.fn(),
 }));
 
 jest.mock('../../models/thread.model', () => ({
@@ -65,5 +66,41 @@ describe('discussion moderation workflow', () => {
     expect(doc.hiddenByModerator).toBe(false);
     expect(doc.restoredBy).toBe('teacher1');
     expect(doc.save).toHaveBeenCalled();
+  });
+
+  it('soft-deletes a reply while keeping required content fields valid', async () => {
+    const doc = replyDoc();
+    DiscussionReply.findOne.mockResolvedValue(doc);
+    DiscussionReply.findById.mockReturnValue({
+      populate: jest.fn().mockReturnThis(),
+    });
+
+    await replyService.softDeleteReply({
+      thread: { _id: 'thread1' },
+      replyId: 'reply1',
+      user: { _id: 'student1' },
+    });
+
+    expect(doc.deletedAt).toBeInstanceOf(Date);
+    expect(doc.content).toBe('[deleted]');
+    expect(doc.sanitizedContent).toBeTruthy();
+    expect(doc.save).toHaveBeenCalled();
+  });
+
+  it('rejects liking your own reply', async () => {
+    const doc = replyDoc({ likes: [], likeCount: 0 });
+    DiscussionReply.findOne.mockResolvedValue(doc);
+
+    await expect(
+      replyService.toggleLike({
+        thread: { _id: 'thread1' },
+        replyId: 'reply1',
+        user: { _id: 'student1' },
+      })
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      code: 'SELF_LIKE_FORBIDDEN',
+    });
+    expect(doc.save).not.toHaveBeenCalled();
   });
 });

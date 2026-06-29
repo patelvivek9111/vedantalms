@@ -40,7 +40,10 @@ const FileAttachmentChips: React.FC<FileAttachmentChipsProps> = ({
   const normalized = normalizeChipFiles({ files, attachmentSources });
   const [preview, setPreview] = useState<NormalizedFile | null>(null);
 
-  const openPreview = (file: NormalizedFile) => {
+  const openPreview = (file: NormalizedFile, e: React.MouseEvent) => {
+    // Chips often render inside a clickable list row; keep the click from
+    // bubbling to that row handler so we open the preview, not the detail view.
+    e.stopPropagation();
     setPreview(file);
   };
 
@@ -56,7 +59,7 @@ const FileAttachmentChips: React.FC<FileAttachmentChipsProps> = ({
               <button
                 type="button"
                 className="hover:underline text-left"
-                onClick={() => openPreview(f)}
+                onClick={(e) => openPreview(f, e)}
               >
                 {f.name}
               </button>
@@ -64,7 +67,7 @@ const FileAttachmentChips: React.FC<FileAttachmentChipsProps> = ({
                 type="button"
                 className="text-indigo-600 dark:text-indigo-400 hover:opacity-80"
                 aria-label={`Preview ${f.name}`}
-                onClick={() => openPreview(f)}
+                onClick={(e) => openPreview(f, e)}
               >
                 <Eye className="w-3 h-3" />
               </button>

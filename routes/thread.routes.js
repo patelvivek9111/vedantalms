@@ -422,6 +422,7 @@ router.get('/:threadId', protect, async (req, res) => {
       }
     }
 
+    setNoStoreThreadListHeaders(res);
     res.json({
       success: true,
       data: payload,
@@ -663,7 +664,10 @@ router.post('/:threadId/replies', protect, async (req, res) => {
     res.json({
       success: true,
       duplicateSuppressed,
-      data: await serializeThreadForUser(req, updatedThread, context)
+      data: await serializeThreadForUser(req, updatedThread, context),
+      createdReply: duplicateSuppressed
+        ? null
+        : discussionReplyService.toLegacyReply(newReply),
     });
   } catch (error) {
     sendRouteError(res, error, 'Error adding reply');
@@ -685,10 +689,10 @@ router.put('/:threadId/replies/:replyId', protect, async (req, res) => {
     if (reply.deletedAt) {
       return res.status(400).json({ success: false, message: 'Deleted replies cannot be edited' });
     }
-    const replyAuthorId = foundReply.source === 'collection' ? reply.authorId : reply.author;
-    const isReplyAuthor = req.user._id.toString() === replyAuthorId.toString();
+    const isReplyAuthor = discussionAccess.userOwnsReply(foundReply, req.user);
+    const replyAuthorId = foundReply.source === 'collection' ? foundReply.reply.authorId : foundReply.reply.author;
     if (isReplyAuthor) {
-      await discussionAccess.assertStudentCanReply(req.user, thread);
+      await discussionAccess.assertStudentCanModifyOwnReply(req.user, thread);
     } else {
       await discussionAccess.assertStudentCanModerateDiscussion(req.user, thread);
     }
@@ -779,15 +783,26 @@ router.delete('/:threadId/replies/:replyId', protect, async (req, res) => {
     if (reply.deletedAt) {
       return res.status(400).json({ success: false, message: 'Reply is already deleted' });
     }
-    const replyAuthorId = foundReply.source === 'collection' ? reply.authorId : reply.author;
-    const isReplyAuthor = req.user._id.toString() === replyAuthorId.toString();
+    const isReplyAuthor = discussionAccess.userOwnsReply(foundReply, req.user);
+    const replyAuthorId = foundReply.source === 'collection' ? foundReply.reply.authorId : foundReply.reply.author;
     if (isReplyAuthor) {
-      await discussionAccess.assertStudentCanReply(req.user, thread);
+      await discussionAccess.assertStudentCanModifyOwnReply(req.user, thread);
     } else {
       await discussionAccess.assertStudentCanModerateDiscussion(req.user, thread);
     }
     if (!isReplyAuthor && req.user.role !== 'admin' && !discussionAccess.isCourseStaff(req.user, (await discussionAccess.loadDiscussionContext(thread)).course)) {
       return res.status(403).json({ success: false, message: 'Not authorized to delete this reply' });
+    }
+    const isRootReply =
+      foundReply.source === 'collection'
+        ? !foundReply.reply.parentReplyId
+        : !(foundReply.reply.parentReply || foundReply.reply.parentReplyId);
+    if (isReplyAuthor && isRootReply) {
+      return res.status(400).json({
+        success: false,
+        message: 'Main discussion posts cannot be deleted',
+        code: 'ROOT_REPLY_DELETE_FORBIDDEN',
+      });
     }
     if (foundReply.source === 'collection') {
       await discussionReplyService.softDeleteReply({
@@ -801,7 +816,7 @@ router.delete('/:threadId/replies/:replyId', protect, async (req, res) => {
       reply.deletedAt = new Date();
       reply.deletedBy = req.user._id;
       reply.deletedReason = req.body?.reason || null;
-      reply.content = '';
+      reply.content = '[deleted]';
       reply.fileAssets = [];
       reply.likes = [];
       await thread.save();
@@ -1316,12 +1331,19 @@ router.post('/:threadId/replies/:replyId/like', protect, async (req, res) => {
     if (reply.deletedAt) {
       return res.status(400).json({ success: false, message: 'Deleted replies cannot be liked' });
     }
+    if (discussionAccess.userOwnsReply(foundReply, req.user)) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot like your own reply',
+        code: 'SELF_LIKE_FORBIDDEN',
+      });
+    }
 
     if (foundReply.source === 'collection') {
       await discussionReplyService.toggleLike({ thread, replyId: req.params.replyId, user: req.user });
     } else {
-      const existingLikeIndex = reply.likes.findIndex(
-        like => like.user.toString() === req.user._id.toString()
+      const existingLikeIndex = (reply.likes || []).findIndex(
+        (like) => discussionAccess.normalizeId(like.user) === discussionAccess.normalizeId(req.user._id)
       );
 
       if (existingLikeIndex > -1) {

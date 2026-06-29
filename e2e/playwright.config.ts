@@ -21,20 +21,28 @@ if (fs.existsSync(e2eEnvLocal)) {
 }
 
 export default defineConfig({
+  globalSetup: require.resolve('./global-setup'),
   testDir: './specs',
   timeout: 90_000,
+  snapshotPathTemplate: '{testDir}/snapshots/{projectName}/{testFilePath}/{arg}{ext}',
+  expect: {
+    toHaveScreenshot: {
+      maxDiffPixelRatio: 0.25,
+      animations: 'disabled',
+    },
+  },
   use: {
     baseURL: process.env.E2E_BASE_URL || 'http://localhost:3000',
     trace: 'on-first-retry',
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
-    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] }, testIgnore: ['**/visual-snapshots.spec.ts'] },
+    { name: 'firefox', use: { ...devices['Desktop Firefox'] }, testIgnore: ['**/visual-snapshots.spec.ts'] },
+    { name: 'webkit', use: { ...devices['Desktop Safari'] }, testIgnore: ['**/visual-snapshots.spec.ts'] },
     ...(process.env.E2E_INCLUDE_EDGE
-      ? [{ name: 'edge', use: { ...devices['Desktop Chrome'], channel: 'msedge' } }]
+      ? [{ name: 'edge', use: { ...devices['Desktop Chrome'], channel: 'msedge' }, testIgnore: ['**/visual-snapshots.spec.ts'] }]
       : []),
-    { name: 'mobile-chrome', use: { ...devices['Pixel 5'] } },
+    { name: 'mobile-chrome', use: { ...devices['Pixel 5'] }, testIgnore: ['**/visual-snapshots.spec.ts'] },
   ],
   webServer: process.env.E2E_SKIP_SERVER
     ? undefined

@@ -76,7 +76,7 @@ const ThreadViewWrapper: React.FC = () => {
   const showCourseBreadcrumb = Boolean(courseId);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen w-full bg-slate-50 dark:bg-slate-950">
       {showCourseBreadcrumb && (
         <div className="sticky top-0 z-[35] mx-auto hidden w-full max-w-7xl bg-gray-50 px-4 pt-2 dark:bg-gray-900 lg:block print:hidden">
           <div className="flex flex-col">
@@ -98,7 +98,7 @@ const ThreadViewWrapper: React.FC = () => {
         </div>
       )}
 
-      <div className={`mx-auto flex w-full max-w-7xl print:block ${isMobileDevice ? 'flex-col' : 'flex-row'}`}>
+      <div className={`flex w-full lg:mx-auto lg:max-w-7xl print:block ${isMobileDevice ? 'flex-col' : 'flex-row'}`}>
         {isMobileMenuOpen && isMobileDevice && (
           <div
             className="print:hidden fixed inset-0 z-[90] bg-black bg-opacity-50 lg:hidden"
@@ -120,7 +120,7 @@ const ThreadViewWrapper: React.FC = () => {
         <div
           className={`w-full flex-1 overflow-visible print:pt-0 lg:overflow-auto ${isMobileMenuOpen && isMobileDevice ? 'overflow-hidden lg:overflow-auto' : ''}`}
         >
-          <div className="container mx-auto px-0 pb-6 pt-0 print:px-0 print:py-0 lg:px-4 lg:pt-3">
+          <div className="w-full px-3 pb-6 pt-0 sm:container sm:mx-auto sm:px-4 sm:pt-2 print:px-0 print:py-0 lg:pt-3">
             <ThreadView />
           </div>
         </div>

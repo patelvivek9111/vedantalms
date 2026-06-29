@@ -1,20 +1,8 @@
 import { test, expect, Page } from '@playwright/test';
 import path from 'path';
+import { apiURL, mathCourseId, student, teacher } from '../helpers/live-auth';
 
 const samplePng = path.join(process.cwd(), 'e2e/fixtures/regression-sample.png');
-
-const apiURL = process.env.E2E_API_URL || 'http://localhost:5000';
-const mathCourseId = '6a020f8351c5af30bd419e7f';
-
-const student = {
-  email: 'arjun.menon@student.demo.vidyalms.com',
-  password: 'VedantaDemo8!',
-};
-
-const teacher = {
-  email: 'teacher@vidyalms.com',
-  password: 'password123',
-};
 
 async function loginViaForm(page: Page, email: string, password: string) {
   await page.goto('/login');
@@ -100,11 +88,61 @@ test.describe('Regression checklist — calendar', () => {
       })
       .toBeTruthy();
 
+    await page.getByRole('button', { name: 'Month', exact: true }).click();
+    await expect(page.locator('.rbc-event').filter({ hasText: title }).first()).toBeVisible({
+      timeout: 15_000,
+    });
+
+    await page.locator('.rbc-event').filter({ hasText: title }).first().click();
+    await expect(page.getByRole('heading', { name: 'Edit Event' })).toBeVisible({ timeout: 10_000 });
+
+    const editedTitle = `${title} edited`;
+    await page.locator('#event-title').fill(editedTitle);
+    await page.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByRole('heading', { name: 'Edit Event' })).not.toBeVisible({
+      timeout: 15_000,
+    });
+
+    await expect
+      .poll(async () => {
+        const res = await request.get(`${apiURL}/api/events`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok()) return false;
+        const body = await res.json();
+        const events = Array.isArray(body) ? body : body.data || body.events || [];
+        const match = events.find((e: { title?: string }) => e.title === editedTitle);
+        createdId = match?._id || match?.id;
+        return Boolean(match);
+      })
+      .toBeTruthy();
+
+    await page.locator('.rbc-event').filter({ hasText: editedTitle }).first().click();
+    await expect(page.getByRole('heading', { name: 'Edit Event' })).toBeVisible();
+    await page.getByRole('button', { name: 'Delete' }).click();
+    await expect(page.getByRole('heading', { name: 'Edit Event' })).not.toBeVisible({
+      timeout: 15_000,
+    });
+
     if (createdId) {
-      await request.delete(`${apiURL}/api/events/${createdId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await expect
+        .poll(async () => {
+          const res = await request.get(`${apiURL}/api/events/${createdId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          return res.status() === 404;
+        })
+        .toBeTruthy();
+      createdId = undefined;
     }
+
+    const courseId = mathCourseId;
+    const courseCheckbox = page.locator(`#calendar-checkbox-${courseId}`);
+    await expect(courseCheckbox).toBeVisible({ timeout: 15_000 });
+    await courseCheckbox.uncheck();
+    await expect(courseCheckbox).not.toBeChecked();
+    await courseCheckbox.check();
+    await expect(courseCheckbox).toBeChecked();
   });
 });
 

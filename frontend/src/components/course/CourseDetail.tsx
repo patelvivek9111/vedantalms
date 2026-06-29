@@ -8,6 +8,7 @@ import { API_URL } from '../../config';
 import { getImageUrl } from '../../services/api';
 import axios from 'axios';
 import { normalizeMongoIdRef } from '../../utils/mongoId';
+import { useCourseShellMobile } from '../../hooks/useCourseShellMobile';
 import { toast } from 'react-toastify';
 import { 
   Lock, 
@@ -151,39 +152,8 @@ const CourseDetail: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showBurgerMenu, setShowBurgerMenu] = useState(false);
   const [showChangeUserModal, setShowChangeUserModal] = useState(false);
-  const [isMobileDevice, setIsMobileDevice] = useState(false);
+  const isMobileDevice = useCourseShellMobile();
   const [showCourseDropdown, setShowCourseDropdown] = useState(false);
-
-  // Check if it's actually a mobile phone (not tablet/iPad)
-  useEffect(() => {
-    const checkMobile = () => {
-      const userAgent = navigator.userAgent.toLowerCase();
-      const screenWidth = window.screen.width;
-      const viewportWidth = window.innerWidth;
-      
-      // Detect tablets/iPads more accurately
-      // Modern iPads report as Macintosh, so check for touch support and screen size
-      const isTablet = /ipad|tablet|playbook|silk|(android(?!.*mobile))|kindle/i.test(userAgent) ||
-        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) || // iPad on iOS 13+
-        (screenWidth >= 768 && screenWidth <= 1024 && 'ontouchstart' in window);
-      
-      // Detect phones - must be mobile user agent AND not a tablet AND small screen
-      const isPhone = (
-        /android|webos|iphone|ipod|blackberry|iemobile|opera mini/i.test(userAgent) ||
-        (/mobile/i.test(userAgent) && !isTablet)
-      ) && !isTablet;
-      
-      // Only show mobile view on actual phones with small screens (< 768px)
-      // Tablets/iPads should show desktop view even if screen is smaller
-      // Also check viewport to handle desktop with dev tools
-      const shouldShowMobile = isPhone && screenWidth < 768 && viewportWidth < 768;
-      
-      setIsMobileDevice(shouldShowMobile);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   const initialSection = section || 'overview';
 

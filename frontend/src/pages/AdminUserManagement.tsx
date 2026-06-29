@@ -66,6 +66,17 @@ export function AdminUserManagement() {
   const [createUserError, setCreateUserError] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [deleteUserLoading, setDeleteUserLoading] = useState(false);
+  const [deleteUserError, setDeleteUserError] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [editForm, setEditForm] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    role: 'student' as 'student' | 'teacher' | 'admin',
+  });
+  const [editUserLoading, setEditUserLoading] = useState(false);
+  const [editUserError, setEditUserError] = useState('');
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -152,22 +163,113 @@ export function AdminUserManagement() {
     switch (action) {
       case 'edit':
         setSelectedUser(user);
+        setEditForm({
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          role: user.role,
+        });
+        setEditUserError('');
         setShowUserModal(true);
         break;
       case 'delete':
+        setDeleteUserError('');
         setUserToDelete(user);
         setShowDeleteConfirm(true);
         break;
       case 'suspend':
-        setUsers(users.map(u => 
-          u._id === user._id ? { ...u, status: 'suspended' as const } : u
-        ));
+        updateUserStatus(user, 'suspended');
         break;
       case 'activate':
-        setUsers(users.map(u => 
-          u._id === user._id ? { ...u, status: 'active' as const } : u
-        ));
+        updateUserStatus(user, 'active');
         break;
+    }
+  };
+
+  const updateUserStatus = async (user: User, status: 'active' | 'suspended') => {
+    const previousStatus = user.status;
+    // Optimistic update so the row reflects the change immediately.
+    setUsers((prev) =>
+      prev.map((u) => (u._id === user._id ? { ...u, status } : u))
+    );
+    setActionError('');
+    try {
+      const token = localStorage.getItem('token');
+      await axios.patch(
+        `${API_URL}/api/admin/users/${user._id}/status`,
+        { status },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+    } catch (err: unknown) {
+      // Revert on failure and surface the reason.
+      setUsers((prev) =>
+        prev.map((u) => (u._id === user._id ? { ...u, status: previousStatus } : u))
+      );
+      const ax = err as { response?: { data?: { message?: string } } };
+      setActionError(
+        ax.response?.data?.message ||
+          `Failed to ${status === 'suspended' ? 'suspend' : 'reactivate'} user.`
+      );
+    }
+  };
+
+  const saveUserEdit = async () => {
+    if (!selectedUser) return;
+    setEditUserLoading(true);
+    setEditUserError('');
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.put(
+        `${API_URL}/api/admin/users/${selectedUser._id}`,
+        {
+          firstName: editForm.firstName,
+          lastName: editForm.lastName,
+          email: editForm.email,
+          role: editForm.role,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const updated = response.data?.data;
+      setUsers((prev) =>
+        prev.map((u) =>
+          u._id === selectedUser._id
+            ? {
+                ...u,
+                firstName: updated?.firstName ?? editForm.firstName,
+                lastName: updated?.lastName ?? editForm.lastName,
+                email: updated?.email ?? editForm.email,
+                role: updated?.role ?? editForm.role,
+              }
+            : u
+        )
+      );
+      setShowUserModal(false);
+      setSelectedUser(null);
+    } catch (err: unknown) {
+      const ax = err as { response?: { data?: { message?: string } } };
+      setEditUserError(ax.response?.data?.message || 'Failed to update user. Please try again.');
+    } finally {
+      setEditUserLoading(false);
+    }
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!userToDelete) return;
+    setDeleteUserLoading(true);
+    setDeleteUserError('');
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(`${API_URL}/api/admin/users/${userToDelete._id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setUsers((prev) => prev.filter((u) => u._id !== userToDelete._id));
+      setShowDeleteConfirm(false);
+      setUserToDelete(null);
+    } catch (err: unknown) {
+      const ax = err as { response?: { data?: { message?: string } } };
+      setDeleteUserError(ax.response?.data?.message || 'Failed to delete user. Please try again.');
+    } finally {
+      setDeleteUserLoading(false);
     }
   };
 
@@ -304,6 +406,23 @@ export function AdminUserManagement() {
           </div>
         </div>
       </div>
+
+      {actionError && (
+        <div
+          role="alert"
+          className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-3 flex items-start justify-between gap-3"
+        >
+          <p className="text-sm text-red-800 dark:text-red-400">{actionError}</p>
+          <button
+            type="button"
+            onClick={() => setActionError('')}
+            aria-label="Dismiss error"
+            className="text-red-700 dark:text-red-300 hover:text-red-900 dark:hover:text-red-100 text-sm font-medium"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Users — mobile cards */}
       <div className="space-y-3 lg:hidden">
@@ -489,6 +608,7 @@ export function AdminUserManagement() {
                     <div className="flex items-center justify-end space-x-2">
                       <button
                         onClick={() => handleUserAction('edit', user)}
+                        aria-label={`Edit ${user.firstName} ${user.lastName}`}
                         className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300"
                       >
                         <Edit className="w-4 h-4" />
@@ -496,6 +616,7 @@ export function AdminUserManagement() {
                       {user.status === 'active' ? (
                         <button
                           onClick={() => handleUserAction('suspend', user)}
+                          aria-label={`Suspend ${user.firstName} ${user.lastName}`}
                           className="text-yellow-600 dark:text-yellow-400 hover:text-yellow-900 dark:hover:text-yellow-300"
                         >
                           <UserX className="w-4 h-4" />
@@ -503,6 +624,7 @@ export function AdminUserManagement() {
                       ) : (
                         <button
                           onClick={() => handleUserAction('activate', user)}
+                          aria-label={`Activate ${user.firstName} ${user.lastName}`}
                           className="text-green-600 dark:text-green-400 hover:text-green-900 dark:hover:text-green-300"
                         >
                           <UserCheck className="w-4 h-4" />
@@ -510,6 +632,8 @@ export function AdminUserManagement() {
                       )}
                       <button
                         onClick={() => handleUserAction('delete', user)}
+                        aria-label={`Delete ${user.firstName} ${user.lastName}`}
+                        data-regression-id="admin-delete-user"
                         className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -638,7 +762,9 @@ export function AdminUserManagement() {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">First Name</label>
                 <input
                   type="text"
-                  defaultValue={selectedUser.firstName}
+                  aria-label="First Name"
+                  value={editForm.firstName}
+                  onChange={(e) => setEditForm((f) => ({ ...f, firstName: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
@@ -646,7 +772,9 @@ export function AdminUserManagement() {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Last Name</label>
                 <input
                   type="text"
-                  defaultValue={selectedUser.lastName}
+                  aria-label="Last Name"
+                  value={editForm.lastName}
+                  onChange={(e) => setEditForm((f) => ({ ...f, lastName: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
@@ -654,14 +782,20 @@ export function AdminUserManagement() {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
                 <input
                   type="email"
-                  defaultValue={selectedUser.email}
+                  aria-label="Email"
+                  value={editForm.email}
+                  onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Role</label>
                 <select
-                  defaultValue={selectedUser.role}
+                  aria-label="Role"
+                  value={editForm.role}
+                  onChange={(e) =>
+                    setEditForm((f) => ({ ...f, role: e.target.value as 'student' | 'teacher' | 'admin' }))
+                  }
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="student">Student</option>
@@ -669,27 +803,27 @@ export function AdminUserManagement() {
                   <option value="admin">Admin</option>
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
-                <select
-                  defaultValue={selectedUser.status}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="suspended">Suspended</option>
-                </select>
-              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Account status (active / suspended) is managed from the row actions.
+              </p>
             </div>
+            {editUserError && (
+              <p className="mt-3 text-sm text-red-600 dark:text-red-400" role="alert">{editUserError}</p>
+            )}
             <div className="flex justify-end space-x-3 mt-6">
               <button
                 onClick={() => setShowUserModal(false)}
-                className="px-4 py-2 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                disabled={editUserLoading}
+                className="px-4 py-2 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
-              <button className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors">
-                Save Changes
+              <button
+                onClick={saveUserEdit}
+                disabled={editUserLoading}
+                className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors disabled:opacity-50"
+              >
+                {editUserLoading ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </div>
@@ -700,21 +834,22 @@ export function AdminUserManagement() {
       <ConfirmationModal
         isOpen={showDeleteConfirm}
         onClose={() => {
+          if (deleteUserLoading) return;
           setShowDeleteConfirm(false);
           setUserToDelete(null);
+          setDeleteUserError('');
         }}
-        onConfirm={() => {
-          if (userToDelete) {
-            setUsers(users.filter(u => u._id !== userToDelete._id));
-            setShowDeleteConfirm(false);
-            setUserToDelete(null);
-          }
-        }}
+        onConfirm={confirmDeleteUser}
         title="Delete User"
-        message={`Are you sure you want to delete ${userToDelete?.firstName} ${userToDelete?.lastName}? This action cannot be undone.`}
+        message={
+          deleteUserError
+            ? `${deleteUserError}`
+            : `Are you sure you want to delete ${userToDelete?.firstName} ${userToDelete?.lastName}? This action cannot be undone.`
+        }
         confirmText="Delete"
         cancelText="Cancel"
         variant="danger"
+        isLoading={deleteUserLoading}
       />
     </div>
     </MobileAppShell>

@@ -76,5 +76,12 @@ export default defineConfig({
     sequence: {
       shuffle: false, // Don't shuffle to make debugging easier
     },
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'text-summary', 'lcov', 'json-summary'],
+      reportsDirectory: './coverage',
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/**/*.test.{ts,tsx}', 'src/main.tsx', 'src/vite-env.d.ts'],
+    },
   },
 }) 

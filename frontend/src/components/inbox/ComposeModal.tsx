@@ -3,6 +3,7 @@ import { CheckSquare2, ChevronLeft, Paperclip } from 'lucide-react';
 import { getImageUrl } from '../../services/api';
 import FileAttachmentPanel from '../files/FileAttachmentPanel';
 import type { NormalizedFile } from '../../utils/fileTypes';
+import { useMobileLayout } from '../../hooks/useMobileLayout';
 
 export type ComposeModalProps = {
   open: boolean;
@@ -73,21 +74,29 @@ const ComposeModal: React.FC<ComposeModalProps> = ({
   setComposeAttachments,
   setSendIndividually,
 }) => {
+  const isMobileLayout = useMobileLayout();
+
   if (!open) return null;
 
+  const dropdownPanelClass = isMobileLayout
+    ? 'mt-2 w-full rounded border border-gray-200 bg-white shadow dark:border-gray-700 dark:bg-gray-900'
+    : 'absolute left-0 top-12 z-30 w-full rounded border border-gray-200 bg-white shadow dark:border-gray-700 dark:bg-gray-900';
+  const dropdownListClass = `${dropdownPanelClass} max-h-48 overflow-y-auto`;
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-[100] p-2 sm:p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-0 w-full max-w-xl relative border border-gray-200 dark:border-gray-700 max-h-[95vh] overflow-y-auto">
+    <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black bg-opacity-30 p-3 pb-20 sm:p-4 sm:pb-4">
+      <div className="relative flex max-h-[calc(100dvh-6rem-env(safe-area-inset-bottom,0px))] w-full max-w-xl flex-col rounded-2xl border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900 sm:max-h-[95vh]">
         <button
-          className="absolute top-2 right-2 sm:top-3 sm:right-3 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 text-xl sm:text-2xl p-1 touch-manipulation"
+          className="absolute right-2 top-2 z-10 touch-manipulation p-1 text-xl text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 sm:right-3 sm:top-3 sm:text-2xl"
           onClick={onClose}
         >
           &times;
         </button>
-        <div className="border-b border-gray-200 dark:border-gray-700 px-3 sm:px-4 lg:px-6 py-2.5 sm:py-3 lg:py-4 text-base sm:text-lg lg:text-xl font-semibold text-gray-900 dark:text-gray-100">
+        <div className="border-b border-gray-200 px-3 py-2.5 text-base font-semibold text-gray-900 dark:border-gray-700 dark:text-gray-100 sm:px-4 sm:py-3 sm:text-lg lg:px-6 lg:py-4 lg:text-xl">
           Compose Message
         </div>
-        <form onSubmit={onSubmit} className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
+        <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-4 sm:py-4 lg:px-6">
           {/* Course Dropdown - Hide for admins */}
           {user?.role !== 'admin' && (
             <div className="mb-3 sm:mb-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-2">
@@ -233,7 +242,7 @@ const ComposeModal: React.FC<ComposeModalProps> = ({
               </div>
               {/* Group dropdown only when icon is clicked - Hide for admins or show modified options */}
               {showGroupDropdown && !composeToGroup && (
-                <div className="absolute left-0 top-12 w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded shadow z-20">
+                <div className={dropdownPanelClass}>
                   {user?.role === 'admin' ? (
                     <>
                       <div
@@ -300,7 +309,7 @@ const ComposeModal: React.FC<ComposeModalProps> = ({
               )}
               {/* User search results dropdown */}
               {composeToInput.length >= 2 && composeUserResults.length > 0 && (
-                <div className="absolute left-0 top-12 w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded shadow z-20 max-h-48 overflow-y-auto">
+                <div className={dropdownListClass}>
                   {composeUserResults.map((u: any) => (
                     <div
                       key={u._id}
@@ -357,7 +366,7 @@ const ComposeModal: React.FC<ComposeModalProps> = ({
               )}
               {/* Dropdown for users in group (for Teachers/Students/Admins) */}
               {composeToGroup && composeToGroup !== 'sections' && composeGroupUsers.length > 0 && !composeToInput && (
-                <div className="absolute left-0 top-12 w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded shadow z-20 max-h-48 overflow-y-auto">
+                <div className={dropdownListClass}>
                   <div
                     className="flex items-center px-2 py-2 border-b border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                     onClick={() => setComposeToGroup('')}
@@ -420,7 +429,7 @@ const ComposeModal: React.FC<ComposeModalProps> = ({
               )}
               {/* Dropdown for course selection when Course Sections is selected - Hide for admins */}
               {user?.role !== 'admin' && composeToGroup === 'sections' && !composeCourse && (
-                <div className="absolute left-0 top-12 w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded shadow z-20 max-h-48 overflow-y-auto">
+                <div className={dropdownListClass}>
                   <div
                     className="flex items-center px-2 py-2 border-b border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                     onClick={() => setComposeToGroup('')}
@@ -495,6 +504,8 @@ const ComposeModal: React.FC<ComposeModalProps> = ({
               label="Add more attachments"
             />
           )}
+          </div>
+          <div className="sticky bottom-0 border-t border-gray-200 bg-white px-3 py-3 dark:border-gray-700 dark:bg-gray-900 sm:px-4 lg:px-6">
           <div className="flex items-center justify-between gap-3 sm:gap-2">
             {composeAttachments.length === 0 ? (
               <FileAttachmentPanel
@@ -533,7 +544,8 @@ const ComposeModal: React.FC<ComposeModalProps> = ({
               </button>
             </div>
           </div>
-          {composeError && <div className="text-red-500 dark:text-red-400 mt-2">{composeError}</div>}
+          {composeError && <div className="mt-2 text-red-500 dark:text-red-400">{composeError}</div>}
+          </div>
         </form>
       </div>
     </div>

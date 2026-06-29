@@ -89,3 +89,36 @@ export const FOLDER_OPTIONS = [
   { value: 'favorite', label: 'Favorite' },
   { value: 'deleted', label: 'Deleted' },
 ] as const;
+
+export function buildForwardSubject(subject: string): string {
+  const trimmed = (subject || '').trim();
+  if (!trimmed) return 'Fwd: ';
+  if (/^fwd:\s/i.test(trimmed)) return trimmed;
+  if (/^re:\s/i.test(trimmed)) return trimmed.replace(/^re:\s/i, 'Fwd: ');
+  return `Fwd: ${trimmed}`;
+}
+
+function formatMessageSender(msg: { senderId?: { firstName?: string; lastName?: string; email?: string } }): string {
+  const sender = msg.senderId;
+  if (!sender) return 'Unknown';
+  const name = `${sender.firstName || ''} ${sender.lastName || ''}`.trim();
+  return name || sender.email || 'Unknown';
+}
+
+/** Plain-text body for compose when forwarding a thread. */
+export function buildForwardBody(messages: Array<{ body?: string; bodyHtml?: string; createdAt?: string; senderId?: any }>, conversation: { subject?: string }): string {
+  const { title } = parseThreadSubject(conversation?.subject || '');
+  const subjectLine = title || conversation?.subject || '(no subject)';
+  const lines: string[] = ['', '---------- Forwarded message ----------'];
+  for (const msg of messages) {
+    const body = stripHtmlToText(msg.bodyHtml ?? msg.body ?? '');
+    const date = msg.createdAt ? format(new Date(msg.createdAt), 'PPpp') : '';
+    lines.push(`From: ${formatMessageSender(msg)}`);
+    if (date) lines.push(`Date: ${date}`);
+    lines.push(`Subject: ${subjectLine}`);
+    lines.push('');
+    lines.push(body);
+    lines.push('');
+  }
+  return lines.join('\n').trimStart();
+}

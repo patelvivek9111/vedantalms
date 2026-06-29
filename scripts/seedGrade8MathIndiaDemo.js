@@ -43,6 +43,7 @@ const {
   SYLLABUS_HTML,
   MODULE_SPECS,
 } = require('./demoData/grade8MathIndiaModules');
+const { persistMathE2eIds } = require('./persistMathE2eIds');
 const {
   allocateQuestionGrades,
   addHours,
@@ -313,6 +314,7 @@ async function main() {
       console.log('[sync-groups] Aligning groups with Assignments tab labels…');
       await syncAssignmentGroupsToUISpec(existing._id);
     }
+    await persistMathE2eIds(existing._id);
     await mongoose.disconnect();
     return;
   }
@@ -335,6 +337,7 @@ async function main() {
     console.log('[seed] To align grading groups + assignment labels with the Assignments tab (Assignments / Discussions), run:');
     console.log('      node scripts/seedGrade8MathIndiaDemo.js --sync-assignment-groups');
     console.log('      node scripts/seedGrade8MathIndiaDemo.js --sync-assignment-groups --course-code=YOUR-CATALOG-CODE');
+    await persistMathE2eIds(existing._id);
     await mongoose.disconnect();
     return;
   }
@@ -925,6 +928,7 @@ async function main() {
     quizWaveIds: [String(qw1._id), String(qw2._id)],
     groupSetId: String(groupSet._id),
   });
+  await persistMathE2eIds(course._id);
   await mongoose.disconnect();
 }
 
