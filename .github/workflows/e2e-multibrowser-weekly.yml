@@ -43,7 +43,7 @@ jobs:
       - name: Wait for API
         run: |
           for i in $(seq 1 60); do
-            curl -sf http://127.0.0.1:5000/api/auth/login -o /dev/null 2>/dev/null && exit 0
+            curl -sf http://127.0.0.1:5000/health -o /dev/null 2>/dev/null && exit 0
             sleep 2
           done
           exit 1
