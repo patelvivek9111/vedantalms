@@ -189,7 +189,7 @@ const AssignmentEditPage: React.FC = () => {
         </div>
       )}
 
-      <div className="mx-auto max-w-4xl px-4 pb-10 pt-16 lg:px-6 lg:pb-12 lg:pt-8">
+      <div className="mx-auto max-w-4xl px-4 pb-10 pt-20 lg:px-6 lg:pb-12 lg:pt-8">
         <header className="mb-8">
           <p className="text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">
             {sectionLabel}

@@ -5,7 +5,7 @@ import api from '../../services/api';
 import { API_URL } from '../../config';
 import { format } from 'date-fns';
 import { safeFormatDate } from '../../utils/dateUtils';
-import { CheckCircle, XCircle, AlertCircle, ArrowLeft, Save, Loader2, CheckSquare, Square, X, ChevronLeft, ChevronRight, SkipForward, FileText } from 'lucide-react';
+import { CheckCircle, XCircle, AlertCircle, ArrowLeft, Save, Loader2, CheckSquare, Square, X, ChevronLeft, ChevronRight, SkipForward, FileText, Send, Pencil, Trash2 } from 'lucide-react';
 import ConfirmationModal from '../common/ConfirmationModal';
 import Breadcrumb from '../common/Breadcrumb';
 import FloatingLabelInput from '../common/FloatingLabelInput';
@@ -1304,7 +1304,7 @@ const AssignmentGrading = () => {
         </div>
       </nav>
 
-      <div className="w-full px-2 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8 pt-16 lg:pt-4">
+      <div className="w-full px-2 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8 pt-20 lg:pt-4">
         {/* Breadcrumb Navigation - Desktop Only */}
         {assignment && course && (
           <div className="hidden lg:block mb-4">
@@ -1768,47 +1768,46 @@ const AssignmentGrading = () => {
                     </p>
                 </div>
 
-                {/* Action Buttons */}
-                <div className="mt-6 flex flex-wrap gap-3">
+                {/* Action Buttons — shared button system: one solid primary, outlined
+                    secondaries, and a separated destructive action. */}
+                {(() => {
+                  const btnBase = 'inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed';
+                  const btnPrimaryGreen = `${btnBase} border border-transparent bg-green-600 text-white hover:bg-green-700 focus:ring-green-500 dark:bg-green-500 dark:hover:bg-green-600`;
+                  const btnPrimaryIndigo = `${btnBase} border border-transparent bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-600`;
+                  const btnOutlineGreen = `${btnBase} border border-green-600 bg-white text-green-700 hover:bg-green-50 focus:ring-green-500 dark:border-green-400 dark:bg-gray-900 dark:text-green-300 dark:hover:bg-green-900/20`;
+                  const btnOutlineIndigo = `${btnBase} border border-indigo-600 bg-white text-indigo-700 hover:bg-indigo-50 focus:ring-indigo-500 dark:border-indigo-400 dark:bg-gray-900 dark:text-indigo-300 dark:hover:bg-indigo-900/20`;
+                  const btnOutlineDanger = `${btnBase} sm:ml-auto border border-red-300 bg-white text-red-700 hover:bg-red-50 focus:ring-red-500 dark:border-red-700 dark:bg-gray-900 dark:text-red-300 dark:hover:bg-red-900/20`;
+                  const iconCls = 'h-4 w-4';
+                  const spinner = <Loader2 className={`${iconCls} animate-spin`} />;
+                  return (
+                <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                     {selectedSubmission.autoGraded ? (
                       <>
                         <button
                           onClick={() => handleGradeSubmission(true)}
                           disabled={isGrading}
-                          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className={btnPrimaryGreen}
                           aria-label="Approve auto-grade"
                         >
-                          {isGrading ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Approving...
-                            </>
-                          ) : (
-                            'Approve Auto-Grade'
-                          )}
+                          {isGrading ? <>{spinner}Approving...</> : <><CheckCircle className={iconCls} />Approve Auto-Grade</>}
                         </button>
                         <button
                           onClick={() => handleGradeSubmission(true, true)}
                           disabled={isGrading}
-                          className="inline-flex items-center px-4 py-2 border border-green-600 text-sm font-medium rounded-md text-green-700 bg-white hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed dark:border-green-400 dark:bg-gray-900 dark:text-green-300 dark:hover:bg-green-900/20"
+                          className={btnOutlineGreen}
+                          aria-label="Approve and release"
                         >
-                          Approve & Release
+                          <Send className={iconCls} />
+                          Approve &amp; Release
                         </button>
                         {assignment.questions && assignment.questions.some(q => q.type !== 'multiple-choice' && q.type !== 'matching') && (
                           <button
                             onClick={() => handleGradeSubmission(false)}
                             disabled={isGrading}
-                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className={btnOutlineIndigo}
                             aria-label="Grade with edits"
                           >
-                            {isGrading ? (
-                              <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                Grading...
-                              </>
-                            ) : (
-                              'Grade with Edits'
-                            )}
+                            {isGrading ? <>{spinner}Grading...</> : <><Pencil className={iconCls} />Grade with Edits</>}
                           </button>
                         )}
                       </>
@@ -1817,48 +1816,35 @@ const AssignmentGrading = () => {
                         <button
                           onClick={() => handleGradeSubmission(false)}
                           disabled={isGrading}
-                          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className={btnPrimaryIndigo}
                           aria-label="Grade submission"
                         >
-                          {isGrading ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Grading...
-                            </>
-                          ) : (
-                            <>
-                              <Save className="h-4 w-4 mr-2" />
-                              Grade Submission
-                            </>
-                          )}
+                          {isGrading ? <>{spinner}Grading...</> : <><Save className={iconCls} />Grade Submission</>}
                         </button>
                         <button
                           onClick={() => handleGradeSubmission(false, true)}
                           disabled={isGrading}
-                          className="inline-flex items-center px-4 py-2 border border-indigo-600 text-sm font-medium rounded-md text-indigo-700 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed dark:border-indigo-400 dark:bg-gray-900 dark:text-indigo-300 dark:hover:bg-indigo-900/20"
+                          className={btnOutlineIndigo}
+                          aria-label="Save and release"
                         >
-                          Save & Release
+                          <Send className={iconCls} />
+                          Save &amp; Release
                         </button>
                       </>
                     )}
-                    
-                    {/* Delete Submission Button */}
+
+                    {/* Delete Submission — destructive, visually separated */}
                     <button
                       onClick={() => setShowDeleteModal(true)}
                       disabled={isDeleting || isGrading}
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 dark:bg-red-500 hover:bg-red-700 dark:hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className={btnOutlineDanger}
                       aria-label="Delete submission"
                     >
-                      {isDeleting ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Deleting...
-                        </>
-                      ) : (
-                        'Delete Submission'
-                      )}
+                      {isDeleting ? <>{spinner}Deleting...</> : <><Trash2 className={iconCls} />Delete Submission</>}
                     </button>
                 </div>
+                  );
+                })()}
               </div>
             ) : (
               <div className="text-center text-gray-500 dark:text-gray-400 py-12">

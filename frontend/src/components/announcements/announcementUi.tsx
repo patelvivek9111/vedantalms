@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { format } from 'date-fns';
+import { getImageUrl } from '../../services/api';
 import type { Announcement } from './AnnouncementList';
 
 const OPTION_BADGE =
@@ -47,14 +48,29 @@ export function AnnouncementOptionBadges({
 export function AnnouncementAuthorAvatar({
   firstName,
   lastName,
+  profilePicture,
   size = 'md',
 }: {
   firstName?: string;
   lastName?: string;
+  profilePicture?: string;
   size?: 'sm' | 'md';
 }) {
+  const [imgError, setImgError] = useState(false);
   const initials = `${firstName?.[0] ?? '?'}${lastName?.[0] ?? ''}`.toUpperCase();
   const sizeClass = size === 'sm' ? 'h-8 w-8 text-xs' : 'h-10 w-10 text-sm';
+
+  if (profilePicture && !imgError) {
+    return (
+      <img
+        src={profilePicture.startsWith('http') ? profilePicture : getImageUrl(profilePicture)}
+        alt={`${firstName ?? ''} ${lastName ?? ''}`.trim()}
+        className={`${sizeClass} shrink-0 rounded-full border border-slate-200 object-cover dark:border-slate-700`}
+        onError={() => setImgError(true)}
+      />
+    );
+  }
+
   return (
     <div
       className={`${sizeClass} flex shrink-0 items-center justify-center rounded-full bg-indigo-100 font-semibold text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300`}

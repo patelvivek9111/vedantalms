@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 import { API_URL } from '../../config';
+import { getImageUrl } from '../../services/api';
 import DatePicker from './DatePicker';
 
 // Attendance status types
@@ -412,6 +413,7 @@ const Attendance: React.FC = () => {
               studentId: student._id,
               studentName: `${student.firstName} ${student.lastName}`,
               email: student.email,
+              profilePicture: student.profilePicture,
               status: ATTENDANCE_STATUSES.UNMARKED,
               date: currentDate,
               timestamp: null,
@@ -601,6 +603,7 @@ const Attendance: React.FC = () => {
               studentId: student._id,
               studentName: `${student.firstName} ${student.lastName}`,
               email: student.email,
+              profilePicture: student.profilePicture,
               status: ATTENDANCE_STATUSES.UNMARKED,
               date: date,
               timestamp: null,
@@ -1261,10 +1264,27 @@ const Attendance: React.FC = () => {
                         className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 dark:text-blue-400 border-gray-300 dark:border-gray-700 rounded focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-900 flex-shrink-0"
                       />
                     )}
-                    <div className="w-10 h-10 sm:w-8 sm:h-8 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center flex-shrink-0">
-                      <span className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">
-                        {record.studentName.split(' ').map((n: string) => n[0]).join('')}
-                      </span>
+                    <div className="relative w-10 h-10 sm:w-8 sm:h-8 flex-shrink-0">
+                      {record.profilePicture ? (
+                        <img
+                          src={record.profilePicture.startsWith('http') ? record.profilePicture : getImageUrl(record.profilePicture)}
+                          alt={record.studentName}
+                          className="w-10 h-10 sm:w-8 sm:h-8 rounded-full object-cover border border-gray-200 dark:border-gray-600"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                            if (fallback) fallback.style.display = 'flex';
+                          }}
+                        />
+                      ) : null}
+                      <div
+                        className={`w-10 h-10 sm:w-8 sm:h-8 bg-gray-100 dark:bg-gray-700 rounded-full items-center justify-center ${record.profilePicture ? 'hidden' : 'flex'}`}
+                        style={{ display: record.profilePicture ? 'none' : 'flex' }}
+                      >
+                        <span className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">
+                          {record.studentName.split(' ').map((n: string) => n[0]).join('')}
+                        </span>
+                      </div>
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm sm:text-base text-gray-900 dark:text-gray-100 truncate">{record.studentName}</p>

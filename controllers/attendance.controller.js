@@ -58,6 +58,7 @@ exports.getAttendance = async (req, res) => {
         studentId: student._id,
         studentName: `${student.firstName} ${student.lastName}`,
         email: student.email,
+        profilePicture: student.profilePicture,
         status: existingRecord ? existingRecord.status : 'unmarked',
         date: date,
         timestamp: existingRecord ? existingRecord.timestamp : null,

@@ -54,7 +54,7 @@ describe('BottomNav', () => {
     ];
     localStorage.setItem('bottomNavItems', JSON.stringify(filteredOutItems));
     
-    const { container } = render(
+    render(
       <BrowserRouter>
         <BottomNav />
       </BrowserRouter>
@@ -67,20 +67,20 @@ describe('BottomNav', () => {
     // So navItems will never be empty unless DEFAULT_NAV_ITEMS is empty.
     // Let's check that filtered items don't appear and defaults do:
     expect(screen.queryByText('My Courses')).not.toBeInTheDocument();
-    // Defaults should render
-    expect(container.firstChild).toBeInTheDocument();
+    // Defaults should render (BottomNav renders via a portal to document.body)
+    expect(screen.getByRole('navigation')).toBeInTheDocument();
   });
 
   it('should render default nav items', () => {
     // Default items should be loaded when localStorage is empty
-    const { container } = render(
+    render(
       <BrowserRouter>
         <BottomNav />
       </BrowserRouter>
     );
 
-    // Should render navigation
-    expect(container.firstChild).toBeInTheDocument();
+    // Should render navigation (BottomNav renders via a portal to document.body)
+    expect(screen.getByRole('navigation')).toBeInTheDocument();
   });
 
   it('should highlight active route', () => {

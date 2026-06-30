@@ -81,7 +81,7 @@ const ScrollableQuizSidebar: React.FC<ScrollableQuizSidebarProps> = ({
             </span>
           </div>
         </div>
-        <div className="w-full bg-gray-200 rounded-full h-2">
+        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
           <div
             className="bg-indigo-600 dark:bg-indigo-500 h-2 rounded-full transition-all duration-300"
             style={{ width: `${(answeredQuestions.size / Math.max(totalQuestions, 1)) * 100}%` }}

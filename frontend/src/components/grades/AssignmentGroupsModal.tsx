@@ -30,7 +30,7 @@ const AssignmentGroupsModal: React.FC<AssignmentGroupsModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4">
       <div className="relative w-full max-h-[92vh] overflow-y-auto rounded-t-2xl bg-white p-4 shadow-lg dark:bg-gray-900 sm:max-w-2xl sm:rounded-lg sm:p-6">
-        <h2 className="mb-4 text-xl font-bold">Edit Assignment Groups</h2>
+        <h2 className="mb-4 text-xl font-bold text-gray-900 dark:text-gray-100">Edit Assignment Groups</h2>
 
         <div className="mb-4 space-y-3 md:hidden">
           {editGroups.map((row, idx) => (
@@ -52,7 +52,7 @@ const AssignmentGroupsModal: React.FC<AssignmentGroupsModalProps> = ({
                 id={`group-name-mobile-${idx}`}
                 value={row.name}
                 onChange={(e) => handleGroupChange(idx, 'name', e.target.value)}
-                className="mb-3 w-full rounded border px-3 py-2"
+                className="mb-3 w-full rounded border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
               />
               <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Weight (%)</label>
               <input
@@ -60,7 +60,7 @@ const AssignmentGroupsModal: React.FC<AssignmentGroupsModalProps> = ({
                 id={`group-weight-mobile-${idx}`}
                 value={row.weight}
                 onChange={(e) => handleGroupChange(idx, 'weight', Number(e.target.value))}
-                className="w-full rounded border px-3 py-2"
+                className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
               />
             </div>
           ))}
@@ -85,7 +85,7 @@ const AssignmentGroupsModal: React.FC<AssignmentGroupsModalProps> = ({
                     name={`groupName-${idx}`}
                     value={row.name}
                     onChange={e => handleGroupChange(idx, 'name', e.target.value)}
-                    className="border rounded px-2 py-1 w-32"
+                    className="border border-gray-300 bg-white text-gray-900 rounded px-2 py-1 w-32 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                   />
                 </td>
                 <td className="px-2 py-1">
@@ -95,7 +95,7 @@ const AssignmentGroupsModal: React.FC<AssignmentGroupsModalProps> = ({
                     name={`groupWeight-${idx}`}
                     value={row.weight}
                     onChange={e => handleGroupChange(idx, 'weight', Number(e.target.value))}
-                    className="border rounded px-2 py-1 w-20"
+                    className="border border-gray-300 bg-white text-gray-900 rounded px-2 py-1 w-20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                   />
                 </td>
                 <td className="px-2 py-1">
@@ -115,24 +115,24 @@ const AssignmentGroupsModal: React.FC<AssignmentGroupsModalProps> = ({
         <div className="mb-4 flex flex-col gap-2 sm:flex-row">
           <button
             type="button"
-            className="min-h-[44px] rounded bg-green-100 px-3 py-2 text-green-700 hover:bg-green-200"
+            className="min-h-[44px] rounded bg-green-100 px-3 py-2 text-green-700 hover:bg-green-200 dark:bg-green-900/40 dark:text-green-300 dark:hover:bg-green-900/60"
             onClick={handleAddGroupRow}
           >
             + Add Group
           </button>
           <button
             type="button"
-            className="min-h-[44px] rounded bg-blue-100 px-3 py-2 text-blue-700 hover:bg-blue-200"
+            className="min-h-[44px] rounded bg-blue-100 px-3 py-2 text-blue-700 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-900/60"
             onClick={handleResetToDefaults}
           >
             Reset to Defaults
           </button>
         </div>
-        {groupError && <div className="text-red-600 mb-2">{groupError}</div>}
+        {groupError && <div className="text-red-600 dark:text-red-400 mb-2">{groupError}</div>}
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button
             type="button"
-            className="min-h-[44px] rounded bg-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-300"
+            className="min-h-[44px] rounded bg-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
             onClick={() => setShowGroupModal(false)}
             disabled={savingGroups}
           >

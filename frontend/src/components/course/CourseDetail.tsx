@@ -1023,7 +1023,7 @@ const CourseDetail: React.FC = () => {
         </div>
       </div>
 
-      <div className={`flex ${isMobileDevice ? 'flex-col pt-16' : 'flex-row pt-0'} w-full max-w-7xl mx-auto`}>
+      <div className={`flex ${isMobileDevice ? 'flex-col pt-20' : 'flex-row pt-0'} w-full max-w-7xl mx-auto`}>
 
       {/* Mobile Overlay */}
       {isMobileMenuOpen && isMobileDevice && (

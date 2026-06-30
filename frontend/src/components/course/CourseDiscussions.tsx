@@ -10,6 +10,7 @@ import { deriveDiscussionWorkflowState } from '../../utils/discussionWorkflowSta
 import { resolveDiscussionStatus, type DiscussionStatus } from '../../utils/discussionStatus';
 import { Pin, MessageCircle, Clock } from 'lucide-react';
 import { SectionDividerHeading } from '../common/SectionDividerHeading';
+import { sortItemsByDueDateDesc, buildStudentDueGroups } from '../../utils/courseworkSort';
 
 interface Thread {
   _id: string;
@@ -285,6 +286,23 @@ const CourseDiscussions: React.FC<CourseDiscussionsProps> = ({
     );
   }
 
+  const isStudentViewer = user?.role === 'student';
+  const pinnedThreads = sortItemsByDueDateDesc(threads.filter((thread) => thread.isPinned));
+  const regularThreads = threads.filter((thread) => !thread.isPinned);
+  const threadIsSubmitted = (thread: Thread) =>
+    Boolean(thread.hasPosted ?? thread.currentUserParticipation?.hasPosted);
+  // Sort/group non-pinned threads exactly like the assignment list:
+  //  - teachers/staff: a single list ordered by due date (latest first, undated last)
+  //  - students: Overdue / Upcoming / Undated / Past sections
+  const regularThreadSections: { key: string; label: string; items: Thread[] }[] = isStudentViewer
+    ? buildStudentDueGroups(regularThreads, {
+        isSubmitted: threadIsSubmitted,
+        itemNoun: 'Threads',
+      })
+    : regularThreads.length > 0
+      ? [{ key: 'threads', label: 'Threads', items: sortItemsByDueDateDesc(regularThreads) }]
+      : [];
+
   return (
     <div className="space-y-4 sm:space-y-6">
       {canManageCourseDiscussions && isCreateModalOpen ? (
@@ -344,23 +362,23 @@ const CourseDiscussions: React.FC<CourseDiscussionsProps> = ({
           </div>
         ) : (
           <div className="space-y-8">
-            {threads.filter((thread) => thread.isPinned).length > 0 && (
+            {pinnedThreads.length > 0 && (
               <section aria-labelledby="pinned-discussions-heading">
                 <SectionDividerHeading id="pinned-discussions-heading">Pinned threads</SectionDividerHeading>
                 <div className="overflow-hidden rounded-xl bg-white ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-700/60">
-                  {threads.filter((t) => t.isPinned).map((thread) => renderThreadCard(thread, true))}
+                  {pinnedThreads.map((thread) => renderThreadCard(thread, true))}
                 </div>
               </section>
             )}
 
-            {threads.filter((thread) => !thread.isPinned).length > 0 && (
-              <section aria-labelledby="threads-heading">
-                <SectionDividerHeading id="threads-heading">Threads</SectionDividerHeading>
+            {regularThreadSections.map((section) => (
+              <section key={section.key} aria-label={section.label}>
+                <SectionDividerHeading id={`threads-heading-${section.key}`}>{section.label}</SectionDividerHeading>
                 <div className="overflow-hidden rounded-xl bg-white ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-700/60">
-                  {threads.filter((t) => !t.isPinned).map((thread) => renderThreadCard(thread, false))}
+                  {section.items.map((thread) => renderThreadCard(thread, false))}
                 </div>
               </section>
-            )}
+            ))}
           </div>
           )}
         </div>

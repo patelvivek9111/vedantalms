@@ -7,6 +7,7 @@ import api from '@/services/api';
 vi.mock('react-router-dom', () => ({
   useParams: () => ({ courseId: 'course1', threadId: 'thread1' }),
   useNavigate: () => vi.fn(),
+  useLocation: () => ({ pathname: '/', search: '', hash: '', state: null, key: 'default' }),
 }));
 
 vi.mock('@/contexts/AuthContext', () => ({
@@ -127,7 +128,8 @@ describe('ThreadView discussion certification behavior', () => {
   it('renders lock/status badges and hidden reply semantics without exposing hidden content', async () => {
     render(<ThreadView />);
 
-    expect(await screen.findByText('Certified Discussion')).toBeInTheDocument();
+    // Title renders in both the desktop heading and the mobile top-nav, so match all.
+    expect((await screen.findAllByText('Certified Discussion')).length).toBeGreaterThan(0);
     expect(screen.getAllByText('Locked').length).toBeGreaterThan(0);
     expect(screen.getByText('Grade hidden')).toBeInTheDocument();
     expect(screen.getByText('Instructor replied')).toBeInTheDocument();

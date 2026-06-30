@@ -769,13 +769,13 @@ export function Dashboard() {
                                     e.stopPropagation();
                                     handleColorChange(course._id, color.value);
                                   }}
-                                  className="w-8 h-8 rounded-full border-2 border-gray-300 hover:border-gray-400 transition-colors"
+                                  className="w-8 h-8 rounded-full border-2 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 transition-colors"
                                   style={{ backgroundColor: color.value }}
                                   title={color.name}
                                 />
                               ))}
                             </div>
-                            <hr className="my-2" />
+                            <hr className="my-2 border-gray-200 dark:border-gray-700" />
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -945,8 +945,8 @@ export function Dashboard() {
                               ref={(el) => { colorPickerRefs.current[course._id] = el; }}
                             >
                               <div className="flex items-center gap-2 mb-3">
-                                <Palette className="h-4 w-4 text-gray-600" />
-                                <span className="text-sm font-medium text-gray-700">Choose Color</span>
+                                <Palette className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Choose Color</span>
                               </div>
                               <div className="grid grid-cols-5 gap-2 mb-3">
                                 {earthyColors.map((color) => (
@@ -962,7 +962,7 @@ export function Dashboard() {
                                   />
                                 ))}
                               </div>
-                              <hr className="my-2" />
+                              <hr className="my-2 border-gray-200 dark:border-gray-700" />
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -984,8 +984,8 @@ export function Dashboard() {
                               ref={(el) => { iconPickerRefs.current[course._id] = el; }}
                             >
                               <div className="flex items-center gap-2 mb-3">
-                                <Settings className="h-4 w-4 text-gray-600" />
-                                <span className="text-sm font-medium text-gray-700">Display Icons (Max 3)</span>
+                                <Settings className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Display Icons (Max 3)</span>
                               </div>
                               <div className="space-y-2">
                                 {availableIcons.map((iconConfig) => {

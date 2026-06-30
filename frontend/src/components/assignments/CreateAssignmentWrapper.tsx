@@ -72,7 +72,7 @@ const CreateAssignmentWrapper: React.FC = () => {
   }
 
   return (
-    <div className={`mx-auto flex w-full max-w-7xl ${isMobileDevice ? 'flex-col pt-16' : 'flex-row'}`}>
+    <div className={`mx-auto flex w-full max-w-7xl ${isMobileDevice ? 'flex-col pt-20' : 'flex-row'}`}>
       <MobileNavigation
         isMobileDevice={isMobileDevice}
         course={course}

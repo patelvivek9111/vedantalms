@@ -1101,7 +1101,7 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
           <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
             <input
               type="checkbox"
-              className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+              className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-indigo-600 focus:ring-indigo-500"
               checked={allRowsSelected}
               onChange={toggleSelectAll}
               aria-label="Select all items"
@@ -1199,7 +1199,7 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
                             >
                               <input
                                 type="checkbox"
-                                className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-indigo-600 focus:ring-indigo-500"
                                 checked={selectedIds.includes(item._id)}
                                 onChange={() => toggleSelect(item._id)}
                                 aria-label={`Select ${item.title}`}

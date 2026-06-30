@@ -251,11 +251,11 @@ export function AdminSecurity() {
       </div>
 
       {/* Security Actions */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Security Actions</h3>
-        <div className="text-center py-8 text-gray-500">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Security Actions</h3>
+        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
           <p className="text-sm">Security actions coming soon</p>
-          <p className="text-xs text-gray-400 mt-2">Additional security features will be available in a future update</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">Additional security features will be available in a future update</p>
         </div>
       </div>
     </div>

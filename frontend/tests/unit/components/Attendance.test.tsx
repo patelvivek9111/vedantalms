@@ -11,6 +11,11 @@ vi.mock('@/contexts/AuthContext', () => ({
 }));
 
 vi.mock('axios');
+// Attendance imports getImageUrl from the api module; mock it so the real axios
+// interceptor setup (api.ts) does not run under the auto-mocked axios.
+vi.mock('@/services/api', () => ({
+  getImageUrl: (value: string) => value,
+}));
 vi.mock('@/config', () => ({
   API_URL: 'http://localhost:5000',
 }));

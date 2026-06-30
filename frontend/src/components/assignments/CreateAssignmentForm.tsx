@@ -1781,7 +1781,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
                       <div key={left.id} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                         <span className="flex-1 min-w-0 text-sm break-words">{left.text || <em>Prompt</em>}</span>
                         <span className="hidden sm:inline mx-2 flex-shrink-0">→</span>
-                        <select className="flex-1 min-w-0 border p-2 rounded text-sm" disabled>
+                        <select className="flex-1 min-w-0 border border-gray-300 bg-white text-gray-900 p-2 rounded text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100" disabled>
                           <option>[ Choose ]</option>
                           {shuffleArray((question.rightItems || []).map(r => r.text)).map((opt, i) => (
                             <option key={i}>{opt}</option>

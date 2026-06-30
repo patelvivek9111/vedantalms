@@ -21,6 +21,7 @@ interface AnnouncementDetailModalProps {
     author: {
       firstName: string;
       lastName: string;
+      profilePicture?: string;
     };
     options?: {
       allowComments?: boolean;
@@ -37,6 +38,7 @@ interface Comment {
     _id: string;
     firstName: string;
     lastName: string;
+    profilePicture?: string;
   };
   createdAt: string;
   likes?: string[];
@@ -165,6 +167,7 @@ const AnnouncementDetailModal: React.FC<AnnouncementDetailModalProps> = ({
                   <AnnouncementAuthorAvatar
                     firstName={comment.author.firstName}
                     lastName={comment.author.lastName}
+                    profilePicture={comment.author.profilePicture}
                     size="sm"
                   />
                   <div>

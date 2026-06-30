@@ -46,7 +46,7 @@ exports.getAnnouncementsByCourse = async (req, res) => {
         ]
       };
       const announcements = await Announcement.find(query)
-        .populate('author', 'firstName lastName')
+        .populate('author', 'firstName lastName profilePicture')
         .sort({ createdAt: -1 });
 
       return res.json({ success: true, data: announcements });
@@ -56,7 +56,7 @@ exports.getAnnouncementsByCourse = async (req, res) => {
       query = { ...query, postTo: 'groupset', groupset: groupsetId };
     }
     const announcements = await Announcement.find(query)
-      .populate('author', 'firstName lastName')
+      .populate('author', 'firstName lastName profilePicture')
       .sort({ createdAt: -1 });
     
     res.json({ success: true, data: announcements });
@@ -168,7 +168,7 @@ exports.getAnnouncementComments = async (req, res) => {
     const announcement = await Announcement.findById(req.params.id)
       .populate({
         path: 'comments.author',
-        select: 'firstName lastName',
+        select: 'firstName lastName profilePicture',
       })
       .lean();
     if (!announcement) return res.status(404).json({ success: false, message: 'Announcement not found' });

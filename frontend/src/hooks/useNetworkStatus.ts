@@ -6,13 +6,15 @@ export function useNetworkStatus() {
   );
 
   useEffect(() => {
+    const goOnline = () => setOnline(true);
+    const goOffline = () => setOnline(false);
     const sync = () => setOnline(navigator.onLine);
-    window.addEventListener('online', sync);
-    window.addEventListener('offline', sync);
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
     const id = window.setInterval(sync, 1000);
     return () => {
-      window.removeEventListener('online', sync);
-      window.removeEventListener('offline', sync);
+      window.removeEventListener('online', goOnline);
+      window.removeEventListener('offline', goOffline);
       window.clearInterval(id);
     };
   }, []);

@@ -119,7 +119,7 @@ const PageViewWrapper: React.FC = () => {
       )}
 
       <div
-        className={`mx-auto flex w-full max-w-7xl print:block ${isMobileDevice ? 'flex-col pt-16' : 'flex-row'}`}
+        className={`mx-auto flex w-full max-w-7xl print:block ${isMobileDevice ? 'flex-col pt-20' : 'flex-row'}`}
       >
         {isMobileMenuOpen && isMobileDevice && (
           <div

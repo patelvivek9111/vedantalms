@@ -32,8 +32,8 @@ jobs:
       E2E_BASE_URL: http://127.0.0.1:3000
       CI: true
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: '20'
           cache: npm
@@ -54,7 +54,7 @@ jobs:
           exit 1
       - name: PR live smoke (fast subset)
         run: npm run test:e2e:live:pr
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: failure()
         with:
           name: live-e2e-pr-artifacts

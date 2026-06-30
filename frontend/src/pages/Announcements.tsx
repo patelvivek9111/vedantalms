@@ -20,7 +20,7 @@ interface AnnouncementsProps {
 
 interface Comment {
   _id: string;
-  author: { _id: string; firstName: string; lastName: string };
+  author: { _id: string; firstName: string; lastName: string; profilePicture?: string };
   text: string;
   createdAt: string;
   replies: Comment[];
@@ -226,6 +226,7 @@ const Announcements: React.FC<AnnouncementsProps> = ({ courseId }) => {
                   <AnnouncementAuthorAvatar
                     firstName={comment.author?.firstName}
                     lastName={comment.author?.lastName}
+                    profilePicture={comment.author?.profilePicture}
                     size="sm"
                   />
                   <div className="min-w-0 flex-1">
@@ -409,6 +410,7 @@ const Announcements: React.FC<AnnouncementsProps> = ({ courseId }) => {
                         <AnnouncementAuthorAvatar
                           firstName={selectedAnnouncement.author?.firstName}
                           lastName={selectedAnnouncement.author?.lastName}
+                          profilePicture={selectedAnnouncement.author?.profilePicture}
                           size="sm"
                         />
                         <span className="font-medium text-slate-700 dark:text-slate-300">

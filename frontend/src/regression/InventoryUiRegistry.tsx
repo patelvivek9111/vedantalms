@@ -1,3 +1,5 @@
+import React from 'react';
+
 /** All UI regression ids from docs/regression-inventory.json */
 export const REGRESSION_UI_IDS = [
   'auth-login',

@@ -222,7 +222,7 @@ export default function GroupDashboard() {
       </div>
       </div>
 
-      <div className={`mx-auto flex w-full max-w-7xl ${isMobileDevice ? 'flex-col pt-16' : 'flex-row pt-0'}`}>
+      <div className={`mx-auto flex w-full max-w-7xl ${isMobileDevice ? 'flex-col pt-20' : 'flex-row pt-0'}`}>
         {isMobileMenuOpen && isMobileDevice && (
           <div
             className="fixed inset-0 z-[90] bg-black/50"

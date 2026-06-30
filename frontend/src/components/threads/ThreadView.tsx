@@ -420,17 +420,26 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center space-x-3">
               <div className="relative">
-                <img
-                  src={reply.author.profilePicture
-                    ? (reply.author.profilePicture.startsWith('http')
-                        ? reply.author.profilePicture
-                        : getImageUrl(reply.author.profilePicture))
-                    : '/default-avatar.png'}
-                  alt={reply.author.firstName}
-                  className="w-10 h-10 rounded-full object-cover border-2 border-gray-100 dark:border-gray-700"
-                  onError={e => (e.currentTarget.src = '/default-avatar.png')}
-                />
-
+                {reply.author.profilePicture ? (
+                  <img
+                    src={reply.author.profilePicture.startsWith('http')
+                      ? reply.author.profilePicture
+                      : getImageUrl(reply.author.profilePicture)}
+                    alt={`${reply.author.firstName} ${reply.author.lastName}`}
+                    className="w-10 h-10 rounded-full object-cover border-2 border-gray-100 dark:border-gray-700"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                      if (fallback) fallback.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
+                <div
+                  className={`w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 items-center justify-center text-white text-sm font-bold border-2 border-gray-100 dark:border-gray-700 ${reply.author.profilePicture ? 'hidden' : 'flex'}`}
+                  style={{ display: reply.author.profilePicture ? 'none' : 'flex' }}
+                >
+                  {reply.author.firstName?.charAt(0)}{reply.author.lastName?.charAt(0)}
+                </div>
               </div>
               <div>
                 <div className="flex items-center space-x-2">
@@ -1648,20 +1657,30 @@ const ThreadView: React.FC = () => {
                         {thread.title}
                       </h1>
                       <div className="mt-4 flex items-center gap-3">
-                        <img
-                          src={thread.author.profilePicture
-                            ? (thread.author.profilePicture.startsWith('http')
-                                ? thread.author.profilePicture
-                                : getImageUrl(thread.author.profilePicture))
-                            : thread.author.avatarUrl
-                            ? (thread.author.avatarUrl.startsWith('http')
-                                ? thread.author.avatarUrl
-                                : getImageUrl(thread.author.avatarUrl))
-                            : '/default-avatar.png'}
-                          alt={thread.author.firstName}
-                          className="h-11 w-11 rounded-full border-2 border-white object-cover shadow-sm ring-1 ring-slate-200 dark:border-slate-800 dark:ring-slate-700"
-                          onError={e => (e.currentTarget.src = '/default-avatar.png')}
-                        />
+                        {thread.author.profilePicture || thread.author.avatarUrl ? (
+                          <img
+                            src={thread.author.profilePicture
+                              ? (thread.author.profilePicture.startsWith('http')
+                                  ? thread.author.profilePicture
+                                  : getImageUrl(thread.author.profilePicture))
+                              : (thread.author.avatarUrl!.startsWith('http')
+                                  ? thread.author.avatarUrl!
+                                  : getImageUrl(thread.author.avatarUrl!))}
+                            alt={`${thread.author.firstName} ${thread.author.lastName}`}
+                            className="h-11 w-11 rounded-full border-2 border-white object-cover shadow-sm ring-1 ring-slate-200 dark:border-slate-800 dark:ring-slate-700"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                              if (fallback) fallback.style.display = 'flex';
+                            }}
+                          />
+                        ) : null}
+                        <div
+                          className={`h-11 w-11 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 items-center justify-center text-white font-bold border-2 border-white shadow-sm ring-1 ring-slate-200 dark:border-slate-800 dark:ring-slate-700 ${thread.author.profilePicture || thread.author.avatarUrl ? 'hidden' : 'flex'}`}
+                          style={{ display: thread.author.profilePicture || thread.author.avatarUrl ? 'none' : 'flex' }}
+                        >
+                          {thread.author.firstName?.charAt(0)}{thread.author.lastName?.charAt(0)}
+                        </div>
                         <div className="min-w-0">
                           <p className="font-semibold text-slate-900 dark:text-slate-100">
                             {thread.author.firstName} {thread.author.lastName}
@@ -1688,7 +1707,7 @@ const ThreadView: React.FC = () => {
                     </div>
 
                     {isModerator && (
-                      <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-1 rounded-xl border border-slate-200 bg-slate-50/80 p-1 dark:border-slate-700 dark:bg-slate-800/60 sm:w-auto">
+                      <div className="flex w-auto shrink-0 flex-wrap items-center gap-0.5 self-start rounded-xl border border-slate-200 bg-slate-50/80 p-1 shadow-sm dark:border-slate-700 dark:bg-slate-800/60 sm:self-auto">
                         <button
                           type="button"
                           data-regression-id="thread-pin-toggle"
@@ -1753,6 +1772,7 @@ const ThreadView: React.FC = () => {
                         >
                           <Settings className="h-4 w-4" aria-hidden="true" />
                         </button>
+                        <span className="mx-0.5 h-6 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
                         <button
                           type="button"
                           onClick={handleDeleteThread}

@@ -27,7 +27,7 @@ const ProfileImage: React.FC<ProfileImageProps> = ({
   const sizeClass = sizeClasses[size];
   
   return (
-    <div className={`relative ${className} ${sizeClass} rounded-full overflow-hidden border-2 border-gray-200 shadow-sm bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center`}>
+    <div className={`relative ${className} ${sizeClass} rounded-full overflow-hidden border-2 border-gray-200 dark:border-gray-700 shadow-sm bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center`}>
       {/* Fallback initials - always present as background */}
       <span className={`text-white font-bold absolute inset-0 flex items-center justify-center ${sizeClass.includes('text-sm') ? 'text-sm' : sizeClass.includes('text-base') ? 'text-base' : sizeClass.includes('text-lg') ? 'text-lg' : 'text-3xl'}`}>
         {initials || 'U'}

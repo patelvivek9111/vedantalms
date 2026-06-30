@@ -5,7 +5,7 @@ import { API_URL } from '../../config';
 import ReactMarkdown from 'react-markdown';
 import { format } from 'date-fns';
 import { safeFormatDate } from '../../utils/dateUtils';
-import { Lock, Unlock, HelpCircle, CheckCircle, Circle, Bookmark, BarChart3, Edit, Eye, X, Download, Calendar, Clock } from 'lucide-react';
+import { Lock, Unlock, HelpCircle, CheckCircle, Circle, Bookmark, BarChart3, Edit, Eye, X, Download, Calendar, Clock, Trash2, Users } from 'lucide-react';
 import FilePreviewModal from '../files/FilePreviewModal';
 import { normalizeLegacyFiles, type NormalizedFile } from '../../utils/fileTypes';
 import AssignmentFileUploadSection from './AssignmentFileUploadSection';
@@ -1167,7 +1167,10 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
     (isStudent && (submission?.files?.length ?? 0) > 0) ||
     isInstructor ||
     (isCreator && !viewAsStudent);
-  const hideAssignmentInfoOnMobile = showMobileQuizLayout || !hasAssignmentInfoContent;
+  // On mobile, instructors don't need this card: the title is already in the top nav, the
+  // body is student-only/desktop-only, and the actions live in the analytics "Quick Actions"
+  // panel (dashboard) or the dedicated preview banner. So it renders empty — hide it.
+  const hideAssignmentInfoOnMobile = showMobileQuizLayout || !hasAssignmentInfoContent || isInstructor;
 
   return (
     <div className="min-h-screen w-full bg-slate-50 dark:bg-slate-950">
@@ -1528,9 +1531,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                               }
                             </p>
                           </div>
-                          <svg className="w-8 h-8 text-blue-400 dark:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-                          </svg>
+                          <Users className="w-8 h-8 text-blue-400 dark:text-blue-500" />
                         </div>
                       </div>
 
@@ -1635,9 +1636,9 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
 
                     {/* Assignment Details — flex row so all three cards share the same height */}
                     <div className="flex flex-col gap-6 md:flex-row md:items-stretch">
-                      <div className="flex min-h-0 flex-1 basis-0 flex-col rounded-lg border border-blue-200 bg-white p-4 dark:border-blue-800 dark:bg-gray-800">
+                      <div className="flex flex-col rounded-lg border border-blue-200 bg-white p-4 dark:border-blue-800 dark:bg-gray-800 md:min-h-0 md:flex-1 md:basis-0">
                         <h4 className="mb-3 text-lg font-semibold text-blue-900 dark:text-blue-100">Assignment Info</h4>
-                        <div className="min-h-0 flex-1 space-y-2 text-sm">
+                        <div className="flex-1 space-y-2 text-sm md:min-h-0">
                           {assignment.questions && assignment.questions.length > 0 && (
                             <>
                               <div className="flex justify-between">
@@ -1669,9 +1670,9 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                         </div>
                       </div>
 
-                      <div className="flex min-h-0 flex-1 basis-0 flex-col rounded-lg border border-blue-200 bg-white p-4 dark:border-blue-800 dark:bg-gray-800">
+                      <div className="flex flex-col rounded-lg border border-blue-200 bg-white p-4 dark:border-blue-800 dark:bg-gray-800 md:min-h-0 md:flex-1 md:basis-0">
                         <h4 className="mb-3 text-lg font-semibold text-blue-900 dark:text-blue-100">Submission Status</h4>
-                        <div className="min-h-0 flex-1 space-y-2 text-sm">
+                        <div className="flex-1 space-y-2 text-sm md:min-h-0">
                           <div className="flex justify-between">
                             <span className="text-gray-600 dark:text-gray-400 dark:text-gray-400">Published:</span>
                             <span className={`font-medium ${assignment.published ? 'text-green-600 dark:text-green-400 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
@@ -1691,9 +1692,9 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                         </div>
                       </div>
 
-                      <div className="flex min-h-0 flex-1 basis-0 flex-col rounded-lg border border-blue-200 bg-white p-4 dark:border-blue-800 dark:bg-gray-800">
+                      <div className="flex flex-col rounded-lg border border-blue-200 bg-white p-4 dark:border-blue-800 dark:bg-gray-800 md:min-h-0 md:flex-1 md:basis-0">
                         <h4 className="mb-3 text-lg font-semibold text-blue-900 dark:text-blue-100">Quick Actions</h4>
-                        <div className="flex min-h-0 flex-1 flex-col gap-2">
+                        <div className="flex flex-1 flex-col gap-2 md:min-h-0">
                           <button
                             onClick={() => navigate(`/assignments/${id}/grade`)}
                             className="w-full text-left px-3 py-2 text-sm bg-blue-50 dark:bg-blue-900/50 hover:bg-blue-100 dark:hover:bg-blue-900/70 rounded-md transition-colors flex items-center space-x-2 text-gray-900 dark:text-gray-100 dark:text-gray-100"
@@ -1733,6 +1734,16 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                             <Eye className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                             <span>Student preview</span>
                           </button>
+                          {isCreator && !viewAsStudent && (
+                            <button
+                              type="button"
+                              onClick={handleDelete}
+                              className="w-full text-left px-3 py-2 text-sm bg-red-50 dark:bg-red-900/40 hover:bg-red-100 dark:hover:bg-red-900/60 rounded-md transition-colors flex items-center space-x-2 text-red-700 dark:text-red-300"
+                            >
+                              <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
+                              <span>Delete Assignment</span>
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -2043,7 +2054,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                         <div className="mt-8 hidden border-t border-slate-200 pt-6 lg:flex lg:justify-between dark:border-slate-700">
                           <button
                             onClick={() => navigateToQuestion(0)}
-                            className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:bg-gray-700"
+                            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
                           >
                             Back to Questions
                           </button>
@@ -2152,7 +2163,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                             <span>{answeredQuestions.size} of {assignment.questions.length} answered</span>
                           </div>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                           <div 
                             className="bg-indigo-600 dark:bg-indigo-500 h-2 rounded-full transition-all duration-300"
                             style={{ width: `${(answeredQuestions.size / assignment.questions.length) * 100}%` }}

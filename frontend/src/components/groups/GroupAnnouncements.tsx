@@ -34,7 +34,7 @@ interface GroupAnnouncementsProps {
 
 interface Comment {
   _id: string;
-  author: { _id: string; firstName: string; lastName: string };
+  author: { _id: string; firstName: string; lastName: string; profilePicture?: string };
   text: string;
   createdAt: string;
   replies: Comment[];
@@ -294,6 +294,7 @@ const GroupAnnouncements: React.FC<GroupAnnouncementsProps> = ({ courseId, group
                   <AnnouncementAuthorAvatar
                     firstName={selectedAnnouncement.author.firstName}
                     lastName={selectedAnnouncement.author.lastName}
+                    profilePicture={selectedAnnouncement.author.profilePicture}
                     size="sm"
                   />
                   <span className="font-medium text-slate-700 dark:text-slate-300">

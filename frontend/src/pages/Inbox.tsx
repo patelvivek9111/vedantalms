@@ -513,7 +513,7 @@ const Inbox: React.FC = () => {
             </nav>
           )}
 
-          <div className={conversationId ? 'hidden lg:block' : undefined}>
+          <div className={conversationId ? 'hidden lg:block' : 'pt-20 lg:pt-0'}>
           <InboxToolbar
             userRole={user?.role}
             courseOptions={courseOptions}

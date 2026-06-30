@@ -79,14 +79,14 @@ const GradeSubmissions = () => {
 
   if (error) {
     return (
-      <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+      <div className="bg-red-100 dark:bg-red-950/30 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded">
         {error}
       </div>
     );
   }
 
   if (!submission) {
-    return <div>Submission not found</div>;
+    return <div className="text-gray-900 dark:text-gray-100">Submission not found</div>;
   }
 
   return (
@@ -138,7 +138,7 @@ const GradeSubmissions = () => {
 
         <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
           <div>
-            <label htmlFor="grade" className="block text-sm font-medium text-gray-700">Grade</label>
+            <label htmlFor="grade" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Grade</label>
             <input
               type="number"
               id="grade"
@@ -147,26 +147,26 @@ const GradeSubmissions = () => {
               onChange={handleChange}
               min="0"
               max="100"
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
             />
           </div>
 
           <div>
-            <label htmlFor="feedback" className="block text-sm font-medium text-gray-700">Feedback</label>
+            <label htmlFor="feedback" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Feedback</label>
             <textarea
               id="feedback"
               name="feedback"
               value={formData.feedback}
               onChange={handleChange}
               rows={4}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
             />
           </div>
 
           {/* Quiz Feedback Options - Only show for quiz assignments */}
           {submission.assignment?.group === 'Quizzes' && (
             <div className="space-y-4">
-              <h3 className="text-lg font-medium text-gray-900">Quiz Feedback Options</h3>
+              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Quiz Feedback Options</h3>
               <div className="space-y-3">
                 <div className="flex items-center">
                   <input
@@ -175,9 +175,9 @@ const GradeSubmissions = () => {
                     name="feedbackOption"
                     checked={!formData.showCorrectAnswers && !formData.showStudentAnswers}
                     onChange={() => setFormData({ ...formData, showCorrectAnswers: false, showStudentAnswers: false })}
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-600 dark:bg-gray-900"
                   />
-                  <label htmlFor="feedbackNone" className="ml-2 block text-sm text-gray-900">
+                  <label htmlFor="feedbackNone" className="ml-2 block text-sm text-gray-900 dark:text-gray-100">
                     No feedback (students won't see results)
                   </label>
                 </div>
@@ -188,9 +188,9 @@ const GradeSubmissions = () => {
                     name="feedbackOption"
                     checked={formData.showCorrectAnswers && !formData.showStudentAnswers}
                     onChange={() => setFormData({ ...formData, showCorrectAnswers: true, showStudentAnswers: false })}
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-600 dark:bg-gray-900"
                   />
-                  <label htmlFor="showCorrectAnswers" className="ml-2 block text-sm text-gray-900">
+                  <label htmlFor="showCorrectAnswers" className="ml-2 block text-sm text-gray-900 dark:text-gray-100">
                     Show students which questions they got correct (green for correct, red for wrong)
                   </label>
                 </div>
@@ -201,14 +201,14 @@ const GradeSubmissions = () => {
                     name="feedbackOption"
                     checked={formData.showStudentAnswers && !formData.showCorrectAnswers}
                     onChange={() => setFormData({ ...formData, showStudentAnswers: true, showCorrectAnswers: false })}
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-600 dark:bg-gray-900"
                   />
-                  <label htmlFor="showStudentAnswers" className="ml-2 block text-sm text-gray-900">
+                  <label htmlFor="showStudentAnswers" className="ml-2 block text-sm text-gray-900 dark:text-gray-100">
                     Show students their submitted answers (green for correct, red for wrong, and show correct answer for wrong ones)
                   </label>
                 </div>
               </div>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
                 These settings control what the student can see when they view their graded submission.
               </p>
             </div>
@@ -218,7 +218,7 @@ const GradeSubmissions = () => {
             <button
               type="button"
               onClick={() => navigate(-1)}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+              className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
             >
               Cancel
             </button>

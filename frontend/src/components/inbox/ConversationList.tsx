@@ -65,7 +65,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
                 onSelectionChange([]);
               }
             }}
-            className="h-3.5 w-3.5 shrink-0 cursor-pointer rounded border-gray-300 accent-blue-600 touch-manipulation"
+            className="h-3.5 w-3.5 shrink-0 cursor-pointer rounded border-gray-300 dark:border-gray-600 accent-blue-600 touch-manipulation"
           />
           <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
             {bulkActionLoading ? (
@@ -184,7 +184,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
                           );
                         }
                       }}
-                      className={`h-4 w-4 shrink-0 cursor-pointer rounded border-gray-300 accent-blue-600 touch-manipulation transition-opacity lg:h-3.5 lg:w-3.5 ${
+                      className={`h-4 w-4 shrink-0 cursor-pointer rounded border-gray-300 dark:border-gray-600 accent-blue-600 touch-manipulation transition-opacity lg:h-3.5 lg:w-3.5 ${
                         selectionActive || isChecked
                           ? 'opacity-100'
                           : 'opacity-100 lg:opacity-0 lg:group-hover:opacity-70 lg:focus:opacity-100'

@@ -389,7 +389,7 @@ function DataTable<T extends Record<string, any>>({
                         if (input) input.indeterminate = someRowsSelected;
                       }}
                       onChange={handleSelectAll}
-                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 text-blue-600 focus:ring-blue-500"
                       onClick={(e) => e.stopPropagation()}
                       aria-label={allRowsSelected ? 'Deselect all rows' : 'Select all rows'}
                       aria-describedby={someRowsSelected ? 'select-all-indeterminate' : undefined}
@@ -476,7 +476,7 @@ function DataTable<T extends Record<string, any>>({
                           type="checkbox"
                           checked={isRowSelected(item)}
                           onChange={() => handleSelectRow(item)}
-                          className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 text-blue-600 focus:ring-blue-500"
                           onClick={(e) => e.stopPropagation()}
                           aria-label={isRowSelected(item) ? `Deselect row ${actualIndex + 1}` : `Select row ${actualIndex + 1}`}
                         />

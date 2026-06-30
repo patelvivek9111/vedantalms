@@ -9,7 +9,7 @@ export interface Announcement {
   title: string;
   body: string;
   createdAt: string;
-  author: { firstName: string; lastName: string };
+  author: { firstName: string; lastName: string; profilePicture?: string };
   options?: {
     delayPosting?: boolean;
     allowComments?: boolean;

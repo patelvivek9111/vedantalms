@@ -345,7 +345,7 @@ const CalendarFilterRow: React.FC<{
       name={inputId}
       checked={checked}
       onChange={onToggle}
-      className="h-3.5 w-3.5 shrink-0 cursor-pointer rounded border-gray-300 accent-blue-600 touch-manipulation"
+      className="h-3.5 w-3.5 shrink-0 cursor-pointer rounded border-gray-300 dark:border-gray-600 accent-blue-600 touch-manipulation"
     />
     <button
       type="button"

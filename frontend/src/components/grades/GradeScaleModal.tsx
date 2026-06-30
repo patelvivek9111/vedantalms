@@ -58,7 +58,7 @@ const GradeScaleModal: React.FC<GradeScaleModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4">
       <div className="relative w-full max-h-[92vh] overflow-y-auto rounded-t-2xl bg-white p-4 shadow-lg dark:bg-gray-900 sm:max-w-2xl sm:rounded-lg sm:p-6">
-        <h2 className="mb-4 text-xl font-bold">Edit Grade Scale</h2>
+        <h2 className="mb-4 text-xl font-bold text-gray-900 dark:text-gray-100">Edit Grade Scale</h2>
 
         <div className="mb-4 space-y-3 md:hidden">
           {editGradeScale.map((row, idx) => (
@@ -79,7 +79,7 @@ const GradeScaleModal: React.FC<GradeScaleModalProps> = ({
                 id={`grade-letter-mobile-${idx}`}
                 value={row.letter}
                 onChange={(e) => handleGradeScaleChange(idx, 'letter', e.target.value)}
-                className="mb-3 w-full rounded border px-3 py-2"
+                className="mb-3 w-full rounded border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
               />
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -89,7 +89,7 @@ const GradeScaleModal: React.FC<GradeScaleModalProps> = ({
                     id={`grade-min-mobile-${idx}`}
                     value={row.min}
                     onChange={(e) => handleGradeScaleChange(idx, 'min', Number(e.target.value))}
-                    className="w-full rounded border px-3 py-2"
+                    className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                   />
                 </div>
                 <div>
@@ -99,7 +99,7 @@ const GradeScaleModal: React.FC<GradeScaleModalProps> = ({
                     id={`grade-max-mobile-${idx}`}
                     value={row.max}
                     onChange={(e) => handleGradeScaleChange(idx, 'max', Number(e.target.value))}
-                    className="w-full rounded border px-3 py-2"
+                    className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                   />
                 </div>
               </div>
@@ -127,7 +127,7 @@ const GradeScaleModal: React.FC<GradeScaleModalProps> = ({
                     name={`gradeLetter-${idx}`}
                     value={row.letter}
                     onChange={e => handleGradeScaleChange(idx, 'letter', e.target.value)}
-                    className="border rounded px-2 py-1 w-16"
+                    className="border border-gray-300 bg-white text-gray-900 rounded px-2 py-1 w-16 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                   />
                 </td>
                 <td className="px-2 py-1">
@@ -137,7 +137,7 @@ const GradeScaleModal: React.FC<GradeScaleModalProps> = ({
                     name={`gradeMin-${idx}`}
                     value={row.min}
                     onChange={e => handleGradeScaleChange(idx, 'min', Number(e.target.value))}
-                    className="border rounded px-2 py-1 w-20"
+                    className="border border-gray-300 bg-white text-gray-900 rounded px-2 py-1 w-20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                   />
                 </td>
                 <td className="px-2 py-1">
@@ -147,7 +147,7 @@ const GradeScaleModal: React.FC<GradeScaleModalProps> = ({
                     name={`gradeMax-${idx}`}
                     value={row.max}
                     onChange={e => handleGradeScaleChange(idx, 'max', Number(e.target.value))}
-                    className="border rounded px-2 py-1 w-20"
+                    className="border border-gray-300 bg-white text-gray-900 rounded px-2 py-1 w-20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                   />
                 </td>
                 <td className="px-2 py-1">
@@ -166,16 +166,16 @@ const GradeScaleModal: React.FC<GradeScaleModalProps> = ({
         </div>
         <button
           type="button"
-          className="mb-4 min-h-[44px] rounded bg-green-100 px-3 py-2 text-green-700 hover:bg-green-200"
+          className="mb-4 min-h-[44px] rounded bg-green-100 px-3 py-2 text-green-700 hover:bg-green-200 dark:bg-green-900/40 dark:text-green-300 dark:hover:bg-green-900/60"
           onClick={handleAutoFix}
         >
           Auto-Fix
         </button>
-        {gradeScaleError && <div className="text-red-600 mb-2">{gradeScaleError}</div>}
+        {gradeScaleError && <div className="text-red-600 dark:text-red-400 mb-2">{gradeScaleError}</div>}
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button
             type="button"
-            className="min-h-[44px] rounded bg-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-300"
+            className="min-h-[44px] rounded bg-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
             onClick={() => setShowGradeScaleModal(false)}
             disabled={savingGradeScale}
           >

@@ -9,6 +9,7 @@ import axios from 'axios';
 import CreatePageForm from '../pages/CreatePageForm';
 import { ModuleProvider } from '../../contexts/ModuleContext';
 import { BookOpen, ChevronDown } from 'lucide-react';
+import { sortItemsByDueDateDesc, buildStudentDueGroups } from '../../utils/courseworkSort';
 
 interface Thread {
   _id: string;
@@ -276,6 +277,23 @@ const GroupDiscussion: React.FC = () => {
     );
   }
 
+  const isStudentViewer = user?.role === 'student';
+  const pinnedThreads = sortItemsByDueDateDesc(threads.filter(thread => thread.isPinned));
+  const regularThreads = threads.filter(thread => !thread.isPinned);
+  // Sort/group the non-pinned threads exactly like the assignment list:
+  //  - teachers/admins: a single list ordered by due date (latest first, undated last)
+  //  - students: Overdue / Upcoming / Undated / Past sections
+  const threadIsSubmitted = (thread: Thread) =>
+    Boolean(thread.hasPosted || thread.currentUserParticipation?.hasPosted);
+  const regularThreadSections: { key: string; label: string; items: Thread[] }[] = isStudentViewer
+    ? buildStudentDueGroups(regularThreads, {
+        isSubmitted: threadIsSubmitted,
+        itemNoun: 'Threads',
+      })
+    : regularThreads.length > 0
+      ? [{ key: 'threads', label: 'Threads', items: sortItemsByDueDateDesc(regularThreads) }]
+      : [];
+
   return (
     <div className={`w-full overflow-visible lg:h-full lg:overflow-y-auto ${isMobileDevice ? 'pb-20' : ''}`}>
       {/* Header - Mobile Optimized */}
@@ -349,7 +367,7 @@ const GroupDiscussion: React.FC = () => {
         ) : (
           <div className="space-y-4">
             {/* Pinned threads */}
-            {threads.filter(thread => thread.isPinned).length > 0 && (
+            {pinnedThreads.length > 0 && (
               <div className={`${isMobileDevice ? 'mb-4' : 'mb-6'}`}>
                 <div className={`flex items-center gap-2 ${isMobileDevice ? 'mb-3 px-4' : 'mb-4'}`}>
                   <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-600 to-transparent"></div>
@@ -357,8 +375,7 @@ const GroupDiscussion: React.FC = () => {
                   <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-600 to-transparent"></div>
                 </div>
                 <div className="overflow-hidden rounded-xl bg-white ring-1 ring-gray-200/70 dark:bg-gray-900 dark:ring-gray-700/60">
-                  {threads
-                    .filter(thread => thread.isPinned)
+                  {pinnedThreads
                     .map((thread) => (
                       <div
                         key={thread._id}
@@ -486,17 +503,16 @@ const GroupDiscussion: React.FC = () => {
               </div>
             )}
 
-            {/* Regular threads */}
-            {threads.filter(thread => !thread.isPinned).length > 0 && (
-              <div>
+            {/* Regular threads — sorted/grouped exactly like the assignment list */}
+            {regularThreadSections.map((section) => (
+              <div key={section.key}>
                 <div className={`flex items-center gap-2 ${isMobileDevice ? 'mb-3 px-4' : 'mb-4'}`}>
                   <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-600 to-transparent"></div>
-                  <h3 className={`${isMobileDevice ? 'text-xs' : 'text-sm'} font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wide px-3`}>Threads</h3>
+                  <h3 className={`${isMobileDevice ? 'text-xs' : 'text-sm'} font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wide px-3`}>{section.label}</h3>
                   <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-600 to-transparent"></div>
                 </div>
                 <div className="overflow-hidden rounded-xl bg-white ring-1 ring-gray-200/70 dark:bg-gray-900 dark:ring-gray-700/60">
-                  {threads
-                    .filter(thread => !thread.isPinned)
+                  {section.items
                     .map((thread) => (
                       <div
                         key={thread._id}
@@ -617,7 +633,7 @@ const GroupDiscussion: React.FC = () => {
                     ))}
                 </div>
               </div>
-            )}
+            ))}
           </div>
           )}
         </div>
