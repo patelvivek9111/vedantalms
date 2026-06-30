@@ -73,5 +73,5 @@ jobs:
       - name: Inventory logic tests
         run: npm run test:inventory:logic
       - name: Inventory UI tests
-        run: npm run test:coverage:frontend -- tests/regression/inventory-ui.test.tsx
+        run: npm run test:coverage -- tests/regression/inventory-ui.test.tsx
         working-directory: frontend
