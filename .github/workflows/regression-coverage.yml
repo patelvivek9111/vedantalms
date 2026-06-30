@@ -71,7 +71,7 @@ jobs:
       - name: Inventory 100% gate (logic + UI + depth)
         run: npm run regression:inventory:strict
       - name: Inventory logic tests
-        run: npm test -- tests/regression/inventory-logic.test.js
+        run: npm run test:inventory:logic
       - name: Inventory UI tests
         run: npm run test:coverage:frontend -- tests/regression/inventory-ui.test.tsx
         working-directory: frontend

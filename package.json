@@ -31,6 +31,7 @@
     "build": "cd frontend && npm install && npm run build",
     "build:frontend": "bash -c 'cd frontend && NODE_ENV= npm install && npm run build'",
     "test": "jest",
+    "test:inventory:logic": "jest tests/regression/inventory-logic.test.js --runInBand --forceExit",
     "test:api": "jest tests/unit/api tests/integration --runInBand --forceExit",
     "test:unit": "jest tests/unit --runInBand",
     "test:grading": "jest tests/grading --runInBand --forceExit",

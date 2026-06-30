@@ -419,7 +419,12 @@ logStartupPhase('mongo.connecting', {
   serverSelectionTimeoutMS: mongoOptions.serverSelectionTimeoutMS,
 });
 
-const mongoStartupPromise = mongoose.connect(MONGODB_URI, mongoOptions)
+// Under Jest the test harness owns the Mongo lifecycle (in-memory server +
+// per-file waitForMongoConnection), so skip the app's own connect to avoid
+// racing against a real .env URI (e.g. a paused Atlas cluster) during tests.
+const mongoStartupPromise = process.env.NODE_ENV === 'test'
+  ? Promise.resolve()
+  : mongoose.connect(MONGODB_URI, mongoOptions)
   .then(async () => {
     if (process.env.NODE_ENV === 'test') {
       return;
