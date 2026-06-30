@@ -44,6 +44,7 @@ const {
   MODULE_SPECS,
 } = require('./demoData/grade8MathIndiaModules');
 const { persistMathE2eIds } = require('./persistMathE2eIds');
+const { resolveMongoDbName } = require('./resolveMongoDbName');
 const {
   allocateQuestionGrades,
   addHours,
@@ -282,11 +283,11 @@ async function main() {
   }
 
   await mongoose.connect(mongoUri, {
-    dbName: process.env.MONGO_DB_NAME || 'lms',
+    dbName: resolveMongoDbName(mongoUri),
     serverSelectionTimeoutMS: parseInt(process.env.MONGO_SERVER_SELECTION_TIMEOUT_MS || '10000', 10),
   });
 
-  const dbName = mongoose.connection?.db?.databaseName || process.env.MONGO_DB_NAME || 'lms';
+  const dbName = mongoose.connection?.db?.databaseName || resolveMongoDbName(mongoUri);
   console.log(`[seed] Connected to MongoDB database: ${dbName}`);
 
   if (syncPagesRequested || syncAssignmentGroupsRequested) {

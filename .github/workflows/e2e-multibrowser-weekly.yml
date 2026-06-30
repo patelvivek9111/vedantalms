@@ -20,6 +20,7 @@ jobs:
           - 27017:27017
     env:
       MONGODB_URI: mongodb://127.0.0.1:27017/lms-multibrowser-e2e
+      MONGO_DB_NAME: lms-multibrowser-e2e
       JWT_SECRET: ci-multibrowser-e2e-jwt
       DEMO_STUDENT_PASSWORD: VedantaDemo8!
       E2E_API_URL: http://127.0.0.1:5000

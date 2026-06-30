@@ -9,6 +9,7 @@ const { spawnSync } = require('child_process');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const mongoose = require('mongoose');
 const User = require('../models/user.model');
+const { resolveMongoDbName } = require('./resolveMongoDbName');
 
 const BASE_USERS = [
   {
@@ -49,7 +50,7 @@ async function main() {
     console.error('[seed:visual] MONGODB_URI is required');
     process.exit(1);
   }
-  await mongoose.connect(uri);
+  await mongoose.connect(uri, { dbName: resolveMongoDbName(uri) });
   for (const def of BASE_USERS) {
     await upsertUser(def);
   }

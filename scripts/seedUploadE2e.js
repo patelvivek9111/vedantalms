@@ -11,6 +11,7 @@ const Course = require('../models/course.model');
 const Module = require('../models/module.model');
 const Page = require('../models/page.model');
 const FileAsset = require('../models/fileAsset.model');
+const { resolveMongoDbName } = require('./resolveMongoDbName');
 
 const PASSWORD = process.env.E2E_UPLOAD_PASSWORD || 'TestUpload123!';
 const USERS = {
@@ -58,7 +59,7 @@ async function upsertUser(def) {
 
 async function main() {
   const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/lms';
-  await mongoose.connect(uri);
+  await mongoose.connect(uri, { dbName: resolveMongoDbName(uri) });
 
   const teacher = await upsertUser(USERS.teacher);
   const student = await upsertUser(USERS.student);

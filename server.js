@@ -12,6 +12,7 @@ const pinoHttp = require('pino-http');
 const pino = require('pino');
 const { requestCorrelation } = require('./middleware/requestCorrelation');
 const { validateStartupEnv } = require('./config/startupValidation');
+const { resolveMongoDbName } = require('./scripts/resolveMongoDbName');
 const { createAdapter } = require('@socket.io/redis-adapter');
 const Redis = require('ioredis');
 
@@ -367,9 +368,8 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir);
 }
 
-// MongoDB connection options
+// MongoDB connection options (dbName resolved after URI is validated below)
 const mongoOptions = {
-  dbName: 'lms',
   maxPoolSize: parseInt(process.env.MONGO_MAX_POOL_SIZE || '80', 10),
   minPoolSize: parseInt(process.env.MONGO_MIN_POOL_SIZE || '10', 10),
   serverSelectionTimeoutMS: parseInt(process.env.MONGO_SERVER_SELECTION_TIMEOUT_MS || '5000', 10),
@@ -413,6 +413,8 @@ if (!MONGODB_URI.startsWith('mongodb://') && !MONGODB_URI.startsWith('mongodb+sr
     process.exit(1);
   }
 }
+
+mongoOptions.dbName = resolveMongoDbName(MONGODB_URI);
 
 logStartupPhase('mongo.connecting', {
   dbName: mongoOptions.dbName,

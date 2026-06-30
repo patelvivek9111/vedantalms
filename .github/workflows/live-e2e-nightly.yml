@@ -16,6 +16,7 @@ jobs:
           - 27017:27017
     env:
       MONGODB_URI: mongodb://127.0.0.1:27017/lms-live-e2e-nightly
+      MONGO_DB_NAME: lms-live-e2e-nightly
       JWT_SECRET: ci-live-e2e-jwt-secret
       DEMO_STUDENT_PASSWORD: VedantaDemo8!
       E2E_API_URL: http://127.0.0.1:5000
@@ -82,6 +83,7 @@ jobs:
           - 27017:27017
     env:
       MONGODB_URI: mongodb://127.0.0.1:27017/lms-seeded-e2e-nightly
+      MONGO_DB_NAME: lms-seeded-e2e-nightly
       JWT_SECRET: ci-seeded-e2e-jwt-secret
       E2E_API_URL: http://127.0.0.1:5000
       E2E_BASE_URL: http://127.0.0.1:3000
