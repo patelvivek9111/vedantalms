@@ -12,7 +12,6 @@ import {
   MessageSquare, 
   BookOpen, 
   Calendar, 
-  ChevronRight,
   ClipboardList,
   CheckSquare,
   CircleCheckBig,
@@ -469,9 +468,7 @@ export const ToDoPanel: React.FC = () => {
                   >
                     <CircleCheckBig className="h-4 w-4 shrink-0" />
                   </button>
-                ) : (
-                  <ChevronRight className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" />
-                ))}
+                ) : null)}
             </div>
           );
         })}
@@ -556,9 +553,7 @@ export const ToDoPanel: React.FC = () => {
                       >
                         <CircleCheckBig className="w-4 h-4 flex-shrink-0" />
                       </button>
-                    ) : (
-                      <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
-                    ))}
+                    ) : null)}
                 </div>
               );
             })}

@@ -25,6 +25,13 @@ function normalizeAssignmentCategoryName(v: unknown): string {
   return String(v ?? '').trim();
 }
 
+function getStudentGradeItemPath(courseId: string, assignment: any): string {
+  if (assignment.isDiscussion) {
+    return `/courses/${courseId}/threads/${assignment._id}`;
+  }
+  return `/assignments/${assignment._id}/view`;
+}
+
 /** Per-group display stats; % uses shared grading (same contract as course total for that category). */
 function aggregateAssignmentGroupStats(
   groupAssignments: any[],
@@ -302,7 +309,20 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
               }
               
               return (
-                <div key={`student-assignment-mobile-${assignment._id}-${idx}`} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                <div
+                  key={`student-assignment-mobile-${assignment._id}-${idx}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => navigate(getStudentGradeItemPath(course._id, assignment))}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      navigate(getStudentGradeItemPath(course._id, assignment));
+                    }
+                  }}
+                  className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 cursor-pointer transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 dark:active:bg-gray-600"
+                  aria-label={`Open ${assignment.title}`}
+                >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1">
                       <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-base mb-1">{assignment.title}</h3>
@@ -329,8 +349,12 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
                   {(feedbackForDiscussion || (hasSubmission && typeof feedback === 'string' && feedback.trim() !== '')) && (
                     <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
                       <button
+                        type="button"
                         className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 transition-colors duration-150 text-sm font-medium flex items-center"
-                        onClick={() => assignment.isDiscussion ? navigate(`/courses/${course._id}/threads/${assignment._id}`) : navigate(`/assignments/${assignment._id}/view`)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(getStudentGradeItemPath(course._id, assignment));
+                        }}
                       >
                         <span className="mr-2">💬</span>
                         View Feedback
@@ -434,7 +458,11 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
                     }
                   }
                   return (
-                    <tr key={`student-assignment-${assignment._id}-${idx}`} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-150">
+                    <tr
+                      key={`student-assignment-${assignment._id}-${idx}`}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-150 cursor-pointer"
+                      onClick={() => navigate(getStudentGradeItemPath(course._id, assignment))}
+                    >
                       <td className="px-4 py-3">
                         <div className="font-medium text-gray-900 dark:text-gray-100">{assignment.title}</div>
                         {assignment.group && (
@@ -453,9 +481,13 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
                         {assignment.isDiscussion ? (
                           feedbackForDiscussion && (
                             <button
+                              type="button"
                               className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 transition-colors duration-150"
                               title="View feedback"
-                              onClick={() => navigate(`/courses/${course._id}/threads/${assignment._id}`)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(getStudentGradeItemPath(course._id, assignment));
+                              }}
                             >
                               <span role="img" aria-label="Comment" className="text-sm">💬</span>
                             </button>
@@ -463,9 +495,13 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
                         ) : (
                           hasSubmission && typeof feedback === 'string' && feedback.trim() !== '' && (
                             <button
+                              type="button"
                               className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 transition-colors duration-150"
                               title="View feedback"
-                              onClick={() => navigate(`/assignments/${assignment._id}/view`)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(getStudentGradeItemPath(course._id, assignment));
+                              }}
                             >
                               <span role="img" aria-label="Comment" className="text-sm">💬</span>
                             </button>

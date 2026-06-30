@@ -258,6 +258,40 @@ function formatPointsValue(value: number): string {
   return num.toFixed(2).replace(/\.?0+$/, '');
 }
 
+function getQuestionEarnedGrade(submission: Submission, questionIndex: number): number | null {
+  const key = questionIndex.toString();
+
+  if (submission.questionGrades) {
+    let grade: number | undefined;
+    if (submission.questionGrades instanceof Map) {
+      grade = submission.questionGrades.get(key);
+    } else {
+      grade = submission.questionGrades[key] ?? submission.questionGrades[questionIndex];
+    }
+    if (typeof grade === 'number' && !Number.isNaN(grade)) return grade;
+  }
+
+  if (submission.autoQuestionGrades) {
+    let grade: number | undefined;
+    if (submission.autoQuestionGrades instanceof Map) {
+      grade = submission.autoQuestionGrades.get(key);
+    } else {
+      grade = submission.autoQuestionGrades[key];
+    }
+    if (typeof grade === 'number' && !Number.isNaN(grade)) return grade;
+  }
+
+  return null;
+}
+
+function formatQuestionPointsDisplay(earned: number | null, maxPoints: number): string {
+  const totalFormatted = formatPointsValue(Number(maxPoints) || 0);
+  if (earned !== null) {
+    return `${formatPointsValue(earned)} / ${totalFormatted} pts`;
+  }
+  return `${totalFormatted} pts`;
+}
+
 function getAssignmentGradeScore(
   submission: Submission | null,
   assignment: Assignment
@@ -1185,9 +1219,6 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
             ariaLabel={isQuiz ? 'Go back to quizzes' : 'Go back to assignments'}
           />
           <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100 truncate px-2 flex-1 text-center">{assignment.title}</h1>
-          {isStudent && assignmentGradeScore && (
-            <AssignmentGradeBadge score={assignmentGradeScore} compact />
-          )}
           <div className="w-10 flex-shrink-0" aria-hidden />
         </div>
       </nav>
@@ -1820,7 +1851,10 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                               </button>
                             </div>
                             <span className="text-sm font-semibold text-slate-700 dark:text-slate-200 sm:text-base">
-                              {assignment.questions[currentQuestion].points} pts
+                              {formatQuestionPointsDisplay(
+                                activeSubmission ? getQuestionEarnedGrade(activeSubmission, currentQuestion) : null,
+                                assignment.questions[currentQuestion].points || 0
+                              )}
                             </span>
                           </div>
                         </div>
@@ -2404,28 +2438,12 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                 )}
                               </div>
                               <div className="flex shrink-0 items-center">
-                                {activeSubmission && activeSubmission.autoGraded && (question.type === 'multiple-choice' || question.type === 'matching') ? (
-                                  (() => {
-                                    const autoGrade = activeSubmission.autoQuestionGrades instanceof Map 
-                                      ? activeSubmission.autoQuestionGrades.get(index.toString())
-                                      : activeSubmission.autoQuestionGrades?.[index.toString()];
-                                    return (
-                                      <span className="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-100">
-                                        {(() => {
-                                          const earned = Number(autoGrade || 0);
-                                          const total = question.points;
-                                          const earnedFormatted = Number.isInteger(earned) ? earned.toString() : earned.toFixed(2);
-                                          const totalFormatted = Number.isInteger(total) ? total.toString() : total.toFixed(2);
-                                          return `${earnedFormatted} / ${totalFormatted} pts`;
-                                        })()}
-                                      </span>
-                                    );
-                                  })()
-                                ) : (
-                                  <span className="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-100">
-                                    {question.points} pts
-                                  </span>
-                                )}
+                                <span className="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-100">
+                                  {formatQuestionPointsDisplay(
+                                    activeSubmission ? getQuestionEarnedGrade(activeSubmission, index) : null,
+                                    question.points || 0
+                                  )}
+                                </span>
                               </div>
                             </div>
                           <div className="mb-4">

@@ -242,11 +242,11 @@ const CalendarDay: React.FC<CalendarDayProps> = ({ day, courseId, isInstructor, 
       {loading ? (
         <div className="w-2 h-2 bg-gray-400 rounded-full mx-auto animate-pulse"></div>
       ) : breakdown ? (
-        <div className="space-y-1">
+        <div className="w-full space-y-1">
           {breakdown.isStudent ? (
             // Student view - show only their own status
-            <div className="space-y-1">
-              <div className="flex h-2 rounded-full overflow-hidden">
+            <div className="w-full space-y-1">
+              <div className="flex h-2 w-full rounded-full overflow-hidden">
                 {breakdown.studentStatus === 'present' && (
                   <div className="bg-green-500 w-full" title="Present"></div>
                 )}
@@ -275,7 +275,7 @@ const CalendarDay: React.FC<CalendarDayProps> = ({ day, courseId, isInstructor, 
             // Teacher/Admin view - show aggregated data
             <>
               {/* Visual breakdown bar */}
-              <div className="flex h-2 rounded-full overflow-hidden">
+              <div className="flex h-2 w-full rounded-full overflow-hidden">
                 {!breakdown.isStudent && (breakdown as any).present > 0 && (
                   <div 
                     className="bg-green-500" 
