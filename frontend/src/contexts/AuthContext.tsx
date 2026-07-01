@@ -56,8 +56,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setMemoryAuthToken(null);
         }
       })
-      .catch((err: { response?: { status?: number } }) => {
+      .catch(async (err: { response?: { status?: number } }) => {
         if (err.response?.status === 401) {
+          try {
+            await api.post('/auth/logout');
+          } catch {
+            /* clear stale cookie if possible */
+          }
           setUser(null);
           setToken(null);
           setMemoryAuthToken(null);

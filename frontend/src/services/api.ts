@@ -17,6 +17,36 @@ const api = axios.create({
   },
 });
 
+const PUBLIC_APP_PATHS = new Set([
+  '/login',
+  '/signup',
+  '/forgot-password',
+  '/reset-password',
+  '/privacy',
+  '/terms',
+  '/',
+]);
+
+function isSessionBootstrapRequest(url: string | undefined): boolean {
+  const rel = String(url || '').replace(/^\//, '');
+  return (
+    rel === 'auth/me' ||
+    rel.startsWith('auth/me?') ||
+    rel === 'auth/login' ||
+    rel.startsWith('auth/login?') ||
+    rel === 'auth/register' ||
+    rel.startsWith('auth/register?') ||
+    rel === 'auth/forgot-password' ||
+    rel === 'auth/reset-password' ||
+    rel === 'auth/logout'
+  );
+}
+
+function isPublicAppPath(): boolean {
+  const path = window.location.pathname.replace(/\/$/, '') || '/';
+  return PUBLIC_APP_PATHS.has(path);
+}
+
 export const normalizeApiInstancePath = (url: string | undefined, baseURL: string | undefined): string | undefined => {
   if (!url || /^https?:\/\//i.test(url)) return url;
   const base = (baseURL || '').replace(/\/$/, '');
@@ -42,15 +72,8 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      const rel = String(error.config?.url || '').replace(/^\//, '');
-      const isUnauthenticatedAuthCall =
-        rel === 'auth/login' ||
-        rel.startsWith('auth/login?') ||
-        rel === 'auth/register' ||
-        rel.startsWith('auth/register?') ||
-        rel === 'auth/forgot-password' ||
-        rel === 'auth/reset-password';
-      if (!isUnauthenticatedAuthCall) {
+      const requestUrl = error.config?.url;
+      if (!isSessionBootstrapRequest(requestUrl) && !isPublicAppPath()) {
         window.location.href = '/login';
       }
     }

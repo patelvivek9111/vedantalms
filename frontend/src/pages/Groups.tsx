@@ -48,6 +48,13 @@ interface GroupSet {
   lastUpdated?: string;
 }
 
+interface TeacherGroupStats {
+  totalGroupSets: number;
+  totalGroups: number;
+  totalMembers: number;
+  activeGroupSets: number;
+}
+
 const Groups: React.FC = () => {
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupSets, setGroupSets] = useState<GroupSet[]>([]);
@@ -272,56 +279,31 @@ const Groups: React.FC = () => {
 
 
   // Calculate statistics based on filtered data
-  const getStats = () => {
-    if (isTeacher) {
-      const hasFilters = Boolean(searchTerm || courseFilter !== 'all' || selectedMetric);
+  const getTeacherStats = (): TeacherGroupStats => {
+    const hasFilters = Boolean(searchTerm || courseFilter !== 'all' || selectedMetric);
 
-      if (!hasFilters) {
-        return groupSetStats;
-      }
-
-      const totalGroups = filteredData.reduce(
-        (sum, gs) => sum + ((gs as GroupSet).totalGroups || 0),
-        0
-      );
-      const totalMembers = filteredData.reduce(
-        (sum, gs) => sum + ((gs as GroupSet).totalMembers || 0),
-        0
-      );
-
-      return {
-        totalGroupSets: filteredData.length,
-        totalGroups,
-        totalMembers,
-        activeGroupSets: filteredData.filter((gs) => (gs as GroupSet).allowSelfSignup).length,
-      };
-    } else {
-      // For students, count unique members across all their groups
-      const uniqueMembers = new Set();
-      
-      filteredData.forEach((group: Group, groupIndex: number) => {
-        if (group.members && Array.isArray(group.members)) {
-          group.members.forEach((member: any, memberIndex: number) => {
-            // Use member ID to ensure uniqueness - check for _id first, then email as fallback
-            const memberId = member._id || member.id || member.email;
-            
-            if (memberId) {
-              uniqueMembers.add(memberId);
-            }
-          });
-        }
-      });
-      
-      return {
-        totalGroups: filteredData.length,
-        totalMembers: uniqueMembers.size,
-        groupsWithLeader: filteredData.filter(g => (g as Group).leader).length,
-        activeGroups: filteredData.filter(g => (g as Group).members && (g as Group).members!.length > 0).length
-      };
+    if (!hasFilters) {
+      return groupSetStats;
     }
+
+    const totalGroups = filteredData.reduce(
+      (sum, gs) => sum + ((gs as GroupSet).totalGroups || 0),
+      0
+    );
+    const totalMembers = filteredData.reduce(
+      (sum, gs) => sum + ((gs as GroupSet).totalMembers || 0),
+      0
+    );
+
+    return {
+      totalGroupSets: filteredData.length,
+      totalGroups,
+      totalMembers,
+      activeGroupSets: filteredData.filter((gs) => (gs as GroupSet).allowSelfSignup).length,
+    };
   };
 
-  const stats = getStats();
+  const teacherStats = isTeacher ? getTeacherStats() : null;
 
   return (
     <SwipeableContainer
@@ -385,7 +367,7 @@ const Groups: React.FC = () => {
                   Total group sets
                 </p>
                 <p className="mt-0.5 text-2xl font-semibold tabular-nums tracking-tight text-gray-900 dark:text-gray-50">
-                  {stats.totalGroupSets}
+                  {teacherStats?.totalGroupSets ?? 0}
                 </p>
               </div>
             </div>
@@ -408,7 +390,7 @@ const Groups: React.FC = () => {
                   Total groups
                 </p>
                 <p className="mt-0.5 text-2xl font-semibold tabular-nums tracking-tight text-gray-900 dark:text-gray-50">
-                  {stats.totalGroups}
+                  {teacherStats?.totalGroups ?? 0}
                 </p>
               </div>
             </div>
@@ -431,7 +413,7 @@ const Groups: React.FC = () => {
                   Total members
                 </p>
                 <p className="mt-0.5 text-2xl font-semibold tabular-nums tracking-tight text-gray-900 dark:text-gray-50">
-                  {stats.totalMembers}
+                  {teacherStats?.totalMembers ?? 0}
                 </p>
               </div>
             </div>
@@ -454,7 +436,7 @@ const Groups: React.FC = () => {
                   Active sets
                 </p>
                 <p className="mt-0.5 text-2xl font-semibold tabular-nums tracking-tight text-gray-900 dark:text-gray-50">
-                  {stats.activeGroupSets}
+                  {teacherStats?.activeGroupSets ?? 0}
                 </p>
               </div>
             </div>
