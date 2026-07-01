@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../utils/authToken';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-toastify';
 import api from '../services/api';
@@ -74,7 +75,7 @@ const Catalog: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       if (!token) {
         setError('Please log in to view the course catalog');
         return;

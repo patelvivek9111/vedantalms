@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../utils/authToken';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
@@ -27,7 +28,7 @@ const PageEditPage: React.FC = () => {
     const fetchPage = async () => {
       if (!pageId) return;
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const response = await axios.get(`${API_URL}/api/pages/view/${pageId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -58,7 +59,7 @@ const PageEditPage: React.FC = () => {
     setIsSubmitting(true);
     setError(null);
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const formDataToSend = new FormData();
       formDataToSend.append('title', formData.title);
       formDataToSend.append('content', formData.content);

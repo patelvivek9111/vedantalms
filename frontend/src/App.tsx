@@ -7,6 +7,10 @@ import { ModuleProvider } from './contexts/ModuleContext';
 import { PrivateRoute } from './components/common/PrivateRoute';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
+import { PrivacyPolicy } from './pages/PrivacyPolicy';
+import { TermsOfService } from './pages/TermsOfService';
+import { ForgotPassword } from './pages/ForgotPassword';
+import { ResetPassword } from './pages/ResetPassword';
 import { Dashboard } from './pages/Dashboard';
 import CourseList from './components/course/CourseList';
 import CourseForm from './components/course/CourseForm';
@@ -156,7 +160,10 @@ function AppContent() {
   const { offline } = useNetworkStatus();
   const location = useLocation();
   const isAuthenticated = !!user;
-  const hideMobileBottomNav = /\/quizwave(\/|$)/.test(location.pathname);
+  const isInboxThread =
+    location.pathname === '/inbox' && Boolean(new URLSearchParams(location.search).get('c'));
+  const hideMobileBottomNav =
+    /\/quizwave(\/|$)/.test(location.pathname) || isInboxThread;
 
   useMessagingSocketConnection(user?._id, token);
   useNotificationSocketConnection(user?._id, token);
@@ -193,6 +200,10 @@ function AppContent() {
           <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
           <Route path="/login" element={<LoginRoute />} />
           <Route path="/signup" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Signup />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<TermsOfService />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
           
           {/* Protected Routes */}

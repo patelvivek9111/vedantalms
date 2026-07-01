@@ -24,8 +24,16 @@ const userSchema = new mongoose.Schema({
   password: {
     type: String,
     required: [true, 'Password is required'],
-    minlength: [6, 'Password must be at least 6 characters'],
+    minlength: [8, 'Password must be at least 8 characters'],
     select: false
+  },
+  tokenVersion: {
+    type: Number,
+    default: 0,
+  },
+  privacyConsentAt: {
+    type: Date,
+    default: null,
   },
   role: {
     type: String,
@@ -95,15 +103,21 @@ userSchema.pre('save', function(next) {
 
 // Sign JWT and return
 userSchema.methods.getSignedJwtToken = function() {
-  const payload = { 
+  const payload = {
     id: this._id,
     role: this.role,
-    email: this.email 
+    email: this.email,
+    tv: this.tokenVersion || 0,
   };
   const secret = process.env.JWT_SECRET || 'your-super-secret-jwt-key-123';
-  const expire = process.env.JWT_EXPIRE || '30d';
+  const expire = process.env.JWT_EXPIRE || '7d';
   const token = jwt.sign(payload, secret, { expiresIn: expire });
   return token;
+};
+
+userSchema.methods.invalidateSessions = async function() {
+  this.tokenVersion = (this.tokenVersion || 0) + 1;
+  await this.save();
 };
 
 // Match user entered password to hashed password in database

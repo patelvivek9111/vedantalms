@@ -395,7 +395,7 @@ router
   .route('/:id')
   .get(protect, getCourse)
   .put(protect, authorize('teacher', 'admin'), updateCourseValidation, updateCourse)
-  .delete(protect, authorize('admin'), deleteCourse);
+  .delete(protect, authorize('teacher', 'admin'), deleteCourse);
 
 router
   .route('/:id/publish')

@@ -70,9 +70,8 @@ const MessageThread: React.FC<MessageThreadProps> = ({
   const participantNames = getOtherParticipantNames(conversation, currentUserId);
 
   return (
-  <div className="flex h-full min-h-0 flex-1 flex-col bg-white p-0 dark:bg-gray-800">
-    <div className="flex flex-col h-full">
-      <header className="sticky top-0 z-10 border-b border-gray-100 bg-white/95 backdrop-blur-sm safe-area-inset-top dark:border-gray-700/80 dark:bg-gray-800/95 lg:rounded-t-2xl">
+    <div className="flex h-full min-h-0 flex-1 flex-col bg-white dark:bg-gray-800">
+      <header className="shrink-0 border-b border-gray-100 bg-white/95 backdrop-blur-sm safe-area-inset-top dark:border-gray-700/80 dark:bg-gray-800/95 lg:rounded-t-2xl">
         <div className="flex items-center gap-1 px-2 py-2.5 sm:gap-2 sm:px-4 sm:py-3 lg:px-6 lg:py-4">
           <button
             type="button"
@@ -99,18 +98,21 @@ const MessageThread: React.FC<MessageThreadProps> = ({
           </div>
         </div>
       </header>
-      <div className="flex-1 overflow-y-auto px-3 sm:px-4 lg:px-6 pb-4 sm:pb-6">
+
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 sm:px-4 lg:px-6">
         {messagesLoading && (
-          <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 py-4">Loading messages...</div>
+          <div className="py-4 text-xs text-gray-600 dark:text-gray-400 sm:text-sm">
+            Loading messages...
+          </div>
         )}
         {messagesError && (
-          <div className="text-xs sm:text-sm text-red-500 dark:text-red-400 py-4">{messagesError}</div>
+          <div className="py-4 text-xs text-red-500 dark:text-red-400 sm:text-sm">{messagesError}</div>
         )}
         {!messagesLoading && !messagesError && messages.length === 0 && (
-          <div className="text-xs sm:text-sm text-gray-400 dark:text-gray-500 py-4">No messages yet.</div>
+          <div className="py-4 text-xs text-gray-400 dark:text-gray-500 sm:text-sm">No messages yet.</div>
         )}
-        <div className="space-y-4 sm:space-y-6 mb-4 sm:mb-6">
-          {messages.map((msg) => {
+        <div className="pb-4 sm:pb-6">
+          {messages.map((msg, index) => {
             const hasName =
               (msg.senderId?.firstName && msg.senderId?.firstName.trim()) ||
               (msg.senderId?.lastName && msg.senderId?.lastName.trim());
@@ -122,13 +124,13 @@ const MessageThread: React.FC<MessageThreadProps> = ({
             return (
               <div
                 key={msg._id}
-                className="border-b border-gray-200 dark:border-gray-700 pb-4 sm:pb-6 last:border-b-0"
+                className={`py-4 sm:py-6 ${index > 0 ? 'border-t border-gray-200 dark:border-gray-700' : ''}`}
               >
-                <div className="flex items-start justify-between mb-3 sm:mb-4 gap-2">
-                  <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
-                    <div className="relative flex-shrink-0">
+                <div className="mb-3 flex items-start justify-between gap-2 sm:mb-4">
+                  <div className="flex min-w-0 flex-1 items-center space-x-2 sm:space-x-3">
+                    <div className="relative shrink-0">
                       <div
-                        className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white font-bold text-sm sm:text-lg overflow-hidden ${getAvatarColor(msg.senderId?._id)} ${isUserOnline(msg.senderId?._id) ? 'online-pulse' : 'border-2 border-transparent'}`}
+                        className={`flex h-8 w-8 items-center justify-center overflow-hidden rounded-full text-sm font-bold text-white sm:h-10 sm:w-10 sm:text-lg ${getAvatarColor(msg.senderId?._id)} ${isUserOnline(msg.senderId?._id) ? 'online-pulse' : 'border-2 border-transparent'}`}
                       >
                         {msg.senderId?.profilePicture ? (
                           <img
@@ -138,7 +140,7 @@ const MessageThread: React.FC<MessageThreadProps> = ({
                                 : getImageUrl(msg.senderId.profilePicture)
                             }
                             alt={senderName}
-                            className="w-8 h-8 sm:w-10 sm:h-10 object-cover rounded-full"
+                            className="h-8 w-8 rounded-full object-cover sm:h-10 sm:w-10"
                           />
                         ) : (
                           getInitials(msg.senderId)
@@ -146,10 +148,10 @@ const MessageThread: React.FC<MessageThreadProps> = ({
                       </div>
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="font-semibold text-sm sm:text-base text-gray-900 dark:text-gray-100 truncate">
+                      <div className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100 sm:text-base">
                         {senderName || 'Unknown User'}
                       </div>
-                      <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                      <div className="text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
                         {capitalizeFirst(
                           format(new Date(msg.createdAt), "MMM d, yyyy 'at' h:mmaaa")
                         )}
@@ -157,14 +159,14 @@ const MessageThread: React.FC<MessageThreadProps> = ({
                     </div>
                   </div>
                   {isMe && (
-                    <span className="text-[10px] sm:text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded flex-shrink-0">
+                    <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-400 dark:bg-gray-700 dark:text-gray-500 sm:px-2 sm:py-1 sm:text-xs">
                       Sent
                     </span>
                   )}
                 </div>
                 <div className="pl-0 sm:pl-13">
                   <div
-                    className="text-xs sm:text-sm text-gray-900 dark:text-gray-100 break-words leading-relaxed prose prose-sm max-w-none"
+                    className="prose prose-sm max-w-none break-words text-xs leading-relaxed text-gray-900 dark:text-gray-100 sm:text-sm"
                     dangerouslySetInnerHTML={{ __html: messageHtmlForRender(msg) }}
                   />
                   <MessageAttachments
@@ -178,85 +180,84 @@ const MessageThread: React.FC<MessageThreadProps> = ({
           })}
         </div>
       </div>
+
       {showReplyBox ? (
-        <form
-          className="flex flex-col gap-2 mt-2 px-3 sm:px-4 lg:px-6 pb-3 sm:pb-4 lg:pb-6"
-          onSubmit={onSendReply}
-        >
-          <label htmlFor="reply-message" className="sr-only">
-            Reply
-          </label>
-          <RichTextEditor
-            id="reply-message"
-            content={reply}
-            onChange={onReplyChange}
-            placeholder="Type your reply..."
-            className="flex-1 border border-gray-200 dark:border-gray-700 rounded p-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm sm:text-base min-h-[100px] sm:min-h-[120px]"
-          />
-          <FileAttachmentPanel
-            files={replyAttachments}
-            onChange={onReplyAttachmentsChange}
-            category="temporary"
-            label="Attach files to reply"
-            accept="image/*,application/pdf,.doc,.docx"
-          />
-          <div className="flex justify-end gap-2 mt-2">
+        <footer className="shrink-0 border-t border-gray-200 bg-white safe-area-inset-bottom dark:border-gray-700 dark:bg-gray-800">
+          <form className="flex flex-col gap-2 px-3 py-3 sm:px-4 lg:px-6" onSubmit={onSendReply}>
+            <label htmlFor="reply-message" className="sr-only">
+              Reply
+            </label>
+            <RichTextEditor
+              id="reply-message"
+              content={reply}
+              onChange={onReplyChange}
+              placeholder="Type your reply..."
+              className="min-h-[100px] flex-1 rounded border border-gray-200 bg-white p-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 sm:min-h-[120px] sm:text-base"
+            />
+            <FileAttachmentPanel
+              files={replyAttachments}
+              onChange={onReplyAttachmentsChange}
+              category="temporary"
+              label="Attach files to reply"
+              accept="image/*,application/pdf,.doc,.docx"
+            />
+            <div className="mt-2 flex justify-end gap-2">
+              <button
+                type="button"
+                className="touch-manipulation rounded bg-gray-200 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-300 disabled:opacity-50 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 sm:px-4 sm:py-2 sm:text-sm"
+                onClick={onHideReply}
+                disabled={sending}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="touch-manipulation rounded bg-blue-600 px-3 py-1.5 text-xs text-white shadow disabled:opacity-50 sm:px-4 sm:py-2 sm:text-sm"
+                disabled={sending || !reply.trim()}
+              >
+                {sending ? 'Sending...' : 'Send'}
+              </button>
+            </div>
+            {sendError && (
+              <div className="text-xs text-red-500 dark:text-red-400 sm:text-sm">{sendError}</div>
+            )}
+          </form>
+        </footer>
+      ) : (
+        <footer className="shrink-0 border-t border-gray-200 bg-white safe-area-inset-bottom dark:border-gray-700 dark:bg-gray-800 lg:pb-2">
+          <div className="flex items-center gap-2 px-3 py-2.5 sm:px-4 sm:py-3 lg:px-6">
+            {restoreAction && (
+              <button
+                type="button"
+                onClick={restoreAction.onRestore}
+                disabled={restoreAction.loading}
+                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50 touch-manipulation dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:flex-none sm:px-4"
+              >
+                <ArchiveRestore className="h-4 w-4 shrink-0" />
+                {restoreAction.loading ? `${restoreAction.label}…` : restoreAction.label}
+              </button>
+            )}
             <button
               type="button"
-              className="px-3 sm:px-4 py-1.5 sm:py-2 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 text-xs sm:text-sm touch-manipulation"
-              onClick={onHideReply}
-              disabled={sending}
+              onClick={onForward}
+              disabled={!canForward}
+              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 touch-manipulation dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:flex-none sm:px-4"
             >
-              Cancel
+              <Forward className="h-4 w-4 shrink-0" />
+              Forward
             </button>
             <button
-              type="submit"
-              className="bg-blue-600 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded disabled:opacity-50 shadow text-xs sm:text-sm touch-manipulation"
-              disabled={sending || !reply.trim()}
+              type="button"
+              onClick={onShowReply}
+              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm font-medium text-blue-700 shadow-sm hover:bg-blue-100 touch-manipulation dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-300 dark:hover:bg-blue-950 sm:flex-none sm:px-4"
             >
-              {sending ? 'Sending...' : 'Send'}
+              <Reply className="h-4 w-4 shrink-0" />
+              Reply
             </button>
           </div>
-        </form>
-      ) : (
-        <div className="flex justify-end gap-2 px-3 pb-3 sm:px-4 sm:pb-4 lg:px-6 lg:pb-6">
-          {restoreAction && (
-            <button
-              type="button"
-              onClick={restoreAction.onRestore}
-              disabled={restoreAction.loading}
-              className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium leading-4 text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 touch-manipulation sm:px-4 sm:py-2 sm:text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:focus:ring-blue-400"
-            >
-              <ArchiveRestore className="mr-1.5 h-3 w-3 sm:mr-2 sm:h-4 sm:w-4" />
-              {restoreAction.loading ? `${restoreAction.label}…` : restoreAction.label}
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={onForward}
-            disabled={!canForward}
-            className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium leading-4 text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 touch-manipulation disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 sm:py-2 sm:text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:focus:ring-blue-400"
-          >
-            <Forward className="mr-1.5 h-3 w-3 sm:mr-2 sm:h-4 sm:w-4" />
-            Forward
-          </button>
-          <button
-            type="button"
-            onClick={onShowReply}
-            className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium leading-4 text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 touch-manipulation sm:px-4 sm:py-2 sm:text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:focus:ring-blue-400"
-          >
-            <Reply className="mr-1.5 h-3 w-3 sm:mr-2 sm:h-4 sm:w-4" />
-            Reply
-          </button>
-        </div>
-      )}
-      {sendError && (
-        <div className="text-red-500 dark:text-red-400 mt-2 px-3 sm:px-4 lg:px-6 text-xs sm:text-sm">
-          {sendError}
-        </div>
+        </footer>
       )}
     </div>
-  </div>
   );
 };
 

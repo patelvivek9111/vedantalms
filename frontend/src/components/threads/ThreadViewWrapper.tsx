@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../../utils/authToken';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import axios from 'axios';
@@ -33,7 +34,7 @@ const ThreadViewWrapper: React.FC = () => {
 
       try {
         setLoading(true);
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         if (!token) {
           throw new Error('No authentication token found');
         }

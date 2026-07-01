@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../../utils/authToken';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
 import { API_URL } from '../../config';
@@ -138,7 +139,7 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
     const fetchGroupSets = async () => {
       if (!courseId || !isOpen) return;
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const response = await axios.get(`${API_URL}/api/groups/sets/${courseId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });

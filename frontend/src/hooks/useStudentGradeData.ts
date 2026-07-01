@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../utils/authToken';
 import axios from 'axios';
 import { API_URL } from '../config';
 
@@ -39,7 +40,7 @@ export const useStudentGradeData = ({
       setStudentTotalGrade(null);
       setStudentLetterGrade(null);
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const res = await axios.get(`${API_URL}/api/grades/student/course/${course._id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -60,7 +61,7 @@ export const useStudentGradeData = ({
     if (activeSection !== 'grades' || isInstructor || isAdmin || !course?._id || !user) return;
     const fetchStudentDiscussions = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const res = await axios.get(`${API_URL}/api/threads/course/${course._id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -106,7 +107,7 @@ export const useStudentGradeData = ({
     if (activeSection !== 'grades' || isInstructor || isAdmin || !course?._id || !user) return;
     const fetchStudentGroupAssignments = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const res = await axios.get(`${API_URL}/api/assignments/course/${course._id}/group-assignments`, {
           headers: { Authorization: `Bearer ${token}` }
         });

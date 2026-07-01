@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../../utils/authToken';
 import CreatePageForm from '../pages/CreatePageForm';
 import { ModuleProvider } from '../../contexts/ModuleContext';
 import { API_URL } from '../../config';
@@ -35,7 +36,7 @@ const CoursePages: React.FC<CoursePagesProps> = ({ courseId, modules, isInstruct
       setLoading(true);
       setError(null);
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const res = await axios.get(`${API_URL}/api/pages/course/${courseId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });

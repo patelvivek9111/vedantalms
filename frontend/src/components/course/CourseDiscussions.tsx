@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../../utils/authToken';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
@@ -128,7 +129,7 @@ const CourseDiscussions: React.FC<CourseDiscussionsProps> = ({
     const fetchModules = async () => {
       if (!courseId) return;
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const res = await axios.get(`${API_URL}/api/modules/${courseId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import api from '../services/api';
 import { disconnectMessagingSocket } from '../utils/messagingSocket';
 import { clearDownloadTokenCache } from '../services/fileUploadApi';
+import { setMemoryAuthToken } from '../utils/authToken';
 
 export interface User {
   _id: string;
@@ -20,177 +21,93 @@ interface AuthContextType {
   setToken: React.Dispatch<React.SetStateAction<string | null>>;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (firstName: string, lastName: string, email: string, password: string, role: string) => Promise<void>;
-  logout: () => void;
+  signup: (firstName: string, lastName: string, email: string, password: string, termsAccepted: boolean) => Promise<void>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function mapUser(userData: Record<string, unknown>): User {
+  return {
+    _id: String(userData.id || userData._id),
+    firstName: String(userData.firstName),
+    lastName: String(userData.lastName),
+    email: String(userData.email),
+    role: String(userData.role),
+    bio: String(userData.bio || ''),
+    profilePicture: String(userData.profilePicture || ''),
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
+  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (token) {
-      // Verify token and get user data
-      api.get('/auth/me')
-        .then(response => {
-          if (response.data.success) {
-            // Map the response data to match our User interface
-            const userData = response.data.user;
-            setUser({
-              _id: userData.id || userData._id, // Handle both 'id' and '_id'
-              firstName: userData.firstName,
-              lastName: userData.lastName,
-              email: userData.email,
-              role: userData.role,
-              bio: userData.bio || '',
-              profilePicture: userData.profilePicture || ''
-            });
-          } else {
-            // Invalid response, clear auth
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            setToken(null);
-            setUser(null);
-          }
-        })
-        .catch((err: { response?: { status?: number } }) => {
-          // Network failures should not sign the user out; only explicit 401s.
-          if (err.response?.status === 401) {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            setToken(null);
-            setUser(null);
-          }
-        })
-        .finally(() => {
-          setLoading(false);
-        });
-    } else {
-      // No token, clear user state
-      setUser(null);
-      setLoading(false);
-    }
-  }, [token]);
+    api
+      .get('/auth/me')
+      .then((response) => {
+        if (response.data.success) {
+          setUser(mapUser(response.data.user));
+        } else {
+          setUser(null);
+          setToken(null);
+          setMemoryAuthToken(null);
+        }
+      })
+      .catch((err: { response?: { status?: number } }) => {
+        if (err.response?.status === 401) {
+          setUser(null);
+          setToken(null);
+          setMemoryAuthToken(null);
+        }
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, []);
 
   const login = async (email: string, password: string) => {
     const response = await api.post('/auth/login', { email, password });
-    const { token, user: userData } = response.data;
-    // Map the user data to match our User interface
-    const user = {
-      _id: userData.id || userData._id, // Handle both 'id' and '_id'
-      firstName: userData.firstName,
-      lastName: userData.lastName,
-      email: userData.email,
-      role: userData.role,
-      bio: userData.bio || '',
-      profilePicture: userData.profilePicture || ''
-    };
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(user));
-    
-    // Save to stored users for quick switching
-    try {
-      const storedUsersKey = 'storedUsers';
-      const stored = localStorage.getItem(storedUsersKey);
-      let users: any[] = stored ? JSON.parse(stored) : [];
-      
-      // Remove existing user with same email
-      users = users.filter((u: any) => u.email !== user.email);
-      
-      // Add new user
-      users.push({
-        _id: user._id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        role: user.role,
-        profilePicture: user.profilePicture,
-        token: token,
-        lastUsed: Date.now()
-      });
-      
-      // Keep only last 5 users
-      if (users.length > 5) {
-        users = users
-          .sort((a: any, b: any) => b.lastUsed - a.lastUsed)
-          .slice(0, 5);
-      }
-      
-      localStorage.setItem(storedUsersKey, JSON.stringify(users));
-    } catch (error) {
-      }
-    
-    setToken(token);
-    setUser(user);
+    const { token: authToken, user: userData } = response.data;
+    const mapped = mapUser(userData);
+    setMemoryAuthToken(authToken);
+    setToken(authToken);
+    setUser(mapped);
   };
 
-  const signup = async (firstName: string, lastName: string, email: string, password: string, role: string) => {
+  const signup = async (
+    firstName: string,
+    lastName: string,
+    email: string,
+    password: string,
+    termsAccepted: boolean
+  ) => {
+    const response = await api.post('/auth/register', {
+      firstName,
+      lastName,
+      email,
+      password,
+      termsAccepted,
+    });
+    const { token: authToken, user: userData } = response.data;
+    const mapped = mapUser(userData);
+    setMemoryAuthToken(authToken);
+    setToken(authToken);
+    setUser(mapped);
+  };
+
+  const logout = async () => {
     try {
-      const response = await api.post('/auth/register', { firstName, lastName, email, password, role });
-      const { token, user: userData } = response.data;
-      // Map the user data to match our User interface
-      const user = {
-        _id: userData.id || userData._id, // Handle both 'id' and '_id'
-        firstName: userData.firstName,
-        lastName: userData.lastName,
-        email: userData.email,
-        role: userData.role,
-        bio: userData.bio || '',
-        profilePicture: userData.profilePicture || ''
-      };
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
-      
-      // Save to stored users for quick switching
-      try {
-        const storedUsersKey = 'storedUsers';
-        const stored = localStorage.getItem(storedUsersKey);
-        let users: any[] = stored ? JSON.parse(stored) : [];
-        
-        // Remove existing user with same email
-        users = users.filter((u: any) => u.email !== user.email);
-        
-        // Add new user
-        users.push({
-          _id: user._id,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          email: user.email,
-          role: user.role,
-          profilePicture: user.profilePicture,
-          token: token,
-          lastUsed: Date.now()
-        });
-        
-        // Keep only last 5 users
-        if (users.length > 5) {
-          users = users
-            .sort((a: any, b: any) => b.lastUsed - a.lastUsed)
-            .slice(0, 5);
-        }
-        
-        localStorage.setItem(storedUsersKey, JSON.stringify(users));
-      } catch (error) {
-        }
-      
-      setToken(token);
-      setUser(user);
-    } catch (error: any) {
-      throw error;
+      await api.post('/auth/logout');
+    } catch {
+      /* cookie may already be cleared */
     }
-  };
-
-  const logout = () => {
     disconnectMessagingSocket();
     clearDownloadTokenCache();
-    // Clear all localStorage items related to auth
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    // Clear any course-related cached data
     localStorage.removeItem('courseColors');
+    setMemoryAuthToken(null);
     setToken(null);
     setUser(null);
   };
@@ -208,4 +125,4 @@ export function useAuth() {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-} 
+}

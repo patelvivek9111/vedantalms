@@ -184,7 +184,51 @@ exports.getMyGroupSets = async (req, res) => {
       groupSet => groupSet.course && groupSet.course.published !== false
     );
 
-    res.json({ success: true, data: filteredGroupSets });
+    const groupSetIds = filteredGroupSets.map((gs) => gs._id);
+    const groups =
+      groupSetIds.length > 0
+        ? await Group.find({ groupSet: { $in: groupSetIds } }).select('groupSet members').lean()
+        : [];
+
+    const countsBySet = new Map();
+    const allUniqueMembers = new Set();
+    let totalGroups = 0;
+
+    for (const group of groups) {
+      totalGroups += 1;
+      const setId = String(group.groupSet);
+      if (!countsBySet.has(setId)) {
+        countsBySet.set(setId, { totalGroups: 0, members: new Set() });
+      }
+      const entry = countsBySet.get(setId);
+      entry.totalGroups += 1;
+      for (const memberId of group.members || []) {
+        const id = String(memberId);
+        entry.members.add(id);
+        allUniqueMembers.add(id);
+      }
+    }
+
+    const data = filteredGroupSets.map((groupSet) => {
+      const entry = countsBySet.get(String(groupSet._id)) || { totalGroups: 0, members: new Set() };
+      const plain = groupSet.toObject();
+      return {
+        ...plain,
+        totalGroups: entry.totalGroups,
+        totalMembers: entry.members.size,
+      };
+    });
+
+    res.json({
+      success: true,
+      data,
+      stats: {
+        totalGroupSets: data.length,
+        totalGroups,
+        totalMembers: allUniqueMembers.size,
+        activeGroupSets: data.filter((gs) => gs.allowSelfSignup).length,
+      },
+    });
   } catch (err) {
     console.error('Error in getMyGroupSets:', err);
     console.error('Error stack:', err.stack);

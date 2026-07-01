@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../utils/authToken';
 import { ChevronDown } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
@@ -88,7 +89,7 @@ const Transcript: React.FC = () => {
   useEffect(() => {
     const fetchSemesters = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const response = await axios.get(`${API_URL}/api/reports/semesters`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -109,7 +110,7 @@ const Transcript: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const response = await axios.get(`${API_URL}/api/reports/transcript`, {
         headers: { 'Authorization': `Bearer ${token}` },
         params: {
@@ -140,7 +141,7 @@ const Transcript: React.FC = () => {
     
     setLoadingAllCourses(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const allCourses: CourseGrade[] = [];
       
       // Fetch courses from all semesters

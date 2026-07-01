@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../utils/authToken';
 import axios from 'axios';
 import { API_URL } from '../config';
 
@@ -28,7 +29,7 @@ export const useStudentSubmissions = ({
     if (!course?._id || !studentId || user?.role !== 'student') return;
     const fetchStudentSubmissions = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const res = await axios.get(`${API_URL}/api/submissions/student/course/${course._id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });

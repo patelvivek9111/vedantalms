@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../../utils/authToken';
 import { useParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCourse } from '../../contexts/CourseContext';
@@ -30,7 +31,7 @@ const AssignmentDetailsWrapper: React.FC = () => {
       if (!assignmentId) return;
 
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const assignmentRes = await axios.get(`${API_URL}/api/assignments/${assignmentId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });

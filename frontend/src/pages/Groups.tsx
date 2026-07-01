@@ -51,7 +51,12 @@ interface GroupSet {
 const Groups: React.FC = () => {
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupSets, setGroupSets] = useState<GroupSet[]>([]);
-  const [allGroupsData, setAllGroupsData] = useState<{[key: string]: any[]}>({}); // Store groups for each group set
+  const [groupSetStats, setGroupSetStats] = useState({
+    totalGroupSets: 0,
+    totalGroups: 0,
+    totalMembers: 0,
+    activeGroupSets: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -106,6 +111,9 @@ const Groups: React.FC = () => {
               totalMembers: groupSet.totalMembers ?? 0,
             }))
           );
+          if (res.data?.stats) {
+            setGroupSetStats(res.data.stats);
+          }
         } else {
           const res = await api.get('/groups/my');
           if (cancelled) return;
@@ -266,35 +274,26 @@ const Groups: React.FC = () => {
   // Calculate statistics based on filtered data
   const getStats = () => {
     if (isTeacher) {
-      // For teachers, calculate unique members across ALL group sets combined
-      const uniqueMembers = new Set();
-      
-      // Use the stored groups data to calculate unique members across all sets
-      (filteredData as GroupSet[]).forEach((groupSet: GroupSet, setIndex: number) => {
-        const groupsForThisSet = allGroupsData[groupSet._id] || [];
-        
-        groupsForThisSet.forEach((group: any, groupIndex: number) => {
-          if (group.members && Array.isArray(group.members)) {
-            group.members.forEach((member: any, memberIndex: number) => {
-              // Use member ID to ensure uniqueness - check for _id first, then email as fallback
-              const memberId = member._id || member.id || member.email;
-              
-              if (memberId) {
-                uniqueMembers.add(memberId);
-              }
-            });
-          }
-        });
-      });
-      
-      // Calculate total groups across all sets
-      const totalGroups = filteredData.reduce((sum, gs) => sum + ((gs as GroupSet).totalGroups || 0), 0);
-      
+      const hasFilters = Boolean(searchTerm || courseFilter !== 'all' || selectedMetric);
+
+      if (!hasFilters) {
+        return groupSetStats;
+      }
+
+      const totalGroups = filteredData.reduce(
+        (sum, gs) => sum + ((gs as GroupSet).totalGroups || 0),
+        0
+      );
+      const totalMembers = filteredData.reduce(
+        (sum, gs) => sum + ((gs as GroupSet).totalMembers || 0),
+        0
+      );
+
       return {
         totalGroupSets: filteredData.length,
-        totalGroups: totalGroups,
-        totalMembers: uniqueMembers.size, // Use the actual unique count
-        activeGroupSets: filteredData.filter(gs => (gs as GroupSet).allowSelfSignup).length
+        totalGroups,
+        totalMembers,
+        activeGroupSets: filteredData.filter((gs) => (gs as GroupSet).allowSelfSignup).length,
       };
     } else {
       // For students, count unique members across all their groups

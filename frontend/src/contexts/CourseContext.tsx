@@ -181,7 +181,7 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setError(null);
       const response = await api.delete(`/courses/${id}`);
       if (response.data.success) {
-        setCourses(courses.filter(course => course._id !== id));
+        setCourses((prev) => prev.filter((course) => course._id !== id));
       } else {
         setError(response.data.message || 'Failed to delete course');
       }

@@ -1,4 +1,5 @@
 import api, { getImageUrl } from './api';
+import { getMemoryAuthToken, authFetchInit } from '../utils/authToken';
 import { extractFileAssetId, isMongoObjectId, buildSecureDownloadPath, mapUploadResponse, type NormalizedFile } from '../utils/fileTypes';
 
 export interface UploadOptions {
@@ -71,7 +72,7 @@ const pendingTokenRequests = new Map<string, Promise<{ token: string; downloadUr
 const TOKEN_REFRESH_BUFFER_MS = 60_000;
 
 function downloadTokenCacheKey(fileAssetId: string): string {
-  const userKey = localStorage.getItem('token')?.slice(-16) || 'anon';
+  const userKey = getMemoryAuthToken()?.slice(-16) || 'anon';
   return `${userKey}:${fileAssetId}`;
 }
 
@@ -147,7 +148,7 @@ export async function fetchAuthenticatedFile(
     /* Bearer-only */
   }
   const target = resolveSecureFileUrl(path);
-  const authToken = localStorage.getItem('token');
+  const authToken = getMemoryAuthToken();
   const res = await fetch(target, {
     headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
     redirect: 'manual',

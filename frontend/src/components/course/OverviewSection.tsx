@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../../utils/authToken';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Unlock, Settings, Layout, Gamepad2 } from 'lucide-react';
 import LatestAnnouncements from '../announcements/LatestAnnouncements';
@@ -49,7 +50,7 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
     const run = async () => {
       setGradebookAssignmentCount('loading');
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const fallback = modules.reduce((acc, m) => acc + (m.assignments?.length || 0), 0);
         if (!token || !course?._id) {
           if (!cancelled) setGradebookAssignmentCount(fallback);

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../../utils/authToken';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
@@ -622,7 +623,7 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
     }
     if (!moduleId) return;
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const response = await api.get(`/assignments/module/${moduleId}`);
       const assignmentsData = response.data?.data || response.data;
       setAssignments(Array.isArray(assignmentsData) ? assignmentsData : []);

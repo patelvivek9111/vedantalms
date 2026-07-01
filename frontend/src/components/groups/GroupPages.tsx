@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../../utils/authToken';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import CreatePageForm from '../pages/CreatePageForm';
@@ -44,7 +45,7 @@ const GroupPages: React.FC<GroupPagesProps> = ({ groupSetId, groupId, isInstruct
     const fetchPages = async () => {
       setLoading(true);
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const res = await api.get(`/pages/groupset/${groupSetId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -63,7 +64,7 @@ const GroupPages: React.FC<GroupPagesProps> = ({ groupSetId, groupId, isInstruct
     const fetchGroupInfo = async () => {
       if (!groupId) return;
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const res = await api.get(`/groups/${groupId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });

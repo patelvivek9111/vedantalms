@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../utils/authToken';
 import { Link } from 'react-router-dom';
 import { 
   Users, 
@@ -61,7 +62,7 @@ export function AdminDashboard() {
 
     const load = async (isInitial: boolean) => {
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         if (!token) return;
         const headers = { Authorization: `Bearer ${token}` };
 

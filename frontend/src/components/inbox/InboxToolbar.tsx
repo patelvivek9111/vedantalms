@@ -133,7 +133,7 @@ const InboxToolbar: React.FC<InboxToolbarProps> = ({
         : 'archive';
 
   return (
-  <div className="sticky top-0 z-20 border-b border-gray-200 bg-white pt-20 dark:border-gray-800 dark:bg-gray-900 lg:border-gray-200/80 lg:bg-white/95 lg:pt-0 lg:backdrop-blur-sm dark:lg:bg-gray-900/95">
+  <div className="sticky top-0 z-20 border-b border-gray-200 bg-white pt-[calc(4rem+env(safe-area-inset-top,0px))] dark:border-gray-800 dark:bg-gray-900 lg:border-gray-200/80 lg:bg-white/95 lg:pt-0 lg:backdrop-blur-sm dark:lg:bg-gray-900/95">
     {/* Mobile — unchanged stacked layout */}
     <div className="mx-auto w-full max-w-3xl space-y-2 px-4 py-3 lg:hidden">
       <div className="flex items-center gap-2">

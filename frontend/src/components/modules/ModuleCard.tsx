@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../../utils/authToken';
 import { Module, useModule } from '../../contexts/ModuleContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { ChevronDown, ChevronRight, FileText, Plus, ClipboardList, Trash2, Lock, Unlock, Pencil } from 'lucide-react';
@@ -108,7 +109,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
         setIsLoadingAssignments(true);
         setAssignmentsError(null);
         try {
-          const token = localStorage.getItem('token');
+          const token = getMemoryAuthToken();
           const res = await axios.get(`${API_URL}/api/assignments/module/${module._id}`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
@@ -129,7 +130,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
         setIsLoadingDiscussions(true);
         setDiscussionsError(null);
         try {
-          const token = localStorage.getItem('token');
+          const token = getMemoryAuthToken();
           const res = await axios.get(`${API_URL}/api/threads/module/${module._id}`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
@@ -187,7 +188,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
   const handleToggleAssignmentPublish = async (assignment: any) => {
     setAssignmentPublishing(assignment._id);
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const res = await axios.patch(
         `${API_URL}/api/assignments/${assignment._id}/publish`,
         {},
@@ -209,7 +210,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
     if (!itemToDelete || itemToDelete.type !== 'page') return;
     setShowDeletePageConfirm(false);
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
       await axios.delete(`${API_URL}/api/pages/${itemToDelete.id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -229,7 +230,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({ module, onAddPage }) => {
     if (!itemToDelete || itemToDelete.type !== 'assignment') return;
     setShowDeleteAssignmentConfirm(false);
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
       await axios.delete(`${API_URL}/api/assignments/${itemToDelete.id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });

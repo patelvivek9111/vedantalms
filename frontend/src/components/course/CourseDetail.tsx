@@ -1,4 +1,5 @@
 import React, { Suspense, useEffect, useState, useRef, useCallback } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../../utils/authToken';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useCourse } from '../../contexts/CourseContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -208,7 +209,7 @@ const CourseDetail: React.FC = () => {
         setCourse(courseData);
 
         // Fetch modules for the course
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const modulesResponse = await api.get(`/modules/${id}`, {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -330,7 +331,7 @@ const CourseDetail: React.FC = () => {
     if (!course?._id) return;
     const fetchGroupAssignments = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const res = await axios.get(`${API_URL}/api/assignments/course/${course._id}/group-assignments`, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined);
         setGroupAssignments(res.data);
       } catch (err) {
@@ -424,7 +425,7 @@ const CourseDetail: React.FC = () => {
   const handleApproveEnrollment = async (studentId: string) => {
     if (!id) return;
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       await axios.post(
         `${API_URL}/api/courses/${id}/enrollment/${studentId}/approve`,
         {},
@@ -446,7 +447,7 @@ const CourseDetail: React.FC = () => {
   const handleDenyEnrollment = async (studentId: string) => {
     if (!id) return;
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       await axios.post(
         `${API_URL}/api/courses/${id}/enrollment/${studentId}/deny`,
         {},
@@ -470,7 +471,7 @@ const CourseDetail: React.FC = () => {
   const handleToggleAssignmentPublish = async (assignment: any) => {
     setAssignmentPublishing(assignment._id);
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const res = await axios.patch(
         `${API_URL}/api/assignments/${assignment._id}/publish`,
         {},

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../utils/authToken';
 import axios from 'axios';
 import { API_URL } from '../config';
 
@@ -50,7 +51,7 @@ export const useGradeScaleManagement = ({
         }
       }
       // Save to backend
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const baseUrl = API_URL || '';
       const res = await axios.put(
         `${baseUrl}/api/courses/${course._id}`,

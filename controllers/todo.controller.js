@@ -28,6 +28,8 @@ exports.createTodo = async (req, res) => {
 // Get all to-dos for the current user (not completed)
 exports.getTodos = async (req, res) => {
   try {
+    const { pruneOrphanCourseTodosForUser } = require('../services/todoCourseCleanup.service');
+    await pruneOrphanCourseTodosForUser(req.user._id);
     const todos = await Todo.find({ user: req.user._id, completed: false }).sort({ dueDate: 1 });
     res.json(todos);
   } catch (err) {

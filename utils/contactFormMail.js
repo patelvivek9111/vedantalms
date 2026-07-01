@@ -28,7 +28,7 @@ function getTransporter() {
     port,
     secure: port === 465,
     auth: { user, pass },
-    tls: { rejectUnauthorized: false },
+    tls: { rejectUnauthorized: process.env.CONTACT_SMTP_TLS_REJECT_UNAUTHORIZED !== 'false' },
   });
   return cachedTransporter;
 }

@@ -9,6 +9,7 @@ const LoginActivity = require('../models/loginActivity.model');
 const SystemSettings = require('../models/systemSettings.model');
 const fs = require('fs');
 const path = require('path');
+const { deleteUserAndRelatedData } = require('../services/userDeleteCascade.service');
 
 // Get system statistics
 exports.getSystemStats = async (req, res) => {
@@ -553,12 +554,24 @@ exports.deleteUser = async (req, res) => {
       }
     }
 
-    await User.deleteOne({ _id: id });
+    const result = await deleteUserAndRelatedData(id, {
+      actorId: req.user._id || req.user.id,
+    });
+
+    if (!result.ok) {
+      if (result.reason === 'user_instructs_courses') {
+        return res.status(400).json({ success: false, message: result.message });
+      }
+      if (result.reason === 'user_not_found') {
+        return res.status(404).json({ success: false, message: 'User not found' });
+      }
+      return res.status(400).json({ success: false, message: result.reason || 'Delete failed' });
+    }
 
     return res.json({
       success: true,
-      message: 'User deleted successfully',
-      data: { _id: id },
+      message: 'User and related data deleted successfully',
+      data: { _id: id, deleted: result.deleted },
     });
   } catch (error) {
     console.error('Error deleting user:', error);
@@ -658,7 +671,11 @@ exports.updateUserStatus = async (req, res) => {
     }
 
     user.accountStatus = status;
-    await user.save();
+    if (status === 'suspended') {
+      await user.invalidateSessions();
+    } else {
+      await user.save();
+    }
 
     return res.json({
       success: true,

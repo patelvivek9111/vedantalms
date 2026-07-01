@@ -290,6 +290,14 @@ export function Login() {
                   error={passwordError}
                   enterKeyHint="done"
                 />
+                <p className="text-right text-sm">
+                  <Link
+                    to="/forgot-password"
+                    className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
+                  >
+                    Forgot password?
+                  </Link>
+                </p>
               </div>
 
               <button

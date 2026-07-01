@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../utils/authToken';
 import { refreshDownloadToken, resolveSecureFileUrl } from '../services/fileUploadApi';
 import { extractFileAssetId, fileAccessErrorMessage } from '../utils/fileTypes';
 
@@ -40,7 +41,7 @@ export function useFileDownload() {
           const refreshed = await refreshDownloadToken(id);
           if (refreshed?.downloadUrl) target = resolveSecureFileUrl(refreshed.downloadUrl);
         }
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const res = await fetch(target, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });

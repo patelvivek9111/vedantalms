@@ -1,4 +1,5 @@
 import React, { useState, ChangeEvent, FormEvent, useEffect } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../../utils/authToken';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
@@ -268,7 +269,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
       }
 
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         // First get the current module to get its course ID
         const moduleResponse = await axios.get(`${API_URL}/api/modules/view/${moduleId}`, {
           headers: {
@@ -337,7 +338,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
     const fetchGroupSets = async () => {
       if (!courseId) return;
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const response = await axios.get(`${API_URL}/api/groups/sets/${courseId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -355,7 +356,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
       // Fetch submission count for this assignment
       const fetchSubmissionCount = async () => {
         try {
-          const token = localStorage.getItem('token');
+          const token = getMemoryAuthToken();
           const response = await axios.get(`${API_URL}/api/submissions/assignment/${assignmentData._id}`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
@@ -737,7 +738,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
       }
 
 
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       
       if (editMode && assignmentData) {
         // Update existing assignment

@@ -1,5 +1,6 @@
 const User = require('../models/user.model');
 const bcrypt = require('bcryptjs');
+const { validatePassword } = require('../utils/passwordPolicy');
 
 // @desc    Search users by email or name
 // @route   GET /api/users/search
@@ -298,11 +299,11 @@ exports.updatePassword = async (req, res) => {
       });
     }
 
-    // Validate minimum password length
-    if (newPassword.length < 6) {
+    const passwordCheck = validatePassword(newPassword);
+    if (!passwordCheck.valid) {
       return res.status(400).json({
         success: false,
-        message: 'Password must be at least 6 characters long'
+        message: passwordCheck.message,
       });
     }
 
@@ -332,9 +333,9 @@ exports.updatePassword = async (req, res) => {
       });
     }
 
-    // Update password
+    // Update password and invalidate other sessions
     user.password = newPassword;
-    await user.save();
+    await user.invalidateSessions();
 
     res.json({
       success: true,

@@ -1,5 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 import { getBackendOrigin } from '../config';
+import { getMemoryAuthToken } from './authToken';
 import {
   MESSAGING_SOCKET_EVENTS,
   type MessagingSocketEvent,
@@ -42,8 +43,10 @@ function attachSocketHandlers(sock: Socket) {
   });
 }
 
-export function getMessagingSocket(token: string): Socket | null {
-  if (!isInboxWebSocketEnabled() || !token) return null;
+export function getMessagingSocket(token?: string | null): Socket | null {
+  if (!isInboxWebSocketEnabled()) return null;
+
+  const authToken = token ?? getMemoryAuthToken();
 
   const baseURL = getBackendOrigin();
 
@@ -58,7 +61,8 @@ export function getMessagingSocket(token: string): Socket | null {
   }
 
   socket = io(`${baseURL}/messaging`, {
-    auth: { token },
+    auth: authToken ? { token: authToken } : undefined,
+    withCredentials: true,
     transports: ['websocket', 'polling'],
     reconnection: true,
     reconnectionDelay: 1000,

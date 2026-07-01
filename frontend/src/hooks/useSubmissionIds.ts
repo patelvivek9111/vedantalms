@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../utils/authToken';
 import axios from 'axios';
 import { API_URL } from '../config';
 
@@ -41,7 +42,7 @@ export const useSubmissionIds = ({
       
       const newSubmissionMap: { [key: string]: string } = {};
       const newGrades: { [studentId: string]: { [assignmentId: string]: number | string } } = { [String(user._id)]: {} };
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const submissionRecords: any[] = [];
 
       try {

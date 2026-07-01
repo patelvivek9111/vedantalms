@@ -695,7 +695,7 @@ export function Dashboard() {
                   <div 
                     {...provided.droppableProps}
                     ref={provided.innerRef}
-                    className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 lg:gap-6"
+                    className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 lg:gap-6"
                   >
                     {publishedCourses.map((course, index) => (
                       <Draggable key={course._id} draggableId={course._id} index={index}>
@@ -711,7 +711,7 @@ export function Dashboard() {
                 >
                   {/* Top section - Dynamic color */}
                   <div 
-                    className="relative h-24 sm:h-32 lg:h-48"
+                    className="relative h-32 lg:h-48"
                     style={{ backgroundColor: getCourseColor(course._id) }}
                   >
                     {/* Drag Handle - Bottom Left (visible on hover) */}
@@ -859,23 +859,23 @@ export function Dashboard() {
                   </div>
                   
                   {/* Bottom section - White */}
-                  <div className="p-3 lg:p-6">
-                    <div className="mb-1.5 lg:mb-2">
+                  <div className="p-4 lg:p-6">
+                    <div className="mb-2 lg:mb-2">
                       <h2
-                        className="mb-0.5 line-clamp-2 text-[13px] font-semibold lg:mb-1 lg:text-lg"
+                        className="mb-1 line-clamp-2 text-base font-bold lg:text-lg lg:font-semibold"
                         style={{ color: getCourseColor(course._id) }}
                       >
                         {course.catalog?.courseCode || course.title}
                       </h2>
-                      <p className="line-clamp-1 text-[10px] text-gray-500 dark:text-gray-400 sm:text-[11px] lg:text-sm">
+                      <p className="line-clamp-1 text-xs text-gray-500 dark:text-gray-400 lg:text-sm">
                         Instructor: {course.instructor.firstName} {course.instructor.lastName}
                       </p>
                     </div>
 
-                    <div className="mt-2 flex items-center justify-between lg:mt-4">
+                    <div className="mt-3 flex items-center justify-between lg:mt-4">
                       {getCourseIcons(course._id).map((iconId) => renderActionIcon(iconId, course._id))}
                       {Array.from({ length: 3 - getCourseIcons(course._id).length }).map((_, index) => (
-                        <div key={index} className="h-7 w-7 lg:h-9 lg:w-9" />
+                        <div key={index} className="h-9 w-9" />
                       ))}
                     </div>
                   </div>

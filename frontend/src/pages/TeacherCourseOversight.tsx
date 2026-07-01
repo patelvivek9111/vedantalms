@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../utils/authToken';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { API_URL } from '../config';
 import { useAuth } from '../contexts/AuthContext';
+import { useCourse } from '../contexts/CourseContext';
 import { getImageUrl } from '../services/api';
 import { 
   BookOpen, 
@@ -48,6 +50,7 @@ interface Course {
 export function TeacherCourseOversight() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { deleteCourse: deleteCourseInContext } = useCourse();
   const [courses, setCourses] = useState<Course[]>([]);
   const [filteredCourses, setFilteredCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
@@ -99,7 +102,7 @@ export function TeacherCourseOversight() {
   useEffect(() => {
     const fetchCourses = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const headers = { Authorization: `Bearer ${token}` };
         
         // Fetch teacher's courses - the API already filters by instructor
@@ -256,7 +259,7 @@ export function TeacherCourseOversight() {
 
     setSaving(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const headers = { Authorization: `Bearer ${token}` };
 
       await axios.put(`${API_URL}/api/courses/${selectedCourse._id}`, {
@@ -284,14 +287,10 @@ export function TeacherCourseOversight() {
 
   const handleDeleteCourse = async (courseId: string) => {
     try {
-      const token = localStorage.getItem('token');
-      const headers = { Authorization: `Bearer ${token}` };
+      await deleteCourseInContext(courseId);
 
-      await axios.delete(`${API_URL}/api/courses/${courseId}`, { headers });
-
-      // Remove from local state
-      setCourses(courses.filter(c => c._id !== courseId));
-      setFilteredCourses(filteredCourses.filter(c => c._id !== courseId));
+      setCourses((prev) => prev.filter((c) => c._id !== courseId));
+      setFilteredCourses((prev) => prev.filter((c) => c._id !== courseId));
       toast.success('Course deleted successfully');
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to delete course');
@@ -306,7 +305,7 @@ export function TeacherCourseOversight() {
     }
 
     setBulkActionLoading(true);
-    const token = localStorage.getItem('token');
+    const token = getMemoryAuthToken();
     const headers = { Authorization: `Bearer ${token}` };
 
     let successCount = 0;
@@ -353,7 +352,7 @@ export function TeacherCourseOversight() {
     }
 
     setBulkActionLoading(true);
-    const token = localStorage.getItem('token');
+    const token = getMemoryAuthToken();
     const headers = { Authorization: `Bearer ${token}` };
 
     let successCount = 0;

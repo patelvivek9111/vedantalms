@@ -1,5 +1,5 @@
-const jwt = require('jsonwebtoken');
 const notificationRealtime = require('../services/notification/notificationRealtime.service');
+const { authenticateSocket: verifySocketAuth } = require('../utils/socketAuth');
 
 const socketMetrics = {
   connected: 0,
@@ -8,26 +8,10 @@ const socketMetrics = {
 };
 
 function authenticateSocket(socket, next) {
-  try {
-    const token =
-      socket.handshake.auth?.token ||
-      socket.handshake.headers?.authorization?.split(' ')[1];
-
-    if (!token) {
-      return next(new Error('Authentication error: No token provided'));
-    }
-
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || 'your-super-secret-jwt-key-123'
-    );
-    socket.userId = decoded.id;
-    socket.userRole = decoded.role;
-    return next();
-  } catch {
+  verifySocketAuth(socket, next).catch(() => {
     socketMetrics.authErrors += 1;
-    return next(new Error('Authentication error: Invalid token'));
-  }
+    next(new Error('Authentication error: Invalid token'));
+  });
 }
 
 /**

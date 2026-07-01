@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../../utils/authToken';
 import axios from 'axios';
 import { API_URL } from '../../config';
 import { Vote, CheckCircle, AlertCircle } from 'lucide-react';
@@ -62,7 +63,7 @@ const PollVote: React.FC<PollVoteProps> = ({ poll, onVoteSuccess }) => {
     setError(null);
 
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       await axios.post(`${API_URL}/api/polls/${poll._id}/vote`, {
         selectedOptions
       }, {

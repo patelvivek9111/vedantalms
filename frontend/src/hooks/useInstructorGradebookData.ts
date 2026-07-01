@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../utils/authToken';
 import axios from 'axios';
 import { API_URL } from '../config';
 import { fetchGradebookColumnItems } from '../utils/fetchGradebookColumnItems';
@@ -41,7 +42,7 @@ export const useInstructorGradebookData = ({
         return;
       }
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const students = course?.students || [];
         if (!token || !course?._id) {
           if (!cancelled) {

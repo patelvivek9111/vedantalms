@@ -1,10 +1,10 @@
 const { QuizSession } = require('../models/quizwave.model');
-const jwt = require('jsonwebtoken');
 const { setSession } = require('../utils/quizwaveSessionStore');
 const { allowQuizWaveEvent } = require('../utils/quizwaveSocketThrottle');
 const engine = require('../services/quizwaveSessionEngine');
 const { PHASES } = engine;
 const { processAnswer, buildLeaderboard } = require('../services/quizScoringEngine');
+const { authenticateSocket: verifySocketAuth } = require('../utils/socketAuth');
 
 // Store active sessions through redis-backed store when available
 const activeSessions = new Map(); // Legacy export for backward compatibility
@@ -26,21 +26,10 @@ const emitRateLimited = (socket) => {
 
 // Authenticate socket connection
 const authenticateSocket = (socket, next) => {
-  try {
-    const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.split(' ')[1];
-    
-    if (!token) {
-      return next(new Error('Authentication error: No token provided'));
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-super-secret-jwt-key-123');
-    socket.userId = decoded.id;
-    socket.userRole = decoded.role;
-    next();
-  } catch (error) {
+  verifySocketAuth(socket, next).catch(() => {
     socketMetrics.authErrors += 1;
     next(new Error('Authentication error: Invalid token'));
-  }
+  });
 };
 
 // Initialize QuizWave socket handlers

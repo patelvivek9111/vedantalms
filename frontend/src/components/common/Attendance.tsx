@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../../utils/authToken';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { 
@@ -143,7 +144,7 @@ const CalendarDay: React.FC<CalendarDayProps> = ({ day, courseId, isInstructor, 
   const fetchDayAttendance = async (date: string) => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       if (!token || !courseId) {
         setAttendanceData([]);
         return;
@@ -357,7 +358,7 @@ const Attendance: React.FC = () => {
         setLoading(true);
         
         // Get authentication token
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         if (!token) {
           return;
         }
@@ -487,7 +488,7 @@ const Attendance: React.FC = () => {
   const handleSaveAttendance = async () => {
     try {
       // Get authentication token
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       if (!token) {
         alert('No authentication token found');
         return;
@@ -529,7 +530,7 @@ const Attendance: React.FC = () => {
 
     // Auto-save to database
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       if (!token) {
         return;
       }
@@ -571,7 +572,7 @@ const Attendance: React.FC = () => {
       setLoading(true);
       
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         if (!token) {
           setLoading(false);
           return;
@@ -644,7 +645,7 @@ const Attendance: React.FC = () => {
 
   const assignInstructor = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       if (!token) {
         alert('No authentication token found');
         return;
@@ -656,7 +657,7 @@ const Attendance: React.FC = () => {
       if (response.data.success) {
         alert('Successfully assigned as instructor!');
         // Refresh course data to update the instructor status
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         if (token) {
           const headers = { Authorization: `Bearer ${token}` };
           const courseResponse = await axios.get(`${API_URL}/api/courses/${courseId}`, { headers });
@@ -672,7 +673,7 @@ const Attendance: React.FC = () => {
   const exportAttendance = async () => {
     try {
       // Fetch attendance percentages for overall data
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       if (!token) {
         alert('No authentication token found');
         return;
@@ -720,7 +721,7 @@ const Attendance: React.FC = () => {
   const exportMonthlyAttendance = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       if (!token) {
         alert('No authentication token found');
         return;
@@ -795,7 +796,7 @@ const Attendance: React.FC = () => {
   const exportCustomAttendance = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       if (!token) {
         alert('No authentication token found');
         return;
@@ -911,7 +912,7 @@ const Attendance: React.FC = () => {
   const fetchAttendancePercentages = async () => {
     if (user?.role !== 'teacher' && user?.role !== 'admin') return;
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       if (!token) return;
 
       const headers = { Authorization: `Bearer ${token}` };

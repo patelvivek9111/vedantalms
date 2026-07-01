@@ -46,7 +46,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
 
   return (
     <div
-      className={`mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col lg:mx-0 lg:h-full lg:max-w-none lg:w-80 lg:shrink-0 lg:overflow-hidden lg:rounded-xl lg:border lg:border-gray-200/80 lg:bg-white lg:shadow-sm dark:lg:border-gray-700 dark:lg:bg-gray-800 xl:w-96 ${hiddenOnMobile ? 'hidden lg:flex' : 'flex'}`}
+      className={`mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col bg-gray-50 dark:bg-gray-950 lg:mx-0 lg:h-full lg:max-w-none lg:w-80 lg:shrink-0 lg:overflow-hidden lg:rounded-xl lg:border lg:border-gray-200/80 lg:bg-white lg:shadow-sm dark:lg:border-gray-700 dark:lg:bg-gray-800 xl:w-96 ${hiddenOnMobile ? 'hidden lg:flex' : 'flex'}`}
     >
       {!loading && !error && conversations.length > 0 && (
         <div className="flex items-center gap-2.5 px-4 py-2 lg:border-b lg:border-gray-100 lg:dark:border-gray-700/80">

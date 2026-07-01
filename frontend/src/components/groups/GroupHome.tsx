@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../../utils/authToken';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Users, MessageSquare, FileText, ClipboardList, Megaphone, Clock, CheckCircle, Settings, UserPlus } from 'lucide-react';
 import axios from 'axios';
@@ -51,7 +52,7 @@ const GroupHome: React.FC = () => {
     const fetchGroupInfo = async () => {
       if (!groupId) return;
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const groupResponse = await axios.get(`${API_URL}/api/groups/${groupId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });

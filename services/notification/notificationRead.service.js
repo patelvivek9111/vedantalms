@@ -54,6 +54,9 @@ function recordReadMetric(endpoint, { queryCount, resultCount, durationMs, extra
  */
 async function listNotificationsForUser(userId, { read, type, limit = 50, page = 1 } = {}) {
   const started = Date.now();
+  const { pruneOrphanCourseNotificationsForUser } = require('./notificationCourseCleanup.service');
+  await pruneOrphanCourseNotificationsForUser(userId);
+
   const limitNum = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 100);
   const pageNum = Math.max(parseInt(page, 10) || 1, 1);
   const skip = (pageNum - 1) * limitNum;

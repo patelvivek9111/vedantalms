@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../../utils/authToken';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../../services/api';
 import { API_URL } from '../../config';
@@ -629,7 +630,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         
         const assignmentRes = await api.get(`/assignments/${id}`);
         // Check if response is HTML
@@ -1028,7 +1029,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
         }
       });
 
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       if (!token) {
         setError('Authentication token not found. Please log in again.');
         setIsSubmitting(false);
@@ -1100,7 +1101,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
   const confirmDelete = async () => {
     setShowDeleteConfirm(false);
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       await api.delete(`/assignments/${id}`);
       navigate(-1);
     } catch (err: any) {

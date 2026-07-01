@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../utils/authToken';
 import axios from 'axios';
 import { API_URL } from '../config';
 import { MobileAppShell } from '../components/common/MobileAppShell';
@@ -50,7 +51,7 @@ export function AdminSecurity() {
   useEffect(() => {
     const fetchSecurityData = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const headers = { Authorization: `Bearer ${token}` };
 
         // Fetch security stats

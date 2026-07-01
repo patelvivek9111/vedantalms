@@ -1458,7 +1458,11 @@ const CalendarPage: React.FC = () => {
               Calendars
             </p>
           </div>
-          <div className="max-h-44 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-700/50">
+          <div
+            className={`divide-y divide-gray-100 dark:divide-gray-700/50 ${
+              calendarOptions.length > 3 ? 'max-h-[11.25rem] overflow-y-auto scrollbar-themed' : ''
+            }`}
+          >
             {calendarOptions.map((opt, idx) => (
               <CalendarFilterRow
                 key={opt.value}
@@ -1494,7 +1498,7 @@ const CalendarPage: React.FC = () => {
           )}
         </div>
         {/* To-Do Panel below calendar list */}
-        <div className="max-h-64 overflow-y-auto pr-1 rounded-2xl">
+        <div className="max-h-64 overflow-y-auto scrollbar-themed pr-1 rounded-2xl">
           <ToDoPanel />
         </div>
       </div>

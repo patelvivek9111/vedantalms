@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../../utils/authToken';
 import axios from 'axios';
 import { QRCodeSVG } from 'qrcode.react';
 import { Printer, QrCode, Loader2, AlertCircle, Copy } from 'lucide-react';
@@ -22,7 +23,7 @@ const CourseEnrollmentQrCard: React.FC<Props> = ({ courseId }) => {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const res = await axios.get(`${API_URL}/api/courses/${courseId}/enrollment-join-info`, {
         headers: { Authorization: `Bearer ${token}` },
       });

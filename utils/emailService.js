@@ -24,8 +24,7 @@ async function initializeEmailService() {
         pass: emailConfig.smtpPassword
       },
       tls: {
-        // Do not fail on invalid certificates (useful for self-signed certs)
-        rejectUnauthorized: false
+        rejectUnauthorized: process.env.SMTP_TLS_REJECT_UNAUTHORIZED !== 'false',
       }
     });
 

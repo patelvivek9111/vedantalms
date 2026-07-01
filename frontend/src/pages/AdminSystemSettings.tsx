@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../utils/authToken';
 import axios from 'axios';
 import { API_URL } from '../config';
 import { 
@@ -69,7 +70,7 @@ export function AdminSystemSettings() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const headers = { Authorization: `Bearer ${token}` };
         
         const response = await axios.get(`${API_URL}/api/admin/settings`, { headers });
@@ -105,7 +106,7 @@ export function AdminSystemSettings() {
     setSaving(true);
     setSaveMessage(null);
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const headers = { Authorization: `Bearer ${token}` };
       
       await axios.put(`${API_URL}/api/admin/settings`, config, { headers });
@@ -129,7 +130,7 @@ export function AdminSystemSettings() {
     setLoading(true);
     setSaveMessage(null);
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const headers = { Authorization: `Bearer ${token}` };
       
       const response = await axios.post(`${API_URL}/api/admin/settings/test-email`, config.email, { headers });

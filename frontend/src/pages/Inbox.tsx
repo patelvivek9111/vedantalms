@@ -106,6 +106,7 @@ const Inbox: React.FC = () => {
   const [showGroupDropdown, setShowGroupDropdown] = useState(false);
   const [sendIndividually, setSendIndividually] = useState(false);
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const markReadInFlightRef = useRef<Set<string>>(new Set());
   const [courseOptions, setCourseOptions] = useState([{ value: 'all', label: 'All Courses' }]);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -161,29 +162,37 @@ const Inbox: React.FC = () => {
 
   const markConversationReadIfNeeded = useCallback(
     async (conv: any) => {
-      if (!conv?._id || !(conv.unreadCount > 0)) return;
+      const id = conv?._id;
+      if (!id || !(conv.unreadCount > 0)) return;
+      if (markReadInFlightRef.current.has(id)) return;
+      markReadInFlightRef.current.add(id);
       try {
-        await mutations.markRead.mutateAsync(conv._id);
+        await mutations.markRead.mutateAsync(id);
       } catch {
         /* list will reconcile on next poll */
+      } finally {
+        markReadInFlightRef.current.delete(id);
       }
     },
     [mutations.markRead]
   );
 
   const handleSelectConversation = useCallback(
-    async (conv: any) => {
+    (conv: any) => {
       setConversationId(conv._id);
       setShowReplyBox(false);
-      await markConversationReadIfNeeded(conv);
     },
-    [setConversationId, markConversationReadIfNeeded]
+    [setConversationId]
   );
 
   useEffect(() => {
-    if (!selectedConversation) return;
+    if (!selectedConversation?._id || !(selectedConversation.unreadCount > 0)) return;
     void markConversationReadIfNeeded(selectedConversation);
-  }, [selectedConversation, markConversationReadIfNeeded]);
+  }, [
+    selectedConversation?._id,
+    selectedConversation?.unreadCount,
+    markConversationReadIfNeeded,
+  ]);
 
   const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -488,13 +497,14 @@ const Inbox: React.FC = () => {
       onSwipeRight={swipeEnabled ? handleSwipeRight : undefined}
       enabled={swipeEnabled}
       preventScrollInterference
-      className="flex h-full min-h-[calc(100dvh-4rem-env(safe-area-inset-bottom,0px))] flex-col bg-gray-50 dark:bg-gray-950 lg:min-h-[calc(100dvh-4rem)]"
+      className={`flex h-full min-h-0 flex-col bg-gray-50 dark:bg-gray-950 lg:-mb-10 lg:min-h-dvh lg:pb-0 ${conversationId ? 'min-h-dvh' : 'min-h-[calc(100dvh-4rem-env(safe-area-inset-bottom,0px))]'}`}
     >
       <PullToRefresh
         onRefresh={handleRefresh}
+        disabled={Boolean(conversationId)}
         className="flex h-full min-h-0 flex-1 flex-col bg-gray-50 dark:bg-gray-950"
       >
-        <div className="flex h-full min-h-0 w-full flex-1 flex-col bg-gray-50 dark:bg-gray-950 lg:min-h-[calc(100dvh-4rem)]">
+        <div className="flex h-full min-h-0 w-full flex-1 flex-col bg-gray-50 dark:bg-gray-950 lg:min-h-dvh">
           {!conversationId && (
             <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm safe-area-inset-top">
               <div className="relative flex items-center justify-between px-4 py-3">
@@ -513,7 +523,7 @@ const Inbox: React.FC = () => {
             </nav>
           )}
 
-          <div className={conversationId ? 'hidden lg:block' : 'pt-20 lg:pt-0'}>
+          <div className={conversationId ? 'hidden shrink-0 lg:block' : 'shrink-0'}>
           <InboxToolbar
             userRole={user?.role}
             courseOptions={courseOptions}
@@ -533,7 +543,7 @@ const Inbox: React.FC = () => {
           </div>
 
           <div
-            className={`flex min-h-0 w-full flex-1 flex-col gap-3 px-0 lg:flex-row lg:gap-4 lg:px-6 lg:pb-6 ${conversationId ? 'py-0 lg:pt-4' : 'pt-2 pb-0 lg:pt-4'}`}
+            className={`flex min-h-0 w-full flex-1 flex-col gap-3 px-0 lg:flex-row lg:items-stretch lg:gap-4 lg:px-6 lg:pb-0 ${conversationId ? 'py-0 lg:pt-4' : 'pt-2 pb-0 lg:pt-4'}`}
           >
             <ComposeModal
               open={showCompose}
@@ -586,7 +596,11 @@ const Inbox: React.FC = () => {
             />
 
             <div
-              className={`flex min-h-[400px] min-w-0 flex-1 flex-col bg-white p-0 dark:bg-gray-800 lg:min-h-0 lg:overflow-hidden lg:rounded-xl lg:border lg:border-gray-200/80 lg:shadow-sm dark:lg:border-gray-700 ${!selectedConversation ? 'hidden lg:flex' : 'flex'}`}
+              className={
+                !selectedConversation
+                  ? 'hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white dark:bg-gray-800 lg:flex lg:h-full lg:rounded-xl lg:border lg:border-gray-200/80 lg:shadow-sm dark:lg:border-gray-700'
+                  : 'fixed inset-0 z-[140] flex h-dvh max-h-dvh min-w-0 flex-col overflow-hidden bg-white dark:bg-gray-800 lg:static lg:z-auto lg:h-full lg:max-h-none lg:flex-1 lg:rounded-xl lg:border lg:border-gray-200/80 lg:shadow-sm dark:lg:border-gray-700'
+              }
             >
               {!selectedConversation && (
                 <div className="flex h-full flex-col items-center justify-center text-gray-400 dark:text-gray-500">

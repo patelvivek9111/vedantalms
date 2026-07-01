@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../../utils/authToken';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import { formatDistanceToNow, format } from 'date-fns';
@@ -796,7 +797,7 @@ const ThreadView: React.FC = () => {
     const fetchGroupCourseId = async () => {
       if (groupId && !courseId) {
         try {
-          const token = localStorage.getItem('token');
+          const token = getMemoryAuthToken();
           const response = await api.get(`/groups/${groupId}`, {
             headers: { Authorization: `Bearer ${token}` }
           });
@@ -837,7 +838,7 @@ const ThreadView: React.FC = () => {
       return;
     }
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       
       // First, fetch the thread to check settings
       const threadRes = await api.get(`/threads/${threadId}${isModerator ? '?includeGrades=true' : ''}`, {
@@ -905,7 +906,7 @@ const ThreadView: React.FC = () => {
     if (!thread?._id) return;
     const markRead = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const res = await api.post(`/threads/${thread._id}/mark-read`, {}, {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -941,7 +942,7 @@ const ThreadView: React.FC = () => {
   }, []);
 
   const fetchChildReplies = async (replyId: string): Promise<Reply[]> => {
-    const token = localStorage.getItem('token');
+    const token = getMemoryAuthToken();
     const response = await api.get(`/replies/${replyId}/children`, {
       headers: { Authorization: `Bearer ${token}` }
     });
@@ -1029,7 +1030,7 @@ const ThreadView: React.FC = () => {
       replyAttemptKeyRef.current = `${thread._id}-${user?._id || 'anonymous'}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     }
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const fileAssetIds = composerFiles.map((f) => f.fileAssetId).filter(Boolean);
       const response = await api.post(
         `/threads/${thread._id}/replies`,
@@ -1102,7 +1103,7 @@ const ThreadView: React.FC = () => {
     if (!thread) return;
 
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const response = await api.post(
         `/threads/${thread._id}/replies/${replyId}/like`,
         {},
@@ -1125,7 +1126,7 @@ const ThreadView: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const fileAssetIds = editThreadAttachments.map((f) => f.fileAssetId).filter(Boolean);
       const response = await api.put(
         `/threads/${thread._id}`,
@@ -1159,7 +1160,7 @@ const ThreadView: React.FC = () => {
     if (!thread) return;
     setShowDeleteThreadConfirm(false);
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const response = await api.delete(
         `/threads/${thread._id}`,
         {
@@ -1178,7 +1179,7 @@ const ThreadView: React.FC = () => {
     if (!thread) return;
 
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const response = await api.patch(
         `/threads/${thread._id}/pin`,
         {},
@@ -1197,7 +1198,7 @@ const ThreadView: React.FC = () => {
   const handleToggleLock = async () => {
     if (!thread || !isModerator) return;
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const endpoint = thread.locked ? 'unlock' : 'lock';
       const response = await api.post(
         `/threads/${thread._id}/${endpoint}`,
@@ -1219,7 +1220,7 @@ const ThreadView: React.FC = () => {
     if (!thread) return;
 
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const response = await api.put(
         `/threads/${thread._id}/replies/${replyId}`,
         payload,
@@ -1240,7 +1241,7 @@ const ThreadView: React.FC = () => {
     if (!thread) return;
 
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const response = await api.delete(
         `/threads/${thread._id}/replies/${replyId}`,
         {
@@ -1281,7 +1282,7 @@ const ThreadView: React.FC = () => {
 
   const handleHideReply = async (replyId: string) => {
     if (!isModerator) return;
-    const token = localStorage.getItem('token');
+    const token = getMemoryAuthToken();
     const response = await api.post(
       `/replies/${replyId}/hide`,
       {},
@@ -1294,7 +1295,7 @@ const ThreadView: React.FC = () => {
 
   const handleRestoreReply = async (replyId: string) => {
     if (!isModerator) return;
-    const token = localStorage.getItem('token');
+    const token = getMemoryAuthToken();
     const response = await api.post(
       `/replies/${replyId}/restore`,
       {},
@@ -1340,7 +1341,7 @@ const ThreadView: React.FC = () => {
     setGradingError(null);
 
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const response = await api.post(
         `/threads/${thread._id}/grade`,
         {
@@ -1384,7 +1385,7 @@ const ThreadView: React.FC = () => {
     if (!thread) return;
 
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const response = await api.put(
         `/threads/${thread._id}`,
         {

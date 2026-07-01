@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../../utils/authToken';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { getQuizWaveSocket } from '../../utils/quizwaveSocket';
 import { quizwaveService } from '../../services/quizwaveService';
@@ -30,7 +31,7 @@ const StudentGameScreen: React.FC = () => {
   const [currentColorIndex, setCurrentColorIndex] = useState(0);
 
   const colorAnimationRef = useRef<NodeJS.Timeout | null>(null);
-  const token = localStorage.getItem('token') || '';
+  const token = getMemoryAuthToken() || '';
   const colors = ['bg-red-500', 'bg-blue-500', 'bg-yellow-500', 'bg-green-500'];
 
   const phase = gameSnapshot?.phase ?? (session?.status === 'ended' ? 'FINISHED' : 'LOBBY');

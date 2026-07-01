@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../utils/authToken';
 import axios from 'axios';
 import { API_URL } from '../config';
 
@@ -24,7 +25,7 @@ export const useDiscussions = ({
     const fetchDiscussions = async () => {
       setDiscussionsLoading(true);
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         let threadsRes;
         try {
           threadsRes = await axios.get(

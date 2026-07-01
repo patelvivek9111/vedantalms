@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../../utils/authToken';
 import { useNavigate, useParams, useOutletContext } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import api, { getImageUrl } from '../../services/api';
@@ -99,7 +100,7 @@ const GroupDiscussion: React.FC = () => {
       if (!groupId) return;
       
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const response = await axios.get(`${API_URL}/api/groups/${groupId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -126,7 +127,7 @@ const GroupDiscussion: React.FC = () => {
       if (!courseId) return;
       
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const response = await axios.get(`${API_URL}/api/courses/${courseId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -146,7 +147,7 @@ const GroupDiscussion: React.FC = () => {
     const fetchGroupsInSet = async () => {
       if (!groupSetId) return;
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const res = await axios.get(`${API_URL}/api/groups/sets/${groupSetId}/groups`, {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -163,7 +164,7 @@ const GroupDiscussion: React.FC = () => {
     const fetchModules = async () => {
       if (!courseId) return;
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const res = await axios.get(`${API_URL}/api/modules/${courseId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -194,7 +195,7 @@ const GroupDiscussion: React.FC = () => {
       
       try {
         setLoading(true);
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const response = await api.get(`/threads/groupset/${groupSetId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });

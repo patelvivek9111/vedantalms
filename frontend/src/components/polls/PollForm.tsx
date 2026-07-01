@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../../utils/authToken';
 import axios from 'axios';
 import { API_URL } from '../../config';
 import { Plus, Trash2 } from 'lucide-react';
@@ -253,7 +254,7 @@ const PollForm: React.FC<PollFormProps> = ({ courseId, poll, onClose, onSuccess 
 
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const payload = {
         title: formData.title.trim(),
         options: formData.options.map(option => option.trim()),

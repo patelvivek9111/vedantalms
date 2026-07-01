@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../utils/authToken';
 import axios from 'axios';
 import { API_URL } from '../config';
 
@@ -35,7 +36,7 @@ export const useGradebookData = ({
       // instructor data when both could run.
       if (isInstructor || isAdmin) return;
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         // 1. Get students
         const students = course?.students || [];
         

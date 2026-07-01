@@ -14,6 +14,15 @@ function validateStartupEnv() {
     if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'your-super-secret-jwt-key-123') {
       errors.push('JWT_SECRET must be set to a strong secret in production');
     }
+    if (!process.env.METRICS_TOKEN) {
+      warnings.push('METRICS_TOKEN is not set — /metrics requires an admin JWT in production');
+    }
+    if (process.env.CLAMAV_ENABLED !== 'true') {
+      warnings.push('CLAMAV_ENABLED is not true — file uploads are not virus-scanned');
+    }
+    if (process.env.MESSAGE_SANITIZER !== 'dompurify') {
+      warnings.push('MESSAGE_SANITIZER is not dompurify — consider enabling for stronger XSS protection');
+    }
     if (!process.env.MONGODB_URI) {
       errors.push('MONGODB_URI is required in production');
     }

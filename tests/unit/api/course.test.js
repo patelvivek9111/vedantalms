@@ -22,7 +22,7 @@ describe('Course API', () => {
     
     // Clean up test data
     await User.deleteMany({ email: { $in: ['teacher-course@test.com', 'admin-course@test.com', 'student-course@test.com'] } });
-    await Course.deleteMany({ title: { $in: ['Test Course', 'Test Course 2', 'Test Course for Update'] } });
+    await Course.deleteMany({ title: { $in: ['Test Course', 'Test Course 2', 'Test Course for Update', 'Test Course for Teacher Delete'] } });
 
     // Create teacher
     const teacher = await User.create({
@@ -60,7 +60,7 @@ describe('Course API', () => {
 
   afterAll(async () => {
     await User.deleteMany({ email: { $in: ['teacher-course@test.com', 'admin-course@test.com', 'student-course@test.com'] } });
-    await Course.deleteMany({ title: { $in: ['Test Course', 'Test Course 2', 'Test Course for Update'] } });
+    await Course.deleteMany({ title: { $in: ['Test Course', 'Test Course 2', 'Test Course for Update', 'Test Course for Teacher Delete'] } });
   });
 
   describe('POST /api/courses', () => {
@@ -316,11 +316,32 @@ describe('Course API', () => {
       expect(response.body.success).toBe(true);
     });
 
-    it('should prevent teacher from deleting course', async () => {
-      if (!courseId) return;
+    it('should allow teacher to delete own course', async () => {
+      const createResponse = await request(app)
+        .post('/api/courses')
+        .set('Authorization', `Bearer ${teacherToken}`)
+        .send({
+          title: 'Test Course for Teacher Delete',
+          description: 'This is a test course description that is long enough to meet the validation requirements',
+        });
+
+      const teacherDeleteCourseId =
+        createResponse.body.data._id || createResponse.body.data.id;
 
       const response = await request(app)
-        .delete(`/api/courses/${courseId}`)
+        .delete(`/api/courses/${teacherDeleteCourseId}`)
+        .set('Authorization', `Bearer ${teacherToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+    });
+
+    it('should prevent teacher from deleting another users course', async () => {
+      const adminCourse = await Course.findOne({ title: 'Test Course 2' });
+      if (!adminCourse) return;
+
+      const response = await request(app)
+        .delete(`/api/courses/${adminCourse._id}`)
         .set('Authorization', `Bearer ${teacherToken}`);
 
       expect(response.status).toBe(403);

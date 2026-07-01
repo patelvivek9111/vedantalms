@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../utils/authToken';
 import { 
   BarChart3, 
   TrendingUp, 
@@ -38,7 +39,7 @@ export function AdminAnalytics() {
   useEffect(() => {
     const fetchAnalytics = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const headers = { Authorization: `Bearer ${token}` };
         
         const response = await axios.get(`${API_URL}/api/admin/analytics?timeRange=${timeRange}`, { headers });

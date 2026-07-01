@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../utils/authToken';
 import api from '../services/api';
 import type { NormalizedFile } from '../utils/fileTypes';
 import { mapUploadResponse } from '../utils/fileTypes';
@@ -34,7 +35,7 @@ export const useSyllabusManagement = ({
     if (!course?._id) return;
     setSavingSyllabus(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const response = await api.put(`/courses/${course._id}`, {
         title: syllabusFields.courseTitle,
         catalog: {
@@ -76,7 +77,7 @@ export const useSyllabusManagement = ({
     if (!course?._id) return;
     setSavingSyllabus(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const fileAssetIds = syllabusAttachmentFiles.map((f) => f.fileAssetId).filter(Boolean);
       const response = await api.put(`/courses/${course._id}`, {
         catalog: {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../../utils/authToken';
 import { Plus, Users, Trash2, Edit2, UserPlus, Shuffle, MessageSquare, Activity, ChevronDown, ChevronUp } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -89,7 +90,7 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const [setsRes, studentsRes, courseRes] = await Promise.all([
           api.get(`/groups/sets/${courseId}`),
           api.get(`/courses/${courseId}/students`),
@@ -114,7 +115,7 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
     const fetchGroups = async () => {
       if (!selectedSet) return;
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const response = await api.get(`/groups/sets/${selectedSet._id}/groups`);
         setGroups(response.data);
       } catch (err: any) {
@@ -128,7 +129,7 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
   const handleCreateSet = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const payload: any = {
         name: newSetName,
         courseId,
@@ -184,7 +185,7 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
       payload.leader = selectedStudents[0];
     }
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const response = await api.post(
         `/groups/sets/${selectedSet._id}/groups`,
         payload,
@@ -207,7 +208,7 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
     e.preventDefault();
     if (!selectedSet) return;
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const response = await api.post(
         `/groups/sets/${selectedSet._id}/auto-split`,
         {
@@ -234,7 +235,7 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
     if (!groupToDelete) return;
     setShowDeleteGroupConfirm(false);
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       await api.delete(`/groups/${groupToDelete}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -249,7 +250,7 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
     e.preventDefault();
     if (!selectedGroup) return;
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const response = await api.put(
         `/groups/${selectedGroup._id}`,
         {
@@ -273,7 +274,7 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
     e.preventDefault();
     if (!selectedGroup) return;
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       await api.post(
         `/groups/${selectedGroup._id}/message`,
         {
@@ -295,7 +296,7 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
 
   const handleViewActivity = async (groupId: string) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const response = await api.get(
         `/groups/${groupId}/activity`,
         {
@@ -360,7 +361,7 @@ const GroupManagement: React.FC<GroupManagementProps> = ({ courseId }) => {
 
         // Persist the changes to the backend
         try {
-          const token = localStorage.getItem('token');
+          const token = getMemoryAuthToken();
           // Update source group if student was in a group
           if (sourceGroup && sourceGroup._id !== destGroupId) {
             const newSourceMembers = updatedGroups.find(g => g._id === sourceGroup._id)?.members.map(m => m._id) || [];

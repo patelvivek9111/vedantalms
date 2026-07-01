@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../../utils/authToken';
 import { useParams, useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { Home, FileText, MessageSquare, ClipboardList, Megaphone, Users } from 'lucide-react';
 import axios from 'axios';
@@ -66,7 +67,7 @@ export default function GroupDashboard() {
     async function fetchGroup() {
       if (!groupId) return;
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const res = await axios.get(`${API_URL}/api/groups/${groupId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -97,7 +98,7 @@ export default function GroupDashboard() {
     async function fetchGroupsInSet() {
       if (!groupSetId) return;
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const res = await axios.get(`${API_URL}/api/groups/sets/${groupSetId}/groups`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -117,7 +118,7 @@ export default function GroupDashboard() {
     const fetchGroupAssignments = async () => {
       setAssignmentsLoading(true);
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const res = await axios.get(`${API_URL}/api/assignments/groupset/${groupSetId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -137,7 +138,7 @@ export default function GroupDashboard() {
     const pageIdIndex = segments.findIndex((seg) => seg === 'pages');
     if (pageIdIndex < 0 || pageIdIndex >= segments.length - 1) return;
     const pageId = segments[pageIdIndex + 1];
-    const token = localStorage.getItem('token');
+    const token = getMemoryAuthToken();
     axios
       .get(`${API_URL}/api/pages/${pageId}`, { headers: { Authorization: `Bearer ${token}` } })
       .then((res) => {
@@ -152,7 +153,7 @@ export default function GroupDashboard() {
     const threadIdIndex = segments.findIndex((seg) => seg === 'discussion');
     if (threadIdIndex < 0 || threadIdIndex >= segments.length - 1) return;
     const threadId = segments[threadIdIndex + 1];
-    const token = localStorage.getItem('token');
+    const token = getMemoryAuthToken();
     axios
       .get(`${API_URL}/api/threads/${threadId}`, { headers: { Authorization: `Bearer ${token}` } })
       .then((res) => {

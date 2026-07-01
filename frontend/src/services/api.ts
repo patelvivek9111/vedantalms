@@ -1,22 +1,22 @@
 import axios from 'axios';
 import { API_URL } from '../config';
+import { getMemoryAuthToken } from '../utils/authToken';
 
-// Ensure baseURL is properly formatted
 const getBaseURL = () => {
   if (!API_URL || API_URL === '') {
-    return '/api'; // Relative URL when served from same domain
+    return '/api';
   }
   return `${API_URL}/api`;
 };
 
 const api = axios.create({
   baseURL: getBaseURL(),
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-/** Strip a leading /api when baseURL already ends with /api (avoids /api/api/... in production). */
 export const normalizeApiInstancePath = (url: string | undefined, baseURL: string | undefined): string | undefined => {
   if (!url || /^https?:\/\//i.test(url)) return url;
   const base = (baseURL || '').replace(/\/$/, '');
@@ -26,32 +26,31 @@ export const normalizeApiInstancePath = (url: string | undefined, baseURL: strin
   return url;
 };
 
-// Add a request interceptor to add the auth token to requests
 api.interceptors.request.use(
   (config) => {
     config.url = normalizeApiInstancePath(config.url, config.baseURL);
-    const token = localStorage.getItem('token');
+    const token = getMemoryAuthToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Add a response interceptor to handle token expiration
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
       const rel = String(error.config?.url || '').replace(/^\//, '');
       const isUnauthenticatedAuthCall =
-        rel === 'auth/login' || rel.startsWith('auth/login?') || rel === 'auth/register' || rel.startsWith('auth/register?');
-      // Do not hard-redirect on failed login/register — that reloads the app and hides inline errors.
+        rel === 'auth/login' ||
+        rel.startsWith('auth/login?') ||
+        rel === 'auth/register' ||
+        rel.startsWith('auth/register?') ||
+        rel === 'auth/forgot-password' ||
+        rel === 'auth/reset-password';
       if (!isUnauthenticatedAuthCall) {
-        localStorage.removeItem('token');
         window.location.href = '/login';
       }
     }
@@ -94,19 +93,14 @@ export const getLoginActivity = async (page = 1, limit = 20, days = 150) => {
   return api.get(`/auth/login-activity?page=${page}&limit=${limit}&days=${days}`);
 };
 
-// Update course overview configuration
 export const updateOverviewConfig = async (courseId: string, config: {
   showLatestAnnouncements?: boolean;
   numberOfAnnouncements?: number;
 }) => {
-  const token = localStorage.getItem('token');
-  const response = await api.put(`/courses/${courseId}/overview-config`, config, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+  const response = await api.put(`/courses/${courseId}/overview-config`, config);
   return response.data;
 };
 
-// Utility function to get full image URL for uploaded files
 export const getImageUrl = (filename: string): string => {
   if (!filename) return '';
   if (filename.startsWith('http')) return filename;
@@ -115,23 +109,17 @@ export const getImageUrl = (filename: string): string => {
     return !API_URL || API_URL === '' ? filename : `${API_URL}${filename}`;
   }
 
-  // If API_URL is empty (relative URL), use relative path
   if (!API_URL || API_URL === '') {
-    // If the path already includes /uploads/, use as-is
     if (filename.startsWith('/uploads/')) {
       return filename;
     }
-    // Otherwise, prepend /uploads/
     return `/uploads/${filename}`;
   }
-  
-  // If API_URL is set, construct full URL
-  // If the path already includes /uploads/, just prepend the base URL
+
   if (filename.startsWith('/uploads/')) {
     return `${API_URL}${filename}`;
   }
-  // Otherwise, assume it's just a filename and prepend /uploads/
   return `${API_URL}/uploads/${filename}`;
 };
 
-export default api; 
+export default api;

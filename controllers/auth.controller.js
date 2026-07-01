@@ -1,72 +1,118 @@
 const User = require('../models/user.model');
 const LoginActivity = require('../models/loginActivity.model');
+const PasswordResetToken = require('../models/passwordResetToken.model');
 const { validationResult } = require('express-validator');
+const { validatePassword } = require('../utils/passwordPolicy');
+const { setAuthCookie, clearAuthCookie } = require('../utils/authCookie');
+const { sendEmail } = require('../utils/emailService');
+
+const SELF_REGISTER_ROLES = new Set(['student']);
+const DEV_SELF_REGISTER_ROLES = new Set(['student', 'teacher']);
+
+function resolveRegistrationRole(requestedRole) {
+  if (process.env.DISABLE_PUBLIC_REGISTRATION === 'true') {
+    return null;
+  }
+  if (process.env.NODE_ENV === 'production') {
+    return 'student';
+  }
+  if (requestedRole && DEV_SELF_REGISTER_ROLES.has(requestedRole)) {
+    return requestedRole;
+  }
+  return 'student';
+}
+
+function sendAuthResponse(res, statusCode, user) {
+  const token = user.getSignedJwtToken();
+  setAuthCookie(res, token);
+  return res.status(statusCode).json({
+    success: true,
+    token,
+    user: {
+      id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      role: user.role,
+      bio: user.bio || '',
+      profilePicture: user.profilePicture || '',
+    },
+  });
+}
 
 // @desc    Register user
 // @route   POST /api/auth/register
 // @access  Public
 exports.register = async (req, res) => {
   try {
-  
-    
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        errors: errors.array().map(err => ({
+        errors: errors.array().map((err) => ({
           field: err.param,
-          message: err.msg
-        }))
+          message: err.msg,
+        })),
       });
     }
 
-    const { firstName, lastName, email, password, role } = req.body;
+    const { firstName, lastName, email, password, role, termsAccepted } = req.body;
 
-    // Check if user exists
-    let user = await User.findOne({ email });
-    if (user) {
-
-      return res.status(400).json({ 
+    const mustAcceptTerms = process.env.NODE_ENV === 'production';
+    if (mustAcceptTerms && !termsAccepted) {
+      return res.status(400).json({
         success: false,
-        message: 'User with this email already exists' 
+        message: 'You must accept the Terms of Service and Privacy Policy',
       });
     }
 
-    // Create user
-    user = await User.create({
+    const assignedRole = resolveRegistrationRole(role);
+    if (!assignedRole) {
+      return res.status(403).json({
+        success: false,
+        message: 'Public registration is disabled. Contact your administrator.',
+      });
+    }
+
+    if (role && !SELF_REGISTER_ROLES.has(role) && process.env.NODE_ENV === 'production') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid role for public registration',
+      });
+    }
+
+    const passwordCheck = validatePassword(password);
+    if (!passwordCheck.valid) {
+      return res.status(400).json({
+        success: false,
+        message: passwordCheck.message,
+      });
+    }
+
+    const existing = await User.findOne({ email });
+    if (existing) {
+      return res.status(400).json({
+        success: false,
+        message: 'User with this email already exists',
+      });
+    }
+
+    const user = await User.create({
       firstName,
       lastName,
       email,
       password,
-      role: role || 'student',
-      bio: '' // Explicitly set bio to empty string for new users
+      role: assignedRole,
+      bio: '',
+      privacyConsentAt: new Date(),
     });
 
-    
-
-    // Create token
-    const token = user.getSignedJwtToken();
-
-    res.status(201).json({
-      success: true,
-      token,
-      user: {
-        id: user._id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        role: user.role,
-        bio: user.bio || '',
-        profilePicture: user.profilePicture || ''
-      }
-    });
+    return sendAuthResponse(res, 201, user);
   } catch (err) {
-    console.error('Registration error:', err);
-    res.status(500).json({ 
+    console.error('Registration error:', err.message);
+    res.status(500).json({
       success: false,
       message: 'Server error during registration',
-      error: err.message 
     });
   }
 };
@@ -78,85 +124,70 @@ exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Validate email & password
     if (!email || !password) {
       return res.status(400).json({ message: 'Please provide an email and password' });
     }
 
-    // Check for user
     const user = await User.findOne({ email }).select('+password');
     if (!user) {
-      // Log failed login attempt
       await LoginActivity.create({
         userId: null,
         ipAddress: req.ip || req.connection.remoteAddress,
         userAgent: req.get('User-Agent') || 'Unknown',
         success: false,
-        failureReason: 'User not found'
+        failureReason: 'User not found',
       });
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // Check if password matches
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
-      // Log failed login attempt
       await LoginActivity.create({
         userId: user._id,
         ipAddress: req.ip || req.connection.remoteAddress,
         userAgent: req.get('User-Agent') || 'Unknown',
         success: false,
-        failureReason: 'Invalid password'
+        failureReason: 'Invalid password',
       });
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // Block suspended accounts (credentials are valid, but access is revoked)
     if (user.accountStatus === 'suspended') {
       await LoginActivity.create({
         userId: user._id,
         ipAddress: req.ip || req.connection.remoteAddress,
         userAgent: req.get('User-Agent') || 'Unknown',
         success: false,
-        failureReason: 'Account suspended'
+        failureReason: 'Account suspended',
       });
-      return res
-        .status(403)
-        .json({ message: 'Your account has been suspended. Please contact an administrator.' });
+      return res.status(403).json({
+        message: 'Your account has been suspended. Please contact an administrator.',
+      });
     }
 
-    // Log successful login
     await LoginActivity.create({
       userId: user._id,
       ipAddress: req.ip || req.connection.remoteAddress,
       userAgent: req.get('User-Agent') || 'Unknown',
-      success: true
+      success: true,
     });
 
-    // Update lastLogin timestamp
     user.lastLogin = new Date();
     await user.save();
 
-    // Create token
-    const token = user.getSignedJwtToken();
-
-    res.json({
-      success: true,
-      token,
-      user: {
-        id: user._id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        role: user.role,
-        bio: user.bio || '',
-        profilePicture: user.profilePicture || ''
-      }
-    });
+    return sendAuthResponse(res, 200, user);
   } catch (err) {
-    console.error(err);
+    console.error('Login error:', err.message);
     res.status(500).json({ message: 'Server error' });
   }
+};
+
+// @desc    Logout user (clear auth cookie)
+// @route   POST /api/auth/logout
+// @access  Public
+exports.logout = async (req, res) => {
+  clearAuthCookie(res);
+  res.json({ success: true, message: 'Logged out' });
 };
 
 // @desc    Get current logged in user
@@ -177,11 +208,11 @@ exports.getMe = async (req, res) => {
         email: user.email,
         role: user.role,
         bio: user.bio || '',
-        profilePicture: user.profilePicture || ''
-      }
+        profilePicture: user.profilePicture || '',
+      },
     });
   } catch (err) {
-    console.error(err);
+    console.error('Get me error:', err.message);
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -191,18 +222,17 @@ exports.getMe = async (req, res) => {
 // @access  Private
 exports.getLoginActivity = async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20; // Increased default limit
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 20;
     const skip = (page - 1) * limit;
-    
-    // Add date filtering
-    const days = parseInt(req.query.days) || 150; // Default to 5 months (150 days)
+
+    const days = parseInt(req.query.days, 10) || 150;
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    const query = { 
+    const query = {
       userId: req.user.id,
-      timestamp: { $gte: startDate }
+      timestamp: { $gte: startDate },
     };
 
     const activities = await LoginActivity.find(query)
@@ -219,15 +249,108 @@ exports.getLoginActivity = async (req, res) => {
         page,
         limit,
         total,
-        pages: Math.ceil(total / limit)
+        pages: Math.ceil(total / limit),
       },
       filter: {
         days,
-        startDate: startDate.toISOString()
-      }
+        startDate: startDate.toISOString(),
+      },
     });
   } catch (err) {
-    console.error(err);
+    console.error('Login activity error:', err.message);
     res.status(500).json({ message: 'Server error' });
   }
-}; 
+};
+
+// @desc    Request password reset email
+// @route   POST /api/auth/forgot-password
+// @access  Public
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email is required' });
+    }
+
+    const user = await User.findOne({ email: String(email).toLowerCase().trim() });
+    const genericResponse = {
+      success: true,
+      message: 'If an account exists for that email, a reset link has been sent.',
+    };
+
+    if (!user) {
+      return res.json(genericResponse);
+    }
+
+    const { rawToken } = await PasswordResetToken.createForUser(user._id);
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const resetUrl = `${frontendUrl.replace(/\/$/, '')}/reset-password?token=${rawToken}`;
+
+    await sendEmail(
+      user.email,
+      'Reset your password',
+      `<p>Hello ${user.firstName},</p>
+       <p>We received a request to reset your password. Click the link below (valid for 1 hour):</p>
+       <p><a href="${resetUrl}">Reset password</a></p>
+       <p>If you did not request this, you can ignore this email.</p>`
+    );
+
+    return res.json(genericResponse);
+  } catch (err) {
+    console.error('Forgot password error:', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// @desc    Reset password with token
+// @route   POST /api/auth/reset-password
+// @access  Public
+exports.resetPassword = async (req, res) => {
+  try {
+    const { token, password, confirmPassword } = req.body;
+    if (!token || !password || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Token, password, and confirm password are required',
+      });
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Passwords do not match',
+      });
+    }
+
+    const passwordCheck = validatePassword(password);
+    if (!passwordCheck.valid) {
+      return res.status(400).json({ success: false, message: passwordCheck.message });
+    }
+
+    const tokenHash = PasswordResetToken.hashToken(token);
+    const resetRecord = await PasswordResetToken.findOne({
+      tokenHash,
+      usedAt: null,
+      expiresAt: { $gt: new Date() },
+    });
+
+    if (!resetRecord) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired reset token' });
+    }
+
+    const user = await User.findById(resetRecord.user).select('+password');
+    if (!user) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired reset token' });
+    }
+
+    user.password = password;
+    await user.invalidateSessions();
+    resetRecord.usedAt = new Date();
+    await resetRecord.save();
+
+    return res.json({ success: true, message: 'Password reset successfully. Please sign in.' });
+  } catch (err) {
+    console.error('Reset password error:', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};

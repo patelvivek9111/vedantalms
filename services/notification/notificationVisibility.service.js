@@ -94,15 +94,7 @@ async function reconcileStaleNotifications({ apply = false, userId = null, limit
 
   if (apply && stale.length) {
     const ids = stale.map((row) => row.notificationId);
-    await Notification.updateMany(
-      { _id: { $in: ids } },
-      {
-        $set: {
-          read: true,
-          readAt: new Date(),
-        },
-      }
-    );
+    await Notification.deleteMany({ _id: { $in: ids } });
   }
 
   return {

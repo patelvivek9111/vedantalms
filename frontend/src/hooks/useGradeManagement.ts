@@ -1,3 +1,5 @@
+import { getMemoryAuthToken, authFetchInit } from '../utils/authToken';
+
 import { useCallback } from 'react';
 import axios from 'axios';
 import { API_URL } from '../config';
@@ -65,7 +67,7 @@ export const useGradeManagement = ({
       setGradeError('');
 
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         let res: any;
         
         // Use manual-grade endpoint for offline assignments
@@ -145,7 +147,7 @@ export const useGradeManagement = ({
     setGradeError('');
 
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       let res: any;
       
       // Use manual-grade endpoint for offline assignments without submissions

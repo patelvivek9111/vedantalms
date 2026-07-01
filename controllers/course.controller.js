@@ -605,7 +605,7 @@ exports.publishCourse = async (req, res) => {
 
 // @desc    Delete course
 // @route   DELETE /api/courses/:id
-// @access  Private (Admin only)
+// @access  Private (Course instructor or Admin)
 exports.deleteCourse = async (req, res) => {
   try {
     // Validate if the ID is a valid MongoDB ObjectId
@@ -616,20 +616,40 @@ exports.deleteCourse = async (req, res) => {
       });
     }
 
-    const course = await Course.findById(req.params.id);
-
+    const course = await Course.findById(req.params.id).select('instructor');
     if (!course) {
       return res.status(404).json({
         success: false,
-        message: 'Course not found'
+        message: 'Course not found',
       });
     }
 
-    await course.deleteOne();
+    if (req.user.role !== 'admin' && course.instructor.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to delete this course',
+      });
+    }
+
+    const { deleteCourseAndRelatedData } = require('../services/courseDeleteCascade.service');
+    const result = await deleteCourseAndRelatedData(req.params.id);
+
+    if (!result.ok) {
+      if (result.reason === 'invalid_course_id') {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid course ID format',
+        });
+      }
+      return res.status(404).json({
+        success: false,
+        message: 'Course not found',
+      });
+    }
 
     res.json({
       success: true,
-      data: {}
+      data: result,
     });
   } catch (err) {
     console.error('Delete course error:', err);

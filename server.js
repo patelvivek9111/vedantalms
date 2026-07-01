@@ -7,10 +7,12 @@ const fs = require('fs');
 const http = require('http');
 const { Server } = require('socket.io');
 const helmet = require('helmet');
+const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 const pinoHttp = require('pino-http');
 const pino = require('pino');
 const { requestCorrelation } = require('./middleware/requestCorrelation');
+const { metricsAuth } = require('./middleware/metricsAuth');
 const { validateStartupEnv } = require('./config/startupValidation');
 const { resolveMongoDbName } = require('./scripts/resolveMongoDbName');
 const { createAdapter } = require('@socket.io/redis-adapter');
@@ -22,6 +24,11 @@ validateStartupEnv();
 
 // Create Express app
 const app = express();
+
+// Trust reverse proxy (Render, nginx) for accurate req.ip and secure cookies
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
 
 // Create HTTP server for Socket.io
 const server = http.createServer(app);
@@ -70,6 +77,7 @@ const corsOptions = {
 
 // Middleware
 app.use(cors(corsOptions));
+app.use(cookieParser());
 app.use(requestCorrelation);
 app.use(helmet({
   crossOriginResourcePolicy: false,
@@ -761,21 +769,22 @@ app.get('/health/ops', (req, res) => {
   res.json(buildHealthOpsPayload());
 });
 
-// Prometheus text exposition (same signals as /health/ops) for Grafana / Alertmanager
-app.get('/metrics', (req, res) => {
+// Prometheus metrics — protected in production
+app.get('/metrics', metricsAuth, (req, res) => {
   res.set('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
   res.send(renderPrometheusMetrics(buildHealthOpsPayload()));
 });
 
-// Test POST endpoint to verify POST requests work
-app.post('/api/test-post', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    message: 'POST request received',
-    body: req.body,
-    timestamp: new Date().toISOString()
+if (process.env.NODE_ENV !== 'production') {
+  // Dev-only test endpoint
+  app.post('/api/test-post', (req, res) => {
+    res.json({
+      status: 'ok',
+      message: 'POST request received',
+      timestamp: new Date().toISOString(),
+    });
   });
-});
+}
 
 // Serve frontend static files in production
 if (process.env.NODE_ENV === 'production') {

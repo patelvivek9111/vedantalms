@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../../utils/authToken';
 import axios from 'axios';
 import { API_URL } from '../../config';
 import { Users } from 'lucide-react';
@@ -62,7 +63,7 @@ const StudentGroupView: React.FC<StudentGroupViewProps> = ({ courseId, userId })
   useEffect(() => {
     const fetchEnrolledGroups = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
 
         const groupSetsResponse = await axios.get(`${API_URL}/api/groups/sets/${courseId}`, {
           headers: { Authorization: `Bearer ${token}` },

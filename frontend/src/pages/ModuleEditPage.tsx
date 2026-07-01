@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../utils/authToken';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useModule } from '../contexts/ModuleContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -24,7 +25,7 @@ const ModuleEditPage: React.FC = () => {
       if (!moduleId) return;
       
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const response = await axios.get(`${API_URL}/api/modules/view/${moduleId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -57,7 +58,7 @@ const ModuleEditPage: React.FC = () => {
 
     try {
       // Get the course ID from the module data
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const moduleResponse = await axios.get(`${API_URL}/api/modules/view/${moduleId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });

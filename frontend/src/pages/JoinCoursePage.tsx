@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../utils/authToken';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'react-toastify';
@@ -78,7 +79,7 @@ const JoinCoursePage: React.FC = () => {
       setWaitlistPosition(null);
       setJoinStateKind('');
       try {
-        const auth = localStorage.getItem('token');
+        const auth = getMemoryAuthToken();
         const body = cred.joinCode ? { joinCode: cred.joinCode } : { token: cred.token };
         const res = await axios.post(`${API_URL}/api/courses/enroll-by-qr`, body, {
           headers: { Authorization: `Bearer ${auth}` },

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../utils/authToken';
 import { 
   Users, 
   Search, 
@@ -81,7 +82,7 @@ export function AdminUserManagement() {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const headers = { Authorization: `Bearer ${token}` };
         
         const params = new URLSearchParams();
@@ -194,7 +195,7 @@ export function AdminUserManagement() {
     );
     setActionError('');
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       await axios.patch(
         `${API_URL}/api/admin/users/${user._id}/status`,
         { status },
@@ -218,7 +219,7 @@ export function AdminUserManagement() {
     setEditUserLoading(true);
     setEditUserError('');
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const response = await axios.put(
         `${API_URL}/api/admin/users/${selectedUser._id}`,
         {
@@ -258,7 +259,7 @@ export function AdminUserManagement() {
     setDeleteUserLoading(true);
     setDeleteUserError('');
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       await axios.delete(`${API_URL}/api/admin/users/${userToDelete._id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -279,7 +280,7 @@ export function AdminUserManagement() {
     setCreateUserLoading(true);
 
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const headers = { Authorization: `Bearer ${token}` };
 
       // Use the register endpoint to create a new user

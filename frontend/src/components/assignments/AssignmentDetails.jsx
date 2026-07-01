@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../../utils/authToken';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
@@ -27,7 +28,7 @@ const AssignmentDetails = () => {
 
     const fetchData = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         
         const assignmentRes = await axios.get(`${API_URL}/api/assignments/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
@@ -80,7 +81,7 @@ const AssignmentDetails = () => {
   const handleSubmission = async (e) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const response = await axios.post(`${API_URL}/api/submissions`, {
         assignment: id,
         answers,
@@ -102,7 +103,7 @@ const AssignmentDetails = () => {
   const confirmDelete = async () => {
     setShowDeleteConfirm(false);
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         await axios.delete(`${API_URL}/api/assignments/${id}`, {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -117,7 +118,7 @@ const AssignmentDetails = () => {
   const handleTogglePublish = async () => {
     setIsPublishing(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const res = await axios.patch(
         `${API_URL}/api/assignments/${id}/publish`,
         {},

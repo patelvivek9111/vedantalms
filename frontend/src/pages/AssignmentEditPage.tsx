@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../utils/authToken';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import CreateAssignmentForm from '../components/assignments/CreateAssignmentForm';
@@ -24,7 +25,7 @@ const AssignmentEditPage: React.FC = () => {
       if (!id) return;
 
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const response = await axios.get(`${API_URL}/api/assignments/${id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });

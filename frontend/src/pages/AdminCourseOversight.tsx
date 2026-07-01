@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../utils/authToken';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'react-toastify';
@@ -67,7 +68,7 @@ export function AdminCourseOversight() {
   useEffect(() => {
     const fetchCourses = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = getMemoryAuthToken();
         const headers = { Authorization: `Bearer ${token}` };
         
         const params = new URLSearchParams();
@@ -128,7 +129,7 @@ export function AdminCourseOversight() {
   };
 
   const handleCourseAction = async (action: string, course: Course) => {
-    const token = localStorage.getItem('token');
+    const token = getMemoryAuthToken();
     const headers = { Authorization: `Bearer ${token}` };
 
     switch (action) {
@@ -199,7 +200,7 @@ export function AdminCourseOversight() {
     }
 
     setBulkActionLoading(true);
-    const token = localStorage.getItem('token');
+    const token = getMemoryAuthToken();
     const headers = { Authorization: `Bearer ${token}` };
 
     let successCount = 0;
@@ -250,7 +251,7 @@ export function AdminCourseOversight() {
     }
 
     setBulkActionLoading(true);
-    const token = localStorage.getItem('token');
+    const token = getMemoryAuthToken();
     const headers = { Authorization: `Bearer ${token}` };
 
     let successCount = 0;
@@ -306,7 +307,7 @@ export function AdminCourseOversight() {
     setShowBulkArchiveConfirm(false);
 
     setBulkActionLoading(true);
-    const token = localStorage.getItem('token');
+    const token = getMemoryAuthToken();
     const headers = { Authorization: `Bearer ${token}` };
 
     let successCount = 0;
@@ -362,7 +363,7 @@ export function AdminCourseOversight() {
     setShowBulkDeleteConfirm(false);
 
     setBulkActionLoading(true);
-    const token = localStorage.getItem('token');
+    const token = getMemoryAuthToken();
     const headers = { Authorization: `Bearer ${token}` };
 
     let successCount = 0;
@@ -546,7 +547,7 @@ export function AdminCourseOversight() {
     
     setSaving(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const headers = { Authorization: `Bearer ${token}` };
       
       const response = await axios.put(
@@ -886,7 +887,7 @@ export function AdminCourseOversight() {
         }}
         onConfirm={async () => {
           if (!courseToDelete) return;
-          const token = localStorage.getItem('token');
+          const token = getMemoryAuthToken();
           const headers = { Authorization: `Bearer ${token}` };
           try {
             await axios.delete(`${API_URL}/api/courses/${courseToDelete._id}`, { headers });

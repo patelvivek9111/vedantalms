@@ -7,6 +7,10 @@
     font-size: 14px;
   }
 
+  html.dark {
+    color-scheme: dark;
+  }
+
   #root {
     min-height: 100dvh;
   }
@@ -730,4 +734,46 @@ input[type="datetime-local"]::-webkit-outer-spin-button {
 
 .rich-text-editor--composer .tox-statusbar {
   display: none !important;
+}
+
+@layer utilities {
+  .scrollbar-themed {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(209 213 219) rgb(243 244 246);
+  }
+
+  .scrollbar-themed::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scrollbar-themed::-webkit-scrollbar-track {
+    background: rgb(243 244 246);
+    border-radius: 4px;
+  }
+
+  .scrollbar-themed::-webkit-scrollbar-thumb {
+    background: rgb(209 213 219);
+    border-radius: 4px;
+  }
+
+  .scrollbar-themed::-webkit-scrollbar-thumb:hover {
+    background: rgb(156 163 175);
+  }
+
+  .dark .scrollbar-themed {
+    scrollbar-color: rgb(75 85 99) rgb(31 41 55);
+  }
+
+  .dark .scrollbar-themed::-webkit-scrollbar-track {
+    background: rgb(31 41 55);
+  }
+
+  .dark .scrollbar-themed::-webkit-scrollbar-thumb {
+    background: rgb(75 85 99);
+  }
+
+  .dark .scrollbar-themed::-webkit-scrollbar-thumb:hover {
+    background: rgb(107 114 128);
+  }
 }

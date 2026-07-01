@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../../utils/authToken';
 import { getQuizWaveSocket } from '../../utils/quizwaveSocket';
 import { quizwaveService, Quiz, QuizSession } from '../../services/quizwaveService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -42,7 +43,7 @@ const QuizSessionControl: React.FC<QuizSessionControlProps> = ({
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [copied, setCopied] = useState(false);
   const [gameSummary, setGameSummary] = useState<QuizWaveGameSnapshot['gameSummary'] | null>(null);
-  const token = localStorage.getItem('token') || '';
+  const token = getMemoryAuthToken() || '';
 
   const applySnapshot = useCallback((snap: QuizWaveGameSnapshot) => {
     setGameSnapshot(snap);

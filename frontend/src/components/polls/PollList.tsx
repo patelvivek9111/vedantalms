@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { getMemoryAuthToken, authFetchInit } from '../../utils/authToken';
 import axios from 'axios';
 import { API_URL } from '../../config';
 import { useAuth } from '../../contexts/AuthContext';
@@ -69,7 +70,7 @@ const PollList: React.FC<PollListProps> = ({ courseId }) => {
   const fetchPolls = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       const response = await axios.get(`${API_URL}/api/polls/courses/${courseId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -91,7 +92,7 @@ const PollList: React.FC<PollListProps> = ({ courseId }) => {
     setShowDeleteConfirm(false);
     setDeletingPoll(pollToDelete);
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       await axios.delete(`${API_URL}/api/polls/${pollToDelete}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -107,7 +108,7 @@ const PollList: React.FC<PollListProps> = ({ courseId }) => {
   const handleClosePoll = async (pollId: string) => {
     try {
       setClosingPoll(pollId);
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       await axios.put(`${API_URL}/api/polls/${pollId}`, { isActive: false }, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -123,7 +124,7 @@ const PollList: React.FC<PollListProps> = ({ courseId }) => {
 
   const handleToggleResults = async (pollId: string, currentVisible: boolean) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getMemoryAuthToken();
       await axios.put(`${API_URL}/api/polls/${pollId}`, {
         resultsVisible: !currentVisible
       }, {
