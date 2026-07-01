@@ -1825,7 +1825,7 @@ const AssignmentGrading = () => {
                           onClick={() => handleGradeSubmission(false, true)}
                           disabled={isGrading}
                           className={btnOutlineIndigo}
-                          aria-label="Save and release"
+                          aria-label="Save & Release"
                         >
                           <Send className={iconCls} />
                           Save &amp; Release

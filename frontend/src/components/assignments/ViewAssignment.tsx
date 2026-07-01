@@ -328,7 +328,10 @@ function AssignmentGradeBadge({
   }
 
   return (
-    <div className="flex shrink-0 items-center gap-3 rounded-xl border border-slate-200/90 bg-gradient-to-br from-slate-50 to-white px-4 py-3 shadow-sm dark:border-slate-700/80 dark:from-slate-900/80 dark:to-slate-900/40">
+    <div
+      className="flex shrink-0 items-center gap-3 rounded-xl border border-slate-200/90 bg-gradient-to-br from-slate-50 to-white px-4 py-3 shadow-sm dark:border-slate-700/80 dark:from-slate-900/80 dark:to-slate-900/40"
+      title={`Score: ${earned} / ${max} pts`}
+    >
       <div
         className={`flex h-11 w-11 items-center justify-center rounded-xl ${
           isPerfect
@@ -1245,17 +1248,17 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                     )}
                   </div>
                 </div>
-                {isStudent && assignmentGradeScore && (
-                  <div className="hidden sm:block">
+                {isStudent && assignmentGradeScore && (showMobileQuizLayout || !activeSubmission) && (
+                  <div className="mt-4 sm:hidden">
+                    <AssignmentGradeBadge score={assignmentGradeScore} />
+                  </div>
+                )}
+                {isStudent && assignmentGradeScore && !(showMobileQuizLayout || !activeSubmission) && (
+                  <div className="hidden sm:block shrink-0">
                     <AssignmentGradeBadge score={assignmentGradeScore} />
                   </div>
                 )}
               </div>
-              {isStudent && assignmentGradeScore && (
-                <div className="mt-4 sm:hidden">
-                  <AssignmentGradeBadge score={assignmentGradeScore} />
-                </div>
-              )}
             {/* Show feedback if student and feedback exists */}
             {isStudent && submission && typeof submission.feedback === 'string' && submission.feedback.trim() !== '' && (
               <div className="mt-4 bg-gradient-to-r from-yellow-50 to-yellow-50/50 dark:from-yellow-900/30 dark:to-yellow-900/10 border-l-4 border-yellow-400 dark:border-yellow-500 shadow-sm sm:shadow-md rounded-lg p-3 sm:p-4 overflow-hidden max-w-full transition-all duration-200">
