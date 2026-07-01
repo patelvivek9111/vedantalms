@@ -376,8 +376,9 @@ test.describe.serial('§8.3–8.4 Assignment edit & grade controls', () => {
     const update = page.waitForResponse(
       (r) => r.url().includes(`/api/assignments/${editAssignmentId}`) && r.request().method() === 'PUT' && r.ok()
     );
+    const leaveEditPage = page.waitForURL((url) => !url.pathname.endsWith('/edit'), { timeout: 15_000 });
     await page.getByRole('button', { name: 'Update assignment' }).click();
-    await update;
+    await Promise.all([update, leaveEditPage]);
     await page.goto(`/assignments/${editAssignmentId}/edit`);
     await expect(page.locator('#assignment-title')).toHaveValue(updatedTitle);
   });
