@@ -45,9 +45,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+
     api
       .get('/auth/me')
       .then((response) => {
+        if (cancelled) return;
         if (response.data.success) {
           setUser(mapUser(response.data.user));
         } else {
@@ -56,21 +59,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setMemoryAuthToken(null);
         }
       })
-      .catch(async (err: { response?: { status?: number } }) => {
+      .catch((err: { response?: { status?: number } }) => {
+        if (cancelled) return;
         if (err.response?.status === 401) {
-          try {
-            await api.post('/auth/logout');
-          } catch {
-            /* clear stale cookie if possible */
-          }
+          // Do not call /auth/logout here — a stale /auth/me can race with login and wipe a fresh cookie.
           setUser(null);
           setToken(null);
           setMemoryAuthToken(null);
         }
       })
       .finally(() => {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const login = async (email: string, password: string) => {

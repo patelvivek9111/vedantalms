@@ -6,6 +6,13 @@ const e2eEnvLocal = path.join(__dirname, '.env.local');
 const frontendDir = path.join(__dirname, '..', 'frontend');
 const frontendBaseURL = process.env.E2E_BASE_URL || 'http://localhost:3000';
 const frontendPort = new URL(frontendBaseURL).port || '3000';
+const apiProxyTarget = process.env.E2E_API_URL || 'http://127.0.0.1:5000';
+
+const viteE2eEnv = {
+  VITE_USE_SAME_ORIGIN_API: 'true',
+  VITE_PROXY_TARGET: apiProxyTarget,
+  VITE_SOCKET_ORIGIN: apiProxyTarget,
+};
 
 if (fs.existsSync(e2eEnvLocal)) {
   for (const line of fs.readFileSync(e2eEnvLocal, 'utf8').split(/\r?\n/)) {
@@ -62,5 +69,6 @@ export default defineConfig({
         url: frontendBaseURL,
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,
+        env: viteE2eEnv,
       },
 });

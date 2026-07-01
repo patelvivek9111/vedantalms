@@ -41,6 +41,11 @@ const normalizeApiBase = (raw: string): string => {
 };
 
 const getApiUrl = (): string => {
+  const useSameOrigin = (import.meta as any).env?.VITE_USE_SAME_ORIGIN_API === 'true';
+  if (useSameOrigin) {
+    return '';
+  }
+
   const envApiUrl = (import.meta as any).env?.VITE_API_URL as string | undefined;
   if (envApiUrl && envApiUrl.trim()) {
     const normalized = normalizeApiBase(envApiUrl);

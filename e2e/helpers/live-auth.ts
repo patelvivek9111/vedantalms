@@ -1,6 +1,7 @@
 import { expect, APIRequestContext, Page } from '@playwright/test';
 
 export const apiURL = process.env.E2E_API_URL || 'http://localhost:5000';
+export const appBaseURL = process.env.E2E_BASE_URL || 'http://localhost:3000';
 export const mathCourseCode = process.env.E2E_MATH_COURSE_CODE || 'DEMO-MATH8-IN-2026';
 
 const mathCourseTitle = 'Mathematics — Grade 8 (Indian Curriculum)';
@@ -104,6 +105,7 @@ export async function registerStudent(request: APIRequestContext, prefix: string
       email,
       password: 'password123',
       role: 'student',
+      termsAccepted: true,
     },
   });
   expect(register.ok(), await register.text()).toBeTruthy();
@@ -132,13 +134,36 @@ export async function getUserId(
   return getUserIdFromToken(request, await getAuthToken(request, creds));
 }
 
+/** Seed the browser session cookie on the app origin (same-origin /api proxy in E2E). */
+export async function seedBrowserAuthCookie(
+  page: Page,
+  creds: { email: string; password: string }
+) {
+  const login = await page.request.post(`${appBaseURL}/api/auth/login`, {
+    data: creds,
+  });
+  expect(login.ok(), await login.text()).toBeTruthy();
+  const { token } = await login.json();
+  const cookieUrl = new URL(appBaseURL);
+  await page.context().addCookies([
+    {
+      name: 'lms_auth',
+      value: token,
+      domain: cookieUrl.hostname,
+      path: '/',
+      httpOnly: true,
+      secure: cookieUrl.protocol === 'https:',
+      sameSite: 'Lax',
+    },
+  ]);
+  return token as string;
+}
+
 export async function loginViaForm(page: Page, email: string, password: string) {
-  await page.goto('/login', { waitUntil: 'load', timeout: 60_000 });
-  await expect(page.locator('#email-address')).toBeVisible({ timeout: 30_000 });
-  await page.locator('#email-address').fill(email);
-  await page.locator('#password').fill(password);
-  await page.locator('button[type="submit"]').click();
+  await seedBrowserAuthCookie(page, { email, password });
+  await page.goto('/dashboard', { waitUntil: 'domcontentloaded', timeout: 60_000 });
   await page.waitForURL('**/dashboard', { timeout: 30_000 });
+  await expect(page.locator('#main-content, main').first()).toBeVisible({ timeout: 30_000 });
 }
 
 export async function clearSession(page: Page) {

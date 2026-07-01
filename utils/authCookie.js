@@ -10,12 +10,19 @@ function parseJwtExpireMs() {
   return n * (multipliers[unit] || 86400000);
 }
 
+function useSecureAuthCookies() {
+  if (process.env.AUTH_COOKIE_SECURE === 'true') return true;
+  if (process.env.AUTH_COOKIE_SECURE === 'false') return false;
+  const frontend = process.env.FRONTEND_URL || '';
+  return frontend.startsWith('https://');
+}
+
 function authCookieOptions() {
-  const isProd = process.env.NODE_ENV === 'production';
+  const secure = useSecureAuthCookies();
   return {
     httpOnly: true,
-    secure: isProd,
-    sameSite: isProd ? 'strict' : 'lax',
+    secure,
+    sameSite: secure ? 'strict' : 'lax',
     path: '/',
     maxAge: parseJwtExpireMs(),
   };
@@ -26,10 +33,11 @@ function setAuthCookie(res, token) {
 }
 
 function clearAuthCookie(res) {
+  const secure = useSecureAuthCookies();
   res.clearCookie(AUTH_COOKIE_NAME, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+    secure,
+    sameSite: secure ? 'strict' : 'lax',
     path: '/',
   });
 }
