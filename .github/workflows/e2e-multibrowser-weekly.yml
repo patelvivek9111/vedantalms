@@ -13,11 +13,6 @@ jobs:
       fail-fast: false
       matrix:
         project: [chromium, firefox, webkit]
-    services:
-      mongodb:
-        image: mongo:7
-        ports:
-          - 27017:27017
     env:
       MONGODB_URI: mongodb://127.0.0.1:27017/lms-multibrowser-e2e
       MONGO_DB_NAME: lms-multibrowser-e2e
@@ -28,6 +23,10 @@ jobs:
       CI: true
     steps:
       - uses: actions/checkout@v5
+
+      - name: Start MongoDB
+        run: bash scripts/ci/start-mongodb.sh
+
       - uses: actions/setup-node@v5
         with:
           node-version: '20'
@@ -49,3 +48,7 @@ jobs:
           exit 1
       - name: Cross-browser smoke
         run: npx playwright test -c e2e/playwright.config.ts --project=${{ matrix.project }} e2e/specs/smoke.spec.ts e2e/specs/student-submit-live.spec.ts --workers=1
+
+      - name: Stop MongoDB
+        if: always()
+        run: bash scripts/ci/stop-mongodb.sh

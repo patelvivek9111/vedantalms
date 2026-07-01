@@ -19,11 +19,6 @@ jobs:
   live-e2e-pr-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    services:
-      mongodb:
-        image: mongo:7
-        ports:
-          - 27017:27017
     env:
       MONGODB_URI: mongodb://127.0.0.1:27017/lms-live-e2e-pr
       MONGO_DB_NAME: lms-live-e2e-pr
@@ -34,6 +29,10 @@ jobs:
       CI: true
     steps:
       - uses: actions/checkout@v5
+
+      - name: Start MongoDB
+        run: bash scripts/ci/start-mongodb.sh
+
       - uses: actions/setup-node@v5
         with:
           node-version: '20'
@@ -61,3 +60,7 @@ jobs:
           name: live-e2e-pr-artifacts
           path: test-results/
           if-no-files-found: ignore
+
+      - name: Stop MongoDB
+        if: always()
+        run: bash scripts/ci/stop-mongodb.sh

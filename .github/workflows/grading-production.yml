@@ -22,11 +22,6 @@ on:
 jobs:
   grading-matrix:
     runs-on: ubuntu-latest
-    services:
-      mongodb:
-        image: mongo:7
-        ports:
-          - 27017:27017
 
     env:
       MONGODB_URI: mongodb://127.0.0.1:27017/lms-grading-ci
@@ -38,6 +33,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+
+      - name: Start MongoDB
+        run: bash scripts/ci/start-mongodb.sh
 
       - uses: actions/setup-node@v5
         with:
@@ -61,3 +59,7 @@ jobs:
 
       - name: Migrations dry-run
         run: npm run migrate:dry-run
+
+      - name: Stop MongoDB
+        if: always()
+        run: bash scripts/ci/stop-mongodb.sh

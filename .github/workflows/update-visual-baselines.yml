@@ -1,31 +1,19 @@
-name: Visual Regression (L3)
+name: Update Visual Baselines (Linux)
 
 on:
-  pull_request:
-    paths:
-      - 'frontend/src/**'
-      - 'frontend/index.html'
-      - 'e2e/specs/visual-snapshots.spec.ts'
-      - 'e2e/playwright.visual.config.ts'
-      - 'e2e/specs/snapshots/**'
-      - 'e2e/helpers/live-auth.ts'
-      - 'scripts/seedVisualE2e.js'
-      - '.github/workflows/visual-regression.yml'
-  schedule:
-    - cron: '0 5 * * *'
   workflow_dispatch:
-    inputs:
-      update_baselines:
-        description: 'Regenerate Linux baselines and commit to main'
-        type: boolean
-        default: false
+  push:
+    branches: [main, master]
+    paths:
+      - 'e2e/specs/snapshots/BASELINE_REFRESH'
 
 permissions:
   contents: write
 
 jobs:
-  visual-snapshots:
+  update-linux-baselines:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     env:
       MONGODB_URI: mongodb://127.0.0.1:27017/lms-visual-e2e
       MONGO_DB_NAME: lms-visual-e2e
@@ -45,14 +33,12 @@ jobs:
           node-version: '20'
           cache: npm
 
-      - name: Install backend dependencies
-        run: npm ci
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm ci --prefix frontend
 
-      - name: Install frontend dependencies
-        run: npm ci
-        working-directory: frontend
-
-      - name: Install Playwright browsers
+      - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
       - name: Seed visual E2E data
@@ -75,19 +61,14 @@ jobs:
           echo "API did not become ready"
           exit 1
 
-      - name: Update visual baselines
-        if: github.event_name == 'workflow_dispatch' && inputs.update_baselines == true
+      - name: Regenerate visual baselines on Linux
         run: npm run test:e2e:visual:update
 
-      - name: Run visual snapshot suite
-        if: github.event_name != 'workflow_dispatch' || inputs.update_baselines != true
-        run: npm run test:e2e:visual
-
       - name: Commit updated snapshots
-        if: github.event_name == 'workflow_dispatch' && inputs.update_baselines == true
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm -f e2e/specs/snapshots/BASELINE_REFRESH 2>/dev/null || true
           git add e2e/specs/snapshots/
           if git diff --staged --quiet; then
             echo "No snapshot changes to commit"
@@ -95,14 +76,6 @@ jobs:
           fi
           git commit -m "Update visual regression baselines (Linux CI runner)."
           git push
-
-      - name: Upload snapshot diff artifacts on failure
-        if: failure()
-        uses: actions/upload-artifact@v5
-        with:
-          name: visual-snapshot-diffs
-          path: test-results/
-          if-no-files-found: ignore
 
       - name: Stop MongoDB
         if: always()
