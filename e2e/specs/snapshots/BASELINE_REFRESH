@@ -1,1 +1,0 @@
-Trigger file: push to main runs Update Visual Baselines (Linux) once, then CI removes this file.
