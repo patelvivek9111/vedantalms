@@ -718,6 +718,7 @@ export function Dashboard() {
                     <div 
                       {...provided.dragHandleProps}
                       className="absolute bottom-3 left-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+                      aria-label={`Reorder ${course.catalog?.courseCode || course.title}`}
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm p-1.5 rounded-md shadow-md">
@@ -731,6 +732,7 @@ export function Dashboard() {
                       <div 
                         {...provided.dragHandleProps}
                         className="absolute top-3 left-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+                        aria-label={`Reorder ${course.catalog?.courseCode || course.title}`}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm p-1.5 rounded-md shadow-md">
@@ -741,12 +743,15 @@ export function Dashboard() {
                     <div className="absolute right-2 top-2 lg:right-3 lg:top-3">
                       <div className="relative">
                         <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             setOpenColorPicker(openColorPicker === course._id ? null : course._id);
                             setOpenIconPicker(null);
                           }}
                           className="rounded-md p-1 transition-colors hover:bg-white/20"
+                          aria-label={`Course appearance options for ${course.catalog?.courseCode || course.title}`}
+                          aria-expanded={openColorPicker === course._id || openIconPicker === course._id}
                         >
                           <MoreVertical className="h-4 w-4 text-white lg:h-5 lg:w-5" />
                         </button>
@@ -928,12 +933,15 @@ export function Dashboard() {
                       <div className="absolute top-3 right-3">
                         <div className="relative">
                           <button
+                            type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               setOpenColorPicker(openColorPicker === course._id ? null : course._id);
                               setOpenIconPicker(null);
                             }}
                             className="p-1 hover:bg-white/20 rounded transition-colors"
+                            aria-label={`Course appearance options for ${course.catalog?.courseCode || course.title}`}
+                            aria-expanded={openColorPicker === course._id || openIconPicker === course._id}
                           >
                             <MoreVertical className="h-5 w-5 text-white" />
                           </button>
