@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Institutional rollback / recovery playbook (no DB writes).
- * Pair with docs/operations/discussion-migration-closure.md.
+ * Pair with docs/archive/discussion-migration-closure.md.
  */
 const playbook = {
   generatedAt: new Date().toISOString(),

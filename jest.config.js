@@ -20,7 +20,7 @@ module.exports = {
   // Enforced ratchet floor — measured baseline 2026-06 (lines 45.06 / stmts 43.54 /
   // funcs 43.05 / branches 31.99 via `npm run test:coverage`), set a couple points
   // under to absorb run-to-run variance. RAISE these as backend tests are added;
-  // never lower them (see docs/production-regression-plan.md §20).
+  // never lower them (see docs/testing.md).
   coverageThreshold: {
     global: {
       statements: 42,

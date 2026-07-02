@@ -1,6 +1,12 @@
-# FERPA-oriented access controls (Phase G)
+# Security and FERPA
 
-## Role matrix (academic records)
+Access controls and audit events for academic records.
+
+---
+
+## FERPA-oriented access controls
+
+### Role matrix
 
 | Role | Own grades/transcript | Course gradebook | Edit submissions | Finalize/amend |
 |------|----------------------|------------------|------------------|----------------|
@@ -11,17 +17,24 @@
 | department_admin | No | Yes | Staff rules | Yes |
 | admin | Yes (override logged) | Yes | Yes (logged) | Yes |
 
-## Audit events
+### Audit events
 
 - `ferpa_access_denied` — blocked access
 - `ferpa_cross_student_attempt` / `ferpa_cross_course_attempt`
 - `transcript_view` / `transcript_download`
 - `gradebook_export_requested` / `gradebook_export_download`
 - `admin_override` — admin mutation on submissions
+- `ferpa_suspicious_access` — invalid file download tokens
 
-## Verification
+### Verification
 
 ```bash
 npm run verify:audit-integrity
 npm run test:grading -- --testPathPattern=ferpaAccess
 ```
+
+---
+
+## Production security
+
+Full go-live checklist (auth cookies, registration lockdown, env vars, smoke tests): [production.md](./production.md#security-checklist).

@@ -73,7 +73,7 @@ const OpsDashboardPanel: React.FC = () => {
       <JobTable title="Active jobs" jobs={activeJobs} />
       <JobTable title="Failed jobs (recent)" jobs={failedJobs} />
       <p className="text-xs text-gray-500">
-        Institution backup/restore status is managed via server scripts — see docs/operations/.
+        Institution backup/restore status is managed via server scripts — see docs/operations.md.
       </p>
     </div>
   );
