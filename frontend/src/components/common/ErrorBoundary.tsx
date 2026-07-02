@@ -1,6 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import * as Sentry from '@sentry/react';
 import logger from '../../utils/logger';
 import { isChunkLoadError } from '../../utils/lazyWithRetry';
 
@@ -33,6 +34,12 @@ class ErrorBoundary extends Component<Props, State> {
     
     // Log the error
     logger.error('Error caught by boundary', error, { errorInfo });
+
+    if (import.meta.env.VITE_SENTRY_DSN) {
+      Sentry.captureException(error, {
+        contexts: { react: { componentStack: errorInfo.componentStack } },
+      });
+    }
   }
 
   handleRetry = () => {
