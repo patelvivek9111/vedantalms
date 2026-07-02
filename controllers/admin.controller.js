@@ -940,6 +940,152 @@ exports.getSecurityEvents = async (req, res) => {
   }
 };
 
+// @desc    Security posture checklist (env + runtime)
+// @route   GET /api/admin/security/posture
+exports.getSecurityPosture = async (req, res) => {
+  try {
+    const { getSecurityPosture } = require('../services/securityPosture.service');
+    res.json({ success: true, data: getSecurityPosture() });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// @desc    Editable security policies
+// @route   GET /api/admin/security/config
+exports.getSecurityConfig = async (req, res) => {
+  try {
+    const { getSecurityPolicy } = require('../services/securityPolicy.service');
+    const { passwordPolicyMessage } = require('../utils/passwordPolicy');
+    const policy = getSecurityPolicy();
+    res.json({
+      success: true,
+      data: {
+        ...policy,
+        passwordPolicyHint: passwordPolicyMessage(policy),
+        envRegistrationLocked: process.env.DISABLE_PUBLIC_REGISTRATION === 'true',
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// @desc    Update security policies
+// @route   PATCH /api/admin/security/config
+exports.patchSecurityConfig = async (req, res) => {
+  try {
+    const {
+      passwordMinLength,
+      requireStrongPassword,
+      maxLoginAttempts,
+      disablePublicRegistration,
+      maintenanceMode,
+    } = req.body;
+
+    let settings = await SystemSettings.findOne();
+    if (!settings) settings = await SystemSettings.create({});
+
+    if (passwordMinLength != null) {
+      settings.security.passwordMinLength = Math.max(6, Math.min(128, parseInt(passwordMinLength, 10) || 8));
+    }
+    if (requireStrongPassword != null) {
+      settings.security.requireStrongPassword = Boolean(requireStrongPassword);
+    }
+    if (maxLoginAttempts != null) {
+      settings.security.maxLoginAttempts = Math.max(3, Math.min(20, parseInt(maxLoginAttempts, 10) || 5));
+    }
+    if (disablePublicRegistration != null) {
+      settings.security.disablePublicRegistration = Boolean(disablePublicRegistration);
+    }
+    if (maintenanceMode != null) {
+      settings.general.maintenanceMode = Boolean(maintenanceMode);
+    }
+
+    await settings.save();
+    const { refreshSecurityPolicyCache } = require('../services/securityPolicy.service');
+    await refreshSecurityPolicyCache();
+    const { getSecurityPolicy } = require('../services/securityPolicy.service');
+    const { passwordPolicyMessage } = require('../utils/passwordPolicy');
+    const policy = getSecurityPolicy();
+
+    res.json({
+      success: true,
+      data: {
+        ...policy,
+        passwordPolicyHint: passwordPolicyMessage(policy),
+        envRegistrationLocked: process.env.DISABLE_PUBLIC_REGISTRATION === 'true',
+      },
+      message: 'Security settings updated',
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// @desc    Export signed login activity CSV
+// @route   GET /api/admin/security/login-export
+exports.exportLoginLog = async (req, res) => {
+  try {
+    const crypto = require('crypto');
+    const days = Math.min(parseInt(req.query.days || '30', 10), 90);
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const activities = await LoginActivity.find({ timestamp: { $gte: since } })
+      .populate('userId', 'email firstName lastName')
+      .sort({ timestamp: -1 })
+      .limit(5000)
+      .lean();
+
+    const escape = (v) => {
+      const s = String(v ?? '').replace(/"/g, '""');
+      return `"${s}"`;
+    };
+
+    const rows = [
+      'timestamp,email,name,success,ip_address,failure_reason,user_agent',
+      ...activities.map((a) => {
+        const user = a.userId;
+        const email = user?.email || '';
+        const name = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : '';
+        return [
+          escape(new Date(a.timestamp).toISOString()),
+          escape(email),
+          escape(name),
+          escape(a.success ? 'yes' : 'no'),
+          escape(a.ipAddress),
+          escape(a.failureReason),
+          escape(a.userAgent),
+        ].join(',');
+      }),
+    ];
+    const csvBody = rows.join('\n');
+    const sha256 = crypto.createHash('sha256').update(csvBody).digest('hex');
+    const signature = crypto
+      .createHmac('sha256', process.env.JWT_SECRET || 'dev-secret')
+      .update(sha256)
+      .digest('hex');
+
+    const lines = [
+      '# Vedanta LMS signed login activity export',
+      `# generated_at=${new Date().toISOString()}`,
+      `# window_days=${days}`,
+      `# row_count=${activities.length}`,
+      `# sha256=${sha256}`,
+      `# hmac_sha256=${signature}`,
+      '# verify_hmac_with=JWT_SECRET',
+      csvBody,
+    ];
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="signed-login-activity-${days}d.csv"`);
+    res.setHeader('X-Audit-Export-Sha256', sha256);
+    res.setHeader('X-Audit-Export-Signature', signature);
+    res.send(lines.join('\n'));
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 // @desc    Get system settings
 // @route   GET /api/admin/settings
 // @access  Private (Admin)
@@ -999,6 +1145,9 @@ exports.updateSystemSettings = async (req, res) => {
     }
     
     await settings.save();
+    
+    const { refreshSecurityPolicyCache } = require('../services/securityPolicy.service');
+    await refreshSecurityPolicyCache();
     
     // Re-initialize email service if email settings were updated
     if (req.body.email) {

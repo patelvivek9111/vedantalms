@@ -257,8 +257,13 @@ async function runJobByType(jobDoc) {
       return processFilePreviewJob(jobDoc);
     case 'files.bulk.download': {
       const bulkDownload = require('./bulkDownload.service');
-      const user = { _id: jobDoc.requestedBy, role: 'admin' };
+      const User = require('../models/user.model');
+      const requester = await User.findById(jobDoc.requestedBy).select('role').lean();
+      const user = { _id: jobDoc.requestedBy, role: requester?.role || 'admin' };
       const ids = jobDoc.payload?.fileAssetIds || [];
+      if (!ids.length) {
+        throw new Error('No files selected for bulk download');
+      }
       return bulkDownload.buildZipArchive({
         fileAssetIds: ids,
         label: jobDoc.payload?.label,

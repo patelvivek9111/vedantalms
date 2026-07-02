@@ -68,11 +68,14 @@ async function buildZipArchive({ fileAssetIds, label, user, audit = {} }) {
   } catch {
     return buildZipArchiveFolder({ fileAssetIds, label, user, audit });
   }
+  if (!ZipArchive) {
+    return buildZipArchiveFolder({ fileAssetIds, label, user, audit });
+  }
 
   const assets = await FileAsset.find({ _id: { $in: fileAssetIds }, isDeleted: false });
   await new Promise((resolve, reject) => {
     const output = fs.createWriteStream(zipPath);
-    const archive = new ZipArchive({ zlib: { level: 6 } });
+    const archive = new ZipArchive('zip', { zlib: { level: 6 } });
     output.on('close', resolve);
     archive.on('error', reject);
     archive.pipe(output);

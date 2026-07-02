@@ -447,6 +447,8 @@ const mongoStartupPromise = process.env.NODE_ENV === 'test'
     await ensureCriticalIndexes(logger);
     logStartupPhase('email.initializing');
     await initializeEmailService();
+    const { refreshSecurityPolicyCache } = require('./services/securityPolicy.service');
+    await refreshSecurityPolicyCache();
     lifecycle.mongoStartupComplete = true;
     lifecycle.mongoStartupError = null;
     logStartupPhase('mongo.startup.complete');
@@ -502,6 +504,7 @@ app.use('/uploads', (req, res, next) => {
 });
 
 // Routes
+app.use('/api', require('./middleware/maintenanceMode'));
 app.use('/api/contact', contactInquiryLimiter, require('./routes/contact.routes'));
 app.use('/api/auth', require('./routes/auth.routes'));
 app.use('/api/catalog', require('./routes/catalog.routes'));
@@ -742,9 +745,11 @@ app.get('/health/ready', async (req, res) => {
     apiSchedulersEnabled: lifecycle.apiSchedulersEnabled,
     notes: {
       gradingWorker:
-        jobQueueRedisConfigured && process.env.NODE_ENV === 'production'
-          ? 'Run npm run worker:grading-jobs alongside the API'
-          : null,
+        jobQueueRedisConfigured && !process.env.DISABLE_EMBEDDED_JOB_WORKER
+          ? 'Embedded with API (set DISABLE_EMBEDDED_JOB_WORKER=true to use a separate worker process)'
+          : jobQueueRedisConfigured && process.env.NODE_ENV === 'production'
+            ? 'Run npm run worker:grading-jobs alongside the API'
+            : null,
       notificationFanoutWorker:
         jobQueueRedisConfigured && process.env.NODE_ENV === 'production'
           ? 'Run npm run worker:notification-fanout for async academic notifications'
@@ -982,6 +987,10 @@ if (process.env.NODE_ENV !== 'test') {
         logStartupPhase('server.listening', { port: PORT });
         console.log(`✅ Server listening on http://localhost:${PORT}`);
         startApiSchedulers();
+        const { startEmbeddedGradingWorkerIfNeeded } = require('./services/jobQueue.service');
+        if (startEmbeddedGradingWorkerIfNeeded()) {
+          console.log('✅ Background job worker started (embedded with API)');
+        }
         return;
       } catch (err) {
         if (err.code !== 'EADDRINUSE' || attempt === maxAttempts) {
@@ -1026,8 +1035,11 @@ if (process.env.NODE_ENV !== 'test') {
 
     logger.info({ signal }, 'shutdown.started');
     if (typeof stopCleanupScheduler === 'function') stopCleanupScheduler();
+    const { closeGradingWorker } = require('./services/jobQueue.service');
+    const closeWorker = () => closeGradingWorker().catch(() => {});
 
-    closeIo()
+    closeWorker()
+      .then(closeIo)
       .then(closeHttp)
       .then(closeMongo)
       .then(() => {

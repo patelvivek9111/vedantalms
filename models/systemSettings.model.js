@@ -43,6 +43,10 @@ const systemSettingsSchema = new mongoose.Schema({
     enableTwoFactor: {
       type: Boolean,
       default: false
+    },
+    disablePublicRegistration: {
+      type: Boolean,
+      default: false
     }
   },
   email: {

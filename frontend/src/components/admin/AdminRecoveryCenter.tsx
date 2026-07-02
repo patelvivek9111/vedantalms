@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import FileRecoveryTable from './FileRecoveryTable';
 import FileAuditTimeline from './FileAuditTimeline';
 import FileVersionRestoreDialog from './FileVersionRestoreDialog';
+import { useDebounce } from '../../hooks/useDebounce';
 import {
   restoreFile,
   previewRestore,
@@ -19,6 +20,7 @@ const AdminRecoveryCenter: React.FC = () => {
   const [message, setMessage] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
   const [restorePreview, setRestorePreview] = useState<Record<string, unknown> | null>(null);
 
   const bump = () => setRefreshKey((k) => k + 1);
@@ -72,7 +74,7 @@ const AdminRecoveryCenter: React.FC = () => {
         <div>
           <FileRecoveryTable
             filter={filter}
-            search={search}
+            search={debouncedSearch}
             selectedId={selected?._id || null}
             onSelect={(f) => {
               setSelected(f);

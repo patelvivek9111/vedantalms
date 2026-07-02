@@ -3,6 +3,7 @@ const LoginActivity = require('../models/loginActivity.model');
 const PasswordResetToken = require('../models/passwordResetToken.model');
 const { validationResult } = require('express-validator');
 const { validatePassword } = require('../utils/passwordPolicy');
+const { isPublicRegistrationDisabled, getSecurityPolicy } = require('../services/securityPolicy.service');
 const { setAuthCookie, clearAuthCookie } = require('../utils/authCookie');
 const { sendEmail } = require('../utils/emailService');
 
@@ -10,7 +11,7 @@ const SELF_REGISTER_ROLES = new Set(['student']);
 const DEV_SELF_REGISTER_ROLES = new Set(['student', 'teacher']);
 
 function resolveRegistrationRole(requestedRole) {
-  if (process.env.DISABLE_PUBLIC_REGISTRATION === 'true') {
+  if (isPublicRegistrationDisabled()) {
     return null;
   }
   if (process.env.NODE_ENV === 'production') {
@@ -74,6 +75,13 @@ exports.register = async (req, res) => {
       });
     }
 
+    if (getSecurityPolicy().maintenanceMode) {
+      return res.status(503).json({
+        success: false,
+        message: 'Registration is unavailable during maintenance.',
+      });
+    }
+
     if (role && !SELF_REGISTER_ROLES.has(role) && process.env.NODE_ENV === 'production') {
       return res.status(400).json({
         success: false,
@@ -128,6 +136,8 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: 'Please provide an email and password' });
     }
 
+    const policy = getSecurityPolicy();
+
     const user = await User.findOne({ email }).select('+password');
     if (!user) {
       await LoginActivity.create({
@@ -138,6 +148,24 @@ exports.login = async (req, res) => {
         failureReason: 'User not found',
       });
       return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    if (policy.maintenanceMode && user.role !== 'admin') {
+      return res.status(503).json({
+        message: 'The system is under maintenance. Please try again later.',
+      });
+    }
+
+    const lockoutWindow = new Date(Date.now() - 15 * 60 * 1000);
+    const recentFailures = await LoginActivity.countDocuments({
+      userId: user._id,
+      success: false,
+      timestamp: { $gte: lockoutWindow },
+    });
+    if (recentFailures >= policy.maxLoginAttempts) {
+      return res.status(429).json({
+        message: 'Too many failed login attempts. Please try again in 15 minutes.',
+      });
     }
 
     const isMatch = await user.matchPassword(password);

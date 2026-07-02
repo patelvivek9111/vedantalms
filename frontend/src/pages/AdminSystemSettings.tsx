@@ -20,8 +20,6 @@ import {
 } from 'lucide-react';
 import InstitutionGradingPolicyTab from '../components/admin/InstitutionGradingPolicyTab';
 import OpsDashboardPanel from '../components/admin/OpsDashboardPanel';
-import OpsFilesPanel from '../components/admin/OpsFilesPanel';
-import OpsRecoveryPanel from '../components/admin/OpsRecoveryPanel';
 import AdminRecoveryCenter from '../components/admin/AdminRecoveryCenter';
 import { MobileAppShell } from '../components/common/MobileAppShell';
 
@@ -66,6 +64,16 @@ export function AdminSystemSettings() {
   const [activeTab, setActiveTab] = useState('general');
   const [showPassword, setShowPassword] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [showFileRecovery, setShowFileRecovery] = useState(false);
+
+  useEffect(() => {
+    if (activeTab !== 'operations') {
+      setShowFileRecovery(false);
+      return;
+    }
+    const id = window.setTimeout(() => setShowFileRecovery(true), 100);
+    return () => window.clearTimeout(id);
+  }, [activeTab]);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -376,12 +384,18 @@ export function AdminSystemSettings() {
                   type="checkbox"
                   id="enableTwoFactor"
                   checked={config.security.enableTwoFactor}
-                  onChange={(e) => handleConfigChange('security', 'enableTwoFactor', e.target.checked)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
+                  disabled
+                  readOnly
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded disabled:opacity-50"
                 />
-                <label htmlFor="enableTwoFactor" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Enable Two-Factor Authentication
-                </label>
+                <div>
+                  <label htmlFor="enableTwoFactor" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Two-Factor Authentication
+                  </label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    MFA requires a full TOTP enrollment flow and is not available yet.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -564,17 +578,11 @@ export function AdminSystemSettings() {
         {activeTab === 'operations' && (
           <div className="space-y-8">
             <OpsDashboardPanel />
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-              <AdminRecoveryCenter />
-            </div>
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-              <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-4">Maintenance tools</h3>
-              <OpsRecoveryPanel />
-            </div>
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-              <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-4">Files</h3>
-              <OpsFilesPanel />
-            </div>
+            {showFileRecovery && (
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-6 px-6 pb-6">
+                <AdminRecoveryCenter />
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -32,6 +32,20 @@ router.post(
   opsController.postRecoveryAction
 );
 
+router.post(
+  '/jobs/:id/retry',
+  protect,
+  authorize('admin', 'registrar', 'department_admin'),
+  opsController.retryJob
+);
+
+router.delete(
+  '/jobs/:id',
+  protect,
+  authorize('admin', 'registrar', 'department_admin'),
+  opsController.dismissJob
+);
+
 router.get(
   '/recovery/files',
   protect,

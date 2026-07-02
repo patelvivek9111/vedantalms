@@ -25,6 +25,12 @@ async function main() {
 
   console.log('Grading jobs worker started (queue: grading)');
 
+  const heartbeat = () => {
+    process.env.GRADING_WORKER_HEARTBEAT_AT = new Date().toISOString();
+  };
+  heartbeat();
+  setInterval(heartbeat, 30000).unref();
+
   const shutdown = async () => {
     await worker.close();
     await mongoose.connection.close();

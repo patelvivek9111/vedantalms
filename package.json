@@ -210,6 +210,8 @@
     "express-validator": "^7.2.1",
     "helmet": "^8.1.0",
     "ioredis": "^5.10.1",
+    "isomorphic-dompurify": "^3.18.0",
+    "jsdom": "^29.1.1",
     "json2csv": "^6.0.0-alpha.2",
     "jsonwebtoken": "^9.0.2",
     "jszip": "^3.10.1",

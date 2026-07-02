@@ -58,18 +58,9 @@ async function markOrphanCandidates({ dryRun = true, limit = 100 } = {}) {
 }
 
 async function retryFailedJob(jobId, user) {
-  const job = await AsyncJob.findById(jobId);
-  if (!job || job.status !== 'failed') {
-    const err = new Error('Job not found or not in failed state');
-    err.statusCode = 400;
-    throw err;
-  }
-  job.status = 'pending';
-  job.error = undefined;
-  await job.save();
-  const { enqueueJob } = require('./jobQueue.service');
-  await enqueueJob(job.type, job.payload, user);
-  return job;
+  const { requeueExistingJob } = require('./jobQueue.service');
+  const result = await requeueExistingJob(jobId);
+  return result.job;
 }
 
 async function runRecoveryDryRun() {

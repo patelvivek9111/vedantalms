@@ -40,3 +40,13 @@ export async function postRecoveryAction(body: {
   const res = await api.post('/ops/recovery', body);
   return res.data;
 }
+
+export async function retryJob(jobId: string) {
+  const res = await api.post(`/ops/jobs/${jobId}/retry`);
+  return res.data;
+}
+
+export async function dismissJob(jobId: string) {
+  const res = await api.delete(`/ops/jobs/${jobId}`);
+  return res.data;
+}

@@ -12,6 +12,10 @@ const {
   getAllCourses,
   getSecurityStats,
   getSecurityEvents,
+  getSecurityPosture,
+  getSecurityConfig,
+  patchSecurityConfig,
+  exportLoginLog,
   getSystemSettings,
   updateSystemSettings,
   testEmailConfig
@@ -28,6 +32,10 @@ router.patch('/users/:id/status', protect, authorize('admin'), updateUserStatus)
 router.get('/courses', protect, authorize('admin'), getAllCourses);
 router.get('/security/stats', protect, authorize('admin'), getSecurityStats);
 router.get('/security/events', protect, authorize('admin'), getSecurityEvents);
+router.get('/security/posture', protect, authorize('admin'), getSecurityPosture);
+router.get('/security/config', protect, authorize('admin'), getSecurityConfig);
+router.patch('/security/config', protect, authorize('admin'), patchSecurityConfig);
+router.get('/security/login-export', protect, authorize('admin'), exportLoginLog);
 router.get('/settings', protect, authorize('admin'), getSystemSettings);
 router.put('/settings', protect, authorize('admin'), updateSystemSettings);
 router.post('/settings/test-email', protect, authorize('admin'), testEmailConfig);
