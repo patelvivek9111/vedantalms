@@ -619,10 +619,12 @@ export function AdminCourseOversight() {
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 border dark:border-gray-700">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Search</label>
+            <label htmlFor="courseSearch" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Search</label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4" />
               <input
+                id="courseSearch"
+                name="courseSearch"
                 type="text"
                 placeholder="Search courses..."
                 value={searchTerm}
@@ -633,8 +635,10 @@ export function AdminCourseOversight() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status</label>
+            <label htmlFor="courseStatusFilter" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status</label>
             <select
+              id="courseStatusFilter"
+              name="courseStatusFilter"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
@@ -647,8 +651,10 @@ export function AdminCourseOversight() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Published</label>
+            <label htmlFor="coursePublishedFilter" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Published</label>
             <select
+              id="coursePublishedFilter"
+              name="coursePublishedFilter"
               value={publishedFilter}
               onChange={(e) => setPublishedFilter(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
@@ -811,8 +817,10 @@ export function AdminCourseOversight() {
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Edit Course</h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
+                <label htmlFor="editCourseTitle" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
                 <input
+                  id="editCourseTitle"
+                  name="title"
                   type="text"
                   value={editFormData.title}
                   onChange={(e) => setEditFormData({ ...editFormData, title: e.target.value })}
@@ -821,8 +829,10 @@ export function AdminCourseOversight() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+                <label htmlFor="editCourseDescription" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
                 <textarea
+                  id="editCourseDescription"
+                  name="description"
                   value={editFormData.description}
                   onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
                   rows={3}
@@ -831,8 +841,10 @@ export function AdminCourseOversight() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Instructor</label>
+                <label htmlFor="editCourseInstructor" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Instructor</label>
                 <input
+                  id="editCourseInstructor"
+                  name="instructor"
                   type="text"
                   value={editFormData.instructor}
                   readOnly
@@ -842,8 +854,10 @@ export function AdminCourseOversight() {
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Instructor cannot be changed from here</p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
+                <label htmlFor="editCourseStatus" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
                 <select
+                  id="editCourseStatus"
+                  name="status"
                   value={editFormData.status}
                   onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value as 'active' | 'draft' | 'archived' })}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"

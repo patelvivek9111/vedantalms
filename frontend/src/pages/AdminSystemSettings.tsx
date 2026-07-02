@@ -273,8 +273,10 @@ export function AdminSystemSettings() {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Site Name</label>
+                <label htmlFor="siteName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Site Name</label>
                 <input
+                  id="siteName"
+                  name="siteName"
                   type="text"
                   value={config.general.siteName}
                   onChange={(e) => handleConfigChange('general', 'siteName', e.target.value)}
@@ -283,8 +285,10 @@ export function AdminSystemSettings() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Site Description</label>
+                <label htmlFor="siteDescription" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Site Description</label>
                 <input
+                  id="siteDescription"
+                  name="siteDescription"
                   type="text"
                   value={config.general.siteDescription}
                   onChange={(e) => handleConfigChange('general', 'siteDescription', e.target.value)}
@@ -293,8 +297,10 @@ export function AdminSystemSettings() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Maximum File Size (MB)</label>
+                <label htmlFor="maxFileSize" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Maximum File Size (MB)</label>
                 <input
+                  id="maxFileSize"
+                  name="maxFileSize"
                   type="number"
                   value={config.general.maxFileSize}
                   onChange={(e) => handleConfigChange('general', 'maxFileSize', parseInt(e.target.value))}
@@ -303,8 +309,10 @@ export function AdminSystemSettings() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Allowed File Types</label>
+                <label htmlFor="allowedFileTypes" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Allowed File Types</label>
                 <input
+                  id="allowedFileTypes"
+                  name="allowedFileTypes"
                   type="text"
                   value={config.general.allowedFileTypes.join(', ')}
                   onChange={(e) => handleConfigChange('general', 'allowedFileTypes', e.target.value.split(', '))}
@@ -335,8 +343,10 @@ export function AdminSystemSettings() {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Minimum Password Length</label>
+                <label htmlFor="securityPasswordMinLength" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Minimum Password Length</label>
                 <input
+                  id="securityPasswordMinLength"
+                  name="securityPasswordMinLength"
                   type="number"
                   value={config.security.passwordMinLength}
                   onChange={(e) => handleConfigChange('security', 'passwordMinLength', parseInt(e.target.value))}
@@ -345,8 +355,10 @@ export function AdminSystemSettings() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Session Timeout (minutes)</label>
+                <label htmlFor="sessionTimeout" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Session Timeout (minutes)</label>
                 <input
+                  id="sessionTimeout"
+                  name="sessionTimeout"
                   type="number"
                   value={config.security.sessionTimeout}
                   onChange={(e) => handleConfigChange('security', 'sessionTimeout', parseInt(e.target.value))}
@@ -355,8 +367,10 @@ export function AdminSystemSettings() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Maximum Login Attempts</label>
+                <label htmlFor="securityMaxLoginAttempts" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Maximum Login Attempts</label>
                 <input
+                  id="securityMaxLoginAttempts"
+                  name="securityMaxLoginAttempts"
                   type="number"
                   value={config.security.maxLoginAttempts}
                   onChange={(e) => handleConfigChange('security', 'maxLoginAttempts', parseInt(e.target.value))}
@@ -407,8 +421,10 @@ export function AdminSystemSettings() {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">SMTP Host</label>
+                <label htmlFor="smtpHost" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">SMTP Host</label>
                 <input
+                  id="smtpHost"
+                  name="smtpHost"
                   type="text"
                   value={config.email.smtpHost}
                   onChange={(e) => handleConfigChange('email', 'smtpHost', e.target.value)}
@@ -417,8 +433,10 @@ export function AdminSystemSettings() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">SMTP Port</label>
+                <label htmlFor="smtpPort" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">SMTP Port</label>
                 <input
+                  id="smtpPort"
+                  name="smtpPort"
                   type="number"
                   value={config.email.smtpPort}
                   onChange={(e) => handleConfigChange('email', 'smtpPort', parseInt(e.target.value))}
@@ -427,8 +445,11 @@ export function AdminSystemSettings() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">SMTP Username</label>
+                <label htmlFor="smtpUser" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">SMTP Username</label>
                 <input
+                  id="smtpUser"
+                  name="smtpUser"
+                  autoComplete="username"
                   type="text"
                   value={config.email.smtpUser}
                   onChange={(e) => handleConfigChange('email', 'smtpUser', e.target.value)}
@@ -437,9 +458,12 @@ export function AdminSystemSettings() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">SMTP Password</label>
+                <label htmlFor="smtpPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">SMTP Password</label>
                 <div className="relative">
                   <input
+                    id="smtpPassword"
+                    name="smtpPassword"
+                    autoComplete="current-password"
                     type={showPassword ? 'text' : 'password'}
                     value={config.email.smtpPassword}
                     onChange={(e) => handleConfigChange('email', 'smtpPassword', e.target.value)}
@@ -456,8 +480,10 @@ export function AdminSystemSettings() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">From Email</label>
+                <label htmlFor="fromEmail" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">From Email</label>
                 <input
+                  id="fromEmail"
+                  name="fromEmail"
                   type="email"
                   value={config.email.fromEmail}
                   onChange={(e) => handleConfigChange('email', 'fromEmail', e.target.value)}
@@ -466,8 +492,10 @@ export function AdminSystemSettings() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">From Name</label>
+                <label htmlFor="fromName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">From Name</label>
                 <input
+                  id="fromName"
+                  name="fromName"
                   type="text"
                   value={config.email.fromName}
                   onChange={(e) => handleConfigChange('email', 'fromName', e.target.value)}
@@ -499,8 +527,10 @@ export function AdminSystemSettings() {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Maximum Storage per User (GB)</label>
+                <label htmlFor="maxStoragePerUser" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Maximum Storage per User (GB)</label>
                 <input
+                  id="maxStoragePerUser"
+                  name="maxStoragePerUser"
                   type="number"
                   value={config.storage.maxStoragePerUser}
                   onChange={(e) => handleConfigChange('storage', 'maxStoragePerUser', parseInt(e.target.value))}
@@ -509,8 +539,10 @@ export function AdminSystemSettings() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Backup Frequency</label>
+                <label htmlFor="backupFrequency" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Backup Frequency</label>
                 <select
+                  id="backupFrequency"
+                  name="backupFrequency"
                   value={config.storage.backupFrequency}
                   onChange={(e) => handleConfigChange('storage', 'backupFrequency', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
@@ -522,8 +554,10 @@ export function AdminSystemSettings() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Retention Days</label>
+                <label htmlFor="retentionDays" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Retention Days</label>
                 <input
+                  id="retentionDays"
+                  name="retentionDays"
                   type="number"
                   value={config.storage.retentionDays}
                   onChange={(e) => handleConfigChange('storage', 'retentionDays', parseInt(e.target.value))}
@@ -531,8 +565,10 @@ export function AdminSystemSettings() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Deleted blob retention (days)</label>
+                <label htmlFor="deletedBlobRetentionDays" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Deleted blob retention (days)</label>
                 <input
+                  id="deletedBlobRetentionDays"
+                  name="deletedBlobRetentionDays"
                   type="number"
                   value={config.storage.deletedBlobRetentionDays ?? config.storage.retentionDays}
                   onChange={(e) => handleConfigChange('storage', 'deletedBlobRetentionDays', parseInt(e.target.value))}
@@ -540,8 +576,10 @@ export function AdminSystemSettings() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Deleted file metadata retention (days)</label>
+                <label htmlFor="deletedFileRetentionDays" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Deleted file metadata retention (days)</label>
                 <input
+                  id="deletedFileRetentionDays"
+                  name="deletedFileRetentionDays"
                   type="number"
                   value={config.storage.deletedFileRetentionDays ?? config.storage.retentionDays}
                   onChange={(e) => handleConfigChange('storage', 'deletedFileRetentionDays', parseInt(e.target.value))}
@@ -549,8 +587,10 @@ export function AdminSystemSettings() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">ZIP export retention (hours)</label>
+                <label htmlFor="zipRetentionHours" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">ZIP export retention (hours)</label>
                 <input
+                  id="zipRetentionHours"
+                  name="zipRetentionHours"
                   type="number"
                   value={config.storage.zipRetentionHours ?? 72}
                   onChange={(e) => handleConfigChange('storage', 'zipRetentionHours', parseInt(e.target.value))}

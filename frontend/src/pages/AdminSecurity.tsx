@@ -268,10 +268,15 @@ export function AdminSecurity() {
             <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-3">
               <p className="text-xs font-medium text-gray-500 uppercase">Password & login policy</p>
               <div>
-                <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">
+                <label
+                  htmlFor="passwordMinLength"
+                  className="block text-sm text-gray-700 dark:text-gray-300 mb-1"
+                >
                   Minimum password length
                 </label>
                 <input
+                  id="passwordMinLength"
+                  name="passwordMinLength"
                   type="number"
                   min={6}
                   max={128}
@@ -283,10 +288,15 @@ export function AdminSecurity() {
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">
+                <label
+                  htmlFor="maxLoginAttempts"
+                  className="block text-sm text-gray-700 dark:text-gray-300 mb-1"
+                >
                   Max failed logins (15 min lockout)
                 </label>
                 <input
+                  id="maxLoginAttempts"
+                  name="maxLoginAttempts"
                   type="number"
                   min={3}
                   max={20}
@@ -299,6 +309,8 @@ export function AdminSecurity() {
               </div>
               <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                 <input
+                  id="requireStrongPassword"
+                  name="requireStrongPassword"
                   type="checkbox"
                   checked={draft.requireStrongPassword}
                   onChange={(e) =>
@@ -453,17 +465,21 @@ function ActionCard({
       type="button"
       disabled={loading || disabled}
       onClick={onClick}
-      className={`text-left rounded-lg border p-4 transition-colors disabled:opacity-50 ${
+      className={`text-left rounded-lg border p-4 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
         active
-          ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/30'
-          : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750'
+          ? 'border-amber-500 bg-amber-50 dark:border-amber-500/60 dark:bg-amber-950/30'
+          : 'border-gray-200 bg-gray-50 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900/40 dark:hover:bg-gray-700/50'
       }`}
     >
       <div className="flex items-start gap-3">
-        <Icon className="h-5 w-5 text-gray-500 shrink-0 mt-0.5" />
+        <Icon
+          className={`h-5 w-5 shrink-0 mt-0.5 ${
+            active ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'
+          }`}
+        />
         <div>
           <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{title}</p>
-          <p className="text-xs text-gray-500 mt-1">{description}</p>
+          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{description}</p>
         </div>
       </div>
     </button>

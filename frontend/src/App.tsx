@@ -47,6 +47,7 @@ import { useMessagingSocketConnection } from './hooks/inbox/useMessagingSocketCo
 import { useNotificationSocketConnection } from './hooks/notifications/useNotificationSocketConnection';
 import { useNotificationCrossTabSync } from './hooks/notifications/useNotificationCrossTabSync';
 import { loginRedirectPath } from './utils/loginRedirect';
+import { AdminPhoneGate } from './components/admin/AdminPhoneGate';
 const AdminDashboard = lazyWithRetry(() => import('./pages/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 const AdminUserManagement = lazyWithRetry(() => import('./pages/AdminUserManagement').then(m => ({ default: m.AdminUserManagement })));
 const AdminAnalytics = lazyWithRetry(() => import('./pages/AdminAnalytics').then(m => ({ default: m.AdminAnalytics })));
@@ -135,11 +136,23 @@ function DashboardWrapper() {
   
   // Render admin dashboard for admin users
   if (user?.role === 'admin') {
-    return withRouteLoader(<AdminDashboard />);
+    return (
+      <AdminPhoneGate>
+        {withRouteLoader(<AdminDashboard />)}
+      </AdminPhoneGate>
+    );
   }
   
   // Render regular dashboard for other users
   return <Dashboard />;
+}
+
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  return (
+    <PrivateRoute allowedRoles={['admin']}>
+      <AdminPhoneGate>{children}</AdminPhoneGate>
+    </PrivateRoute>
+  );
 }
 
 const withRouteLoader = (node: React.ReactNode) => (
@@ -441,17 +454,17 @@ function AppContent() {
           <Route
             path="/admin/users"
             element={
-              <PrivateRoute allowedRoles={['admin']}>
+              <AdminRoute>
                 {withRouteLoader(<AdminUserManagement />)}
-              </PrivateRoute>
+              </AdminRoute>
             }
           />
           <Route
             path="/admin/courses"
             element={
-              <PrivateRoute allowedRoles={['admin']}>
+              <AdminRoute>
                 {withRouteLoader(<AdminCourseOversight />)}
-              </PrivateRoute>
+              </AdminRoute>
             }
           />
           <Route
@@ -465,36 +478,36 @@ function AppContent() {
           <Route
             path="/admin/analytics"
             element={
-              <PrivateRoute allowedRoles={['admin']}>
+              <AdminRoute>
                 {withRouteLoader(<AdminAnalytics />)}
-              </PrivateRoute>
+              </AdminRoute>
             }
           />
           <Route
             path="/admin/settings"
             element={
-              <PrivateRoute allowedRoles={['admin']}>
+              <AdminRoute>
                 {withRouteLoader(<AdminSystemSettings />)}
-              </PrivateRoute>
+              </AdminRoute>
             }
           />
           <Route
             path="/admin/security"
             element={
-              <PrivateRoute allowedRoles={['admin']}>
+              <AdminRoute>
                 {withRouteLoader(<AdminSecurity />)}
-              </PrivateRoute>
+              </AdminRoute>
             }
           />
           <Route
             path="/admin/backup"
             element={
-              <PrivateRoute allowedRoles={['admin']}>
+              <AdminRoute>
                 <div className="p-6">
                   <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Backup & Recovery</h1>
                   <p className="text-gray-600 dark:text-gray-400">System backup and recovery management</p>
                 </div>
-              </PrivateRoute>
+              </AdminRoute>
             }
           />
           {/* Reports/Transcript Routes */}

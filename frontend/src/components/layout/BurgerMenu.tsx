@@ -106,16 +106,16 @@ function ProfileSectionInline() {
       {editMode ? (
         <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="space-y-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">First Name</label>
-            <input type="text" className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-gray-800" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+            <label htmlFor="profileFirstName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">First Name</label>
+            <input id="profileFirstName" name="firstName" autoComplete="given-name" type="text" className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-gray-800" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Last Name</label>
-            <input type="text" className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-gray-800" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+            <label htmlFor="profileLastName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Last Name</label>
+            <input id="profileLastName" name="lastName" autoComplete="family-name" type="text" className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-gray-800" value={lastName} onChange={(e) => setLastName(e.target.value)} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Bio</label>
-            <textarea rows={3} className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-gray-800" value={bio} onChange={(e) => setBio(e.target.value)} />
+            <label htmlFor="profileBio" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Bio</label>
+            <textarea id="profileBio" name="bio" rows={3} className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-gray-800" value={bio} onChange={(e) => setBio(e.target.value)} />
           </div>
           <div className="flex gap-2">
             <button type="button" onClick={() => setEditMode(false)} className="flex-1 px-3 py-2 bg-gray-200 dark:bg-gray-700 rounded text-sm">Cancel</button>

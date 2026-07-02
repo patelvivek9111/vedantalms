@@ -356,10 +356,12 @@ export function AdminUserManagement() {
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Search</label>
+            <label htmlFor="userSearch" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Search</label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4" />
               <input
+                id="userSearch"
+                name="userSearch"
                 type="text"
                 placeholder="Search users..."
                 value={searchTerm}
@@ -370,8 +372,10 @@ export function AdminUserManagement() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Role</label>
+            <label htmlFor="roleFilter" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Role</label>
             <select
+              id="roleFilter"
+              name="roleFilter"
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -384,8 +388,10 @@ export function AdminUserManagement() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status</label>
+            <label htmlFor="statusFilter" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status</label>
             <select
+              id="statusFilter"
+              name="statusFilter"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -662,8 +668,11 @@ export function AdminUserManagement() {
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">First Name</label>
+                  <label htmlFor="newUserFirstName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">First Name</label>
                   <input
+                    id="newUserFirstName"
+                    name="firstName"
+                    autoComplete="given-name"
                     type="text"
                     required
                     value={newUser.firstName}
@@ -673,8 +682,11 @@ export function AdminUserManagement() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Last Name</label>
+                  <label htmlFor="newUserLastName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Last Name</label>
                   <input
+                    id="newUserLastName"
+                    name="lastName"
+                    autoComplete="family-name"
                     type="text"
                     required
                     value={newUser.lastName}
@@ -684,8 +696,11 @@ export function AdminUserManagement() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+                  <label htmlFor="newUserEmail" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
                   <input
+                    id="newUserEmail"
+                    name="email"
+                    autoComplete="email"
                     type="email"
                     required
                     value={newUser.email}
@@ -695,8 +710,11 @@ export function AdminUserManagement() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
+                  <label htmlFor="newUserPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
                   <input
+                    id="newUserPassword"
+                    name="newPassword"
+                    autoComplete="new-password"
                     type="password"
                     required
                     minLength={6}
@@ -708,8 +726,10 @@ export function AdminUserManagement() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Role</label>
+                  <label htmlFor="newUserRole" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Role</label>
                   <select
+                    id="newUserRole"
+                    name="role"
                     required
                     value={newUser.role}
                     onChange={(e) => setNewUser({ ...newUser, role: e.target.value as 'student' | 'teacher' | 'admin' })}
@@ -760,8 +780,11 @@ export function AdminUserManagement() {
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Edit User</h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">First Name</label>
+                <label htmlFor="editUserFirstName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">First Name</label>
                 <input
+                  id="editUserFirstName"
+                  name="firstName"
+                  autoComplete="given-name"
                   type="text"
                   aria-label="First Name"
                   value={editForm.firstName}
@@ -770,8 +793,11 @@ export function AdminUserManagement() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Last Name</label>
+                <label htmlFor="editUserLastName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Last Name</label>
                 <input
+                  id="editUserLastName"
+                  name="lastName"
+                  autoComplete="family-name"
                   type="text"
                   aria-label="Last Name"
                   value={editForm.lastName}
@@ -780,8 +806,11 @@ export function AdminUserManagement() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+                <label htmlFor="editUserEmail" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
                 <input
+                  id="editUserEmail"
+                  name="email"
+                  autoComplete="email"
                   type="email"
                   aria-label="Email"
                   value={editForm.email}
@@ -790,8 +819,10 @@ export function AdminUserManagement() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Role</label>
+                <label htmlFor="editUserRole" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Role</label>
                 <select
+                  id="editUserRole"
+                  name="role"
                   aria-label="Role"
                   value={editForm.role}
                   onChange={(e) =>

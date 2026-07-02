@@ -750,8 +750,10 @@ export function TeacherCourseOversight() {
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Course Title</label>
+                <label htmlFor="teacherEditCourseTitle" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Course Title</label>
                 <input
+                  id="teacherEditCourseTitle"
+                  name="title"
                   type="text"
                   value={editFormData.title}
                   onChange={(e) => setEditFormData({ ...editFormData, title: e.target.value })}
@@ -759,8 +761,10 @@ export function TeacherCourseOversight() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</label>
+                <label htmlFor="teacherEditCourseDescription" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</label>
                 <textarea
+                  id="teacherEditCourseDescription"
+                  name="description"
                   value={editFormData.description}
                   onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
                   rows={4}
@@ -768,8 +772,10 @@ export function TeacherCourseOversight() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status</label>
+                <label htmlFor="teacherEditCourseStatus" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status</label>
                 <select
+                  id="teacherEditCourseStatus"
+                  name="status"
                   value={editFormData.status}
                   onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value as 'active' | 'draft' })}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
