@@ -1,5 +1,5 @@
 import { test, expect, Page, APIRequestContext } from '@playwright/test';
-import { apiURL, mathCourseId, teacher } from '../helpers/live-auth';
+import { apiURL, mathCourseId, teacher, loginViaForm } from '../helpers/live-auth';
 
 let createdAnnouncementId = '';
 let createdPollId = '';
@@ -18,15 +18,6 @@ async function getAuthToken(
 
 async function enablePlainEditor(page: Page) {
   await page.addInitScript(() => localStorage.setItem('lms:e2e:plain-editor', '1'));
-}
-
-async function loginViaForm(page: Page, email: string, password: string) {
-  await page.goto('/login', { waitUntil: 'load', timeout: 60_000 });
-  await expect(page.locator('#email-address')).toBeVisible({ timeout: 30_000 });
-  await page.locator('#email-address').fill(email);
-  await page.locator('#password').fill(password);
-  await page.locator('button[type="submit"]').click();
-  await page.waitForURL('**/dashboard', { timeout: 30_000 });
 }
 
 function futureDateTimeLocal(hoursFromNow = 48) {

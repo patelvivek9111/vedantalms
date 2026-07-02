@@ -1,16 +1,8 @@
 import { test, expect, Page } from '@playwright/test';
 import path from 'path';
-import { apiURL, mathCourseId, student, teacher } from '../helpers/live-auth';
+import { apiURL, mathCourseId, student, teacher, loginViaForm } from '../helpers/live-auth';
 
 const samplePng = path.join(process.cwd(), 'e2e/fixtures/regression-sample.png');
-
-async function loginViaForm(page: Page, email: string, password: string) {
-  await page.goto('/login');
-  await page.locator('#email-address').fill(email);
-  await page.locator('#password').fill(password);
-  await page.locator('button[type="submit"]').click();
-  await page.waitForURL('**/dashboard', { timeout: 30_000 });
-}
 
 async function getAuthToken(
   request: import('@playwright/test').APIRequestContext,

@@ -10,6 +10,7 @@ import {
   student,
   getAuthToken,
   loginViaForm,
+  clearSession,
   registerStudent,
 } from '../helpers/live-auth';
 const samplePng = path.join(process.cwd(), 'e2e/fixtures/regression-sample.png');
@@ -397,8 +398,7 @@ test.describe.serial('§8.3–8.4 Assignment edit & grade controls', () => {
     await page.getByRole('button', { name: 'Submit Assignment' }).first().click();
     await expect(page.getByText(/submitted/i).first()).toBeVisible({ timeout: 30_000 });
 
-    await page.context().clearCookies();
-    await page.evaluate(() => localStorage.clear());
+    await clearSession(page);
     await loginViaForm(page, teacher.email, teacher.password);
     await page.goto(`/assignments/${deleteGradeAssignmentId}/grade`);
     await page.getByRole('button', { name: /grade submission from e2e deletesub/i }).click();

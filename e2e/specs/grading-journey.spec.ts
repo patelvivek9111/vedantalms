@@ -1,6 +1,6 @@
 import { test, expect, APIRequestContext } from '@playwright/test';
 import path from 'path';
-import { apiURL, mathCourseId, teacher } from '../helpers/live-auth';
+import { apiURL, mathCourseId, teacher, loginViaForm, clearSession } from '../helpers/live-auth';
 
 const samplePng = path.join(process.cwd(), 'e2e/fixtures/regression-sample.png');
 const student = { email: 'priya.sharma@student.demo.vidyalms.com', password: 'VedantaDemo8!' };
@@ -16,14 +16,6 @@ async function getAuthToken(
   expect(login.ok()).toBeTruthy();
   const body = await login.json();
   return body.token as string;
-}
-
-async function loginViaForm(page: import('@playwright/test').Page, email: string, password: string) {
-  await page.goto('/login');
-  await page.locator('#email-address').fill(email);
-  await page.locator('#password').fill(password);
-  await page.locator('button[type="submit"]').click();
-  await page.waitForURL('**/dashboard', { timeout: 30_000 });
 }
 
 test.describe.serial('§5.2 Assignment — manual grading journey', () => {
@@ -149,14 +141,8 @@ test.describe.serial('§5.2 Assignment — manual grading journey', () => {
       )
       .toBe(18);
 
-    await page.context().clearCookies();
-    await page.evaluate(() => localStorage.clear());
-    await page.goto('/login', { waitUntil: 'load', timeout: 60_000 });
-    await expect(page.locator('#email-address')).toBeVisible({ timeout: 30_000 });
-    await page.locator('#email-address').fill(student.email);
-    await page.locator('#password').fill(student.password);
-    await page.locator('button[type="submit"]').click();
-    await page.waitForURL('**/dashboard', { timeout: 30_000 });
+    await clearSession(page);
+    await loginViaForm(page, student.email, student.password);
     await page.goto(`/assignments/${assignmentId}/view`);
     await expect(page.getByText(answerText)).toBeVisible({ timeout: 20_000 });
     await expect(page.locator('[title="Score: 18 / 20 pts"]')).toBeAttached();

@@ -53,6 +53,7 @@ describe('Phase 11B Sprint 1 integration', () => {
   const originalExpansion = process.env.ACADEMIC_NOTIFICATION_EXPANSION_ENABLED;
   const originalPlanner = process.env.PLANNER_MISSING_ASSIGNMENTS_ENABLED;
   const originalPlannerUx = process.env.PLANNER_UX_ENABLED;
+  const originalForceInline = process.env.FORCE_INLINE_JOBS;
 
   beforeAll(async () => {
     mongoServer = await createMongoMemoryServer();
@@ -61,6 +62,7 @@ describe('Phase 11B Sprint 1 integration', () => {
     process.env.ACADEMIC_NOTIFICATION_EXPANSION_ENABLED = 'true';
     process.env.PLANNER_MISSING_ASSIGNMENTS_ENABLED = 'true';
     process.env.PLANNER_UX_ENABLED = 'true';
+    process.env.FORCE_INLINE_JOBS = 'true';
 
     teacher = await User.create({
       firstName: 'Ann',
@@ -136,6 +138,7 @@ describe('Phase 11B Sprint 1 integration', () => {
     process.env.ACADEMIC_NOTIFICATION_EXPANSION_ENABLED = originalExpansion;
     process.env.PLANNER_MISSING_ASSIGNMENTS_ENABLED = originalPlanner;
     process.env.PLANNER_UX_ENABLED = originalPlannerUx;
+    process.env.FORCE_INLINE_JOBS = originalForceInline;
     await mongoose.disconnect();
     if (mongoServer) await mongoServer.stop();
   });

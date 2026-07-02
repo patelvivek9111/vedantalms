@@ -171,6 +171,9 @@ export async function loginViaForm(page: Page, email: string, password: string) 
 
 export async function clearSession(page: Page) {
   await page.context().clearCookies();
-  await page.goto('/login');
-  await page.evaluate(() => localStorage.clear());
+  await page.evaluate(() => {
+    localStorage.clear();
+    sessionStorage.removeItem('lms_auth_token');
+  });
+  await page.goto('/login', { waitUntil: 'domcontentloaded', timeout: 60_000 });
 }

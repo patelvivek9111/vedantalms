@@ -1,6 +1,6 @@
 import { test, expect, Page, APIRequestContext } from '@playwright/test';
 import path from 'path';
-import { apiURL, mathCourseId, teacher } from '../helpers/live-auth';
+import { apiURL, mathCourseId, teacher, loginViaForm, clearSession } from '../helpers/live-auth';
 
 const samplePng = path.join(process.cwd(), 'e2e/fixtures/regression-sample.png');
 const student = { email: 'priya.sharma@student.demo.vidyalms.com', password: 'VedantaDemo8!' };
@@ -17,19 +17,6 @@ async function getAuthToken(
   expect(login.ok()).toBeTruthy();
   const body = await login.json();
   return body.token as string;
-}
-
-async function loginViaForm(page: Page, email: string, password: string) {
-  await page.goto('/login', { waitUntil: 'load', timeout: 60_000 });
-  await page.locator('#email-address').fill(email);
-  await page.locator('#password').fill(password);
-  await page.locator('button[type="submit"]').click();
-  await page.waitForURL('**/dashboard', { timeout: 30_000 });
-}
-
-async function clearSession(page: Page) {
-  await page.context().clearCookies();
-  await page.evaluate(() => localStorage.clear());
 }
 
 test.describe.serial('§6.2 Manual grading UI — live journeys', () => {

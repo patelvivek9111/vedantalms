@@ -1,5 +1,5 @@
 import { test, expect, APIRequestContext } from '@playwright/test';
-import { apiURL, mathCourseId, teacher, student } from '../helpers/live-auth';
+import { apiURL, mathCourseId, teacher, student, loginViaForm } from '../helpers/live-auth';
 
 const Q1_CORRECT = '4';
 const Q1_WRONG = '3';
@@ -16,15 +16,6 @@ async function getAuthToken(
   expect(login.ok()).toBeTruthy();
   const body = await login.json();
   return body.token as string;
-}
-
-async function loginViaForm(page: import('@playwright/test').Page, email: string, password: string) {
-  await page.goto('/login', { waitUntil: 'load', timeout: 60_000 });
-  await expect(page.locator('#email-address')).toBeVisible({ timeout: 30_000 });
-  await page.locator('#email-address').fill(email);
-  await page.locator('#password').fill(password);
-  await page.locator('button[type="submit"]').click();
-  await page.waitForURL('**/dashboard', { timeout: 30_000 });
 }
 
 test.describe.serial('§5.3 Quiz — automated grading journey', () => {

@@ -127,7 +127,7 @@ async function transitionToPosted(courseId, user, courseDoc) {
   });
 
   if (!alreadyPosted) {
-    notifyGradesPosted({ course, actor: user }).catch((err) =>
+    await notifyGradesPosted({ course, actor: user }).catch((err) =>
       console.error('grades.posted notification error:', err)
     );
   }

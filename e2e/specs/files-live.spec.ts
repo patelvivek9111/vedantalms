@@ -1,6 +1,6 @@
 import { test, expect, Page, APIRequestContext } from '@playwright/test';
 import path from 'path';
-import { apiURL, mathCourseId, getMathCourseId, student, admin } from '../helpers/live-auth';
+import { apiURL, mathCourseId, getMathCourseId, student, admin, loginViaForm } from '../helpers/live-auth';
 
 const samplePng = path.join(process.cwd(), 'e2e/fixtures/regression-sample.png');
 
@@ -19,14 +19,6 @@ async function getAuthToken(
 
 async function enablePlainEditor(page: Page) {
   await page.addInitScript(() => localStorage.setItem('lms:e2e:plain-editor', '1'));
-}
-
-async function loginViaForm(page: Page, email: string, password: string) {
-  await page.goto('/login', { waitUntil: 'load', timeout: 60_000 });
-  await page.locator('#email-address').fill(email);
-  await page.locator('#password').fill(password);
-  await page.locator('button[type="submit"]').click();
-  await page.waitForURL('**/dashboard', { timeout: 30_000 });
 }
 
 test.describe.serial('§5.5 Files & uploads — live journeys', () => {

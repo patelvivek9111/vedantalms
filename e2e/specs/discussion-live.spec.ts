@@ -1,5 +1,5 @@
 import { test, expect, Page, APIRequestContext } from '@playwright/test';
-import { apiURL, mathCourseId, getMathCourseId, teacher, student } from '../helpers/live-auth';
+import { apiURL, mathCourseId, getMathCourseId, teacher, student, loginViaForm, clearSession } from '../helpers/live-auth';
 const classmate = { email: 'ananya.iyer@student.demo.vidyalms.com', password: 'VedantaDemo8!' };
 
 const MAIN_REPLY = 'L4 §5.1 main reply from Arjun';
@@ -23,15 +23,6 @@ async function getAuthToken(
 
 async function enablePlainEditor(page: Page) {
   await page.addInitScript(() => localStorage.setItem('lms:e2e:plain-editor', '1'));
-}
-
-async function loginViaForm(page: Page, email: string, password: string) {
-  await page.goto('/login', { waitUntil: 'load', timeout: 60_000 });
-  await expect(page.locator('#email-address')).toBeVisible({ timeout: 30_000 });
-  await page.locator('#email-address').fill(email);
-  await page.locator('#password').fill(password);
-  await page.locator('button[type="submit"]').click();
-  await page.waitForURL('**/dashboard', { timeout: 30_000 });
 }
 
 async function gotoThread(page: Page) {
@@ -237,8 +228,7 @@ test.describe.serial('§5.1 Discussion — live API journey', () => {
     expect(lockedBody.data?.locked ?? lockedBody.data?.workflowState?.locked).toBeTruthy();
 
     await enablePlainEditor(page);
-    await page.context().clearCookies();
-    await page.evaluate(() => localStorage.clear());
+    await clearSession(page);
     await loginViaForm(page, student.email, student.password);
     await gotoThread(page);
     await expect(
@@ -246,8 +236,7 @@ test.describe.serial('§5.1 Discussion — live API journey', () => {
     ).toBeVisible();
     await expect(page.getByRole('button', { name: /start the discussion/i })).toHaveCount(0);
 
-    await page.context().clearCookies();
-    await page.evaluate(() => localStorage.clear());
+    await clearSession(page);
     await loginViaForm(page, teacher.email, teacher.password);
     await gotoThread(page);
     await page.getByRole('button', { name: /unlock discussion/i }).click();
