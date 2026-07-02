@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import Attendance from '@/components/common/Attendance';
 import { useAuth } from '@/contexts/AuthContext';
+import { setMemoryAuthToken } from '@/utils/authToken';
 import axios from 'axios';
 
 // Mock dependencies
@@ -29,10 +30,20 @@ vi.mock('@/utils/logger', () => ({
 const mockedUseAuth = useAuth as any;
 const mockedAxios = axios as any;
 
+function renderAttendance() {
+  return render(
+    <MemoryRouter initialEntries={['/courses/course1']}>
+      <Routes>
+        <Route path="/courses/:id" element={<Attendance />} />
+      </Routes>
+    </MemoryRouter>
+  );
+}
+
 describe('Attendance', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.setItem('token', 'test-token');
+    setMemoryAuthToken('test-token');
     mockedUseAuth.mockReturnValue({
       user: { _id: 'user1', role: 'teacher' },
     });
@@ -49,11 +60,7 @@ describe('Attendance', () => {
       })
       .mockResolvedValueOnce([]);
 
-    render(
-      <BrowserRouter>
-        <Attendance />
-      </BrowserRouter>
-    );
+    renderAttendance();
 
     await waitFor(() => {
       expect(mockedAxios.get).toHaveBeenCalled();
@@ -71,11 +78,7 @@ describe('Attendance', () => {
       })
       .mockResolvedValueOnce([]);
 
-    render(
-      <BrowserRouter>
-        <Attendance />
-      </BrowserRouter>
-    );
+    renderAttendance();
 
     await waitFor(() => {
       expect(mockedAxios.get).toHaveBeenCalled();
@@ -101,11 +104,7 @@ describe('Attendance', () => {
       ]);
     mockedAxios.post.mockResolvedValue({ data: { success: true } });
 
-    render(
-      <BrowserRouter>
-        <Attendance />
-      </BrowserRouter>
-    );
+    renderAttendance();
 
     await waitFor(() => {
       expect(mockedAxios.get).toHaveBeenCalled();
@@ -123,11 +122,7 @@ describe('Attendance', () => {
       })
       .mockResolvedValueOnce([]);
 
-    render(
-      <BrowserRouter>
-        <Attendance />
-      </BrowserRouter>
-    );
+    renderAttendance();
 
     await waitFor(() => {
       expect(mockedAxios.get).toHaveBeenCalled();
@@ -145,11 +140,7 @@ describe('Attendance', () => {
       })
       .mockResolvedValueOnce([]);
 
-    render(
-      <BrowserRouter>
-        <Attendance />
-      </BrowserRouter>
-    );
+    renderAttendance();
 
     await waitFor(() => {
       expect(mockedAxios.get).toHaveBeenCalled();
@@ -167,11 +158,7 @@ describe('Attendance', () => {
       })
       .mockResolvedValueOnce([]);
 
-    render(
-      <BrowserRouter>
-        <Attendance />
-      </BrowserRouter>
-    );
+    renderAttendance();
 
     await waitFor(() => {
       expect(mockedAxios.get).toHaveBeenCalled();

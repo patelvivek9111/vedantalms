@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getMemoryAuthToken, authFetchInit } from '../../utils/authToken';
+import { withAuthCredentials } from '../../utils/authToken';
 import { useParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import axios from 'axios';
@@ -26,10 +26,8 @@ const AssignmentViewWrapper: React.FC = () => {
       if (!assignmentId) return;
 
       try {
-        const token = getMemoryAuthToken();
-        const assignmentRes = await axios.get(`${API_URL}/api/assignments/${assignmentId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const authConfig = withAuthCredentials();
+        const assignmentRes = await axios.get(`${API_URL}/api/assignments/${assignmentId}`, authConfig);
 
         if (assignmentRes.data) {
           const assignment = assignmentRes.data;
@@ -46,7 +44,7 @@ const AssignmentViewWrapper: React.FC = () => {
               if (groupSetId) {
                 const groupSetRes = await axios.get(
                   `${API_URL}/api/groups/sets/id/${groupSetId}`,
-                  { headers: { Authorization: `Bearer ${token}` } }
+                  authConfig
                 );
                 const groupSetData = groupSetRes.data;
                 resolvedCourseId =
@@ -57,9 +55,7 @@ const AssignmentViewWrapper: React.FC = () => {
           } else if (assignment.module) {
             const moduleId =
               typeof assignment.module === 'string' ? assignment.module : assignment.module._id;
-            const moduleRes = await axios.get(`${API_URL}/api/modules/view/${moduleId}`, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
+            const moduleRes = await axios.get(`${API_URL}/api/modules/view/${moduleId}`, authConfig);
 
             if (moduleRes.data.success) {
               resolvedCourseId =
@@ -68,9 +64,7 @@ const AssignmentViewWrapper: React.FC = () => {
           }
 
           if (resolvedCourseId) {
-            const courseRes = await axios.get(`${API_URL}/api/courses/${resolvedCourseId}`, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
+            const courseRes = await axios.get(`${API_URL}/api/courses/${resolvedCourseId}`, authConfig);
             if (courseRes.data.success) {
               setCourse(courseRes.data.data);
             }

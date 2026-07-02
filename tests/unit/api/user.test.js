@@ -350,8 +350,25 @@ describe('User API', () => {
 
       expect(loginResponse.status).toBe(200);
 
-      // Reset password for other tests
-      await User.findByIdAndUpdate(studentId, { password: 'password123' });
+      // Reset password and refresh token (password change invalidates prior JWT)
+      const resetRes = await request(app)
+        .put('/api/users/me/password')
+        .set('Authorization', `Bearer ${loginResponse.body.token}`)
+        .send({
+          currentPassword: 'newpassword123',
+          newPassword: 'password123',
+          confirmPassword: 'password123',
+        });
+      expect(resetRes.status).toBe(200);
+
+      const restoredLogin = await request(app)
+        .post('/api/auth/login')
+        .send({
+          email: 'student-user@test.com',
+          password: 'password123',
+        });
+      expect(restoredLogin.status).toBe(200);
+      studentToken = restoredLogin.body.token;
     });
 
     it('should require all password fields', async () => {

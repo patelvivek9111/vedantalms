@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getMemoryAuthToken, authFetchInit } from '../../utils/authToken';
+import { withAuthCredentials } from '../../utils/authToken';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { 
@@ -144,14 +144,12 @@ const CalendarDay: React.FC<CalendarDayProps> = ({ day, courseId, isInstructor, 
   const fetchDayAttendance = async (date: string) => {
     try {
       setLoading(true);
-      const token = getMemoryAuthToken();
-      if (!token || !courseId) {
+      if (!courseId) {
         setAttendanceData([]);
         return;
       }
 
-      const headers = { Authorization: `Bearer ${token}` };
-      const response = await axios.get(`${API_URL}/api/courses/${courseId}/attendance?date=${date}`, { headers });
+      const response = await axios.get(`${API_URL}/api/courses/${courseId}/attendance?date=${date}`, withAuthCredentials());
       const allAttendanceData = response.data || [];
       
       // Filter data based on user role
@@ -356,17 +354,11 @@ const Attendance: React.FC = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        
-        // Get authentication token
-        const token = getMemoryAuthToken();
-        if (!token) {
-          return;
-        }
 
-        const headers = { Authorization: `Bearer ${token}` };
-        
+        const authConfig = withAuthCredentials();
+
         // Fetch course details to check if user is instructor
-        const courseResponse = await axios.get(`${API_URL}/api/courses/${courseId}`, { headers });
+        const courseResponse = await axios.get(`${API_URL}/api/courses/${courseId}`, authConfig);
         const course = courseResponse.data;
         
         // Check if course data is nested in a 'data' property
@@ -390,7 +382,7 @@ const Attendance: React.FC = () => {
         setSelectedDate(currentDate);
         
         try {
-          const attendanceResponse = await axios.get(`${API_URL}/api/courses/${courseId}/attendance?date=${currentDate}`, { headers });
+          const attendanceResponse = await axios.get(`${API_URL}/api/courses/${courseId}/attendance?date=${currentDate}`, authConfig);
           const allAttendanceData = attendanceResponse.data;
           
           // Filter data based on user role
@@ -408,7 +400,7 @@ const Attendance: React.FC = () => {
           // If no attendance data exists, create default records
           if (isUserInstructor || user?.role === 'admin') {
             // For teachers/admins, create records for all students
-            const studentsResponse = await axios.get(`${API_URL}/api/courses/${courseId}/students`, { headers });
+            const studentsResponse = await axios.get(`${API_URL}/api/courses/${courseId}/students`, authConfig);
             const students = Array.isArray(studentsResponse.data) ? studentsResponse.data : [];
             const defaultAttendanceData = students.map((student: any) => ({
               studentId: student._id,
@@ -487,20 +479,10 @@ const Attendance: React.FC = () => {
 
   const handleSaveAttendance = async () => {
     try {
-      // Get authentication token
-      const token = getMemoryAuthToken();
-      if (!token) {
-        alert('No authentication token found');
-        return;
-      }
-
-      const headers = { Authorization: `Bearer ${token}` };
-      
-      // Save attendance data to backend
-      const response = await axios.post(`${API_URL}/api/courses/${courseId}/attendance`, {
+      await axios.post(`${API_URL}/api/courses/${courseId}/attendance`, {
         date: selectedDate,
         attendanceData: attendanceData.filter(record => record.status !== ATTENDANCE_STATUSES.UNMARKED)
-      }, { headers });
+      }, withAuthCredentials());
       
       // Refresh attendance percentages after successful save
       fetchAttendancePercentages();
@@ -530,14 +512,6 @@ const Attendance: React.FC = () => {
 
     // Auto-save to database
     try {
-      const token = getMemoryAuthToken();
-      if (!token) {
-        return;
-      }
-
-      const headers = { Authorization: `Bearer ${token}` };
-      
-      // Save all attendance data for the current date using the updated data (excluding unmarked)
       const requestData = {
         date: selectedDate,
         attendanceData: updatedAttendanceData
@@ -552,7 +526,7 @@ const Attendance: React.FC = () => {
       };
       
       
-      const response = await axios.post(`${API_URL}/api/courses/${courseId}/attendance`, requestData, { headers });
+      const response = await axios.post(`${API_URL}/api/courses/${courseId}/attendance`, requestData, withAuthCredentials());
       
       // Refresh attendance percentages after successful save
       fetchAttendancePercentages();
@@ -572,16 +546,10 @@ const Attendance: React.FC = () => {
       setLoading(true);
       
       try {
-        const token = getMemoryAuthToken();
-        if (!token) {
-          setLoading(false);
-          return;
-        }
+        const authConfig = withAuthCredentials();
 
-        const headers = { Authorization: `Bearer ${token}` };
-        
         try {
-          const attendanceResponse = await axios.get(`${API_URL}/api/courses/${courseId}/attendance?date=${date}`, { headers });
+          const attendanceResponse = await axios.get(`${API_URL}/api/courses/${courseId}/attendance?date=${date}`, authConfig);
           const allAttendanceData = attendanceResponse.data || [];
           
           // Filter data based on user role
@@ -599,7 +567,7 @@ const Attendance: React.FC = () => {
           // If no attendance data exists, create default records
           if (isInstructor || user?.role === 'admin') {
             // For teachers/admins, create records for all students
-            const studentsResponse = await axios.get(`${API_URL}/api/courses/${courseId}/students`, { headers });
+            const studentsResponse = await axios.get(`${API_URL}/api/courses/${courseId}/students`, authConfig);
             const defaultAttendanceData = (studentsResponse.data || []).map((student: any) => ({
               studentId: student._id,
               studentName: `${student.firstName} ${student.lastName}`,
@@ -645,25 +613,13 @@ const Attendance: React.FC = () => {
 
   const assignInstructor = async () => {
     try {
-      const token = getMemoryAuthToken();
-      if (!token) {
-        alert('No authentication token found');
-        return;
-      }
+      const response = await axios.patch(`${API_URL}/api/courses/${courseId}/assign-instructor`, {}, withAuthCredentials());
 
-      const headers = { Authorization: `Bearer ${token}` };
-      const response = await axios.patch(`${API_URL}/api/courses/${courseId}/assign-instructor`, {}, { headers });
-      
       if (response.data.success) {
         alert('Successfully assigned as instructor!');
-        // Refresh course data to update the instructor status
-        const token = getMemoryAuthToken();
-        if (token) {
-          const headers = { Authorization: `Bearer ${token}` };
-          const courseResponse = await axios.get(`${API_URL}/api/courses/${courseId}`, { headers });
-          setCourseData(courseResponse.data);
-          setIsInstructor(true);
-        }
+        const courseResponse = await axios.get(`${API_URL}/api/courses/${courseId}`, withAuthCredentials());
+        setCourseData(courseResponse.data);
+        setIsInstructor(true);
       }
     } catch (error: any) {
       alert('Error assigning instructor: ' + (error.response?.data?.message || error.message));
@@ -672,17 +628,8 @@ const Attendance: React.FC = () => {
 
   const exportAttendance = async () => {
     try {
-      // Fetch attendance percentages for overall data
-      const token = getMemoryAuthToken();
-      if (!token) {
-        alert('No authentication token found');
-        return;
-      }
-
-      const headers = { Authorization: `Bearer ${token}` };
-      
-      // Fetch attendance percentages
-      const percentagesResponse = await axios.get(`${API_URL}/api/courses/${courseId}/attendance/percentages`, { headers });
+      const authConfig = withAuthCredentials();
+      const percentagesResponse = await axios.get(`${API_URL}/api/courses/${courseId}/attendance/percentages`, authConfig);
       const attendancePercentages = percentagesResponse.data;
 
       // Create CSV content with course header
@@ -721,14 +668,8 @@ const Attendance: React.FC = () => {
   const exportMonthlyAttendance = async () => {
     try {
       setLoading(true);
-      const token = getMemoryAuthToken();
-      if (!token) {
-        alert('No authentication token found');
-        return;
-      }
+      const authConfig = withAuthCredentials();
 
-      const headers = { Authorization: `Bearer ${token}` };
-      
       // Get the current month's date range
       const currentDate = new Date(selectedDate);
       const year = currentDate.getFullYear();
@@ -744,7 +685,7 @@ const Attendance: React.FC = () => {
         const dateString = date.toISOString().split('T')[0];
         
         try {
-          const response = await axios.get(`${API_URL}/api/courses/${courseId}/attendance?date=${dateString}`, { headers });
+          const response = await axios.get(`${API_URL}/api/courses/${courseId}/attendance?date=${dateString}`, authConfig);
           if (response.data && response.data.length > 0) {
             allAttendanceData.push(...response.data);
           }
@@ -754,7 +695,7 @@ const Attendance: React.FC = () => {
       }
 
       // Fetch attendance percentages
-      const percentagesResponse = await axios.get(`${API_URL}/api/courses/${courseId}/attendance/percentages`, { headers });
+      const percentagesResponse = await axios.get(`${API_URL}/api/courses/${courseId}/attendance/percentages`, authConfig);
       const attendancePercentages = percentagesResponse.data;
 
       // Create CSV content with course header
@@ -796,16 +737,9 @@ const Attendance: React.FC = () => {
   const exportCustomAttendance = async () => {
     try {
       setLoading(true);
-      const token = getMemoryAuthToken();
-      if (!token) {
-        alert('No authentication token found');
-        return;
-      }
+      const authConfig = withAuthCredentials();
 
-      const headers = { Authorization: `Bearer ${token}` };
-      
-      // Fetch attendance percentages
-      const percentagesResponse = await axios.get(`${API_URL}/api/courses/${courseId}/attendance/percentages`, { headers });
+      const percentagesResponse = await axios.get(`${API_URL}/api/courses/${courseId}/attendance/percentages`, authConfig);
       const attendancePercentages = percentagesResponse.data;
 
       // Get all students if none selected
@@ -823,7 +757,7 @@ const Attendance: React.FC = () => {
         const dateString = d.toISOString().split('T')[0];
         
         try {
-          const response = await axios.get(`${API_URL}/api/courses/${courseId}/attendance?date=${dateString}`, { headers });
+          const response = await axios.get(`${API_URL}/api/courses/${courseId}/attendance?date=${dateString}`, authConfig);
           if (response.data && Array.isArray(response.data) && response.data.length > 0) {
             // Filter by selected students
             const filteredData = response.data.filter((record: any) => 
@@ -912,11 +846,7 @@ const Attendance: React.FC = () => {
   const fetchAttendancePercentages = async () => {
     if (user?.role !== 'teacher' && user?.role !== 'admin') return;
     try {
-      const token = getMemoryAuthToken();
-      if (!token) return;
-
-      const headers = { Authorization: `Bearer ${token}` };
-      const response = await axios.get(`${API_URL}/api/courses/${courseId}/attendance/percentages`, { headers });
+      const response = await axios.get(`${API_URL}/api/courses/${courseId}/attendance/percentages`, withAuthCredentials());
       setAttendancePercentages(response.data);
     } catch {
       // instructor-only endpoint

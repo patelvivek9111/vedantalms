@@ -66,7 +66,7 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { token, user } = useAuth();
+  const { user } = useAuth();
 
   const getCourses = async () => {
     try {
@@ -236,17 +236,15 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   useEffect(() => {
-    if (token && user?._id) {
-      // Fetch courses when token and user are available
-      getCourses().catch(err => {
-        });
+    if (user?._id) {
+      // Fetch courses when user is authenticated (cookie or bearer)
+      getCourses().catch(() => {});
     } else {
-      // Clear courses when token is removed or user changes (logout or new login)
       setCourses([]);
       setError(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, user?._id]); // Also depend on user._id to reload when user changes
+  }, [user?._id]);
 
   // Ensure context value is always defined - use object literal to always return the same structure
   const contextValue: CourseContextType = {

@@ -22,6 +22,20 @@ test.describe.serial('§10 Student — login → submit → refresh', () => {
     const modulesBody = await modulesRes.json();
     const modules = Array.isArray(modulesBody) ? modulesBody : modulesBody.data || [];
     const moduleId = modules[0]?._id;
+    expect(moduleId, 'Course needs at least one module for §10 submit test').toBeTruthy();
+
+    const moduleView = await request.get(`${apiURL}/api/modules/view/${moduleId}`, {
+      headers: { Authorization: `Bearer ${teacherToken}` },
+    });
+    expect(moduleView.ok(), await moduleView.text()).toBeTruthy();
+    const moduleData = (await moduleView.json()).data;
+    if (!moduleData?.published) {
+      const publishModule = await request.patch(`${apiURL}/api/modules/${moduleId}/publish`, {
+        headers: { Authorization: `Bearer ${teacherToken}` },
+      });
+      expect(publishModule.ok(), await publishModule.text()).toBeTruthy();
+      expect((await publishModule.json()).published).toBe(true);
+    }
 
     const now = Date.now();
     const create = await request.post(`${apiURL}/api/assignments`, {

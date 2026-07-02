@@ -67,7 +67,7 @@ describe('Context coverage', () => {
     );
     await waitFor(() => expect(screen.getByText('a@b.com')).toBeInTheDocument());
     fireEvent.click(screen.getByText('logout'));
-    expect(screen.getByText('no-user')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('no-user')).toBeInTheDocument());
   });
 
   it('CourseContext fetches courses when authenticated', async () => {

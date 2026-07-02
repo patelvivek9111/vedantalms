@@ -54,16 +54,14 @@ describe('§15 API route gaps — smoke coverage', () => {
       });
     teacherToken = teacherRes.body.token;
 
-    const adminRes = await request(app)
-      .post('/api/auth/register')
-      .send({
-        firstName: 'Route',
-        lastName: 'Admin',
-        email: `route-gaps-admin-${unique}@test.com`,
-        password: 'password123',
-        role: 'admin',
-      });
-    adminToken = adminRes.body.token;
+    const adminUser = await User.create({
+      firstName: 'Route',
+      lastName: 'Admin',
+      email: `route-gaps-admin-${unique}@test.com`,
+      password: 'password123',
+      role: 'admin',
+    });
+    adminToken = adminUser.getSignedJwtToken();
 
     const courseRes = await request(app)
       .post('/api/courses')

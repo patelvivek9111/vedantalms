@@ -156,6 +156,9 @@ export async function seedBrowserAuthCookie(
       sameSite: 'Lax',
     },
   ]);
+  await page.addInitScript((authToken: string) => {
+    sessionStorage.setItem('lms_auth_token', authToken);
+  }, token);
   return token as string;
 }
 

@@ -5,6 +5,8 @@ const mockCountDocuments = jest.fn();
 const mockFindOneAndUpdate = jest.fn();
 const mockUpdateMany = jest.fn();
 const mockFindOneAndDelete = jest.fn();
+const mockFind = jest.fn();
+const mockDeleteMany = jest.fn();
 
 jest.mock('../../../models/notification.model', () => ({
   aggregate: (...args) => mockAggregate(...args),
@@ -12,6 +14,8 @@ jest.mock('../../../models/notification.model', () => ({
   findOneAndUpdate: (...args) => mockFindOneAndUpdate(...args),
   updateMany: (...args) => mockUpdateMany(...args),
   findOneAndDelete: (...args) => mockFindOneAndDelete(...args),
+  find: (...args) => mockFind(...args),
+  deleteMany: (...args) => mockDeleteMany(...args),
 }));
 
 jest.mock('../../../services/workflowObservability.service', () => ({
@@ -37,6 +41,12 @@ describe('notificationRead.service', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCountDocuments.mockResolvedValue(3);
+    mockFind.mockReturnValue({
+      select: () => ({
+        lean: () => Promise.resolve([]),
+      }),
+    });
+    mockDeleteMany.mockResolvedValue({ deletedCount: 0 });
   });
 
   describe('serializeNotification', () => {

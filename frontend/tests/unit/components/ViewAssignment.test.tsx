@@ -1,7 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import ViewAssignment from '@/components/assignments/ViewAssignment';
+import { useAuth } from '@/contexts/AuthContext';
 import api from '@/services/api';
+
+vi.mock('@/contexts/AuthContext', () => ({
+  useAuth: vi.fn(),
+}));
 
 vi.mock('react-router-dom', () => ({
   useParams: () => ({ id: 'assign1' }),
@@ -38,6 +43,7 @@ vi.mock('@/components/assignments/MobileQuizChrome', () => ({
 vi.mock('@/components/assignments/TimedQuizStartScreen', () => ({ default: () => null }));
 
 const mockedApi = api as { get: ReturnType<typeof vi.fn> };
+const mockedUseAuth = useAuth as ReturnType<typeof vi.fn>;
 
 const assignmentPayload = {
   _id: 'assign1',
@@ -65,7 +71,7 @@ describe('ViewAssignment — student read path', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.setItem('token', 'test-token');
-    localStorage.setItem('user', JSON.stringify(studentUser));
+    mockedUseAuth.mockReturnValue({ user: studentUser });
     mockedApi.get.mockImplementation((url: string) => {
       if (url.startsWith('/submissions/student/')) {
         return Promise.reject(new Error('no submission'));

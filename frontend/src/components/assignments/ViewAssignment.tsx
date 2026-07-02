@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getMemoryAuthToken, authFetchInit } from '../../utils/authToken';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
 import { API_URL } from '../../config';
 import ReactMarkdown from 'react-markdown';
@@ -393,7 +393,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
   const [submission, setSubmission] = useState<Submission | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>('');
-  const [user, setUser] = useState<User | null>(null);
+  const { user } = useAuth();
   const [answers, setAnswers] = useState<Answers>({});
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isStartingQuiz, setIsStartingQuiz] = useState<boolean>(false);
@@ -499,27 +499,6 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
 
     return all;
   };
-
-  useEffect(() => {
-    let storedUser = null;
-    try {
-      const userStr = localStorage.getItem('user');
-      if (userStr) {
-        storedUser = JSON.parse(userStr);
-      }
-    } catch (e) {
-      logger.error('Error parsing user from localStorage', e);
-    }
-    setUser(storedUser);
-    // Add a timeout fallback in case user is not set
-    const timeout = setTimeout(() => {
-      if (!storedUser) {
-        setError('User not found. Please log in again.');
-        setLoading(false);
-      }
-    }, 2000);
-    return () => clearTimeout(timeout);
-  }, []);
 
   useEffect(() => {
     return () => {
@@ -630,8 +609,6 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const token = getMemoryAuthToken();
-        
         const assignmentRes = await api.get(`/assignments/${id}`);
         // Check if response is HTML
         if (typeof assignmentRes.data === 'string' && assignmentRes.data.trim().startsWith('<!DOCTYPE')) {
@@ -1029,13 +1006,6 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
         }
       });
 
-      const token = getMemoryAuthToken();
-      if (!token) {
-        setError('Authentication token not found. Please log in again.');
-        setIsSubmitting(false);
-        return;
-      }
-      
       // Extract file objects with URL and original name
       const fileObjects = uploadedFiles.map((file: UploadedFile) => {
         // If file is an object with url and name, use it; otherwise create object from string URL
@@ -1101,7 +1071,6 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
   const confirmDelete = async () => {
     setShowDeleteConfirm(false);
     try {
-      const token = getMemoryAuthToken();
       await api.delete(`/assignments/${id}`);
       navigate(-1);
     } catch (err: any) {

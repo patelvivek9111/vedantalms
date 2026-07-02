@@ -1,6 +1,24 @@
 import '@testing-library/jest-dom/vitest'
-import { vi } from 'vitest'
+import { afterEach, vi } from 'vitest'
 import { createAxiosMock } from './helpers/mockApi'
+import { setMemoryAuthToken } from '@/utils/authToken'
+
+// Bridge legacy test pattern: localStorage token -> in-memory auth token
+const origSetItem = localStorage.setItem.bind(localStorage)
+localStorage.setItem = (key: string, value: string) => {
+  origSetItem(key, value)
+  if (key === 'token') setMemoryAuthToken(value)
+}
+const origRemoveItem = localStorage.removeItem.bind(localStorage)
+localStorage.removeItem = (key: string) => {
+  origRemoveItem(key)
+  if (key === 'token') setMemoryAuthToken(null)
+}
+
+afterEach(() => {
+  setMemoryAuthToken(null)
+  localStorage.removeItem('token')
+})
 
 // Default axios mock so modules that call axios.create() (e.g. api.ts) do not crash when loaded.
 vi.mock('axios', () => createAxiosMock())
