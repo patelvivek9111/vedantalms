@@ -1,3 +1,5 @@
+// Initialize Sentry first (no-op when SENTRY_DSN is unset).
+require('./instrument');
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -666,6 +668,11 @@ app.post('/api/upload', protect, upload.array('files', 10), async (req, res) => 
     res.status(error.statusCode || 500).json({ message: error.message || 'Error uploading files' });
   }
 });
+
+// Report errors to Sentry before our own handlers format the response.
+if (process.env.SENTRY_DSN) {
+  require('@sentry/node').setupExpressErrorHandler(app);
+}
 
 // Error handling middleware
 app.use((err, req, res, next) => {

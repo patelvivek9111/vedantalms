@@ -190,6 +190,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@sentry/node": "^10.63.0",
     "@socket.io/redis-adapter": "^8.3.0",
     "@tailwindcss/typography": "^0.5.10",
     "@tinymce/tinymce-react": "^6.2.1",
