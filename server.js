@@ -35,46 +35,12 @@ if (process.env.NODE_ENV === 'production') {
 // Create HTTP server for Socket.io
 const server = http.createServer(app);
 
-// CORS configuration for production
-const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    const allowedOrigins = process.env.NODE_ENV === 'production' 
-    ? [
-        process.env.FRONTEND_URL || 'https://vedantaed.com',
-        'https://www.vedantaed.com',
-          'https://vedantaed.com',
-          'https://vedantalms-backend.onrender.com',
-      ]
-      : [
-        'http://localhost:3000',
-        'http://localhost:3001',
-        'http://localhost:5173',
-        'http://127.0.0.1:3000',
-        'http://127.0.0.1:3001',
-        'http://127.0.0.1:5173',
-      ];
-    // Vite picks the next free port when 5173 is taken; allow any localhost port in dev.
-    const isLocalDevOrigin =
-      process.env.NODE_ENV !== 'production' &&
-      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d{1,5})?$/.test(origin);
+const { createCorsOriginCallback, getProductionOrigins, getDevOrigins } = require('./config/cors');
 
-    // Check if origin is in allowed list or matches patterns
-    const isAllowed = isLocalDevOrigin ||
-      allowedOrigins.includes(origin) ||
-      origin.endsWith('.onrender.com') ||
-      origin.endsWith('.vercel.app');
-    
-    if (isAllowed) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+const corsOptions = {
+  origin: createCorsOriginCallback(),
   credentials: true,
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200,
 };
 
 // Middleware
@@ -711,7 +677,7 @@ app.get('/health/live', (req, res) => {
   res.json({ status: 'live', timestamp: new Date().toISOString() });
 });
 
-app.get('/health/dependencies', async (req, res) => {
+app.get('/health/dependencies', metricsAuth, async (req, res) => {
   const opsController = require('./controllers/ops.controller');
   return opsController.getDependenciesHealth(req, res);
 });
@@ -777,7 +743,7 @@ app.get('/health/ready', async (req, res) => {
   res.status(healthy ? 200 : 503).json(payload);
 });
 
-app.get('/health/ops', (req, res) => {
+app.get('/health/ops', metricsAuth, (req, res) => {
   res.json(buildHealthOpsPayload());
 });
 
@@ -892,18 +858,10 @@ let io = null;
 if (process.env.NODE_ENV !== 'test') {
   io = new Server(server, {
     cors: {
-      origin: process.env.NODE_ENV === 'production'
-        ? [process.env.FRONTEND_URL || 'https://vedantaed.com', 'https://www.vedantaed.com']
-        : [
-          'http://localhost:3000',
-          'http://localhost:3001',
-          'http://localhost:5173',
-          'http://127.0.0.1:3000',
-          'http://127.0.0.1:3001',
-          'http://127.0.0.1:5173',
-        ],
+      origin:
+        process.env.NODE_ENV === 'production' ? getProductionOrigins() : getDevOrigins(),
       credentials: true,
-      methods: ['GET', 'POST']
+      methods: ['GET', 'POST'],
     },
     connectTimeout: socketConnectTimeoutMs,
     pingTimeout: socketPingTimeoutMs,

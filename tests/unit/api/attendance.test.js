@@ -114,13 +114,64 @@ describe('Attendance API', () => {
       expect(response.status).toBe(400);
     });
 
-    it('should allow student to view attendance', async () => {
+    it('should prevent student from viewing course attendance roster', async () => {
       const response = await request(app)
         .get(`/api/courses/${courseId}/attendance`)
         .set('Authorization', `Bearer ${studentToken}`)
         .query({ date: testDate });
 
-      expect(response.status).toBe(200);
+      expect(response.status).toBe(403);
+    });
+
+    it('should prevent unenrolled users from viewing course attendance roster', async () => {
+      const outsider = await request(app).post('/api/auth/register').send({
+        firstName: 'Other',
+        lastName: 'Student',
+        email: 'outsider-att@test.com',
+        password: 'password123',
+        role: 'student',
+      });
+
+      const response = await request(app)
+        .get(`/api/courses/${courseId}/attendance`)
+        .set('Authorization', `Bearer ${outsider.body.token}`)
+        .query({ date: testDate });
+
+      expect(response.status).toBe(403);
+
+      await User.deleteOne({ email: 'outsider-att@test.com' });
+    });
+  });
+
+  describe('Attendance debug routes removed', () => {
+    const debugRoutes = [
+      { method: 'get', path: (id) => `/api/courses/${id}/attendance/test` },
+      { method: 'post', path: (id) => `/api/courses/${id}/attendance/cleanup` },
+      { method: 'post', path: (id) => `/api/courses/${id}/attendance/test-save` },
+      { method: 'post', path: (id) => `/api/courses/${id}/attendance/fix-db` },
+      { method: 'get', path: (id) => `/api/courses/${id}/attendance/inspect` },
+    ];
+
+    it.each(debugRoutes)('returns 404 for removed debug route %#', async (route) => {
+      const req = request(app)
+        [route.method](route.path(courseId))
+        .set('Authorization', `Bearer ${teacherToken}`);
+
+      const response =
+        route.method === 'get'
+          ? await req.query({ date: testDate })
+          : await req.send({ date: testDate, attendanceData: [] });
+
+      expect(response.status).toBe(404);
+    });
+
+    it('prevents students from reaching removed destructive attendance routes', async () => {
+      const response = await request(app)
+        .post(`/api/courses/${courseId}/attendance/cleanup`)
+        .set('Authorization', `Bearer ${studentToken}`)
+        .send({});
+
+      expect(response.status).toBe(404);
     });
   });
 
@@ -304,6 +355,19 @@ describe('Attendance API', () => {
 
       expect(response.status).toBe(200);
       expect(Array.isArray(response.body)).toBe(true);
+    });
+
+    it('should get student own attendance for a specific date', async () => {
+      const response = await request(app)
+        .get(`/api/courses/${courseId}/attendance/student`)
+        .set('Authorization', `Bearer ${studentToken}`)
+        .query({ date: testDate });
+
+      expect(response.status).toBe(200);
+      expect(Array.isArray(response.body)).toBe(true);
+      expect(response.body).toHaveLength(1);
+      expect(String(response.body[0].studentId)).toBe(String(studentId));
+      expect(response.body[0].status).toBeDefined();
     });
 
     it('should prevent accessing other student attendance', async () => {

@@ -51,7 +51,12 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
       ? MOBILE_TOOLBAR
       : DESKTOP_TOOLBAR;
 
-  if (typeof window !== 'undefined' && window.localStorage.getItem('lms:e2e:plain-editor') === '1') {
+  const tinymceApiKey = import.meta.env.VITE_TINYMCE_API_KEY as string | undefined;
+  const usePlainEditor =
+    (typeof window !== 'undefined' && window.localStorage.getItem('lms:e2e:plain-editor') === '1') ||
+    !tinymceApiKey;
+
+  if (usePlainEditor) {
     return (
       <textarea
         id={id}
@@ -67,7 +72,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
   const editor = (
     <Editor
-      apiKey="gdng5aigkhrb5lsxhh4j8u2s4elts687j9k2uzu63l6zd4gw"
+      apiKey={tinymceApiKey}
       value={content}
       onEditorChange={onChange}
       id={id}

@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/user.model');
 const { extractTokenFromSocketHandshake } = require('../utils/authCookie');
+const { resolveJwtSecret } = require('../utils/jwtSecret');
 
 async function authenticateSocket(socket, next) {
   try {
@@ -10,10 +11,7 @@ async function authenticateSocket(socket, next) {
       return next(new Error('Authentication error: No token provided'));
     }
 
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || 'your-super-secret-jwt-key-123'
-    );
+    const decoded = jwt.verify(token, resolveJwtSecret());
 
     const user = await User.findById(decoded.id).select('accountStatus tokenVersion role');
     if (!user) {

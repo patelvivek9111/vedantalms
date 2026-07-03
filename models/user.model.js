@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { resolveJwtSecret } = require('../utils/jwtSecret');
 
 const userSchema = new mongoose.Schema({
   firstName: {
@@ -109,7 +110,7 @@ userSchema.methods.getSignedJwtToken = function() {
     email: this.email,
     tv: this.tokenVersion || 0,
   };
-  const secret = process.env.JWT_SECRET || 'your-super-secret-jwt-key-123';
+  const secret = resolveJwtSecret();
   const expire = process.env.JWT_EXPIRE || '7d';
   const token = jwt.sign(payload, secret, { expiresIn: expire });
   return token;

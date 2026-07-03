@@ -2,6 +2,11 @@ const Attendance = require('../models/attendance.model');
 const Course = require('../models/course.model');
 const User = require('../models/user.model');
 const mongoose = require('mongoose');
+const { isCourseGradingStaff } = require('../middleware/academicPermissions');
+
+function denyAttendanceRosterAccess(res) {
+  return res.status(403).json({ message: 'Not authorized to view course attendance roster' });
+}
 
 // Get attendance for a specific course and date
 exports.getAttendance = async (req, res) => {
@@ -24,10 +29,13 @@ exports.getAttendance = async (req, res) => {
       return res.status(400).json({ message: 'Invalid date format' });
     }
 
-    // Get all students enrolled in the course
     const course = await Course.findById(courseId).populate('students');
     if (!course) {
       return res.status(404).json({ message: 'Course not found' });
+    }
+
+    if (!isCourseGradingStaff(req.user, course)) {
+      return denyAttendanceRosterAccess(res);
     }
 
     // Parse the date properly
@@ -245,25 +253,57 @@ exports.getAttendanceStats = async (req, res) => {
 exports.getStudentAttendance = async (req, res) => {
   try {
     const { courseId } = req.params;
+    const { date } = req.query;
     const studentId = req.user._id;
 
-    // Verify student is enrolled in the course
     const course = await Course.findById(courseId);
-    if (!course || !course.students.includes(studentId)) {
+    if (!course || !course.students.some((id) => String(id) === String(studentId))) {
       return res.status(404).json({ message: 'Course not found or student not enrolled' });
+    }
+
+    if (date) {
+      const dateObj = new Date(date);
+      if (isNaN(dateObj.getTime())) {
+        return res.status(400).json({ message: 'Invalid date format' });
+      }
+
+      const attendanceDate = new Date(date);
+      attendanceDate.setHours(0, 0, 0, 0);
+      const nextDate = new Date(attendanceDate);
+      nextDate.setDate(nextDate.getDate() + 1);
+
+      const existingRecord = await Attendance.findOne({
+        course: courseId,
+        student: studentId,
+        date: { $gte: attendanceDate, $lt: nextDate },
+      });
+
+      return res.json([
+        {
+          studentId,
+          studentName: `${req.user.firstName} ${req.user.lastName}`,
+          email: req.user.email,
+          profilePicture: req.user.profilePicture || '',
+          status: existingRecord ? existingRecord.status : 'unmarked',
+          date,
+          timestamp: existingRecord ? existingRecord.timestamp : null,
+          reason: existingRecord ? existingRecord.reason : '',
+          notes: existingRecord ? existingRecord.notes : '',
+        },
+      ]);
     }
 
     const attendanceRecords = await Attendance.find({
       course: courseId,
-      student: studentId
+      student: studentId,
     }).sort({ date: -1 });
 
-    const attendanceData = attendanceRecords.map(record => ({
+    const attendanceData = attendanceRecords.map((record) => ({
       date: record.date,
       status: record.status,
       timestamp: record.timestamp,
       reason: record.reason,
-      notes: record.notes
+      notes: record.notes,
     }));
 
     res.json(attendanceData);

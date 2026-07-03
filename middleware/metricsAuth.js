@@ -2,7 +2,7 @@ const { extractTokenFromRequest } = require('../utils/authCookie');
 const jwt = require('jsonwebtoken');
 
 /**
- * Protect /metrics in production. Accepts METRICS_TOKEN bearer or admin JWT.
+ * Protect /metrics, /health/ops, and /health/dependencies in production. Accepts METRICS_TOKEN bearer or admin JWT.
  */
 function metricsAuth(req, res, next) {
   if (process.env.NODE_ENV !== 'production') {

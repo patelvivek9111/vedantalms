@@ -1,4 +1,5 @@
 const Event = require('../models/event.model');
+const { studentCanAccessEvent } = require('../utils/eventAccess');
 
 exports.getEvents = async (req, res) => {
   try {
@@ -160,7 +161,7 @@ exports.getEventById = async (req, res) => {
     }
     
     // Check if user has access to this event
-    if (req.user.role === 'student' && event.createdBy.toString() !== req.user._id.toString()) {
+    if (req.user.role === 'student' && !(await studentCanAccessEvent(req.user, event))) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to access this event'

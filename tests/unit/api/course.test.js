@@ -439,6 +439,16 @@ describe('Course API', () => {
 
       expect(response.status).toBe(404);
     });
+
+    it('should prevent enrolled students from viewing full course roster', async () => {
+      if (!courseId) return;
+
+      const response = await request(app)
+        .get(`/api/courses/${courseId}/students`)
+        .set('Authorization', `Bearer ${studentToken}`);
+
+      expect(response.status).toBe(403);
+    });
   });
 
   describe('GET /api/courses/:courseId/enrollment-status', () => {

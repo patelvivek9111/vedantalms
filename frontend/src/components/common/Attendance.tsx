@@ -71,6 +71,33 @@ const STATUS_CONFIG = {
   }
 };
 
+function canViewCourseAttendanceRoster(
+  role: string | undefined,
+  isInstructor: boolean
+): boolean {
+  return (
+    isInstructor ||
+    role === 'admin' ||
+    role === 'teacher' ||
+    role === 'teaching_assistant' ||
+    role === 'registrar' ||
+    role === 'department_admin'
+  );
+}
+
+async function fetchCourseAttendanceForDate(
+  courseId: string,
+  date: string,
+  isStaff: boolean,
+  authConfig = withAuthCredentials()
+) {
+  const url = isStaff
+    ? `${API_URL}/api/courses/${courseId}/attendance?date=${date}`
+    : `${API_URL}/api/courses/${courseId}/attendance/student?date=${date}`;
+  const response = await axios.get(url, authConfig);
+  return Array.isArray(response.data) ? response.data : [];
+}
+
 // Helper function to generate calendar days for a given month
 const generateCalendarDays = (dateString: string) => {
   if (!dateString) {
@@ -149,20 +176,12 @@ const CalendarDay: React.FC<CalendarDayProps> = ({ day, courseId, isInstructor, 
         return;
       }
 
-      const response = await axios.get(`${API_URL}/api/courses/${courseId}/attendance?date=${date}`, withAuthCredentials());
-      const allAttendanceData = response.data || [];
-      
-      // Filter data based on user role
-      if (isInstructor || user?.role === 'admin') {
-        // Teachers/Admins see all students
-        setAttendanceData(Array.isArray(allAttendanceData) ? allAttendanceData : []);
-      } else {
-        // Students only see their own attendance
-        const studentAttendanceData = (Array.isArray(allAttendanceData) ? allAttendanceData : []).filter((record: any) => 
-          record.studentId === user?._id
-        );
-        setAttendanceData(studentAttendanceData);
-      }
+      const response = await fetchCourseAttendanceForDate(
+        courseId,
+        date,
+        canViewCourseAttendanceRoster(user?.role, isInstructor)
+      );
+      setAttendanceData(response);
     } catch (error) {
       // If no attendance data exists, return empty array
       setAttendanceData([]);
@@ -382,20 +401,13 @@ const Attendance: React.FC = () => {
         setSelectedDate(currentDate);
         
         try {
-          const attendanceResponse = await axios.get(`${API_URL}/api/courses/${courseId}/attendance?date=${currentDate}`, authConfig);
-          const allAttendanceData = attendanceResponse.data;
-          
-          // Filter data based on user role
-          if (isUserInstructor || user?.role === 'admin') {
-            // Teachers/Admins see all students
-            setAttendanceData(allAttendanceData);
-          } else {
-            // Students only see their own attendance
-            const studentAttendanceData = allAttendanceData.filter((record: any) => 
-              record.studentId === user?._id
-            );
-            setAttendanceData(studentAttendanceData);
-          }
+          const allAttendanceData = await fetchCourseAttendanceForDate(
+            courseId,
+            currentDate,
+            canViewCourseAttendanceRoster(user?.role, isUserInstructor),
+            authConfig
+          );
+          setAttendanceData(allAttendanceData);
         } catch (attendanceError) {
           // If no attendance data exists, create default records
           if (isUserInstructor || user?.role === 'admin') {
@@ -549,20 +561,13 @@ const Attendance: React.FC = () => {
         const authConfig = withAuthCredentials();
 
         try {
-          const attendanceResponse = await axios.get(`${API_URL}/api/courses/${courseId}/attendance?date=${date}`, authConfig);
-          const allAttendanceData = attendanceResponse.data || [];
-          
-          // Filter data based on user role
-          if (isInstructor || user?.role === 'admin') {
-            // Teachers/Admins see all students
-            setAttendanceData(Array.isArray(allAttendanceData) ? allAttendanceData : []);
-          } else {
-            // Students only see their own attendance
-            const studentAttendanceData = (Array.isArray(allAttendanceData) ? allAttendanceData : []).filter((record: any) => 
-              record.studentId === user?._id
-            );
-            setAttendanceData(studentAttendanceData);
-          }
+          const allAttendanceData = await fetchCourseAttendanceForDate(
+            courseId,
+            date,
+            canViewCourseAttendanceRoster(user?.role, isInstructor),
+            authConfig
+          );
+          setAttendanceData(allAttendanceData);
         } catch (attendanceError) {
           // If no attendance data exists, create default records
           if (isInstructor || user?.role === 'admin') {
@@ -685,9 +690,13 @@ const Attendance: React.FC = () => {
         const dateString = date.toISOString().split('T')[0];
         
         try {
-          const response = await axios.get(`${API_URL}/api/courses/${courseId}/attendance?date=${dateString}`, authConfig);
-          if (response.data && response.data.length > 0) {
-            allAttendanceData.push(...response.data);
+          const dayData = await fetchCourseAttendanceForDate(
+            courseId,
+            dateString,
+            canViewCourseAttendanceRoster(user?.role, isInstructor)
+          );
+          if (dayData.length > 0) {
+            allAttendanceData.push(...dayData);
           }
         } catch (error) {
           // Skip days with no data
@@ -757,10 +766,13 @@ const Attendance: React.FC = () => {
         const dateString = d.toISOString().split('T')[0];
         
         try {
-          const response = await axios.get(`${API_URL}/api/courses/${courseId}/attendance?date=${dateString}`, authConfig);
-          if (response.data && Array.isArray(response.data) && response.data.length > 0) {
-            // Filter by selected students
-            const filteredData = response.data.filter((record: any) => 
+          const dayData = await fetchCourseAttendanceForDate(
+            courseId,
+            dateString,
+            canViewCourseAttendanceRoster(user?.role, isInstructor)
+          );
+          if (dayData.length > 0) {
+            const filteredData = dayData.filter((record: any) =>
               studentsToExport.includes(record.studentId)
             );
             allAttendanceData.push(...filteredData);

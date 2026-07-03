@@ -62,9 +62,10 @@ describe('Events API', () => {
       });
     courseId = courseResponse.body.data._id || courseResponse.body.data.id;
 
-    // Enroll student in course
+    // Enroll student in course and publish it for calendar access tests
     await Course.findByIdAndUpdate(courseId, {
-      $addToSet: { students: studentId }
+      $addToSet: { students: studentId },
+      published: true,
     });
   });
 
@@ -382,6 +383,31 @@ describe('Events API', () => {
 
       // This might be 403 or 404 depending on implementation
       expect([403, 404]).toContain(response.status);
+    });
+
+    it('should allow student to access enrolled course calendar events', async () => {
+      const start = new Date();
+      const end = new Date();
+      end.setHours(end.getHours() + 2);
+      const createResponse = await request(app)
+        .post('/api/events')
+        .set('Authorization', `Bearer ${teacherToken}`)
+        .send({
+          title: 'Course Calendar Event',
+          start: start.toISOString(),
+          end: end.toISOString(),
+          type: 'event',
+          calendar: courseId,
+        });
+      const courseEventId = createResponse.body._id || createResponse.body.id;
+
+      const response = await request(app)
+        .get(`/api/events/${courseEventId}`)
+        .set('Authorization', `Bearer ${studentToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.title).toBe('Course Calendar Event');
     });
   });
 

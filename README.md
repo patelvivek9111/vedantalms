@@ -279,7 +279,7 @@ lms/
 │
 ├── routes/                              # Mounted under /api/* in server.js (see below for file list)
 ├── middleware/
-│   ├── auth.js, roleCheck.js, upload.js, fileAccess.js
+│   ├── auth.js, upload.js, fileAccess.js
 │   ├── academicPermissions.js, ferpaAccess.js, requestCorrelation.js
 │   └── discussionRouteMetrics.js        # Optional metrics hooks for thread/reply traffic
 │

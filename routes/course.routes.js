@@ -275,13 +275,11 @@ router.get('/:courseId/students', protect, async (req, res) => {
       });
     }
 
-    // Check if user has access to the course
-    if (req.user.role === 'student' && 
-        !course.students.some(student => student._id.toString() === req.user.id) &&
-        course.instructor.toString() !== req.user.id) {
+    const { isCourseGradingStaff } = require('../middleware/academicPermissions');
+    if (!isCourseGradingStaff(req.user, course)) {
       return res.status(403).json({
         success: false,
-        message: 'Not authorized to access this course'
+        message: 'Not authorized to view course roster',
       });
     }
 

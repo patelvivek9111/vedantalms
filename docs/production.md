@@ -15,7 +15,7 @@ npm run migrate            # apply migrations (maintenance window)
 npm run worker:grading-jobs   # BullMQ worker (requires REDIS_URL)
 ```
 
-**Health endpoints:** `GET /health`, `GET /health/ready`, `GET /health/ops`, `GET /metrics` (protect with `METRICS_TOKEN` in production).
+**Health endpoints:** `GET /health`, `GET /health/ready` are public; `GET /health/ops`, `GET /health/dependencies`, and `GET /metrics` require `METRICS_TOKEN` or admin JWT in production.
 
 ---
 
@@ -98,7 +98,7 @@ Use before each production deployment.
 
 - [ ] `GET /health` returns `ok`
 - [ ] `GET /health/ready` returns `ready` (or expected degraded reason)
-- [ ] `GET /health/ops` returns metrics payload
+- [ ] `GET /health/ops` returns metrics payload (with `METRICS_TOKEN` or admin JWT in production)
 - [ ] `GET /metrics` reachable for Prometheus (with auth)
 
 ### 4) Frontend sanity

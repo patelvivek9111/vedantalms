@@ -2,13 +2,44 @@ const Group = require('../models/Group');
 const User = require('../models/user.model');
 const GroupSet = require('../models/GroupSet');
 const Course = require('../models/course.model');
+const { isCourseGradingStaff } = require('../middleware/academicPermissions');
+
+async function loadGroupWithCourse(groupId) {
+  const group = await Group.findById(groupId).populate('groupSet');
+  if (!group) return null;
+
+  const courseRef = group.course || group.groupSet?.course;
+  if (!courseRef) return { group, course: null };
+
+  const courseId = courseRef._id || courseRef;
+  const course = await Course.findById(courseId);
+  return { group, course };
+}
+
+function isGroupMember(user, group) {
+  return (group.members || []).some((memberId) => String(memberId) === String(user._id));
+}
+
+function canManageGroupRoster(user, course) {
+  return course && isCourseGradingStaff(user, course);
+}
 
 // Get all members of a group
 exports.getGroupMembers = async (req, res) => {
   try {
-    const group = await Group.findById(req.params.groupId).populate('members', 'firstName lastName email profilePicture');
-    if (!group) return res.status(404).json({ message: 'Group not found' });
-    res.json(group.members);
+    const loaded = await loadGroupWithCourse(req.params.groupId);
+    if (!loaded) return res.status(404).json({ message: 'Group not found' });
+
+    const { group, course } = loaded;
+    if (!canManageGroupRoster(req.user, course) && !isGroupMember(req.user, group)) {
+      return res.status(403).json({ message: 'Not authorized to view group members' });
+    }
+
+    const populated = await Group.findById(group._id).populate(
+      'members',
+      'firstName lastName email profilePicture'
+    );
+    res.json(populated.members);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -17,10 +48,17 @@ exports.getGroupMembers = async (req, res) => {
 // Remove a member from a group
 exports.removeGroupMember = async (req, res) => {
   try {
-    const group = await Group.findById(req.params.groupId);
-    if (!group) return res.status(404).json({ message: 'Group not found' });
+    const loaded = await loadGroupWithCourse(req.params.groupId);
+    if (!loaded) return res.status(404).json({ message: 'Group not found' });
+
+    const { group, course } = loaded;
+    const removingSelf = String(req.params.userId) === String(req.user._id);
+    if (!canManageGroupRoster(req.user, course) && !removingSelf) {
+      return res.status(403).json({ message: 'Not authorized to remove group members' });
+    }
+
     group.members = group.members.filter(
-      memberId => memberId.toString() !== req.params.userId
+      (memberId) => memberId.toString() !== req.params.userId
     );
     await group.save();
     res.json({ message: 'Member removed' });
@@ -39,6 +77,9 @@ exports.getAvailableStudentsForGroupSet = async (req, res) => {
     if (!groupSet) return res.status(404).json({ message: 'Group set not found' });
     const course = await Course.findById(groupSet.course._id || groupSet.course);
     if (!course) return res.status(404).json({ message: 'Course not found' });
+    if (!canManageGroupRoster(req.user, course)) {
+      return res.status(403).json({ message: 'Not authorized to view available students' });
+    }
     // Find all groups in this group set
     const groups = await Group.find({ groupSet: groupSetId });
     const membersInGroups = new Set();
@@ -64,9 +105,15 @@ exports.addGroupMember = async (req, res) => {
   try {
     const { groupId } = req.params;
     const { userId } = req.body;
-    const group = await Group.findById(groupId);
-    if (!group) return res.status(404).json({ message: 'Group not found' });
-    if (group.members.includes(userId)) {
+    const loaded = await loadGroupWithCourse(groupId);
+    if (!loaded) return res.status(404).json({ message: 'Group not found' });
+
+    const { group, course } = loaded;
+    if (!canManageGroupRoster(req.user, course)) {
+      return res.status(403).json({ message: 'Not authorized to modify group members' });
+    }
+
+    if (group.members.some((memberId) => String(memberId) === String(userId))) {
       return res.status(400).json({ message: 'User already in group' });
     }
     group.members.push(userId);

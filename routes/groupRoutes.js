@@ -8,6 +8,12 @@ const Course = require('../models/course.model.js');
 const Submission = require('../models/Submission.js');
 const groupController = require('../controllers/group.controller');
 const groupMeetingController = require('../controllers/groupMeeting.controller');
+const {
+  canAccessCourseGroupData,
+  isGroupMember,
+  loadGroupSetWithCourse,
+  isCourseGradingStaff,
+} = require('../utils/groupAccess');
 
 // Add this route for getting all groups for the current user (must be before any parameterized routes)
 router.get('/my', protect, groupController.getMyGroups);
@@ -108,6 +114,13 @@ router.post('/sets', protect, authorize('teacher', 'admin'), async (req, res) =>
 
 router.get('/sets/:courseId', protect, async (req, res) => {
     try {
+        const course = await Course.findById(req.params.courseId);
+        if (!course) {
+            return res.status(404).json({ error: 'Course not found' });
+        }
+        if (!canAccessCourseGroupData(req.user, course)) {
+            return res.status(403).json({ error: 'Not authorized to view group sets for this course' });
+        }
         const groupSets = await GroupSet.find({ course: req.params.courseId });
         res.json(groupSets);
     } catch (error) {
@@ -176,8 +189,15 @@ router.post('/sets/:setId/auto-split', protect, authorize('teacher', 'admin'), a
 router.post('/sets/:setId/self-signup', protect, async (req, res) => {
     try {
         const { groupId } = req.body;
-        const groupSet = await GroupSet.findById(req.params.setId);
-        
+        const loaded = await loadGroupSetWithCourse(req.params.setId);
+        if (!loaded) {
+            return res.status(404).json({ error: 'Group set not found' });
+        }
+        const { groupSet, course } = loaded;
+        if (!canAccessCourseGroupData(req.user, course)) {
+            return res.status(403).json({ error: 'Not authorized to join groups in this course' });
+        }
+
         if (!groupSet.allowSelfSignup) {
             return res.status(403).json({ error: 'Self signup is not allowed for this group set' });
         }
@@ -186,8 +206,11 @@ router.post('/sets/:setId/self-signup', protect, async (req, res) => {
         if (!group) {
             return res.status(404).json({ error: 'Group not found' });
         }
+        if (String(group.groupSet) !== String(groupSet._id)) {
+            return res.status(400).json({ error: 'Group does not belong to this group set' });
+        }
         
-        if (group.members.includes(req.user._id)) {
+        if (group.members.some((memberId) => String(memberId) === String(req.user._id))) {
             return res.status(400).json({ error: 'Already a member of this group' });
         }
         
@@ -203,7 +226,16 @@ router.post('/sets/:setId/self-signup', protect, async (req, res) => {
 // Get all groups in a set
 router.get('/sets/:setId/groups', protect, async (req, res) => {
     try {
-        const groups = await Group.find({ groupSet: req.params.setId })
+        const loaded = await loadGroupSetWithCourse(req.params.setId);
+        if (!loaded) {
+            return res.status(404).json({ error: 'Group set not found' });
+        }
+        const { groupSet, course } = loaded;
+        if (!canAccessCourseGroupData(req.user, course)) {
+            return res.status(403).json({ error: 'Not authorized to view groups for this group set' });
+        }
+
+        const groups = await Group.find({ groupSet: groupSet._id })
             .populate('members', 'firstName lastName email profilePicture')
             .populate('leader', 'firstName lastName email profilePicture');
         res.json(groups);
@@ -256,6 +288,14 @@ router.put('/:groupId', protect, authorize('teacher', 'admin'), async (req, res)
 // Delete group
 router.delete('/groups/:groupId', protect, authorize('teacher', 'admin'), async (req, res) => {
     try {
+        const group = await Group.findById(req.params.groupId);
+        if (!group) {
+            return res.status(404).json({ error: 'Group not found' });
+        }
+        const loaded = await loadGroupSetWithCourse(group.groupSet);
+        if (!loaded?.course || !isCourseGradingStaff(req.user, loaded.course)) {
+            return res.status(403).json({ error: 'Not authorized to delete this group' });
+        }
         await Group.findByIdAndDelete(req.params.groupId);
         res.json({ message: 'Group deleted successfully' });
     } catch (error) {
@@ -340,6 +380,13 @@ router.get('/:groupId', protect, async (req, res) => {
     if (!group) {
       return res.status(404).json({ error: 'Group not found' });
     }
+    const course = await Course.findById(group.groupSet?.course || group.course);
+    if (!course) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+    if (!canAccessCourseGroupData(req.user, course) && !isGroupMember(req.user, group)) {
+      return res.status(403).json({ error: 'Not authorized to view this group' });
+    }
     res.json({ _id: group._id, name: group.name, groupSet: group.groupSet._id, groupSetName: group.groupSet.name, course: group.groupSet.course });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -349,18 +396,23 @@ router.get('/:groupId', protect, async (req, res) => {
 // Get a single group set by ID
 router.get('/sets/id/:setId', protect, async (req, res) => {
   try {
-    const groupSet = await GroupSet.findById(req.params.setId).populate('course', '_id title');
-    if (!groupSet) {
+    const loaded = await loadGroupSetWithCourse(req.params.setId);
+    if (!loaded) {
       return res.status(404).json({ error: 'Group set not found' });
     }
-    res.json(groupSet);
+    const { groupSet, course } = loaded;
+    if (!canAccessCourseGroupData(req.user, course)) {
+      return res.status(403).json({ error: 'Not authorized to view this group set' });
+    }
+    const populated = await GroupSet.findById(groupSet._id).populate('course', '_id title');
+    res.json(populated);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
 // Get all members of a group
-router.get('/:groupId/members', groupController.getGroupMembers);
+router.get('/:groupId/members', protect, groupController.getGroupMembers);
 
 // Group meetings (Zoho link-based MVP)
 router.get('/:groupId/meetings', protect, groupMeetingController.listGroupMeetings);
@@ -369,12 +421,12 @@ router.patch('/:groupId/meetings/:meetingId', protect, groupMeetingController.up
 router.delete('/:groupId/meetings/:meetingId', protect, groupMeetingController.deleteGroupMeeting);
 
 // Remove a member from a group
-router.delete('/:groupId/members/:userId', groupController.removeGroupMember);
+router.delete('/:groupId/members/:userId', protect, groupController.removeGroupMember);
 
 // Get available students for a group set (not in any group in the set)
-router.get('/sets/:groupSetId/available-students', groupController.getAvailableStudentsForGroupSet);
+router.get('/sets/:groupSetId/available-students', protect, groupController.getAvailableStudentsForGroupSet);
 
 // Add a member to a group
-router.post('/:groupId/members', groupController.addGroupMember);
+router.post('/:groupId/members', protect, groupController.addGroupMember);
 
 module.exports = router; 

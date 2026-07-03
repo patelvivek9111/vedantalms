@@ -15,13 +15,20 @@ function validateStartupEnv() {
       errors.push('JWT_SECRET must be set to a strong secret in production');
     }
     if (!process.env.METRICS_TOKEN) {
-      warnings.push('METRICS_TOKEN is not set — /metrics requires an admin JWT in production');
+      warnings.push(
+        'METRICS_TOKEN is not set - /metrics, /health/ops, and /health/dependencies require an admin JWT in production'
+      );
     }
     if (process.env.CLAMAV_ENABLED !== 'true') {
       warnings.push('CLAMAV_ENABLED is not true — file uploads are not virus-scanned');
     }
     if (process.env.MESSAGE_SANITIZER !== 'dompurify') {
       warnings.push('MESSAGE_SANITIZER is not dompurify — consider enabling for stronger XSS protection');
+    }
+    if (process.env.DISABLE_PUBLIC_REGISTRATION !== 'true') {
+      warnings.push(
+        'DISABLE_PUBLIC_REGISTRATION is not true — public signup may remain enabled unless disabled in admin settings'
+      );
     }
     if (!process.env.MONGODB_URI) {
       errors.push('MONGODB_URI is required in production');
