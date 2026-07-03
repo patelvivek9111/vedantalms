@@ -86,11 +86,12 @@ function canViewCourseAttendanceRoster(
 }
 
 async function fetchCourseAttendanceForDate(
-  courseId: string,
+  courseId: string | undefined,
   date: string,
   isStaff: boolean,
   authConfig = withAuthCredentials()
 ) {
+  if (!courseId) return [];
   const url = isStaff
     ? `${API_URL}/api/courses/${courseId}/attendance?date=${date}`
     : `${API_URL}/api/courses/${courseId}/attendance/student?date=${date}`;

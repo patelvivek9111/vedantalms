@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
 import RichTextEditor from '@/components/common/RichTextEditor';
 
@@ -21,6 +21,14 @@ describe('RichTextEditor', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // The component renders the TinyMCE editor only when an API key is configured;
+    // otherwise it falls back to a plain textarea. Stub the key so these tests
+    // exercise the TinyMCE integration path they are written for.
+    vi.stubEnv('VITE_TINYMCE_API_KEY', 'test-api-key');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('should render editor with content', () => {
