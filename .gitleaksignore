@@ -1,0 +1,4 @@
+# Historical TinyMCE apiKey in RichTextEditor.tsx (removed in security hardening).
+# Rotate/restrict the legacy key in Tiny Cloud, then remove these lines after key rotation.
+b4e67e9387fa385a92d9aadcf2c4ed31dd117805:frontend/src/components/RichTextEditor.tsx:generic-api-key:19
+f7e521ce3896e22289cbbb16a75618bde4783e3b:frontend/src/components/RichTextEditor.tsx:generic-api-key:15

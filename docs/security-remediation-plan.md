@@ -11,7 +11,8 @@ This file tracks the vulnerabilities and security issues found during the free i
 - [x] Fix 4 round-4 re-pentest gaps (group set/course IDOR on list endpoints)
 - [x] Rerun automated security-related tests after fixes
 - [x] Rerun dependency audits after fixes
-- [ ] Run external tooling when available: Gitleaks, OWASP ZAP, Trivy, Semgrep
+- [x] Run Gitleaks secret scan (local + CI); 2 historical findings documented and ignored pending key rotation
+- [ ] Run remaining external tooling: OWASP ZAP, Trivy, Semgrep
 
 **Dependency status (2026-07-03):** `npm audit` reports **0 vulnerabilities** in both backend and frontend.
 
@@ -102,7 +103,8 @@ Notable frontend packages/advisories to verify:
 - [x] Confirm production metrics protection: `METRICS_TOKEN` (startup warning + `.env.example`)
 - [x] Confirm public registration is disabled or restricted for production (startup warning + `DISABLE_PUBLIC_REGISTRATION`)
 - [x] Decide whether dev/test rate limiting should be enabled for local security tests with `ENFORCE_RATE_LIMIT_IN_DEV=true` (documented in `.env.example`; off by default in dev)
-- [x] Restrict the TinyMCE API key by domain in the Tiny dashboard (code now reads `VITE_TINYMCE_API_KEY`; restrict key in Tiny Cloud console)
+- [x] Remove hardcoded TinyMCE API key fallback; require `VITE_TINYMCE_API_KEY` or use plain textarea editor
+- [ ] Rotate or restrict legacy TinyMCE API key exposed in git history (see Gitleaks section)
 - [x] Delete or fix unused `middleware/roleCheck.js`
 
 ### Low
@@ -131,7 +133,7 @@ Issues found during the follow-up verification pass after the first remediation 
 ### Operational (verify at deploy time)
 
 - [ ] Confirm production env vars are set on live/staging: `CLAMAV_ENABLED`, `MESSAGE_SANITIZER`, `METRICS_TOKEN`, `DISABLE_PUBLIC_REGISTRATION`, `VITE_TINYMCE_API_KEY`
-- [ ] Restrict TinyMCE API key by domain in Tiny Cloud dashboard
+- [ ] Rotate or restrict legacy TinyMCE API key in Tiny Cloud dashboard (Gitleaks found key in commits `f7e521c`, `b4e67e9`)
 
 ## Round 3 Re-Pentest Gaps (2026-07-03)
 
@@ -178,12 +180,63 @@ Issues found during the fourth verification pass.
 - [x] Run round-2 tests: attendance student date, course roster lockdown, jwtSecret, CORS, startup validation
 - [x] Run round-3 tests: group route auth (`tests/unit/api/groups.test.js`)
 - [x] Run round-4 tests: group set/course IDOR lockdown (extended `groups.test.js`)
+- [x] Run `npm run scan:gitleaks` (git history scan; passes with `.gitleaksignore` for accepted historical findings)
 
-## Deferred External Tooling
+## External Tooling
+
+Priority order: **Gitleaks** → Semgrep → Trivy → OWASP ZAP (all free for basic use).
+
+### Gitleaks (2026-07-03) — complete
+
+- [x] Install Gitleaks locally (`winget install Gitleaks.Gitleaks`)
+- [x] Add `.gitleaks.toml` (default rules + generated-artifact exclusions)
+- [x] Add `.gitleaksignore` for 2 accepted historical findings
+- [x] Add `npm run scan:gitleaks`
+- [x] Add CI job in `.github/workflows/hardening-production.yml`
+- [x] Gitignore local report files (`gitleaks-report.json`)
+
+**Scan command:**
+
+```bash
+npm run scan:gitleaks
+```
+
+**Findings (git history):**
+
+| Rule | File | Commits | Status |
+| --- | --- | --- | --- |
+| `generic-api-key` | `frontend/src/components/RichTextEditor.tsx` | `f7e521c`, `b4e67e9` | Removed from current code; fingerprinted in `.gitleaksignore` |
+
+**Operational follow-up:**
+
+- [ ] In [Tiny Cloud](https://www.tiny.cloud/), rotate or restrict the legacy API key that was hardcoded before the security fix
+- [ ] After rotation, remove the two lines from `.gitleaksignore` and confirm `npm run scan:gitleaks` still passes
+
+**Local notes:**
+
+- `.env` secrets are gitignored; never commit `.env`
+- `frontend/dist/` may contain old bundled keys from local builds; keep dist gitignored and excluded in `.gitleaks.toml`
+
+### Semgrep — not started
+
+- [ ] Add `semgrep scan --config auto` to CI or run locally
+- [ ] Triage findings; fix or document accepted risks
+
+### Trivy — not started
+
+- [ ] Run `trivy fs .` and `trivy config` against Docker/deploy files
+- [ ] Compare with `npm audit` (already 0 vulns)
+
+### OWASP ZAP — not started
+
+- [ ] Run baseline scan against staging (`zap-baseline.py -t https://staging-url`)
+- [ ] Review XSS, CSRF, cookie, and header findings
+
+## Deferred External Tooling (summary)
 
 These were not completed in the initial pass because the tools were not installed or the local app/database was not fully available.
 
-- [ ] Gitleaks secret scan
+- [x] Gitleaks secret scan (see **External Tooling → Gitleaks** above)
 - [ ] OWASP ZAP baseline scan against staging/local app
 - [ ] Trivy filesystem/container scan
 - [ ] Semgrep security audit

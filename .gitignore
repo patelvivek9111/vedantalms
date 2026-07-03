@@ -35,6 +35,10 @@ pids
 # Jest in-memory Mongo URI (written by tests/globalSetup.js)
 tests/.mongo-memory-uri
 
+# Local Gitleaks scan output (may reference redacted secret metadata)
+gitleaks-report.json
+gitleaks-current-report.json
+
 # Coverage directory used by tools like istanbul
 coverage/
 *.lcov

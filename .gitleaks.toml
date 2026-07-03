@@ -1,0 +1,15 @@
+title = "LMS Gitleaks Config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Generated local artifacts that should not be scanned"
+paths = [
+  '''^\.ci-artifacts/''',
+  '''^frontend/dist/''',
+  '''^frontend/coverage/''',
+  '''^coverage/''',
+  '''^gitleaks-report\.json$''',
+  '''^gitleaks-current-report\.json$''',
+]

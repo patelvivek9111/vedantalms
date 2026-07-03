@@ -48,6 +48,7 @@
     "verify:mongo-explain:ci": "node scripts/verifyMongoExplainCi.js",
     "ops:infra-tier-review": "node scripts/ops/infraTierReview.js",
     "verify:workflows": "node scripts/validateWorkflowFiles.js",
+    "scan:gitleaks": "gitleaks git . --config .gitleaks.toml --redact --verbose",
     "validate:indexes": "node scripts/validateMongoIndexes.js",
     "migrate": "node scripts/migrations/run.js",
     "migrate:dry-run": "node scripts/migrations/run.js --dry-run",
