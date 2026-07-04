@@ -65,6 +65,8 @@ async function quarantineBlob(asset, audit = {}) {
 
   if (asset.provider === 'cloudinary') {
     await deleteStoredBlob(asset);
+    const filePreviewJob = require('./filePreviewJob.service');
+    await filePreviewJob.purgePreviewArtifacts(asset._id).catch(() => {});
     asset.cleanupState = 'SOFT_DELETED';
     asset.metadata = {
       ...(asset.metadata || {}),
@@ -130,6 +132,9 @@ async function quarantineBlob(asset, audit = {}) {
     restoreEligible: true,
   };
   await asset.save();
+
+  const filePreviewJob = require('./filePreviewJob.service');
+  await filePreviewJob.purgePreviewArtifacts(asset._id).catch(() => {});
 
   await academicAuditService.recordAuditEvent({
     actorId: audit.actorId,

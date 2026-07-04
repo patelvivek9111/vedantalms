@@ -5,6 +5,7 @@ const {
   isCloudinaryConfigured,
   deleteFromCloudinary,
   extractPublicId,
+  inferResourceTypeFromUrl,
 } = require('../../utils/cloudinary');
 const { LocalStorageAdapter } = require('./localStorageAdapter');
 
@@ -52,7 +53,13 @@ class CloudStorageAdapter {
   async deleteByUrl(url, resourceType = 'auto') {
     if (url && url.includes('cloudinary.com')) {
       const publicId = extractPublicId(url);
-      if (publicId) await deleteFromCloudinary(publicId, resourceType);
+      if (publicId) {
+        const resolvedType =
+          resourceType && resourceType !== 'auto'
+            ? resourceType
+            : inferResourceTypeFromUrl(url, 'image');
+        await deleteFromCloudinary(publicId, resolvedType);
+      }
     }
   }
 

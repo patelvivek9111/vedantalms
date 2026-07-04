@@ -74,6 +74,13 @@ async function invalidatePreviewCache(fileAssetId) {
   return previewStorage.invalidatePreviewCache(fileAssetId);
 }
 
+/** Remove generated preview artifacts (Cloudinary folder + local cache + manifest). */
+async function purgePreviewArtifacts(fileAssetId) {
+  if (!fileAssetId) return;
+  await invalidatePreviewCache(fileAssetId);
+  await PreviewManifest.deleteOne({ fileAssetId }).catch(() => {});
+}
+
 function tryVideoPosterFrame(buf, assetId, ext) {
   try {
     const { execSync } = require('child_process');
@@ -321,6 +328,7 @@ module.exports = {
   resolveSecurePreviewRef,
   queuePreviewGeneration,
   queuePreviewRegeneration,
+  purgePreviewArtifacts,
   detectPreviewKind,
   isClientRenderedDocx,
   PREVIEW_DIR,
