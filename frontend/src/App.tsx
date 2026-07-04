@@ -168,8 +168,24 @@ function LoginRoute() {
   return <Login />;
 }
 
+function AppShell() {
+  const { loading } = useAuth();
+
+  if (loading) {
+    return <AppLoadingSkeleton />;
+  }
+
+  return (
+    <CourseProvider>
+      <ErrorBoundary>
+        <AppContent />
+      </ErrorBoundary>
+    </CourseProvider>
+  );
+}
+
 function AppContent() {
-  const { user, loading, token } = useAuth();
+  const { user, token } = useAuth();
   const { offline } = useNetworkStatus();
   const location = useLocation();
   const isAuthenticated = !!user;
@@ -181,10 +197,6 @@ function AppContent() {
   useMessagingSocketConnection(user?._id, token);
   useNotificationSocketConnection(user?._id, token);
   useNotificationCrossTabSync(user?._id);
-
-  if (loading) {
-    return <AppLoadingSkeleton />;
-  }
 
   return (
     <MobileKeyboardProvider>
@@ -570,11 +582,7 @@ function App() {
       <ThemeProvider>
         <AuthProvider>
           <QueryProvider>
-            <CourseProvider>
-              <ErrorBoundary>
-                <AppContent />
-              </ErrorBoundary>
-            </CourseProvider>
+            <AppShell />
           </QueryProvider>
         </AuthProvider>
       </ThemeProvider>

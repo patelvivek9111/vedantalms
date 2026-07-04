@@ -10,11 +10,15 @@ const { getSemesterFromCourse } = require('../utils/semesterUtils');
 const User = require('../models/user.model');
 
 const { paths } = require('../config/paths');
-const JOBS_DIR = paths.jobExports;
+
+function getJobsDir() {
+  return paths.jobExports;
+}
 
 function ensureJobsDir() {
-  if (!fs.existsSync(JOBS_DIR)) {
-    fs.mkdirSync(JOBS_DIR, { recursive: true });
+  const jobsDir = getJobsDir();
+  if (!fs.existsSync(jobsDir)) {
+    fs.mkdirSync(jobsDir, { recursive: true });
   }
 }
 
@@ -113,7 +117,7 @@ async function processExportGradebook(jobDoc) {
 
   ensureJobsDir();
   const fileName = `gradebook-${courseId}-${Date.now()}.xlsx`;
-  const filePath = path.join(JOBS_DIR, fileName);
+  const filePath = path.join(getJobsDir(), fileName);
   fs.writeFileSync(filePath, buffer);
 
   const { token, expiresAt } = createDownloadToken(jobDoc._id);
@@ -286,5 +290,5 @@ module.exports = {
   runJobByType,
   createDownloadToken,
   verifyDownloadToken,
-  JOBS_DIR,
+  getJobsDir,
 };

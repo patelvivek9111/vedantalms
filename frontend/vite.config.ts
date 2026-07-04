@@ -55,7 +55,12 @@ export default defineConfig({
         target: process.env.VITE_PROXY_TARGET || 'http://127.0.0.1:5000',
         changeOrigin: true,
         secure: false,
-      }
+      },
+      '/uploads': {
+        target: process.env.VITE_PROXY_TARGET || 'http://127.0.0.1:5000',
+        changeOrigin: true,
+        secure: false,
+      },
     }
   },
   test: {

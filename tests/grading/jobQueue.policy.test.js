@@ -3,6 +3,7 @@
  */
 const mongoose = require('mongoose');
 const { createMongoMemoryServer } = require('../mongoMemoryServer');
+const { applyJestExportPaths } = require('../exportPaths');
 const { seedGradingContractE2E } = require('./e2eContractSeed');
 const User = require('../../models/user.model');
 const AsyncJob = require('../../models/asyncJob.model');
@@ -14,6 +15,7 @@ describe('jobQueue (Wave D)', () => {
   let registrar;
 
   beforeAll(async () => {
+    applyJestExportPaths();
     process.env.FORCE_INLINE_JOBS = 'true';
     mongoServer = await createMongoMemoryServer();
     process.env.MONGODB_URI = mongoServer.getUri();
@@ -63,6 +65,7 @@ describe('jobQueue (Wave D)', () => {
 
     expect(job.status).toBe('completed');
     expect(job.filePath).toBeTruthy();
+    expect(job.filePath.startsWith(process.env.JOB_EXPORTS_DIR)).toBe(true);
     expect(job.downloadToken).toBeTruthy();
     expect(job.result?.studentCount).toBeGreaterThanOrEqual(1);
   });

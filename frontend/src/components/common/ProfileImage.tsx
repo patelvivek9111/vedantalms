@@ -1,5 +1,5 @@
 import React from 'react';
-import { getImageUrl } from '../../services/api';
+import { resolveSecureFileUrl } from '../../services/fileUploadApi';
 
 interface ProfileImageProps {
   firstName: string;
@@ -35,9 +35,7 @@ const ProfileImage: React.FC<ProfileImageProps> = ({
       {/* Profile picture - overlays fallback when loaded */}
       {profilePicture && (
         <img
-          src={profilePicture.startsWith('http')
-            ? profilePicture
-            : getImageUrl(profilePicture)}
+          src={resolveSecureFileUrl(profilePicture)}
           alt={`${firstName} ${lastName}`}
           className={`${sizeClass} rounded-full object-cover relative z-10`}
           onError={(e) => {

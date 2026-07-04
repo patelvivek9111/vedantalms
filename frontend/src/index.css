@@ -354,6 +354,19 @@ input[type="datetime-local"]::-webkit-outer-spin-button {
   appearance: none;
 }
 
+/* Hide browser spinners on number inputs (grades, courses, groups, admin, etc.) */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  display: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 /* Focus visible indicators for accessibility */
 *:focus-visible {
   outline: 2px solid #3b82f6;

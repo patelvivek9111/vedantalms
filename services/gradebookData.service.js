@@ -19,6 +19,7 @@ const { calculateFinalGradeWithWeightedGroups } = require('../utils/gradeCalcula
 const { courseContextFromResolvedPolicy } = require('../shared/grading/policyResolver.cjs');
 const { resolveAssignmentWorkflowState } = require('./assignmentWorkflow.service');
 const discussionReplyService = require('./discussionReply.service');
+const { mapUsersWithResolvedProfilePictures } = require('../utils/profilePictureUrl');
 
 function normalizeStudentId(id) {
   if (id && typeof id === 'object' && id._id) return String(id._id);
@@ -358,9 +359,11 @@ async function getCourseGradebookPage(courseId, { page = 1, pageSize = 50, polic
       ? await buildGradebookGrades(course, assignments, pageStudentIds, cache, null, submissionMap, cellMeta)
       : {};
 
-  const students = (course.students || [])
-    .map((s) => (typeof s === 'object' ? s : { _id: s }))
-    .filter((s) => pageStudentIds.includes(String(s._id)));
+  const students = await mapUsersWithResolvedProfilePictures(
+    (course.students || [])
+      .map((s) => (typeof s === 'object' ? s : { _id: s }))
+      .filter((s) => pageStudentIds.includes(String(s._id)))
+  );
 
   return {
     course: {
@@ -408,7 +411,7 @@ async function getFullGradebookDataset(courseId, policyCache) {
 
   return {
     course,
-    students: course.students || [],
+    students: await mapUsersWithResolvedProfilePictures(course.students || []),
     assignments,
     grades,
     policyMeta: {

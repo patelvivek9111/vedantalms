@@ -484,10 +484,12 @@ const uploadsStatic = express.static(path.join(__dirname, 'uploads'), {
 
 app.use('/uploads', (req, res, next) => {
   const relative = req.path.replace(/^\/+/, '');
+  const isLegacyProfilePicture = /^profilePicture-\d+-\d+\.(jpe?g|png|gif|webp)$/i.test(relative);
   const isPublicAsset =
     relative.startsWith('public/') ||
     relative.startsWith('public\\') ||
-    relative.startsWith('branding/');
+    relative.startsWith('branding/') ||
+    isLegacyProfilePicture;
   if (!isPublicAsset) {
     return res.status(403).json({
       message: 'Academic files require authentication. Use GET /api/files/:id/download',
@@ -496,6 +498,14 @@ app.use('/uploads', (req, res, next) => {
   const filePath = path.join(__dirname, 'uploads', relative);
   if (fs.existsSync(filePath)) {
     uploadsStatic(req, res, next);
+  } else if (isLegacyProfilePicture) {
+    const { resolveProfilePictureRedirectUrl } = require('./utils/profilePictureUrl');
+    resolveProfilePictureRedirectUrl(relative)
+      .then((redirectUrl) => {
+        if (redirectUrl) return res.redirect(302, redirectUrl);
+        res.status(404).end();
+      })
+      .catch(() => res.status(404).end());
   } else {
     res.status(404).json({ message: 'File not found' });
   }

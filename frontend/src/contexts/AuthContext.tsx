@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, type Context } from 'react';
 import api from '../services/api';
 import { disconnectMessagingSocket } from '../utils/messagingSocket';
 import { clearDownloadTokenCache } from '../services/fileUploadApi';
@@ -25,7 +25,17 @@ interface AuthContextType {
   logout: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+function createAuthContext(): Context<AuthContextType | undefined> {
+  return createContext<AuthContextType | undefined>(undefined);
+}
+
+// Preserve context identity across Vite HMR so useAuth and AuthProvider stay in sync.
+const hotData = import.meta.hot?.data as { authContext?: Context<AuthContextType | undefined> } | undefined;
+const AuthContext = hotData?.authContext ?? createAuthContext();
+
+if (import.meta.hot && hotData) {
+  hotData.authContext = AuthContext;
+}
 
 function mapUser(userData: Record<string, unknown>): User {
   return {

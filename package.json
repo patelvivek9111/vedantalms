@@ -64,6 +64,8 @@
     "test:migration": "jest tests/migration --runInBand --forceExit",
     "verify:institution-export": "node scripts/verifyInstitutionExport.js",
     "export:institution": "node scripts/exportInstitutionBundle.js",
+    "cleanup:export-artifacts": "node scripts/cleanupExportArtifacts.js",
+    "cleanup:export-artifacts:all": "node scripts/cleanupExportArtifacts.js --days=0",
     "restore:institution": "node scripts/restoreInstitutionBundle.js",
     "verify:data-integrity": "node scripts/verifyDataIntegrity.js",
     "verify:restore": "node scripts/verifyRestore.js",

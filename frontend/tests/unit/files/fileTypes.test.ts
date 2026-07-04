@@ -6,6 +6,8 @@ import {
   fileAccessErrorMessage,
   formatFileSize,
   isDocxFile,
+  normalizeSubmissionAttachments,
+  preferFileDisplayName,
 } from '../../../src/utils/fileTypes';
 
 describe('fileTypes', () => {
@@ -50,5 +52,23 @@ describe('fileTypes', () => {
     const out = dedupeFileNames([f1, f2]);
     expect(out[0].name).toBe('essay.pdf');
     expect(out[1].name).toBe('essay (2).pdf');
+  });
+
+  it('prefers descriptive filenames over generic placeholders', () => {
+    expect(preferFileDisplayName('file', 'homework.pdf')).toBe('homework.pdf');
+    expect(preferFileDisplayName('files-123_test.pdf', 'file')).toBe('files-123_test.pdf');
+  });
+
+  it('pairs submission fileAssets with legacy filenames for grading preview', () => {
+    const id = '507f1f77bcf86cd799439011';
+    const normalized = normalizeSubmissionAttachments({
+      clientFiles: [{ url: '/uploads/files-123_test.pdf', legacy: true }],
+      files: ['files-1763689234116-123547927_pwuq3f.pdf'],
+      fileAssets: [id],
+    });
+    expect(normalized).toHaveLength(1);
+    expect(normalized[0].fileAssetId).toBe(id);
+    expect(normalized[0].name).toContain('.pdf');
+    expect(detectPreviewKind(normalized[0])).toBe('pdf');
   });
 });

@@ -7,6 +7,7 @@ import {
   extractFileAssetId,
   buildSecureStreamPath,
   isMongoObjectId,
+  preferFileDisplayName,
   type NormalizedFile,
 } from '../../utils/fileTypes';
 import UnsupportedFileBanner from './UnsupportedFileBanner';
@@ -129,7 +130,7 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, open, onClose
           const m = metaRes.data.data;
           next = {
             ...next,
-            name: m.originalName || next.name,
+            name: preferFileDisplayName(next.name, m.originalName),
             mimeType: m.mimeType,
             size: m.size,
           };

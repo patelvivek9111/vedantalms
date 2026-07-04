@@ -27,7 +27,13 @@ function getStorageService() {
   return storageInstance;
 }
 
+/** Clears cached adapters so JOB_EXPORTS_DIR / INSTITUTION_EXPORTS_DIR changes take effect. */
+function resetStorageService() {
+  storageInstance = null;
+}
+
 module.exports = {
   getStorageService,
   createStorageAdapter,
+  resetStorageService,
 };

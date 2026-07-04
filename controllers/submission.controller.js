@@ -445,7 +445,7 @@ exports.createSubmission = async (req, res) => {
     if (existingSubmission) {
       if (submitIdempotencyKey && existingSubmission.lastSubmitIdempotencyKey === submitIdempotencyKey) {
         const enriched = existingSubmission.toObject ? existingSubmission.toObject() : existingSubmission;
-        enriched.clientFiles = await buildClientFileList(existingSubmission);
+        enriched.clientFiles = await buildClientFileList(existingSubmission, req.user._id);
         return res.status(200).json(enriched);
       }
 
@@ -467,7 +467,7 @@ exports.createSubmission = async (req, res) => {
       existingSubmission = await autoGradeSubmissionOnce(existingSubmission, assignmentDoc);
       
       const enriched = existingSubmission.toObject();
-      enriched.clientFiles = await buildClientFileList(existingSubmission);
+      enriched.clientFiles = await buildClientFileList(existingSubmission, req.user._id);
       return res.status(200).json(enriched);
     }
 
@@ -558,7 +558,7 @@ exports.createSubmission = async (req, res) => {
     }
 
     const enriched = finalSubmission.toObject();
-    enriched.clientFiles = await buildClientFileList(finalSubmission);
+    enriched.clientFiles = await buildClientFileList(finalSubmission, req.user._id);
     res.status(201).json(enriched);
   } catch (error) {
     res.status(error.statusCode || 500).json({
@@ -697,8 +697,16 @@ exports.getAssignmentSubmissions = async (req, res) => {
     const pageItems = hasMore ? submissions.slice(0, limit) : submissions;
     const nextCursor = hasMore ? pageItems[pageItems.length - 1]?.submittedAt?.toISOString() : null;
 
+    const data = await Promise.all(
+      pageItems.map(async (submission) => {
+        const row = submission.toObject ? submission.toObject() : { ...submission };
+        row.clientFiles = await buildClientFileList(submission, req.user._id);
+        return row;
+      })
+    );
+
     res.json({
-      data: pageItems,
+      data,
       nextCursor,
       hasMore
     });
@@ -1343,7 +1351,7 @@ exports.getStudentSubmission = async (req, res) => {
     }
 
     const payload = gradeReleaseService.redactSubmissionForStudent(submission, assignment);
-    payload.files = await buildClientFileList(submission);
+    payload.files = await buildClientFileList(submission, req.user._id);
     res.json(payload);
   } catch (error) {
     res.status(500).json({ message: error.message });

@@ -23,10 +23,12 @@ const GradebookTableToolbar: React.FC<GradebookTableToolbarProps> = ({
 }) => (
   <div className={`${ds.surface.card} px-4 py-3`}>
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <label className="flex-1 min-w-0">
+      <label htmlFor="gradebook-search" className="flex-1 min-w-0">
         <span className="sr-only">Search students</span>
         <input
           type="search"
+          id="gradebook-search"
+          name="gradebookSearch"
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Search students…"

@@ -6,6 +6,7 @@ const { validatePassword } = require('../utils/passwordPolicy');
 const { isPublicRegistrationDisabled, getSecurityPolicy } = require('../services/securityPolicy.service');
 const { setAuthCookie, clearAuthCookie } = require('../utils/authCookie');
 const { sendEmail } = require('../utils/emailService');
+const { resolveProfilePictureUrl } = require('../utils/profilePictureUrl');
 
 const SELF_REGISTER_ROLES = new Set(['student']);
 const DEV_SELF_REGISTER_ROLES = new Set(['student', 'teacher']);
@@ -23,9 +24,10 @@ function resolveRegistrationRole(requestedRole) {
   return 'student';
 }
 
-function sendAuthResponse(res, statusCode, user) {
+async function sendAuthResponse(res, statusCode, user) {
   const token = user.getSignedJwtToken();
   setAuthCookie(res, token);
+  const profilePicture = await resolveProfilePictureUrl(user.profilePicture || '', { userId: user._id });
   return res.status(statusCode).json({
     success: true,
     token,
@@ -36,7 +38,7 @@ function sendAuthResponse(res, statusCode, user) {
       email: user.email,
       role: user.role,
       bio: user.bio || '',
-      profilePicture: user.profilePicture || '',
+      profilePicture,
     },
   });
 }
@@ -115,7 +117,7 @@ exports.register = async (req, res) => {
       privacyConsentAt: new Date(),
     });
 
-    return sendAuthResponse(res, 201, user);
+    return await sendAuthResponse(res, 201, user);
   } catch (err) {
     console.error('Registration error:', err.message);
     res.status(500).json({
@@ -203,7 +205,7 @@ exports.login = async (req, res) => {
     user.lastLogin = new Date();
     await user.save();
 
-    return sendAuthResponse(res, 200, user);
+    return await sendAuthResponse(res, 200, user);
   } catch (err) {
     console.error('Login error:', err.message);
     res.status(500).json({ message: 'Server error' });
@@ -227,6 +229,7 @@ exports.getMe = async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
+    const profilePicture = await resolveProfilePictureUrl(user.profilePicture || '', { userId: user._id });
     res.json({
       success: true,
       user: {
@@ -236,7 +239,7 @@ exports.getMe = async (req, res) => {
         email: user.email,
         role: user.role,
         bio: user.bio || '',
-        profilePicture: user.profilePicture || '',
+        profilePicture,
       },
     });
   } catch (err) {

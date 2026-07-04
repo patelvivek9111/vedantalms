@@ -3,6 +3,10 @@
 
 const fs = require('fs');
 const path = require('path');
+const { applyJestExportPaths } = require('./exportPaths');
+
+// Redirect export artifacts away from repo uploads/ before any service modules load.
+applyJestExportPaths();
 
 // Set test environment variables
 process.env.NODE_ENV = 'test';

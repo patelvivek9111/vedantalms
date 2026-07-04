@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 import { API_URL } from '../../config';
-import { getImageUrl } from '../../services/api';
+import { resolveSecureFileUrl } from '../../services/fileUploadApi';
 import DatePicker from './DatePicker';
 
 // Attendance status types
@@ -956,6 +956,7 @@ const Attendance: React.FC = () => {
             <div className="flex-1">
               <DatePicker
                 id="attendance-date"
+                name="attendanceDate"
                 label="Select Date"
                 value={selectedDate}
                 onChange={(e) => handleDateChange(e.target.value)}
@@ -969,6 +970,8 @@ const Attendance: React.FC = () => {
                 <Search className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                 <input
                   type="text"
+                  id="attendance-search"
+                  name="attendanceSearch"
                   placeholder="Search students..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -976,6 +979,8 @@ const Attendance: React.FC = () => {
                 />
               </div>
               <select
+                id="attendance-status-filter"
+                name="attendanceStatusFilter"
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
                 className="w-full sm:w-auto border border-gray-300 dark:border-gray-700 rounded-md px-3 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-xs sm:text-sm"
@@ -999,6 +1004,8 @@ const Attendance: React.FC = () => {
             </span>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <select
+                id="attendance-bulk-action"
+                name="attendanceBulkAction"
                 value={bulkAction}
                 onChange={(e) => setBulkAction(e.target.value)}
                 className="flex-1 sm:flex-none border border-gray-300 dark:border-gray-700 rounded-md px-3 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-xs sm:text-sm"
@@ -1203,6 +1210,8 @@ const Attendance: React.FC = () => {
                     {isInstructor && (
                       <input
                         type="checkbox"
+                        id={`attendance-select-${record.studentId}`}
+                        name="attendanceStudentSelect"
                         checked={selectedStudents.has(record.studentId)}
                         onChange={() => handleStudentSelect(record.studentId)}
                         className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 dark:text-blue-400 border-gray-300 dark:border-gray-700 rounded focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-900 flex-shrink-0"
@@ -1211,7 +1220,7 @@ const Attendance: React.FC = () => {
                     <div className="relative w-10 h-10 sm:w-8 sm:h-8 flex-shrink-0">
                       {record.profilePicture ? (
                         <img
-                          src={record.profilePicture.startsWith('http') ? record.profilePicture : getImageUrl(record.profilePicture)}
+                          src={resolveSecureFileUrl(record.profilePicture)}
                           alt={record.studentName}
                           className="w-10 h-10 sm:w-8 sm:h-8 rounded-full object-cover border border-gray-200 dark:border-gray-600"
                           onError={(e) => {

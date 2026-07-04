@@ -1,8 +1,8 @@
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
 const mongoose = require('mongoose');
 const { createMongoMemoryServer } = require('../mongoMemoryServer');
+const { applyJestExportPaths } = require('../exportPaths');
 const { exportInstitutionBundle } = require('../../services/export/institutionalExport.service');
 const {
   restoreInstitutionBundle,
@@ -15,14 +15,12 @@ const Course = require('../../models/course.model');
 const StudentCourseGradeSnapshot = require('../../models/studentCourseGradeSnapshot.model');
 
 let mongoServer;
-let exportBaseDir;
 
 beforeAll(async () => {
+  applyJestExportPaths();
   mongoServer = await createMongoMemoryServer();
   await mongoose.connect(mongoServer.getUri());
-  exportBaseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lms-export-'));
-  process.env.INSTITUTION_EXPORTS_DIR = exportBaseDir;
-});
+}, 120000);
 
 afterAll(async () => {
   await mongoose.disconnect();
@@ -61,6 +59,8 @@ describe('institution migration (Phase R1-R8)', () => {
       sections: ['users', 'courses', 'enrollments', 'permissionsRoles'],
       registerBackup: false,
     });
+
+    expect(result.directory.startsWith(process.env.INSTITUTION_EXPORTS_DIR)).toBe(true);
 
     expect(result.manifest.schemaVersion).toBe(1);
     expect(result.manifest.exportVersion).toBe('2.0.0');

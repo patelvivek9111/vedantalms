@@ -1,11 +1,14 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import ProfileImage from '@/components/common/ProfileImage';
-import { getImageUrl } from '@/services/api';
+import { resolveSecureFileUrl } from '@/services/fileUploadApi';
 
-// Mock getImageUrl
-vi.mock('@/services/api', () => ({
-  getImageUrl: vi.fn((url) => `/uploads/${url}`),
+vi.mock('@/services/fileUploadApi', () => ({
+  resolveSecureFileUrl: vi.fn((url: string) => {
+    if (!url) return '';
+    if (url.startsWith('http')) return url;
+    return `/uploads/${url}`;
+  }),
 }));
 
 describe('ProfileImage', () => {

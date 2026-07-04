@@ -18,6 +18,48 @@ import { offlineStorage } from '../../utils/offlineStorage';
 import { hapticNavigation } from '../../utils/hapticFeedback';
 import { queryClient } from '../../lib/queryClient';
 import { signalNotificationInvalidation } from '../../hooks/notifications/notificationSync';
+import {
+  normalizeSubmissionAttachments,
+} from '../../utils/fileTypes';
+import FileAttachmentChips from '../files/FileAttachmentChips';
+
+function questionTypeLabel(type) {
+  if (type === 'multiple-choice') return 'Multiple choice';
+  if (type === 'matching') return 'Matching';
+  if (type === 'text') return 'Text entry';
+  return 'Question';
+}
+
+function formatMultipleChoiceAnswer(question, studentAnswer) {
+  if (studentAnswer === undefined || studentAnswer === null || studentAnswer === '') {
+    return 'No answer';
+  }
+  const options = Array.isArray(question?.options) ? question.options : [];
+  const answerText = String(studentAnswer);
+  const byText = options.find((option) => String(option?.text || '').trim() === answerText.trim());
+  if (byText) return byText.text;
+  const asIndex = Number.parseInt(answerText, 10);
+  if (!Number.isNaN(asIndex) && options[asIndex]) {
+    return options[asIndex].text || answerText;
+  }
+  return answerText;
+}
+
+function submissionHasAttachments(submission) {
+  if (!submission) return false;
+  return Boolean(
+    submission.clientFiles?.length ||
+      submission.files?.length ||
+      submission.fileAssets?.length
+  );
+}
+
+/** Match sidebar display: finalGrade wins when truthy, else grade (handles finalGrade=0 + grade=50). */
+function resolveSubmissionPointsGrade(submission) {
+  if (!submission) return '';
+  const value = submission.finalGrade || submission.grade;
+  return value !== undefined && value !== null && value !== '' ? String(value) : '';
+}
 
 const AssignmentGrading = () => {
   const { id } = useParams();
@@ -45,6 +87,7 @@ const AssignmentGrading = () => {
   const [gradeErrors, setGradeErrors] = useState({});
   const [showUnsavedChangesConfirm, setShowUnsavedChangesConfirm] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [overallGrade, setOverallGrade] = useState('');
   const feedbackTimeoutRef = useRef(null);
   const lastSavedFeedbackRef = useRef('');
   const lastSavedGradesRef = useRef({});
@@ -372,6 +415,11 @@ const AssignmentGrading = () => {
       });
       
       setQuestionGrades(initialGrades);
+        setOverallGrade(
+          savedData.overallGrade != null && savedData.overallGrade !== ''
+            ? String(savedData.overallGrade)
+            : resolveSubmissionPointsGrade(selectedSubmission)
+        );
         // Prefer offline saved feedback, then server feedback
         const feedbackText = savedData.feedback ?? selectedSubmission.feedback ?? '';
       setFeedback(feedbackText);
@@ -548,8 +596,19 @@ const AssignmentGrading = () => {
       return;
     }
     
+    const hasQuestions = Array.isArray(assignment?.questions) && assignment.questions.length > 0;
+
+    if (!approveGrade && !hasQuestions) {
+      const maxPoints = assignment?.totalPoints || 100;
+      const validation = validateGrade(overallGrade, maxPoints);
+      if (!validation.valid) {
+        toast.error(validation.error || 'Enter a valid overall grade');
+        return;
+      }
+    }
+
     // Validate all grades before submission
-    if (!approveGrade && assignment?.questions) {
+    if (!approveGrade && hasQuestions) {
       for (let i = 0; i < assignment.questions.length; i++) {
         const question = assignment.questions[i];
         if (question && question.type !== 'multiple-choice' && question.type !== 'matching') {
@@ -593,6 +652,7 @@ const AssignmentGrading = () => {
       };
 
       if (!approveGrade) {
+        if (hasQuestions) {
         const gradesToSend = {};
         
         Object.keys(questionGrades).forEach(index => {
@@ -663,6 +723,9 @@ const AssignmentGrading = () => {
         }
         
         payload.questionGrades = gradesToSend;
+        } else if (overallGrade !== '' && overallGrade !== null && overallGrade !== undefined) {
+          payload.grade = parseFloat(overallGrade);
+        }
       }
 
       const response = await api.put(`/submissions/${selectedSubmission._id}`, payload);
@@ -744,6 +807,7 @@ const AssignmentGrading = () => {
         });
       }
       setQuestionGrades(updatedGrades);
+      setOverallGrade(resolveSubmissionPointsGrade(response.data));
       lastSavedGradesRef.current = { ...updatedGrades };
       lastSavedFeedbackRef.current = feedback;
       setHasUnsavedChanges(false);
@@ -1535,6 +1599,75 @@ const AssignmentGrading = () => {
                   )}
                 </div>
 
+                {/* Student submission: uploaded files and written response */}
+                {(submissionHasAttachments(selectedSubmission) ||
+                  selectedSubmission.submissionText?.trim() ||
+                  !assignment.questions?.length) && (
+                  <div className="mb-6 border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/40">
+                    <div className="flex items-center gap-2 mb-3">
+                      <FileText className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                      <h3 className="font-medium text-gray-900 dark:text-gray-100">Student Submission</h3>
+                    </div>
+
+                    {selectedSubmission.submissionText?.trim() ? (
+                      <div className="mb-4">
+                        <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Written response
+                        </div>
+                        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3 text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
+                          {selectedSubmission.submissionText}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {submissionHasAttachments(selectedSubmission) ? (
+                      <div>
+                        <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Uploaded files
+                        </div>
+                        <FileAttachmentChips
+                          files={normalizeSubmissionAttachments(selectedSubmission)}
+                        />
+                      </div>
+                    ) : null}
+
+                    {!submissionHasAttachments(selectedSubmission) &&
+                      !selectedSubmission.submissionText?.trim() &&
+                      !assignment.questions?.length && (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          No written response or files were submitted.
+                        </p>
+                      )}
+                  </div>
+                )}
+
+                {/* Upload-only / no-question assignments: single overall grade */}
+                {(!assignment.questions || assignment.questions.length === 0) && (
+                  <div className="mb-6 border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-900">
+                    <div className="max-w-xs">
+                      <FloatingLabelInput
+                        id="overall-grade"
+                        name="overall-grade"
+                        type="number"
+                        label={`Overall grade (0-${assignment.totalPoints || 100})`}
+                        min="0"
+                        max={assignment.totalPoints || 100}
+                        step="0.1"
+                        value={overallGrade}
+                        onChange={(e) => {
+                          setOverallGrade(e.target.value);
+                          setHasUnsavedChanges(true);
+                        }}
+                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        aria-label="Overall submission grade"
+                      />
+                    </div>
+                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                      Review uploaded files and feedback above, then enter the total points earned.
+                    </p>
+                  </div>
+                )}
+
                 {/* Questions */}
                 {assignment.questions && Array.isArray(assignment.questions) && (
                   <div className="space-y-4">
@@ -1549,9 +1682,14 @@ const AssignmentGrading = () => {
                           <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-900">
                             <div className="flex justify-between items-start mb-3">
                               <div>
-                                <h3 className="font-medium text-gray-900 dark:text-gray-100">
-                                  Question {index + 1}
-                                </h3>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <h3 className="font-medium text-gray-900 dark:text-gray-100">
+                                    Question {index + 1}
+                                  </h3>
+                                  <span className="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs text-gray-600 dark:text-gray-300">
+                                    {questionTypeLabel(questionType)}
+                                  </span>
+                                </div>
                                 <p className="text-sm text-gray-600 dark:text-gray-400">{question.text}</p>
                               </div>
                               <div className="text-right">
@@ -1571,7 +1709,7 @@ const AssignmentGrading = () => {
                               </div>
                               {questionType === 'multiple-choice' ? (
                                 <div className="text-sm text-gray-900 dark:text-gray-100">
-                                  {studentAnswer || 'No answer'}
+                                  {formatMultipleChoiceAnswer(question, studentAnswer)}
                                 </div>
                               ) : questionType === 'matching' ? (
                                 <div className="space-y-2">

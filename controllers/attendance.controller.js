@@ -3,6 +3,7 @@ const Course = require('../models/course.model');
 const User = require('../models/user.model');
 const mongoose = require('mongoose');
 const { isCourseGradingStaff } = require('../middleware/academicPermissions');
+const { resolveProfilePictureUrl } = require('../utils/profilePictureUrl');
 
 function denyAttendanceRosterAccess(res) {
   return res.status(403).json({ message: 'Not authorized to view course attendance roster' });
@@ -60,20 +61,22 @@ exports.getAttendance = async (req, res) => {
     });
 
     // Create attendance data for all enrolled students
-    const attendanceData = course.students.map(student => {
-      const existingRecord = attendanceMap[student._id.toString()];
-      return {
-        studentId: student._id,
-        studentName: `${student.firstName} ${student.lastName}`,
-        email: student.email,
-        profilePicture: student.profilePicture,
-        status: existingRecord ? existingRecord.status : 'unmarked',
-        date: date,
-        timestamp: existingRecord ? existingRecord.timestamp : null,
-        reason: existingRecord ? existingRecord.reason : '',
-        notes: existingRecord ? existingRecord.notes : ''
-      };
-    });
+    const attendanceData = await Promise.all(
+      course.students.map(async (student) => {
+        const existingRecord = attendanceMap[student._id.toString()];
+        return {
+          studentId: student._id,
+          studentName: `${student.firstName} ${student.lastName}`,
+          email: student.email,
+          profilePicture: await resolveProfilePictureUrl(student.profilePicture, { userId: student._id }),
+          status: existingRecord ? existingRecord.status : 'unmarked',
+          date: date,
+          timestamp: existingRecord ? existingRecord.timestamp : null,
+          reason: existingRecord ? existingRecord.reason : '',
+          notes: existingRecord ? existingRecord.notes : '',
+        };
+      })
+    );
 
     res.json(attendanceData);
   } catch (error) {

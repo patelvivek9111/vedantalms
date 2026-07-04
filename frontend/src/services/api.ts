@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { API_URL } from '../config';
+import { API_URL, getBackendOrigin } from '../config';
 import { getMemoryAuthToken } from '../utils/authToken';
 
 const getBaseURL = () => {
@@ -128,21 +128,17 @@ export const getImageUrl = (filename: string): string => {
   if (!filename) return '';
   if (filename.startsWith('http')) return filename;
 
+  const backendBase = (API_URL || getBackendOrigin()).replace(/\/$/, '');
+
   if (filename.startsWith('/api/files/')) {
-    return !API_URL || API_URL === '' ? filename : `${API_URL}${filename}`;
+    return `${backendBase}${filename}`;
   }
 
-  if (!API_URL || API_URL === '') {
-    if (filename.startsWith('/uploads/')) {
-      return filename;
-    }
-    return `/uploads/${filename}`;
-  }
+  const uploadPath = filename.startsWith('/uploads/')
+    ? filename
+    : `/uploads/${filename}`;
 
-  if (filename.startsWith('/uploads/')) {
-    return `${API_URL}${filename}`;
-  }
-  return `${API_URL}/uploads/${filename}`;
+  return `${backendBase}${uploadPath}`;
 };
 
 export default api;

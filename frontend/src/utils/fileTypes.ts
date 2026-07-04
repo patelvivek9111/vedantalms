@@ -138,7 +138,10 @@ export function mapUploadResponse(file: Record<string, unknown>): NormalizedFile
 export function needsFileNameHydration(file: NormalizedFile): boolean {
   if (!file.fileAssetId) return false;
   const n = (file.name || '').trim();
-  return !n || /^file-\d+$/i.test(n);
+  if (!n || n === 'file' || n === 'attachment') return true;
+  if (/^file-\d+$/i.test(n)) return true;
+  if (!getExtension(n) && !file.mimeType) return true;
+  return false;
 }
 
 export function normalizeLegacyFiles(
@@ -168,22 +171,94 @@ export function normalizeLegacyFiles(
   });
 }
 
+/** Prefer a human-readable filename (with extension) over generic placeholders. */
+export function preferFileDisplayName(existing: string, candidate?: string): string {
+  const current = (existing || '').trim();
+  const next = (candidate || '').trim();
+  if (!next) return current || 'file';
+  if (!current || current === 'file' || current === 'attachment' || current === 'download') {
+    return next;
+  }
+  if (!getExtension(current) && getExtension(next)) return next;
+  if (needsFileNameHydration({ name: current, fileAssetId: 'a'.repeat(24) })) return next;
+  return current;
+}
+
+/**
+ * Normalize submission attachments for instructor grading — pairs fileAsset IDs with
+ * legacy filename paths when clientFiles only contains legacy entries.
+ */
+export function normalizeSubmissionAttachments(submission: {
+  clientFiles?: Array<Record<string, unknown>>;
+  files?: Array<string | Record<string, unknown>>;
+  fileAssets?: Array<string | Record<string, unknown>>;
+}): NormalizedFile[] {
+  const secureClientFiles = (submission.clientFiles || []).filter((a) => {
+    const url = String(a.url || a.path || '');
+    const id = String(a.fileAssetId || a._id || extractFileAssetId(url) || '');
+    return Boolean(id && isMongoObjectId(id));
+  });
+
+  if (secureClientFiles.length) {
+    return normalizeAttachmentSources({ attachmentFiles: secureClientFiles });
+  }
+
+  const assetIds = (submission.fileAssets || [])
+    .map((id) => (typeof id === 'string' ? id : String((id as { _id?: string })._id || id)))
+    .filter((id) => isMongoObjectId(id));
+
+  const legacyFiles = submission.files || [];
+
+  if (assetIds.length) {
+    return assetIds.map((id, index) => {
+      const legacy = legacyFiles[index] ?? legacyFiles[0];
+      const legacyNorm = legacy ? normalizeLegacyFiles([legacy])[0] : null;
+      const name = preferFileDisplayName(legacyNorm?.name || '', legacyNorm?.name);
+      return {
+        fileAssetId: id,
+        name: name || 'attachment',
+        url: buildSecureDownloadPath(id),
+        mimeType: legacyNorm?.mimeType,
+        status: 'done' as const,
+      };
+    });
+  }
+
+  if (legacyFiles.length) {
+    return normalizeLegacyFiles(legacyFiles);
+  }
+
+  return [];
+}
+
 /** Prefer API attachmentFiles; fall back to legacy attachment id/url lists. */
 export function normalizeAttachmentSources(source: {
   attachmentFiles?: Array<Record<string, unknown>>;
   attachments?: Array<string | Record<string, unknown>>;
   fileAssets?: Array<string | Record<string, unknown>>;
 }): NormalizedFile[] {
-  if (source.attachmentFiles?.length) {
-    return source.attachmentFiles.map((a) =>
-      mapUploadResponse({
-        fileAssetId: a.fileAssetId || a._id,
-        originalname: a.originalName || a.name,
-        path: a.url || a.path,
+  const secureAttachmentFiles = (source.attachmentFiles || []).filter((a) => {
+    const url = String(a.url || a.path || '');
+    const id = String(a.fileAssetId || a._id || extractFileAssetId(url) || '');
+    return Boolean(id && isMongoObjectId(id));
+  });
+
+  if (secureAttachmentFiles.length) {
+    return secureAttachmentFiles.map((a) => {
+      const url = String(a.url || a.path || '');
+      const fileAssetId = String(a.fileAssetId || a._id || extractFileAssetId(url) || '');
+      const legacyName = url.split('/').pop() || '';
+      return mapUploadResponse({
+        fileAssetId: fileAssetId || undefined,
+        originalname: preferFileDisplayName(
+          legacyName,
+          String(a.originalName || a.originalname || a.name || '')
+        ),
+        path: url || (fileAssetId ? buildSecureDownloadPath(fileAssetId) : ''),
         size: a.size,
         mimeType: a.mimeType,
-      })
-    );
+      });
+    });
   }
   const raw =
     source.attachments?.length

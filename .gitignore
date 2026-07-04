@@ -34,6 +34,7 @@ pids
 
 # Jest in-memory Mongo URI (written by tests/globalSetup.js)
 tests/.mongo-memory-uri
+tests/.jest-artifacts-root
 
 # Local Gitleaks scan output (may reference redacted secret metadata)
 gitleaks-report.json

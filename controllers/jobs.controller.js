@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const jobQueueService = require('../services/jobQueue.service');
-const { verifyDownloadToken, JOBS_DIR } = require('../services/gradingJobProcessors');
+const { verifyDownloadToken, getJobsDir } = require('../services/gradingJobProcessors');
 
 exports.getJobStatus = async (req, res) => {
   try {
@@ -68,7 +68,7 @@ exports.downloadJobExport = async (req, res) => {
     }).catch(() => {});
 
     const resolved = path.resolve(job.filePath); // nosemgrep: javascript.express.security.audit.express-path-join-resolve-traversal.express-path-join-resolve-traversal
-    if (!resolved.startsWith(path.resolve(JOBS_DIR)) || !fs.existsSync(resolved)) {
+    if (!resolved.startsWith(path.resolve(getJobsDir())) || !fs.existsSync(resolved)) {
       return res.status(404).json({ success: false, message: 'File not found' });
     }
 
