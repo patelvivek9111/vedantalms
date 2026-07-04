@@ -1,5 +1,5 @@
 import api, { getImageUrl } from './api';
-import { getMemoryAuthToken, authFetchInit } from '../utils/authToken';
+import { getMemoryAuthToken } from '../utils/authToken';
 import { extractFileAssetId, isMongoObjectId, buildSecureDownloadPath, mapUploadResponse, type NormalizedFile } from '../utils/fileTypes';
 
 export interface UploadOptions {
@@ -149,17 +149,19 @@ export async function fetchAuthenticatedFile(
   }
   const target = resolveSecureFileUrl(path);
   const authToken = getMemoryAuthToken();
-  const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
+  const authHeaders: Record<string, string> = authToken
+    ? { Authorization: `Bearer ${authToken}` }
+    : {};
 
   // Match download: follow API → Cloudinary redirects. manual + cross-origin yields status 0
   // (opaqueredirect) when Location is hidden, which breaks blob previews inconsistently.
-  const followed = await fetch(target, { headers, redirect: 'follow' });
+  const followed = await fetch(target, { headers: authHeaders, redirect: 'follow' });
   if (followed.ok) {
     return followed;
   }
 
   // Fallback for same-origin proxies that expose Location on manual redirect.
-  const manual = await fetch(target, { headers, redirect: 'manual' });
+  const manual = await fetch(target, { headers: authHeaders, redirect: 'manual' });
   const needsRedirectFollow =
     manual.status === 0 ||
     manual.type === 'opaqueredirect' ||
@@ -170,7 +172,7 @@ export async function fetchAuthenticatedFile(
       const redirected = await fetchRedirectTarget(location);
       if (redirected.ok) return redirected;
     }
-    const retryFollow = await fetch(target, { headers, redirect: 'follow' });
+    const retryFollow = await fetch(target, { headers: authHeaders, redirect: 'follow' });
     if (retryFollow.ok) return retryFollow;
   }
 
