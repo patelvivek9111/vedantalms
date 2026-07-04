@@ -44,6 +44,10 @@ semgrep-report.json
 semgrep-security-report.json
 .semgrep-baseline.json
 
+# Local Trivy scan output
+trivy-report.json
+trivy-fs-report.json
+
 # Coverage directory used by tools like istanbul
 coverage/
 *.lcov

@@ -27,6 +27,13 @@ jobs:
       - run: pip install semgrep
       - run: semgrep scan --config p/nodejs --config p/typescript --config p/react --error
 
+  trivy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: aquasecurity/setup-trivy@v2
+      - run: npm run scan:trivy
+
   hardening:
     runs-on: ubuntu-latest
 

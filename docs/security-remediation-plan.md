@@ -13,7 +13,8 @@ This file tracks the vulnerabilities and security issues found during the free i
 - [x] Rerun dependency audits after fixes
 - [x] Run Gitleaks secret scan (local + CI); 2 historical findings documented and ignored pending key rotation
 - [x] Run Semgrep static analysis (local + CI); focused node/ts/react rules, 0 blocking findings
-- [ ] Run remaining external tooling: OWASP ZAP, Trivy
+- [x] Run Trivy filesystem scan (local + CI); 0 HIGH/CRITICAL vulns or misconfigs
+- [ ] Run remaining external tooling: OWASP ZAP
 
 **Dependency status (2026-07-03):** `npm audit` reports **0 vulnerabilities** in both backend and frontend.
 
@@ -183,6 +184,7 @@ Issues found during the fourth verification pass.
 - [x] Run round-4 tests: group set/course IDOR lockdown (extended `groups.test.js`)
 - [x] Run `npm run scan:gitleaks` (git history scan; passes with `.gitleaksignore` for accepted historical findings)
 - [x] Run `npm run scan:semgrep` (focused node/ts/react rules; 0 blocking findings)
+- [x] Run `npm run scan:trivy` (lockfiles + Dockerfiles; HIGH/CRITICAL gate)
 
 ## External Tooling
 
@@ -253,10 +255,36 @@ npm run scan:semgrep
 semgrep scan --config auto --json -o semgrep-report.json
 ```
 
-### Trivy — not started
+### Trivy (2026-07-04) — complete
 
-- [ ] Run `trivy fs .` and `trivy config` against Docker/deploy files
-- [ ] Compare with `npm audit` (already 0 vulns)
+- [x] Install Trivy locally (`winget install AquaSecurity.Trivy`)
+- [x] Add `npm run scan:trivy`
+- [x] Add CI job in `.github/workflows/hardening-production.yml`
+- [x] Gitignore local report files (`trivy-report.json`, etc.)
+- [x] Fix Dockerfile misconfigurations (non-root `USER`)
+
+**Scan command:**
+
+```bash
+npm run scan:trivy
+```
+
+**What it scans:** `package-lock.json` and `frontend/package-lock.json` for vulnerabilities (prod deps only; aligns with `npm audit` 0/0), plus `Dockerfile` and `Dockerfile.load` for misconfigurations. Secrets are covered by Gitleaks (Trivy secret scan is slower and omitted from CI).
+
+**Findings triaged:**
+
+| Rule | Target | Resolution |
+| --- | --- | --- |
+| DS-0002 (non-root user) | `Dockerfile`, `Dockerfile.load` | Added `nodejs` user (uid 1001) and `USER nodejs` in final image |
+
+**Optional informational scans (not gated in CI):**
+
+```bash
+trivy fs --scanners vuln --include-dev-deps --severity MEDIUM,HIGH,CRITICAL .
+trivy config --severity MEDIUM,HIGH,CRITICAL .
+```
+
+Docker Compose files are not evaluated by Trivy’s compose scanner in this setup; production compose hardening is documented separately.
 
 ### OWASP ZAP — not started
 
@@ -269,8 +297,8 @@ These were not completed in the initial pass because the tools were not installe
 
 - [x] Gitleaks secret scan (see **External Tooling → Gitleaks** above)
 - [x] Semgrep static analysis (see **External Tooling → Semgrep** above)
+- [x] Trivy filesystem/container scan (see **External Tooling → Trivy** above)
 - [ ] OWASP ZAP baseline scan against staging/local app
-- [ ] Trivy filesystem/container scan
 
 ## Notes
 
