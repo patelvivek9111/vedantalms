@@ -7,6 +7,7 @@ const fs = require('fs');
 const Course = require('../models/course.model');
 const fileAssetService = require('../services/fileAsset.service');
 const { assertCourseFilesMutable } = require('../services/fileLifecycle.service');
+const { paths, isPathInside } = require('../config/paths');
 
 // @desc    Create a page under a module
 // @route   POST /api/pages
@@ -358,7 +359,10 @@ exports.deletePage = async (req, res) => {
     // Delete attachments
     if (page.attachments && page.attachments.length > 0) {
       for (const attachment of page.attachments) {
-        const filePath = path.join(__dirname, '..', attachment);
+        const filePath = path.resolve(path.join(__dirname, '..', attachment)); // nosemgrep: javascript.express.security.audit.express-path-join-resolve-traversal.express-path-join-resolve-traversal
+        if (!isPathInside(paths.uploads, filePath)) {
+          continue;
+        }
         try {
           await fs.unlink(filePath);
         } catch (err) {

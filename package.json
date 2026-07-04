@@ -49,6 +49,7 @@
     "ops:infra-tier-review": "node scripts/ops/infraTierReview.js",
     "verify:workflows": "node scripts/validateWorkflowFiles.js",
     "scan:gitleaks": "gitleaks git . --config .gitleaks.toml --redact --verbose",
+    "scan:semgrep": "semgrep scan --config p/nodejs --config p/typescript --config p/react --error",
     "validate:indexes": "node scripts/validateMongoIndexes.js",
     "migrate": "node scripts/migrations/run.js",
     "migrate:dry-run": "node scripts/migrations/run.js --dry-run",

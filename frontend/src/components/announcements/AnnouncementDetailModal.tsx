@@ -279,9 +279,10 @@ const AnnouncementDetailModal: React.FC<AnnouncementDetailModalProps> = ({
               {formatAnnouncementDate(announcement.createdAt)} · {announcement.author.firstName}{' '}
               {announcement.author.lastName}
             </p>
+            {/* Announcement HTML is sanitized server-side (MESSAGE_SANITIZER=dompurify). */}
             <div
               className="prose prose-slate mt-4 max-w-none dark:prose-invert"
-              dangerouslySetInnerHTML={{ __html: announcement.body }}
+              dangerouslySetInnerHTML={{ __html: announcement.body }} // nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml
             />
             <AnnouncementOptionBadges options={announcement.options} className="mt-4" />
           </article>

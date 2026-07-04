@@ -39,6 +39,11 @@ tests/.mongo-memory-uri
 gitleaks-report.json
 gitleaks-current-report.json
 
+# Local Semgrep scan output
+semgrep-report.json
+semgrep-security-report.json
+.semgrep-baseline.json
+
 # Coverage directory used by tools like istanbul
 coverage/
 *.lcov

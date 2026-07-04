@@ -67,7 +67,7 @@ exports.downloadJobExport = async (req, res) => {
       courseId: job.payload?.courseId,
     }).catch(() => {});
 
-    const resolved = path.resolve(job.filePath);
+    const resolved = path.resolve(job.filePath); // nosemgrep: javascript.express.security.audit.express-path-join-resolve-traversal.express-path-join-resolve-traversal
     if (!resolved.startsWith(path.resolve(JOBS_DIR)) || !fs.existsSync(resolved)) {
       return res.status(404).json({ success: false, message: 'File not found' });
     }

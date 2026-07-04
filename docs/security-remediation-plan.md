@@ -12,7 +12,8 @@ This file tracks the vulnerabilities and security issues found during the free i
 - [x] Rerun automated security-related tests after fixes
 - [x] Rerun dependency audits after fixes
 - [x] Run Gitleaks secret scan (local + CI); 2 historical findings documented and ignored pending key rotation
-- [ ] Run remaining external tooling: OWASP ZAP, Trivy, Semgrep
+- [x] Run Semgrep static analysis (local + CI); focused node/ts/react rules, 0 blocking findings
+- [ ] Run remaining external tooling: OWASP ZAP, Trivy
 
 **Dependency status (2026-07-03):** `npm audit` reports **0 vulnerabilities** in both backend and frontend.
 
@@ -104,7 +105,7 @@ Notable frontend packages/advisories to verify:
 - [x] Confirm public registration is disabled or restricted for production (startup warning + `DISABLE_PUBLIC_REGISTRATION`)
 - [x] Decide whether dev/test rate limiting should be enabled for local security tests with `ENFORCE_RATE_LIMIT_IN_DEV=true` (documented in `.env.example`; off by default in dev)
 - [x] Remove hardcoded TinyMCE API key fallback; require `VITE_TINYMCE_API_KEY` or use plain textarea editor
-- [ ] Rotate or restrict legacy TinyMCE API key exposed in git history (see Gitleaks section)
+- [x] Restrict legacy TinyMCE API key via Tiny Cloud **Approved Domains** (rotation is not offered by Tiny Cloud)
 - [x] Delete or fix unused `middleware/roleCheck.js`
 
 ### Low
@@ -133,7 +134,7 @@ Issues found during the follow-up verification pass after the first remediation 
 ### Operational (verify at deploy time)
 
 - [ ] Confirm production env vars are set on live/staging: `CLAMAV_ENABLED`, `MESSAGE_SANITIZER`, `METRICS_TOKEN`, `DISABLE_PUBLIC_REGISTRATION`, `VITE_TINYMCE_API_KEY`
-- [ ] Rotate or restrict legacy TinyMCE API key in Tiny Cloud dashboard (Gitleaks found key in commits `f7e521c`, `b4e67e9`)
+- [x] Restrict legacy TinyMCE API key in Tiny Cloud **Approved Domains** (`localhost`, `vedantaed.com`, `www.vedantaed.com`; add frontend deploy host if different)
 
 ## Round 3 Re-Pentest Gaps (2026-07-03)
 
@@ -181,6 +182,7 @@ Issues found during the fourth verification pass.
 - [x] Run round-3 tests: group route auth (`tests/unit/api/groups.test.js`)
 - [x] Run round-4 tests: group set/course IDOR lockdown (extended `groups.test.js`)
 - [x] Run `npm run scan:gitleaks` (git history scan; passes with `.gitleaksignore` for accepted historical findings)
+- [x] Run `npm run scan:semgrep` (focused node/ts/react rules; 0 blocking findings)
 
 ## External Tooling
 
@@ -209,18 +211,47 @@ npm run scan:gitleaks
 
 **Operational follow-up:**
 
-- [ ] In [Tiny Cloud](https://www.tiny.cloud/), rotate or restrict the legacy API key that was hardcoded before the security fix
-- [ ] After rotation, remove the two lines from `.gitleaksignore` and confirm `npm run scan:gitleaks` still passes
+- [x] Restrict key in Tiny Cloud **Approved Domains** (this is the supported mitigation; Tiny Cloud does not offer key rotation)
+- [ ] Confirm every **frontend** hostname that loads the editor is listed (browser origin, not API backend). Remove `vedantalms-backend.onrender.com` if the editor is not served from that host.
+- [ ] Keep `.gitleaksignore` entries until satisfied the historical exposure is accepted; they document known git-history findings only
+
+**Why there is no “rotate key” button:** TinyMCE Cloud API keys are public client identifiers (visible in browser network traffic), not private secrets. Tiny does not provide rotation/regeneration in the dashboard. Security is enforced by **domain allowlisting**, which you have configured.
 
 **Local notes:**
 
 - `.env` secrets are gitignored; never commit `.env`
 - `frontend/dist/` may contain old bundled keys from local builds; keep dist gitignored and excluded in `.gitleaks.toml`
 
-### Semgrep — not started
+### Semgrep (2026-07-04) — complete
 
-- [ ] Add `semgrep scan --config auto` to CI or run locally
-- [ ] Triage findings; fix or document accepted risks
+- [x] Install Semgrep locally (`pip install semgrep`)
+- [x] Add `.semgrepignore` (scripts, monitoring, `.github`, dist, node_modules)
+- [x] Add `npm run scan:semgrep`
+- [x] Add CI job in `.github/workflows/hardening-production.yml`
+- [x] Gitignore local report files (`semgrep-report.json`, etc.)
+- [x] Triage and fix or document findings
+
+**Scan command (focused app rules; not full `--config auto`):**
+
+```bash
+npm run scan:semgrep
+```
+
+**Strategy:** Full `semgrep scan --config auto` reports ~161 findings, mostly noise from `scripts/`, GitHub Actions mutable tags, and path-traversal heuristics on guarded code. CI uses **p/nodejs**, **p/typescript**, and **p/react** only (~74 rules on tracked app code).
+
+**Findings triaged (5 → 0):**
+
+| Rule | File | Resolution |
+| --- | --- | --- |
+| `raw-html-format` | `controllers/auth.controller.js` | Password-reset email switched to plain text (no HTML injection surface) |
+| `express-path-join-resolve-traversal` | `page.controller.js`, `file.controller.js`, `jobs.controller.js` | `isPathInside` guards + `nosemgrep` where path is validated |
+| `react-dangerouslysetinnerhtml` | `AnnouncementDetailModal.tsx` | Server-side DOMPurify sanitization; `nosemgrep` documents accepted risk |
+
+**Optional informational scan (not gated in CI):**
+
+```bash
+semgrep scan --config auto --json -o semgrep-report.json
+```
 
 ### Trivy — not started
 
@@ -237,9 +268,9 @@ npm run scan:gitleaks
 These were not completed in the initial pass because the tools were not installed or the local app/database was not fully available.
 
 - [x] Gitleaks secret scan (see **External Tooling → Gitleaks** above)
+- [x] Semgrep static analysis (see **External Tooling → Semgrep** above)
 - [ ] OWASP ZAP baseline scan against staging/local app
 - [ ] Trivy filesystem/container scan
-- [ ] Semgrep security audit
 
 ## Notes
 

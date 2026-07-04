@@ -317,10 +317,13 @@ exports.forgotPassword = async (req, res) => {
     await sendEmail(
       user.email,
       'Reset your password',
-      `<p>Hello ${user.firstName},</p>
-       <p>We received a request to reset your password. Click the link below (valid for 1 hour):</p>
-       <p><a href="${resetUrl}">Reset password</a></p>
-       <p>If you did not request this, you can ignore this email.</p>`
+      `Hello ${user.firstName},
+
+We received a request to reset your password. Open this link (valid for 1 hour):
+
+${resetUrl}
+
+If you did not request this, you can ignore this email.`
     );
 
     return res.json(genericResponse);

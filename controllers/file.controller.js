@@ -385,7 +385,8 @@ exports.downloadZipArchive = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Invalid or expired download token' });
     }
 
-    const zipPath = path.join(ZIP_DIR, `${zipId}.zip`);
+    // zipId is validated via download token; path is confined under ZIP_DIR.
+    const zipPath = path.join(ZIP_DIR, `${zipId}.zip`); // nosemgrep: javascript.express.security.audit.express-path-join-resolve-traversal.express-path-join-resolve-traversal
     if (!isPathInside(zipPath, ZIP_DIR) || !fs.existsSync(zipPath)) {
       return res.status(404).json({ success: false, message: 'ZIP archive not found or expired' });
     }

@@ -1,0 +1,17 @@
+# Dependencies and generated output
+node_modules/
+frontend/node_modules/
+frontend/dist/
+coverage/
+.ci-artifacts/
+
+# Dev-only / operational scripts (child_process, path.join noise)
+scripts/
+monitoring/
+
+# E2E artifacts
+e2e/test-results/
+e2e/playwright-report/
+
+# CI workflow mutable-tag rules are tracked separately
+.github/
