@@ -41,6 +41,8 @@ const corsOptions = {
   origin: createCorsOriginCallback(),
   credentials: true,
   optionsSuccessStatus: 200,
+  // Required so the browser can read Location on 302 stream/download redirects to Cloudinary.
+  exposedHeaders: ['Location'],
 };
 
 // Middleware
@@ -397,48 +399,76 @@ logStartupPhase('mongo.connecting', {
   serverSelectionTimeoutMS: mongoOptions.serverSelectionTimeoutMS,
 });
 
+function mongoStartupEnvHint(err) {
+  if (String(err?.message || '').toLowerCase().includes('index')) {
+    console.error('Index sync failed. Check model index definitions and your MongoDB provider index feature support.');
+    return;
+  }
+  const envHint = process.env.RENDER
+    ? 'On Render: Environment → set MONGODB_URI, and in Atlas Network Access allow 0.0.0.0/0 (or Render outbound IPs).'
+    : 'Locally: set MONGODB_URI in .env (or your shell). In Atlas → Network Access, add your current public IP or 0.0.0.0/0 for development only.';
+  console.error(envHint);
+}
+
+async function runMongoStartupTasks() {
+  logStartupPhase('mongo.connected');
+  const { initializeEmailService } = require('./utils/emailService');
+  const { ensureCriticalIndexes } = require('./utils/ensureIndexes');
+  logStartupPhase('indexes.syncing');
+  await ensureCriticalIndexes(logger);
+  logStartupPhase('email.initializing');
+  await initializeEmailService();
+  const { refreshSecurityPolicyCache } = require('./services/securityPolicy.service');
+  await refreshSecurityPolicyCache();
+  lifecycle.mongoStartupComplete = true;
+  lifecycle.mongoStartupError = null;
+  logStartupPhase('mongo.startup.complete');
+}
+
+async function connectMongoForStartup() {
+  const isDevManaged = process.env.LMS_DEV_MANAGED === '1';
+  const maxAttempts = isDevManaged ? 12 : 1;
+  const baseDelayMs = 2000;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      await mongoose.connect(MONGODB_URI, mongoOptions);
+      await runMongoStartupTasks();
+      return;
+    } catch (err) {
+      lifecycle.mongoStartupComplete = false;
+      lifecycle.mongoStartupError = err.message || String(err);
+
+      if (mongoose.connection.readyState !== 0) {
+        try {
+          await mongoose.disconnect();
+        } catch {
+          /* ignore */
+        }
+      }
+
+      if (attempt < maxAttempts) {
+        const delayMs = Math.min(baseDelayMs * attempt, 15000);
+        console.error(
+          `❌ MongoDB connection failed (attempt ${attempt}/${maxAttempts}): ${err.message}`
+        );
+        console.error(`   Retrying in ${Math.round(delayMs / 1000)}s…`);
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        continue;
+      }
+
+      console.error('❌ MongoDB startup error:', err.message);
+      mongoStartupEnvHint(err);
+      process.exit(1);
+    }
+  }
+}
+
 // Under Jest the test harness owns the Mongo lifecycle (in-memory server +
 // per-file waitForMongoConnection), so skip the app's own connect to avoid
 // racing against a real .env URI (e.g. a paused Atlas cluster) during tests.
-const mongoStartupPromise = process.env.NODE_ENV === 'test'
-  ? Promise.resolve()
-  : mongoose.connect(MONGODB_URI, mongoOptions)
-  .then(async () => {
-    if (process.env.NODE_ENV === 'test') {
-      return;
-    }
-
-    logStartupPhase('mongo.connected');
-    const { initializeEmailService } = require('./utils/emailService');
-    const { ensureCriticalIndexes } = require('./utils/ensureIndexes');
-    logStartupPhase('indexes.syncing');
-    await ensureCriticalIndexes(logger);
-    logStartupPhase('email.initializing');
-    await initializeEmailService();
-    const { refreshSecurityPolicyCache } = require('./services/securityPolicy.service');
-    await refreshSecurityPolicyCache();
-    lifecycle.mongoStartupComplete = true;
-    lifecycle.mongoStartupError = null;
-    logStartupPhase('mongo.startup.complete');
-  })
-  .catch((err) => {
-    lifecycle.mongoStartupComplete = false;
-    lifecycle.mongoStartupError = err.message || String(err);
-    console.error('❌ MongoDB startup error:', err.message);
-    if (String(err.message || '').toLowerCase().includes('index')) {
-      console.error('Index sync failed. Check model index definitions and your MongoDB provider index feature support.');
-    } else {
-      const envHint = process.env.RENDER
-        ? 'On Render: Environment → set MONGODB_URI, and in Atlas Network Access allow 0.0.0.0/0 (or Render outbound IPs).'
-        : 'Locally: set MONGODB_URI in .env (or your shell). In Atlas → Network Access, add your current public IP or 0.0.0.0/0 for development only.';
-      console.error(envHint);
-    }
-    if (process.env.NODE_ENV === 'test') {
-      return;
-    }
-    process.exit(1); // Exit if cannot connect to database
-    throw err;
-  });
+const mongoStartupPromise =
+  process.env.NODE_ENV === 'test' ? Promise.resolve() : connectMongoForStartup();
 
 // Serve uploads directory for profile pictures and other files
 // IMPORTANT: This must be BEFORE frontend static files and catch-all route

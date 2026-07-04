@@ -275,6 +275,8 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, open, onClose
       ) : kind === 'image' ? (
         effectiveBlobUrl ? (
           <ImagePreview url={effectiveBlobUrl} alt={display.name} />
+        ) : blobError ? (
+          <UnsupportedFileBanner />
         ) : (
           <LoadingInline label="Loading image…" />
         )

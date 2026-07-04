@@ -160,6 +160,11 @@ export async function fetchAuthenticatedFile(
     if (location) {
       return fetchRedirectTarget(location);
     }
+    // Cross-origin CORS may hide Location until the API exposes it; follow redirect like download.
+    return fetch(target, {
+      headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+      redirect: 'follow',
+    });
   }
 
   return res;
