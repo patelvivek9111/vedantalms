@@ -143,16 +143,29 @@ const deleteFromCloudinary = async (publicId, resourceType = 'auto') => {
  * @param {String} url - Cloudinary URL
  * @returns {String|null} Public ID or null
  */
+/**
+ * Cloudinary signed URLs must use a concrete resource type (image/raw/video), not "auto".
+ */
+function inferResourceTypeFromUrl(url, fallback = 'image') {
+  if (!url || typeof url !== 'string') return fallback;
+  if (/\/video\/upload\//.test(url)) return 'video';
+  if (/\/raw\/upload\//.test(url)) return 'raw';
+  if (/\/image\/upload\//.test(url)) return 'image';
+  return fallback;
+}
+
 const extractPublicId = (url) => {
   if (!url || typeof url !== 'string') return null;
+  const clean = url.split('?')[0].split('#')[0];
 
-  const versionMatch = url.match(/\/v\d+\/(.+)\.[a-z0-9]+$/i);
-  if (versionMatch && versionMatch[1]) {
-    return versionMatch[1];
-  }
+  const versionWithExt = clean.match(/\/v\d+\/(.+)\.[a-z0-9]+$/i);
+  if (versionWithExt?.[1]) return versionWithExt[1];
 
-  const pathMatch = url.match(/\/lms\/(.+)/);
-  if (pathMatch && pathMatch[1]) {
+  const versionNoExt = clean.match(/\/v\d+\/(.+)$/i);
+  if (versionNoExt?.[1]) return versionNoExt[1];
+
+  const pathMatch = clean.match(/\/lms\/(.+)$/i);
+  if (pathMatch?.[1]) {
     return `lms/${pathMatch[1].replace(/\.[a-z0-9]+$/i, '')}`;
   }
 
@@ -163,13 +176,17 @@ function getSignedCloudinaryUrl(url, { download = true, resourceType = 'auto' } 
   if (!url || !url.includes('cloudinary.com')) return null;
   const publicId = extractPublicId(url);
   if (!publicId) return null;
+  const resolvedType =
+    resourceType && resourceType !== 'auto'
+      ? resourceType
+      : inferResourceTypeFromUrl(url, 'image');
   return cloudinary.url(publicId, {
-    resource_type: resourceType,
+    resource_type: resolvedType,
     secure: true,
     sign_url: true,
     ...(download ? { flags: 'attachment' } : {}),
   });
-};
+}
 
 /**
  * Check if Cloudinary is configured
@@ -190,6 +207,7 @@ module.exports = {
   deleteFromCloudinary,
   deletePreviewFolder,
   extractPublicId,
+  inferResourceTypeFromUrl,
   getSignedCloudinaryUrl,
   isCloudinaryConfigured,
   cloudinary
