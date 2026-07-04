@@ -717,6 +717,9 @@ const CourseDetail: React.FC = () => {
             courseArchived={course?.operationalStatus === 'archived'}
             handleSaveSyllabus={syllabusManagement.handleSaveSyllabus}
             onRemoveSyllabusFile={syllabusManagement.onRemoveSyllabusFile}
+            onEnterUploadMode={syllabusManagement.enterSyllabusUploadMode}
+            onEnterEditorMode={syllabusManagement.enterSyllabusEditorMode}
+            onDeletePublishedSyllabusFile={syllabusManagement.handleDeletePublishedSyllabusFile}
             onCancelEdit={() => {
               syllabusManagement.setEditingSyllabus(false);
               // Reset to original values

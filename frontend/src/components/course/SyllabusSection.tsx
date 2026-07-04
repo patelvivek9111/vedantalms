@@ -43,6 +43,9 @@ interface SyllabusSectionProps {
   handleSaveSyllabus: () => void;
   onCancelEdit: () => void;
   onRemoveSyllabusFile?: (file: NormalizedFile, index: number) => void;
+  onEnterUploadMode?: () => void;
+  onEnterEditorMode?: () => void;
+  onDeletePublishedSyllabusFile?: (file: NormalizedFile) => void;
 }
 
 const labelClass =
@@ -92,6 +95,9 @@ const SyllabusSection: React.FC<SyllabusSectionProps> = ({
   handleSaveSyllabus,
   onCancelEdit,
   onRemoveSyllabusFile,
+  onEnterUploadMode,
+  onEnterEditorMode,
+  onDeletePublishedSyllabusFile,
 }) => {
   const canEdit = isInstructor || isAdmin;
 
@@ -243,7 +249,7 @@ const SyllabusSection: React.FC<SyllabusSectionProps> = ({
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <button
                     type="button"
-                    onClick={() => setSyllabusMode('upload')}
+                    onClick={() => (onEnterUploadMode ? onEnterUploadMode() : setSyllabusMode('upload'))}
                     className="group flex flex-col items-start gap-3 rounded-2xl border-2 border-dashed border-slate-200 bg-white/80 p-5 text-left shadow-sm transition hover:border-blue-400 hover:bg-blue-50/40 dark:border-slate-600 dark:bg-slate-900/40 dark:hover:border-blue-500 dark:hover:bg-blue-950/20"
                   >
                     <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-100 text-blue-700 transition group-hover:bg-blue-600 group-hover:text-white dark:bg-blue-950/60 dark:text-blue-300 dark:group-hover:bg-blue-600">
@@ -256,7 +262,7 @@ const SyllabusSection: React.FC<SyllabusSectionProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setSyllabusMode('editor')}
+                    onClick={() => (onEnterEditorMode ? onEnterEditorMode() : setSyllabusMode('editor'))}
                     className="group flex flex-col items-start gap-3 rounded-2xl border-2 border-dashed border-slate-200 bg-white/80 p-5 text-left shadow-sm transition hover:border-blue-400 hover:bg-blue-50/40 dark:border-slate-600 dark:bg-slate-900/40 dark:hover:border-blue-500 dark:hover:bg-blue-950/20"
                   >
                     <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-700 transition group-hover:bg-blue-600 group-hover:text-white dark:bg-slate-800 dark:text-slate-300 dark:group-hover:bg-blue-600">
@@ -383,6 +389,12 @@ const SyllabusSection: React.FC<SyllabusSectionProps> = ({
                   url: file.url?.startsWith('http') ? file.url : `${API_URL}${file.url}`,
                   fileAssetId: file.fileAssetId,
                 }))}
+                removable={canEdit && !courseArchived}
+                onRemove={
+                  onDeletePublishedSyllabusFile
+                    ? (file) => onDeletePublishedSyllabusFile(file)
+                    : undefined
+                }
               />
             </section>
           )}

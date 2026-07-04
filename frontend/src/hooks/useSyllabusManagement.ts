@@ -95,9 +95,52 @@ export const useSyllabusManagement = ({
         setSyllabusMode('none');
         setSyllabusContent('');
         setSyllabusAttachmentFiles([]);
+        setRemoveSyllabusAssetIds([]);
       }
     } catch (err: any) {
       alert('Failed to save syllabus');
+    } finally {
+      setSavingSyllabus(false);
+    }
+  };
+
+  const enterSyllabusUploadMode = () => {
+    loadSyllabusFilesFromCourse(course.catalog?.syllabusFiles || []);
+    setRemoveSyllabusAssetIds([]);
+    setSyllabusMode('upload');
+  };
+
+  const enterSyllabusEditorMode = () => {
+    loadSyllabusFilesFromCourse(course.catalog?.syllabusFiles || []);
+    setSyllabusContent(course.catalog?.syllabusContent || '');
+    setRemoveSyllabusAssetIds([]);
+    setSyllabusMode('editor');
+  };
+
+  const handleDeletePublishedSyllabusFile = async (file: NormalizedFile) => {
+    if (!course?._id || !file.fileAssetId) return;
+    if (!window.confirm(`Remove "${file.name}" from the syllabus?`)) return;
+    setSavingSyllabus(true);
+    try {
+      const token = getMemoryAuthToken();
+      const response = await api.put(
+        `/courses/${course._id}`,
+        {
+          catalog: {
+            ...course.catalog,
+            removeSyllabusFileAssetIds: [file.fileAssetId],
+          },
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (response.data.success) {
+        setCourse(response.data.data);
+        if (syllabusMode !== 'none') {
+          loadSyllabusFilesFromCourse(response.data.data.catalog?.syllabusFiles || []);
+        }
+      }
+    } catch {
+      alert('Failed to remove syllabus file');
     } finally {
       setSavingSyllabus(false);
     }
@@ -119,6 +162,9 @@ export const useSyllabusManagement = ({
     handleSyllabusFieldChange,
     handleSaveSyllabusFields,
     handleSaveSyllabus,
+    enterSyllabusUploadMode,
+    enterSyllabusEditorMode,
+    handleDeletePublishedSyllabusFile,
     removeSyllabusAssetIds,
     onRemoveSyllabusFile: (file: NormalizedFile) => {
       if (file.fileAssetId) setRemoveSyllabusAssetIds((prev) => [...prev, file.fileAssetId!]);

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Paperclip, Eye } from 'lucide-react';
+import { Paperclip, Eye, X } from 'lucide-react';
 import {
   normalizeLegacyFiles,
   normalizeAttachmentSources,
@@ -15,6 +15,8 @@ interface FileAttachmentChipsProps {
     fileAssets?: Array<string | Record<string, unknown>>;
   };
   className?: string;
+  removable?: boolean;
+  onRemove?: (file: NormalizedFile, index: number) => void;
 }
 
 function normalizeChipFiles(props: FileAttachmentChipsProps): NormalizedFile[] {
@@ -36,6 +38,8 @@ const FileAttachmentChips: React.FC<FileAttachmentChipsProps> = ({
   files = [],
   attachmentSources,
   className = '',
+  removable = false,
+  onRemove,
 }) => {
   const normalized = normalizeChipFiles({ files, attachmentSources });
   const [preview, setPreview] = useState<NormalizedFile | null>(null);
@@ -71,6 +75,19 @@ const FileAttachmentChips: React.FC<FileAttachmentChipsProps> = ({
               >
                 <Eye className="w-3 h-3" />
               </button>
+              {removable && onRemove && (
+                <button
+                  type="button"
+                  className="text-red-600 dark:text-red-400 hover:opacity-80"
+                  aria-label={`Remove ${f.name}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemove(f, i);
+                  }}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
             </div>
           </li>
         ))}
