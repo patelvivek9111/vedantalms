@@ -137,6 +137,7 @@ Issues found during the follow-up verification pass after the first remediation 
 - [ ] Confirm production env vars are set on live/staging: `CLAMAV_ENABLED`, `MESSAGE_SANITIZER`, `METRICS_TOKEN`, `DISABLE_PUBLIC_REGISTRATION`, `VITE_TINYMCE_API_KEY` (Vercel)
 - [x] Vercel security headers deployed on vedantaed.com
 - [x] `VITE_TINYMCE_API_KEY` on Vercel + local `frontend/.env.local` (gitignored)
+- [x] Post-deploy smoke (`npm run smoke:deploy`) — 4/4 on Render API URL
 - [x] Restrict legacy TinyMCE API key in Tiny Cloud **Approved Domains** (`localhost`, `vedantaed.com`, `www.vedantaed.com`; add frontend deploy host if different)
 
 ## Round 3 Re-Pentest Gaps (2026-07-03)
@@ -188,6 +189,7 @@ Issues found during the fourth verification pass.
 - [x] Run `npm run scan:semgrep` (focused node/ts/react rules; 0 blocking findings)
 - [x] Run `npm run scan:trivy` (lockfiles + Dockerfiles; HIGH/CRITICAL gate)
 - [x] Run `npm run scan:zap` (passive baseline on production; 0 FAIL with `-I`)
+- [x] Run `npm run smoke:deploy` against production (`PRODUCTION_API_URL=https://vedantalms-backend.onrender.com`; health, login, courses, todos — 4/4 pass, 2026-07-04)
 
 ## External Tooling
 
