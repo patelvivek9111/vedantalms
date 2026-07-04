@@ -68,6 +68,7 @@
     "verify:data-integrity": "node scripts/verifyDataIntegrity.js",
     "verify:restore": "node scripts/verifyRestore.js",
     "verify:backup-compatibility": "node scripts/verifyBackupCompatibility.js",
+    "verify:cloudinary": "node scripts/verifyCloudinarySetup.js",
     "migrate:legacy-files": "node scripts/migrations/registerLegacyUploads.js --apply",
     "migrate:legacy-files:dry-run": "node scripts/migrations/registerLegacyUploads.js --dry-run",
     "verify:file-orphans": "node scripts/verifyFileOrphans.js",

@@ -134,7 +134,9 @@ Issues found during the follow-up verification pass after the first remediation 
 
 ### Operational (verify at deploy time)
 
-- [ ] Confirm production env vars are set on live/staging: `CLAMAV_ENABLED`, `MESSAGE_SANITIZER`, `METRICS_TOKEN`, `DISABLE_PUBLIC_REGISTRATION`, `VITE_TINYMCE_API_KEY`
+- [ ] Confirm production env vars are set on live/staging: `CLAMAV_ENABLED`, `MESSAGE_SANITIZER`, `METRICS_TOKEN`, `DISABLE_PUBLIC_REGISTRATION`, `VITE_TINYMCE_API_KEY` (Vercel)
+- [x] Vercel security headers deployed on vedantaed.com
+- [x] `VITE_TINYMCE_API_KEY` on Vercel + local `frontend/.env.local` (gitignored)
 - [x] Restrict legacy TinyMCE API key in Tiny Cloud **Approved Domains** (`localhost`, `vedantaed.com`, `www.vedantaed.com`; add frontend deploy host if different)
 
 ## Round 3 Re-Pentest Gaps (2026-07-03)
