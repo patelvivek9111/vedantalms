@@ -48,6 +48,10 @@ semgrep-security-report.json
 trivy-report.json
 trivy-fs-report.json
 
+# Local OWASP ZAP scan output
+zap-report.html
+zap-report.json
+
 # Coverage directory used by tools like istanbul
 coverage/
 *.lcov

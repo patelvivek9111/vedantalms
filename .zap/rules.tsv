@@ -1,0 +1,6 @@
+10015	IGNORE	(Cache-control on Vercel static assets and redirects)
+10049	IGNORE	(Storable but non-cacheable on 307 redirects to apex/www)
+10050	IGNORE	(CDN edge cache on public HTML; index.html uses no-store)
+10098	IGNORE	(Vercel static ACAO * on public assets; API CORS is app-controlled)
+10109	IGNORE	(Modern SPA — expected for React client)
+90004	IGNORE	(COEP not required for this LMS deployment model)
