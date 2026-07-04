@@ -32,7 +32,12 @@ export function useAuthenticatedFileBlob(
         setBlobUrl(revoked);
       } catch (e) {
         const status = (e as { status?: number })?.status;
-        setError(status ? fileAccessErrorMessage(status) : 'Unable to load file preview.');
+        const message = (e as Error).message;
+        setError(
+          status != null && status > 0
+            ? fileAccessErrorMessage(status)
+            : message || 'Unable to load file preview.'
+        );
       } finally {
         setLoading(false);
       }

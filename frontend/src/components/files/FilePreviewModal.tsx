@@ -283,6 +283,8 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, open, onClose
       ) : kind === 'pdf' ? (
         effectiveBlobUrl ? (
           <PdfPreview url={effectiveBlobUrl} title={display.name} />
+        ) : blobError ? (
+          <UnsupportedFileBanner />
         ) : (
           <LoadingInline label="Loading PDF…" />
         )

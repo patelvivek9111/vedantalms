@@ -149,25 +149,32 @@ export async function fetchAuthenticatedFile(
   }
   const target = resolveSecureFileUrl(path);
   const authToken = getMemoryAuthToken();
-  const res = await fetch(target, {
-    headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
-    redirect: 'manual',
-  });
+  const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
 
-  // Stream/download endpoints may 302 to Cloudinary — fetch signed URL without Authorization.
-  if (res.status >= 300 && res.status < 400) {
-    const location = res.headers.get('Location');
-    if (location) {
-      return fetchRedirectTarget(location);
-    }
-    // Cross-origin CORS may hide Location until the API exposes it; follow redirect like download.
-    return fetch(target, {
-      headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
-      redirect: 'follow',
-    });
+  // Match download: follow API → Cloudinary redirects. manual + cross-origin yields status 0
+  // (opaqueredirect) when Location is hidden, which breaks blob previews inconsistently.
+  const followed = await fetch(target, { headers, redirect: 'follow' });
+  if (followed.ok) {
+    return followed;
   }
 
-  return res;
+  // Fallback for same-origin proxies that expose Location on manual redirect.
+  const manual = await fetch(target, { headers, redirect: 'manual' });
+  const needsRedirectFollow =
+    manual.status === 0 ||
+    manual.type === 'opaqueredirect' ||
+    (manual.status >= 300 && manual.status < 400);
+  if (needsRedirectFollow) {
+    const location = manual.headers.get('Location');
+    if (location) {
+      const redirected = await fetchRedirectTarget(location);
+      if (redirected.ok) return redirected;
+    }
+    const retryFollow = await fetch(target, { headers, redirect: 'follow' });
+    if (retryFollow.ok) return retryFollow;
+  }
+
+  return followed.status ? followed : manual;
 }
 
 export async function fetchAuthenticatedFileBlob(
