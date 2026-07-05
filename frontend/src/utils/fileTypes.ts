@@ -135,7 +135,9 @@ export function mapUploadResponse(file: Record<string, unknown>): NormalizedFile
 }
 
 /** True when the UI label is a placeholder and should be resolved from file metadata. */
-export function needsFileNameHydration(file: NormalizedFile): boolean {
+export function needsFileNameHydration(
+  file: Pick<NormalizedFile, 'name' | 'fileAssetId' | 'mimeType'>
+): boolean {
   if (!file.fileAssetId) return false;
   const n = (file.name || '').trim();
   if (!n || n === 'file' || n === 'attachment') return true;
