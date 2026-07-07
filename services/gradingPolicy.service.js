@@ -12,6 +12,11 @@ const {
 const { DEFAULT_GRADING_POLICY } = require('../shared/grading/policyDefaults.cjs');
 const gradingPolicyAuditService = require('./gradingPolicyAudit.service');
 const { generateResolvedPolicySnapshot } = require('../shared/grading/policySnapshot.cjs');
+const {
+  normalizeApplyMode,
+  structuralPolicyPayload,
+  stripPolicyApplication,
+} = require('../shared/grading/policyApplication.cjs');
 
 /**
  * Load and resolve effective grading policy for a course.
@@ -156,10 +161,50 @@ async function upsertCoursePolicy(courseId, payload, userId) {
   }
   if (payload.groups) doc.groups = payload.groups;
   if (payload.gradeScale) doc.gradeScale = payload.gradeScale;
+
+  const applyMode = normalizeApplyMode(
+    payload.applyMode !== undefined ? payload.applyMode : doc.applyMode
+  );
+  if (structuralPolicyPayload(payload) && applyMode !== 'retroactive_all') {
+    const err = new Error(
+      'Group weight or grade scale changes require retroactive apply mode.'
+    );
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const policyChanging = Boolean(policyPart || payload.groups || payload.gradeScale);
+  if (payload.applyMode !== undefined || policyChanging) {
+    doc.applyMode = applyMode;
+  }
+  if (!doc.applyMode) doc.applyMode = 'retroactive_all';
+
+  if (applyMode === 'from_assignment' && policyChanging) {
+    if (!payload.effectiveAssignmentId) {
+      const err = new Error('effectiveAssignmentId is required for from_assignment apply mode.');
+      err.statusCode = 400;
+      throw err;
+    }
+    doc.effectiveAssignmentId = payload.effectiveAssignmentId;
+    doc.effectiveAt = null;
+    if (oldSnapshot) doc.legacyPolicySnapshot = oldSnapshot.resolvedPolicySnapshot;
+  } else if (applyMode === 'prospective_only' && policyChanging) {
+    doc.effectiveAt = payload.effectiveAt ? new Date(payload.effectiveAt) : new Date();
+    doc.effectiveAssignmentId = null;
+    if (oldSnapshot) doc.legacyPolicySnapshot = oldSnapshot.resolvedPolicySnapshot;
+  }
+
+  if (applyMode === 'retroactive_all') {
+    doc.effectiveAt = null;
+    doc.effectiveAssignmentId = null;
+    doc.legacyPolicySnapshot = null;
+  }
+
   doc.version = (doc.version || 0) + 1;
   doc.updatedBy = userId;
   await doc.save();
   await require('./policyRedisCache.service').invalidateCoursePolicyCache(courseId);
+  await require('./workflowCache.service').invalidateAllStudentCourseGrades(courseId);
   const saved = doc.toObject();
 
   if (course && oldSnapshot) {
@@ -172,10 +217,44 @@ async function upsertCoursePolicy(courseId, payload, userId) {
       oldPolicy: oldSnapshot.resolvedPolicySnapshot,
       newPolicy: newSnapshot.resolvedPolicySnapshot,
       reason: payload.reason,
+      applyMode: doc.applyMode,
+      effectiveAt: doc.effectiveAt,
+      impactSummary: payload.impactSummary || undefined,
     });
   }
 
   return saved;
+}
+
+/**
+ * Courses that would recalculate on next grade view after an institution policy change.
+ */
+async function getInstitutionPolicyImpactSummary() {
+  const Course = require('../models/course.model');
+  const CourseGradeLifecycle = require('../models/courseGradeLifecycle.model');
+
+  const publishedCourses = await Course.find({ published: true }).select('_id').lean();
+  const courseIds = publishedCourses.map((c) => c._id);
+  if (!courseIds.length) {
+    return {
+      totalPublishedCourses: 0,
+      finalizedCourseCount: 0,
+      liveRecalcCourseCount: 0,
+    };
+  }
+
+  const finalizedCourseIds = await CourseGradeLifecycle.find({
+    course: { $in: courseIds },
+    status: { $in: ['FINALIZED', 'AMENDED'] },
+  }).distinct('course');
+  const finalizedSet = new Set(finalizedCourseIds.map(String));
+  const liveRecalcCourseCount = courseIds.filter((id) => !finalizedSet.has(String(id))).length;
+
+  return {
+    totalPublishedCourses: courseIds.length,
+    finalizedCourseCount: finalizedSet.size,
+    liveRecalcCourseCount,
+  };
 }
 
 /**
@@ -222,4 +301,5 @@ module.exports = {
   getCoursePolicyDocument,
   upsertCoursePolicy,
   getEffectivePolicyBreakdown,
+  getInstitutionPolicyImpactSummary,
 };

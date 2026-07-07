@@ -28,6 +28,12 @@ router.put(
   authorize('admin', 'registrar'),
   gradingPolicyController.updateInstitutionGradingPolicy
 );
+router.get(
+  '/institution/impact-summary',
+  protect,
+  authorize('admin', 'registrar'),
+  gradingPolicyController.getInstitutionPolicyImpactSummary
+);
 
 router.get(
   '/course/:courseId',
@@ -43,6 +49,12 @@ router.post(
   '/course/:courseId/preview',
   protect,
   gradingPolicyController.previewCourseGradingPolicy
+);
+router.post(
+  '/course/:courseId/impact-preview',
+  protect,
+  recomputeLimiter,
+  gradingPolicyController.previewCoursePolicyImpact
 );
 router.get(
   '/course/:courseId/effective',

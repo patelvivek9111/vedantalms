@@ -36,6 +36,9 @@ const plannerItemStateSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+plannerItemStateSchema.set('toObject', { flattenMaps: true });
+plannerItemStateSchema.set('toJSON', { flattenMaps: true });
+
 plannerItemStateSchema.index({ user: 1, itemKey: 1 }, { unique: true });
 plannerItemStateSchema.index({ user: 1, status: 1, snoozeUntil: 1 });
 

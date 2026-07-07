@@ -10,6 +10,7 @@ vi.mock('@/services/api', () => ({
 
 vi.mock('@/utils/gradeUtils', () => ({
   calculateFinalGradeWithWeightedGroups: vi.fn(() => 95),
+  calculateProjectedFinalGradeWithWeightedGroups: vi.fn(() => 95),
   getLetterGrade: vi.fn(() => 'A')
 }));
 

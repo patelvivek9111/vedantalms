@@ -20,8 +20,15 @@ import { queryClient } from '../../lib/queryClient';
 import { signalNotificationInvalidation } from '../../hooks/notifications/notificationSync';
 import {
   normalizeSubmissionAttachments,
+  normalizeTeacherFeedbackAttachments,
+  fileAssetIdsFromFiles,
 } from '../../utils/fileTypes';
+import {
+  parseSubmissionAnswers,
+  getAnswerForQuestion,
+} from '../../utils/submissionAnswers';
 import FileAttachmentChips from '../files/FileAttachmentChips';
+import FileAttachmentPanel from '../files/FileAttachmentPanel';
 
 function questionTypeLabel(type) {
   if (type === 'multiple-choice') return 'Multiple choice';
@@ -73,6 +80,7 @@ const AssignmentGrading = () => {
   const [selectedSubmission, setSelectedSubmission] = useState(null);
   const [questionGrades, setQuestionGrades] = useState({});
   const [feedback, setFeedback] = useState('');
+  const [feedbackFiles, setFeedbackFiles] = useState([]);
   const [isGrading, setIsGrading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -90,6 +98,7 @@ const AssignmentGrading = () => {
   const [overallGrade, setOverallGrade] = useState('');
   const feedbackTimeoutRef = useRef(null);
   const lastSavedFeedbackRef = useRef('');
+  const lastSavedFeedbackFilesRef = useRef('');
   const lastSavedGradesRef = useRef({});
   const [swipeProgress, setSwipeProgress] = useState(0); // -1 to 1, negative = left swipe, positive = right swipe
   const [isSwiping, setIsSwiping] = useState(false);
@@ -302,13 +311,17 @@ const AssignmentGrading = () => {
     return text.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
   }, []);
 
-  // Auto-save feedback
-  const autoSaveFeedback = useCallback(async (feedbackText, submissionId) => {
-    if (!submissionId || feedbackText === lastSavedFeedbackRef.current) {
-      return;
-    }
+  // Auto-save feedback and attached files
+  const autoSaveFeedback = useCallback(async (feedbackText, submissionId, files = feedbackFiles) => {
+    if (!submissionId) return;
 
     const sanitizedFeedback = sanitizeFeedback(feedbackText);
+    const fileAssetIds = fileAssetIdsFromFiles(files);
+    const filesKey = fileAssetIds.join(',');
+    const unchanged =
+      feedbackText === lastSavedFeedbackRef.current &&
+      filesKey === lastSavedFeedbackFilesRef.current;
+    if (unchanged) return;
     
     // Always save to offline storage first
     if (id) {
@@ -325,9 +338,11 @@ const AssignmentGrading = () => {
     try {
       await api.put(`/submissions/${submissionId}`, {
           feedback: sanitizedFeedback,
+          teacherFeedbackFileAssetIds: fileAssetIds,
         approveGrade: false
       });
       lastSavedFeedbackRef.current = feedbackText;
+      lastSavedFeedbackFilesRef.current = filesKey;
       setAutoSaveStatus('saved');
       setTimeout(() => setAutoSaveStatus(''), 2000);
     } catch (err) {
@@ -338,15 +353,16 @@ const AssignmentGrading = () => {
     } else {
       // Offline - just mark as saved locally
       lastSavedFeedbackRef.current = feedbackText;
+      lastSavedFeedbackFilesRef.current = filesKey;
       setAutoSaveStatus('saved');
       setTimeout(() => setAutoSaveStatus(''), 2000);
     }
-  }, [sanitizeFeedback, id, isOnline, saveFeedbackOffline]);
+  }, [sanitizeFeedback, id, isOnline, saveFeedbackOffline, feedbackFiles]);
 
   // Debounced auto-save
   const debouncedAutoSave = useMemo(
-    () => debounce((feedbackText, submissionId) => {
-      autoSaveFeedback(feedbackText, submissionId);
+    () => debounce((feedbackText, submissionId, files) => {
+      autoSaveFeedback(feedbackText, submissionId, files);
     }, 2000),
     [debounce, autoSaveFeedback]
   );
@@ -424,6 +440,9 @@ const AssignmentGrading = () => {
         const feedbackText = savedData.feedback ?? selectedSubmission.feedback ?? '';
       setFeedback(feedbackText);
       lastSavedFeedbackRef.current = feedbackText;
+        const initialFeedbackFiles = normalizeTeacherFeedbackAttachments(selectedSubmission);
+        setFeedbackFiles(initialFeedbackFiles);
+        lastSavedFeedbackFilesRef.current = fileAssetIdsFromFiles(initialFeedbackFiles).join(',');
       lastSavedGradesRef.current = { ...initialGrades };
       setHasUnsavedChanges(false);
       };
@@ -441,10 +460,21 @@ const AssignmentGrading = () => {
     if (selectedSubmission?._id) {
       clearTimeout(feedbackTimeoutRef.current);
       feedbackTimeoutRef.current = setTimeout(() => {
-        debouncedAutoSave(newFeedback, selectedSubmission._id);
+        debouncedAutoSave(newFeedback, selectedSubmission._id, feedbackFiles);
       }, 2000);
     }
-  }, [selectedSubmission, debouncedAutoSave]);
+  }, [selectedSubmission, debouncedAutoSave, feedbackFiles]);
+
+  const handleFeedbackFilesChange = useCallback((files) => {
+    setFeedbackFiles(files);
+    setHasUnsavedChanges(true);
+    if (selectedSubmission?._id) {
+      clearTimeout(feedbackTimeoutRef.current);
+      feedbackTimeoutRef.current = setTimeout(() => {
+        debouncedAutoSave(feedback, selectedSubmission._id, files);
+      }, 2000);
+    }
+  }, [selectedSubmission, debouncedAutoSave, feedback]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -646,6 +676,7 @@ const AssignmentGrading = () => {
     try {
       const payload = {
         feedback: sanitizeFeedback(feedback),
+        teacherFeedbackFileAssetIds: fileAssetIdsFromFiles(feedbackFiles),
         approveGrade,
         releaseGrade,
         releaseFeedback: releaseGrade,
@@ -810,6 +841,14 @@ const AssignmentGrading = () => {
       setOverallGrade(resolveSubmissionPointsGrade(response.data));
       lastSavedGradesRef.current = { ...updatedGrades };
       lastSavedFeedbackRef.current = feedback;
+      lastSavedFeedbackFilesRef.current = fileAssetIdsFromFiles(feedbackFiles).join(',');
+      if (response.data.teacherFeedbackClientFiles) {
+        const savedFeedbackFiles = normalizeTeacherFeedbackAttachments(response.data);
+        setFeedbackFiles(savedFeedbackFiles);
+        setSelectedSubmission((prev) =>
+          prev ? { ...prev, teacherFeedbackClientFiles: response.data.teacherFeedbackClientFiles } : prev
+        );
+      }
       setHasUnsavedChanges(false);
       
       // Check notification status from server response
@@ -1196,16 +1235,15 @@ const AssignmentGrading = () => {
     return isNaN(points) || points < 0 ? 0 : points;
   };
 
+  const parsedAnswers = useMemo(
+    () => parseSubmissionAnswers(selectedSubmission?.answers, assignment?.questions),
+    [selectedSubmission?.answers, assignment?.questions]
+  );
+
   const getStudentAnswer = (questionIndex) => {
-    if (!selectedSubmission?.answers) return '';
-    
-    let answer = '';
-    if (selectedSubmission.answers instanceof Map) {
-      answer = selectedSubmission.answers.get(questionIndex.toString()) || '';
-    } else if (typeof selectedSubmission.answers === 'object') {
-      answer = selectedSubmission.answers[questionIndex.toString()] || '';
-    }
-    
+    const answer = getAnswerForQuestion(parsedAnswers, questionIndex);
+    if (answer === undefined || answer === null || answer === '') return '';
+
     const questionType = getQuestionType(questionIndex);
     if (questionType === 'matching' && typeof answer === 'string') {
       try {
@@ -1214,7 +1252,7 @@ const AssignmentGrading = () => {
         return {};
       }
     }
-    
+
     return answer;
   };
 
@@ -1904,6 +1942,23 @@ const AssignmentGrading = () => {
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                       Auto-saves after 2 seconds
                     </p>
+                    <div className="mt-4">
+                      <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Feedback files
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                        Attach annotated documents, rubrics, or other feedback files for the student.
+                      </p>
+                      <FileAttachmentPanel
+                        files={feedbackFiles}
+                        onChange={handleFeedbackFilesChange}
+                        courseId={course?._id}
+                        assignmentId={id}
+                        category="feedback"
+                        label="Upload feedback files"
+                        multiple
+                      />
+                    </div>
                 </div>
 
                 {/* Action Buttons — shared button system: one solid primary, outlined

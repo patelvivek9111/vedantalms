@@ -79,6 +79,9 @@ const notificationSchema = new mongoose.Schema({
   timestamps: true
 });
 
+notificationSchema.set('toObject', { flattenMaps: true });
+notificationSchema.set('toJSON', { flattenMaps: true });
+
 // Index for efficient queries
 notificationSchema.index({ user: 1, read: 1, createdAt: -1 });
 notificationSchema.index({ user: 1, type: 1, createdAt: -1 });

@@ -54,6 +54,12 @@ jobs:
       - name: Grading policy tests (backend)
         run: npm run test:grading
 
+      - name: Submission Map serialization regression tests
+        run: npm run test:serialization
+
+      - name: Pre-rollout feature integration tests
+        run: npm run test:pre-rollout
+
       - name: Grading policy tests (frontend)
         run: npm run test:grading
         working-directory: frontend

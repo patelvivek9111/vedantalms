@@ -1,8 +1,20 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StudentGradeSidebar from '../common/StudentGradeSidebar';
-import { computeAssignmentGroupPercent } from '../../utils/gradebookCompute';
-import { isExcusedGrade, EXCUSED_GRADE } from '../../utils/gradeUtils';
+import { computeAssignmentGroupStats, normalizeResolvedPolicyForCourse } from '../../utils/gradebookCompute';
+import {
+  buildStudentVisibleGradesMap,
+  discussionHasSubmissionForStudent,
+  resolveStudentDiscussionEarnedScore,
+  resolveStudentDiscussionFeedback,
+  resolveStudentDiscussionSubmittedAt,
+} from '../../utils/discussionGradeDisplay';
+import { normalizeMongoIdRef } from '../../utils/mongoId';
+import {
+  GradeStatusBadge,
+  resolveStudentGradeRowDisplay,
+  type StudentGradeRowDisplay,
+} from './GradeStatusBadge';
 
 interface StudentGradesViewProps {
   course: any;
@@ -17,8 +29,11 @@ interface StudentGradesViewProps {
   studentSubmissions: any[];
   studentTotalGrade: number | null;
   studentLetterGrade: string | null;
-  /** After the course total API finishes (success or failure); avoids showing a client-only total that disagrees with the server. */
+  studentFinalGrade?: number | null;
+  studentFinalLetterGrade?: string | null;
   studentGradeSummaryReady: boolean;
+  resolvedGradingPolicy?: import('../../utils/gradeUtils').ResolvedGradingPolicy | null;
+  gradingPolicyLoading?: boolean;
 }
 
 function normalizeAssignmentCategoryName(v: unknown): string {
@@ -32,83 +47,93 @@ function getStudentGradeItemPath(courseId: string, assignment: any): string {
   return `/assignments/${assignment._id}/view`;
 }
 
-/** Per-group display stats; % uses shared grading (same contract as course total for that category). */
-function aggregateAssignmentGroupStats(
-  groupAssignments: any[],
+function assignmentMaxPoints(assignment: any): number {
+  return (
+    assignment.questions?.reduce((sum: number, q: any) => sum + (q.points || 0), 0) ||
+    assignment.totalPoints ||
+    0
+  );
+}
+
+function formatDueDate(dueDate: unknown): string {
+  if (!dueDate) return '-';
+  return new Date(dueDate as string | Date).toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+type StudentAssignmentRowModel = {
+  assignment: any;
+  rowDisplay: StudentGradeRowDisplay;
+  maxPoints: number;
+  assignmentFeedback: string;
+  hasSubmission: boolean;
+};
+
+function buildStudentAssignmentRowModel(
+  assignment: any,
   studentId: string,
-  course: any,
-  groupName: string,
-  gradebookData: StudentGradesViewProps['gradebookData'],
-  submissionMap: { [key: string]: string },
-  studentSubmissions: any[] = []
-) {
-  let totalEarned = 0;
-  let totalPossible = 0;
-  let gradedAssignments = 0;
+  gradebookGrades: StudentGradesViewProps['gradebookData']['grades'],
+  submissionMap: StudentGradesViewProps['submissionMap'],
+  studentSubmissions: any[],
+  missingAssignmentMode?: 'count_as_zero' | 'exclude_until_graded'
+): StudentAssignmentRowModel {
+  const sid = String(studentId);
+  const submissionKey = `${sid}_${String(assignment._id)}`;
+  const submission = studentSubmissions.find(
+    (s) => s.assignment && normalizeMongoIdRef(s.assignment._id) === normalizeMongoIdRef(assignment._id)
+  );
 
-  for (const assignment of groupAssignments) {
-    const maxPoints =
-      assignment.questions?.reduce((sum: number, q: any) => sum + (q.points || 0), 0) ||
-      assignment.totalPoints ||
-      0;
-    let grade = assignment.isDiscussion
-      ? assignment.grade
-      : gradebookData.grades[String(studentId)]?.[String(assignment._id)];
+  const initialGrade = assignment.isDiscussion
+    ? resolveStudentDiscussionEarnedScore(assignment, sid)
+    : gradebookGrades[sid]?.[String(assignment._id)];
 
-    if (assignment.isDiscussion && (grade === null || grade === undefined)) {
-      const studentGradeObj = assignment.studentGrades?.find(
-        (g: any) => g.student && (g.student._id === String(studentId) || g.student === String(studentId))
-      );
-      if (studentGradeObj && typeof studentGradeObj.grade === 'number') {
-        grade = studentGradeObj.grade;
-      }
-    }
+  const hasSubmission = assignment.isDiscussion
+    ? discussionHasSubmissionForStudent(assignment, sid)
+    : Boolean(submissionMap[submissionKey]);
 
-    if (isExcusedGrade(grade) || grade === EXCUSED_GRADE) {
-      continue;
-    }
-    if (!assignment.isDiscussion && assignment.published === false) {
-      continue;
-    }
+  const rowDisplay = resolveStudentGradeRowDisplay({
+    assignment,
+    submission,
+    grade: initialGrade,
+    studentId: sid,
+    hasSubmission,
+    submittedAt: assignment.isDiscussion
+      ? resolveStudentDiscussionSubmittedAt(assignment, sid)
+      : submission?.submittedAt
+        ? new Date(submission.submittedAt)
+        : undefined,
+    missingAssignmentMode,
+  });
 
-    if (typeof grade === 'number') {
-      totalEarned += grade;
-      totalPossible += maxPoints;
-      gradedAssignments++;
-    } else {
-      const dueDate = assignment.dueDate ? new Date(assignment.dueDate) : null;
-      const now = new Date();
-      const submissionKey = `${String(studentId)}_${String(assignment._id)}`;
-      const hasSubmission = assignment.isDiscussion
-        ? assignment.hasSubmitted ||
-          (Array.isArray(assignment.replies) &&
-            assignment.replies.some(
-              (r: any) => r.author && (r.author._id === String(studentId) || r.author === String(studentId))
-            ))
-        : !!submissionMap[submissionKey];
+  const assignmentFeedback = assignment.isDiscussion
+    ? resolveStudentDiscussionFeedback(assignment, sid)
+    : typeof submission?.feedback === 'string'
+      ? submission.feedback.trim()
+      : '';
 
-      if (dueDate && now > dueDate && !hasSubmission) {
-        totalEarned += 0;
-        totalPossible += maxPoints;
-        gradedAssignments++;
-      }
-    }
+  return {
+    assignment,
+    rowDisplay,
+    maxPoints: assignmentMaxPoints(assignment),
+    assignmentFeedback,
+    hasSubmission,
+  };
+}
+
+function renderScoreDisplay(rowDisplay: StudentGradeRowDisplay, maxPoints: number): React.ReactNode {
+  if (rowDisplay.scoreHidden) {
+    return <span className="font-semibold text-gray-900 dark:text-gray-100">{rowDisplay.scoreCell}</span>;
   }
-
-  const percentage =
-    groupAssignments.length > 0
-      ? computeAssignmentGroupPercent(
-          studentId,
-          groupName,
-          groupAssignments,
-          course,
-          gradebookData.grades,
-          submissionMap,
-          studentSubmissions
-        )
-      : 0;
-
-  return { totalEarned, totalPossible, gradedAssignments, percentage };
+  return (
+    <>
+      <span className="font-semibold text-gray-900 dark:text-gray-100">{rowDisplay.scoreCell}</span>
+      <span className="text-gray-500 dark:text-gray-400"> / {maxPoints}</span>
+    </>
+  );
 }
 
 const StudentGradesView: React.FC<StudentGradesViewProps> = ({
@@ -122,50 +147,106 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
   studentSubmissions,
   studentTotalGrade,
   studentLetterGrade,
+  studentFinalGrade,
+  studentFinalLetterGrade,
   studentGradeSummaryReady,
+  resolvedGradingPolicy = null,
+  gradingPolicyLoading = false,
 }) => {
   const navigate = useNavigate();
 
-  if (!user) {
-    return <div className="text-center py-8 text-gray-500">User not found.</div>;
+  if (!user?._id) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        {!user ? 'User not found.' : 'User ID not found.'}
+      </div>
+    );
   }
 
-  // Construct the same assignment list structure as teacher gradebook for consistency
-  const studentModuleAssignments = modules.flatMap((module: any) =>
-    (module.assignments || []).map((assignment: any) => {
-      // Normalize dueDate for all assignment types (future-proof)
-      let dueDateRaw = assignment.dueDate || assignment.due_date || assignment.discussionDueDate || null;
-      let dueDate = dueDateRaw ? new Date(dueDateRaw) : null;
-      return {
-        ...assignment,
-        moduleTitle: module.title,
-        isDiscussion: false,
-        dueDate,
-      };
-    })
+  const studentId = String(user._id);
+
+  const studentAssignments = useMemo(() => {
+    const moduleAssignments = modules.flatMap((module: any) =>
+      (module.assignments || []).map((assignment: any) => {
+        const dueDateRaw =
+          assignment.dueDate || assignment.due_date || assignment.discussionDueDate || null;
+        return {
+          ...assignment,
+          moduleTitle: module.title,
+          isDiscussion: false,
+          dueDate: dueDateRaw ? new Date(dueDateRaw) : null,
+        };
+      })
+    );
+
+    const groupAssignments = studentGroupAssignments.map((assignment: any) => ({
+      ...assignment,
+      moduleTitle: 'Group Assignments',
+      isDiscussion: false,
+    }));
+
+    const gradedDiscussions = studentDiscussions.map((discussion: any) => ({
+      _id: discussion._id,
+      title: discussion.title,
+      totalPoints: discussion.totalPoints,
+      group: discussion.group,
+      moduleTitle: 'Discussions',
+      isDiscussion: true,
+      grade: discussion.grade ?? null,
+      feedback: discussion.feedback ?? null,
+      gradeVisibility: discussion.gradeVisibility,
+      discussionReleaseMode: discussion.discussionReleaseMode,
+      gradesReleasedAt: discussion.gradesReleasedAt,
+      gradeHidden: discussion.gradeHidden,
+      studentGrades: discussion.studentGrades || [],
+      dueDate: discussion.dueDate || null,
+      hasSubmitted: discussion.hasSubmitted || discussion.hasPosted || false,
+      hasPosted: discussion.hasPosted || discussion.hasSubmitted || false,
+      studentReplyCreatedAt: discussion.studentReplyCreatedAt ?? null,
+      replies: discussion.replies || [],
+      published: discussion.published !== false,
+    }));
+
+    return [...moduleAssignments, ...groupAssignments, ...gradedDiscussions];
+  }, [modules, studentGroupAssignments, studentDiscussions]);
+
+  const effectiveGradingPolicy = useMemo(
+    () => normalizeResolvedPolicyForCourse(course, resolvedGradingPolicy, studentAssignments),
+    [course, resolvedGradingPolicy, studentAssignments]
   );
 
-  const studentGroupAssignmentsList = studentGroupAssignments.map((assignment: any) => ({
-    ...assignment,
-    moduleTitle: 'Group Assignments',
-    isDiscussion: false
-  }));
+  const missingAssignmentMode =
+    effectiveGradingPolicy?.missingAssignment?.mode ?? 'count_as_zero';
 
-  const studentGradedDiscussions = studentDiscussions.map((discussion: any) => ({
-    _id: discussion._id,
-    title: discussion.title,
-    totalPoints: discussion.totalPoints,
-    group: discussion.group,
-    moduleTitle: 'Discussions',
-    isDiscussion: true,
-    studentGrades: discussion.studentGrades || [],
-    dueDate: discussion.dueDate || null,
-    hasSubmitted: discussion.hasSubmitted || false,
-    replies: discussion.replies || []
-  }));
+  const gradingPolicyReady = !gradingPolicyLoading && Boolean(effectiveGradingPolicy);
 
-  // Use the same structure as teacher gradebook
-  const studentAssignments = [...studentModuleAssignments, ...studentGroupAssignmentsList, ...studentGradedDiscussions];
+  const studentVisibleGrades = useMemo(
+    () => buildStudentVisibleGradesMap(studentId, studentAssignments, gradebookData.grades),
+    [studentId, studentAssignments, gradebookData.grades]
+  );
+
+  const assignmentRows = useMemo(
+    () =>
+      studentAssignments.map((assignment) =>
+        buildStudentAssignmentRowModel(
+          assignment,
+          studentId,
+          studentVisibleGrades,
+          submissionMap,
+          studentSubmissions,
+          gradingPolicyReady ? missingAssignmentMode : undefined
+        )
+      ),
+    [
+      studentAssignments,
+      studentId,
+      studentVisibleGrades,
+      submissionMap,
+      studentSubmissions,
+      gradingPolicyReady,
+      missingAssignmentMode,
+    ]
+  );
 
   const courseGroupsList = course.groups || [];
   const courseGroupNameSet = new Set(
@@ -207,15 +288,13 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
         ]
       : []),
   ];
-  
-  const studentId = user?._id;
-  if (!studentId) {
-    return <div className="text-center py-8 text-gray-500">User ID not found.</div>;
-  }
+
+  const openAssignment = (assignment: any) => {
+    navigate(getStudentGradeItemPath(course._id, assignment));
+  };
 
   return (
     <div className="flex flex-col md:flex-row gap-4">
-      {/* Main Content */}
       <div className="flex-1">
         <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-4 border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between mb-4">
@@ -227,424 +306,329 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
               </p>
             </div>
           </div>
-          {/* Show calculated grade using backend API result */}
-          {/* Mobile Card View */}
+
+          {/* Mobile */}
           <div className="md:hidden space-y-3">
-            {studentAssignments.map((assignment: any, idx: number) => {
-              const submissionKey = `${String(studentId)}_${String(assignment._id)}`;
-              let hasSubmission = assignment.isDiscussion 
-                ? assignment.hasSubmitted || (Array.isArray(assignment.replies) && assignment.replies.some((r: any) => r.author && (r.author._id === String(studentId) || r.author === String(studentId))))
-                : !!submissionMap[submissionKey];
-              
-              let grade = assignment.isDiscussion
-                ? assignment.grade
-                : gradebookData.grades[String(studentId)]?.[String(assignment._id)];
-              const maxPoints = assignment.questions?.reduce((sum: number, q: any) => sum + (q.points || 0), 0) || assignment.totalPoints || 0;
-              const submission = studentSubmissions.find(s => s.assignment && s.assignment._id === assignment._id);
-              const feedback = typeof submission?.feedback === 'string' ? submission.feedback : '';
-              const dueDate = assignment.dueDate ? new Date(assignment.dueDate) : null;
-              const now = new Date();
-              const discussionGradeHidden = assignment.isDiscussion && assignment.gradeVisibility?.scoreVisible === false;
-              let statusCell: React.ReactNode = null;
-              let scoreCell: string | number = typeof grade === 'number' ? 
-                (Number.isInteger(grade) ? grade.toString() : Number(grade).toFixed(2)) : '-';
-              let submittedAt: Date | null = null;
-              
-              if (assignment.isDiscussion) {
-                if (grade === null || grade === undefined) {
-                  if (Array.isArray(assignment.studentGrades)) {
-                    const studentGradeObj = assignment.studentGrades.find((g: any) => g.student && (g.student._id === String(studentId) || g.student === String(studentId)));
-                    if (studentGradeObj && typeof studentGradeObj.grade === 'number') {
-                      grade = studentGradeObj.grade;
-                      scoreCell = Number.isInteger(grade) ? grade.toString() : Number(grade).toFixed(2);
-                      submittedAt = studentGradeObj.gradedAt ? new Date(studentGradeObj.gradedAt) : null;
-                      hasSubmission = true;
-                    }
+            {assignmentRows.map(({ assignment, rowDisplay, maxPoints, assignmentFeedback }, idx) => (
+              <div
+                key={`student-assignment-mobile-${assignment._id}-${idx}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => openAssignment(assignment)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    openAssignment(assignment);
                   }
-                }
-                if (!hasSubmission && Array.isArray(assignment.replies)) {
-                  const reply = assignment.replies.find((r: any) => r.author && (r.author._id === studentId || r.author === studentId));
-                  if (reply && reply.createdAt) {
-                    submittedAt = new Date(reply.createdAt);
-                    hasSubmission = true;
-                  }
-                }
-                if (hasSubmission) {
-                  if (dueDate && submittedAt && submittedAt > dueDate) {
-                    statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">Late</span>;
-                  } else {
-                    statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Submitted</span>;
-                  }
-                  if (discussionGradeHidden) {
-                    scoreCell = 'Hidden';
-                  }
-                } else if (dueDate && now > dueDate) {
-                  statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">Missing</span>;
-                  scoreCell = '0';
-                }
-              } else {
-                if (!assignment.published) {
-                  statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">Not Published</span>;
-                  scoreCell = '-';
-                } else if (hasSubmission) {
-                  if (submission && submission.submittedAt && dueDate && new Date(submission.submittedAt) > dueDate) {
-                    statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">Late</span>;
-                  } else {
-                    statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Submitted</span>;
-                  }
-                } else if (assignment.isOfflineAssignment) {
-                  statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">Offline</span>;
-                  scoreCell = '-';
-                } else if (dueDate && now > dueDate) {
-                  statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">Missing</span>;
-                  scoreCell = '0';
-                }
-              }
-              let feedbackForDiscussion = '';
-              if (assignment.isDiscussion && Array.isArray(assignment.studentGrades)) {
-                const studentGradeObj = assignment.studentGrades.find((g: any) => g.student && (g.student._id === studentId || g.student === studentId));
-                if (studentGradeObj && typeof studentGradeObj.feedback === 'string' && studentGradeObj.feedback.trim() !== '') {
-                  feedbackForDiscussion = studentGradeObj.feedback;
-                }
-              }
-              
-              return (
-                <div
-                  key={`student-assignment-mobile-${assignment._id}-${idx}`}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => navigate(getStudentGradeItemPath(course._id, assignment))}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      navigate(getStudentGradeItemPath(course._id, assignment));
-                    }
-                  }}
-                  className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 cursor-pointer transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 dark:active:bg-gray-600"
-                  aria-label={`Open ${assignment.title}`}
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-base mb-1">{assignment.title}</h3>
-                      {assignment.group && (
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">{assignment.group}</div>
-                      )}
-                    </div>
-                    {statusCell}
+                }}
+                className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 cursor-pointer transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 dark:active:bg-gray-600"
+                aria-label={`Open ${assignment.title}`}
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-base mb-1">
+                      {assignment.title}
+                    </h3>
+                    {assignment.group ? (
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">{assignment.group}</div>
+                    ) : null}
                   </div>
-                  <div className="grid grid-cols-2 gap-3 mt-3">
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Due Date</div>
-                      <div className="text-sm text-gray-900 dark:text-gray-100">
-                        {assignment.dueDate ? new Date(assignment.dueDate).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Score</div>
-                      <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                        {scoreCell} / {maxPoints}
-                      </div>
-                    </div>
-                  </div>
-                  {(feedbackForDiscussion || (hasSubmission && typeof feedback === 'string' && feedback.trim() !== '')) && (
-                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                      <button
-                        type="button"
-                        className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 transition-colors duration-150 text-sm font-medium flex items-center"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(getStudentGradeItemPath(course._id, assignment));
-                        }}
-                      >
-                        <span className="mr-2">💬</span>
-                        View Feedback
-                      </button>
-                    </div>
-                  )}
+                  {rowDisplay.showStatusBadge ? <GradeStatusBadge status={rowDisplay.status} /> : null}
                 </div>
-              );
-            })}
+                <div className="grid grid-cols-2 gap-3 mt-3">
+                  <div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Due Date</div>
+                    <div className="text-sm text-gray-900 dark:text-gray-100">
+                      {formatDueDate(assignment.dueDate)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Score</div>
+                    <div className="text-sm">{renderScoreDisplay(rowDisplay, maxPoints)}</div>
+                  </div>
+                </div>
+                {assignmentFeedback ? (
+                  <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                    <button
+                      type="button"
+                      className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 transition-colors duration-150 text-sm font-medium flex items-center"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openAssignment(assignment);
+                      }}
+                    >
+                      <span className="mr-2">💬</span>
+                      View Feedback
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            ))}
           </div>
-          
-          {/* Desktop Table View */}
+
+          {/* Desktop */}
           <div className="hidden md:block overflow-x-auto">
             <table className="min-w-full">
               <thead>
                 <tr className="border-b border-gray-200 dark:border-gray-700">
-                  <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Name</th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Due</th>
-                  <th className="px-4 py-2 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                  <th className="px-4 py-2 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Score</th>
-                  <th className="px-4 py-2 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Out of</th>
-                  <th className="px-4 py-2 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider"></th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                    Name
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                    Due
+                  </th>
+                  <th className="px-4 py-2 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-4 py-2 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                    Score
+                  </th>
+                  <th className="px-4 py-2 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                    Out of
+                  </th>
+                  <th className="px-4 py-2 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {studentAssignments.map((assignment: any, idx: number) => {
-                  const submissionKey = `${String(studentId)}_${String(assignment._id)}`;
-                  let hasSubmission = assignment.isDiscussion 
-                    ? assignment.hasSubmitted || (Array.isArray(assignment.replies) && assignment.replies.some((r: any) => r.author && (r.author._id === String(studentId) || r.author === String(studentId))))
-                    : !!submissionMap[submissionKey];
-                  
-                  let grade = assignment.isDiscussion
-                    ? assignment.grade
-                    : gradebookData.grades[String(studentId)]?.[String(assignment._id)];
-                  const maxPoints = assignment.questions?.reduce((sum: number, q: any) => sum + (q.points || 0), 0) || assignment.totalPoints || 0;
-                  const submission = studentSubmissions.find(s => s.assignment && s.assignment._id === assignment._id);
-                  const feedback = typeof submission?.feedback === 'string' ? submission.feedback : '';
-                  const dueDate = assignment.dueDate ? new Date(assignment.dueDate) : null;
-                  const now = new Date();
-                  const discussionGradeHidden = assignment.isDiscussion && assignment.gradeVisibility?.scoreVisible === false;
-                  let statusCell: React.ReactNode = null;
-                  let scoreCell: string | number = typeof grade === 'number' ? 
-                    (Number.isInteger(grade) ? grade.toString() : Number(grade).toFixed(2)) : '-';
-                  let submittedAt: Date | null = null;
-                  
-                  if (assignment.isDiscussion) {
-                    if (grade === null || grade === undefined) {
-                      if (Array.isArray(assignment.studentGrades)) {
-                        const studentGradeObj = assignment.studentGrades.find((g: any) => g.student && (g.student._id === String(studentId) || g.student === String(studentId)));
-                        if (studentGradeObj && typeof studentGradeObj.grade === 'number') {
-                          grade = studentGradeObj.grade;
-                          scoreCell = Number.isInteger(grade) ? grade.toString() : Number(grade).toFixed(2);
-                          submittedAt = studentGradeObj.gradedAt ? new Date(studentGradeObj.gradedAt) : null;
-                          hasSubmission = true;
-                        }
-                      }
-                    }
-                    if (!hasSubmission && Array.isArray(assignment.replies)) {
-                      const reply = assignment.replies.find((r: any) => r.author && (r.author._id === studentId || r.author === studentId));
-                      if (reply && reply.createdAt) {
-                        submittedAt = new Date(reply.createdAt);
-                        hasSubmission = true;
-                      }
-                    }
-                    if (hasSubmission) {
-                      if (dueDate && submittedAt && submittedAt > dueDate) {
-                        statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">Late</span>;
-                      } else {
-                        statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Submitted</span>;
-                      }
-                      if (discussionGradeHidden) {
-                        scoreCell = 'Hidden';
-                      }
-                    } else if (dueDate && now > dueDate) {
-                      statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">Missing</span>;
-                      scoreCell = '0';
-                    }
-                  } else {
-                    if (!assignment.published) {
-                      statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">Not Published</span>;
-                      scoreCell = '-';
-                    } else if (hasSubmission) {
-                      if (submission && submission.submittedAt && dueDate && new Date(submission.submittedAt) > dueDate) {
-                        statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">Late</span>;
-                      } else {
-                        statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Submitted</span>;
-                      }
-                    } else if (assignment.isOfflineAssignment) {
-                      statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">Offline</span>;
-                      scoreCell = '-';
-                    } else if (dueDate && now > dueDate) {
-                      statusCell = <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">Missing</span>;
-                      scoreCell = '0';
-                    }
-                  }
-                  let feedbackForDiscussion = '';
-                  if (assignment.isDiscussion && Array.isArray(assignment.studentGrades)) {
-                    const studentGradeObj = assignment.studentGrades.find((g: any) => g.student && (g.student._id === studentId || g.student === studentId));
-                    if (studentGradeObj && typeof studentGradeObj.feedback === 'string' && studentGradeObj.feedback.trim() !== '') {
-                      feedbackForDiscussion = studentGradeObj.feedback;
-                    }
-                  }
-                  return (
-                    <tr
-                      key={`student-assignment-${assignment._id}-${idx}`}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-150 cursor-pointer"
-                      onClick={() => navigate(getStudentGradeItemPath(course._id, assignment))}
-                    >
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-gray-900 dark:text-gray-100">{assignment.title}</div>
-                        {assignment.group && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{assignment.group}</div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400">
-                        {assignment.dueDate ? new Date(assignment.dueDate).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
-                      </td>
-                      <td className="px-4 py-3 text-center">{statusCell}</td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="font-semibold text-gray-900 dark:text-gray-100">{scoreCell}</span>
-                      </td>
-                      <td className="px-4 py-3 text-center text-xs text-gray-600 dark:text-gray-400">{maxPoints}</td>
-                      <td className="px-4 py-3 text-center">
-                        {assignment.isDiscussion ? (
-                          feedbackForDiscussion && (
-                            <button
-                              type="button"
-                              className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 transition-colors duration-150"
-                              title="View feedback"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(getStudentGradeItemPath(course._id, assignment));
-                              }}
-                            >
-                              <span role="img" aria-label="Comment" className="text-sm">💬</span>
-                            </button>
-                          )
-                        ) : (
-                          hasSubmission && typeof feedback === 'string' && feedback.trim() !== '' && (
-                            <button
-                              type="button"
-                              className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 transition-colors duration-150"
-                              title="View feedback"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(getStudentGradeItemPath(course._id, assignment));
-                              }}
-                            >
-                              <span role="img" aria-label="Comment" className="text-sm">💬</span>
-                            </button>
-                          )
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {assignmentRows.map(({ assignment, rowDisplay, maxPoints, assignmentFeedback }, idx) => (
+                  <tr
+                    key={`student-assignment-${assignment._id}-${idx}`}
+                    className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-150 cursor-pointer"
+                    onClick={() => openAssignment(assignment)}
+                  >
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-gray-900 dark:text-gray-100">{assignment.title}</div>
+                      {assignment.group ? (
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{assignment.group}</div>
+                      ) : null}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400">
+                      {formatDueDate(assignment.dueDate)}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {rowDisplay.showStatusBadge ? (
+                        <GradeStatusBadge status={rowDisplay.status} />
+                      ) : null}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="font-semibold text-gray-900 dark:text-gray-100">
+                        {rowDisplay.scoreCell}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center text-xs text-gray-600 dark:text-gray-400">
+                      {maxPoints}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {assignmentFeedback ? (
+                        <button
+                          type="button"
+                          className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 transition-colors duration-150"
+                          title="View feedback"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openAssignment(assignment);
+                          }}
+                        >
+                          <span role="img" aria-label="Comment" className="text-sm">
+                            💬
+                          </span>
+                        </button>
+                      ) : null}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         </div>
-        
-        {/* Assignment Group Performance Summary - Separate Card */}
-        {assignmentGroupSummaryRows.length > 0 && (
+
+        {assignmentGroupSummaryRows.length > 0 ? (
           <div className="mt-6">
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
               <div className="flex items-center space-x-3 mb-4">
                 <div className="bg-blue-100 dark:bg-blue-900 rounded-lg p-2">
-                  <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  <svg
+                    className="w-5 h-5 text-blue-600 dark:text-blue-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                    />
                   </svg>
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Performance by Assignment Group</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Your scores broken down by weighted categories</p>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    Performance by Assignment Group
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Your scores broken down by weighted categories. Categories marked — are not in your total yet
+                    (submitted work awaiting grades, or nothing graded in that group); their weight is redistributed.
+                  </p>
                 </div>
               </div>
-              
-              {/* Mobile Card View */}
+
+              {!gradingPolicyLoading && !effectiveGradingPolicy ? (
+                <div className="py-6 text-center text-sm text-amber-700 dark:text-amber-300">
+                  Could not load grading policy. Refresh the page or contact your instructor.
+                </div>
+              ) : !gradingPolicyReady ? (
+                <div className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                  Loading category totals…
+                </div>
+              ) : (
+                <>
               <div className="md:hidden space-y-3">
                 {assignmentGroupSummaryRows.map((row) => {
-                  const { totalEarned, totalPossible, gradedAssignments, percentage } =
-                    aggregateAssignmentGroupStats(
-                      row.assignments,
-                      studentId,
-                      course,
-                      row.displayName,
-                      gradebookData,
-                      submissionMap,
-                      studentSubmissions
-                    );
-                  const groupAssignments = row.assignments;
+                  const groupStats = computeAssignmentGroupStats(
+                    studentId,
+                    row.displayName,
+                    row.assignments,
+                    course,
+                    studentVisibleGrades,
+                    submissionMap,
+                    studentSubmissions,
+                    effectiveGradingPolicy
+                  );
+                  const { totalEarned, totalPossible, includedCount, totalInGroup, contributesToGrade, percentage } =
+                    groupStats;
                   const percentageColor =
-                    percentage >= 90
-                      ? 'text-green-600 dark:text-green-400'
-                      : percentage >= 80
-                        ? 'text-blue-600 dark:text-blue-400'
-                        : percentage >= 70
-                          ? 'text-yellow-600 dark:text-yellow-400'
-                          : 'text-red-600 dark:text-red-400';
+                    percentage == null
+                      ? 'text-gray-500 dark:text-gray-400'
+                      : percentage >= 90
+                        ? 'text-green-600 dark:text-green-400'
+                        : percentage >= 80
+                          ? 'text-blue-600 dark:text-blue-400'
+                          : percentage >= 70
+                            ? 'text-yellow-600 dark:text-yellow-400'
+                            : 'text-red-600 dark:text-red-400';
 
                   return (
-                    <div key={row.key} className="bg-white dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                    <div
+                      key={row.key}
+                      className="bg-white dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700"
+                    >
                       <div className="font-semibold text-gray-900 dark:text-gray-100 mb-3">{row.displayName}</div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Assignments</div>
-                          <div className="text-sm text-gray-900 dark:text-gray-100">{gradedAssignments}/{groupAssignments.length}</div>
+                          <div className="text-sm text-gray-900 dark:text-gray-100">
+                            {includedCount}/{totalInGroup}
+                          </div>
                         </div>
                         <div>
                           <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Weight</div>
                           <div className="text-sm text-gray-900 dark:text-gray-100">
-                            {row.weightPercent != null && !Number.isNaN(row.weightPercent) ? `${row.weightPercent}%` : '—'}
+                            {row.weightPercent != null && !Number.isNaN(row.weightPercent)
+                              ? `${row.weightPercent}%`
+                              : '—'}
                           </div>
                         </div>
                         <div>
                           <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Points Earned</div>
-                          <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">{totalEarned.toFixed(1)}</div>
+                          <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                            {contributesToGrade ? totalEarned.toFixed(1) : '—'}
+                          </div>
                         </div>
                         <div>
                           <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Points</div>
-                          <div className="text-sm text-gray-900 dark:text-gray-100">{totalPossible.toFixed(1)}</div>
+                          <div className="text-sm text-gray-900 dark:text-gray-100">
+                            {contributesToGrade ? totalPossible.toFixed(1) : '—'}
+                          </div>
                         </div>
                       </div>
                       <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
                         <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Percentage</div>
                         <div className={`text-lg font-bold ${percentageColor}`}>
-                          {totalPossible > 0 ? percentage.toFixed(1) : '-'}%
+                          {percentage != null ? `${percentage.toFixed(1)}%` : '—'}
                         </div>
                       </div>
                     </div>
                   );
                 })}
               </div>
-              
-              {/* Desktop Table View */}
+
               <div className="hidden md:block bg-white dark:bg-gray-900 rounded-lg overflow-hidden shadow-sm">
                 <table className="w-full">
                   <thead className="bg-gray-50 dark:bg-gray-800">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Assignment Group</th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Assignments</th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Points Earned</th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Total Points</th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Percentage</th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Weight</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                        Assignment Group
+                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                        Assignments
+                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                        Points Earned
+                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                        Total Points
+                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                        Percentage
+                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                        Weight
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                     {assignmentGroupSummaryRows.map((row) => {
-                      const { totalEarned, totalPossible, gradedAssignments, percentage } =
-                        aggregateAssignmentGroupStats(
-                      row.assignments,
-                      studentId,
-                      course,
-                      row.displayName,
-                      gradebookData,
-                      submissionMap,
-                      studentSubmissions
-                    );
-                      const groupAssignments = row.assignments;
+                      const groupStats = computeAssignmentGroupStats(
+                        studentId,
+                        row.displayName,
+                        row.assignments,
+                        course,
+                        studentVisibleGrades,
+                        submissionMap,
+                        studentSubmissions,
+                        effectiveGradingPolicy
+                      );
+                      const { totalEarned, totalPossible, includedCount, totalInGroup, contributesToGrade, percentage } =
+                        groupStats;
                       const percentageColor =
-                        percentage >= 90
-                          ? 'text-green-600 dark:text-green-400'
-                          : percentage >= 80
-                            ? 'text-blue-600 dark:text-blue-400'
-                            : percentage >= 70
-                              ? 'text-yellow-600 dark:text-yellow-400'
-                              : 'text-red-600 dark:text-red-400';
+                        percentage == null
+                          ? 'text-gray-500 dark:text-gray-400'
+                          : percentage >= 90
+                            ? 'text-green-600 dark:text-green-400'
+                            : percentage >= 80
+                              ? 'text-blue-600 dark:text-blue-400'
+                              : percentage >= 70
+                                ? 'text-yellow-600 dark:text-yellow-400'
+                                : 'text-red-600 dark:text-red-400';
 
                       return (
-                        <tr key={row.key} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-150">
+                        <tr
+                          key={row.key}
+                          className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-150"
+                        >
                           <td className="px-4 py-3">
                             <div className="font-medium text-gray-900 dark:text-gray-100">{row.displayName}</div>
                           </td>
                           <td className="px-4 py-3 text-center text-sm text-gray-600 dark:text-gray-400">
-                            {gradedAssignments}/{groupAssignments.length}
+                            {includedCount}/{totalInGroup}
                           </td>
                           <td className="px-4 py-3 text-center">
-                            <span className="font-semibold text-gray-900 dark:text-gray-100">{totalEarned.toFixed(1)}</span>
-                          </td>
-                          <td className="px-4 py-3 text-center text-sm text-gray-600 dark:text-gray-400">
-                            {totalPossible.toFixed(1)}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <span className={`font-semibold ${percentageColor}`}>
-                              {totalPossible > 0 ? percentage.toFixed(1) : '-'}%
+                            <span className="font-semibold text-gray-900 dark:text-gray-100">
+                              {contributesToGrade ? totalEarned.toFixed(1) : '—'}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-center text-sm text-gray-600 dark:text-gray-400">
-                            {row.weightPercent != null && !Number.isNaN(row.weightPercent) ? `${row.weightPercent}%` : '—'}
+                            {contributesToGrade ? totalPossible.toFixed(1) : '—'}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span className={`font-semibold ${percentageColor}`}>
+                              {percentage != null ? `${percentage.toFixed(1)}%` : '—'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center text-sm text-gray-600 dark:text-gray-400">
+                            {row.weightPercent != null && !Number.isNaN(row.weightPercent)
+                              ? `${row.weightPercent}%`
+                              : '—'}
                           </td>
                         </tr>
                       );
@@ -652,21 +636,25 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
                   </tbody>
                 </table>
               </div>
+                </>
+              )}
             </div>
           </div>
-        )}
+        ) : null}
       </div>
 
-      {/* Right Sidebar (only) */}
       <StudentGradeSidebar
         course={course}
         studentId={studentId}
-        grades={gradebookData.grades}
+        grades={studentVisibleGrades}
         assignments={studentAssignments}
         submissionMap={submissionMap}
         studentSubmissions={studentSubmissions}
         backendTotalGrade={studentTotalGrade}
         backendLetterGrade={studentLetterGrade}
+        backendFinalGrade={studentFinalGrade}
+        backendFinalLetterGrade={studentFinalLetterGrade}
+        resolvedGradingPolicy={effectiveGradingPolicy}
         summaryReady={studentGradeSummaryReady}
       />
     </div>
@@ -674,13 +662,3 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
 };
 
 export default StudentGradesView;
-
-
-
-
-
-
-
-
-
-

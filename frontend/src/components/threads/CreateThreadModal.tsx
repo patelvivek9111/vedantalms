@@ -13,6 +13,8 @@ import FormFieldGroup from '../common/FormFieldGroup';
 import { useDraftManager } from '../../hooks/useDraftManager';
 import { Save, RefreshCw } from 'lucide-react';
 import FileAttachmentPanel from '../files/FileAttachmentPanel';
+import GradingPeriodPicker from '../grades/GradingPeriodPicker';
+import GradingPeriodsModal from '../grades/GradingPeriodsModal';
 import type { NormalizedFile } from '../../utils/fileTypes';
 
 interface CreateThreadModalProps {
@@ -52,6 +54,8 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
   // New state for grading options
   const [isGraded, setIsGraded] = useState(false);
   const [totalPoints, setTotalPoints] = useState(100);
+  const [gradingPeriodId, setGradingPeriodId] = useState<string | null>(null);
+  const [showGradingPeriodsModal, setShowGradingPeriodsModal] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState('Discussions');
   const [dueDate, setDueDate] = useState('');
   const [selectedModule, setSelectedModule] = useState('');
@@ -255,6 +259,7 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
         totalPoints: isGraded ? totalPoints : null,
         group: selectedGroup,
         dueDate: dueDate ? new Date(dueDate).toISOString() : null,
+        gradingPeriodId: gradingPeriodId || null,
         settings: {
           requirePostBeforeSee,
           allowLikes,
@@ -531,6 +536,13 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
                     { value: 'Discussions', label: 'Discussions' }
                   ]}
                 />
+
+                <GradingPeriodPicker
+                  courseId={courseId}
+                  value={gradingPeriodId}
+                  onChange={setGradingPeriodId}
+                  onManagePeriods={() => setShowGradingPeriodsModal(true)}
+                />
               </>
             )}
           </FormFieldGroup>
@@ -618,6 +630,11 @@ const CreateThreadModal: React.FC<CreateThreadModalProps> = ({
           </button>
         </div>
       </form>
+      <GradingPeriodsModal
+        show={showGradingPeriodsModal}
+        courseId={courseId}
+        onClose={() => setShowGradingPeriodsModal(false)}
+      />
     </div>
   );
 };

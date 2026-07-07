@@ -2,7 +2,7 @@
  * Semantic version of the shared grading engine (calculator + policy resolution).
  * Bump MINOR when policy-aware behavior changes; bump MAJOR only with migration plan.
  */
-const GRADING_ENGINE_VERSION = '1.0.0';
+const GRADING_ENGINE_VERSION = '1.3.0';
 
 function getGradingEngineVersion() {
   return GRADING_ENGINE_VERSION;

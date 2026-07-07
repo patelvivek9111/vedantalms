@@ -35,6 +35,8 @@
     "test:api": "jest tests/unit/api tests/integration --runInBand --forceExit",
     "test:unit": "jest tests/unit --runInBand",
     "test:grading": "jest tests/grading --runInBand --forceExit",
+    "test:serialization": "jest tests/integration/submissionSerialization.integration.test.js tests/integration/assignmentGradingPipeline.integration.test.js tests/integration/notificationMetadata.integration.test.js tests/unit/utils/mongooseSerialize.test.js tests/unit/utils/submissionResponse.test.js --runInBand --forceExit",
+    "test:pre-rollout": "jest tests/integration/preRolloutFeatures.integration.test.js tests/integration/submissionSerialization.integration.test.js tests/integration/assignmentGradingPipeline.integration.test.js tests/integration/notificationMetadata.integration.test.js tests/unit/utils/mongooseSerialize.test.js tests/unit/utils/submissionResponse.test.js --runInBand --forceExit",
     "test:grading:policy": "jest tests/grading --testPathPattern=policy|parity",
     "verify:grading": "node scripts/verifySharedGrading.js && node scripts/checkDeprecatedGradingCalculator.js",
     "verify:notification-email-guard": "node scripts/verifyNotificationEmailGuard.js",

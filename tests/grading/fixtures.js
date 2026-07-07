@@ -38,6 +38,7 @@ function buildAssignment({
   dueDate = PAST_DUE,
   isDiscussion = false,
   hasSubmitted = false,
+  ...rest
 }) {
   return {
     _id: id,
@@ -49,6 +50,7 @@ function buildAssignment({
     dueDate,
     isDiscussion,
     hasSubmitted,
+    ...rest,
   };
 }
 
@@ -135,7 +137,7 @@ function case2MissingAssignment() {
   };
 }
 
-/** Case 3: submitted but not graded — excluded from overall */
+/** Case 3: submitted but not graded past due — Canvas Current excludes (80% from graded only) */
 function case3SubmittedNotGraded() {
   const groups = [{ name: 'Assignments', weight: 100 }];
   const gradedId = aid('graded');
@@ -146,7 +148,6 @@ function case3SubmittedNotGraded() {
   ];
   const grades = buildGrades(STUDENT_ID, { [gradedId]: 80 });
   const submissions = buildSubmissions({ [gradedId]: true, [pendingId]: true });
-  // Only graded item counts: 80%
   return {
     id: 'case3',
     studentId: STUDENT_ID,
@@ -156,7 +157,7 @@ function case3SubmittedNotGraded() {
     submissions,
     expectedPercent: 80,
     expectedLetter: 'B',
-    pendingCell: { assignmentId: pendingId, label: 'Not Graded' },
+    pendingCell: { assignmentId: pendingId, label: '0 (MA)' },
   };
 }
 

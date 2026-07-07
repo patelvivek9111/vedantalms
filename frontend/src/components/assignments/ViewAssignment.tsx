@@ -23,6 +23,7 @@ import logger from '../../utils/logger';
 import ConfirmationModal from '../common/ConfirmationModal';
 import BackButton from '../common/BackButton';
 import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
+import { resolveSubmissionDisplayGrade } from '../../utils/submissionGrades';
 
 interface ViewAssignmentProps {
   courseId?: string;
@@ -247,10 +248,7 @@ function getAssignmentMaxPoints(assignment: Assignment): number {
 function resolveSubmissionEarnedPoints(submission: Submission): number | null {
   if (submission.gradeVisibility?.scoreVisible === false) return null;
   if (submission.gradeVisibility?.mode === 'hidden') return null;
-  if (typeof submission.finalGrade === 'number') return submission.finalGrade;
-  if (typeof submission.grade === 'number') return submission.grade;
-  if (submission.autoGraded && typeof submission.autoGrade === 'number') return submission.autoGrade;
-  return null;
+  return resolveSubmissionDisplayGrade(submission);
 }
 
 function formatPointsValue(value: number): string {
@@ -1255,7 +1253,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                     const fileUrl = typeof file === 'string' ? file : (file.url || file.path || '');
                     const fileName = typeof file === 'string' 
                       ? file.split('/').pop() || `Feedback File ${index + 1}`
-                      : (file.name || file.originalname || `Feedback File ${index + 1}`);
+                      : (file.name || file.originalname || (file as { originalName?: string }).originalName || `Feedback File ${index + 1}`);
                     return (
                       <div key={index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 p-3 sm:p-3 bg-white dark:bg-gray-900 rounded-lg border border-indigo-200/50 dark:border-indigo-700/50 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden max-w-full">
                         <div className="flex items-start sm:items-center space-x-3 flex-1 min-w-0 w-full sm:w-auto">

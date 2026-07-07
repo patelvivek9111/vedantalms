@@ -4,6 +4,7 @@
  */
 const {
   calculateFinalGradeWithWeightedGroups,
+  computeGroupPointTotals,
   getLetterGrade,
 } = require('../../utils/gradeCalculation');
 const {
@@ -65,12 +66,29 @@ describe('Grading policy — calculateFinalGradeWithWeightedGroups (backend)', (
     });
   });
 
-  describe('Case 3 — Submitted but not graded (excluded)', () => {
+  describe('Case 3 — Submitted but not graded (Canvas Current excludes)', () => {
     const scenario = case3SubmittedNotGraded();
 
-    it('excludes pending item from overall (80%)', () => {
+    it('excludes pending past-due item from current (80%)', () => {
       const { percent } = runScenario(scenario);
       expect(percent).toBeCloseTo(scenario.expectedPercent, 5);
+    });
+
+    it('computeGroupPointTotals matches category earned/possible', () => {
+      const { studentId, assignments, grades, submissions } = scenario;
+      const stats = computeGroupPointTotals(
+        studentId,
+        assignments,
+        grades,
+        submissions,
+        null,
+        'Assignments'
+      );
+      expect(stats.includedCount).toBe(1);
+      expect(stats.totalInGroup).toBe(2);
+      expect(stats.totalEarned).toBe(80);
+      expect(stats.totalPossible).toBe(100);
+      expect(stats.percentage).toBeCloseTo(80, 5);
     });
   });
 

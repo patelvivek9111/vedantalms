@@ -7,6 +7,7 @@ const asyncJobSchema = new mongoose.Schema(
       enum: [
         'grades.finalize',
         'grades.recompute',
+        'grades.policyImpactPreview',
         'transcript.regenerate',
         'export.gradebook',
         'course.copy',

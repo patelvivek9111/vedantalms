@@ -57,6 +57,24 @@ const delJson = async (key) => {
   }
 };
 
+/** Delete all keys matching prefix* (SCAN; safe for cache namespaces). */
+const deleteKeysByPrefix = async (prefix) => {
+  const client = getRedisClient();
+  if (!client || !prefix) return;
+  try {
+    let cursor = '0';
+    do {
+      const [next, keys] = await client.scan(cursor, 'MATCH', `${prefix}*`, 'COUNT', 100);
+      cursor = next;
+      if (keys.length > 0) {
+        await client.del(...keys);
+      }
+    } while (cursor !== '0');
+  } catch {
+    // swallow cache delete errors
+  }
+};
+
 const getNumber = async (key) => {
   const client = getRedisClient();
   if (!client) return 0;
@@ -99,6 +117,7 @@ module.exports = {
   getJson,
   setJson,
   delJson,
+  deleteKeysByPrefix,
   getNumber,
   incr,
   incrWithExpire,

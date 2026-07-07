@@ -4,6 +4,7 @@
  */
 const { DEFAULT_GRADING_POLICY, DEFAULT_GRADE_SCALE } = require('./policyDefaults.cjs');
 const { deepMergePolicy, sanitizeGradingPolicy } = require('./policyValidation.cjs');
+const { buildPolicyApplication } = require('./policyApplication.cjs');
 
 /**
  * @param {object} options
@@ -66,6 +67,7 @@ function resolveGradingPolicy({
     ...resolved,
     groups: effectiveGroups,
     gradeScale,
+    policyApplication: buildPolicyApplication(coursePolicy),
     _meta: {
       courseId: course?._id ? String(course._id) : null,
       policyVersion:

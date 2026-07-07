@@ -50,4 +50,20 @@ describe('resolveGradingPolicy', () => {
     const resolved = resolveGradingPolicy({ course, coursePolicy });
     expect(resolved.groups.find((g) => g.name === 'Attendance')).toBeUndefined();
   });
+
+  it('retroactive apply mode omits legacy policy even when snapshot is stored', () => {
+    const course = { groups: [{ name: 'Assignments', weight: 100 }] };
+    const coursePolicy = {
+      applyMode: 'retroactive_all',
+      legacyPolicySnapshot: {
+        missingAssignment: { mode: 'exclude_until_graded' },
+        version: 1,
+      },
+      policy: { missingAssignment: { mode: 'count_as_zero' } },
+    };
+    const resolved = resolveGradingPolicy({ course, coursePolicy });
+    expect(resolved.missingAssignment.mode).toBe('count_as_zero');
+    expect(resolved.policyApplication.applyMode).toBe('retroactive_all');
+    expect(resolved.policyApplication.legacyPolicy).toBeNull();
+  });
 });

@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { getMemoryAuthToken, authFetchInit } from '../utils/authToken';
 import axios from 'axios';
 import { API_URL } from '../config';
+import { normalizeMongoIdRef } from '../utils/mongoId';
 
 interface UseStudentGradeDataProps {
   activeSection: string;
@@ -11,6 +12,8 @@ interface UseStudentGradeDataProps {
   user: any;
   setStudentTotalGrade: React.Dispatch<React.SetStateAction<number | null>>;
   setStudentLetterGrade: React.Dispatch<React.SetStateAction<string | null>>;
+  setStudentFinalGrade?: React.Dispatch<React.SetStateAction<number | null>>;
+  setStudentFinalLetterGrade?: React.Dispatch<React.SetStateAction<string | null>>;
   setStudentDiscussions: React.Dispatch<React.SetStateAction<any[]>>;
   setStudentGroupAssignments: React.Dispatch<React.SetStateAction<any[]>>;
   /** False while the course total API is in flight so the UI can avoid a misleading client-only total. */
@@ -25,6 +28,8 @@ export const useStudentGradeData = ({
   user,
   setStudentTotalGrade,
   setStudentLetterGrade,
+  setStudentFinalGrade,
+  setStudentFinalLetterGrade,
   setStudentDiscussions,
   setStudentGroupAssignments,
   setStudentGradeSummaryReady,
@@ -39,22 +44,30 @@ export const useStudentGradeData = ({
       setStudentGradeSummaryReady?.(false);
       setStudentTotalGrade(null);
       setStudentLetterGrade(null);
+      setStudentFinalGrade?.(null);
+      setStudentFinalLetterGrade?.(null);
       try {
         const token = getMemoryAuthToken();
         const res = await axios.get(`${API_URL}/api/grades/student/course/${course._id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        setStudentTotalGrade(res.data.totalPercent);
-        setStudentLetterGrade(res.data.letterGrade);
+        const current =
+          res.data.currentPercent ?? res.data.totalPercent ?? null;
+        setStudentTotalGrade(current);
+        setStudentLetterGrade(res.data.letterGrade ?? null);
+        setStudentFinalGrade?.(res.data.finalPercent ?? null);
+        setStudentFinalLetterGrade?.(res.data.finalLetterGrade ?? null);
       } catch (err) {
         setStudentTotalGrade(null);
         setStudentLetterGrade(null);
+        setStudentFinalGrade?.(null);
+        setStudentFinalLetterGrade?.(null);
       } finally {
         setStudentGradeSummaryReady?.(true);
       }
     };
     fetchStudentGrade();
-  }, [activeSection, isInstructor, isAdmin, course?._id, setStudentTotalGrade, setStudentLetterGrade, setStudentGradeSummaryReady]);
+  }, [activeSection, isInstructor, isAdmin, course?._id, setStudentTotalGrade, setStudentLetterGrade, setStudentFinalGrade, setStudentFinalLetterGrade, setStudentGradeSummaryReady]);
 
   // Fetch graded discussions for the course for student view
   useEffect(() => {
@@ -81,16 +94,25 @@ export const useStudentGradeData = ({
 
             if (Array.isArray(thread.studentGrades)) {
               studentGradeObj = thread.studentGrades.find(
-                (g: any) => g.student && (g.student._id === userId || g.student === userId)
+                (g: any) => normalizeMongoIdRef(g.student) === normalizeMongoIdRef(userId)
               );
             }
+
+            const gradeVisible = thread.gradeVisibility?.scoreVisible === true;
 
             return {
               ...thread,
               isDiscussion: true,
-              grade: typeof studentGradeObj?.grade === 'number' ? studentGradeObj.grade : null,
-              feedback: typeof studentGradeObj?.feedback === 'string' ? studentGradeObj.feedback : '',
-              hasSubmitted: hasSubmitted,
+              grade: gradeVisible
+                ? typeof thread.grade === 'number'
+                  ? thread.grade
+                  : (typeof studentGradeObj?.grade === 'number' ? studentGradeObj.grade : null)
+                : null,
+              gradeVisibility: thread.gradeVisibility ?? studentGradeObj?.gradeVisibility,
+              feedback: gradeVisible && typeof studentGradeObj?.feedback === 'string' ? studentGradeObj.feedback : '',
+              hasSubmitted: hasSubmitted || thread.hasPosted === true,
+              hasPosted: thread.hasPosted === true || hasSubmitted,
+              studentReplyCreatedAt: thread.studentReplyCreatedAt ?? null,
               replies: thread.replies || []
             };
           });

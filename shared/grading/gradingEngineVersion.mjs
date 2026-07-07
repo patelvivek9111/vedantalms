@@ -1,4 +1,4 @@
-export const GRADING_ENGINE_VERSION = '1.0.0';
+export const GRADING_ENGINE_VERSION = '1.3.0';
 
 export function getGradingEngineVersion() {
   return GRADING_ENGINE_VERSION;

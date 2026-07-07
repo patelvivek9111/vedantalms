@@ -649,7 +649,7 @@ app.post('/api/upload', protect, upload.array('files', 10), async (req, res) => 
       courseId: courseId || undefined,
       assignmentId: assignmentId || undefined,
       metadata: { ip: req.ip, requestId: req.requestId },
-      skipLifecycleCheck: category === 'temporary' || category === 'profile',
+      skipLifecycleCheck: category === 'temporary' || category === 'profile' || category === 'feedback',
     });
 
     const files = assets.map((asset) => {

@@ -35,6 +35,16 @@ const gradingPolicyAuditSchema = new mongoose.Schema(
       type: String,
       maxlength: 500,
     },
+    applyMode: {
+      type: String,
+      enum: ['retroactive_all', 'prospective_only', 'from_assignment'],
+    },
+    effectiveAt: { type: Date },
+    impactSummary: {
+      affectedCount: { type: Number },
+      maxDeltaPercent: { type: Number },
+      letterChanges: { type: Number },
+    },
   },
   { timestamps: true }
 );

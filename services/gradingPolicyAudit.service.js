@@ -12,6 +12,9 @@ async function recordPolicyChange({
   oldPolicy,
   newPolicy,
   reason,
+  applyMode,
+  effectiveAt,
+  impactSummary,
 }) {
   const oldPlain = toPlainPolicy(oldPolicy || {});
   const newPlain = toPlainPolicy(newPolicy || {});
@@ -30,6 +33,9 @@ async function recordPolicyChange({
       summaryLines: summarizePolicyDiff(diff),
     },
     reason: reason || undefined,
+    applyMode: applyMode || undefined,
+    effectiveAt: effectiveAt || undefined,
+    impactSummary: impactSummary || undefined,
   });
 
   return entry.toObject();

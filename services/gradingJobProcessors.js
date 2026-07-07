@@ -71,6 +71,18 @@ async function processGradesFinalize(jobDoc) {
   return result;
 }
 
+async function processGradesPolicyImpactPreview(jobDoc) {
+  const { courseId, payload } = jobDoc.payload;
+  const gradingPolicyImpactService = require('./gradingPolicyImpact.service');
+  const course = await Course.findById(courseId).select('students').lean();
+  const total = (course?.students || []).length;
+  await updateProgress(jobDoc._id, 0, total);
+
+  const result = await gradingPolicyImpactService.previewCoursePolicyImpact(courseId, payload || {});
+  await updateProgress(jobDoc._id, total, total);
+  return result;
+}
+
 async function processGradesRecompute(jobDoc) {
   const user = await User.findById(jobDoc.payload.userId);
   if (!user) throw new Error('Requesting user not found');
@@ -241,6 +253,8 @@ async function runJobByType(jobDoc) {
       return processGradesFinalize(jobDoc);
     case 'grades.recompute':
       return processGradesRecompute(jobDoc);
+    case 'grades.policyImpactPreview':
+      return processGradesPolicyImpactPreview(jobDoc);
     case 'transcript.regenerate':
       return processTranscriptRegenerate(jobDoc);
     case 'export.gradebook':

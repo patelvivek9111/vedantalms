@@ -12,8 +12,8 @@ const PRODUCTION_FILES = [
 ];
 
 const CANONICAL_PATTERNS = [
-  /calculateFinalGradeWithWeightedGroups/,
   /calculateCourseGradeForStudent/,
+  /computeStudentCourseGrade/,
 ];
 
 describe('Canonical calculator usage in production controllers', () => {
@@ -30,11 +30,22 @@ describe('Canonical calculator usage in production controllers', () => {
     });
   }
 
-  it('gradeCalculation.service delegates to calculateFinalGradeWithWeightedGroups', () => {
+  it('gradeCalculation.service is the single canonical grade entry point', () => {
     const content = fs.readFileSync(
       path.join(ROOT, 'services/gradeCalculation.service.js'),
       'utf8'
     );
-    expect(content).toMatch(/calculateFinalGradeWithWeightedGroups/);
+    expect(content).toMatch(/computeStudentCourseGrade/);
+    expect(content).toMatch(/calculateCurrentGradeWithWeightedGroups/);
+    expect(content).toMatch(/calculateProjectedFinalGradeWithWeightedGroups/);
+  });
+
+  it('gradebookData.service uses computeStudentCourseGrade for totals', () => {
+    const content = fs.readFileSync(
+      path.join(ROOT, 'services/gradebookData.service.js'),
+      'utf8'
+    );
+    expect(content).toMatch(/computeStudentCourseGrade/);
+    expect(content).not.toMatch(/calculateFinalGradeWithWeightedGroups/);
   });
 });

@@ -86,6 +86,8 @@ const discussionReplySchema = new mongoose.Schema(
         editedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
         previousContent: { type: String },
         previousSanitizedContent: { type: String },
+        previousFileAssets: [{ type: mongoose.Schema.Types.ObjectId, ref: 'FileAsset' }],
+        previousAttachments: [{ type: mongoose.Schema.Types.ObjectId, ref: 'FileAsset' }],
         reason: { type: String, default: null },
       },
     ],

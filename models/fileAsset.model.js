@@ -13,6 +13,7 @@ const FILE_CATEGORIES = [
   'system',
   'temporary',
   'message',
+  'feedback',
 ];
 
 const FILE_VISIBILITY = ['private', 'course', 'institution', 'public'];

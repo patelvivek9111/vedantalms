@@ -64,6 +64,8 @@ const CourseAssignments: React.FC<CourseAssignmentsProps> = ({
       group: d.group || 'Discussions',
       totalPoints: d.totalPoints || 0,
       published: true,
+      grade: d.grade ?? null,
+      gradeVisibility: d.gradeVisibility ?? null,
       studentGrades: d.studentGrades || [],
       replies: d.replies || [],
       hasSubmitted: d.hasSubmitted ?? d.hasPosted ?? false,

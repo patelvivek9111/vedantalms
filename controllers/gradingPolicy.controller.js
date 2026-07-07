@@ -68,6 +68,14 @@ exports.getCourseGradingPolicy = async (req, res) => {
           gpaScale: resolved.gpaScale,
           groups: resolved.groups,
           gradeScale: resolved.gradeScale,
+          policyApplication: resolved.policyApplication
+            ? {
+                applyMode: resolved.policyApplication.applyMode || 'retroactive_all',
+                effectiveAt: resolved.policyApplication.effectiveAt || null,
+                effectiveAssignmentId: resolved.policyApplication.effectiveAssignmentId || null,
+                legacyPolicy: resolved.policyApplication.legacyPolicy || null,
+              }
+            : { applyMode: 'retroactive_all', legacyPolicy: null },
           _meta: {
             ...resolved._meta,
             policyHash: snapshotBundle.policyHash,
@@ -85,6 +93,17 @@ exports.getCourseGradingPolicy = async (req, res) => {
   }
 };
 
+async function assertCoursePolicyEditor(req, course) {
+  const isAdmin = req.user.role === 'admin';
+  const isInstructor =
+    course.instructor && course.instructor.toString() === req.user._id.toString();
+  if (!isAdmin && !isInstructor) {
+    const err = new Error('Not authorized');
+    err.statusCode = 403;
+    throw err;
+  }
+}
+
 exports.updateCourseGradingPolicy = async (req, res) => {
   try {
     const courseId = req.params.courseId;
@@ -93,11 +112,20 @@ exports.updateCourseGradingPolicy = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Course not found' });
     }
 
-    const isAdmin = req.user.role === 'admin';
-    const isInstructor =
-      course.instructor && course.instructor.toString() === req.user._id.toString();
-    if (!isAdmin && !isInstructor) {
-      return res.status(403).json({ success: false, message: 'Not authorized' });
+    await assertCoursePolicyEditor(req, course);
+
+    const gradeLifecycleService = require('../services/gradeLifecycle.service');
+    const { getSemesterFromCourse } = require('../utils/semesterUtils');
+    const { term, year } = getSemesterFromCourse(course);
+    const lifecycle = await gradeLifecycleService.getLifecycle(courseId, term, year);
+    if (lifecycle?.status === 'POSTED') {
+      const reason = typeof req.body.reason === 'string' ? req.body.reason.trim() : '';
+      if (!reason) {
+        return res.status(400).json({
+          success: false,
+          message: 'A reason is required when changing policy on a posted course.',
+        });
+      }
     }
 
     const doc = await gradingPolicyService.upsertCoursePolicy(
@@ -107,6 +135,10 @@ exports.updateCourseGradingPolicy = async (req, res) => {
         groups: req.body.groups,
         gradeScale: req.body.gradeScale,
         reason: req.body.reason,
+        applyMode: req.body.applyMode,
+        effectiveAt: req.body.effectiveAt,
+        effectiveAssignmentId: req.body.effectiveAssignmentId,
+        impactSummary: req.body.impactSummary,
       },
       req.user._id
     );
@@ -120,6 +152,52 @@ exports.updateCourseGradingPolicy = async (req, res) => {
 /**
  * Preview overall % under a proposed or saved policy (fixture-style sample).
  */
+exports.previewCoursePolicyImpact = async (req, res) => {
+  try {
+    const courseId = req.params.courseId;
+    const course = await Course.findById(courseId).lean();
+    if (!course) {
+      return res.status(404).json({ success: false, message: 'Course not found' });
+    }
+
+    await assertCoursePolicyEditor(req, course);
+
+    const gradingPolicyImpactService = require('../services/gradingPolicyImpact.service');
+    const jobQueueService = require('../services/jobQueue.service');
+    const studentCount = (course.students || []).length;
+    const useAsync =
+      req.query.async === 'true' ||
+      (req.query.async !== 'false' && jobQueueService.shouldUseAsyncJob(studentCount));
+
+    if (useAsync) {
+      const { job, async: isAsync } = await jobQueueService.enqueueJob(
+        'grades.policyImpactPreview',
+        {
+          courseId,
+          payload: req.body,
+          userId: String(req.user._id),
+        },
+        req.user
+      );
+      const statusCode = isAsync ? 202 : 200;
+      return res.status(statusCode).json({
+        success: true,
+        data: {
+          jobId: job._id,
+          status: job.status,
+          async: isAsync,
+          result: job.result,
+        },
+      });
+    }
+
+    const data = await gradingPolicyImpactService.previewCoursePolicyImpact(courseId, req.body);
+    res.json({ success: true, data });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ success: false, message: error.message });
+  }
+};
+
 exports.previewCourseGradingPolicy = async (req, res) => {
   try {
     const courseId = req.params.courseId;
@@ -300,6 +378,15 @@ exports.recomputeTranscriptGrades = async (req, res) => {
     res.json({ success: true, data: result });
   } catch (error) {
     res.status(error.statusCode || 500).json({ success: false, message: error.message });
+  }
+};
+
+exports.getInstitutionPolicyImpactSummary = async (req, res) => {
+  try {
+    const data = await gradingPolicyService.getInstitutionPolicyImpactSummary();
+    res.json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 

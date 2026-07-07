@@ -1,6 +1,11 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import WhatIfScores from './WhatIfScores';
-import { getLetterGrade, calculateFinalGradeWithWeightedGroups } from '../../utils/gradeUtils';
+import { getLetterGrade, type ResolvedGradingPolicy } from '../../utils/gradeUtils';
+import {
+  computeStudentCurrentPercent,
+  computeStudentProjectedFinalPercent,
+  normalizeResolvedPolicyForCourse,
+} from '../../utils/gradebookCompute';
 
 interface StudentGradeSidebarProps {
   course: any;
@@ -11,9 +16,14 @@ interface StudentGradeSidebarProps {
   studentSubmissions: any[];
   backendTotalGrade?: number | null;
   backendLetterGrade?: string | null;
+  backendFinalGrade?: number | null;
+  backendFinalLetterGrade?: string | null;
+  resolvedGradingPolicy?: ResolvedGradingPolicy | null;
   /** When false, do not show a client-calculated total (avoids flash before the server total arrives). */
   summaryReady?: boolean;
 }
+
+const GRADE_DIFF_EPSILON = 0.005;
 
 const StudentGradeSidebar: React.FC<StudentGradeSidebarProps> = ({
   course,
@@ -24,47 +34,129 @@ const StudentGradeSidebar: React.FC<StudentGradeSidebarProps> = ({
   studentSubmissions,
   backendTotalGrade,
   backendLetterGrade,
+  backendFinalGrade,
+  backendFinalLetterGrade,
+  resolvedGradingPolicy = null,
   summaryReady = true,
 }) => {
   const [showWhatIfScores, setShowWhatIfScores] = useState(false);
+  /** Canvas-style: checked = current grade (graded assignments only). */
+  const [gradedOnly, setGradedOnly] = useState(true);
 
-  const clientWeighted = calculateFinalGradeWithWeightedGroups(
+  const effectiveGradingPolicy = useMemo(
+    () => normalizeResolvedPolicyForCourse(course, resolvedGradingPolicy, assignments),
+    [course, resolvedGradingPolicy, assignments]
+  );
+
+  const clientCurrent = useMemo(() => {
+    if (!summaryReady || !course?.groups?.length) return null;
+    return computeStudentCurrentPercent(
+      studentId,
+      course,
+      assignments,
+      grades,
+      submissionMap,
+      studentSubmissions,
+      effectiveGradingPolicy
+    );
+  }, [
+    summaryReady,
     studentId,
     course,
     assignments,
     grades,
-    submissionMap
-  );
+    submissionMap,
+    studentSubmissions,
+    effectiveGradingPolicy,
+  ]);
 
-  let weightedPercent: number | null;
-  let letter: string;
+  const clientFinal = useMemo(() => {
+    if (!summaryReady || !course?.groups?.length) return null;
+    return computeStudentProjectedFinalPercent(
+      studentId,
+      course,
+      assignments,
+      grades,
+      submissionMap,
+      studentSubmissions,
+      effectiveGradingPolicy
+    );
+  }, [
+    summaryReady,
+    studentId,
+    course,
+    assignments,
+    grades,
+    submissionMap,
+    studentSubmissions,
+    effectiveGradingPolicy,
+  ]);
 
-  if (!summaryReady) {
-    weightedPercent = null;
-    letter = '…';
-  } else if (backendTotalGrade != null) {
-    weightedPercent = backendTotalGrade;
-    letter = backendLetterGrade || getLetterGrade(weightedPercent, course?.gradeScale);
-  } else {
-    weightedPercent = clientWeighted;
-    letter = getLetterGrade(weightedPercent ?? 0, course?.gradeScale);
-  }
+  const currentPercent =
+    backendTotalGrade ?? clientCurrent ?? null;
+  // Prefer client final — stale API cache can return final === current.
+  const finalPercent = clientFinal ?? backendFinalGrade ?? null;
+
+  const currentLetter =
+    currentPercent == null
+      ? '…'
+      : backendLetterGrade || getLetterGrade(currentPercent, course?.gradeScale);
+  const finalLetter =
+    finalPercent == null
+      ? null
+      : backendFinalLetterGrade || getLetterGrade(finalPercent, course?.gradeScale);
+
+  const canToggleGradeMode =
+    summaryReady &&
+    currentPercent != null &&
+    finalPercent != null &&
+    Math.abs(finalPercent - currentPercent) > GRADE_DIFF_EPSILON;
+
+  const displayPercent = canToggleGradeMode && !gradedOnly ? finalPercent : currentPercent;
+  const displayLetter =
+    canToggleGradeMode && !gradedOnly
+      ? finalLetter || getLetterGrade(finalPercent ?? 0, course?.gradeScale)
+      : currentLetter;
 
   return (
     <div className="w-full md:w-64 flex-shrink-0">
       <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-3 sm:p-4 mb-3 sm:mb-4 border border-gray-200 dark:border-gray-700">
-        <div className="text-base sm:text-lg font-bold mb-2 sm:mb-3 text-gray-900 dark:text-gray-100">
-          Total:{' '}
-          {!summaryReady ? (
-            <span className="text-gray-400 dark:text-gray-500 font-medium animate-pulse">Loading…</span>
-          ) : (
-            <>
-              {(weightedPercent ?? 0).toFixed(2)}% [{letter}]
-            </>
+        <div className="space-y-2 sm:space-y-3">
+          <div>
+            <div className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              {canToggleGradeMode && !gradedOnly ? 'Final grade' : 'Current grade'}
+            </div>
+            <div className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100">
+              {!summaryReady ? (
+                <span className="text-gray-400 dark:text-gray-500 font-medium animate-pulse">
+                  Loading…
+                </span>
+              ) : (
+                <>
+                  {(displayPercent ?? 0).toFixed(2)}% [{displayLetter}]
+                </>
+              )}
+            </div>
+          </div>
+          {canToggleGradeMode && (
+            <label className="flex cursor-pointer items-start gap-2 text-xs text-gray-600 dark:text-gray-400 sm:text-sm">
+              <input
+                type="checkbox"
+                checked={gradedOnly}
+                onChange={(e) => setGradedOnly(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800"
+              />
+              <span>
+                Show current grade only
+                <span className="mt-0.5 block text-[11px] text-gray-500 dark:text-gray-500">
+                  Uncheck to view final grade (all groups at full weight)
+                </span>
+              </span>
+            </label>
           )}
         </div>
-        <div className="space-y-2">
-          <button 
+        <div className="space-y-2 mt-3 sm:mt-4">
+          <button
             type="button"
             onClick={() => setShowWhatIfScores(true)}
             className="min-h-[44px] w-full rounded border border-gray-300 bg-gray-100 px-3 py-2 text-xs font-medium text-gray-700 transition-colors duration-150 hover:bg-gray-200 sm:text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
@@ -72,7 +164,7 @@ const StudentGradeSidebar: React.FC<StudentGradeSidebarProps> = ({
             What-If Scores
           </button>
         </div>
-        
+
         {course.groups && course.groups.length > 0 && (
           <div className="mt-3 sm:mt-4">
             <div className="font-semibold mb-2 text-xs text-gray-700 dark:text-gray-300 uppercase tracking-wide">Assignment Weighting</div>
@@ -122,16 +214,16 @@ const StudentGradeSidebar: React.FC<StudentGradeSidebarProps> = ({
           </div>
         )}
       </div>
-      {/* What-If Scores Modal */}
       {showWhatIfScores && (
         <WhatIfScores
           course={course}
           assignments={assignments}
           currentGrades={grades}
           studentId={studentId}
-          onSaveWhatIf={(scores) => {
-            // Here you would typically save the what-if scores to the backend
-          }}
+          submissionMap={submissionMap}
+          studentSubmissions={studentSubmissions}
+          resolvedGradingPolicy={resolvedGradingPolicy}
+          onSaveWhatIf={() => {}}
           onClose={() => setShowWhatIfScores(false)}
         />
       )}
@@ -139,4 +231,4 @@ const StudentGradeSidebar: React.FC<StudentGradeSidebarProps> = ({
   );
 };
 
-export default StudentGradeSidebar; 
+export default StudentGradeSidebar;

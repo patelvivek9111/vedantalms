@@ -22,6 +22,7 @@ const {
   applyPaperUploadQuizFields,
   validatePaperUploadQuizPayload,
 } = require('../utils/quizSubmissionMode');
+const { readMapField, hasMapFieldValue } = require('../utils/mongooseSerialize');
 
 /** Plain object or Mongoose doc → assignment JSON with computed totalPoints (matches getModuleAssignments). */
 const enrichAssignmentTotalPoints = (a) => {
@@ -108,6 +109,10 @@ exports.createAssignment = async (req, res) => {
       isOfflineAssignment: req.body.isOfflineAssignment === 'true' || req.body.isOfflineAssignment === true,
       totalPoints,
     };
+
+    if (req.body.gradingPeriodId !== undefined) {
+      assignmentData.gradingPeriodId = req.body.gradingPeriodId || null;
+    }
 
     if (quizSubmissionMode === 'paper_upload') {
       applyPaperUploadQuizFields(assignmentData);
@@ -415,6 +420,9 @@ exports.updateAssignment = async (req, res) => {
     if (req.body.defaultGradeHidden !== undefined) assignment.defaultGradeHidden = req.body.defaultGradeHidden === 'true' || req.body.defaultGradeHidden === true;
     if (req.body.isOfflineAssignment !== undefined) assignment.isOfflineAssignment = req.body.isOfflineAssignment === 'true' || req.body.isOfflineAssignment === true;
     if (req.body.totalPoints !== undefined) assignment.totalPoints = req.body.totalPoints ? parseFloat(req.body.totalPoints) : 0;
+    if (req.body.gradingPeriodId !== undefined) {
+      assignment.gradingPeriodId = req.body.gradingPeriodId || null;
+    }
     
     // Update questions if provided
     if (questions) {
@@ -843,11 +851,11 @@ exports.getAssignmentStats = async (req, res) => {
 
     // Calculate question statistics
     const questionStats = assignment.questions?.map((q, index) => {
-      const questionSubmissions = submissions.filter(s => s.answers && s.answers[index]);
-      const correctCount = questionSubmissions.filter(s => {
-        const answer = s.answers[index];
+      const questionSubmissions = submissions.filter((s) => hasMapFieldValue(s.answers, index));
+      const correctCount = questionSubmissions.filter((s) => {
+        const answer = readMapField(s.answers, index);
         if (q.type === 'multiple-choice') {
-          return answer === q.options.find(opt => opt.isCorrect)?.text;
+          return answer === q.options.find((opt) => opt.isCorrect)?.text;
         }
         return false; // For other question types, we can't determine correctness automatically
       }).length;

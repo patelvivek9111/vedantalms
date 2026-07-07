@@ -1,8 +1,12 @@
 const {
   calculateFinalGradeWithWeightedGroups,
+  calculateCurrentGradeWithWeightedGroups,
+  calculateProjectedFinalGradeWithWeightedGroups,
   getLetterGrade,
 } = require('../../shared/grading/gradeCalculation.cjs');
 const { resolveGradingPolicy, courseContextFromResolvedPolicy } = require('../../shared/grading/policyResolver.cjs');
+const { cp25SubmittedUngradedFinalGap, POLICY_NOW } = require('./canvasParity.fixtures');
+const { runCurrentGrade, runFinalGrade } = require('./parityRunner');
 
 const PAST_DUE = '2020-06-01T00:00:00.000Z';
 const LATE = '2020-06-10T00:00:00.000Z';
@@ -115,5 +119,14 @@ describe('Policy matrix', () => {
     ];
     expect(getLetterGrade(94, scale)).toBe('F');
     expect(getLetterGrade(95, scale)).toBe('A');
+  });
+
+  it('count_as_zero current excludes ungraded submitted; final counts as zero (CP-25)', () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(POLICY_NOW);
+    const scenario = cp25SubmittedUngradedFinalGap();
+    expect(runCurrentGrade(scenario)).toBeCloseTo(80, 5);
+    expect(runFinalGrade(scenario)).toBeCloseTo(40, 5);
+    jest.useRealTimers();
   });
 });

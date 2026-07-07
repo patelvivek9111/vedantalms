@@ -12,4 +12,8 @@ describe('Shared grading source of truth', () => {
   it('backend re-exports match shared getGradebookCellForExport', () => {
     expect(backend.getGradebookCellForExport).toBe(shared.getGradebookCellForExport);
   });
+
+  it('backend re-exports match shared isAssignmentGroupActive', () => {
+    expect(backend.isAssignmentGroupActive).toBe(shared.isAssignmentGroupActive);
+  });
 });

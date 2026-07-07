@@ -1,6 +1,6 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, History } from 'lucide-react';
 import ProfileImage from '../common/ProfileImage';
 import { TableRowSkeleton } from '../common/SkeletonLoader';
 import { useVirtualWindow } from '../../hooks/useVirtualWindow';
@@ -12,11 +12,23 @@ import {
   isExcusedGrade,
   EXCUSED_GRADE,
 } from '../../utils/gradeUtils';
-import { computeStudentWeightedPercent } from '../../utils/gradebookCompute';
+import {
+  discussionHasSubmissionForStudent,
+  resolveInstructorDiscussionCellGrade,
+} from '../../utils/instructorGradebookGrades';
+import { normalizeMongoIdRef } from '../../utils/mongoId';
+import {
+  computeStudentProjectedFinalPercent,
+  computeStudentWeightedPercent,
+} from '../../utils/gradebookCompute';
+import { usePersistedState } from '../../hooks/usePersistedState';
 import AssignmentGroupsModal from './AssignmentGroupsModal';
 import GradeScaleModal from './GradeScaleModal';
 import GradingPolicyModal from './GradingPolicyModal';
+import GradebookCellHistoryPanel from './GradebookCellHistoryPanel';
+import GradeOverrideModal from './GradeOverrideModal';
 import CourseGradeLifecyclePanel from './CourseGradeLifecyclePanel';
+import type { GradebookPolicyMeta } from '../../hooks/usePaginatedGradebook';
 
 interface GradebookViewProps {
   course: any;
@@ -28,6 +40,13 @@ interface GradebookViewProps {
     assignments: any[];
     grades: { [studentId: string]: { [assignmentId: string]: number | string } };
   };
+  /** Server-computed weighted % per student (same path as My Grades — student visibility). */
+  studentTotals?: Record<string, number>;
+  studentFinalTotals?: Record<string, number>;
+  gradeOverrides?: Record<string, { finalPercent: number; letterGrade?: string; reason?: string }>;
+  /** Policy used when computing server totals (authoritative for overall %). */
+  gradebookPolicyMeta?: GradebookPolicyMeta | null;
+  cellMeta?: Record<string, Record<string, { hasSubmitted?: boolean; hasHistory?: boolean }>>;
   submissionMap: { [key: string]: string };
   studentSubmissions: any[];
   isInstructor: boolean;
@@ -71,22 +90,42 @@ interface GradebookViewProps {
     show: boolean;
     setShow: (v: boolean) => void;
     editPolicy: import('../../utils/gradeUtils').GradingPolicyConfig;
+    resolvedPolicy?: import('../../utils/gradeUtils').ResolvedGradingPolicy | null;
     setEditPolicy: React.Dispatch<React.SetStateAction<import('../../utils/gradeUtils').GradingPolicyConfig>>;
     onSave: () => void;
-    onPreview: () => void;
+    onReviewImpact: () => void;
+    onBackFromImpact: () => void;
     saving: boolean;
     loading: boolean;
     error: string;
-    preview: { totalPercent: number; letterGrade: string } | null;
     dirty?: boolean;
+    canReviewImpact?: boolean;
+    impactPreview: import('../../services/gradingApi').PolicyImpactPreview | null;
+    impactLoading?: boolean;
+    impactStep?: boolean;
+    lifecycleStatus?: string;
+    applyMode?: 'retroactive_all' | 'prospective_only' | 'from_assignment';
+    onApplyModeChange?: (mode: 'retroactive_all' | 'prospective_only' | 'from_assignment') => void;
+    effectiveAssignmentId?: string | null;
+    onEffectiveAssignmentChange?: (assignmentId: string) => void;
+    saveReason?: string;
+    onSaveReasonChange?: (value: string) => void;
   };
+  onGradebookRefresh?: () => void;
 }
+
+type OverallGradeMode = 'current' | 'final';
 
 const GradebookView: React.FC<GradebookViewProps> = ({
   course,
   courseId,
   isGradebookLoading = false,
   gradebookData,
+  studentTotals = {},
+  studentFinalTotals = {},
+  gradeOverrides = {},
+  gradebookPolicyMeta = null,
+  cellMeta = {},
   submissionMap,
   studentSubmissions,
   isInstructor,
@@ -127,10 +166,53 @@ const GradebookView: React.FC<GradebookViewProps> = ({
   setEditGradeScale,
   resolvedGradingPolicy = null,
   gradingPolicyModal,
+  onGradebookRefresh,
 }) => {
   const navigate = useNavigate();
+  const [historyCell, setHistoryCell] = useState<{
+    studentId: string;
+    studentName: string;
+    assignmentId: string;
+    assignmentTitle: string;
+  } | null>(null);
+  const [overrideStudent, setOverrideStudent] = useState<{
+    studentId: string;
+    studentName: string;
+    computedFinalPercent: number | null;
+  } | null>(null);
+  const [overallGradeMode, setOverallGradeMode] = usePersistedState<OverallGradeMode>(
+    `gradebook-overall-mode-${courseId}`,
+    'final'
+  );
+  const [overallGradeMenuOpen, setOverallGradeMenuOpen] = useState(false);
+  const desktopOverallGradeMenuRef = useRef<HTMLDivElement>(null);
+  const mobileOverallGradeMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!overallGradeMenuOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      const inDesktop = desktopOverallGradeMenuRef.current?.contains(target);
+      const inMobile = mobileOverallGradeMenuRef.current?.contains(target);
+      if (!inDesktop && !inMobile) {
+        setOverallGradeMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [overallGradeMenuOpen]);
 
   const { students, assignments, grades } = gradebookData;
+
+  const effectiveMissingMode =
+    gradebookPolicyMeta?.missingAssignmentMode ??
+    resolvedGradingPolicy?.missingAssignment?.mode ??
+    'count_as_zero';
+
+  const effectiveApplyMode =
+    gradebookPolicyMeta?.applyMode ??
+    resolvedGradingPolicy?.policyApplication?.applyMode ??
+    'retroactive_all';
 
   const gradebookGroupMap = useMemo(() => {
     const map = (course.groups || []).reduce((acc: any, group: any) => {
@@ -145,23 +227,152 @@ const GradebookView: React.FC<GradebookViewProps> = ({
     return map;
   }, [course.groups, assignments]);
 
+  const effectiveResolvedPolicy = useMemo(() => {
+    if (!resolvedGradingPolicy) return null;
+    const mode =
+      gradebookPolicyMeta?.missingAssignmentMode ??
+      resolvedGradingPolicy.missingAssignment?.mode;
+    if (!mode || resolvedGradingPolicy.missingAssignment?.mode === mode) {
+      return resolvedGradingPolicy;
+    }
+    return {
+      ...resolvedGradingPolicy,
+      missingAssignment: { ...resolvedGradingPolicy.missingAssignment, mode },
+    };
+  }, [resolvedGradingPolicy, gradebookPolicyMeta?.missingAssignmentMode]);
+
   const weightedByStudent = useMemo(() => {
     const map: Record<string, number> = {};
     for (const student of students) {
-      map[student._id] = computeStudentWeightedPercent(
-        student._id,
+      const sid = String(student._id);
+      const serverTotal = studentTotals[sid] ?? studentTotals[student._id as string];
+      if (typeof serverTotal === 'number' && Number.isFinite(serverTotal)) {
+        map[sid] = serverTotal;
+        continue;
+      }
+      if (isGradebookLoading) continue;
+      const rowMeta = cellMeta[sid] || {};
+      const augmentedAssignments = assignments.map((assignment: any) => {
+        const aid = String(assignment._id);
+        if (!assignment.isDiscussion || assignment.hasSubmitted === true) return assignment;
+        if (rowMeta[aid]?.hasSubmitted === true) {
+          return { ...assignment, hasSubmitted: true };
+        }
+        return assignment;
+      });
+      map[sid] = computeStudentWeightedPercent(
+        sid,
         course,
-        assignments,
+        augmentedAssignments,
         grades,
         submissionMap,
         studentSubmissions,
-        resolvedGradingPolicy
+        effectiveResolvedPolicy
       );
     }
     return map;
-  }, [students, course, assignments, grades, submissionMap, studentSubmissions, resolvedGradingPolicy]);
+  }, [
+    students,
+    studentTotals,
+    isGradebookLoading,
+    course,
+    assignments,
+    cellMeta,
+    grades,
+    submissionMap,
+    studentSubmissions,
+    effectiveResolvedPolicy,
+  ]);
 
-  const getWeightedGrade = (student: any) => weightedByStudent[student._id] ?? 0;
+  const finalByStudent = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const student of students) {
+      const sid = String(student._id);
+      const serverFinal = studentFinalTotals[sid] ?? studentFinalTotals[student._id as string];
+      if (typeof serverFinal === 'number' && Number.isFinite(serverFinal)) {
+        map[sid] = serverFinal;
+        continue;
+      }
+      if (isGradebookLoading) continue;
+      const rowMeta = cellMeta[sid] || {};
+      const augmentedAssignments = assignments.map((assignment: any) => {
+        const aid = String(assignment._id);
+        if (!assignment.isDiscussion || assignment.hasSubmitted === true) return assignment;
+        if (rowMeta[aid]?.hasSubmitted === true) {
+          return { ...assignment, hasSubmitted: true };
+        }
+        return assignment;
+      });
+      map[sid] = computeStudentProjectedFinalPercent(
+        sid,
+        course,
+        augmentedAssignments,
+        grades,
+        submissionMap,
+        studentSubmissions,
+        effectiveResolvedPolicy
+      );
+    }
+    return map;
+  }, [
+    students,
+    studentFinalTotals,
+    isGradebookLoading,
+    course,
+    assignments,
+    cellMeta,
+    grades,
+    submissionMap,
+    studentSubmissions,
+    effectiveResolvedPolicy,
+  ]);
+
+  const getWeightedGrade = (student: any) => {
+    const sid = String(student._id);
+    const value = weightedByStudent[sid];
+    return typeof value === 'number' && Number.isFinite(value) ? value : null;
+  };
+
+  const getFinalGrade = (student: any) => {
+    const sid = String(student._id);
+    const override = gradeOverrides[sid];
+    if (override?.finalPercent != null) return override.finalPercent;
+    const value = finalByStudent[sid];
+    return typeof value === 'number' && Number.isFinite(value) ? value : null;
+  };
+
+  const getOverallPercent = (student: any) =>
+    overallGradeMode === 'current' ? getWeightedGrade(student) : getFinalGrade(student);
+
+  const overallByStudent = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const student of students) {
+      const sid = String(student._id);
+      let percent: number | null = null;
+      if (overallGradeMode === 'current') {
+        const value = weightedByStudent[sid];
+        percent = typeof value === 'number' && Number.isFinite(value) ? value : null;
+      } else {
+        const override = gradeOverrides[sid];
+        if (override?.finalPercent != null) {
+          percent = override.finalPercent;
+        } else {
+          const value = finalByStudent[sid];
+          percent = typeof value === 'number' && Number.isFinite(value) ? value : null;
+        }
+      }
+      if (percent != null) map[sid] = percent;
+    }
+    return map;
+  }, [students, overallGradeMode, weightedByStudent, finalByStudent, gradeOverrides]);
+
+  const formatOverallGrade = (percent: number | null) => {
+    if (percent == null) {
+      return isGradebookLoading ? '…' : '—';
+    }
+    const letter = getLetterGrade(percent, course?.gradeScale);
+    return `${percent.toFixed(2)}% (${letter})`;
+  };
 
   const {
     search,
@@ -170,7 +381,7 @@ const GradebookView: React.FC<GradebookViewProps> = ({
     setFilterMode,
     filteredStudents,
     needsGradingCount,
-  } = useGradebookFilters(courseId, students, assignments, grades, submissionMap, weightedByStudent);
+  } = useGradebookFilters(courseId, students, assignments, grades, submissionMap, overallByStudent);
 
   const GRADE_ROW_HEIGHT = 56;
   const scrollHeight = Math.min(900, Math.max(400, window.innerHeight * 0.75));
@@ -214,10 +425,43 @@ const GradebookView: React.FC<GradebookViewProps> = ({
           <div>
             <h2 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">Gradebook</h2>
             <p className="mt-1 text-xs text-gray-600 dark:text-gray-400 sm:text-sm">Track student performance and manage grades</p>
-            {resolvedGradingPolicy?.version != null && (isInstructor || isAdmin) && (
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-500" title="Policy snapshot used for weighted totals">
-                Policy v{resolvedGradingPolicy.version}
-                {resolvedGradingPolicy.source ? ` · ${resolvedGradingPolicy.source}` : ''}
+            {resolvedGradingPolicy && (isInstructor || isAdmin) && (
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-500" title="Policy used for weighted totals">
+                Missing:{' '}
+                {effectiveMissingMode === 'exclude_until_graded'
+                  ? 'exclude until graded'
+                  : 'count as zero'}
+                {effectiveApplyMode !== 'retroactive_all' ? (
+                  <>
+                    {' '}
+                    · apply: {effectiveApplyMode.replace(/_/g, ' ')}
+                    {(gradebookPolicyMeta?.hasLegacyPolicy ||
+                      resolvedGradingPolicy.policyApplication?.legacyPolicy) ? (
+                      <>
+                        {' '}
+                        (older work:{' '}
+                        {resolvedGradingPolicy.policyApplication?.legacyPolicy?.missingAssignment
+                          ?.mode === 'exclude_until_graded'
+                          ? 'exclude'
+                          : 'count zero'}
+                        )
+                      </>
+                    ) : null}
+                  </>
+                ) : null}
+                {' '}
+                · Overall column:{' '}
+                {overallGradeMode === 'current'
+                  ? 'current grade (graded assignments only)'
+                  : 'final grade (all groups at full weight)'}
+                {gradebookPolicyMeta?.missingAssignmentMode &&
+                resolvedGradingPolicy.missingAssignment?.mode &&
+                gradebookPolicyMeta.missingAssignmentMode !==
+                  resolvedGradingPolicy.missingAssignment.mode ? (
+                  <span className="ml-1 text-amber-600 dark:text-amber-400">
+                    (totals use gradebook policy — refresh settings if this looks wrong)
+                  </span>
+                ) : null}
               </p>
             )}
           </div>
@@ -276,9 +520,71 @@ const GradebookView: React.FC<GradebookViewProps> = ({
 
       {/* Mobile Card View for Gradebook */}
       <div className="lg:hidden space-y-4">
+        <div
+          ref={mobileOverallGradeMenuRef}
+          className="relative flex justify-end"
+        >
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
+            onClick={() => setOverallGradeMenuOpen((open) => !open)}
+            aria-haspopup="menu"
+            aria-expanded={overallGradeMenuOpen}
+          >
+            {overallGradeMode === 'current' ? 'Current Grade' : 'Final Grade'}
+            <ChevronDown
+              className={`h-4 w-4 transition-transform ${overallGradeMenuOpen ? 'rotate-180' : ''}`}
+              aria-hidden
+            />
+          </button>
+          {overallGradeMenuOpen && (
+            <div
+              role="menu"
+              className="absolute right-0 top-full z-30 mt-1 w-56 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800"
+            >
+              <button
+                type="button"
+                role="menuitem"
+                className={`block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 ${
+                  overallGradeMode === 'current'
+                    ? 'font-semibold text-blue-600 dark:text-blue-400'
+                    : 'text-gray-700 dark:text-gray-300'
+                }`}
+                onClick={() => {
+                  setOverallGradeMode('current');
+                  setOverallGradeMenuOpen(false);
+                }}
+              >
+                Current grade
+                <span className="mt-0.5 block text-xs font-normal text-gray-500 dark:text-gray-400">
+                  Graded assignments only
+                </span>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className={`block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 ${
+                  overallGradeMode === 'final'
+                    ? 'font-semibold text-blue-600 dark:text-blue-400'
+                    : 'text-gray-700 dark:text-gray-300'
+                }`}
+                onClick={() => {
+                  setOverallGradeMode('final');
+                  setOverallGradeMenuOpen(false);
+                }}
+              >
+                Final grade
+                <span className="mt-0.5 block text-xs font-normal text-gray-500 dark:text-gray-400">
+                  All groups at full weight
+                </span>
+              </button>
+            </div>
+          )}
+        </div>
         {filteredStudents.map((student: any) => {
-          const weightedPercent = getWeightedGrade(student);
-          const letter = getLetterGrade(weightedPercent, course?.gradeScale);
+          const overallPercent = getOverallPercent(student);
+          const letter =
+            overallPercent == null ? '…' : getLetterGrade(overallPercent, course?.gradeScale);
           let gradeColor = 'text-gray-700 dark:text-gray-300';
           if (letter === 'A') gradeColor = 'text-green-600 dark:text-green-400';
           else if (letter === 'B') gradeColor = 'text-blue-600 dark:text-blue-400';
@@ -315,7 +621,9 @@ const GradebookView: React.FC<GradebookViewProps> = ({
                   <h3 className="font-semibold text-gray-900 dark:text-gray-100">{student.firstName} {student.lastName}</h3>
                   <div className="text-sm">
                     <span className={`font-bold ${gradeColor}`}>
-                      {weightedPercent.toFixed(2)}% [{letter}]
+                      {overallPercent == null
+                        ? formatOverallGrade(null)
+                        : `${overallPercent.toFixed(2)}% [${letter}]`}
                     </span>
                   </div>
                 </div>
@@ -327,10 +635,12 @@ const GradebookView: React.FC<GradebookViewProps> = ({
                 <div className="px-4 pt-4 pb-4 space-y-2 max-h-96 overflow-y-auto border-t border-gray-200 dark:border-gray-700">
                 {assignments.map((assignment: any, assIdx: number) => {
                   const submissionKey = `${student._id}_${assignment._id}`;
-                  const hasSubmission = assignment.isDiscussion 
-                    ? Array.isArray(assignment.replies) && assignment.replies.some((r: any) => r.author && (r.author._id === student._id || r.author === student._id))
+                  const hasSubmission = assignment.isDiscussion
+                    ? discussionHasSubmissionForStudent(assignment, student._id)
                     : !!submissionMap[submissionKey];
-                  const grade = grades[student._id]?.[assignment._id];
+                  const grade = assignment.isDiscussion
+                    ? resolveInstructorDiscussionCellGrade(grades, student._id, assignment)
+                    : grades[normalizeMongoIdRef(student._id)]?.[normalizeMongoIdRef(assignment._id)];
                   const maxPoints = assignment.questions?.reduce((sum: number, q: any) => sum + (q.points || 0), 0) || assignment.totalPoints || 0;
                   
                   let cellContent: React.ReactNode;
@@ -457,11 +767,72 @@ const GradebookView: React.FC<GradebookViewProps> = ({
                   })}
                   {/* Sticky last column header */}
                   <th className="px-6 py-4 border-b border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-center text-gray-700 dark:text-gray-300 sticky right-0 top-0 z-20 font-semibold text-sm uppercase tracking-wider" style={{ boxShadow: '-2px 0 8px -4px rgba(0,0,0,0.1)' }}>
-                    <div className="flex items-center justify-center space-x-2">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                      </svg>
-                      <span>Overall Grade</span>
+                    <div
+                      ref={desktopOverallGradeMenuRef}
+                      className="relative flex items-center justify-center"
+                    >
+                      <button
+                        type="button"
+                        className="inline-flex items-center justify-center gap-1 rounded-md px-1 py-0.5 text-gray-700 transition-colors hover:bg-gray-100 hover:text-blue-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-blue-400"
+                        onClick={() => setOverallGradeMenuOpen((open) => !open)}
+                        aria-haspopup="menu"
+                        aria-expanded={overallGradeMenuOpen}
+                        aria-label="Choose overall grade display mode"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                        <span>
+                          {overallGradeMode === 'current' ? 'Current Grade' : 'Final Grade'}
+                        </span>
+                        <ChevronDown
+                          className={`h-4 w-4 transition-transform ${overallGradeMenuOpen ? 'rotate-180' : ''}`}
+                          aria-hidden
+                        />
+                      </button>
+                      {overallGradeMenuOpen && (
+                        <div
+                          role="menu"
+                          className="absolute right-0 top-full z-30 mt-1 w-56 rounded-lg border border-gray-200 bg-white py-1 text-left normal-case tracking-normal shadow-lg dark:border-gray-700 dark:bg-gray-800"
+                        >
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className={`block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 ${
+                              overallGradeMode === 'current'
+                                ? 'font-semibold text-blue-600 dark:text-blue-400'
+                                : 'text-gray-700 dark:text-gray-300'
+                            }`}
+                            onClick={() => {
+                              setOverallGradeMode('current');
+                              setOverallGradeMenuOpen(false);
+                            }}
+                          >
+                            Current grade
+                            <span className="mt-0.5 block text-xs font-normal text-gray-500 dark:text-gray-400">
+                              Graded assignments only
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className={`block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 ${
+                              overallGradeMode === 'final'
+                                ? 'font-semibold text-blue-600 dark:text-blue-400'
+                                : 'text-gray-700 dark:text-gray-300'
+                            }`}
+                            onClick={() => {
+                              setOverallGradeMode('final');
+                              setOverallGradeMenuOpen(false);
+                            }}
+                          >
+                            Final grade
+                            <span className="mt-0.5 block text-xs font-normal text-gray-500 dark:text-gray-400">
+                              All groups at full weight
+                            </span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </th>
                 </tr>
@@ -478,9 +849,18 @@ const GradebookView: React.FC<GradebookViewProps> = ({
                 {!isGradebookLoading &&
                 displayStudents.map((student: any, localIdx: number) => {
                   const rowIdx = virtualEnabled ? virtualRange.start + localIdx : localIdx;
-                  // Calculate weighted grade
-                  const weightedPercent = getWeightedGrade(student);
-                  const letter = getLetterGrade(weightedPercent, course?.gradeScale);
+                  const sid = String(student._id);
+                  const overallPercent = getOverallPercent(student);
+                  const override = gradeOverrides[sid];
+                  const showOverrideBadge =
+                    overallGradeMode === 'final' && override?.finalPercent != null;
+                  const letter =
+                    overallPercent == null
+                      ? '…'
+                      : getLetterGrade(
+                          overallPercent,
+                          course?.gradeScale
+                        );
                   const rowBg = rowIdx % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800';
                   const stickyBg = rowIdx % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800';
                   
@@ -511,11 +891,15 @@ const GradebookView: React.FC<GradebookViewProps> = ({
                       </td>
                       {assignments.map((assignment: any, assIdx: number) => {
                         const submissionKey = `${student._id}_${assignment._id}`;
-                        const hasSubmission = assignment.isDiscussion 
-                          ? Array.isArray(assignment.replies) && assignment.replies.some((r: any) => r.author && (r.author._id === student._id || r.author === student._id))
+                        const cellMetaEntry = cellMeta[String(student._id)]?.[String(assignment._id)];
+                        const hasSubmission = assignment.isDiscussion
+                          ? cellMetaEntry?.hasSubmitted === true ||
+                            discussionHasSubmissionForStudent(assignment, student._id)
                           : !!submissionMap[submissionKey];
                         const isDiscussion = assignment.isDiscussion;
-                        const grade = grades[student._id]?.[assignment._id];
+                        const grade = assignment.isDiscussion
+                          ? resolveInstructorDiscussionCellGrade(grades, student._id, assignment)
+                          : grades[normalizeMongoIdRef(student._id)]?.[normalizeMongoIdRef(assignment._id)];
                         const dueDate = assignment.dueDate ? new Date(assignment.dueDate) : null;
                         const now = new Date();
                         
@@ -567,6 +951,19 @@ const GradebookView: React.FC<GradebookViewProps> = ({
                               {Number.isInteger(grade) ? grade : Number(grade).toFixed(2)}
                             </div>
                           );
+                        } else if (
+                          dueDate &&
+                          now.getTime() > dueDate.getTime() &&
+                          effectiveMissingMode !== 'exclude_until_graded'
+                        ) {
+                          cellContent = (
+                            <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300">
+                              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                              0 (MA)
+                            </div>
+                          );
                         } else if (hasSubmission) {
                           if (dueDate && submittedAt && submittedAt.getTime() > dueDate.getTime()) {
                             // Submitted late
@@ -579,7 +976,6 @@ const GradebookView: React.FC<GradebookViewProps> = ({
                               </div>
                             );
                           } else {
-                            // Submitted but not graded
                             cellContent = (
                               <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300">
                                 <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -601,13 +997,15 @@ const GradebookView: React.FC<GradebookViewProps> = ({
                             </div>
                           );
                         } else if (dueDate && now.getTime() > dueDate.getTime()) {
-                          // Missing after due date (only for non-offline assignments)
+                          const missingCountsAsZero =
+                            effectiveMissingMode !== 'exclude_until_graded';
+                          const missingLabel = missingCountsAsZero ? '0 (MA)' : 'Missing';
                           cellContent = (
                             <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300">
                               <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                               </svg>
-                              0 (MA)
+                              {missingLabel}
                             </div>
                           );
                         } else {
@@ -680,19 +1078,40 @@ const GradebookView: React.FC<GradebookViewProps> = ({
                                 />
                               </div>
                             ) : (
-                              <div
-                                className={`${(isInstructor || isAdmin) && hasSubmission ? 'cursor-pointer hover:scale-105 transform transition-transform duration-150' : ''} ${savingGrade?.studentId === student._id && savingGrade?.assignmentId === assignment._id ? 'opacity-50' : ''}`}
-                              >
-                                {savingGrade?.studentId === student._id && savingGrade?.assignmentId === assignment._id ? (
-                                  <div className="inline-flex items-center">
-                                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24">
-                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                    Saving...
-                                  </div>
-                                ) : null}
-                                {cellContent}
+                              <div className="flex items-center justify-center gap-1">
+                                <div
+                                  className={`${(isInstructor || isAdmin) && hasSubmission ? 'cursor-pointer hover:scale-105 transform transition-transform duration-150' : ''} ${savingGrade?.studentId === student._id && savingGrade?.assignmentId === assignment._id ? 'opacity-50' : ''}`}
+                                >
+                                  {savingGrade?.studentId === student._id && savingGrade?.assignmentId === assignment._id ? (
+                                    <div className="inline-flex items-center">
+                                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                      </svg>
+                                      Saving...
+                                    </div>
+                                  ) : null}
+                                  {cellContent}
+                                </div>
+                                {(isInstructor || isAdmin) && cellMetaEntry?.hasHistory === true && (
+                                  <button
+                                    type="button"
+                                    title="View grade history"
+                                    aria-label="View grade history"
+                                    className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setHistoryCell({
+                                        studentId: String(student._id),
+                                        studentName: `${student.firstName || ''} ${student.lastName || ''}`.trim(),
+                                        assignmentId: String(assignment._id),
+                                        assignmentTitle: assignment.title || 'Assignment',
+                                      });
+                                    }}
+                                  >
+                                    <History className="h-3.5 w-3.5" aria-hidden />
+                                  </button>
+                                )}
                               </div>
                             )}
                           </td>
@@ -701,9 +1120,39 @@ const GradebookView: React.FC<GradebookViewProps> = ({
                       {/* Sticky last column body */}
                       <td className={`px-6 py-4 border-l border-gray-200 dark:border-gray-600 text-center font-semibold whitespace-nowrap sticky right-0 z-[5] ${rowBg} transition-colors duration-150`} style={{ boxShadow: '-2px 0 8px -4px rgba(0,0,0,0.1)' }}>
                         {(course.groups && course.groups.length > 0) ? (
-                          <div className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-bold ${gradeColor} bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-600`}>
-                            {Number(weightedPercent).toFixed(2)}% ({letter})
-                          </div>
+                            overallGradeMode === 'final' && (isInstructor || isAdmin) ? (
+                              <button
+                                type="button"
+                                className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-bold ${gradeColor} bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-600 hover:ring-2 hover:ring-blue-300 dark:hover:ring-blue-700`}
+                                title="Override final grade"
+                                onClick={() => {
+                                  setOverrideStudent({
+                                    studentId: sid,
+                                    studentName: `${student.firstName || ''} ${student.lastName || ''}`.trim(),
+                                    computedFinalPercent:
+                                      finalByStudent[sid] ?? getWeightedGrade(student),
+                                  });
+                                }}
+                              >
+                                {formatOverallGrade(overallPercent)}
+                                {showOverrideBadge ? (
+                                  <span className="ml-1 text-[10px] font-normal uppercase tracking-wide text-violet-600 dark:text-violet-400">
+                                    Override
+                                  </span>
+                                ) : null}
+                              </button>
+                            ) : (
+                              <span
+                                className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-bold ${gradeColor} bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-600`}
+                              >
+                                {formatOverallGrade(overallPercent)}
+                                {showOverrideBadge ? (
+                                  <span className="ml-1 text-[10px] font-normal uppercase tracking-wide text-violet-600 dark:text-violet-400">
+                                    Override
+                                  </span>
+                                ) : null}
+                              </span>
+                            )
                         ) : '-'}
                       </td>
                     </tr>
@@ -861,13 +1310,27 @@ const GradebookView: React.FC<GradebookViewProps> = ({
           show={gradingPolicyModal.show}
           onClose={() => gradingPolicyModal.setShow(false)}
           editPolicy={gradingPolicyModal.editPolicy}
+          resolvedPolicy={gradingPolicyModal.resolvedPolicy}
           setEditPolicy={gradingPolicyModal.setEditPolicy}
           onSave={gradingPolicyModal.onSave}
-          onPreview={gradingPolicyModal.onPreview}
+          onReviewImpact={gradingPolicyModal.onReviewImpact}
+          onBackFromImpact={gradingPolicyModal.onBackFromImpact}
           saving={gradingPolicyModal.saving}
           loading={gradingPolicyModal.loading}
           error={gradingPolicyModal.error}
-          preview={gradingPolicyModal.preview}
+          dirty={gradingPolicyModal.dirty}
+          canReviewImpact={gradingPolicyModal.canReviewImpact}
+          impactPreview={gradingPolicyModal.impactPreview}
+          impactLoading={gradingPolicyModal.impactLoading}
+          impactStep={gradingPolicyModal.impactStep}
+          lifecycleStatus={gradingPolicyModal.lifecycleStatus}
+          applyMode={gradingPolicyModal.applyMode}
+          onApplyModeChange={gradingPolicyModal.onApplyModeChange}
+          effectiveAssignmentId={gradingPolicyModal.effectiveAssignmentId}
+          onEffectiveAssignmentChange={gradingPolicyModal.onEffectiveAssignmentChange}
+          impactAssignments={gradingPolicyModal.impactPreview?.assignments}
+          saveReason={gradingPolicyModal.saveReason}
+          onSaveReasonChange={gradingPolicyModal.onSaveReasonChange}
         />
       )}
       <GradeScaleModal
@@ -882,6 +1345,29 @@ const GradebookView: React.FC<GradebookViewProps> = ({
         setEditGradeScale={setEditGradeScale}
         setGradeScaleError={setGradeScaleError}
       />
+      {historyCell && (
+        <GradebookCellHistoryPanel
+          show
+          courseId={courseId}
+          studentId={historyCell.studentId}
+          studentName={historyCell.studentName}
+          assignmentId={historyCell.assignmentId}
+          assignmentTitle={historyCell.assignmentTitle}
+          onClose={() => setHistoryCell(null)}
+        />
+      )}
+      {overrideStudent && (
+        <GradeOverrideModal
+          show
+          courseId={courseId}
+          studentId={overrideStudent.studentId}
+          studentName={overrideStudent.studentName}
+          computedFinalPercent={overrideStudent.computedFinalPercent}
+          gradeScale={course?.gradeScale}
+          onClose={() => setOverrideStudent(null)}
+          onSaved={() => onGradebookRefresh?.()}
+        />
+      )}
     </div>
   );
 };

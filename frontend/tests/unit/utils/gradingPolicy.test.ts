@@ -59,7 +59,7 @@ describe('Grading policy — gradeUtils (frontend)', () => {
     expect(percent).toBeCloseTo(50, 5);
   });
 
-  it('Case 3: submitted not graded excluded → 80%', () => {
+  it('Case 3: submitted not graded past due excluded from current → 80%', () => {
     const s = case3SubmittedNotGraded();
     const { percent } = runScenario(s);
     expect(percent).toBeCloseTo(80, 5);
@@ -119,7 +119,7 @@ describe('Grading policy — export cell labels align with gradebook UI', () => 
     expect(cell.marker).toBe('RED');
   });
 
-  it('Case 3: pending grading shows Not Graded (not 0)', () => {
+  it('Case 3: pending past due shows 0 (MA) under count_as_zero', () => {
     const s = case3SubmittedNotGraded();
     const pending = s.assignments.find((a) => a._id === s.pendingAssignmentId)!;
     const cell = getGradebookCellForExport(
@@ -129,8 +129,8 @@ describe('Grading policy — export cell labels align with gradebook UI', () => 
       s.submissionMap,
       s.studentSubmissions
     );
-    expect(cell.display).toBe('Not Graded');
-    expect(cell.marker).toBe('BLUE');
+    expect(cell.display).toBe('0 (MA)');
+    expect(cell.marker).toBe('RED');
   });
 
   it('Case 5: excused shows Excused', () => {
@@ -161,7 +161,7 @@ describe('Grading policy — export cell labels align with gradebook UI', () => 
     expect(cell.marker).toBe('GRAY');
   });
 
-  it('Case 7: ungraded late shows Late', () => {
+  it('Case 7: ungraded late past due shows Late', () => {
     const s = case7LateSubmission();
     const late = s.assignments.find((a) => a._id === s.lateAssignmentId)!;
     const gradesEmpty = { [STUDENT_ID]: {} };

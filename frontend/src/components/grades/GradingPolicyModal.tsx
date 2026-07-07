@@ -1,10 +1,23 @@
 import React, { useState } from 'react';
-import type { GradingPolicyConfig } from '../../utils/gradeUtils';
+import type { GradingPolicyConfig, ResolvedGradingPolicy } from '../../utils/gradeUtils';
+
+const MISSING_MODE_LABELS: Record<string, string> = {
+  count_as_zero: 'Count missing (past due) as zero',
+  exclude_until_graded: 'Exclude until graded',
+};
+
+function missingModeLabel(mode?: string): string {
+  return MISSING_MODE_LABELS[mode || 'count_as_zero'] || mode || 'count_as_zero';
+}
+import type { PolicyImpactPreview as PolicyImpactPreviewData } from '../../services/gradingApi';
 import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 import { ErrorBanner } from '../../design-system';
 import EffectivePolicyPreview from './EffectivePolicyPreview';
 import PolicyAuditHistory from './PolicyAuditHistory';
 import CourseGradeLifecyclePanel from './CourseGradeLifecyclePanel';
+import PolicyImpactPreview from './PolicyImpactPreview';
+import PolicyDropRulesSection from './PolicyDropRulesSection';
+import PolicyApplyModeSelector, { type PolicyApplyMode } from './PolicyApplyModeSelector';
 
 interface GradingPolicyModalProps {
   show: boolean;
@@ -12,14 +25,27 @@ interface GradingPolicyModalProps {
   courseId?: string;
   userRole?: string;
   editPolicy: GradingPolicyConfig;
+  resolvedPolicy?: ResolvedGradingPolicy | null;
   setEditPolicy: React.Dispatch<React.SetStateAction<GradingPolicyConfig>>;
   onSave: () => void;
-  onPreview: () => void;
+  onReviewImpact: () => void;
   saving: boolean;
   loading: boolean;
   error: string;
-  preview: { totalPercent: number; letterGrade: string } | null;
   dirty?: boolean;
+  canReviewImpact?: boolean;
+  impactPreview: PolicyImpactPreviewData | null;
+  impactLoading?: boolean;
+  impactStep?: boolean;
+  onBackFromImpact?: () => void;
+  lifecycleStatus?: string;
+  applyMode?: PolicyApplyMode;
+  onApplyModeChange?: (mode: PolicyApplyMode) => void;
+  effectiveAssignmentId?: string | null;
+  onEffectiveAssignmentChange?: (assignmentId: string) => void;
+  impactAssignments?: Array<{ id: string; title: string; group?: string }>;
+  saveReason?: string;
+  onSaveReasonChange?: (value: string) => void;
 }
 
 const GradingPolicyModal: React.FC<GradingPolicyModalProps> = ({
@@ -28,23 +54,58 @@ const GradingPolicyModal: React.FC<GradingPolicyModalProps> = ({
   courseId,
   userRole,
   editPolicy,
+  resolvedPolicy = null,
   setEditPolicy,
   onSave,
-  onPreview,
+  onReviewImpact,
   saving,
   loading,
   error,
-  preview,
   dirty = false,
+  canReviewImpact = true,
+  impactPreview,
+  impactLoading = false,
+  impactStep = false,
+  onBackFromImpact,
+  lifecycleStatus = 'DRAFT',
+  applyMode = 'retroactive_all',
+  onApplyModeChange,
+  effectiveAssignmentId = null,
+  onEffectiveAssignmentChange,
+  impactAssignments = [],
+  saveReason = '',
+  onSaveReasonChange,
 }) => {
   const [tab, setTab] = useState<'settings' | 'effective' | 'history' | 'lifecycle'>('settings');
   useUnsavedChangesGuard(dirty && show);
+
+  const groupNames = (resolvedPolicy?.groups || []).map((g) => g.name).filter(Boolean);
+
+  const updateDropRules = (
+    key: 'dropLowest' | 'dropHighest',
+    value: NonNullable<GradingPolicyConfig['dropLowest']>
+  ) => {
+    update(key, value);
+  };
 
   if (!show) return null;
 
   const update = <K extends keyof GradingPolicyConfig>(key: K, value: GradingPolicyConfig[K]) => {
     setEditPolicy((p) => ({ ...p, [key]: value }));
   };
+
+  const reasonRequired = lifecycleStatus === 'POSTED';
+  const saveBlockedReason =
+    saving || impactLoading
+      ? 'Please wait…'
+      : impactPreview == null
+        ? 'Impact preview is still loading or failed. Go back and click Review impact again.'
+        : reasonRequired && !saveReason.trim()
+          ? 'Enter a reason for this policy change (required for posted courses).'
+          : null;
+  const canConfirmSave = saveBlockedReason == null;
+
+  const showSettingsFooter = tab === 'settings' && !loading;
 
   return (
     <div
@@ -53,14 +114,17 @@ const GradingPolicyModal: React.FC<GradingPolicyModalProps> = ({
       aria-modal="true"
       aria-labelledby="grading-policies-title"
     >
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white shadow-xl dark:bg-gray-900">
+      <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white shadow-xl dark:bg-gray-900">
         <div className="border-b border-gray-200 px-6 py-4 dark:border-gray-700">
-          <h2 id="grading-policies-title" className="text-lg font-semibold text-gray-900 dark:text-gray-100">Grading policies</h2>
+          <h2 id="grading-policies-title" className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            {impactStep ? 'Review policy impact' : 'Grading policies'}
+          </h2>
           <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            Configure how this course calculates final grades. New policy applies to future calculations;
-            frozen transcript rows keep their original policy snapshot.
+            {impactStep
+              ? 'Compare current vs proposed grades for every enrolled student before saving.'
+              : 'Configure how this course calculates grades. Saving recalculates live totals for all enrolled students unless the course is finalized.'}
           </p>
-          {courseId && (
+          {courseId && !impactStep && (
             <div className="mt-4 flex gap-2 border-b border-gray-200 dark:border-gray-700">
               {(['settings', 'effective', 'history', 'lifecycle'] as const).map((key) => (
                 <button
@@ -86,7 +150,30 @@ const GradingPolicyModal: React.FC<GradingPolicyModalProps> = ({
           )}
         </div>
 
-        {tab === 'effective' && courseId ? (
+        {impactStep ? (
+          <div className="p-6">
+            {error && <div className="mb-4"><ErrorBanner message={error} /></div>}
+            <div className="mb-6">
+              <PolicyApplyModeSelector
+                value={applyMode}
+                onChange={(mode) => onApplyModeChange?.(mode)}
+                lifecycleStatus={lifecycleStatus}
+                disabled={impactLoading}
+                assignments={impactAssignments}
+                effectiveAssignmentId={effectiveAssignmentId}
+                onEffectiveAssignmentChange={onEffectiveAssignmentChange}
+              />
+            </div>
+            <PolicyImpactPreview
+              impact={impactPreview}
+              loading={impactLoading}
+              lifecycleStatus={lifecycleStatus}
+              applyMode={applyMode}
+              saveReason={saveReason}
+              onSaveReasonChange={onSaveReasonChange || (() => {})}
+            />
+          </div>
+        ) : tab === 'effective' && courseId ? (
           <div className="p-6">
             <EffectivePolicyPreview courseId={courseId} />
           </div>
@@ -103,11 +190,65 @@ const GradingPolicyModal: React.FC<GradingPolicyModalProps> = ({
         ) : (
           <div className="space-y-6 p-6">
             {error && <ErrorBanner message={error} />}
+            {resolvedPolicy && (
+              <div
+                className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-100"
+                role="status"
+              >
+                <p>
+                  <span className="font-medium">Currently calculating grades using:</span>{' '}
+                  {missingModeLabel(resolvedPolicy.missingAssignment?.mode)}
+                  {resolvedPolicy.policyApplication?.applyMode &&
+                  resolvedPolicy.policyApplication.applyMode !== 'retroactive_all' ? (
+                    <>
+                      {' '}
+                      · apply mode:{' '}
+                      <span className="font-medium">
+                        {resolvedPolicy.policyApplication.applyMode.replace(/_/g, ' ')}
+                      </span>
+                    </>
+                  ) : null}
+                </p>
+                {resolvedPolicy.policyApplication?.legacyPolicy &&
+                  resolvedPolicy.policyApplication.applyMode !== 'retroactive_all' && (
+                    <p className="mt-2 text-amber-800 dark:text-amber-200">
+                      Older assignments still use{' '}
+                      <strong>
+                        {missingModeLabel(
+                          resolvedPolicy.policyApplication.legacyPolicy.missingAssignment?.mode
+                        )}
+                      </strong>{' '}
+                      until you save with <strong>retroactive</strong> apply mode.
+                    </p>
+                  )}
+                {dirty &&
+                  editPolicy.missingAssignment?.mode !== resolvedPolicy.missingAssignment?.mode && (
+                    <p className="mt-2 text-amber-800 dark:text-amber-200">
+                      Your draft selection ({missingModeLabel(editPolicy.missingAssignment?.mode)})
+                      is not saved yet. Review impact and save — use <strong>retroactive</strong>{' '}
+                      apply mode to recalculate all missing work.
+                    </p>
+                  )}
+              </div>
+            )}
+
             {dirty && (
               <p className="text-xs text-amber-700 dark:text-amber-300" role="status">
-                You have unsaved policy changes.
+                You have unsaved policy changes. Review impact before saving.
               </p>
             )}
+
+            <section className="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+              <PolicyApplyModeSelector
+                value={applyMode}
+                onChange={(mode) => onApplyModeChange?.(mode)}
+                lifecycleStatus={lifecycleStatus}
+                disabled={impactLoading}
+                assignments={impactAssignments}
+                effectiveAssignmentId={effectiveAssignmentId}
+                onEffectiveAssignmentChange={onEffectiveAssignmentChange}
+              />
+            </section>
 
             <section>
               <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Missing assignments</h3>
@@ -227,21 +368,21 @@ const GradingPolicyModal: React.FC<GradingPolicyModalProps> = ({
               )}
             </section>
 
-            <section>
-              <label className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
-                <input
-                  type="checkbox"
-                  checked={!!editPolicy.dropLowest?.enabled}
-                  onChange={(e) =>
-                    update('dropLowest', {
-                      enabled: e.target.checked,
-                      rules: editPolicy.dropLowest?.rules || [],
-                    })
-                  }
-                />
-                Drop lowest scores
-              </label>
-            </section>
+            <PolicyDropRulesSection
+              label="Drop lowest scores"
+              policyKey="dropLowest"
+              editPolicy={editPolicy}
+              groupNames={groupNames}
+              onUpdate={updateDropRules}
+            />
+
+            <PolicyDropRulesSection
+              label="Drop highest scores"
+              policyKey="dropHighest"
+              editPolicy={editPolicy}
+              groupNames={groupNames}
+              onUpdate={updateDropRules}
+            />
 
             <section>
               <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Attendance</h3>
@@ -278,40 +419,60 @@ const GradingPolicyModal: React.FC<GradingPolicyModalProps> = ({
                 <option value="percentage">Percentage</option>
               </select>
             </section>
-
-            {preview && (
-              <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm dark:border-blue-800 dark:bg-blue-900/30">
-                Preview sample: <strong>{preview.totalPercent.toFixed(2)}%</strong> ({preview.letterGrade})
-              </div>
-            )}
           </div>
         )}
 
-        {tab === 'settings' && (
-        <div className="flex justify-end gap-3 border-t border-gray-200 px-6 py-4 dark:border-gray-700">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={onPreview}
-            className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
-          >
-            Preview
-          </button>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={onSave}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-          >
-            {saving ? 'Saving…' : 'Save policies'}
-          </button>
-        </div>
+        {impactStep ? (
+          <div className="border-t border-gray-200 px-6 py-4 dark:border-gray-700">
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={onBackFromImpact}
+                className="rounded-lg border px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                Back to settings
+              </button>
+              <button
+                type="button"
+                disabled={!canConfirmSave}
+                title={saveBlockedReason || undefined}
+                onClick={onSave}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {saving ? 'Saving…' : 'Confirm and save'}
+              </button>
+            </div>
+            {saveBlockedReason ? (
+              <p className="mt-2 text-right text-xs text-amber-700 dark:text-amber-300" role="status">
+                {saveBlockedReason}
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          showSettingsFooter && (
+            <div className="flex justify-end gap-3 border-t border-gray-200 px-6 py-4 dark:border-gray-700">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-lg border px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!canReviewImpact || impactLoading}
+                onClick={onReviewImpact}
+                className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300 disabled:opacity-50"
+              >
+                {impactLoading ? 'Calculating…' : 'Review impact'}
+              </button>
+              {!canReviewImpact && !impactLoading ? (
+                <p className="mt-2 text-right text-xs text-gray-500 dark:text-gray-400">
+                  On posted courses, change a policy setting or apply mode before reviewing impact.
+                </p>
+              ) : null}
+            </div>
+          )
         )}
       </div>
     </div>
@@ -319,4 +480,3 @@ const GradingPolicyModal: React.FC<GradingPolicyModalProps> = ({
 };
 
 export default GradingPolicyModal;
-

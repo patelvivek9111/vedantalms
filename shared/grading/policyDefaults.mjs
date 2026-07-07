@@ -13,6 +13,10 @@ export const DEFAULT_GRADING_POLICY = {
     capPercent: 100,
   },
   dropLowest: { enabled: false, rules: [] },
+  dropHighest: { enabled: false, rules: [] },
+  gradeVisibility: {
+    mutedAssignmentsInTotals: 'exclude', // 'exclude' | 'include'
+  },
   categoryCaps: { enabled: false, caps: [] },
   attendance: {
     mode: 'weighted_group',
@@ -32,6 +36,10 @@ export const DEFAULT_GRADING_POLICY = {
       { letter: 'D', points: 1.0 },
       { letter: 'F', points: 0.0 },
     ],
+  },
+  extraCredit: {
+    enabled: true,
+    capPercent: null,
   },
 };
 

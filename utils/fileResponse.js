@@ -38,7 +38,36 @@ async function buildClientFileList(doc, userId = null) {
   return merged;
 }
 
+async function buildTeacherFeedbackClientFiles(doc, userId = null) {
+  const ids = new Set();
+  for (const id of doc.teacherFeedbackFileAssets || []) {
+    if (id) ids.add(String(id));
+  }
+  const legacyUrls = [...(doc.teacherFeedbackFiles || [])].filter(Boolean);
+  for (const url of legacyUrls) {
+    if (typeof url !== 'string') continue;
+    const match = url.match(/\/api\/files\/([a-f0-9]{24})/i);
+    if (match) ids.add(match[1]);
+  }
+
+  const fromAssets = await loadSerializedFileAssets([...ids], userId);
+  const seenUrls = new Set(fromAssets.map((f) => f.url));
+  const merged = [...fromAssets];
+
+  for (const url of legacyUrls) {
+    if (typeof url !== 'string') continue;
+    if (url.includes('/api/files/')) continue;
+    if (!seenUrls.has(url)) {
+      merged.push({ url, legacy: true });
+      seenUrls.add(url);
+    }
+  }
+
+  return merged;
+}
+
 module.exports = {
   loadSerializedFileAssets,
   buildClientFileList,
+  buildTeacherFeedbackClientFiles,
 };

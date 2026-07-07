@@ -36,16 +36,16 @@ describe('Gradebook export cell labels (shared module)', () => {
     expect(cell.marker).toBe('RED');
   });
 
-  it('submitted not graded → Not Graded', () => {
-    const assignment = buildAssignment({ id: 'a-pend', group: 'Assignments' });
+  it('submitted not graded past due → 0 (MA) under count_as_zero', () => {
+    const assignment = buildAssignment({ id: 'a-pend', group: 'Assignments', dueDate: PAST_DUE });
     const cell = getGradebookCellForExport(
       student,
       assignment,
       buildGrades(STUDENT_ID, {}),
       { [`${STUDENT_ID}_a-pend`]: 'sub-1' }
     );
-    expect(cell.display).toBe('Not Graded');
-    expect(cell.marker).toBe('BLUE');
+    expect(cell.display).toBe('0 (MA)');
+    expect(cell.marker).toBe('RED');
   });
 
   it('late ungraded → Late', () => {

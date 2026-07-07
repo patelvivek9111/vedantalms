@@ -130,6 +130,36 @@ async function assertCanAccessFileAsset(user, fileAssetId, { ip, requestId } = {
     throw accessDenied();
   }
 
+  if (asset.category === 'feedback') {
+    const sub = asset.submissionId
+      ? await Submission.findById(asset.submissionId).lean()
+      : null;
+    if (user.role === 'student') {
+      if (!isEnrolledStudent(user, course)) throw accessDenied();
+      if (sub && String(sub.student) !== String(user._id)) {
+        throw accessDenied('Cannot access another student feedback file');
+      }
+      if (sub) {
+        const gradeReleaseService = require('./gradeRelease.service');
+        const assignment = await Assignment.findById(sub.assignment)
+          .select('gradeReleaseMode defaultGradeHidden showCorrectAnswers showStudentAnswers')
+          .lean();
+        const visibility = gradeReleaseService.resolveStudentGradeVisibility(sub, assignment);
+        if (!visibility.feedbackVisible) {
+          throw accessDenied('Feedback not yet released');
+        }
+      }
+      return { asset, course };
+    }
+    if (isCourseGradingStaff(user, course) || canViewCourseGrades(user, course)) {
+      if (sub && !canAccessStudentRecord(user, sub.student)) {
+        throw accessDenied();
+      }
+      return { asset, course };
+    }
+    throw accessDenied();
+  }
+
   if (asset.category === 'assignment' || asset.category === 'syllabus' || asset.category === 'page' || asset.category === 'announcement') {
     if (user.role === 'student') {
       if (!isEnrolledStudent(user, course)) throw accessDenied();

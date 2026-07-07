@@ -29,6 +29,21 @@ const courseGradingPolicySchema = new mongoose.Schema(
     ],
     /** Future: per-teacher overrides stored separately; placeholder for extensibility. */
     allowTeacherOverrides: { type: Boolean, default: false },
+    /** How mid-course policy changes apply to already-graded work. */
+    applyMode: {
+      type: String,
+      enum: ['retroactive_all', 'prospective_only', 'from_assignment'],
+      default: 'retroactive_all',
+    },
+    /** Cutoff for prospective_only — work graded before this uses submission policy snapshot. */
+    effectiveAt: { type: Date, default: null },
+    effectiveAssignmentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Assignment',
+      default: null,
+    },
+    /** Policy in effect before last prospective/from_assignment change (for legacy rule resolution). */
+    legacyPolicySnapshot: { type: mongoose.Schema.Types.Mixed, default: null },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true }

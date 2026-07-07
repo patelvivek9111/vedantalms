@@ -1,4 +1,6 @@
 export * from './gradeCalculation.mjs';
+export * from './groupActivation.mjs';
+export * from './gradeStatus.mjs';
 export * from './gradeValues.mjs';
 export * from './gradebookCell.mjs';
 export * from './constants.mjs';
@@ -8,7 +10,10 @@ export * from './policyValidation.mjs';
 export * from './gpaScale.mjs';
 export * from './latePenalty.mjs';
 export * from './dropLowest.mjs';
+export * from './dropHighest.mjs';
+export * from './dropRules.mjs';
 export * from './policySnapshot.mjs';
 export * from './policyDiff.mjs';
+export * from './extraCredit.mjs';
 export * from './gradingEngineVersion.mjs';
 export * from './transcriptHash.mjs';

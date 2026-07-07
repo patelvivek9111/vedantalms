@@ -111,6 +111,14 @@ const CourseDetail: React.FC = () => {
   const [assignmentPublishing, setAssignmentPublishing] = useState<string | null>(null);
   const [assignmentPublished, setAssignmentPublished] = useState<{ [id: string]: boolean }>({});
   const [gradebookData, setGradebookData] = useState<any>({ students: [], assignments: [], grades: {} });
+  const [gradebookStudentTotals, setGradebookStudentTotals] = useState<Record<string, number>>({});
+  const [gradebookStudentFinalTotals, setGradebookStudentFinalTotals] = useState<Record<string, number>>({});
+  const [gradebookOverrides, setGradebookOverrides] = useState<
+    Record<string, { finalPercent: number; letterGrade?: string; reason?: string }>
+  >({});
+  const [gradebookPolicyMeta, setGradebookPolicyMeta] = useState<
+    import('../../hooks/usePaginatedGradebook').GradebookPolicyMeta | null
+  >(null);
   const [instructorGradebookLoading, setInstructorGradebookLoading] = useState(false);
   const isAdmin = user?.role === 'admin';
   const isInstitutionalDiscussionStaff = ['registrar', 'department_admin'].includes(user?.role || '');
@@ -135,6 +143,8 @@ const CourseDetail: React.FC = () => {
   // Add state for backend-calculated student grade
   const [studentTotalGrade, setStudentTotalGrade] = useState<number | null>(null);
   const [studentLetterGrade, setStudentLetterGrade] = useState<string | null>(null);
+  const [studentFinalGrade, setStudentFinalGrade] = useState<number | null>(null);
+  const [studentFinalLetterGrade, setStudentFinalLetterGrade] = useState<string | null>(null);
   const [studentGradeSummaryReady, setStudentGradeSummaryReady] = useState(false);
   // Add state for graded discussions for student view
   const [studentDiscussions, setStudentDiscussions] = useState<any[]>([]);
@@ -247,6 +257,9 @@ const CourseDetail: React.FC = () => {
   // Avoid showing another course's gradebook counts/columns while the new course loads
   useEffect(() => {
     setGradebookData({ students: [], assignments: [], grades: {} });
+    setGradebookStudentTotals({});
+    setGradebookStudentFinalTotals({});
+    setGradebookOverrides({});
   }, [id]);
 
   // Grade scale management
@@ -269,7 +282,9 @@ const CourseDetail: React.FC = () => {
     setGroupError: assignmentGroupsManagement.setGroupError,
   };
 
-  const gradingPolicyManagement = useGradingPolicy(id);
+  const gradingPolicyManagement = useGradingPolicy(id, {
+    onSaved: () => setGradebookRefresh((n) => n + 1),
+  });
 
   // Syllabus management
   const syllabusManagement = useSyllabusManagement({
@@ -514,10 +529,16 @@ const CourseDetail: React.FC = () => {
       const updatedGrades = { ...prev.grades };
       if (!updatedGrades[String(user._id)]) updatedGrades[String(user._id)] = {};
       
-      // Add discussion grades
+      // Released discussion grades only (matches backend grade calculation)
       for (const discussion of studentDiscussions) {
-        if (typeof discussion.grade === 'number') {
-          updatedGrades[String(user._id)][String(discussion._id)] = discussion.grade;
+        const aid = String(discussion._id);
+        if (
+          typeof discussion.grade === 'number' &&
+          discussion.gradeVisibility?.scoreVisible === true
+        ) {
+          updatedGrades[String(user._id)][aid] = discussion.grade;
+        } else if (updatedGrades[String(user._id)][aid] !== undefined) {
+          delete updatedGrades[String(user._id)][aid];
         }
       }
       
@@ -534,13 +555,15 @@ const CourseDetail: React.FC = () => {
     user,
     setStudentTotalGrade,
     setStudentLetterGrade,
+    setStudentFinalGrade,
+    setStudentFinalLetterGrade,
     setStudentDiscussions,
     setStudentGroupAssignments,
     setStudentGradeSummaryReady,
   });
 
   // Fetch paginated gradebook data for instructors/admins.
-  usePaginatedGradebook({
+  const { pagination: gradebookPagination, cellMeta: gradebookCellMeta } = usePaginatedGradebook({
     activeSection,
     isInstructor,
     isAdmin,
@@ -549,6 +572,10 @@ const CourseDetail: React.FC = () => {
     setGradebookData,
     setSubmissionMap,
     setGradebookLoading: setInstructorGradebookLoading,
+    setStudentTotals: setGradebookStudentTotals,
+    setStudentFinalTotals: setGradebookStudentFinalTotals,
+    setGradeOverrides: setGradebookOverrides,
+    setPolicyMeta: setGradebookPolicyMeta,
   });
 
 
@@ -850,7 +877,11 @@ const CourseDetail: React.FC = () => {
             studentSubmissions={studentSubmissions}
             studentTotalGrade={studentTotalGrade}
             studentLetterGrade={studentLetterGrade}
+            studentFinalGrade={studentFinalGrade}
+            studentFinalLetterGrade={studentFinalLetterGrade}
             studentGradeSummaryReady={studentGradeSummaryReady}
+            resolvedGradingPolicy={gradingPolicyManagement.resolved}
+            gradingPolicyLoading={gradingPolicyManagement.loading}
           />
         );
 
@@ -877,6 +908,11 @@ const CourseDetail: React.FC = () => {
             courseId={id || ''}
             isGradebookLoading={instructorGradebookLoading}
             gradebookData={gradebookData}
+            studentTotals={gradebookStudentTotals}
+            studentFinalTotals={gradebookStudentFinalTotals}
+            gradeOverrides={gradebookOverrides}
+            gradebookPolicyMeta={gradebookPolicyMeta}
+            cellMeta={gradebookCellMeta}
             submissionMap={submissionMap}
             studentSubmissions={studentSubmissions}
             isInstructor={isInstructor}
@@ -919,16 +955,29 @@ const CourseDetail: React.FC = () => {
               show: gradingPolicyManagement.showModal,
               setShow: gradingPolicyManagement.setShowModal,
               editPolicy: gradingPolicyManagement.editPolicy,
+              resolvedPolicy: gradingPolicyManagement.resolved,
               setEditPolicy: gradingPolicyManagement.setEditPolicy,
               onSave: gradingPolicyManagement.handleSave,
-              onPreview: gradingPolicyManagement.runPreview,
+              onReviewImpact: gradingPolicyManagement.runImpactPreview,
+              onBackFromImpact: () => gradingPolicyManagement.setImpactStep(false),
               saving: gradingPolicyManagement.saving,
               loading: gradingPolicyManagement.loading,
               error: gradingPolicyManagement.error,
-              preview: gradingPolicyManagement.preview,
               dirty: gradingPolicyManagement.dirty,
+              canReviewImpact: gradingPolicyManagement.canReviewImpact,
+              impactPreview: gradingPolicyManagement.impactPreview,
+              impactLoading: gradingPolicyManagement.impactLoading,
+              impactStep: gradingPolicyManagement.impactStep,
+              lifecycleStatus: gradingPolicyManagement.lifecycleStatus,
+              applyMode: gradingPolicyManagement.applyMode,
+              onApplyModeChange: gradingPolicyManagement.setApplyMode,
+              effectiveAssignmentId: gradingPolicyManagement.effectiveAssignmentId,
+              onEffectiveAssignmentChange: gradingPolicyManagement.setEffectiveAssignmentId,
+              saveReason: gradingPolicyManagement.saveReason,
+              onSaveReasonChange: gradingPolicyManagement.setSaveReason,
             }}
             handleGradeInputKeyDown={handleGradeInputKeyDown}
+            onGradebookRefresh={() => setGradebookRefresh((n) => n + 1)}
           />
           </>
         );

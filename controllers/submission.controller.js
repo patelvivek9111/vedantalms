@@ -15,7 +15,8 @@ const { assertCourseFilesMutable, resolveCourseForAssignment } = require('../ser
 const { buildDownloadPath, attachFileAssets } = fileAssetService;
 const { supersedeFileAssets } = require('../services/fileVersioning.service');
 const { assertFileMutable } = require('../services/fileGovernance.service');
-const { buildClientFileList } = require('../utils/fileResponse');
+const { buildClientFileList, buildTeacherFeedbackClientFiles } = require('../utils/fileResponse');
+const { serializeSubmissionForApi } = require('../utils/submissionResponse');
 const assignmentAccess = require('../services/assignmentAccess.service');
 const timedQuizAttemptService = require('../services/timedQuizAttempt.service');
 const gradeReleaseService = require('../services/gradeRelease.service');
@@ -25,7 +26,7 @@ const workflowCache = require('../services/workflowCache.service');
 const { isPaperUploadQuiz } = require('../utils/quizSubmissionMode');
 
 function getIdempotencyKey(req, prefix) {
-  const raw = req.headers['idempotency-key'] || req.headers['x-idempotency-key'];
+  const raw = req.headers?.['idempotency-key'] || req.headers?.['x-idempotency-key'];
   if (!raw) return null;
   return `${prefix}:${String(raw).slice(0, 128)}`;
 }
@@ -199,12 +200,68 @@ async function applySubmissionFiles(submission, assignmentDoc, req) {
   return submission;
 }
 
+async function applyTeacherFeedbackFiles(submission, assignmentDoc, req) {
+  if (req.body.teacherFeedbackFileAssetIds === undefined) {
+    return submission;
+  }
+
+  const course = await resolveCourseForAssignment(assignmentDoc._id);
+  if (course) {
+    await assertCourseFilesMutable(course, req.user, { action: 'feedback_file_update' });
+  }
+
+  const fileAssetIds = fileAssetService.parseFileAssetIdsFromBody({
+    fileAssetIds: req.body.teacherFeedbackFileAssetIds,
+  });
+
+  const previousIds = (submission.teacherFeedbackFileAssets || []).map(String);
+
+  for (const id of fileAssetIds) {
+    const asset = await require('../models/fileAsset.model').findById(id);
+    if (asset) await assertFileMutable(asset, { action: 'attach', user: req.user });
+  }
+
+  await fileAssetService.validateFileAssetIdsForAttach(fileAssetIds, {
+    user: req.user,
+    courseId: course?._id,
+    assignmentId: assignmentDoc._id,
+    category: 'feedback',
+    ownerOnly: true,
+  });
+
+  await supersedeFileAssets({
+    previousAssetIds: previousIds,
+    newAssetIds: fileAssetIds,
+    patch: {
+      category: 'feedback',
+      courseId: course?._id,
+      assignmentId: assignmentDoc._id,
+      submissionId: submission._id,
+      accessScope: { enrolledOnly: true, ownerOnly: false },
+      visibility: 'course',
+    },
+    audit: { userId: req.user._id, ip: req.ip, requestId: req.requestId },
+  });
+
+  submission.teacherFeedbackFileAssets = fileAssetIds;
+  submission.teacherFeedbackFiles = fileAssetIds.map((id) => buildDownloadPath(id));
+  return submission;
+}
+
 async function saveGradedSubmission(submission, auditMeta = {}) {
   const isGraded =
     submission.excused === true ||
     submission.gradedAt != null ||
     submission.grade !== undefined ||
     submission.finalGrade !== undefined;
+
+  let priorDoc = null;
+  if (isGraded && submission._id) {
+    priorDoc = await require('../models/Submission')
+      .findById(submission._id)
+      .select('grade finalGrade excused student assignment')
+      .lean();
+  }
 
   if (isGraded && submission.assignment) {
     const course = await gradingPolicySnapshotService.getCourseForAssignment(submission.assignment);
@@ -239,7 +296,31 @@ async function saveGradedSubmission(submission, auditMeta = {}) {
     }
     await gradingPolicySnapshotService.stampSubmissionPolicySnapshot(submission);
   }
-  return submission.save();
+
+  const saved = await submission.save();
+
+  if (priorDoc && submission.assignment) {
+    const gradebookHistory = require('../services/gradebookHistory.service');
+    const course = await gradingPolicySnapshotService.getCourseForAssignment(submission.assignment);
+    if (course) {
+      const prevGrade = priorDoc.finalGrade ?? priorDoc.grade ?? null;
+      const nextGrade = submission.finalGrade ?? submission.grade ?? null;
+      await gradebookHistory.recordGradeChange({
+        courseId: course._id || course.id,
+        assignmentId: submission.assignment,
+        studentId: priorDoc.student || submission.student,
+        previousGrade: prevGrade,
+        newGrade: nextGrade,
+        previousExcused: !!priorDoc.excused,
+        newExcused: !!submission.excused,
+        changeType: submission.excused ? 'excused' : 'grade',
+        changedBy: auditMeta.userId || null,
+        metadata: auditMeta.metadata || null,
+      }).catch(() => {});
+    }
+  }
+
+  return saved;
 }
 
 // Submit an assignment
@@ -288,7 +369,7 @@ exports.submitAssignment = async (req, res) => {
     
     if (existingSubmission) {
       if (submitIdempotencyKey && existingSubmission.lastSubmitIdempotencyKey === submitIdempotencyKey) {
-        return res.json(existingSubmission);
+        return res.json(serializeSubmissionForApi(existingSubmission));
       }
       if (!assignment.isTimedQuiz) {
         await submissionVersionService.snapshotSubmission(existingSubmission, { actorId: req.user._id });
@@ -334,7 +415,7 @@ exports.submitAssignment = async (req, res) => {
       }
       
       await existingSubmission.save();
-      return res.json(existingSubmission);
+      return res.json(serializeSubmissionForApi(existingSubmission));
     }
     
     // Get file URLs from uploaded files (already uploaded via /api/upload)
@@ -350,7 +431,7 @@ exports.submitAssignment = async (req, res) => {
     });
     
     await submission.save();
-    res.status(201).json(submission);
+    res.status(201).json(serializeSubmissionForApi(submission));
   } catch (error) {
     // If there's an error, delete any uploaded files
     if (req.files) {
@@ -444,7 +525,7 @@ exports.createSubmission = async (req, res) => {
     
     if (existingSubmission) {
       if (submitIdempotencyKey && existingSubmission.lastSubmitIdempotencyKey === submitIdempotencyKey) {
-        const enriched = existingSubmission.toObject ? existingSubmission.toObject() : existingSubmission;
+        const enriched = serializeSubmissionForApi(existingSubmission);
         enriched.clientFiles = await buildClientFileList(existingSubmission, req.user._id);
         return res.status(200).json(enriched);
       }
@@ -466,7 +547,7 @@ exports.createSubmission = async (req, res) => {
       
       existingSubmission = await autoGradeSubmissionOnce(existingSubmission, assignmentDoc);
       
-      const enriched = existingSubmission.toObject();
+      const enriched = serializeSubmissionForApi(existingSubmission);
       enriched.clientFiles = await buildClientFileList(existingSubmission, req.user._id);
       return res.status(200).json(enriched);
     }
@@ -557,7 +638,7 @@ exports.createSubmission = async (req, res) => {
       // Don't fail the submission if notification fails
     }
 
-    const enriched = finalSubmission.toObject();
+    const enriched = serializeSubmissionForApi(finalSubmission);
     enriched.clientFiles = await buildClientFileList(finalSubmission, req.user._id);
     res.status(201).json(enriched);
   } catch (error) {
@@ -699,8 +780,9 @@ exports.getAssignmentSubmissions = async (req, res) => {
 
     const data = await Promise.all(
       pageItems.map(async (submission) => {
-        const row = submission.toObject ? submission.toObject() : { ...submission };
+        const row = serializeSubmissionForApi(submission);
         row.clientFiles = await buildClientFileList(submission, req.user._id);
+        row.teacherFeedbackClientFiles = await buildTeacherFeedbackClientFiles(submission, req.user._id);
         return row;
       })
     );
@@ -775,7 +857,7 @@ exports.getStudentSubmissionsForCourse = async (req, res) => {
 // Grade a submission
 exports.gradeSubmission = async (req, res) => {
   try {
-    const { grade, feedback, questionGrades, useIndividualGrades, memberGrades, approveGrade, showCorrectAnswers, showStudentAnswers, studentId, excused, releaseGrade, hideGrade, releaseFeedback } = req.body;
+    const { grade, feedback, questionGrades, useIndividualGrades, memberGrades, approveGrade, showCorrectAnswers, showStudentAnswers, studentId, excused, releaseGrade, hideGrade, releaseFeedback, teacherFeedbackFileAssetIds } = req.body;
     let submission = await Submission.findById(req.params.id).populate('group');
 
     // If submission doesn't exist, check if this is for an offline assignment
@@ -822,9 +904,13 @@ exports.gradeSubmission = async (req, res) => {
       submission.gradedBy = req.user._id;
       submission.gradedAt = new Date();
       submission.feedback = feedback ?? submission.feedback;
+      const assignmentDoc = await Assignment.findById(submission.assignment);
+      if (assignmentDoc) {
+        await applyTeacherFeedbackFiles(submission, assignmentDoc, req);
+      }
       await saveGradedSubmission(submission, { user: req.user, userId: req.user._id, ip: req.ip, requestId: req.requestId });
       await invalidateStudentGradeCacheForSubmission(submission);
-      return res.json(submission);
+      return res.json(serializeSubmissionForApi(submission));
     }
     if (excused === false) {
       submission.excused = false;
@@ -1074,6 +1160,7 @@ exports.gradeSubmission = async (req, res) => {
         }
         // Calculate average grade for the group
         submission.grade = membersGraded > 0 ? totalGrade / membersGraded : 0;
+        submission.finalGrade = submission.grade;
 
       } else {
         submission.useIndividualGrades = false;
@@ -1084,6 +1171,7 @@ exports.gradeSubmission = async (req, res) => {
             return res.status(400).json({ message: 'Invalid grade format' });
           }
           submission.grade = parsedGrade;
+          submission.finalGrade = parsedGrade;
         }
       }
       
@@ -1127,6 +1215,11 @@ exports.gradeSubmission = async (req, res) => {
     }
 
     submission.feedback = feedback;
+
+    const assignmentDoc = await Assignment.findById(submission.assignment);
+    if (assignmentDoc) {
+      await applyTeacherFeedbackFiles(submission, assignmentDoc, req);
+    }
     
     // Update quiz feedback options if provided
     if (showCorrectAnswers !== undefined) {
@@ -1252,7 +1345,7 @@ exports.gradeSubmission = async (req, res) => {
     let responseData;
     try {
       if (populatedSubmission && typeof populatedSubmission.toObject === 'function') {
-        responseData = populatedSubmission.toObject();
+        responseData = serializeSubmissionForApi(populatedSubmission);
       } else if (populatedSubmission && typeof populatedSubmission === 'object') {
         responseData = { ...populatedSubmission };
       } else {
@@ -1264,43 +1357,20 @@ exports.gradeSubmission = async (req, res) => {
         responseData = {};
       }
       
-      // Ensure Map fields are properly converted to plain objects
-      // Mongoose Maps need explicit conversion for JSON serialization
-      if (populatedSubmission) {
-        // Convert autoQuestionGrades Map to plain object if it exists
-        if (populatedSubmission.autoQuestionGrades instanceof Map) {
-          responseData.autoQuestionGrades = Object.fromEntries(populatedSubmission.autoQuestionGrades);
-        } else if (populatedSubmission.autoQuestionGrades && typeof populatedSubmission.autoQuestionGrades === 'object') {
-          // Already an object, ensure it's a plain object (not a Mongoose Map wrapper)
-          responseData.autoQuestionGrades = { ...populatedSubmission.autoQuestionGrades };
-        }
-        
-        // Convert questionGrades Map to plain object if it exists
-        if (populatedSubmission.questionGrades instanceof Map) {
-          responseData.questionGrades = Object.fromEntries(populatedSubmission.questionGrades);
-        } else if (populatedSubmission.questionGrades && typeof populatedSubmission.questionGrades === 'object') {
-          responseData.questionGrades = { ...populatedSubmission.questionGrades };
-        }
-        
-        // Convert answers Map to plain object if it exists
-        if (populatedSubmission.answers instanceof Map) {
-          responseData.answers = Object.fromEntries(populatedSubmission.answers);
-        } else if (populatedSubmission.answers && typeof populatedSubmission.answers === 'object') {
-          responseData.answers = { ...populatedSubmission.answers };
-        }
-      }
-      
       responseData.notificationCreated = notificationCreated || false;
       responseData.teacherApproved = submission.teacherApproved || false;
+      responseData.teacherFeedbackClientFiles = await buildTeacherFeedbackClientFiles(submission, req.user._id);
       
       res.json(responseData);
     } catch (responseError) {
       console.error('Error formatting response:', responseError);
-      // Fallback: send basic response
+      const fallback = populatedSubmission
+        ? serializeSubmissionForApi(populatedSubmission)
+        : serializeSubmissionForApi(submission);
       res.json({
-        ...(populatedSubmission || {}),
+        ...fallback,
         notificationCreated: notificationCreated || false,
-        teacherApproved: submission.teacherApproved || false
+        teacherApproved: submission.teacherApproved || false,
       });
     }
   } catch (error) {
@@ -1350,8 +1420,14 @@ exports.getStudentSubmission = async (req, res) => {
       return res.status(404).json({ message: 'Submission not found' });
     }
 
+    const visibility = gradeReleaseService.resolveStudentGradeVisibility(submission, assignment);
     const payload = gradeReleaseService.redactSubmissionForStudent(submission, assignment);
     payload.files = await buildClientFileList(submission, req.user._id);
+    if (visibility.feedbackVisible) {
+      const feedbackClientFiles = await buildTeacherFeedbackClientFiles(submission, req.user._id);
+      payload.teacherFeedbackFiles = feedbackClientFiles;
+      payload.teacherFeedbackClientFiles = feedbackClientFiles;
+    }
     res.json(payload);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -1378,7 +1454,10 @@ exports.getSubmissionById = async (req, res) => {
       return res.status(404).json({ message: 'Submission not found' });
     }
 
-    res.json(submission);
+    const payload = serializeSubmissionForApi(submission);
+    payload.clientFiles = await buildClientFileList(submission, req.user._id);
+    payload.teacherFeedbackClientFiles = await buildTeacherFeedbackClientFiles(submission, req.user._id);
+    res.json(payload);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -1554,7 +1633,7 @@ exports.createOrUpdateManualGrade = async (req, res) => {
       .populate('submittedBy', 'firstName lastName email')
       .populate('gradedBy', 'firstName lastName');
     
-    res.json(populatedSubmission);
+    res.json(serializeSubmissionForApi(populatedSubmission));
   } catch (error) {
     console.error('Error creating/updating manual grade:', error);
     res.status(500).json({ message: error.message });

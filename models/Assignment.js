@@ -147,7 +147,21 @@ const assignmentSchema = new mongoose.Schema({
     type: Number,
     min: 0,
     default: 0
-  }
+  },
+  isExtraCredit: {
+    type: Boolean,
+    default: false
+  },
+  bonusPoints: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  gradingPeriodId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'CourseGradingPeriod',
+    default: null,
+  },
 }, {
   timestamps: true
 });

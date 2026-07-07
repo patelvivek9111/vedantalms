@@ -79,6 +79,8 @@ jobs:
       - run: npm run verify:grading
       - run: npm run verify:workflows
       - run: npm run test:grading
+      - run: npm run test:serialization
+      - run: npm run test:pre-rollout
       - run: npm run validate:indexes
       - run: npm run migrate:dry-run
       - run: node scripts/verifyAuditIntegrity.js || echo "skip audit integrity without mongo"

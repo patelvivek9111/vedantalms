@@ -2,19 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { fetchPolicyAudit } from '../../services/gradingApi';
 import { ErrorBanner } from '../../design-system';
 import AuditFilterBar, { type AuditFilters } from '../../features/audit/AuditFilterBar';
-import { filterPolicyAuditEntries } from '../../features/audit/filterAuditEntries';
+import { filterPolicyAuditEntries, type PolicyAuditEntry } from '../../features/audit/filterAuditEntries';
 import PolicyDiffViewer from './PolicyDiffViewer';
-
-interface AuditEntry {
-  _id: string;
-  createdAt: string;
-  oldHash?: string;
-  newHash?: string;
-  oldPolicy?: Record<string, unknown>;
-  newPolicy?: Record<string, unknown>;
-  reason?: string;
-  actor?: { firstName?: string; lastName?: string; email?: string };
-}
 
 interface PolicyAuditHistoryProps {
   entityType: 'institution' | 'course';
@@ -23,7 +12,7 @@ interface PolicyAuditHistoryProps {
 
 const PolicyAuditHistory: React.FC<PolicyAuditHistoryProps> = ({ entityType, entityId }) => {
   const [loading, setLoading] = useState(true);
-  const [entries, setEntries] = useState<AuditEntry[]>([]);
+  const [entries, setEntries] = useState<PolicyAuditEntry[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [filters, setFilters] = useState<AuditFilters>({ search: '', category: '', severity: '' });
@@ -84,6 +73,17 @@ const PolicyAuditHistory: React.FC<PolicyAuditHistoryProps> = ({ entityType, ent
                   </span>
                   {entry.reason && (
                     <span className="text-xs text-gray-600 dark:text-gray-400">Reason: {entry.reason}</span>
+                  )}
+                  {entry.applyMode && (
+                    <span className="text-xs text-gray-600 dark:text-gray-400">
+                      Apply mode: {entry.applyMode.replace(/_/g, ' ')}
+                    </span>
+                  )}
+                  {entry.impactSummary && (
+                    <span className="text-xs text-gray-600 dark:text-gray-400">
+                      Impact: {entry.impactSummary.affectedCount} affected, max Δ{' '}
+                      {entry.impactSummary.maxDeltaPercent?.toFixed?.(2) ?? entry.impactSummary.maxDeltaPercent}%
+                    </span>
                   )}
                 </button>
                 {isOpen && (

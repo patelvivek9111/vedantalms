@@ -3,6 +3,8 @@
  */
 import {
   calculateFinalGradeWithWeightedGroups,
+  calculateProjectedFinalGradeWithWeightedGroups,
+  computeGroupPointTotals,
   courseContextFromResolvedPolicy,
   resolveGradingPolicy,
   type Course,
@@ -49,28 +51,117 @@ export function augmentAssignmentsForStudent(assignments: any[], studentId: stri
     if (!a.isDiscussion) return a;
     return {
       ...a,
-      hasSubmitted: hasReplyByUser(a.replies || [], studentId),
+      hasSubmitted:
+        a.hasSubmitted === true || hasReplyByUser(a.replies || [], studentId),
     };
   });
 }
 
-function buildCourseContext(course: Course, resolvedFromApi?: ResolvedGradingPolicy | null) {
-  if (resolvedFromApi?.groups) {
-    const ctx = {
-      groups: resolvedFromApi.groups as Course['groups'],
-      gradeScale: (resolvedFromApi.gradeScale as Course['gradeScale']) || course.gradeScale,
-      gradingPolicy: resolvedFromApi,
-    };
-    return { ctx, policy: resolvedFromApi };
+/**
+ * Merge API resolved policy with course fields so missing-assignment rules always apply
+ * even when the policy payload omits groups (must match backend grade engine).
+ */
+export function normalizeResolvedPolicyForCourse(
+  course: Course,
+  resolved?: ResolvedGradingPolicy | null,
+  assignments: Array<{ _id: unknown }> = []
+): ResolvedGradingPolicy | null {
+  const courseGroups = course.groups ?? [];
+  let base: ResolvedGradingPolicy | null = resolved ?? null;
+  if (!base && (courseGroups.length > 0 || course.gradingPolicy)) {
+    base = resolveGradingPolicy({ course }) as ResolvedGradingPolicy;
   }
-  if (course.gradingPolicy) {
-    const resolved = resolveGradingPolicy({ course });
+  if (!base) return null;
+  const groups =
+    base.groups && base.groups.length > 0 ? base.groups : courseGroups;
+  const gradeScale =
+    base.gradeScale && base.gradeScale.length > 0
+      ? base.gradeScale
+      : course.gradeScale;
+  let normalized: ResolvedGradingPolicy = {
+    ...base,
+    groups,
+    ...(gradeScale ? { gradeScale } : {}),
+  };
+  if (
+    assignments.length > 0 &&
+    normalized.policyApplication?.applyMode === 'from_assignment'
+  ) {
+    normalized = enrichResolvedForAssignmentOrder(normalized, assignments) as ResolvedGradingPolicy;
+  }
+  return normalized;
+}
+
+function buildCourseContext(
+  course: Course,
+  resolvedFromApi?: ResolvedGradingPolicy | null,
+  assignments: Array<{ _id: unknown }> = []
+) {
+  const normalized = normalizeResolvedPolicyForCourse(course, resolvedFromApi, assignments);
+  if (normalized) {
+    const ctx = {
+      groups: normalized.groups as Course['groups'],
+      gradeScale: (normalized.gradeScale as Course['gradeScale']) || course.gradeScale,
+      gradingPolicy: normalized,
+    };
+    return { ctx, policy: normalized };
+  }
+  if ((course.groups?.length ?? 0) > 0 || course.gradingPolicy) {
+    const resolved = resolveGradingPolicy({ course }) as ResolvedGradingPolicy;
     return { ctx: courseContextFromResolvedPolicy(resolved), policy: resolved };
   }
   return { ctx: course, policy: undefined };
 }
 
-/** Canonical per-student weighted % (same as GradebookView overall column). */
+/** Current grade % (graded-only / exclude-until-graded rules). */
+export function computeStudentCurrentPercent(
+  studentId: string,
+  course: Course,
+  assignments: any[],
+  grades: Grades,
+  submissionMap: { [key: string]: string },
+  studentSubmissions: any[] = [],
+  resolvedPolicy?: ResolvedGradingPolicy | null
+): number {
+  return computeStudentWeightedPercent(
+    studentId,
+    course,
+    assignments,
+    grades,
+    submissionMap,
+    studentSubmissions,
+    resolvedPolicy
+  );
+}
+
+/** Projected final % (all published assignments; ungraded = zero). */
+export function computeStudentProjectedFinalPercent(
+  studentId: string,
+  course: Course,
+  assignments: any[],
+  grades: Grades,
+  submissionMap: { [key: string]: string },
+  studentSubmissions: any[] = [],
+  resolvedPolicy?: ResolvedGradingPolicy | null
+): number {
+  const studentSubmissionMap = buildStudentSubmissionMapFromComposite(
+    studentId,
+    submissionMap,
+    studentSubmissions
+  );
+  const augmentedAssignments = augmentAssignmentsForStudent(assignments, studentId);
+  const { ctx, policy } = buildCourseContext(course, resolvedPolicy, augmentedAssignments);
+  return calculateProjectedFinalGradeWithWeightedGroups(
+    studentId,
+    ctx,
+    augmentedAssignments,
+    grades,
+    studentSubmissionMap,
+    policy
+  );
+}
+
+/** @deprecated Use computeStudentCurrentPercent — kept for existing imports. */
 export function computeStudentWeightedPercent(
   studentId: string,
   course: Course,
@@ -86,7 +177,7 @@ export function computeStudentWeightedPercent(
     studentSubmissions
   );
   const augmentedAssignments = augmentAssignmentsForStudent(assignments, studentId);
-  const { ctx, policy } = buildCourseContext(course, resolvedPolicy);
+  const { ctx, policy } = buildCourseContext(course, resolvedPolicy, augmentedAssignments);
   return calculateFinalGradeWithWeightedGroups(
     studentId,
     ctx,
@@ -123,4 +214,46 @@ export function computeAssignmentGroupPercent(
     submissionMap,
     studentSubmissions
   );
+}
+
+export type AssignmentGroupStats = {
+  totalEarned: number;
+  totalPossible: number;
+  includedCount: number;
+  totalInGroup: number;
+  contributesToGrade: boolean;
+  percentage: number | null;
+};
+
+/**
+ * Per-group display stats aligned with the canonical grading engine (matches course total rules).
+ */
+export function computeAssignmentGroupStats(
+  studentId: string,
+  groupName: string,
+  groupAssignments: any[],
+  course: Course,
+  grades: Grades,
+  submissionMap: { [key: string]: string },
+  studentSubmissions: any[] = [],
+  resolvedPolicy?: ResolvedGradingPolicy | null
+): AssignmentGroupStats {
+  const studentSubmissionMap = buildStudentSubmissionMapFromComposite(
+    studentId,
+    submissionMap,
+    studentSubmissions
+  );
+  const augmentedAssignments = augmentAssignmentsForStudent(groupAssignments, studentId);
+  const { policy } = buildCourseContext(course, resolvedPolicy, augmentedAssignments);
+
+  const pointTotals = computeGroupPointTotals(
+    studentId,
+    augmentedAssignments,
+    grades,
+    studentSubmissionMap,
+    policy,
+    groupName
+  );
+
+  return pointTotals;
 }

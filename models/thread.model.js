@@ -162,6 +162,11 @@ const threadSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  gradingPeriodId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'CourseGradingPeriod',
+    default: null,
+  },
   dueDate: {
     type: Date,
     default: null
@@ -267,11 +272,32 @@ threadSchema.virtual('replyCount').get(function() {
   return this.counters?.replyCount ?? this.replies.length;
 });
 
-// Update lastActivity when a reply is added
+function clampThreadCounters(doc) {
+  if (!doc?.counters) return;
+  for (const key of [
+    'replyCount',
+    'participantCount',
+    'unreadCount',
+    'likeCount',
+    'unresolvedModerationCount',
+  ]) {
+    if (typeof doc.counters[key] === 'number' && doc.counters[key] < 0) {
+      doc.counters[key] = 0;
+    }
+  }
+}
+
+threadSchema.pre('validate', function(next) {
+  clampThreadCounters(this);
+  next();
+});
+
+// Update lastActivity when a reply is added.
 threadSchema.pre('save', function(next) {
   if (this.isModified('replies')) {
     this.lastActivity = new Date();
   }
+  clampThreadCounters(this);
   next();
 });
 

@@ -14,6 +14,7 @@ const {
   loadGroupSetWithCourse,
   isCourseGradingStaff,
 } = require('../utils/groupAccess');
+const { serializeSubmissionForApi } = require('../utils/submissionResponse');
 
 // Add this route for getting all groups for the current user (must be before any parameterized routes)
 router.get('/my', protect, groupController.getMyGroups);
@@ -265,9 +266,8 @@ router.put('/:groupId', protect, authorize('teacher', 'admin'), async (req, res)
             return res.status(404).json({ message: 'Course not found' });
         }
 
-        // Check if user is the instructor or admin of the course
-        if (course.instructor.toString() !== req.user._id.toString() && 
-            (!course.admins || !course.admins.includes(req.user._id))) {
+        // Check if user is grading staff for the course
+        if (!isCourseGradingStaff(req.user, course)) {
             return res.status(403).json({ message: 'Not authorized to modify this group' });
         }
 
@@ -316,7 +316,7 @@ router.post('/:groupId/message', protect, async (req, res) => {
     // Verify user has access to the course
     const groupSet = await GroupSet.findById(group.groupSet);
     const course = await Course.findById(groupSet.course);
-    if (!course.instructors.includes(req.user._id) && !course.admins.includes(req.user._id)) {
+    if (!isCourseGradingStaff(req.user, course)) {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
@@ -350,12 +350,12 @@ router.get('/:groupId/activity', protect, async (req, res) => {
     // Verify user has access to the course
     const groupSet = await GroupSet.findById(group.groupSet);
     const course = await Course.findById(groupSet.course);
-    if (!course.instructors.includes(req.user._id) && !course.admins.includes(req.user._id)) {
+    if (!isCourseGradingStaff(req.user, course)) {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
     // Get group's submissions
-    const submissions = await Submission.find({
+    const submissionDocs = await Submission.find({
       group: group._id
     }).populate('assignment').sort('-submittedAt');
 
@@ -365,7 +365,7 @@ router.get('/:groupId/activity', protect, async (req, res) => {
     }).populate('author').sort('-createdAt');
 
     res.json({
-      submissions,
+      submissions: submissionDocs.map(serializeSubmissionForApi),
       discussions
     });
   } catch (err) {

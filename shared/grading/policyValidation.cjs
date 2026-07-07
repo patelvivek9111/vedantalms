@@ -43,6 +43,24 @@ function validateGradingPolicy(policy, { partial = false } = {}) {
     });
   }
 
+  const dropHigh = policy.dropHighest || {};
+  if (dropHigh.enabled && Array.isArray(dropHigh.rules)) {
+    dropHigh.rules.forEach((rule, i) => {
+      if (!rule?.groupName) errors.push(`dropHighest.rules[${i}].groupName is required`);
+      if (rule?.count != null && (rule.count < 0 || rule.count > 50)) {
+        errors.push(`dropHighest.rules[${i}].count must be between 0 and 50`);
+      }
+    });
+  }
+
+  const visibility = policy.gradeVisibility || {};
+  if (
+    visibility.mutedAssignmentsInTotals &&
+    !['exclude', 'include'].includes(visibility.mutedAssignmentsInTotals)
+  ) {
+    errors.push('gradeVisibility.mutedAssignmentsInTotals must be exclude or include');
+  }
+
   const caps = policy.categoryCaps || {};
   if (caps.enabled && Array.isArray(caps.caps)) {
     caps.caps.forEach((cap, i) => {

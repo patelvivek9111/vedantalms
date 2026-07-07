@@ -1,6 +1,6 @@
 /**
  * Ensures backend gradeCalculation.js stays aligned with documented policy expectations.
- * Frontend gradeUtils.ts is maintained as a TypeScript port of the same algorithm.
+ * Full CP-11…CP-25 coverage lives in canvasParityComprehensive.policy.test.js (Phase 7).
  */
 const {
   calculateFinalGradeWithWeightedGroups,
@@ -18,6 +18,8 @@ const {
   case8ManualGrade,
   case9GroupAssignment,
 } = require('./fixtures');
+const { ALL_CANVAS_PARITY_SCENARIOS } = require('./canvasParity.fixtures');
+const { runCurrentGrade } = require('./parityRunner');
 
 /** Expected overall % per scenario — shared contract with frontend Vitest suite */
 const CONTRACT = [
@@ -54,5 +56,15 @@ describe('Grading policy contract — backend canonical results', () => {
     const letter = getLetterGrade(percent, s.course.gradeScale);
     expect(percent).toBeCloseTo(expectedPercent, 5);
     expect(letter).toBe(expectedLetter);
+  });
+
+  it.each(
+    ALL_CANVAS_PARITY_SCENARIOS.filter((f) => {
+      const s = f();
+      return s.expectedCurrentPercent != null && !s.assertLessThan && !s.assertLessThanUncapped;
+    }).map((f) => [f().id, f])
+  )('%s current matches canvas parity fixture', (_id, factory) => {
+    const s = factory();
+    expect(runCurrentGrade(s)).toBeCloseTo(s.expectedCurrentPercent, 5);
   });
 });

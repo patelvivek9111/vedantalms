@@ -271,6 +271,16 @@ function filterDiscussionForStudent(user, thread, options = {}) {
 
   obj.studentGrades = discussionGradeVisibility.filterStudentGradesForUser(obj, user);
 
+  const gradeRow = discussionGradeVisibility.findStudentGrade(obj, user._id);
+  obj.gradeVisibility = discussionGradeVisibility.resolveDiscussionGradeVisibility(obj, gradeRow);
+  const visibleRow = discussionGradeVisibility.discussionGradeForTotals(obj, user._id);
+  if (visibleRow) {
+    const { resolveAssignmentGrade } = require('../utils/gradeCalculation');
+    obj.grade = resolveAssignmentGrade({ discussionGradeRow: visibleRow });
+  } else {
+    obj.grade = null;
+  }
+
   if (obj.settings?.requirePostBeforeSee && !obj.hasSubmitted) {
     obj.replies = [];
     obj.replyCount = 0;

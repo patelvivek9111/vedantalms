@@ -8,6 +8,7 @@ const {
   CAPABILITIES,
 } = require('../middleware/academicPermissions');
 const gradesController = require('../controllers/grades.controller');
+const gradingPeriodController = require('../controllers/gradingPeriod.controller');
 const gradeLifecycleController = require('../controllers/gradeLifecycle.controller');
 
 const skipLimit = () => process.env.DISABLE_RATE_LIMIT === 'true';
@@ -40,6 +41,41 @@ router.get('/courses/averages', protect, gradesController.getCourseClassAverages
 router.get('/course/:courseId/average', protect, gradesController.getCourseClassAverage);
 
 router.get('/course/:courseId/gradebook', protect, gradesController.getCourseGradebook);
+router.get(
+  '/course/:courseId/gradebook/history',
+  protect,
+  gradesController.getGradebookCellHistory
+);
+router.get(
+  '/course/:courseId/grading-periods',
+  protect,
+  gradingPeriodController.listGradingPeriods
+);
+router.post(
+  '/course/:courseId/grading-periods',
+  protect,
+  gradingPeriodController.createGradingPeriod
+);
+router.patch(
+  '/course/:courseId/grading-periods/:periodId',
+  protect,
+  gradingPeriodController.updateGradingPeriod
+);
+router.get(
+  '/course/:courseId/students/:studentId/grade-override',
+  protect,
+  gradesController.getStudentGradeOverride
+);
+router.put(
+  '/course/:courseId/students/:studentId/grade-override',
+  protect,
+  gradesController.setStudentGradeOverride
+);
+router.delete(
+  '/course/:courseId/students/:studentId/grade-override',
+  protect,
+  gradesController.clearStudentGradeOverride
+);
 router.post(
   '/course/:courseId/gradebook/export',
   gradingLifecycleLimiter,

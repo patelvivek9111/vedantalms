@@ -44,14 +44,16 @@ function resolveDiscussionGradeVisibility(thread, gradeRow) {
 
 function redactStudentGradeRow(thread, gradeRow) {
   const visibility = resolveDiscussionGradeVisibility(thread, gradeRow);
+  const studentRef = gradeRow?.student ?? null;
   if (!gradeRow || !visibility.scoreVisible) {
     return {
+      student: studentRef,
       gradeVisibility: visibility,
     };
   }
 
   return {
-    student: gradeRow.student,
+    student: studentRef,
     grade: gradeRow.grade,
     excused: gradeRow.excused === true,
     feedback: visibility.feedbackVisible ? gradeRow.feedback || null : null,

@@ -1,4 +1,7 @@
-import { isExcusedGrade } from './gradeValues.mjs';
+import {
+  resolveSubmissionGradeStatus,
+  gradebookCellFromStatus,
+} from './gradeStatus.mjs';
 
 export function getGradebookCellForExport(
   student,
@@ -22,12 +25,13 @@ export function getGradebookCellForExport(
       )
     : !!submissionMap[submissionKey];
 
-  const dueDate = assignment.dueDate ? new Date(assignment.dueDate) : null;
-  const now = new Date();
-
+  let submission = null;
   let submittedAt = null;
+
   if (assignment.isDiscussion) {
-    if (Array.isArray(assignment.replies)) {
+    if (assignment.studentReplyCreatedAt) {
+      submittedAt = new Date(assignment.studentReplyCreatedAt);
+    } else if (Array.isArray(assignment.replies)) {
       const reply = assignment.replies.find(
         (r) => r.author && (r.author._id === student._id || r.author === student._id)
       );
@@ -36,50 +40,23 @@ export function getGradebookCellForExport(
   } else {
     const submissionId = submissionMap[submissionKey];
     if (submissionId && Array.isArray(studentSubmissions)) {
-      const sub = studentSubmissions.find((s) => String(s._id) === String(submissionId));
-      if (sub?.submittedAt) submittedAt = new Date(sub.submittedAt);
-      if (isExcusedGrade(grade, sub)) {
-        return { display: 'Excused', marker: 'GRAY' };
-      }
+      submission = studentSubmissions.find((s) => String(s._id) === String(submissionId));
+      if (submission?.submittedAt) submittedAt = new Date(submission.submittedAt);
     }
   }
 
-  if (!assignment.isDiscussion && !assignment.published) {
-    return { display: 'Not Published', marker: 'GRAY' };
-  }
+  const statusResult = resolveSubmissionGradeStatus({
+    assignment,
+    submission,
+    grade,
+    now: new Date(),
+    perspective: 'instructor',
+    studentId: sid,
+    hasSubmission,
+    submittedAt,
+  });
 
-  if (isExcusedGrade(grade, null)) {
-    return { display: 'Excused', marker: 'GRAY' };
-  }
-
-  if (typeof grade === 'number') {
-    const maxPoints =
-      assignment.questions?.reduce((sum, q) => sum + (q.points || 0), 0) ||
-      assignment.totalPoints ||
-      0;
-    const percentage = maxPoints > 0 ? (grade / maxPoints) * 100 : 0;
-    let marker = 'GREEN';
-    if (percentage < 60) marker = 'RED';
-    else if (percentage < 70) marker = 'ORANGE';
-    else if (percentage < 80) marker = 'YELLOW';
-    const display = Number.isInteger(grade) ? String(grade) : Number(grade).toFixed(2);
-    return { display, marker };
-  }
-
-  if (hasSubmission) {
-    if (dueDate && submittedAt && submittedAt.getTime() > dueDate.getTime()) {
-      return { display: 'Late', marker: 'ORANGE' };
-    }
-    return { display: 'Not Graded', marker: 'BLUE' };
-  }
-
-  if (assignment.isOfflineAssignment) {
-    return { display: 'Add Grade', marker: 'PURPLE' };
-  }
-
-  if (dueDate && now.getTime() > dueDate.getTime()) {
-    return { display: '0 (MA)', marker: 'RED' };
-  }
-
-  return { display: 'No Submission', marker: 'PENDING' };
+  const cell = gradebookCellFromStatus(statusResult, { grade, assignment });
+  const { status, ...exportCell } = cell;
+  return exportCell;
 }

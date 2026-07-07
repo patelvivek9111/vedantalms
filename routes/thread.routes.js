@@ -152,6 +152,9 @@ async function serializeThreadForUser(req, thread, context = {}, options = {}) {
   if (!payload.repliesHiddenUntilPost && typeof listReplyCountOverride === 'number') {
     payload.replyCount = Math.max(payload.replyCount ?? 0, listReplyCountOverride);
   }
+  if (options.studentReplyCreatedAt != null) {
+    payload.studentReplyCreatedAt = options.studentReplyCreatedAt;
+  }
   return discussionStatus.attachDiscussionStatus(payload, {
     course: context.course,
     module: context.module,
@@ -188,9 +191,13 @@ async function buildFilteredThreadListResponse(req, threads, routeType, { extraG
   const userId = req.user?._id;
   let repliedThreadIds = new Set();
   let participationByThread = new Map();
+  let firstReplyAtByThread = new Map();
   if (userId) {
     if (req.user.role === 'student') {
-      repliedThreadIds = await discussionReplyService.batchThreadIdsRepliedByUser(threadIds, userId);
+      [repliedThreadIds, firstReplyAtByThread] = await Promise.all([
+        discussionReplyService.batchThreadIdsRepliedByUser(threadIds, userId),
+        discussionReplyService.batchFirstReplyCreatedAtByUser(threadIds, userId),
+      ]);
     }
     participationByThread = await discussionParticipation.summariesForUser(threadIds, userId);
   }
@@ -216,6 +223,7 @@ async function buildFilteredThreadListResponse(req, threads, routeType, { extraG
           batchParticipationLoaded: !!userId,
           hasSubmittedPrefetched: req.user?.role === 'student' ? repliedThreadIds.has(tid) : undefined,
           participationPrefetched: participationByThread.get(tid) || null,
+          studentReplyCreatedAt: firstReplyAtByThread.get(tid) ?? null,
         })
       );
     } catch (error) {
@@ -309,6 +317,7 @@ router.post('/', protect, authorize(['teacher', 'teaching_assistant', 'admin']),
       groupId,
       settings,
       fileAssetIds,
+      gradingPeriodId,
     } = req.body;
 
     const course = await Course.findById(courseId);
@@ -346,6 +355,7 @@ router.post('/', protect, authorize(['teacher', 'teaching_assistant', 'admin']),
       lockAfterDue: lockAfterDue === true,
       discussionReleaseMode: discussionReleaseMode || 'immediate',
       gradeHidden: gradeHidden === true || discussionReleaseMode === 'hidden',
+      gradingPeriodId: gradingPeriodId || null,
       settings: {
         requirePostBeforeSee: settings?.requirePostBeforeSee || false,
         allowLikes: settings?.allowLikes !== undefined ? settings.allowLikes : true,
@@ -916,6 +926,7 @@ router.put('/:threadId', protect, async (req, res) => {
     if (discussionReleaseMode !== undefined) thread.discussionReleaseMode = discussionReleaseMode || 'immediate';
     if (gradesReleasedAt !== undefined) thread.gradesReleasedAt = gradesReleasedAt || null;
     if (gradeHidden !== undefined) thread.gradeHidden = gradeHidden === true;
+    if (req.body.gradingPeriodId !== undefined) thread.gradingPeriodId = req.body.gradingPeriodId || null;
     if (module !== undefined) thread.module = module;
     if (groupSet !== undefined) thread.groupSet = groupSet;
     if (groupId !== undefined) thread.groupId = groupId;
@@ -1062,7 +1073,27 @@ router.post('/:threadId/grade', protect, authorize(['teacher', 'teaching_assista
       });
     }
     if (discussionReleaseMode) thread.discussionReleaseMode = discussionReleaseMode;
-    discussionGradeVisibility.releaseDiscussionGrades(thread, { releaseGrade, hideGrade, mode: discussionReleaseMode });
+    const effectiveMode = discussionReleaseMode || thread.discussionReleaseMode || 'immediate';
+    if (hideGrade === true || effectiveMode === 'hidden') {
+      discussionGradeVisibility.releaseDiscussionGrades(thread, {
+        hideGrade: true,
+        mode: 'hidden',
+      });
+    } else if (
+      grade !== null &&
+      grade !== undefined &&
+      (releaseGrade === true || effectiveMode === 'immediate')
+    ) {
+      discussionGradeVisibility.releaseDiscussionGrades(thread, {
+        releaseGrade: true,
+        mode: effectiveMode,
+      });
+    } else if (releaseGrade === true) {
+      discussionGradeVisibility.releaseDiscussionGrades(thread, {
+        releaseGrade: true,
+        mode: effectiveMode,
+      });
+    }
 
     await thread.save();
     await recordDiscussionAudit({
@@ -1092,7 +1123,7 @@ router.post('/:threadId/grade', protect, authorize(['teacher', 'teaching_assista
 
     res.json({
       success: true,
-      data: await serializeThreadForUser(req, updatedThread, context)
+      data: await serializeThreadForUser(req, updatedThread, context, { includeGrades: true })
     });
   } catch (error) {
     sendRouteError(res, error, 'Error grading thread');
@@ -1346,16 +1377,20 @@ router.post('/:threadId/replies/:replyId/like', protect, async (req, res) => {
         (like) => discussionAccess.normalizeId(like.user) === discussionAccess.normalizeId(req.user._id)
       );
 
+      const nextLikes = [...(reply.likes || [])];
       if (existingLikeIndex > -1) {
-        reply.likes.splice(existingLikeIndex, 1);
+        nextLikes.splice(existingLikeIndex, 1);
       } else {
-        reply.likes.push({
+        nextLikes.push({
           user: req.user._id,
-          likedAt: new Date()
+          likedAt: new Date(),
         });
       }
 
-      await thread.save();
+      await Thread.updateOne(
+        { _id: thread._id, 'replies._id': req.params.replyId },
+        { $set: { 'replies.$.likes': nextLikes } }
+      );
     }
 
     const updatedThread = await Thread.findById(thread._id)

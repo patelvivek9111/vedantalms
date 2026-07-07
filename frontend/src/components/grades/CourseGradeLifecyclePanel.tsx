@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useCourseGradeLifecycle } from '../../hooks/useCourseGradeLifecycle';
+import { dryRunTranscriptRecompute } from '../../services/gradingApi';
 import { ErrorBanner, LoadingInline } from '../../design-system';
 import ConfirmDialog from '../../design-system/ConfirmDialog';
 import AsyncJobBanner from '../common/AsyncJobBanner';
@@ -29,8 +30,10 @@ const CourseGradeLifecyclePanel: React.FC<CourseGradeLifecyclePanelProps> = ({
     severity: '',
   });
 
-  const {
-    lifecycleData,
+  const [dryRunLoading, setDryRunLoading] = useState(false);
+  const [dryRunResult, setDryRunResult] = useState<string | null>(null);
+
+  const {    lifecycleData,
     provenance,
     timeline,
     loading,
@@ -57,6 +60,30 @@ const CourseGradeLifecyclePanel: React.FC<CourseGradeLifecyclePanelProps> = ({
     () => filterTimelineEntries(timeline, auditFilters),
     [timeline, auditFilters]
   );
+
+  const runTranscriptDryRun = async () => {
+    if (!lifecycleData) return;
+    setDryRunLoading(true);
+    setDryRunResult(null);
+    try {
+      const res = await dryRunTranscriptRecompute(
+        courseId,
+        lifecycleData.term,
+        lifecycleData.year
+      );
+      if (res.success && res.data) {
+        const changed = res.data.changedCount ?? 0;
+        const total = res.data.affected?.length ?? changed;
+        setDryRunResult(
+          `Dry-run complete: ${changed} of ${total} student(s) would change if recomputed with current policy.`
+        );
+      }
+    } catch {
+      setDryRunResult('Transcript dry-run failed.');
+    } finally {
+      setDryRunLoading(false);
+    }
+  };
 
   return (
     <>
@@ -142,9 +169,22 @@ const CourseGradeLifecyclePanel: React.FC<CourseGradeLifecyclePanelProps> = ({
                   >
                     Amend finalized grades
                   </button>
+                  <button
+                    type="button"
+                    disabled={dryRunLoading}
+                    onClick={() => void runTranscriptDryRun()}
+                    className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800 disabled:opacity-50"
+                  >
+                    {dryRunLoading ? 'Running dry-run…' : 'Dry-run recompute'}
+                  </button>
                 </div>
               )}
             </div>
+            {dryRunResult && (
+              <p className="mb-3 text-sm text-gray-700 dark:text-gray-300" role="status">
+                {dryRunResult}
+              </p>
+            )}
 
             <div className="mb-3 flex gap-2 border-b border-gray-200 dark:border-gray-700">
               {(['provenance', 'timeline'] as const).map((key) => (

@@ -30,6 +30,8 @@ import {
   RotateCcw
 } from 'lucide-react';
 import ConfirmationModal from '../common/ConfirmationModal';
+import GradingPeriodPicker from '../grades/GradingPeriodPicker';
+import GradingPeriodsModal from '../grades/GradingPeriodsModal';
 import PullToRefresh from '../common/PullToRefresh';
 import DiscussionReplyComposer from '../discussions/DiscussionReplyComposer';
 import BackButton from '../common/BackButton';
@@ -40,6 +42,14 @@ import type { NormalizedFile } from '../../utils/fileTypes';
 import { deriveDiscussionWorkflowState, sanitizeDiscussionHtml } from '../../utils/discussionWorkflowStatus';
 import { resolveDiscussionStatus, type DiscussionStatus } from '../../utils/discussionStatus';
 import { normalizeMongoIdRef } from '../../utils/mongoId';
+import { findStudentDiscussionGradeRow } from '../../utils/discussionGradeDisplay';
+
+function gradeRowForStudent(
+  studentGrades: Thread['studentGrades'] | undefined,
+  studentId: string | undefined
+) {
+  return findStudentDiscussionGradeRow(studentGrades, studentId);
+}
 
 function normalizeThreadPayload(threadData: Thread): Thread {
   return {
@@ -160,15 +170,35 @@ interface Reply {
   editHistory?: Array<{ editedAt: string; editedBy?: string }>;
 }
 
+function isAuthorContentEditEntry(
+  entry: { editedAt: string; editedBy?: string; reason?: string },
+  authorId: string | null
+): boolean {
+  if (!authorId || !entry) return false;
+  if (entry.reason === 'deleted') return false;
+  return normalizeMongoIdRef(entry.editedBy) === authorId;
+}
+
 function isReplyEdited(reply: Reply): boolean {
-  if (Array.isArray(reply.editHistory) && reply.editHistory.length > 0) return true;
-  const created = Date.parse(reply.createdAt);
-  const updated = Date.parse(reply.updatedAt);
-  return Number.isFinite(created) && Number.isFinite(updated) && updated - created > 1000;
+  const authorId = normalizeMongoIdRef(reply.author?._id);
+  if (!authorId || !Array.isArray(reply.editHistory) || reply.editHistory.length === 0) {
+    return false;
+  }
+  return reply.editHistory.some((entry) => isAuthorContentEditEntry(entry, authorId));
+}
+
+function lastAuthorEditTimestamp(reply: Reply): string | null {
+  const authorId = normalizeMongoIdRef(reply.author?._id);
+  if (!authorId || !Array.isArray(reply.editHistory)) return null;
+  for (let i = reply.editHistory.length - 1; i >= 0; i--) {
+    const entry = reply.editHistory[i];
+    if (isAuthorContentEditEntry(entry, authorId)) return entry.editedAt;
+  }
+  return null;
 }
 
 function replyTimestampLabel(reply: Reply): string {
-  const when = isReplyEdited(reply) ? reply.updatedAt : reply.createdAt;
+  const when = lastAuthorEditTimestamp(reply) || reply.createdAt;
   return formatDistanceToNow(new Date(when), { addSuffix: true });
 }
 
@@ -777,8 +807,12 @@ const ThreadView: React.FC = () => {
     requirePostBeforeSee: false,
     allowLikes: true,
     allowComments: true,
-    module: ''
+    module: '',
+    discussionReleaseMode: 'immediate' as 'immediate' | 'manual' | 'hidden',
+    releaseGradesNow: false,
+    gradingPeriodId: null as string | null,
   });
+  const [showGradingPeriodsModal, setShowGradingPeriodsModal] = useState(false);
 
   // Add state for students
   const [students, setStudents] = useState<{ _id: string; firstName: string; lastName: string; profilePicture?: string }[]>([]);
@@ -1347,7 +1381,8 @@ const ThreadView: React.FC = () => {
         {
           studentId: selectedStudent._id,
           grade: parseFloat(grade),
-          feedback
+          feedback,
+          releaseGrade: thread.discussionReleaseMode !== 'hidden',
         },
         {
           headers: { Authorization: `Bearer ${token}` }
@@ -1355,7 +1390,17 @@ const ThreadView: React.FC = () => {
       );
 
       if (response.data.success) {
-        setThread(normalizeThreadPayload(response.data.data));
+        let nextThread = normalizeThreadPayload(response.data.data);
+        const returnedGrades = Array.isArray(nextThread.studentGrades) ? nextThread.studentGrades : [];
+        if (isModerator && thread.isGraded && returnedGrades.length === 0) {
+          const threadRes = await api.get(`/threads/${thread._id}?includeGrades=true`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (threadRes.data.success) {
+            nextThread = normalizeThreadPayload(threadRes.data.data);
+          }
+        }
+        setThread(nextThread);
         setShowGradingModal(false);
         setSelectedStudent(null);
         setGrade('');
@@ -1366,14 +1411,14 @@ const ThreadView: React.FC = () => {
         setGradingError('Failed to submit grade');
       }
     } catch (err) {
-      setGradingError('Failed to submit grade. Please try again.');
+      setGradingError(getApiErrorMessage(err, 'Failed to submit grade. Please try again.'));
     } finally {
       setIsGrading(false);
     }
   };
 
   const openGradingModal = (student: { _id: string; firstName: string; lastName: string }) => {
-    const existingGrade = thread?.studentGrades.find(g => g.student._id === student._id);
+    const existingGrade = gradeRowForStudent(thread?.studentGrades, student._id);
     setSelectedStudent(student);
     setGrade(existingGrade?.grade?.toString() || '');
     setFeedback(existingGrade?.feedback || '');
@@ -1386,12 +1431,17 @@ const ThreadView: React.FC = () => {
 
     try {
       const token = getMemoryAuthToken();
+      const { releaseGradesNow, ...settingsPayload } = editSettings;
       const response = await api.put(
         `/threads/${thread._id}`,
         {
-          ...editSettings,
+          ...settingsPayload,
           dueDate: editSettings.dueDate || null,
           module: editSettings.module || null,
+          gradesReleasedAt:
+            releaseGradesNow || editSettings.discussionReleaseMode === 'immediate'
+              ? new Date().toISOString()
+              : undefined,
           settings: {
             requirePostBeforeSee: editSettings.requirePostBeforeSee,
             allowLikes: editSettings.allowLikes,
@@ -1435,7 +1485,7 @@ const ThreadView: React.FC = () => {
   // Find feedback for the logged-in student
   let studentFeedback = '';
   if (user?.role === 'student' && Array.isArray(thread.studentGrades)) {
-    const studentGradeObj = thread.studentGrades.find((g: any) => g.student && (g.student._id === user._id || g.student === user._id));
+    const studentGradeObj = gradeRowForStudent(thread.studentGrades, user._id);
     if (studentGradeObj && typeof studentGradeObj.feedback === 'string' && studentGradeObj.feedback.trim() !== '') {
       studentFeedback = studentGradeObj.feedback;
     }
@@ -1763,7 +1813,10 @@ const ThreadView: React.FC = () => {
                               requirePostBeforeSee: thread.settings?.requirePostBeforeSee || false,
                               allowLikes: thread.settings?.allowLikes !== false,
                               allowComments: thread.settings?.allowComments !== false,
-                              module: thread.module || ''
+                              module: thread.module || '',
+                              discussionReleaseMode: thread.discussionReleaseMode || 'immediate',
+                              releaseGradesNow: false,
+                              gradingPeriodId: thread.gradingPeriodId ? String(thread.gradingPeriodId) : null,
                             });
                             setShowEditModal(true);
                           }}
@@ -1879,8 +1932,8 @@ const ThreadView: React.FC = () => {
                   
                   {/* Filter student's replies */}
                   {(() => {
-                    const studentReplies = thread?.replies?.filter(reply => 
-                      reply.author._id === selectedStudent._id
+                    const studentReplies = thread?.replies?.filter(reply =>
+                      normalizeMongoIdRef(reply.author) === normalizeMongoIdRef(selectedStudent._id)
                     ) || [];
                     
                     if (studentReplies.length === 0) {
@@ -1915,9 +1968,13 @@ const ThreadView: React.FC = () => {
                               dangerouslySetInnerHTML={{ __html: sanitizeDiscussionHtml(reply.content) }}
                             />
                             
-                            {reply.updatedAt !== reply.createdAt && (
+                            {isReplyEdited(reply) && (
                               <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 italic">
-                                Edited {formatDistanceToNow(new Date(reply.updatedAt), { addSuffix: true })}
+                                Edited{' '}
+                                {formatDistanceToNow(
+                                  new Date(lastAuthorEditTimestamp(reply) || reply.createdAt),
+                                  { addSuffix: true }
+                                )}
                               </div>
                             )}
                           </div>
@@ -2088,6 +2145,54 @@ const ThreadView: React.FC = () => {
                     </select>
                   </div>
 
+                  <GradingPeriodPicker
+                    courseId={resolvedCourseId}
+                    value={editSettings.gradingPeriodId}
+                    onChange={(id) => setEditSettings((prev) => ({ ...prev, gradingPeriodId: id }))}
+                    onManagePeriods={() => setShowGradingPeriodsModal(true)}
+                    className="mb-4"
+                  />
+
+                  <div className="mb-4">
+                    <label htmlFor="discussionReleaseMode" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Grade visibility for students
+                    </label>
+                    <select
+                      id="discussionReleaseMode"
+                      value={editSettings.discussionReleaseMode}
+                      onChange={(e) => setEditSettings(prev => ({
+                        ...prev,
+                        discussionReleaseMode: e.target.value as 'immediate' | 'manual' | 'hidden',
+                        releaseGradesNow: e.target.value === 'immediate' ? true : prev.releaseGradesNow,
+                      }))}
+                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500"
+                    >
+                      <option value="immediate">Release immediately when graded</option>
+                      <option value="manual">Hold until you release grades</option>
+                      <option value="hidden">Never show grades to students</option>
+                    </select>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      Manual mode keeps scores hidden until you release them or re-save a grade.
+                    </p>
+                  </div>
+
+                  {editSettings.discussionReleaseMode === 'manual' && (
+                    <label className="mb-4 flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={editSettings.releaseGradesNow}
+                        onChange={(e) => setEditSettings(prev => ({
+                          ...prev,
+                          releaseGradesNow: e.target.checked,
+                        }))}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">
+                        Release grades to students now
+                      </span>
+                    </label>
+                  )}
+
                   <div className="mb-6">
                     <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Due Date
@@ -2195,7 +2300,7 @@ const ThreadView: React.FC = () => {
           </div>
           <div className="space-y-3 p-4 lg:hidden">
             {students.map((student) => {
-              const gradeObj = thread.studentGrades.find(g => g.student._id === student._id);
+              const gradeObj = gradeRowForStudent(thread.studentGrades, student._id);
               return (
                 <div
                   key={student._id}
@@ -2245,7 +2350,7 @@ const ThreadView: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {students.map((student) => {
-                  const gradeObj = thread.studentGrades.find(g => g.student._id === student._id);
+                  const gradeObj = gradeRowForStudent(thread.studentGrades, student._id);
                   return (
                     <tr key={student._id} className="transition hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
                       <td className="whitespace-nowrap px-5 py-4 sm:px-6">
@@ -2329,6 +2434,13 @@ const ThreadView: React.FC = () => {
         cancelText="Cancel"
         variant="danger"
       />
+      {resolvedCourseId && (
+        <GradingPeriodsModal
+          show={showGradingPeriodsModal}
+          courseId={resolvedCourseId}
+          onClose={() => setShowGradingPeriodsModal(false)}
+        />
+      )}
       </div>
     </PullToRefresh>
   );

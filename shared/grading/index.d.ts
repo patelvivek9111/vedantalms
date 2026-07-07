@@ -10,6 +10,10 @@ export interface GradingPolicyConfig {
     capPercent?: number;
   };
   dropLowest?: { enabled: boolean; rules: { groupName: string; count: number }[] };
+  dropHighest?: { enabled: boolean; rules: { groupName: string; count: number }[] };
+  gradeVisibility?: {
+    mutedAssignmentsInTotals?: 'exclude' | 'include';
+  };
   categoryCaps?: {
     enabled: boolean;
     caps: { groupName: string; maxWeightPercent: number }[];
@@ -19,6 +23,10 @@ export interface GradingPolicyConfig {
     groupName?: string;
     weightPercent?: number | null;
   };
+  extraCredit?: {
+    enabled?: boolean;
+    capPercent?: number | null;
+  };
   gpaScale?: {
     type: 'letter' | 'four_point' | 'percentage';
     mappings?: { letter: string; points: number }[];
@@ -26,7 +34,7 @@ export interface GradingPolicyConfig {
 }
 
 export interface CourseGradingContext {
-  groups?: { name: string; weight: number }[];
+  groups?: { name: string; weight: number; isExtraCreditGroup?: boolean }[];
   gradeScale?: { letter: string; min: number; max: number }[];
   gradingPolicy?: GradingPolicyConfig;
 }
@@ -60,6 +68,27 @@ export function sanitizeGradingPolicy(policy: unknown): GradingPolicyConfig;
 
 export function getGpaPoints(letterGrade: string, gpaScale?: GradingPolicyConfig['gpaScale']): number;
 
+export type GradeMode = 'current' | 'final';
+
+export function calculateCurrentGradeWithWeightedGroups(
+  studentId: string,
+  course: CourseGradingContext,
+  assignments: { _id: string; group?: string; [key: string]: unknown }[],
+  grades: Record<string, Record<string, number | string>>,
+  submissions?: Record<string, unknown>,
+  policyOverride?: GradingPolicyConfig | null
+): number;
+
+export function calculateProjectedFinalGradeWithWeightedGroups(
+  studentId: string,
+  course: CourseGradingContext,
+  assignments: { _id: string; group?: string; [key: string]: unknown }[],
+  grades: Record<string, Record<string, number | string>>,
+  submissions?: Record<string, unknown>,
+  policyOverride?: GradingPolicyConfig | null
+): number;
+
+/** @deprecated Alias for calculateCurrentGradeWithWeightedGroups (backwards compatible). */
 export function calculateFinalGradeWithWeightedGroups(
   studentId: string,
   course: CourseGradingContext,
@@ -84,6 +113,145 @@ export function getLetterGrade(
   percent: number,
   gradeScale?: { letter: string; min: number; max: number }[]
 ): string;
+
+export function computeGroupPointTotals(
+  studentId: string,
+  groupAssignments: { _id: string; group?: string; [key: string]: unknown }[],
+  grades: Record<string, Record<string, number | string>>,
+  submissions?: Record<string, unknown>,
+  policy?: GradingPolicyConfig | null,
+  groupName?: string | null,
+  gradeMode?: GradeMode,
+  courseGroups?: { name: string; isExtraCreditGroup?: boolean }[]
+): {
+  totalEarned: number;
+  totalPossible: number;
+  includedCount: number;
+  totalInGroup: number;
+  contributesToGrade: boolean;
+  percentage: number | null;
+};
+
+export type GroupTotals = {
+  earned: number;
+  possible: number;
+  extraCreditEarned: number;
+  hasGradedAssignments: boolean;
+};
+
+export function isExtraCreditGroup(group: { isExtraCreditGroup?: boolean }): boolean;
+export function isExtraCreditAssignment(
+  assignment: { isExtraCredit?: boolean; group?: string; [key: string]: unknown },
+  courseGroups?: { name: string; isExtraCreditGroup?: boolean }[]
+): boolean;
+export function extraCreditEnabled(policy: GradingPolicyConfig | null | undefined): boolean;
+export function assignmentBonusPoints(assignment: { bonusPoints?: number }): number;
+export function applyExtraCreditToCourseTotal(
+  basePercent: number,
+  extraCreditEarned: number,
+  regularPossible: number,
+  policy: GradingPolicyConfig | null | undefined
+): number;
+
+export function createGroupTotals(): GroupTotals;
+
+/** Canvas-style: group active when it has contributing graded or missing-as-zero work (current), or any published work (final). */
+export function isAssignmentGroupActive(totals: GroupTotals, gradeMode?: GradeMode): boolean;
+
+export function assignmentContributesToGrade(
+  assignment: { _id: string; [key: string]: unknown },
+  studentId: string,
+  grades: Record<string, Record<string, number | string>>,
+  submissions: Record<string, unknown>,
+  now: Date,
+  policy: GradingPolicyConfig | null | undefined,
+  gradeMode?: GradeMode
+): { earned: number; possible: number } | null;
+
+export function applyAssignmentToGroupTotals(
+  assignment: { _id: string; [key: string]: unknown },
+  studentId: string,
+  grades: Record<string, Record<string, number | string>>,
+  submissions: Record<string, unknown>,
+  now: Date,
+  totals: GroupTotals,
+  policy: GradingPolicyConfig | null | undefined,
+  gradeMode?: GradeMode,
+  courseGroups?: { name: string; isExtraCreditGroup?: boolean }[]
+): void;
+
+export function assignmentMaxPoints(assignment: {
+  questions?: { points?: number }[];
+  totalPoints?: number;
+}): number;
+
+export function isUnpublished(assignment: {
+  isDiscussion?: boolean;
+  published?: boolean;
+}): boolean;
+
+export function hasSubmissionForAssignment(
+  assignment: { isDiscussion?: boolean; hasSubmitted?: boolean },
+  submissions: Record<string, unknown>,
+  assignmentId: string
+): boolean;
+
+export type GradeStatus =
+  | 'NOT_SUBMITTED'
+  | 'SUBMITTED'
+  | 'GRADED'
+  | 'MISSING'
+  | 'EXCUSED'
+  | 'LATE'
+  | 'HIDDEN'
+  | 'PENDING_REVIEW'
+  | 'MANUAL_POST'
+  | 'AUTO_POST'
+  | 'UNPUBLISHED'
+  | 'OFFLINE_PENDING';
+
+export const GRADE_STATUS: Record<string, GradeStatus>;
+
+export const GRADE_STATUS_LABELS: Record<GradeStatus, string>;
+
+export function hasSubmissionScore(submission: unknown): boolean;
+
+export function releaseModeForAssignment(assignment: { gradeReleaseMode?: string }): string;
+
+export function isScoreReleased(submission: unknown, assignment: unknown): boolean;
+
+export function resolveSubmissionGradeStatus(args: {
+  assignment: { _id?: string; [key: string]: unknown };
+  submission?: unknown | null;
+  grade?: number | string | null;
+  now?: Date;
+  perspective?: 'instructor' | 'student';
+  policy?: GradingPolicyConfig | null;
+  studentId?: string | null;
+  hasSubmission?: boolean;
+  submittedAt?: Date | null;
+}): { status: GradeStatus; score?: number; submittedAt?: Date | null };
+
+export function gradebookCellFromStatus(
+  statusResult: { status: GradeStatus; score?: number },
+  ctx: { grade?: number | string; assignment: { [key: string]: unknown } }
+): { display: string; marker: GradebookCellMarker; status: GradeStatus };
+
+export function mapWorkflowStateToGradeStatus(workflowState: string): GradeStatus;
+
+export function mapGradeStatusToWorkflowState(
+  statusResult: { status: GradeStatus },
+  ctx: {
+    assignment?: { [key: string]: unknown } | null;
+    submission?: unknown | null;
+    module?: { published?: boolean } | null;
+    now?: Date;
+  }
+): string;
+
+export function getGradeStatusLabel(status: GradeStatus): string;
+
+export function shouldShowStudentStatusBadge(status: GradeStatus): boolean;
 
 export type GradebookCellMarker =
   | 'GREEN'

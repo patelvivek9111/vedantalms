@@ -124,6 +124,13 @@ const submissionSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'FileAsset',
   }],
+  teacherFeedbackFiles: [{
+    type: String
+  }],
+  teacherFeedbackFileAssets: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'FileAsset',
+  }],
   memberGrades: [{
     student: {
       type: mongoose.Schema.Types.ObjectId,
@@ -214,6 +221,11 @@ submissionSchema.index({ group: 1, submittedAt: -1 });
 submissionSchema.index({ attemptStatus: 1, attemptDeadlineAt: 1 });
 submissionSchema.index({ assignment: 1, student: 1, lastSubmitIdempotencyKey: 1 });
 submissionSchema.index({ assignment: 1, group: 1, lastSubmitIdempotencyKey: 1 });
+
+// Mongoose 8 Map fields (answers, questionGrades, autoQuestionGrades) serialize to {}
+// unless flattenMaps is enabled — safety net for any res.json(doc) path.
+submissionSchema.set('toObject', { flattenMaps: true });
+submissionSchema.set('toJSON', { flattenMaps: true });
 
 const { portabilityMetadataPlugin } = require('./plugins/portabilityMetadata.plugin');
 submissionSchema.plugin(portabilityMetadataPlugin);

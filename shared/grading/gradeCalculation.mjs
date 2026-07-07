@@ -1,31 +1,15 @@
-import { isExcusedGrade } from './gradeValues.mjs';
 import { DEFAULT_GRADING_POLICY } from './policyDefaults.mjs';
-import { applyLatePenaltyToEarned } from './latePenalty.mjs';
-import { getDroppedAssignmentIds } from './dropLowest.mjs';
+import { filterAssignmentsForDropRules } from './dropRules.mjs';
+import {
+  createGroupTotals,
+  isAssignmentGroupActive,
+  applyAssignmentToGroupTotals,
+} from './groupActivation.mjs';
+import { applyExtraCreditToCourseTotal } from './extraCredit.mjs';
 
 function safeWeight(w) {
   const n = Number(w);
   return Number.isFinite(n) && n >= 0 ? n : 0;
-}
-
-function assignmentMaxPoints(assignment) {
-  if (assignment.questions?.length) {
-    return assignment.questions.reduce((sum, q) => sum + (q.points || 0), 0);
-  }
-  return assignment.totalPoints || 0;
-}
-
-function isUnpublished(assignment) {
-  return (
-    (assignment.isDiscussion && assignment.published === false) ||
-    (!assignment.isDiscussion && !assignment.published)
-  );
-}
-
-function hasSubmissionForAssignment(assignment, submissions, assignmentId) {
-  return assignment.isDiscussion
-    ? assignment.hasSubmitted === true
-    : submissions[assignmentId] !== undefined;
 }
 
 function getEffectivePolicy(course, policyOverride) {
@@ -34,39 +18,6 @@ function getEffectivePolicy(course, policyOverride) {
     return course.gradingPolicy;
   }
   return DEFAULT_GRADING_POLICY;
-}
-
-function applyAssignmentToGroupTotals(
-  assignment,
-  studentId,
-  grades,
-  submissions,
-  now,
-  totals,
-  policy
-) {
-  const assignmentId = String(assignment._id);
-  const grade = grades[studentId]?.[assignmentId];
-  const submission = submissions[assignmentId];
-  const max = assignmentMaxPoints(assignment);
-  const dueDate = assignment.dueDate ? new Date(assignment.dueDate) : null;
-
-  if (isUnpublished(assignment)) return;
-  if (isExcusedGrade(grade, submission)) return;
-
-  const hasSubmission = hasSubmissionForAssignment(assignment, submissions, assignmentId);
-  const missingMode = policy?.missingAssignment?.mode || 'count_as_zero';
-
-  if (typeof grade === 'number' && Number.isFinite(grade)) {
-    let earned = applyLatePenaltyToEarned(grade, submission, assignment, policy?.latePenalty);
-    totals.earned += earned;
-    totals.possible += max;
-    totals.hasGradedAssignments = true;
-  } else if (missingMode === 'count_as_zero' && dueDate && now > dueDate && !hasSubmission) {
-    totals.earned += 0;
-    totals.possible += max;
-    totals.hasGradedAssignments = true;
-  }
 }
 
 function getCappedWeight(groupName, adjustedWeight, policy) {
@@ -80,7 +31,45 @@ function getCappedWeight(groupName, adjustedWeight, policy) {
   return Math.min(adjustedWeight, cap);
 }
 
-export function calculateFinalGradeWithWeightedGroups(
+function filterGroupAssignments(groupAssignments, sid, grades, submissions, policy, groupName) {
+  return filterAssignmentsForDropRules(
+    groupAssignments,
+    sid,
+    grades,
+    submissions,
+    policy,
+    groupName
+  );
+}
+
+function accumulateGroupTotals(
+  assignments,
+  sid,
+  grades,
+  submissions,
+  now,
+  policy,
+  gradeMode,
+  courseGroups
+) {
+  const totals = createGroupTotals();
+  assignments.forEach((assignment) => {
+    applyAssignmentToGroupTotals(
+      assignment,
+      sid,
+      grades,
+      submissions,
+      now,
+      totals,
+      policy,
+      gradeMode,
+      courseGroups
+    );
+  });
+  return totals;
+}
+
+export function calculateCurrentGradeWithWeightedGroups(
   studentId,
   course,
   assignments,
@@ -92,6 +81,7 @@ export function calculateFinalGradeWithWeightedGroups(
   const policy = getEffectivePolicy(course, policyOverride);
   const courseGroups = course.groups || [];
   const now = new Date();
+  const gradeMode = 'current';
 
   const groupedAssignmentIds = new Set();
   courseGroups.forEach((group) => {
@@ -102,28 +92,33 @@ export function calculateFinalGradeWithWeightedGroups(
 
   const groupsWithGrades = [];
   const groupsWithoutGrades = [];
+  let courseExtraCreditEarned = 0;
+  let courseRegularPossible = 0;
 
   courseGroups.forEach((group) => {
-    let groupAssignments = assignments.filter((a) => a.group === group.name);
-    const droppedIds = getDroppedAssignmentIds(
+    const groupAssignments = filterGroupAssignments(
+      assignments.filter((a) => a.group === group.name),
+      sid,
+      grades,
+      submissions,
+      policy,
+      group.name
+    );
+
+    const totals = accumulateGroupTotals(
       groupAssignments,
       sid,
       grades,
       submissions,
-      policy.dropLowest,
-      group.name
+      now,
+      policy,
+      gradeMode,
+      courseGroups
     );
-    if (droppedIds.size > 0) {
-      groupAssignments = groupAssignments.filter((a) => !droppedIds.has(String(a._id)));
-    }
+    courseExtraCreditEarned += totals.extraCreditEarned;
+    courseRegularPossible += totals.possible;
 
-    const totals = { earned: 0, possible: 0, hasGradedAssignments: false };
-
-    groupAssignments.forEach((assignment) => {
-      applyAssignmentToGroupTotals(assignment, sid, grades, submissions, now, totals, policy);
-    });
-
-    if (totals.hasGradedAssignments && totals.possible > 0) {
+    if (isAssignmentGroupActive(totals, gradeMode)) {
       groupsWithGrades.push({
         ...group,
         originalWeight: safeWeight(group.weight),
@@ -142,18 +137,28 @@ export function calculateFinalGradeWithWeightedGroups(
   let otherPossible = 0;
 
   if (otherAssignments.length > 0) {
-    const totals = { earned: 0, possible: 0, hasGradedAssignments: false };
-    otherAssignments.forEach((assignment) => {
-      applyAssignmentToGroupTotals(assignment, sid, grades, submissions, now, totals, policy);
-    });
+    const totals = accumulateGroupTotals(
+      otherAssignments,
+      sid,
+      grades,
+      submissions,
+      now,
+      policy,
+      gradeMode,
+      courseGroups
+    );
+    courseExtraCreditEarned += totals.extraCreditEarned;
+    courseRegularPossible += totals.possible;
     otherEarned = totals.earned;
     otherPossible = totals.possible;
-    otherGroupHasGrades = totals.hasGradedAssignments;
+    otherGroupHasGrades = isAssignmentGroupActive(totals, gradeMode);
   }
 
   const weightToRedistribute = groupsWithoutGrades.reduce((sum, g) => sum + safeWeight(g.weight), 0);
 
-  if (groupsWithGrades.length === 0 && !otherGroupHasGrades) return 0;
+  if (groupsWithGrades.length === 0 && !otherGroupHasGrades) {
+    return 0;
+  }
 
   let totalAdjustedWeight = 0;
   let weightedSum = 0;
@@ -185,13 +190,137 @@ export function calculateFinalGradeWithWeightedGroups(
     }
   }
 
-  if (totalAdjustedWeight === 0) return 0;
-  return weightedSum / totalAdjustedWeight;
+  if (totalAdjustedWeight === 0) {
+    return 0;
+  }
+
+  const basePercent = weightedSum / totalAdjustedWeight;
+  return applyExtraCreditToCourseTotal(
+    basePercent,
+    courseExtraCreditEarned,
+    courseRegularPossible,
+    policy
+  );
+}
+
+export function calculateProjectedFinalGradeWithWeightedGroups(
+  studentId,
+  course,
+  assignments,
+  grades,
+  submissions = {},
+  policyOverride = null
+) {
+  const sid = String(studentId);
+  const policy = getEffectivePolicy(course, policyOverride);
+  const courseGroups = course.groups || [];
+  const now = new Date();
+  const gradeMode = 'final';
+
+  const groupedAssignmentIds = new Set();
+  courseGroups.forEach((group) => {
+    assignments
+      .filter((a) => a.group === group.name)
+      .forEach((a) => groupedAssignmentIds.add(String(a._id)));
+  });
+
+  let courseExtraCreditEarned = 0;
+  let courseRegularPossible = 0;
+  let weightedSum = 0;
+  let totalNominalWeight = 0;
+
+  courseGroups.forEach((group) => {
+    const nominalWeight = safeWeight(group.weight);
+    if (nominalWeight <= 0) return;
+
+    const cappedWeight = getCappedWeight(group.name, nominalWeight, policy);
+    totalNominalWeight += cappedWeight;
+
+    const groupAssignments = filterGroupAssignments(
+      assignments.filter((a) => a.group === group.name),
+      sid,
+      grades,
+      submissions,
+      policy,
+      group.name
+    );
+
+    const totals = accumulateGroupTotals(
+      groupAssignments,
+      sid,
+      grades,
+      submissions,
+      now,
+      policy,
+      gradeMode,
+      courseGroups
+    );
+    courseExtraCreditEarned += totals.extraCreditEarned;
+    courseRegularPossible += totals.possible;
+
+    const groupPercent = totals.possible > 0 ? (totals.earned / totals.possible) * 100 : 0;
+    weightedSum += groupPercent * cappedWeight;
+  });
+
+  const otherAssignments = assignments.filter((a) => !groupedAssignmentIds.has(String(a._id)));
+  if (otherAssignments.length > 0) {
+    const totals = accumulateGroupTotals(
+      otherAssignments,
+      sid,
+      grades,
+      submissions,
+      now,
+      policy,
+      gradeMode,
+      courseGroups
+    );
+    courseExtraCreditEarned += totals.extraCreditEarned;
+    courseRegularPossible += totals.possible;
+
+    if (totals.possible > 0) {
+      const otherPercent = (totals.earned / totals.possible) * 100;
+      const otherWeight = Math.max(0, 100 - totalNominalWeight);
+      if (otherWeight > 0) {
+        weightedSum += otherPercent * otherWeight;
+        totalNominalWeight += otherWeight;
+      }
+    }
+  }
+
+  if (totalNominalWeight === 0) {
+    return 0;
+  }
+
+  const basePercent = weightedSum / totalNominalWeight;
+  return applyExtraCreditToCourseTotal(
+    basePercent,
+    courseExtraCreditEarned,
+    courseRegularPossible,
+    policy
+  );
+}
+
+/** @deprecated Name retained for backwards compatibility — equals current grade mode. */
+export function calculateFinalGradeWithWeightedGroups(
+  studentId,
+  course,
+  assignments,
+  grades,
+  submissions = {},
+  policyOverride = null
+) {
+  return calculateCurrentGradeWithWeightedGroups(
+    studentId,
+    course,
+    assignments,
+    grades,
+    submissions,
+    policyOverride
+  );
 }
 
 /**
  * @deprecated Legacy weighted calculator — use calculateFinalGradeWithWeightedGroups.
- * Exported only for backward compatibility; do not use in gradebook, exports, transcripts, or reports.
  */
 export function getWeightedGradeForStudent(studentId, course, assignments, grades, submissions = {}) {
   const sid = String(studentId);
@@ -221,7 +350,7 @@ export function getWeightedGradeForStudent(studentId, course, assignments, grade
   normalizedGroups.forEach((group) => {
     const groupAssignments = assignments.filter((a) => a.group === group.name);
     if (groupAssignments.length === 0) return;
-    const totals = { earned: 0, possible: 0, hasGradedAssignments: false };
+    const totals = createGroupTotals();
     groupAssignments.forEach((assignment) => {
       applyAssignmentToGroupTotals(assignment, sid, grades, submissions, now, totals, policy);
     });
@@ -235,7 +364,7 @@ export function getWeightedGradeForStudent(studentId, course, assignments, grade
 
   const otherAssignments = assignments.filter((a) => !groupedAssignmentIds.has(String(a._id)));
   if (otherAssignments.length > 0) {
-    const totals = { earned: 0, possible: 0, hasGradedAssignments: false };
+    const totals = createGroupTotals();
     otherAssignments.forEach((assignment) => {
       applyAssignmentToGroupTotals(assignment, sid, grades, submissions, now, totals, policy);
     });
@@ -248,6 +377,65 @@ export function getWeightedGradeForStudent(studentId, course, assignments, grade
 
   if (totalWeight === 0) return 0;
   return weightedSum / totalWeight;
+}
+
+export function computeGroupPointTotals(
+  studentId,
+  groupAssignments,
+  grades,
+  submissions = {},
+  policy = null,
+  groupName = null,
+  gradeMode = 'current',
+  courseGroups = []
+) {
+  const sid = String(studentId);
+  const now = new Date();
+  const effectivePolicy = policy || DEFAULT_GRADING_POLICY;
+  let assignments = groupAssignments;
+
+  if (
+    groupName &&
+    (effectivePolicy?.dropLowest?.enabled || effectivePolicy?.dropHighest?.enabled)
+  ) {
+    assignments = filterAssignmentsForDropRules(
+      assignments,
+      sid,
+      grades,
+      submissions,
+      effectivePolicy,
+      groupName
+    );
+  }
+
+  const totals = { ...createGroupTotals(), includedCount: 0 };
+
+  for (const assignment of assignments) {
+    const before = totals.possible;
+    applyAssignmentToGroupTotals(
+      assignment,
+      sid,
+      grades,
+      submissions,
+      now,
+      totals,
+      effectivePolicy,
+      gradeMode,
+      courseGroups
+    );
+    if (totals.possible > before) totals.includedCount += 1;
+  }
+
+  const contributesToGrade = isAssignmentGroupActive(totals, gradeMode);
+
+  return {
+    totalEarned: totals.earned,
+    totalPossible: totals.possible,
+    includedCount: totals.includedCount,
+    totalInGroup: assignments.length,
+    contributesToGrade,
+    percentage: contributesToGrade ? (totals.earned / totals.possible) * 100 : null,
+  };
 }
 
 export function getLetterGrade(percent, gradeScale) {

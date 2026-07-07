@@ -30,6 +30,8 @@ import {
 import { useDraftManager } from '../../hooks/useDraftManager';
 import ConfirmationModal from '../common/ConfirmationModal';
 import FileAttachmentPanel from '../files/FileAttachmentPanel';
+import GradingPeriodPicker from '../grades/GradingPeriodPicker';
+import GradingPeriodsModal from '../grades/GradingPeriodsModal';
 import { normalizeAttachmentSources } from '../../utils/fileTypes';
 import type { NormalizedFile } from '../../utils/fileTypes';
 
@@ -190,6 +192,8 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
   const [newOption, setNewOption] = useState({ text: '', isCorrect: false });
   const [courseId, setCourseId] = useState<string | null>(null);
   const [courseGroups, setCourseGroups] = useState<{ name: string; weight: number }[]>([]);
+  const [gradingPeriodId, setGradingPeriodId] = useState<string | null>(null);
+  const [showGradingPeriodsModal, setShowGradingPeriodsModal] = useState(false);
   // Initialize group from URL param, assignmentData, or empty string
   const [group, setGroup] = useState(searchParams.get('group') || '');
   const [currentStep, setCurrentStep] = useState(1);
@@ -441,6 +445,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
       if (!group) {
         setGroup(assignmentData.group || '');
       }
+      setGradingPeriodId(assignmentData.gradingPeriodId ? String(assignmentData.gradingPeriodId) : null);
       setExistingAttachments(assignmentData.attachments || []);
       setAttachmentFiles(normalizeAttachmentSources(assignmentData));
       // Set totalPointsInput for offline assignments in edit mode
@@ -725,6 +730,11 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
       }
       if (group) {
         formDataToSend.append('group', group);
+      }
+      if (gradingPeriodId) {
+        formDataToSend.append('gradingPeriodId', gradingPeriodId);
+      } else if (editMode) {
+        formDataToSend.append('gradingPeriodId', '');
       }
       const removeSet = new Set(removeAssetIds.map(String));
       const fileAssetIds = attachmentFiles
@@ -1179,6 +1189,12 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
                   helperText={formData.availableFrom ? `Must be after ${new Date(formData.availableFrom).toLocaleString()}` : ''}
                 />
               </div>
+              <GradingPeriodPicker
+                courseId={courseId}
+                value={gradingPeriodId}
+                onChange={setGradingPeriodId}
+                onManagePeriods={() => setShowGradingPeriodsModal(true)}
+              />
             </FormFieldGroup>
             <FormNavBar>
               <button type="button" onClick={nextStep} className={`${BTN_PRIMARY} w-full sm:w-auto`}>
@@ -1835,6 +1851,13 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
             {formInner}
           </div>
         </div>
+      )}
+      {courseId && (
+        <GradingPeriodsModal
+          show={showGradingPeriodsModal}
+          courseId={courseId}
+          onClose={() => setShowGradingPeriodsModal(false)}
+        />
       )}
     </>
   );

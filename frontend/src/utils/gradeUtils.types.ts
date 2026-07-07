@@ -25,6 +25,14 @@ export interface GroupWithGrades extends Group {
 export interface ResolvedGradingPolicy extends GradingPolicyConfig {
   groups?: Group[];
   gradeScale?: { letter: string; min: number; max: number }[];
+  policyApplication?: {
+    applyMode?: 'retroactive_all' | 'prospective_only' | 'from_assignment';
+    effectiveAt?: string | null;
+    effectiveAssignmentId?: string | null;
+    legacyPolicy?: GradingPolicyConfig | null;
+    hasLegacyPolicy?: boolean;
+    legacyMissingMode?: 'count_as_zero' | 'exclude_until_graded' | null;
+  };
   _meta?: Record<string, unknown>;
   source?: string;
 }
@@ -41,6 +49,10 @@ export interface GradingPolicyConfig {
     capPercent?: number;
   };
   dropLowest?: { enabled: boolean; rules: { groupName: string; count: number }[] };
+  dropHighest?: { enabled: boolean; rules: { groupName: string; count: number }[] };
+  gradeVisibility?: {
+    mutedAssignmentsInTotals?: 'exclude' | 'include';
+  };
   categoryCaps?: {
     enabled: boolean;
     caps: { groupName: string; maxWeightPercent: number }[];

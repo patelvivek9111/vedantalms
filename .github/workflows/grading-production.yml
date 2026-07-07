@@ -7,16 +7,32 @@ on:
       - 'shared/grading/**'
       - 'services/**'
       - 'models/**'
+      - 'controllers/submission.controller.js'
+      - 'utils/mongooseSerialize.js'
+      - 'utils/submissionResponse.js'
       - 'scripts/migrations/**'
       - 'tests/grading/**'
+      - 'tests/integration/submissionSerialization.integration.test.js'
+      - 'tests/integration/assignmentGradingPipeline.integration.test.js'
+      - 'tests/integration/notificationMetadata.integration.test.js'
+      - 'tests/unit/utils/mongooseSerialize.test.js'
+      - 'tests/unit/utils/submissionResponse.test.js'
       - '.github/workflows/grading-production.yml'
   pull_request:
     paths:
       - 'shared/grading/**'
       - 'services/**'
       - 'models/**'
+      - 'controllers/submission.controller.js'
+      - 'utils/mongooseSerialize.js'
+      - 'utils/submissionResponse.js'
       - 'scripts/migrations/**'
       - 'tests/grading/**'
+      - 'tests/integration/submissionSerialization.integration.test.js'
+      - 'tests/integration/assignmentGradingPipeline.integration.test.js'
+      - 'tests/integration/notificationMetadata.integration.test.js'
+      - 'tests/unit/utils/mongooseSerialize.test.js'
+      - 'tests/unit/utils/submissionResponse.test.js'
   workflow_dispatch:
 
 jobs:
@@ -53,6 +69,9 @@ jobs:
 
       - name: Grading test suite
         run: npm run test:grading
+
+      - name: Submission Map serialization regression tests
+        run: npm run test:serialization
 
       - name: Validate Mongo indexes
         run: npm run validate:indexes

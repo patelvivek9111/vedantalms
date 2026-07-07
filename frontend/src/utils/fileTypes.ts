@@ -233,6 +233,19 @@ export function normalizeSubmissionAttachments(submission: {
   return [];
 }
 
+/** Normalize instructor feedback attachments for grading UI and student view. */
+export function normalizeTeacherFeedbackAttachments(submission: {
+  teacherFeedbackClientFiles?: Array<Record<string, unknown>>;
+  teacherFeedbackFiles?: Array<string | Record<string, unknown>>;
+  teacherFeedbackFileAssets?: Array<string | Record<string, unknown>>;
+}): NormalizedFile[] {
+  return normalizeSubmissionAttachments({
+    clientFiles: submission.teacherFeedbackClientFiles,
+    files: submission.teacherFeedbackFiles,
+    fileAssets: submission.teacherFeedbackFileAssets,
+  });
+}
+
 /** Prefer API attachmentFiles; fall back to legacy attachment id/url lists. */
 export function normalizeAttachmentSources(source: {
   attachmentFiles?: Array<Record<string, unknown>>;

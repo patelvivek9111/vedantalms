@@ -20,6 +20,12 @@ export interface PolicyAuditEntry {
   oldPolicy?: Record<string, unknown>;
   newPolicy?: Record<string, unknown>;
   reason?: string;
+  applyMode?: string;
+  impactSummary?: {
+    affectedCount?: number;
+    maxDeltaPercent?: number;
+    letterChanges?: number;
+  };
   actor?: { firstName?: string; lastName?: string; email?: string };
 }
 
@@ -30,6 +36,6 @@ export function filterPolicyAuditEntries(entries: PolicyAuditEntry[], filters: A
     const actor = e.actor
       ? `${e.actor.firstName || ''} ${e.actor.lastName || ''} ${e.actor.email || ''}`
       : '';
-    return `${e.reason || ''} ${actor} ${e.createdAt}`.toLowerCase().includes(q);
+    return `${e.reason || ''} ${e.applyMode || ''} ${actor} ${e.createdAt}`.toLowerCase().includes(q);
   });
 }

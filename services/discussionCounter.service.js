@@ -42,7 +42,7 @@ async function incrementReplyCreated(threadId, authorId, { parentReplyId = null,
   const update = {
     $inc: {
       'counters.replyCount': 1,
-      ...(existingByAuthor <= 1 ? { 'counters.participantCount': 1 } : {}),
+      ...(existingByAuthor === 0 ? { 'counters.participantCount': 1 } : {}),
     },
     $set: { lastActivity: createdAt },
   };
@@ -56,17 +56,28 @@ async function incrementReplyCreated(threadId, authorId, { parentReplyId = null,
 }
 
 async function incrementReplyDeleted(threadId, authorId, { parentReplyId = null } = {}) {
-  const remainingByAuthor = await DiscussionReply.countDocuments({
+  const activeByAuthor = await DiscussionReply.countDocuments({
     threadId,
     authorId,
     deletedAt: null,
   });
-  await Thread.findByIdAndUpdate(threadId, {
-    $inc: {
-      'counters.replyCount': -1,
-      ...(remainingByAuthor === 0 ? { 'counters.participantCount': -1 } : {}),
+  if (activeByAuthor > 0) {
+    const inc = { 'counters.replyCount': -1 };
+    if (activeByAuthor <= 1) {
+      inc['counters.participantCount'] = -1;
+    }
+    await Thread.findByIdAndUpdate(threadId, { $inc: inc });
+  }
+  await Thread.findByIdAndUpdate(threadId, [
+    {
+      $set: {
+        'counters.replyCount': { $max: [0, { $ifNull: ['$counters.replyCount', 0] }] },
+        'counters.participantCount': {
+          $max: [0, { $ifNull: ['$counters.participantCount', 0] }],
+        },
+      },
     },
-  });
+  ]);
   if (parentReplyId) {
     await DiscussionReply.findByIdAndUpdate(parentReplyId, { $inc: { childCount: -1 } });
   }

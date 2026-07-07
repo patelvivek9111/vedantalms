@@ -1,29 +1,12 @@
 const observability = require('./workflowObservability.service');
-
-function hasScore(submission) {
-  return (
-    submission?.excused === true ||
-    typeof submission?.grade === 'number' ||
-    typeof submission?.finalGrade === 'number' ||
-    typeof submission?.autoGrade === 'number' ||
-    (Array.isArray(submission?.memberGrades) &&
-      submission.memberGrades.some((memberGrade) => typeof memberGrade?.grade === 'number' || memberGrade?.excused))
-  );
-}
-
-function releaseModeForAssignment(assignment) {
-  return assignment?.gradeReleaseMode || 'immediate';
-}
+const { serializeSubmissionForApi } = require('../utils/submissionResponse');
+const {
+  isScoreReleased,
+  releaseModeForAssignment,
+} = require('../shared/grading/gradeStatus.cjs');
 
 function isReleased(submission, assignment) {
-  if (!submission || !hasScore(submission)) return false;
-  if (submission.gradeHidden === true) return false;
-  if (submission.gradesReleasedAt) return true;
-
-  const mode = releaseModeForAssignment(assignment);
-  if (mode === 'manual') return false;
-  if (mode === 'on_grade') return typeof submission.grade === 'number' || submission.excused === true;
-  return assignment?.defaultGradeHidden === true ? false : true;
+  return isScoreReleased(submission, assignment);
 }
 
 function feedbackReleased(submission, assignment) {
@@ -57,19 +40,10 @@ function resolveStudentGradeVisibility(submission, assignment) {
   };
 }
 
-function mapFieldToObject(value) {
-  if (value instanceof Map) return Object.fromEntries(value);
-  if (value && typeof value === 'object') return { ...value };
-  return value;
-}
-
 function redactSubmissionForStudent(submission, assignment) {
   if (!submission) return submission;
   const visibility = resolveStudentGradeVisibility(submission, assignment);
-  const payload = submission.toObject ? submission.toObject() : { ...submission };
-  payload.answers = mapFieldToObject(payload.answers);
-  payload.autoQuestionGrades = mapFieldToObject(payload.autoQuestionGrades);
-  payload.questionGrades = mapFieldToObject(payload.questionGrades);
+  const payload = serializeSubmissionForApi(submission);
   payload.gradeVisibility = visibility;
 
   if (!visibility.scoreVisible) {
@@ -92,6 +66,9 @@ function redactSubmissionForStudent(submission, assignment) {
     delete payload.questionGrades;
     delete payload.autoQuestionGrades;
     delete payload.feedback;
+    delete payload.teacherFeedbackFiles;
+    delete payload.teacherFeedbackFileAssets;
+    delete payload.teacherFeedbackClientFiles;
     payload.showCorrectAnswers = false;
     payload.showStudentAnswers = false;
   }

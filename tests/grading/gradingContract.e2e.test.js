@@ -61,7 +61,10 @@ describe('Grading contract E2E (Mongo + HTTP)', () => {
     );
     expect(courseRow).toBeDefined();
     expect(gradesRes.body.totalPercent).toBeCloseTo(courseRow.finalGrade, 4);
+    expect(gradesRes.body.currentPercent).toBeCloseTo(gradesRes.body.totalPercent, 4);
     expect(gradesRes.body.letterGrade).toBe(courseRow.letterGrade);
+    expect(typeof gradesRes.body.finalPercent).toBe('number');
+    expect(typeof gradesRes.body.finalLetterGrade).toBe('string');
     expect(gradesRes.body.totalPercent).toBeCloseTo(contract.expectedPercent, 4);
     expect(gradesRes.body.letterGrade).toBe(contract.expectedLetter);
   });

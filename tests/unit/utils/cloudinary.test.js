@@ -1,3 +1,4 @@
+const cloudinary = require('cloudinary').v2;
 const {
   extractPublicId,
   inferResourceTypeFromUrl,
@@ -7,6 +8,14 @@ const {
 describe('cloudinary signed URLs', () => {
   const sampleUrl =
     'https://res.cloudinary.com/dwvlv5wrv/image/upload/v1783186674/lms/academic/syllabus/file_b1fswl.png';
+
+  beforeAll(() => {
+    cloudinary.config({
+      cloud_name: 'dwvlv5wrv',
+      api_key: 'test-api-key',
+      api_secret: 'test-api-secret',
+    });
+  });
 
   test('extractPublicId handles versioned paths without query string', () => {
     expect(extractPublicId(sampleUrl)).toBe('lms/academic/syllabus/file_b1fswl');

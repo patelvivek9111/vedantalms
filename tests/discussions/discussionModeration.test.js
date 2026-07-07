@@ -69,7 +69,8 @@ describe('discussion moderation workflow', () => {
   });
 
   it('soft-deletes a reply while keeping required content fields valid', async () => {
-    const doc = replyDoc();
+    const fileId = 'bbbbbbbbbbbbbbbbbbbbbbbb';
+    const doc = replyDoc({ fileAssets: [fileId], attachments: [fileId] });
     DiscussionReply.findOne.mockResolvedValue(doc);
     DiscussionReply.findById.mockReturnValue({
       populate: jest.fn().mockReturnThis(),
@@ -84,6 +85,37 @@ describe('discussion moderation workflow', () => {
     expect(doc.deletedAt).toBeInstanceOf(Date);
     expect(doc.content).toBe('[deleted]');
     expect(doc.sanitizedContent).toBeTruthy();
+    expect(doc.editHistory[0].previousFileAssets).toEqual([fileId]);
+    expect(doc.fileAssets).toEqual([]);
+    expect(doc.save).toHaveBeenCalled();
+  });
+
+  it('restores file attachments after soft-delete', async () => {
+    const fileId = 'aaaaaaaaaaaaaaaaaaaaaaaa';
+    const doc = replyDoc({
+      deletedAt: new Date(),
+      content: '[deleted]',
+      sanitizedContent: '[deleted]',
+      fileAssets: [],
+      attachments: [],
+      editHistory: [
+        {
+          previousContent: '<p>With file</p>',
+          previousSanitizedContent: '<p>With file</p>',
+          previousFileAssets: [fileId],
+          previousAttachments: [fileId],
+        },
+      ],
+    });
+    DiscussionReply.findById.mockReturnValueOnce(Promise.resolve(doc)).mockReturnValueOnce({
+      populate: jest.fn().mockReturnThis(),
+    });
+
+    await replyService.restoreReply({ replyId: 'reply1', user: { _id: 'teacher1' } });
+
+    expect(doc.fileAssets).toEqual([fileId]);
+    expect(doc.attachments).toEqual([fileId]);
+    expect(doc.content).toBe('<p>With file</p>');
     expect(doc.save).toHaveBeenCalled();
   });
 

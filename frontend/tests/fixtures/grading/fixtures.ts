@@ -13,12 +13,14 @@ export const DEFAULT_SCALE = [
   { letter: 'F', min: 0, max: 59 },
 ];
 
-/** Relative dates avoid Vitest fake-timer worker hangs while keeping deterministic policy behavior. */
+/** Fixed policy clock for tests that pass `now` explicitly (e.g. gradeStatus). */
+export const POLICY_NOW = new Date('2025-06-15T12:00:00.000Z');
+
+/** Relative to real clock so grading tests work without fake timers in Vitest. */
 const msDay = 24 * 60 * 60 * 1000;
 const now = Date.now();
 export const PAST_DUE = new Date(now - 14 * msDay).toISOString();
 export const FUTURE_DUE = new Date(now + 90 * msDay).toISOString();
-/** Submitted after PAST_DUE but before "now" */
 export const LATE_SUBMIT_AT = new Date(now - 7 * msDay).toISOString();
 
 export function aid(name: string): string {
@@ -38,18 +40,21 @@ export function buildAssignment(opts: {
   dueDate?: string;
   isDiscussion?: boolean;
   hasSubmitted?: boolean;
+  [key: string]: unknown;
 }) {
   const totalPoints = opts.totalPoints ?? 100;
+  const { id, title, group, published, dueDate, isDiscussion, hasSubmitted, ...rest } = opts;
   return {
-    _id: opts.id,
-    title: opts.title || opts.id,
-    group: opts.group,
+    _id: id,
+    title: title || id,
+    group,
     totalPoints,
     questions: [{ points: totalPoints }],
-    published: opts.published ?? true,
-    dueDate: opts.dueDate ?? PAST_DUE,
-    isDiscussion: opts.isDiscussion ?? false,
-    hasSubmitted: opts.hasSubmitted ?? false,
+    published: published ?? true,
+    dueDate: dueDate ?? PAST_DUE,
+    isDiscussion: isDiscussion ?? false,
+    hasSubmitted: hasSubmitted ?? false,
+    ...rest,
   };
 }
 

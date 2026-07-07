@@ -9,7 +9,7 @@ jest.mock('../../../models/thread.model', () => ({
 const mongoose = require('mongoose');
 const DiscussionReply = require('../../../models/discussionReply.model');
 const Thread = require('../../../models/thread.model');
-const { batchThreadIdsRepliedByUser } = require('../../../services/discussionReply.service');
+const { batchThreadIdsRepliedByUser, batchFirstReplyCreatedAtByUser } = require('../../../services/discussionReply.service');
 
 describe('discussionReply.service batchThreadIdsRepliedByUser', () => {
   const userId = new mongoose.Types.ObjectId();
@@ -46,5 +46,26 @@ describe('discussionReply.service batchThreadIdsRepliedByUser', () => {
 
     const replied = await batchThreadIdsRepliedByUser([threadB], userId);
     expect(replied.has(String(threadB))).toBe(true);
+  });
+});
+
+describe('discussionReply.service batchFirstReplyCreatedAtByUser', () => {
+  const userId = new mongoose.Types.ObjectId();
+  const threadA = new mongoose.Types.ObjectId();
+  const lateAt = new Date('2025-11-10T12:00:00.000Z');
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('returns earliest collection reply timestamp per thread', async () => {
+    DiscussionReply.aggregate.mockResolvedValue([{ _id: threadA, firstAt: lateAt }]);
+    Thread.find.mockReturnValue({
+      select: jest.fn().mockReturnThis(),
+      lean: jest.fn().mockResolvedValue([]),
+    });
+
+    const map = await batchFirstReplyCreatedAtByUser([threadA], userId);
+    expect(map.get(String(threadA))?.toISOString()).toBe(lateAt.toISOString());
   });
 });

@@ -1,14 +1,192 @@
 const {
-  calculateFinalGradeWithWeightedGroups,
+  calculateCurrentGradeWithWeightedGroups,
+  calculateProjectedFinalGradeWithWeightedGroups,
   getLetterGrade,
   courseContextFromResolvedPolicy,
 } = require('../utils/gradeCalculation');
 const { generateResolvedPolicySnapshot } = require('../shared/grading/policySnapshot.cjs');
 const { getGradingEngineVersion } = require('../shared/grading/gradingEngineVersion.cjs');
+const { enrichResolvedForAssignmentOrder } = require('../shared/grading/policyApplication.cjs');
 const gradingPolicySnapshotService = require('./gradingPolicySnapshot.service');
+const courseStudentGradeOverrideService = require('./courseStudentGradeOverride.service');
+const studentGradeDetailService = require('./studentGradeDetail.service');
+const {
+  loadCourseGradeAssignments,
+  buildStudentGradeInputs,
+} = require('./gradeCalculationInputs.service');
 
 /**
- * Single entry point for student course grade % + letter (grades API, transcript, exports).
+ * Compute Canvas-style current + projected final totals for a student course grade.
+ */
+function computeDualGradeTotals(
+  studentId,
+  courseContext,
+  allAssignments,
+  grades,
+  submissionMap,
+  resolved
+) {
+  const sid = String(studentId);
+  const currentPercent = calculateCurrentGradeWithWeightedGroups(
+    sid,
+    courseContext,
+    allAssignments,
+    grades,
+    submissionMap,
+    resolved
+  );
+  const finalPercent = calculateProjectedFinalGradeWithWeightedGroups(
+    sid,
+    courseContext,
+    allAssignments,
+    grades,
+    submissionMap,
+    resolved
+  );
+  const letterGrade = getLetterGrade(currentPercent, courseContext.gradeScale);
+  const finalLetterGrade = getLetterGrade(finalPercent, courseContext.gradeScale);
+
+  return {
+    currentPercent,
+    finalPercent,
+    totalPercent: currentPercent,
+    letterGrade,
+    finalLetterGrade,
+  };
+}
+
+/**
+ * Canonical course grade computation — student API, gradebook totals, exports, transcripts.
+ * @param {'instructor'|'student'} [options.audience='student'] — student applies grade-release visibility
+ */
+async function computeStudentCourseGrade(course, studentId, options = {}) {
+  const coursePlain = course?.toObject ? course.toObject() : course;
+  const courseId = coursePlain._id || coursePlain.id;
+  const sid = String(studentId);
+  const audience = options.audience || 'student';
+
+  const assignments =
+    options.assignments ||
+    (await loadCourseGradeAssignments(courseId, {
+      gradingPeriodId: options.gradingPeriodId,
+    }));
+
+  const { resolved: rawResolved, courseContext: rawContext, fromStoredSnapshot } =
+    await gradingPolicySnapshotService.getGradingContextForCalculation(coursePlain, {
+      storedPolicySnapshot: options.storedPolicySnapshot,
+      skipInstitution: options.skipInstitution,
+      teacherPolicy: options.teacherPolicy,
+      policyCache: options.policyCache,
+    });
+
+  let { allAssignments, grades, submissionMap } = options;
+  if (!allAssignments || !grades || !submissionMap) {
+    const built = await buildStudentGradeInputs(coursePlain, sid, assignments, audience, {
+      resolved: rawResolved,
+    });
+    allAssignments = built.allAssignments;
+    grades = built.grades;
+    submissionMap = built.submissionMap;
+  }
+
+  const resolved = enrichResolvedForAssignmentOrder(rawResolved, allAssignments);
+  const courseContext =
+    resolved === rawResolved ? rawContext : courseContextFromResolvedPolicy(resolved);
+
+  let dualTotals = computeDualGradeTotals(
+    sid,
+    courseContext,
+    allAssignments,
+    grades,
+    submissionMap,
+    resolved
+  );
+
+  const override = await courseStudentGradeOverrideService.getActiveOverride(courseId, sid);
+  if (override) {
+    dualTotals = {
+      ...dualTotals,
+      finalPercent: override.finalPercent,
+      finalLetterGrade:
+        override.letterGrade ||
+        getLetterGrade(override.finalPercent, courseContext.gradeScale),
+      gradeOverride: {
+        finalPercent: override.finalPercent,
+        letterGrade: override.letterGrade,
+        reason: override.reason,
+        overriddenAt: override.updatedAt || override.createdAt,
+      },
+    };
+  }
+
+  const assignmentGroups = studentGradeDetailService.buildAssignmentGroupBreakdown(
+    sid,
+    courseContext,
+    allAssignments,
+    grades,
+    submissionMap,
+    resolved
+  );
+  const unpostedCount =
+    audience === 'student'
+      ? studentGradeDetailService.countUnpostedAssignments(
+          allAssignments,
+          grades,
+          submissionMap,
+          sid
+        )
+      : 0;
+  const policyMeta = studentGradeDetailService.buildPolicyMeta(resolved, {
+    gradingEngineVersion: options.gradingEngineVersion || getGradingEngineVersion(),
+  });
+  const snapshotBundle = generateResolvedPolicySnapshot(resolved);
+
+  return {
+    ...dualTotals,
+    studentId: sid,
+    audience,
+    allAssignments,
+    grades,
+    submissionMap,
+    resolved,
+    courseContext,
+    assignmentGroups,
+    unpostedCount,
+    policyMeta,
+    fromStoredSnapshot: !!fromStoredSnapshot,
+    gradingEngineVersion: options.gradingEngineVersion || getGradingEngineVersion(),
+    ...snapshotBundle,
+  };
+}
+
+/**
+ * Public API shape for GET /api/grades/student/course/:courseId
+ * totalPercent remains an alias for currentPercent (backwards compatible).
+ */
+function toStudentGradeApiResponse(gradeResult, options = {}) {
+  const payload = {
+    currentPercent: gradeResult.currentPercent,
+    finalPercent: gradeResult.finalPercent,
+    totalPercent: gradeResult.totalPercent,
+    letterGrade: gradeResult.letterGrade,
+    finalLetterGrade: gradeResult.finalLetterGrade,
+    fromFrozenSnapshot: !!gradeResult.fromFrozenSnapshot,
+  };
+
+  if (options.extended !== false) {
+    payload.assignmentGroups = gradeResult.assignmentGroups || [];
+    payload.unpostedCount = gradeResult.unpostedCount ?? 0;
+    payload.policyMeta = gradeResult.policyMeta || null;
+    if (gradeResult.gradeOverride) {
+      payload.gradeOverride = gradeResult.gradeOverride;
+    }
+  }
+
+  return payload;
+}
+
+/**
+ * Student course grade with lifecycle / transcript guards. Delegates to computeStudentCourseGrade.
  */
 async function calculateCourseGradeForStudent(
   studentId,
@@ -53,9 +231,14 @@ async function calculateCourseGradeForStudent(
     );
     if (frozen) {
       const resolved = frozen.gradingPolicySnapshot;
+      const officialPercent = frozen.finalPercent;
+      const officialLetter = frozen.letterGrade;
       return {
-        totalPercent: frozen.finalPercent,
-        letterGrade: frozen.letterGrade,
+        currentPercent: officialPercent,
+        finalPercent: officialPercent,
+        totalPercent: officialPercent,
+        letterGrade: officialLetter,
+        finalLetterGrade: officialLetter,
         resolved,
         courseContext: courseContextFromResolvedPolicy(resolved),
         policyVersion: frozen.gradingPolicyVersion,
@@ -75,33 +258,29 @@ async function calculateCourseGradeForStudent(
     }
   }
 
-  const { resolved, courseContext, fromStoredSnapshot } =
-    await gradingPolicySnapshotService.getGradingContextForCalculation(coursePlain, {
-      storedPolicySnapshot: options.storedPolicySnapshot,
-      skipInstitution: options.skipInstitution,
-      teacherPolicy: options.teacherPolicy,
-    });
+  const hasPrebuilt =
+    allAssignments != null && grades != null && submissionMap != null;
 
-  const totalPercent = calculateFinalGradeWithWeightedGroups(
-    sid,
-    courseContext,
-    allAssignments,
-    grades,
-    submissionMap,
-    resolved
-  );
-  const letterGrade = getLetterGrade(totalPercent, courseContext.gradeScale);
-  const snapshotBundle = generateResolvedPolicySnapshot(resolved);
+  const result = await computeStudentCourseGrade(coursePlain, sid, {
+    audience: 'student',
+    gradingEngineVersion: engineVersion,
+    storedPolicySnapshot: options.storedPolicySnapshot,
+    skipInstitution: options.skipInstitution,
+    teacherPolicy: options.teacherPolicy,
+    policyCache: options.policyCache,
+    ...(hasPrebuilt ? { allAssignments, grades, submissionMap } : {}),
+  });
 
   let persistedSnapshot = false;
   if (options.persistTranscriptSnapshot && options.term && options.year) {
+    const snapshotBundle = generateResolvedPolicySnapshot(result.resolved);
     const { created } = await gradingPolicySnapshotService.persistTranscriptSnapshot({
       studentId,
       courseId,
       term: options.term,
       year: options.year,
-      finalPercent: totalPercent,
-      letterGrade,
+      finalPercent: result.totalPercent,
+      letterGrade: result.letterGrade,
       snapshotBundle,
       gradingEngineVersion: engineVersion,
       lifecycleStatus: options.lifecycleStatus || lifecycle?.status || null,
@@ -110,18 +289,15 @@ async function calculateCourseGradeForStudent(
   }
 
   return {
-    totalPercent,
-    letterGrade,
-    resolved,
-    courseContext,
-    fromStoredSnapshot: !!fromStoredSnapshot,
-    gradingEngineVersion: engineVersion,
+    ...result,
     persistedSnapshot,
     lifecycleStatus: lifecycle?.status,
-    ...snapshotBundle,
   };
 }
 
 module.exports = {
+  computeDualGradeTotals,
+  computeStudentCourseGrade,
+  toStudentGradeApiResponse,
   calculateCourseGradeForStudent,
 };

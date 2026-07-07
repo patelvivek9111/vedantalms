@@ -22,12 +22,11 @@ const LIST_PROJECTION = {
   metadata: 1,
 };
 
+const { serializeMongooseDoc } = require('../../utils/mongooseSerialize');
+
 function serializeNotification(doc) {
   if (!doc) return doc;
-  const out = { ...doc };
-  if (out.metadata instanceof Map) {
-    out.metadata = Object.fromEntries(out.metadata);
-  }
+  const out = serializeMongooseDoc(doc, { extraMapFields: ['metadata'] });
   delete out.dedupeKey;
   return out;
 }

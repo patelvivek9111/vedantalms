@@ -87,6 +87,11 @@ async function validateUpload(file, { user, category, courseId, metadata = {} })
     err.statusCode = 403;
     throw err;
   }
+  if (category === 'feedback' && user.role === 'student') {
+    const err = new Error('Only instructors may upload feedback files');
+    err.statusCode = 403;
+    throw err;
+  }
 }
 
 async function createFileAsset({
@@ -211,7 +216,7 @@ async function validateFileAssetIdsForAttach(fileAssetIds, {
     if (asset.category !== category && category) {
       const allowedStaging =
         asset.category === 'temporary' &&
-        ['submission', 'assignment', 'page', 'announcement', 'syllabus', 'message', 'discussion'].includes(
+        ['submission', 'assignment', 'page', 'announcement', 'syllabus', 'message', 'discussion', 'feedback'].includes(
           category
         );
       if (!allowedStaging) {

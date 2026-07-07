@@ -1,5 +1,6 @@
 import { DEFAULT_GRADING_POLICY, DEFAULT_GRADE_SCALE } from './policyDefaults.mjs';
 import { deepMergePolicy, sanitizeGradingPolicy } from './policyValidation.mjs';
+import { buildPolicyApplication } from './policyApplication.mjs';
 
 export function resolveGradingPolicy({
   course = null,
@@ -49,6 +50,7 @@ export function resolveGradingPolicy({
     ...resolved,
     groups: effectiveGroups,
     gradeScale,
+    policyApplication: buildPolicyApplication(coursePolicy),
     _meta: {
       courseId: course?._id ? String(course._id) : null,
       policyVersion: coursePolicy?.version || institutionPolicy?.version || resolved.version || 1,

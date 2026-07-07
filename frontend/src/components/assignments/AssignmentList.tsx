@@ -12,6 +12,9 @@ import {
   discussionGradeToGradebookValue,
   submissionToGradebookValue,
 } from '../../utils/instructorGradebookGrades';
+import { resolveStudentDiscussionEarnedScore } from '../../utils/discussionGradeDisplay';
+import { fetchCourseGradingPeriods, type GradingPeriod } from '../../services/gradingApi';
+import GradingPeriodsModal from '../grades/GradingPeriodsModal';
 interface Attachment {
   _id: string;
   filename: string;
@@ -104,10 +107,7 @@ function formatCanvasDue(d: Date): string {
 function getEarnedScoreForItem(item: any, submission: any | undefined, studentId?: string): number | null {
   if (!studentId) return null;
   if (item.type === 'discussion') {
-    const grades = item.studentGrades;
-    if (!Array.isArray(grades)) return null;
-    const row = grades.find((g: any) => String(g.student?._id || g.student) === String(studentId));
-    return typeof row?.grade === 'number' ? row.grade : null;
+    return resolveStudentDiscussionEarnedScore(item, studentId);
   }
   if (!submission) return null;
   if (submission.useIndividualGrades && Array.isArray(submission.memberGrades)) {
@@ -568,6 +568,8 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
   const [searchQuery, setSearchQuery] = useState('');
   const [listViewMode, setListViewMode] = useState<ListViewMode>('date');
   const [gradingPeriod, setGradingPeriod] = useState('all');
+  const [gradingPeriods, setGradingPeriods] = useState<GradingPeriod[]>([]);
+  const [showGradingPeriodsModal, setShowGradingPeriodsModal] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [expandedStudentSections, setExpandedStudentSections] = useState<Record<string, boolean>>({
@@ -730,6 +732,24 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
     };
   }, [isTeacherOrAdmin, courseId]);
 
+  useEffect(() => {
+    if (!courseId || !isTeacherOrAdmin) {
+      setGradingPeriods([]);
+      return;
+    }
+    let cancelled = false;
+    fetchCourseGradingPeriods(courseId)
+      .then((res) => {
+        if (!cancelled && res.success) setGradingPeriods(res.data || []);
+      })
+      .catch(() => {
+        if (!cancelled) setGradingPeriods([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [courseId, isTeacherOrAdmin]);
+
   const assignmentsList = useMemo(
     () =>
       propAssignments
@@ -740,9 +760,15 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
 
   const flatList = useMemo(() => {
     const normalized = assignmentsList.map(item => normalizeListItem(item));
-    const searched = filterListBySearch(normalized, searchQuery);
+    const periodFiltered =
+      gradingPeriod === 'all'
+        ? normalized
+        : normalized.filter(
+            item => item.gradingPeriodId && String(item.gradingPeriodId) === gradingPeriod
+          );
+    const searched = filterListBySearch(periodFiltered, searchQuery);
     return sortItemsByDueDateDesc(searched);
-  }, [assignmentsList, searchQuery]);
+  }, [assignmentsList, searchQuery, gradingPeriod]);
 
   const flatListItemKey = useMemo(
     () => (isTeacherOrAdmin ? flatList.map(item => `${item._id}:${item.type}`).join('|') : ''),
@@ -1026,7 +1052,8 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
       {/* Assignment list toolbar (teachers) */}
       {isTeacherOrAdmin && (
         <div className="mb-4 overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="flex flex-wrap items-center gap-2">
             <div className="relative w-full sm:w-auto sm:min-w-[200px]">
               <label htmlFor="assignment-grading-period" className="sr-only">
                 Grading period
@@ -1038,11 +1065,24 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
                 className={`${FORM_SELECT} min-h-[44px] w-full appearance-none bg-slate-50/80 pr-10 dark:bg-slate-800/50`}
               >
                 <option value="all">All grading periods</option>
+                {gradingPeriods.map(period => (
+                  <option key={period._id} value={period._id}>
+                    {period.name}
+                  </option>
+                ))}
               </select>
               <ChevronDown
                 className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
                 aria-hidden
               />
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowGradingPeriodsModal(true)}
+              className="min-h-[44px] rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              Manage periods
+            </button>
             </div>
 
             <div className="relative min-w-0 flex-1">
@@ -1295,6 +1335,20 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
         cancelText="Cancel"
         variant="danger"
       />
+      {courseId && (
+        <GradingPeriodsModal
+          show={showGradingPeriodsModal}
+          courseId={courseId}
+          onClose={() => setShowGradingPeriodsModal(false)}
+          onChanged={() => {
+            fetchCourseGradingPeriods(courseId)
+              .then((res) => {
+                if (res.success) setGradingPeriods(res.data || []);
+              })
+              .catch(() => {});
+          }}
+        />
+      )}
       </div>
     </PullToRefresh>
   );

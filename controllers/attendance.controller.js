@@ -9,6 +9,26 @@ function denyAttendanceRosterAccess(res) {
   return res.status(403).json({ message: 'Not authorized to view course attendance roster' });
 }
 
+/** Match calendar-day boundaries used when saving attendance (local midnight, not UTC). */
+function buildLocalDateRangeFilter(startDate, endDate) {
+  const filter = {};
+  if (startDate) {
+    const start = new Date(startDate);
+    if (!Number.isNaN(start.getTime())) {
+      start.setHours(0, 0, 0, 0);
+      filter.$gte = start;
+    }
+  }
+  if (endDate) {
+    const end = new Date(endDate);
+    if (!Number.isNaN(end.getTime())) {
+      end.setHours(23, 59, 59, 999);
+      filter.$lte = end;
+    }
+  }
+  return Object.keys(filter).length ? filter : null;
+}
+
 // Get attendance for a specific course and date
 exports.getAttendance = async (req, res) => {
   try {
@@ -207,11 +227,9 @@ exports.getAttendanceStats = async (req, res) => {
     const { startDate, endDate } = req.query;
 
     const query = { course: courseId };
-    if (startDate && endDate) {
-      query.date = {
-        $gte: new Date(startDate + 'T00:00:00.000Z'),
-        $lte: new Date(endDate + 'T23:59:59.999Z')
-      };
+    const dateFilter = buildLocalDateRangeFilter(startDate, endDate);
+    if (dateFilter) {
+      query.date = dateFilter;
     }
 
     const attendanceRecords = await Attendance.find(query).populate('student', 'firstName lastName');
@@ -340,11 +358,9 @@ exports.getAttendancePercentages = async (req, res) => {
 
     // Build date range query
     const dateQuery = {};
-    if (startDate && endDate) {
-      dateQuery.date = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate)
-      };
+    const dateFilter = buildLocalDateRangeFilter(startDate, endDate);
+    if (dateFilter) {
+      dateQuery.date = dateFilter;
     }
 
     // Get all attendance records for the course

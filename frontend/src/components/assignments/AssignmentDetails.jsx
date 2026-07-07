@@ -6,7 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import { format } from 'date-fns';
 import { safeFormatDate } from '../../utils/dateUtils';
 import { Lock, Unlock } from 'lucide-react';
-import { API_URL } from '../../config';
+import { parseSubmissionAnswers } from '../../utils/submissionAnswers';
 
 const AssignmentDetails = () => {
   const { id } = useParams();
@@ -53,7 +53,7 @@ const AssignmentDetails = () => {
                 setSubmission(submissionData);
               } else {
                 setSubmission(submissionData);
-                setAnswers(submissionData.answers || {});
+                setAnswers(parseSubmissionAnswers(submissionData.answers, assignmentData?.questions));
               }
             }
           } catch (err) {

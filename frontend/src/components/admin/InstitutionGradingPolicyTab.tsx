@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { DEFAULT_GRADING_POLICY, type GradingPolicyConfig } from '../../utils/gradeUtils';
-import { fetchInstitutionGradingPolicy, saveInstitutionGradingPolicy } from '../../services/gradingApi';
+import {
+  fetchInstitutionGradingPolicy,
+  fetchInstitutionPolicyImpactSummary,
+  saveInstitutionGradingPolicy,
+  type InstitutionPolicyImpactSummary,
+} from '../../services/gradingApi';
 import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 import PolicyAuditHistory from '../grades/PolicyAuditHistory';
 
@@ -10,15 +15,22 @@ const InstitutionGradingPolicyTab: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [dirty, setDirty] = useState(false);
+  const [impactSummary, setImpactSummary] = useState<InstitutionPolicyImpactSummary | null>(null);
   useUnsavedChangesGuard(dirty);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetchInstitutionGradingPolicy();
-        if (res.success && res.data.policy) {
-          setPolicy({ ...DEFAULT_GRADING_POLICY, ...res.data.policy });
+        const [policyRes, impactRes] = await Promise.all([
+          fetchInstitutionGradingPolicy(),
+          fetchInstitutionPolicyImpactSummary().catch(() => null),
+        ]);
+        if (policyRes.success && policyRes.data.policy) {
+          setPolicy({ ...DEFAULT_GRADING_POLICY, ...policyRes.data.policy });
           setDirty(false);
+        }
+        if (impactRes?.success) {
+          setImpactSummary(impactRes.data);
         }
       } catch {
         setMessage('Could not load institution grading defaults.');
@@ -53,6 +65,15 @@ const InstitutionGradingPolicyTab: React.FC = () => {
           Courses inherit these settings unless overridden. Changes apply to new grade calculations immediately.
         </p>
       </div>
+      {impactSummary && impactSummary.totalPublishedCourses > 0 && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-100">
+          Saving institution defaults will recalculate live grades in{' '}
+          <strong>{impactSummary.liveRecalcCourseCount}</strong> published course
+          {impactSummary.liveRecalcCourseCount === 1 ? '' : 's'}.{' '}
+          <strong>{impactSummary.finalizedCourseCount}</strong> finalized course
+          {impactSummary.finalizedCourseCount === 1 ? '' : 's'} keep frozen transcript snapshots.
+        </div>
+      )}
       {message && <p className="text-sm text-blue-700 dark:text-blue-300">{message}</p>}
       <div>
         <label className="text-sm font-medium">Missing assignments</label>
@@ -85,6 +106,24 @@ const InstitutionGradingPolicyTab: React.FC = () => {
         />
         Enable late penalties by default
       </label>
+      <div>
+        <label className="text-sm font-medium">Muted assignments in grade totals</label>
+        <select
+          className="mt-1 block w-full max-w-md rounded border px-3 py-2 text-sm dark:bg-gray-900"
+          value={policy.gradeVisibility?.mutedAssignmentsInTotals || 'exclude'}
+          onChange={(e) =>
+            setPolicy((p) => ({
+              ...p,
+              gradeVisibility: {
+                mutedAssignmentsInTotals: e.target.value as 'exclude' | 'include',
+              },
+            }))
+          }
+        >
+          <option value="exclude">Exclude muted (hidden) grades from totals</option>
+          <option value="include">Include muted grades in totals (Canvas institution option)</option>
+        </select>
+      </div>
       <button
         type="button"
         disabled={saving}

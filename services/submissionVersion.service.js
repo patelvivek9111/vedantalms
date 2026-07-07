@@ -4,7 +4,7 @@ const DEFAULT_MAX_VERSIONS = parseInt(process.env.SUBMISSION_VERSION_MAX || '100
 function mapToPlain(value) {
   if (!value) return value;
   if (value instanceof Map) return Object.fromEntries(value.entries());
-  if (typeof value.toObject === 'function') return value.toObject();
+  if (typeof value.toObject === 'function') return value.toObject({ flattenMaps: true });
   return value;
 }
 

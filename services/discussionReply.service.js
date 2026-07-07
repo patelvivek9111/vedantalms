@@ -571,6 +571,8 @@ async function softDeleteReply({ thread, replyId, user, reason = null, moderator
     editedBy: user._id,
     previousContent: reply.content,
     previousSanitizedContent: reply.sanitizedContent,
+    previousFileAssets: [...(reply.fileAssets || [])],
+    previousAttachments: [...(reply.attachments || [])],
     reason: reason || 'deleted',
   });
   reply.editHistory = reply.editHistory.slice(-10);
@@ -633,6 +635,12 @@ async function restoreReply({ replyId, user, note = null }) {
       .find((entry) => entry.previousContent || entry.previousSanitizedContent);
     reply.content = lastSnapshot?.previousContent || reply.content;
     reply.sanitizedContent = lastSnapshot?.previousSanitizedContent || reply.sanitizedContent || reply.content;
+    if (lastSnapshot?.previousFileAssets?.length) {
+      reply.fileAssets = [...lastSnapshot.previousFileAssets];
+      reply.attachments = lastSnapshot.previousAttachments?.length
+        ? [...lastSnapshot.previousAttachments]
+        : [...lastSnapshot.previousFileAssets];
+    }
     reply.deletedAt = null;
     reply.deletedBy = null;
     reply.deletedReason = null;
@@ -683,7 +691,7 @@ async function toggleLike({ thread, replyId, user }) {
     reply.likes.push({ user: user._id, likedAt: new Date() });
   }
   reply.likeCount = Math.max(0, (reply.likeCount || 0) + delta);
-  await reply.save();
+  await reply.save({ timestamps: false });
   await discussionCounterService.updateLikeCount(thread._id, reply._id, delta);
   await discussionParticipation.recordLike({ threadId: thread._id, userId: user._id, delta });
   return populateReplyQuery(DiscussionReply.findById(reply._id));
@@ -746,6 +754,58 @@ async function batchStudentDiscussionParticipation(studentIds, threadIds) {
   }
 
   return map;
+}
+
+/**
+ * Earliest non-deleted reply timestamp per thread for one user (collection + embedded).
+ * Returns Map<threadId, Date>.
+ */
+async function batchFirstReplyCreatedAtByUser(threadIds, userId) {
+  const result = new Map();
+  const unique = [...new Set(threadIds.map(normalizeId).filter(Boolean))];
+  const uid = normalizeId(userId);
+  if (!unique.length || !uid) return result;
+
+  const oids = unique
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+  if (!oids.length) return result;
+
+  const authorOid = mongoose.Types.ObjectId.isValid(uid)
+    ? new mongoose.Types.ObjectId(uid)
+    : uid;
+
+  const collectionHits = await DiscussionReply.aggregate([
+    {
+      $match: {
+        threadId: { $in: oids },
+        authorId: authorOid,
+        deletedAt: null,
+      },
+    },
+    { $group: { _id: '$threadId', firstAt: { $min: '$createdAt' } } },
+  ]);
+  for (const row of collectionHits) {
+    if (row.firstAt) result.set(String(row._id), new Date(row.firstAt));
+  }
+
+  const remaining = oids.filter((oid) => !result.has(String(oid)));
+  if (!remaining.length) return result;
+
+  const threads = await Thread.find({ _id: { $in: remaining } }).select('replies').lean();
+  for (const thread of threads) {
+    let minAt = null;
+    for (const reply of thread.replies || []) {
+      if (reply.deletedAt) continue;
+      if (normalizeId(reply.author) !== uid) continue;
+      const at = reply.createdAt ? new Date(reply.createdAt) : null;
+      if (!at || Number.isNaN(at.getTime())) continue;
+      if (!minAt || at.getTime() < minAt.getTime()) minAt = at;
+    }
+    if (minAt) result.set(String(thread._id), minAt);
+  }
+
+  return result;
 }
 
 async function batchThreadIdsRepliedByUser(threadIds, userId) {
@@ -887,6 +947,7 @@ module.exports = {
   hasCollectionReplies,
   hasReplyByUser,
   batchStudentDiscussionParticipation,
+  batchFirstReplyCreatedAtByUser,
   batchThreadIdsRepliedByUser,
   hideReply,
   listChildReplies,
