@@ -13,14 +13,13 @@ const {
   canAmendGrades,
 } = require('../middleware/academicPermissions');
 const academicAuditService = require('./academicAudit.service');
+const { FINALIZED_STATUSES } = require('./gradeLifecycleConstants');
 const {
   notifyGradesPosted,
   notifyGradesFinalized,
   notifyGradesAmended,
 } = require('./notification/academicNotificationProducers.service');
 const crypto = require('crypto');
-
-const FINALIZED_STATUSES = new Set(['FINALIZED', 'AMENDED']);
 
 function lifecycleError(message, statusCode = 403) {
   const err = new Error(message);

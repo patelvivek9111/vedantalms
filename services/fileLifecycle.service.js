@@ -2,9 +2,8 @@ const Course = require('../models/course.model');
 const Assignment = require('../models/Assignment');
 const Module = require('../models/module.model');
 const GroupSet = require('../models/GroupSet');
-const gradeLifecycleService = require('./gradeLifecycle.service');
 const { getSemesterFromCourse } = require('../utils/semesterUtils');
-const { FINALIZED_STATUSES } = require('./gradeLifecycle.service');
+const { FINALIZED_STATUSES } = require('./gradeLifecycleConstants');
 
 async function resolveCourseForAssignment(assignmentId) {
   const assignment = await Assignment.findById(assignmentId)
@@ -41,6 +40,7 @@ async function assertCourseFilesMutable(course, user, { action = 'mutate' } = {}
   }
   assertCourseOperational(course, { action });
   const { term, year } = getSemesterFromCourse(course);
+  const gradeLifecycleService = require('./gradeLifecycle.service');
   const lifecycle = await gradeLifecycleService.getLifecycle(course._id, term, year);
   if (lifecycle && FINALIZED_STATUSES.has(lifecycle.status)) {
     const err = new Error(

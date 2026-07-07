@@ -1,6 +1,6 @@
 const FileAsset = require('../models/fileAsset.model');
 const CourseGradeLifecycle = require('../models/courseGradeLifecycle.model');
-const { FINALIZED_STATUSES } = require('./gradeLifecycle.service');
+const { FINALIZED_STATUSES } = require('./gradeLifecycleConstants');
 const { getSemesterFromCourse } = require('../utils/semesterUtils');
 const academicAuditService = require('./academicAudit.service');
 
