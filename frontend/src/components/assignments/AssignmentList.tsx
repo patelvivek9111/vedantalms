@@ -354,6 +354,7 @@ function normalizeListItem(item: any) {
     replies: item.replies || [],
     studentGrades: item.studentGrades || [],
     hasSubmitted: Boolean(item.hasSubmitted ?? item.hasPosted),
+    gradingPeriodId: item.gradingPeriodId ?? null,
   };
 }
 

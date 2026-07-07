@@ -60,6 +60,11 @@ export function courseContextFromResolvedPolicy(resolved: ResolvedGradingPolicy)
   gradingPolicy: ResolvedGradingPolicy;
 };
 
+export function enrichResolvedForAssignmentOrder(
+  resolved: ResolvedGradingPolicy,
+  assignments?: { _id: string; [key: string]: unknown }[]
+): ResolvedGradingPolicy;
+
 export function validateGradingPolicy(
   policy: unknown,
   options?: { partial?: boolean }

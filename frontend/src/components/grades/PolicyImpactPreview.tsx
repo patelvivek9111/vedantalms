@@ -31,6 +31,7 @@ const PolicyImpactPreview: React.FC<PolicyImpactPreviewProps> = ({
   applyMode = 'retroactive_all',
   saveReason,
   onSaveReasonChange,
+  onExportCsv,
 }) => {
   if (loading) {
     return <p className="text-sm text-gray-500">Calculating impact for enrolled students…</p>;

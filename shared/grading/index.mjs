@@ -17,3 +17,4 @@ export * from './policyDiff.mjs';
 export * from './extraCredit.mjs';
 export * from './gradingEngineVersion.mjs';
 export * from './transcriptHash.mjs';
+export * from './policyApplication.mjs';

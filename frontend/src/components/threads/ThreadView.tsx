@@ -288,6 +288,7 @@ interface Thread {
     hasInstructorReply?: boolean;
     lastViewedAt?: string | null;
   };
+  gradingPeriodId?: string | null;
 }
 
 interface ReplyComponentProps {

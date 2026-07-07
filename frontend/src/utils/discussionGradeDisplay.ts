@@ -8,6 +8,11 @@ export type DiscussionStudentGradeRow = {
   grade?: number | null;
   feedback?: string | null;
   gradedAt?: string | Date | null;
+  gradedBy?: {
+    _id?: string;
+    firstName?: string;
+    lastName?: string;
+  } | null;
   gradeVisibility?: { scoreVisible?: boolean; feedbackVisible?: boolean };
   excused?: boolean;
 };

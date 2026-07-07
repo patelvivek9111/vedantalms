@@ -17,6 +17,7 @@ const transcriptHash = require('./transcriptHash.cjs');
 const dropLowest = require('./dropLowest.cjs');
 const dropHighest = require('./dropHighest.cjs');
 const dropRules = require('./dropRules.cjs');
+const policyApplication = require('./policyApplication.cjs');
 
 module.exports = {
   ...gradeCalculation,
@@ -38,4 +39,5 @@ module.exports = {
   ...dropLowest,
   ...dropHighest,
   ...dropRules,
+  ...policyApplication,
 };

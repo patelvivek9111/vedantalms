@@ -6,6 +6,7 @@ import {
   calculateProjectedFinalGradeWithWeightedGroups,
   computeGroupPointTotals,
   courseContextFromResolvedPolicy,
+  enrichResolvedForAssignmentOrder,
   resolveGradingPolicy,
   type Course,
   type Grades,
@@ -87,7 +88,10 @@ export function normalizeResolvedPolicyForCourse(
     assignments.length > 0 &&
     normalized.policyApplication?.applyMode === 'from_assignment'
   ) {
-    normalized = enrichResolvedForAssignmentOrder(normalized, assignments) as ResolvedGradingPolicy;
+    normalized = enrichResolvedForAssignmentOrder(
+      normalized,
+      assignments as { _id: string; [key: string]: unknown }[]
+    ) as ResolvedGradingPolicy;
   }
   return normalized;
 }

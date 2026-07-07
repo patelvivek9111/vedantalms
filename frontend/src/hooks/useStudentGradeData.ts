@@ -82,7 +82,11 @@ export const useStudentGradeData = ({
           .filter((thread: any) => thread.isGraded)
           .map((thread: any) => {
             const userId = user?._id;
-            let studentGradeObj: { grade?: number; feedback?: string } | null = null;
+            let studentGradeObj: {
+              grade?: number;
+              feedback?: string;
+              gradeVisibility?: { scoreVisible?: boolean };
+            } | null = null;
             let hasSubmitted = false;
 
             // Check if student has replied to the thread
