@@ -12,6 +12,7 @@ import {
 import RichTextEditor from '../common/RichTextEditor';
 import FileAttachmentPanel from '../files/FileAttachmentPanel';
 import FileAttachmentChips from '../files/FileAttachmentChips';
+import SanitizedHtml from '../common/SanitizedHtml';
 import type { NormalizedFile } from '../../utils/fileTypes';
 import { API_URL } from '../../config';
 
@@ -368,9 +369,9 @@ const SyllabusSection: React.FC<SyllabusSectionProps> = ({
                 </h3>
                 <span className="h-px flex-1 bg-gradient-to-r from-slate-200 to-transparent dark:from-slate-700" aria-hidden />
               </div>
-              <div
+              <SanitizedHtml
                 className="prose prose-slate max-w-none prose-headings:tracking-tight prose-a:text-blue-600 dark:prose-invert"
-                dangerouslySetInnerHTML={{ __html: course.catalog.syllabusContent }}
+                html={course.catalog.syllabusContent}
               />
             </section>
           )}

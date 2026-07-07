@@ -109,6 +109,7 @@ async function serializeThreadForUser(req, thread, context = {}, options = {}) {
     page: req.query.replyPage || req.query.page,
     limit: req.query.replyLimit || req.query.limit,
     rootOnly: req.query.rootOnly === 'true',
+    userId: req.user?._id,
     ...options.replies,
   };
   const threadWithReplies =
@@ -574,7 +575,10 @@ router.get('/:threadId/replies', protect, async (req, res) => {
     }
     res.json({
       success: true,
-      data: page.replies,
+      data: await discussionReplyService.hydrateRepliesFileAssetsForClient(
+        page.replies,
+        req.user?._id
+      ),
       pagination: page.pagination,
       source: page.source,
     });
@@ -677,7 +681,7 @@ router.post('/:threadId/replies', protect, async (req, res) => {
       data: await serializeThreadForUser(req, updatedThread, context),
       createdReply: duplicateSuppressed
         ? null
-        : discussionReplyService.toLegacyReply(newReply),
+        : await discussionReplyService.hydrateReplyFileAssetsForClient(newReply, req.user._id),
     });
   } catch (error) {
     sendRouteError(res, error, 'Error adding reply');

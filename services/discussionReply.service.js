@@ -5,6 +5,8 @@ const discussionCounterService = require('./discussionCounter.service');
 const discussionParticipation = require('./discussionParticipation.service');
 const { sanitizeDiscussionHtml } = require('./discussionSanitizer.service');
 const discussionObservability = require('./discussionObservability.service');
+const { loadSerializedFileAssets } = require('../utils/fileResponse');
+const { serializeFileAsset } = require('./fileAsset.service');
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
@@ -69,6 +71,66 @@ function populateReplyQuery(query) {
     .populate('fileAssets', 'originalName mimeType size path')
     .populate('likes.user', '_id firstName lastName')
     .populate('deletedBy', 'firstName lastName role');
+}
+
+function collectReplyFileAssetIds(fileAssets = []) {
+  const ids = [];
+  for (const item of fileAssets) {
+    if (!item) continue;
+    if (typeof item === 'string') {
+      ids.push(item);
+      continue;
+    }
+    const id = item._id || item.fileAssetId || item.id;
+    if (id) ids.push(String(id));
+  }
+  return [...new Set(ids)];
+}
+
+function serializePopulatedReplyFileAssets(fileAssets, userId) {
+  if (!fileAssets?.length) return [];
+  return fileAssets
+    .map((item) => {
+      if (!item) return null;
+      if (typeof item === 'string') return item;
+      if (item.originalName || item.originalname || item.fileAssetId) {
+        return serializeFileAsset(item, userId);
+      }
+      return item;
+    })
+    .filter(Boolean);
+}
+
+async function hydrateReplyFileAssetsForClient(reply, userId = null) {
+  const legacy = reply?.content !== undefined && reply?.author !== undefined
+    ? { ...reply }
+    : toLegacyReply(reply);
+  if (!legacy.fileAssets?.length) {
+    legacy.attachments = legacy.attachments || [];
+    return legacy;
+  }
+
+  const serialized = serializePopulatedReplyFileAssets(legacy.fileAssets, userId);
+  const needsHydration = serialized.some(
+    (item) => typeof item === 'string' || !item?.originalName
+  );
+
+  if (!needsHydration) {
+    legacy.fileAssets = serialized;
+    legacy.attachments = serialized;
+    return legacy;
+  }
+
+  const ids = collectReplyFileAssetIds(legacy.fileAssets);
+  const hydrated = ids.length ? await loadSerializedFileAssets(ids, userId) : [];
+  legacy.fileAssets = hydrated;
+  legacy.attachments = hydrated;
+  return legacy;
+}
+
+async function hydrateRepliesFileAssetsForClient(replies, userId = null) {
+  if (!replies?.length) return replies || [];
+  return Promise.all(replies.map((reply) => hydrateReplyFileAssetsForClient(reply, userId)));
 }
 
 function toLegacyReply(reply) {
@@ -854,7 +916,7 @@ async function batchThreadIdsRepliedByUser(threadIds, userId) {
 async function populateThreadReplyPage(thread, options = {}) {
   const page = await listRootReplies(thread, options);
   const obj = thread?.toObject ? thread.toObject({ virtuals: true }) : { ...thread };
-  obj.replies = page.replies;
+  obj.replies = await hydrateRepliesFileAssetsForClient(page.replies, options.userId);
   obj.repliesPagination = page.pagination;
   obj.replySource = page.source;
   obj.replyCount = obj.counters?.replyCount ?? page.pagination.total;
@@ -956,6 +1018,8 @@ module.exports = {
   restoreReply,
   softDeleteReply,
   toLegacyReply,
+  hydrateReplyFileAssetsForClient,
+  hydrateRepliesFileAssetsForClient,
   toggleLike,
   updateReply,
 };

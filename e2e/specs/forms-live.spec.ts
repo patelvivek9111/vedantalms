@@ -91,7 +91,10 @@ test.describe.serial('§5.4 Announcements & forms — live API journey', () => {
     await page.locator('#title').fill(title);
     await page.locator('input[placeholder="Option 1"]').fill('Option A');
     await page.locator('input[placeholder="Option 2"]').fill('Option B');
-    await page.locator('#endDate').fill(futureDateTimeLocal());
+    const endDateInput = page.locator('#endDate');
+    await endDateInput.fill(futureDateTimeLocal());
+    await endDateInput.dispatchEvent('input');
+    await endDateInput.dispatchEvent('change');
 
     const [createRes] = await Promise.all([
       page.waitForResponse(

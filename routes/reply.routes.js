@@ -87,7 +87,10 @@ router.get('/:replyId/children', protect, async (req, res) => {
     setNoStoreDiscussionHeaders(res);
     res.json({
       success: true,
-      data: page.replies,
+      data: await discussionReplyService.hydrateRepliesFileAssetsForClient(
+        page.replies,
+        req.user?._id
+      ),
       pagination: page.pagination,
       source: page.source,
     });

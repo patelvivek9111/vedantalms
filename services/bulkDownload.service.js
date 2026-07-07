@@ -156,6 +156,16 @@ async function buildZipArchiveFolder({ fileAssetIds, label, user, audit }) {
 
 async function createScopeZipJob(scope, user, { label } = {}) {
   const fileAssetIds = await resolveScopeFileIds(scope, user);
+  if (!fileAssetIds.length) {
+    return {
+      job: {
+        status: 'completed',
+        type: 'files.bulk.download',
+        result: { empty: true, fileCount: 0, label: label || scope.type || 'bulk' },
+      },
+      async: false,
+    };
+  }
   const { enqueueJob } = require('./jobQueue.service');
   return enqueueJob(
     'files.bulk.download',

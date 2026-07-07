@@ -40,6 +40,7 @@ import FileAttachmentChips from '../files/FileAttachmentChips';
 import FileAttachmentPanel, { normalizeLegacyFiles } from '../files/FileAttachmentPanel';
 import type { NormalizedFile } from '../../utils/fileTypes';
 import { deriveDiscussionWorkflowState, sanitizeDiscussionHtml } from '../../utils/discussionWorkflowStatus';
+import SanitizedHtml from '../common/SanitizedHtml';
 import { resolveDiscussionStatus, type DiscussionStatus } from '../../utils/discussionStatus';
 import { normalizeMongoIdRef } from '../../utils/mongoId';
 import { findStudentDiscussionGradeRow } from '../../utils/discussionGradeDisplay';
@@ -614,9 +615,9 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
                 </div>
               ) : (
                 <>
-                  <div 
+                  <SanitizedHtml
                     className="prose prose-gray max-w-none mb-4 text-gray-800 dark:text-gray-300 leading-relaxed prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-p:text-gray-800 dark:prose-p:text-gray-300"
-                    dangerouslySetInnerHTML={{ __html: sanitizeDiscussionHtml(reply.content) }}
+                    html={sanitizeDiscussionHtml(reply.content)}
                   />
                   <FileAttachmentChips files={reply.fileAssets} className="mb-2" />
                 </>
@@ -1841,9 +1842,9 @@ const ThreadView: React.FC = () => {
                     )}
                   </div>
 
-                  <div
+                  <SanitizedHtml
                     className="prose prose-slate mb-6 max-w-none leading-relaxed dark:prose-invert prose-headings:text-slate-900 prose-p:text-slate-700 dark:prose-headings:text-slate-100 dark:prose-p:text-slate-300"
-                    dangerouslySetInnerHTML={{ __html: sanitizeDiscussionHtml(thread.content) }}
+                    html={sanitizeDiscussionHtml(thread.content)}
                   />
                   <FileAttachmentChips files={thread.fileAssets} className="mb-5" />
                   {thread.repliesHiddenUntilPost && (
@@ -1964,9 +1965,9 @@ const ThreadView: React.FC = () => {
                               </div>
                             </div>
                             
-                            <div 
+                            <SanitizedHtml
                               className="prose prose-sm max-w-none text-gray-700 dark:text-gray-300 leading-relaxed prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-p:text-gray-700 dark:prose-p:text-gray-300"
-                              dangerouslySetInnerHTML={{ __html: sanitizeDiscussionHtml(reply.content) }}
+                              html={sanitizeDiscussionHtml(reply.content)}
                             />
                             
                             {isReplyEdited(reply) && (

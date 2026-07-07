@@ -40,6 +40,24 @@ const PollForm: React.FC<PollFormProps> = ({ courseId, poll, onClose, onSuccess 
 
   const isEditing = !!poll;
 
+  const buildDefaultEndDate = () => {
+    const defaultEndDate = new Date();
+    defaultEndDate.setDate(defaultEndDate.getDate() + 7);
+    const minutes = Math.round(defaultEndDate.getMinutes() / 10) * 10;
+    defaultEndDate.setMinutes(minutes);
+    const year = defaultEndDate.getFullYear();
+    const month = String(defaultEndDate.getMonth() + 1).padStart(2, '0');
+    const day = String(defaultEndDate.getDate()).padStart(2, '0');
+    const hours = String(defaultEndDate.getHours()).padStart(2, '0');
+    const minutesStr = String(minutes).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutesStr}`;
+  };
+
+  const resolveValidEndDate = (candidate?: string) => {
+    if (candidate && new Date(candidate) > new Date()) return candidate;
+    return buildDefaultEndDate();
+  };
+
   // Draft manager (only for create mode)
   const formId = `poll-create-${courseId}`;
   const { draft, isDraftSaved, saveDraft, autoSave, clearDraft } = useDraftManager<{
@@ -60,7 +78,7 @@ const PollForm: React.FC<PollFormProps> = ({ courseId, poll, onClose, onSuccess 
       setFormData({
         title: draft.title || '',
         options: draft.options && draft.options.length >= 2 ? draft.options : ['', ''],
-        endDate: draft.endDate || formData.endDate,
+        endDate: resolveValidEndDate(draft.endDate),
         allowMultipleVotes: draft.allowMultipleVotes || false,
         resultsVisible: draft.resultsVisible || false
       });
@@ -88,22 +106,10 @@ const PollForm: React.FC<PollFormProps> = ({ courseId, poll, onClose, onSuccess 
   const confirmResetForm = () => {
     setShowResetConfirm(false);
       clearDraft();
-      // Reset to default end date (7 days from now)
-      const defaultEndDate = new Date();
-      defaultEndDate.setDate(defaultEndDate.getDate() + 7);
-      const minutes = Math.round(defaultEndDate.getMinutes() / 10) * 10;
-      defaultEndDate.setMinutes(minutes);
-      const year = defaultEndDate.getFullYear();
-      const month = String(defaultEndDate.getMonth() + 1).padStart(2, '0');
-      const day = String(defaultEndDate.getDate()).padStart(2, '0');
-      const hours = String(defaultEndDate.getHours()).padStart(2, '0');
-      const minutesStr = String(minutes).padStart(2, '0');
-      const formattedDate = `${year}-${month}-${day}T${hours}:${minutesStr}`;
-      
       setFormData({
         title: '',
         options: ['', ''],
-        endDate: formattedDate,
+        endDate: buildDefaultEndDate(),
         allowMultipleVotes: false,
         resultsVisible: false
       });
@@ -132,23 +138,9 @@ const PollForm: React.FC<PollFormProps> = ({ courseId, poll, onClose, onSuccess 
         resultsVisible: poll.resultsVisible
       });
     } else {
-             // Set default end date to 7 days from now with 10-minute increments
-       const defaultEndDate = new Date();
-       defaultEndDate.setDate(defaultEndDate.getDate() + 7);
-       // Round minutes to nearest 10-minute increment
-       const minutes = Math.round(defaultEndDate.getMinutes() / 10) * 10;
-       defaultEndDate.setMinutes(minutes);
-       // Format for datetime-local input (YYYY-MM-DDTHH:MM)
-       const year = defaultEndDate.getFullYear();
-       const month = String(defaultEndDate.getMonth() + 1).padStart(2, '0');
-       const day = String(defaultEndDate.getDate()).padStart(2, '0');
-       const hours = String(defaultEndDate.getHours()).padStart(2, '0');
-       const minutesStr = String(minutes).padStart(2, '0');
-       const formattedDate = `${year}-${month}-${day}T${hours}:${minutesStr}`;
-      
       setFormData(prev => ({
         ...prev,
-        endDate: formattedDate
+        endDate: resolveValidEndDate(prev.endDate),
       }));
     }
   }, [poll]);
@@ -208,12 +200,12 @@ const PollForm: React.FC<PollFormProps> = ({ courseId, poll, onClose, onSuccess 
     }
   };
 
-  const validateEndDate = () => {
-    if (!formData.endDate) {
+  const validateEndDate = (candidate = formData.endDate) => {
+    if (!candidate) {
       setFieldErrors(prev => ({ ...prev, endDate: 'End date is required' }));
       return false;
     }
-    if (new Date(formData.endDate) <= new Date()) {
+    if (new Date(candidate) <= new Date()) {
       setFieldErrors(prev => ({ ...prev, endDate: 'End date must be in the future' }));
       return false;
     }
@@ -226,6 +218,10 @@ const PollForm: React.FC<PollFormProps> = ({ courseId, poll, onClose, onSuccess 
   };
 
   const validateForm = () => {
+    const endDate = resolveValidEndDate(formData.endDate);
+    if (endDate !== formData.endDate) {
+      setFormData((prev) => ({ ...prev, endDate }));
+    }
     if (!formData.title.trim()) {
       setError('Title is required');
       return false;
@@ -238,7 +234,7 @@ const PollForm: React.FC<PollFormProps> = ({ courseId, poll, onClose, onSuccess 
       setError('All options must have text');
       return false;
     }
-    if (!validateEndDate()) {
+    if (!validateEndDate(endDate)) {
       return false;
     }
     return true;
@@ -255,10 +251,11 @@ const PollForm: React.FC<PollFormProps> = ({ courseId, poll, onClose, onSuccess 
     setLoading(true);
     try {
       const token = getMemoryAuthToken();
+      const effectiveEndDate = resolveValidEndDate(formData.endDate);
       const payload = {
         title: formData.title.trim(),
         options: formData.options.map(option => option.trim()),
-        endDate: new Date(formData.endDate).toISOString(),
+        endDate: new Date(effectiveEndDate).toISOString(),
         allowMultipleVotes: formData.allowMultipleVotes,
         resultsVisible: formData.resultsVisible
       };
@@ -324,7 +321,7 @@ const PollForm: React.FC<PollFormProps> = ({ courseId, poll, onClose, onSuccess 
                   validateEndDate();
                 }
               }}
-              onBlur={validateEndDate}
+              onBlur={() => validateEndDate()}
               error={fieldErrors.endDate}
               helperText="Select when the poll should end (10-minute increments)"
               min={new Date().toISOString().split('T')[0]}
