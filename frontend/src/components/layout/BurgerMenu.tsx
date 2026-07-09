@@ -19,6 +19,7 @@ import api from '../../services/api';
 import { NavCustomizationModal, NavItem } from '../layout/NavCustomizationModal';
 import { ChangeUserModal } from '../modals/ChangeUserModal';
 import { NotificationPreferencesPanel } from '../notifications/NotificationPreferencesPanel';
+import { performLogout } from '../../utils/authLogout';
 
 interface BurgerMenuProps {
   showBurgerMenu: boolean;
@@ -614,8 +615,7 @@ export const BurgerMenu: React.FC<BurgerMenuProps> = ({
                 onClick={() => {
                   setShowBurgerMenu(false);
                   setBurgerMenuSection(null);
-                  logout();
-                  navigate('/login');
+                  void performLogout(logout, navigate);
                 }}
                 className="w-full text-left px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3 touch-manipulation"
               >

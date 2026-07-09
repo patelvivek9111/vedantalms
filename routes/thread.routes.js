@@ -14,6 +14,7 @@ const discussionStatus = require('../services/discussionStatus.service');
 const discussionObservability = require('../services/discussionObservability.service');
 const discussionListDiagnostics = require('../services/discussionListDiagnostics.service');
 const discussionListService = require('../services/discussionList.service');
+const gradingPeriodAssignmentService = require('../services/gradingPeriodAssignment.service');
 const { sanitizeDiscussionHtml } = require('../services/discussionSanitizer.service');
 const DiscussionAuditEvent = require('../models/discussionAuditEvent.model');
 const gradeLifecycleService = require('../services/gradeLifecycle.service');
@@ -338,7 +339,14 @@ router.post('/', protect, authorize(['teacher', 'teaching_assistant', 'admin']),
         ownerOnly: true,
       });
     }
-    
+
+    const resolvedGradingPeriodId = gradingPeriodId
+      ? gradingPeriodId
+      : await gradingPeriodAssignmentService.resolvePeriodIdForCourseDueDate(
+          courseId,
+          dueDate || null
+        );
+
     const thread = new Thread({
       title,
       content: sanitizeDiscussionHtml(content),
@@ -356,7 +364,7 @@ router.post('/', protect, authorize(['teacher', 'teaching_assistant', 'admin']),
       lockAfterDue: lockAfterDue === true,
       discussionReleaseMode: discussionReleaseMode || 'immediate',
       gradeHidden: gradeHidden === true || discussionReleaseMode === 'hidden',
-      gradingPeriodId: gradingPeriodId || null,
+      gradingPeriodId: resolvedGradingPeriodId || null,
       settings: {
         requirePostBeforeSee: settings?.requirePostBeforeSee || false,
         allowLikes: settings?.allowLikes !== undefined ? settings.allowLikes : true,
@@ -930,7 +938,16 @@ router.put('/:threadId', protect, async (req, res) => {
     if (discussionReleaseMode !== undefined) thread.discussionReleaseMode = discussionReleaseMode || 'immediate';
     if (gradesReleasedAt !== undefined) thread.gradesReleasedAt = gradesReleasedAt || null;
     if (gradeHidden !== undefined) thread.gradeHidden = gradeHidden === true;
-    if (req.body.gradingPeriodId !== undefined) thread.gradingPeriodId = req.body.gradingPeriodId || null;
+    if (req.body.gradingPeriodId !== undefined && req.body.gradingPeriodId) {
+      thread.gradingPeriodId = req.body.gradingPeriodId;
+    } else if (dueDate !== undefined) {
+      // Due date changed without an explicit period → re-slot automatically.
+      thread.gradingPeriodId =
+        await gradingPeriodAssignmentService.resolvePeriodIdForCourseDueDate(
+          thread.course,
+          thread.dueDate
+        );
+    }
     if (module !== undefined) thread.module = module;
     if (groupSet !== undefined) thread.groupSet = groupSet;
     if (groupId !== undefined) thread.groupId = groupId;
@@ -1034,6 +1051,10 @@ router.post('/:threadId/grade', protect, authorize(['teacher', 'teaching_assista
         metadata: { source: 'discussion_grade' },
       },
     });
+    await gradingPeriodAssignmentService.assertGradingPeriodEditable(
+      context.course._id,
+      thread.gradingPeriodId
+    );
 
     if (!thread.isGraded) {
       return res.status(400).json({

@@ -129,6 +129,34 @@ const systemSettingsSchema = new mongoose.Schema({
       default: 25,
     },
   },
+  /** Institution-wide school/college calendar and defaults. */
+  academic: {
+    institutionMode: {
+      type: String,
+      enum: ['college', 'school', 'mixed'],
+      default: 'mixed',
+    },
+    defaultScheduleType: {
+      type: String,
+      enum: ['single_term', 'full_year', 'custom'],
+      default: 'single_term',
+    },
+    calendarStyle: {
+      type: String,
+      enum: ['us', 'india'],
+      default: 'us',
+    },
+    calendarPreset: {
+      type: String,
+      default: 'us_quarters',
+    },
+    academicYearStart: { type: Number, default: null },
+    useInstitutionCalendar: { type: Boolean, default: true },
+    defaultCreditHoursSchool: { type: Number, default: 0 },
+    defaultCreditHoursCollege: { type: Number, default: 3 },
+    reportingTermSchool: { type: String, default: 'Academic Year' },
+    reportingTermCollege: { type: String, default: 'Fall' },
+  },
 }, {
   timestamps: true
 });

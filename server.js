@@ -541,6 +541,7 @@ app.use('/api/jobs', require('./routes/jobs.routes'));
 app.use('/api/registrar/reports', require('./routes/registrarReports.routes'));
 app.use('/api/ops', require('./routes/ops.routes'));
 app.use('/api/admin', require('./routes/admin.routes'));
+app.use('/api/academic', require('./routes/academic.routes'));
 app.use('/api/notifications', require('./routes/notification.routes').router);
 app.use('/api/quizwave', require('./routes/quizwave.routes'));
 app.use('/api/integrations/zoho-meeting', require('./routes/zohoMeeting.routes'));

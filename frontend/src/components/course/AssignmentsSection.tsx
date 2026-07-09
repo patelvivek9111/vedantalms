@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import AssignmentList from '../assignments/AssignmentList';
 import { SectionDividerHeading } from '../common/SectionDividerHeading';
 
-interface AssignmentsSectionProps {
+export interface AssignmentsSectionProps {
   modules: any[];
   groupAssignments: any[];
   discussions: any[];
@@ -14,6 +14,7 @@ interface AssignmentsSectionProps {
   studentSubmissions: any[];
   submissionMap: { [key: string]: string };
   course: any;
+  onGradingPeriodsChanged?: () => void;
 }
 
 const AssignmentsSection: React.FC<AssignmentsSectionProps> = ({
@@ -27,6 +28,7 @@ const AssignmentsSection: React.FC<AssignmentsSectionProps> = ({
   studentSubmissions,
   submissionMap,
   course,
+  onGradingPeriodsChanged,
 }) => {
   const navigate = useNavigate();
 
@@ -61,6 +63,7 @@ const AssignmentsSection: React.FC<AssignmentsSectionProps> = ({
       studentGrades: d.studentGrades || [],
       replies: d.replies || [],
       hasSubmitted: d.hasSubmitted ?? d.hasPosted ?? false,
+      gradingPeriodId: d.gradingPeriodId ?? null,
     }))
   ];
   
@@ -98,7 +101,7 @@ const AssignmentsSection: React.FC<AssignmentsSectionProps> = ({
       ) : modules.length > 0 ? (
         <section aria-labelledby="assignments-heading">
           <SectionDividerHeading id="assignments-heading">Assignments</SectionDividerHeading>
-          <AssignmentList assignments={deduplicatedList} userRole={user?.role} studentSubmissions={user?.role === 'student' ? studentSubmissions : undefined} studentId={user?._id} submissionMap={user?.role === 'student' ? submissionMap : undefined} courseId={course?._id} />
+          <AssignmentList assignments={deduplicatedList} userRole={user?.role} studentSubmissions={user?.role === 'student' ? studentSubmissions : undefined} studentId={user?._id} submissionMap={user?.role === 'student' ? submissionMap : undefined} courseId={course?._id} onGradingPeriodsChanged={onGradingPeriodsChanged} />
         </section>
       ) : (
         <div className="py-8 text-center text-gray-500 dark:text-gray-400">No modules available. Please create a module to add assignments.</div>

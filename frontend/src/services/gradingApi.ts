@@ -175,19 +175,108 @@ export interface GradingPeriod {
   position: number;
   startDate?: string | null;
   endDate?: string | null;
+  closeDate?: string | null;
   closed?: boolean;
+  weight?: number | null;
+}
+
+export interface GradingPeriodSettings {
+  allowStudentAllPeriods: boolean;
+  displayTotalsForAllPeriods: boolean;
+}
+
+export interface GradingPeriodBreakdownRow {
+  periodId: string;
+  periodName: string;
+  weight: number;
+  currentPercent: number | null;
+  finalPercent: number | null;
+  letterGrade: string | null;
+  finalLetterGrade: string | null;
 }
 
 export async function fetchCourseGradingPeriods(courseId: string) {
   const res = await api.get(`/grades/course/${courseId}/grading-periods`);
-  return res.data as { success: boolean; data: GradingPeriod[] };
+  return res.data as {
+    success: boolean;
+    data: GradingPeriod[];
+    settings?: GradingPeriodSettings;
+  };
+}
+
+export interface GradingPeriodInput {
+  name?: string;
+  startDate?: string | null;
+  endDate?: string | null;
+  closeDate?: string | null;
+  closed?: boolean;
+  weight?: number | null;
 }
 
 export async function createCourseGradingPeriod(
   courseId: string,
-  body: { name: string; startDate?: string; endDate?: string; closed?: boolean }
+  body: GradingPeriodInput & { name: string }
 ) {
   const res = await api.post(`/grades/course/${courseId}/grading-periods`, body);
+  return res.data;
+}
+
+export async function updateCourseGradingPeriod(
+  courseId: string,
+  periodId: string,
+  body: GradingPeriodInput
+) {
+  const res = await api.patch(`/grades/course/${courseId}/grading-periods/${periodId}`, body);
+  return res.data;
+}
+
+export interface GradingPeriodDeletionImpact {
+  period: GradingPeriod;
+  assignmentCount: number;
+  discussionCount: number;
+  hasAssignmentsOrGrades: boolean;
+  periodWasClosed: boolean;
+  remainingPeriodCount: number;
+  weightWarning: string | null;
+  preservesSnapshots: boolean;
+}
+
+export interface GradingPeriodDeleteResult {
+  deletedPeriod: GradingPeriod;
+  assignmentsUnassigned: number;
+  discussionsUnassigned: number;
+  remainingPeriodCount: number;
+  totalRemainingWeight: number;
+  weightWarning: string | null;
+  periodWasClosed: boolean;
+  preservesSnapshots: boolean;
+}
+
+export async function fetchGradingPeriodDeletionImpact(courseId: string, periodId: string) {
+  const res = await api.get(
+    `/grades/course/${courseId}/grading-periods/${periodId}/deletion-impact`
+  );
+  return res.data as { success: boolean; data: GradingPeriodDeletionImpact };
+}
+
+export async function deleteCourseGradingPeriod(courseId: string, periodId: string) {
+  const res = await api.delete(`/grades/course/${courseId}/grading-periods/${periodId}`);
+  return res.data as { success: boolean; data: GradingPeriodDeleteResult };
+}
+
+export async function updateGradingPeriodSettings(
+  courseId: string,
+  settings: Partial<GradingPeriodSettings>
+) {
+  const res = await api.patch(`/grades/course/${courseId}/grading-periods/settings`, settings);
+  return res.data as { success: boolean; data: GradingPeriodSettings };
+}
+
+export async function applyGradingPeriodTemplate(
+  courseId: string,
+  template: 'quarters' | 'semesters' | 'terms'
+) {
+  const res = await api.post(`/grades/course/${courseId}/grading-periods/templates`, { template });
   return res.data;
 }
 

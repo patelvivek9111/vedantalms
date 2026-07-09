@@ -801,6 +801,9 @@ const ThreadView: React.FC = () => {
   const [isGrading, setIsGrading] = useState(false);
 
   const [showEditModal, setShowEditModal] = useState(false);
+  const [editModalAnchor, setEditModalAnchor] = useState<
+    { left: number; top: number; width: number; height: number } | null
+  >(null);
   const [editSettings, setEditSettings] = useState({
     isGraded: false,
     totalPoints: 100,
@@ -815,6 +818,34 @@ const ThreadView: React.FC = () => {
     gradingPeriodId: null as string | null,
   });
   const [showGradingPeriodsModal, setShowGradingPeriodsModal] = useState(false);
+
+  // Keep the Edit Thread Settings modal centered over the visible content pane.
+  useEffect(() => {
+    if (!showEditModal) return;
+    const measure = () => {
+      const el = document.querySelector<HTMLElement>('#course-main-content');
+      if (!el) {
+        setEditModalAnchor(null);
+        return;
+      }
+      const r = el.getBoundingClientRect();
+      const top = Math.max(r.top, 0);
+      const bottom = Math.min(r.bottom, window.innerHeight);
+      setEditModalAnchor({
+        left: r.left,
+        top,
+        width: r.width,
+        height: Math.max(0, bottom - top),
+      });
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    window.addEventListener('scroll', measure, true);
+    return () => {
+      window.removeEventListener('resize', measure);
+      window.removeEventListener('scroll', measure, true);
+    };
+  }, [showEditModal]);
 
   // Add state for students
   const [students, setStudents] = useState<{ _id: string; firstName: string; lastName: string; profilePicture?: string }[]>([]);
@@ -2051,8 +2082,20 @@ const ThreadView: React.FC = () => {
       )}
 
       {/* Edit Settings Modal */}
-      {showEditModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-2 sm:p-4">
+      {showEditModal && createPortal(
+        <div
+          className="fixed bg-black bg-opacity-50 z-50 flex items-center justify-center p-2 sm:p-4"
+          style={
+            editModalAnchor
+              ? {
+                  left: editModalAnchor.left,
+                  top: editModalAnchor.top,
+                  width: editModalAnchor.width,
+                  height: editModalAnchor.height,
+                }
+              : { inset: 0 }
+          }
+        >
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md max-h-[95vh] overflow-y-auto">
             <div className="flex justify-between items-center p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-gray-100 flex items-center space-x-2">
@@ -2285,7 +2328,8 @@ const ThreadView: React.FC = () => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Student Grades Section (for teachers) */}

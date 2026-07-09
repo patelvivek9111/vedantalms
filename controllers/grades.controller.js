@@ -40,6 +40,10 @@ exports.getStudentCourseGrade = async (req, res) => {
   try {
     const courseId = req.params.courseId;
     const studentId = req.user._id;
+    const gradingPeriodId =
+      req.query.gradingPeriodId && req.query.gradingPeriodId !== 'all'
+        ? String(req.query.gradingPeriodId)
+        : null;
 
     const course = await Course.findById(courseId).lean();
     if (!course) return res.status(404).json({ message: 'Course not found' });
@@ -49,14 +53,21 @@ exports.getStudentCourseGrade = async (req, res) => {
     const cacheKey = studentCourseGradeCacheKey(
       studentId,
       courseId,
-      `${policyHash}:${getGradingEngineVersion()}`
+      `${policyHash}:${getGradingEngineVersion()}:gp=${gradingPeriodId || 'all'}`
     );
     const cached = await getJson(cacheKey);
     if (cached) {
       return res.json(cached);
     }
 
-    const gradeResult = await calculateCourseGradeForStudent(studentId, course);
+    const gradeResult = await calculateCourseGradeForStudent(
+      studentId,
+      course,
+      undefined,
+      undefined,
+      undefined,
+      { gradingPeriodId }
+    );
 
     const payload = toStudentGradeApiResponse(gradeResult);
     await setJson(cacheKey, payload, 60);
@@ -379,6 +390,10 @@ exports.getCourseGradebook = async (req, res) => {
     const data = await getCourseGradebookPage(courseId, {
       page: req.query.page,
       pageSize: req.query.pageSize,
+      gradingPeriodId:
+        req.query.gradingPeriodId && req.query.gradingPeriodId !== 'all'
+          ? String(req.query.gradingPeriodId)
+          : null,
     });
     if (req.user.role === 'student') {
       const sid = String(req.user._id);
@@ -440,11 +455,16 @@ exports.enqueueGradebookExport = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Not authorized' });
     }
 
+    const gradingPeriodId =
+      req.body?.gradingPeriodId && req.body.gradingPeriodId !== 'all'
+        ? String(req.body.gradingPeriodId)
+        : null;
+
     const jobQueueService = require('../services/jobQueue.service');
     const ferpaAudit = require('../services/ferpaAudit.service');
     const { job, async: isAsync } = await jobQueueService.enqueueJob(
       'export.gradebook',
-      { courseId: String(courseId) },
+      { courseId: String(courseId), ...(gradingPeriodId ? { gradingPeriodId } : {}) },
       req.user
     );
     await ferpaAudit.recordExportRequest(req, {

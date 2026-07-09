@@ -4,7 +4,7 @@ const DEFAULT_LIST_LIMIT = 50;
 const MAX_LIST_LIMIT = 100;
 
 const LIST_SELECT =
-  'title course module groupSet groupId author fileAssets counters lastActivity isPinned isGraded totalPoints group published dueDate settings moderationState createdAt updatedAt studentGrades discussionReleaseMode gradesReleasedAt gradeHidden';
+  'title course module groupSet groupId author fileAssets counters lastActivity isPinned isGraded totalPoints group published dueDate gradingPeriodId settings moderationState createdAt updatedAt studentGrades discussionReleaseMode gradesReleasedAt gradeHidden';
 
 function parseListPagination(query = {}) {
   const page = Math.max(1, parseInt(query.page, 10) || 1);

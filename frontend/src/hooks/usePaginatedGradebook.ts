@@ -17,6 +17,8 @@ interface UsePaginatedGradebookProps {
   page?: number;
   pageSize?: number;
   refresh: number;
+  /** When set, gradebook columns + totals are scoped to that grading period. */
+  gradingPeriodId?: string;
   setGradebookData: React.Dispatch<React.SetStateAction<{
     students: any[];
     assignments: any[];
@@ -41,6 +43,7 @@ export function usePaginatedGradebook({
   page = 1,
   pageSize = 100,
   refresh,
+  gradingPeriodId,
   setGradebookData,
   setSubmissionMap,
   setGradebookLoading,
@@ -65,7 +68,7 @@ export function usePaginatedGradebook({
       setGradebookLoading?.(true);
       try {
         const res = await api.get(`/grades/course/${courseId}/gradebook`, {
-          params: { page, pageSize },
+          params: { page, pageSize, ...(gradingPeriodId ? { gradingPeriodId } : {}) },
         });
         const data = res.data?.data;
         if (!data || cancelled) return;
@@ -112,6 +115,7 @@ export function usePaginatedGradebook({
     page,
     pageSize,
     refresh,
+    gradingPeriodId,
     setGradebookData,
     setSubmissionMap,
     setGradebookLoading,

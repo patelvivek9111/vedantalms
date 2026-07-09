@@ -6,6 +6,7 @@ import {
   computeStudentProjectedFinalPercent,
   normalizeResolvedPolicyForCourse,
 } from '../../utils/gradebookCompute';
+import type { GradingPeriodBreakdownRow } from '../../services/gradingApi';
 
 interface StudentGradeSidebarProps {
   course: any;
@@ -19,6 +20,10 @@ interface StudentGradeSidebarProps {
   backendFinalGrade?: number | null;
   backendFinalLetterGrade?: string | null;
   resolvedGradingPolicy?: ResolvedGradingPolicy | null;
+  /** When false, hide course total (Canvas: displayTotalsForAllPeriods off + all periods view). */
+  showCourseTotal?: boolean;
+  /** Weighted period breakdown when viewing all periods with weighted rollup. */
+  gradingPeriodBreakdown?: GradingPeriodBreakdownRow[] | null;
   /** When false, do not show a client-calculated total (avoids flash before the server total arrives). */
   summaryReady?: boolean;
 }
@@ -37,6 +42,8 @@ const StudentGradeSidebar: React.FC<StudentGradeSidebarProps> = ({
   backendFinalGrade,
   backendFinalLetterGrade,
   resolvedGradingPolicy = null,
+  showCourseTotal = true,
+  gradingPeriodBreakdown = null,
   summaryReady = true,
 }) => {
   const [showWhatIfScores, setShowWhatIfScores] = useState(false);
@@ -118,27 +125,38 @@ const StudentGradeSidebar: React.FC<StudentGradeSidebarProps> = ({
       ? finalLetter || getLetterGrade(finalPercent ?? 0, course?.gradeScale)
       : currentLetter;
 
+  const periodBreakdown =
+    Array.isArray(gradingPeriodBreakdown) && gradingPeriodBreakdown.length > 0
+      ? gradingPeriodBreakdown
+      : null;
+
   return (
     <div className="w-full md:w-64 flex-shrink-0">
       <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-3 sm:p-4 mb-3 sm:mb-4 border border-gray-200 dark:border-gray-700">
         <div className="space-y-2 sm:space-y-3">
-          <div>
-            <div className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              {canToggleGradeMode && !gradedOnly ? 'Final grade' : 'Current grade'}
+          {showCourseTotal ? (
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                {canToggleGradeMode && !gradedOnly ? 'Final grade' : 'Current grade'}
+              </div>
+              <div className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100">
+                {!summaryReady ? (
+                  <span className="text-gray-400 dark:text-gray-500 font-medium animate-pulse">
+                    Loading…
+                  </span>
+                ) : (
+                  <>
+                    {(displayPercent ?? 0).toFixed(2)}% [{displayLetter}]
+                  </>
+                )}
+              </div>
             </div>
-            <div className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100">
-              {!summaryReady ? (
-                <span className="text-gray-400 dark:text-gray-500 font-medium animate-pulse">
-                  Loading…
-                </span>
-              ) : (
-                <>
-                  {(displayPercent ?? 0).toFixed(2)}% [{displayLetter}]
-                </>
-              )}
+          ) : (
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              Select a grading period to view your course total.
             </div>
-          </div>
-          {canToggleGradeMode && (
+          )}
+          {showCourseTotal && canToggleGradeMode && (
             <label className="flex cursor-pointer items-start gap-2 text-xs text-gray-600 dark:text-gray-400 sm:text-sm">
               <input
                 type="checkbox"
@@ -155,6 +173,31 @@ const StudentGradeSidebar: React.FC<StudentGradeSidebarProps> = ({
             </label>
           )}
         </div>
+        {periodBreakdown && (
+          <div className="mt-3 sm:mt-4">
+            <div className="font-semibold mb-2 text-xs text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+              Grading periods
+            </div>
+            <div className="rounded bg-gray-50 p-2 dark:bg-gray-800 sm:p-3 space-y-2">
+              {periodBreakdown.map((row) => (
+                <div
+                  key={row.periodId}
+                  className="flex items-center justify-between text-sm text-gray-700 dark:text-gray-300"
+                >
+                  <span className="truncate pr-2" title={row.periodName}>
+                    {row.periodName}
+                    {row.weight > 0 ? (
+                      <span className="ml-1 text-xs text-gray-500">({row.weight}%)</span>
+                    ) : null}
+                  </span>
+                  <span className="font-semibold text-gray-900 dark:text-gray-100 shrink-0">
+                    {row.currentPercent != null ? `${row.currentPercent.toFixed(1)}%` : '—'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="space-y-2 mt-3 sm:mt-4">
           <button
             type="button"

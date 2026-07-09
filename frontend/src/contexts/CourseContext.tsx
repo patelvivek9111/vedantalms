@@ -42,6 +42,8 @@ interface Course {
     term: string;
     year: number;
   };
+  scheduleType?: 'single_term' | 'full_year' | 'custom';
+  academicYearLabel?: string | null;
   enrollmentRequests?: any[];
   waitlist?: any[];
 }
@@ -50,8 +52,24 @@ interface CourseContextType {
   courses: Course[];
   loading: boolean;
   error: string | null;
-  createCourse: (title: string, description: string, catalogData?: any, semesterData?: any) => Promise<void>;
-  updateCourse: (id: string, title?: string, description?: string, catalogData?: any, semesterData?: any, defaultColor?: string) => Promise<void>;
+  createCourse: (
+    title: string,
+    description: string,
+    catalogData?: any,
+    semesterData?: any,
+    scheduleType?: 'single_term' | 'full_year' | 'custom',
+    extra?: { academicYearLabel?: string | null }
+  ) => Promise<Course | null>;
+  updateCourse: (
+    id: string,
+    title?: string,
+    description?: string,
+    catalogData?: any,
+    semesterData?: any,
+    defaultColor?: string,
+    scheduleType?: 'single_term' | 'full_year' | 'custom',
+    extra?: { academicYearLabel?: string | null }
+  ) => Promise<void>;
   updateCourseDefaultColor: (id: string, defaultColor: string) => Promise<void>;
   deleteCourse: (id: string) => Promise<void>;
   enrollStudent: (courseId: string, studentId: string) => Promise<void>;
@@ -107,21 +125,31 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  const createCourse = async (title: string, description: string, catalogData?: any, semesterData?: any) => {
+  const createCourse = async (
+    title: string,
+    description: string,
+    catalogData?: any,
+    semesterData?: any,
+    scheduleType?: 'single_term' | 'full_year' | 'custom',
+    extra?: { academicYearLabel?: string | null }
+  ) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.post('/courses', { 
-        title, 
+      const response = await api.post('/courses', {
+        title,
         description,
         catalog: catalogData,
-        semester: semesterData
+        semester: semesterData,
+        scheduleType: scheduleType || 'single_term',
+        academicYearLabel: extra?.academicYearLabel ?? undefined,
       });
       if (response.data.success) {
         setCourses([...courses, response.data.data]);
-      } else {
-        setError(response.data.message || 'Failed to create course');
+        return response.data.data as Course;
       }
+      setError(response.data.message || 'Failed to create course');
+      return null;
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error creating course');
       throw err;
@@ -130,7 +158,16 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  const updateCourse = async (id: string, title?: string, description?: string, catalogData?: any, semesterData?: any, defaultColor?: string) => {
+  const updateCourse = async (
+    id: string,
+    title?: string,
+    description?: string,
+    catalogData?: any,
+    semesterData?: any,
+    defaultColor?: string,
+    scheduleType?: 'single_term' | 'full_year' | 'custom',
+    extra?: { academicYearLabel?: string | null }
+  ) => {
     try {
       setLoading(true);
       setError(null);
@@ -140,6 +177,10 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (catalogData !== undefined) updateData.catalog = catalogData;
       if (semesterData !== undefined) updateData.semester = semesterData;
       if (defaultColor !== undefined) updateData.defaultColor = defaultColor;
+      if (scheduleType !== undefined) updateData.scheduleType = scheduleType;
+      if (extra?.academicYearLabel !== undefined) {
+        updateData.academicYearLabel = extra.academicYearLabel;
+      }
       
       const response = await api.put(`/courses/${id}`, updateData);
       if (response.data.success) {
@@ -276,7 +317,7 @@ export const useCourse = () => {
       courses: [],
       loading: false,
       error: null,
-      createCourse: async () => {},
+      createCourse: async () => null,
       updateCourse: async () => {},
       updateCourseDefaultColor: async () => {},
       deleteCourse: async () => {},

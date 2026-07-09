@@ -89,12 +89,20 @@ function assignmentColumnWidth(title: string | undefined): number {
  * Download gradebook as Excel (.xlsx) with cell background colors matching the on-screen gradebook.
  * (CSV cannot store fills; Excel is required for highlighting.)
  */
+export interface GradebookExportOptions {
+  /** Server-computed current totals keyed by student id. Used to match the on-screen gradebook exactly. */
+  studentTotals?: Record<string, number>;
+  /** Human-readable label for the selected grading period (e.g. "Quarter 1" or "All grading periods"). */
+  periodLabel?: string;
+}
+
 export const exportGradebookXlsx = async (
   gradebookData: GradebookData,
   course: Course,
   submissionMap: { [key: string]: string },
   studentSubmissions: any[] = [],
-  resolvedGradingPolicy: import('./gradeUtils').ResolvedGradingPolicy | null = null
+  resolvedGradingPolicy: import('./gradeUtils').ResolvedGradingPolicy | null = null,
+  exportOptions: GradebookExportOptions = {}
 ): Promise<void> => {
   const ExcelJSMod = await import('exceljs');
   const ExcelJS = ExcelJSMod.default;
@@ -123,7 +131,8 @@ export const exportGradebookXlsx = async (
   ws.getCell('A2').value = `Instructor: ${instructorInfo}`;
 
   ws.mergeCells(`A3:${lastCol}3`);
-  ws.getCell('A3').value = `Export date: ${new Date().toLocaleString()}`;
+  const periodLabelText = exportOptions.periodLabel || 'All grading periods';
+  ws.getCell('A3').value = `Export date: ${new Date().toLocaleString()}  |  Grading period: ${periodLabelText}`;
 
   const policyVersion = resolvedGradingPolicy
     ? extractPolicyVersion(resolvedGradingPolicy as Record<string, unknown>)
@@ -173,15 +182,23 @@ export const exportGradebookXlsx = async (
 
   let dataRow = headerRowIndex + 1;
   for (const student of students) {
-    const weightedPercent = computeStudentWeightedPercent(
-      student._id,
-      course as any,
-      assignments,
-      grades,
-      submissionMap,
-      studentSubmissions,
-      resolvedGradingPolicy
-    );
+    // Prefer the server-computed total (matches the on-screen gradebook, including
+    // weighted grading-period rollup); fall back to local compute if unavailable.
+    const serverTotal =
+      exportOptions.studentTotals?.[String(student._id)] ??
+      exportOptions.studentTotals?.[student._id as string];
+    const weightedPercent =
+      typeof serverTotal === 'number' && Number.isFinite(serverTotal)
+        ? serverTotal
+        : computeStudentWeightedPercent(
+            student._id,
+            course as any,
+            assignments,
+            grades,
+            submissionMap,
+            studentSubmissions,
+            resolvedGradingPolicy
+          );
     const scale =
       (resolvedGradingPolicy?.gradeScale as Course['gradeScale']) || course?.gradeScale;
     const letter = getLetterGrade(weightedPercent, scale);
@@ -255,7 +272,11 @@ export const exportGradebookXlsx = async (
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `gradebook_${(course?.title || 'Unknown_Course').replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
+  const periodSlug = (exportOptions.periodLabel || 'all')
+    .replace(/[^a-z0-9]+/gi, '_')
+    .replace(/^_+|_+$/g, '')
+    .toLowerCase();
+  a.download = `gradebook_${(course?.title || 'Unknown_Course').replace(/\s+/g, '_')}_${periodSlug}_${new Date().toISOString().split('T')[0]}.xlsx`;
   a.click();
   window.URL.revokeObjectURL(url);
 };

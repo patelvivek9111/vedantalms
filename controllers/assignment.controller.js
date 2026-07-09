@@ -1,6 +1,8 @@
 const Assignment = require('../models/Assignment');
 const Submission = require('../models/Submission');
 const Module = require('../models/module.model');
+const GroupSet = require('../models/GroupSet');
+const gradingPeriodAssignmentService = require('../services/gradingPeriodAssignment.service');
 const fs = require('fs').promises;
 const path = require('path');
 const mongoose = require('mongoose');
@@ -110,8 +112,21 @@ exports.createAssignment = async (req, res) => {
       totalPoints,
     };
 
-    if (req.body.gradingPeriodId !== undefined) {
-      assignmentData.gradingPeriodId = req.body.gradingPeriodId || null;
+    const explicitPeriodId =
+      req.body.gradingPeriodId !== undefined && req.body.gradingPeriodId
+        ? req.body.gradingPeriodId
+        : null;
+    if (explicitPeriodId) {
+      assignmentData.gradingPeriodId = explicitPeriodId;
+    } else {
+      const periodCourseId =
+        course?._id ||
+        (assignmentData.isGroupAssignment && req.body.groupSet
+          ? await GroupSet.findById(req.body.groupSet).select('course').lean().then((g) => g?.course)
+          : null);
+      assignmentData.gradingPeriodId = periodCourseId
+        ? await gradingPeriodAssignmentService.resolvePeriodIdForCourseDueDate(periodCourseId, dueDate)
+        : null;
     }
 
     if (quizSubmissionMode === 'paper_upload') {
@@ -420,8 +435,15 @@ exports.updateAssignment = async (req, res) => {
     if (req.body.defaultGradeHidden !== undefined) assignment.defaultGradeHidden = req.body.defaultGradeHidden === 'true' || req.body.defaultGradeHidden === true;
     if (req.body.isOfflineAssignment !== undefined) assignment.isOfflineAssignment = req.body.isOfflineAssignment === 'true' || req.body.isOfflineAssignment === true;
     if (req.body.totalPoints !== undefined) assignment.totalPoints = req.body.totalPoints ? parseFloat(req.body.totalPoints) : 0;
-    if (req.body.gradingPeriodId !== undefined) {
-      assignment.gradingPeriodId = req.body.gradingPeriodId || null;
+    if (req.body.gradingPeriodId !== undefined && req.body.gradingPeriodId) {
+      assignment.gradingPeriodId = req.body.gradingPeriodId;
+    } else if (dueDate !== undefined && course?._id) {
+      // Due date changed without an explicit period → re-slot automatically.
+      assignment.gradingPeriodId =
+        await gradingPeriodAssignmentService.resolvePeriodIdForCourseDueDate(
+          course._id,
+          assignment.dueDate
+        );
     }
     
     // Update questions if provided

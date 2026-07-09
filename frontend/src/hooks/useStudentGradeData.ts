@@ -10,10 +10,15 @@ interface UseStudentGradeDataProps {
   isAdmin: boolean;
   course: any;
   user: any;
+  /** When set, totals are scoped to that grading period. */
+  gradingPeriodId?: string;
   setStudentTotalGrade: React.Dispatch<React.SetStateAction<number | null>>;
   setStudentLetterGrade: React.Dispatch<React.SetStateAction<string | null>>;
   setStudentFinalGrade?: React.Dispatch<React.SetStateAction<number | null>>;
   setStudentFinalLetterGrade?: React.Dispatch<React.SetStateAction<string | null>>;
+  setStudentGradingPeriodBreakdown?: React.Dispatch<
+    React.SetStateAction<import('../services/gradingApi').GradingPeriodBreakdownRow[] | null>
+  >;
   setStudentDiscussions: React.Dispatch<React.SetStateAction<any[]>>;
   setStudentGroupAssignments: React.Dispatch<React.SetStateAction<any[]>>;
   /** False while the course total API is in flight so the UI can avoid a misleading client-only total. */
@@ -26,10 +31,12 @@ export const useStudentGradeData = ({
   isAdmin,
   course,
   user,
+  gradingPeriodId,
   setStudentTotalGrade,
   setStudentLetterGrade,
   setStudentFinalGrade,
   setStudentFinalLetterGrade,
+  setStudentGradingPeriodBreakdown,
   setStudentDiscussions,
   setStudentGroupAssignments,
   setStudentGradeSummaryReady,
@@ -46,10 +53,12 @@ export const useStudentGradeData = ({
       setStudentLetterGrade(null);
       setStudentFinalGrade?.(null);
       setStudentFinalLetterGrade?.(null);
+      setStudentGradingPeriodBreakdown?.(null);
       try {
         const token = getMemoryAuthToken();
         const res = await axios.get(`${API_URL}/api/grades/student/course/${course._id}`, {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
+          params: gradingPeriodId ? { gradingPeriodId } : undefined,
         });
         const current =
           res.data.currentPercent ?? res.data.totalPercent ?? null;
@@ -57,17 +66,19 @@ export const useStudentGradeData = ({
         setStudentLetterGrade(res.data.letterGrade ?? null);
         setStudentFinalGrade?.(res.data.finalPercent ?? null);
         setStudentFinalLetterGrade?.(res.data.finalLetterGrade ?? null);
+        setStudentGradingPeriodBreakdown?.(res.data.gradingPeriodBreakdown ?? null);
       } catch (err) {
         setStudentTotalGrade(null);
         setStudentLetterGrade(null);
         setStudentFinalGrade?.(null);
         setStudentFinalLetterGrade?.(null);
+        setStudentGradingPeriodBreakdown?.(null);
       } finally {
         setStudentGradeSummaryReady?.(true);
       }
     };
     fetchStudentGrade();
-  }, [activeSection, isInstructor, isAdmin, course?._id, setStudentTotalGrade, setStudentLetterGrade, setStudentFinalGrade, setStudentFinalLetterGrade, setStudentGradeSummaryReady]);
+  }, [activeSection, isInstructor, isAdmin, course?._id, gradingPeriodId, setStudentTotalGrade, setStudentLetterGrade, setStudentFinalGrade, setStudentFinalLetterGrade, setStudentGradingPeriodBreakdown, setStudentGradeSummaryReady]);
 
   // Fetch graded discussions for the course for student view
   useEffect(() => {

@@ -19,7 +19,6 @@ const studentCourseGradeSnapshotSchema = new mongoose.Schema(
     },
     term: {
       type: String,
-      enum: ['Fall', 'Spring', 'Summer', 'Winter', null],
       default: null,
     },
     year: {

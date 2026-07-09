@@ -5,6 +5,7 @@ const { transcriptLimiter } = require('./grades.routes');
 const {
   getAvailableSemesters,
   getStudentTranscript,
+  getStudentReportCard,
   issueStudentTranscript,
   getTranscriptIssuanceHistory,
 } = require('../controllers/reports.controller');
@@ -12,6 +13,7 @@ const { requireCapability, CAPABILITIES } = require('../middleware/academicPermi
 
 router.get('/semesters', protect, authorize('student'), getAvailableSemesters);
 router.get('/transcript', transcriptLimiter, protect, authorize('student'), getStudentTranscript);
+router.get('/report-card', transcriptLimiter, protect, authorize('student'), getStudentReportCard);
 
 router.post(
   '/transcript/issue',

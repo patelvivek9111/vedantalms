@@ -302,7 +302,7 @@ async function getCourseGradebookPage(
   };
 }
 
-async function getFullGradebookDataset(courseId, policyCache) {
+async function getFullGradebookDataset(courseId, policyCache, options = {}) {
   const course = await Course.findById(courseId)
     .populate('students', 'firstName lastName email profilePicture')
     .lean();
@@ -318,7 +318,8 @@ async function getFullGradebookDataset(courseId, policyCache) {
   });
   const snapshotBundle = generateResolvedPolicySnapshot(resolved);
 
-  const assignments = await loadGradebookColumns(courseId);
+  const columnOptions = options.gradingPeriodId ? { gradingPeriodId: options.gradingPeriodId } : {};
+  const assignments = await loadGradebookColumns(courseId, columnOptions);
   const studentIds = (course.students || []).map(normalizeStudentId);
   const submissionMap = {};
   const grades =

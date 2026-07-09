@@ -123,12 +123,19 @@ async function processTranscriptRegenerate(jobDoc) {
 }
 
 async function processExportGradebook(jobDoc) {
-  const { courseId } = jobDoc.payload;
-  const dataset = await buildGradebookDataset(courseId);
-  const buffer = await buildGradebookWorkbookBuffer(dataset);
+  const { courseId, gradingPeriodId } = jobDoc.payload;
+  const exportOptions = gradingPeriodId ? { gradingPeriodId } : {};
+  const dataset = await buildGradebookDataset(courseId, exportOptions);
+  const buffer = await buildGradebookWorkbookBuffer(dataset, exportOptions);
 
   ensureJobsDir();
-  const fileName = `gradebook-${courseId}-${Date.now()}.xlsx`;
+  const { resolvePeriodLabel } = require('./gradebookExport.service');
+  const periodLabel = await resolvePeriodLabel(courseId, gradingPeriodId);
+  const periodSlug = periodLabel
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase();
+  const fileName = `gradebook-${courseId}-${periodSlug}-${Date.now()}.xlsx`;
   const filePath = path.join(getJobsDir(), fileName);
   fs.writeFileSync(filePath, buffer);
 

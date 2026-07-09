@@ -1142,6 +1142,9 @@ exports.updateSystemSettings = async (req, res) => {
       if (req.body.storage) {
         settings.storage = { ...settings.storage, ...req.body.storage };
       }
+      if (req.body.academic) {
+        settings.academic = { ...(settings.academic?.toObject?.() || settings.academic || {}), ...req.body.academic };
+      }
     }
     
     await settings.save();

@@ -112,6 +112,9 @@ interface GradebookViewProps {
     onSaveReasonChange?: (value: string) => void;
   };
   onGradebookRefresh?: () => void;
+  gradingPeriods?: import('../../services/gradingApi').GradingPeriod[];
+  selectedGradingPeriod?: string;
+  onGradingPeriodChange?: (periodId: string) => void;
 }
 
 type OverallGradeMode = 'current' | 'final';
@@ -167,6 +170,9 @@ const GradebookView: React.FC<GradebookViewProps> = ({
   resolvedGradingPolicy = null,
   gradingPolicyModal,
   onGradebookRefresh,
+  gradingPeriods = [],
+  selectedGradingPeriod = 'all',
+  onGradingPeriodChange,
 }) => {
   const navigate = useNavigate();
   const [historyCell, setHistoryCell] = useState<{
@@ -501,6 +507,34 @@ const GradebookView: React.FC<GradebookViewProps> = ({
           </div>
         </div>
       </div>
+
+      {(isInstructor || isAdmin) && gradingPeriods.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+          <label htmlFor="gradebook-grading-period" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Grading period
+          </label>
+          <select
+            id="gradebook-grading-period"
+            value={selectedGradingPeriod}
+            onChange={(e) => onGradingPeriodChange?.(e.target.value)}
+            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+          >
+            <option value="all">All grading periods</option>
+            {gradingPeriods.map((p) => (
+              <option key={p._id} value={p._id}>
+                {p.name}
+                {p.closed ? ' (closed)' : ''}
+              </option>
+            ))}
+          </select>
+          {selectedGradingPeriod !== 'all' &&
+            gradingPeriods.find((p) => p._id === selectedGradingPeriod)?.closed && (
+              <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                This period is closed — grades are read-only.
+              </span>
+            )}
+        </div>
+      )}
 
       {(isInstructor || isAdmin) && courseId && (
         <CourseGradeLifecyclePanel courseId={courseId} userRole={userRole} />

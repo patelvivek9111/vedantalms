@@ -7,69 +7,38 @@ const Thread = require('../models/thread.model');
 const Group = require('../models/Group');
 const { calculateCourseGradeForStudent } = require('../services/gradeCalculation.service');
 const discussionReplyService = require('../services/discussionReply.service');
+const {
+  getSemesterFromCourse,
+  isValidTerm,
+  compareSemesters,
+  formatCourseTranscriptLabel,
+} = require('../utils/semesterUtils');
 
 // GET /api/reports/semesters
-// Get all unique semesters that the student has courses in
 exports.getAvailableSemesters = async (req, res) => {
   try {
     const studentId = req.user._id;
+    const courses = await Course.find({ students: studentId }).select(
+      'semester createdAt academicYearLabel scheduleType'
+    );
 
-    // Find all courses the student is enrolled in
-    // Include courses with or without semester info, we'll handle defaults later
-    const courses = await Course.find({ 
-      students: studentId
-    }).select('semester');
-
-    // Helper function to get semester with defaults
-    const getSemesterWithDefaults = (course) => {
-      if (course.semester && course.semester.term && course.semester.year) {
-        return { term: course.semester.term, year: course.semester.year };
-      }
-      // Default to current semester based on course creation date
-      const now = new Date(course.createdAt || new Date());
-      const month = now.getMonth();
-      const year = now.getFullYear();
-      
-      let term = 'Fall';
-      if (month >= 0 && month <= 4) {
-        term = 'Spring';
-      } else if (month >= 5 && month <= 6) {
-        term = 'Summer';
-      } else if (month === 11) {
-        term = 'Winter';
-      }
-      
-      return { term, year };
-    };
-
-    // Extract unique semesters
-    const semesterSet = new Set();
-    courses.forEach(course => {
-      const semester = getSemesterWithDefaults(course);
-      semesterSet.add(`${semester.term}-${semester.year}`);
+    const semesterMap = new Map();
+    courses.forEach((course) => {
+      const semester = getSemesterFromCourse(course);
+      const key = `${semester.term}::${semester.year}`;
+      semesterMap.set(key, {
+        term: semester.term,
+        year: semester.year,
+        label: course.academicYearLabel || `${semester.term} ${semester.year}`,
+      });
     });
 
-    // Convert to array of objects and sort by year (descending) then term
-    const termOrder = { 'Fall': 3, 'Summer': 2, 'Spring': 1, 'Winter': 0 };
-    const semesters = Array.from(semesterSet).map(s => {
-      const [term, year] = s.split('-');
-      return { term, year: parseInt(year) };
-    }).sort((a, b) => {
-      if (a.year !== b.year) return b.year - a.year;
-      return (termOrder[b.term] || 0) - (termOrder[a.term] || 0);
-    });
+    const semesters = Array.from(semesterMap.values()).sort(compareSemesters);
 
-    res.json({
-      success: true,
-      data: semesters
-    });
+    res.json({ success: true, data: semesters });
   } catch (error) {
     console.error('Error fetching semesters:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch semesters',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Failed to fetch semesters', error: error.message });
   }
 };
 
@@ -87,12 +56,10 @@ exports.getStudentTranscript = async (req, res) => {
       });
     }
 
-    // Validate term
-    const validTerms = ['Fall', 'Spring', 'Summer', 'Winter'];
-    if (!validTerms.includes(term)) {
+    if (!isValidTerm(term)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid term. Must be one of: Fall, Spring, Summer, Winter'
+        message: `Invalid term. Must be one of: ${require('../utils/semesterUtils').VALID_TERMS.join(', ')}`,
       });
     }
 
@@ -114,26 +81,7 @@ exports.getStudentTranscript = async (req, res) => {
     }).catch(() => {});
 
     // Helper function to get semester with defaults
-    const getSemesterWithDefaults = (course) => {
-      if (course.semester && course.semester.term && course.semester.year) {
-        return { term: course.semester.term, year: course.semester.year };
-      }
-      // Default to current semester based on course creation date
-      const now = new Date(course.createdAt || new Date());
-      const month = now.getMonth();
-      const year = now.getFullYear();
-      
-      let term = 'Fall';
-      if (month >= 0 && month <= 4) {
-        term = 'Spring';
-      } else if (month >= 5 && month <= 6) {
-        term = 'Summer';
-      } else if (month === 11) {
-        term = 'Winter';
-      }
-      
-      return { term, year };
-    };
+    const getSemesterWithDefaults = (course) => getSemesterFromCourse(course);
 
     // Find all courses for this student (we'll filter by semester after fetching)
     const allCourses = await Course.find({
@@ -141,7 +89,7 @@ exports.getStudentTranscript = async (req, res) => {
       published: true
     })
       .populate('instructor', 'firstName lastName')
-      .select('title catalog gradeScale groups semester createdAt');
+      .select('title catalog gradeScale groups semester createdAt scheduleType academicYearLabel');
 
     // Filter courses by semester (including those with default semester)
     const courses = allCourses.filter(course => {
@@ -281,10 +229,14 @@ exports.getStudentTranscript = async (req, res) => {
       );
       const { totalPercent, letterGrade } = gradeResult;
 
-      // Extract course code from catalog or title
       const courseCode = course.catalog?.subject || course.title.split(' ')[0] || 'N/A';
-      // Default to 3 credit hours if not specified
-      const creditHours = course.catalog?.creditHours || 3;
+      // Default credit hours: respect explicit 0 (K-12); full-year courses default to 0
+      const creditHours =
+        course.catalog?.creditHours != null
+          ? course.catalog.creditHours
+          : course.scheduleType === 'full_year'
+            ? 0
+            : 3;
 
       courseGrades.push({
         courseId: course._id.toString(),
@@ -294,6 +246,12 @@ exports.getStudentTranscript = async (req, res) => {
         finalGrade: totalPercent,
         letterGrade: letterGrade,
         semester: course.semester || { term, year: parseInt(year) },
+        academicYearLabel: course.academicYearLabel || null,
+        scheduleType: course.scheduleType || 'single_term',
+        periodLabel: formatCourseTranscriptLabel(course),
+        gradingPeriodBreakdown: gradeResult.gradingPeriodBreakdown || [],
+        catalogStartDate: course.catalog?.startDate || null,
+        catalogEndDate: course.catalog?.endDate || null,
         gradingPolicyVersion: gradeResult.policyVersion,
         gradingPolicyHash: gradeResult.policyHash,
         gradingEngineVersion: gradeResult.gradingEngineVersion,
@@ -336,6 +294,48 @@ exports.getStudentTranscript = async (req, res) => {
       message: 'Failed to fetch transcript',
       error: error.message
     });
+  }
+};
+
+/** GET /api/reports/report-card — student progress report (Excel) with period columns */
+exports.getStudentReportCard = async (req, res) => {
+  try {
+    const studentId = req.user._id;
+    const { term, year } = req.query;
+    if (!term || !year) {
+      return res.status(400).json({ success: false, message: 'Term and year are required' });
+    }
+    if (!isValidTerm(term)) {
+      return res.status(400).json({ success: false, message: 'Invalid term' });
+    }
+    const yearNum = parseInt(year, 10);
+    if (Number.isNaN(yearNum)) {
+      return res.status(400).json({ success: false, message: 'Invalid year' });
+    }
+
+    const ferpaAudit = require('../services/ferpaAudit.service');
+    await ferpaAudit.recordTranscriptAccess(req, {
+      studentId,
+      term,
+      year: yearNum,
+      mode: 'report_card_download',
+    }).catch(() => {});
+
+    const { buildStudentReportCardWorkbook } = require('../services/reportCardExport.service');
+    const buffer = await buildStudentReportCardWorkbook(studentId, term, yearNum);
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="report-card-${term}-${yearNum}.xlsx"`
+    );
+    res.send(Buffer.from(buffer));
+  } catch (error) {
+    console.error('Error generating report card:', error);
+    res.status(500).json({ success: false, message: 'Failed to generate report card' });
   }
 };
 

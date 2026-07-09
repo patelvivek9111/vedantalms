@@ -13,12 +13,15 @@ interface UseDiscussionsProps {
   course: any;
   setDiscussions: React.Dispatch<React.SetStateAction<any[]>>;
   setDiscussionsLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  /** Bump to force a re-fetch (e.g. after grading-period reconciliation). */
+  refreshToken?: number;
 }
 
 export const useDiscussions = ({
   course,
   setDiscussions,
   setDiscussionsLoading,
+  refreshToken = 0,
 }: UseDiscussionsProps) => {
   useEffect(() => {
     if (!course?._id) return;
@@ -51,7 +54,7 @@ export const useDiscussions = ({
       }
     };
     fetchDiscussions();
-  }, [course?._id, setDiscussions, setDiscussionsLoading]);
+  }, [course?._id, setDiscussions, setDiscussionsLoading, refreshToken]);
 };
 
 

@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const app = require('../../../server');
 const User = require('../../../models/user.model');
 const Course = require('../../../models/course.model');
+const { isValidTerm } = require('../../../utils/semesterUtils');
 const { waitForMongoConnection } = require('../../helpers');
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/lms-test';
@@ -96,7 +97,8 @@ describe('Reports API', () => {
       if (response.body.data.length > 0) {
         expect(response.body.data[0]).toHaveProperty('term');
         expect(response.body.data[0]).toHaveProperty('year');
-        expect(['Fall', 'Spring', 'Summer', 'Winter']).toContain(response.body.data[0].term);
+        expect(response.body.data[0]).toHaveProperty('label');
+        expect(isValidTerm(response.body.data[0].term)).toBe(true);
       }
     });
 
@@ -271,6 +273,46 @@ describe('Reports API', () => {
         expect(course).toHaveProperty('letterGrade');
         expect(course).toHaveProperty('semester');
       }
+    });
+
+    it('should accept school reporting terms', async () => {
+      const response = await request(app)
+        .get('/api/reports/transcript')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .query({
+          term: 'Academic Year',
+          year: '2024',
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+    });
+  });
+
+  describe('GET /api/reports/report-card', () => {
+    it('should download report card (student)', async () => {
+      const response = await request(app)
+        .get('/api/reports/report-card')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .query({
+          term: 'Fall',
+          year: '2024',
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.headers['content-type']).toMatch(/spreadsheet/);
+    });
+
+    it('should prevent teacher from accessing report card', async () => {
+      const response = await request(app)
+        .get('/api/reports/report-card')
+        .set('Authorization', `Bearer ${teacherToken}`)
+        .query({
+          term: 'Fall',
+          year: '2024',
+        });
+
+      expect(response.status).toBe(403);
     });
   });
 });

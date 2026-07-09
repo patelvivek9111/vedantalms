@@ -22,6 +22,7 @@ import { useCourse } from '../../contexts/CourseContext';
 import { useUnreadMessages } from '../../hooks/useUnreadMessages';
 import { getImageUrl } from '../../services/api';
 import { NavCountBadge } from '../common/NavCountBadge';
+import { performLogout } from '../../utils/authLogout';
 
 const getNavItems = (userRole: string) => {
   const baseItems = [
@@ -85,6 +86,7 @@ export default function GlobalSidebar() {
   const { courses } = useCourse();
   const { unreadCount } = useUnreadMessages();
   const [showCourseDropdown, setShowCourseDropdown] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -132,12 +134,16 @@ export default function GlobalSidebar() {
     }, 300); // 300ms delay before hiding
   };
 
-  const handleLogout = () => {
-    logout();
-    // Clear any cached state and redirect to login
-    navigate('/login', { replace: true });
-    // Force a page reload to clear any cached component state
-    window.location.href = '/login';
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await performLogout(logout, navigate);
+    } catch {
+      navigate('/login', { replace: true });
+    } finally {
+      setLoggingOut(false);
+    }
   };
 
   const availableCourses = courses.filter((course) => course.published);
@@ -160,7 +166,7 @@ export default function GlobalSidebar() {
           <span className="text-blue-800 dark:text-blue-300 text-lg font-bold">LMS</span>
         </div>
       </div>
-      <div className="flex-1 min-h-0 overflow-visible flex flex-col gap-1 items-center w-full px-2">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-visible flex flex-col gap-1 items-center w-full px-2">
         {getNavItems(user?.role || '').map(({ label, icon: Icon, to }) => {
           // Highlight 'Courses' for any /courses* route (but not /teacher/courses or /admin/courses)
           const isActive =
@@ -362,11 +368,14 @@ export default function GlobalSidebar() {
       <div className="mt-1 w-full px-2 shrink-0">
         <button
           type="button"
-          onClick={handleLogout}
-          className="group flex w-full flex-col items-center rounded-xl px-1 py-2 text-blue-100/85 transition-colors duration-200 hover:bg-white/[0.08] hover:text-white dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-gray-100"
+          onClick={() => void handleLogout()}
+          disabled={loggingOut}
+          className="group flex w-full flex-col items-center rounded-xl px-1 py-2 text-blue-100/85 transition-colors duration-200 hover:bg-white/[0.08] hover:text-white disabled:opacity-60 dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-gray-100"
         >
           <LogOut className="mb-1 h-5 w-5 opacity-90 transition-opacity group-hover:opacity-100" />
-          <span className="text-[11px] font-medium leading-tight tracking-tight">Logout</span>
+          <span className="text-[11px] font-medium leading-tight tracking-tight">
+            {loggingOut ? 'Logging out…' : 'Logout'}
+          </span>
         </button>
       </div>
     </nav>

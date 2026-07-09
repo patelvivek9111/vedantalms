@@ -122,8 +122,26 @@ const courseSchema = new mongoose.Schema({
     }],
   },
   semester: {
-    term: { type: String, enum: ['Fall', 'Spring', 'Summer', 'Winter'], default: 'Fall' },
+    term: { type: String, default: 'Fall' },
     year: { type: Number, default: new Date().getFullYear() }
+  },
+  /** Display label e.g. "2025–26" for year-long school courses. */
+  academicYearLabel: { type: String, default: null, trim: true },
+  /**
+   * How the course is scheduled for grading/reporting.
+   * single_term — one reporting period (~college semester or school one-term class)
+   * full_year — year-long course; use grading periods (quarters/terms) inside the course
+   * custom — no assumptions
+   */
+  scheduleType: {
+    type: String,
+    enum: ['single_term', 'full_year', 'custom'],
+    default: 'single_term',
+  },
+  /** Canvas-style grading period display rules for students. */
+  gradingPeriodSettings: {
+    allowStudentAllPeriods: { type: Boolean, default: true },
+    displayTotalsForAllPeriods: { type: Boolean, default: true },
   },
   /** Opaque token embedded in join QR / deep links; not the Mongo _id. */
   enrollmentQrToken: {

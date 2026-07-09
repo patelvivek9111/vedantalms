@@ -14,6 +14,7 @@ import {
 } from '../../utils/instructorGradebookGrades';
 import { resolveStudentDiscussionEarnedScore } from '../../utils/discussionGradeDisplay';
 import { fetchCourseGradingPeriods, type GradingPeriod } from '../../services/gradingApi';
+import { resolveCurrentGradingPeriodId } from '../../utils/gradingPeriods';
 import GradingPeriodsModal from '../grades/GradingPeriodsModal';
 interface Attachment {
   _id: string;
@@ -46,6 +47,7 @@ interface AssignmentListProps {
   submissionMap?: { [key: string]: string };
   courseId?: string;
   isQuizzesView?: boolean;
+  onGradingPeriodsChanged?: () => void;
 }
 
 
@@ -560,7 +562,7 @@ function formatAveragePercentLabel(value: number | null | undefined): string {
   return Number.isInteger(value) ? `${value}%` : `${value.toFixed(1)}%`;
 }
 
-const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: propAssignments, userRole, studentSubmissions, studentId, submissionMap, courseId, isQuizzesView = false }) => {
+const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: propAssignments, userRole, studentSubmissions, studentId, submissionMap, courseId, isQuizzesView = false, onGradingPeriodsChanged }) => {
   const navigate = useNavigate();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [discussions, setDiscussions] = useState<any[]>([]);
@@ -570,6 +572,7 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
   const [listViewMode, setListViewMode] = useState<ListViewMode>('date');
   const [gradingPeriod, setGradingPeriod] = useState('all');
   const [gradingPeriods, setGradingPeriods] = useState<GradingPeriod[]>([]);
+  const periodDefaultedRef = React.useRef(false);
   const [showGradingPeriodsModal, setShowGradingPeriodsModal] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -741,7 +744,15 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
     let cancelled = false;
     fetchCourseGradingPeriods(courseId)
       .then((res) => {
-        if (!cancelled && res.success) setGradingPeriods(res.data || []);
+        if (cancelled || !res.success) return;
+        const periods = res.data || [];
+        setGradingPeriods(periods);
+        // Default to the current period (Canvas behavior) on first load.
+        if (!periodDefaultedRef.current && periods.length > 0) {
+          const current = resolveCurrentGradingPeriodId(periods);
+          if (current) setGradingPeriod(current);
+          periodDefaultedRef.current = true;
+        }
       })
       .catch(() => {
         if (!cancelled) setGradingPeriods([]);
@@ -1347,6 +1358,7 @@ const AssignmentList: React.FC<AssignmentListProps> = ({ moduleId, assignments: 
                 if (res.success) setGradingPeriods(res.data || []);
               })
               .catch(() => {});
+            onGradingPeriodsChanged?.();
           }}
         />
       )}

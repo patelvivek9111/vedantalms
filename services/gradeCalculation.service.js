@@ -10,6 +10,7 @@ const { enrichResolvedForAssignmentOrder } = require('../shared/grading/policyAp
 const gradingPolicySnapshotService = require('./gradingPolicySnapshot.service');
 const courseStudentGradeOverrideService = require('./courseStudentGradeOverride.service');
 const studentGradeDetailService = require('./studentGradeDetail.service');
+const gradingPeriodRollupService = require('./gradingPeriodRollup.service');
 const {
   loadCourseGradeAssignments,
   buildStudentGradeInputs,
@@ -102,6 +103,41 @@ async function computeStudentCourseGrade(course, studentId, options = {}) {
     resolved
   );
 
+  let gradingPeriodBreakdown = null;
+
+  // Canvas: when viewing all periods and periods are weighted, course total = weighted period average.
+  if (!options.gradingPeriodId && !options.skipPeriodRollup) {
+    const periods = await gradingPeriodRollupService.listCoursePeriods(courseId);
+    if (gradingPeriodRollupService.shouldUseWeightedRollup(periods)) {
+      const rollup = await gradingPeriodRollupService.rollupWeightedPeriodGrades(
+        coursePlain,
+        sid,
+        periods,
+        (periodId) =>
+          computeStudentCourseGrade(coursePlain, sid, {
+            ...options,
+            gradingPeriodId: periodId,
+            skipPeriodRollup: true,
+            assignments: undefined,
+            allAssignments: undefined,
+            grades: undefined,
+            submissionMap: undefined,
+          })
+      );
+      if (rollup) {
+        dualTotals = {
+          ...dualTotals,
+          currentPercent: rollup.currentPercent,
+          finalPercent: rollup.finalPercent,
+          totalPercent: rollup.totalPercent,
+          letterGrade: rollup.letterGrade,
+          finalLetterGrade: rollup.finalLetterGrade,
+        };
+        gradingPeriodBreakdown = rollup.gradingPeriodBreakdown;
+      }
+    }
+  }
+
   const override = await courseStudentGradeOverrideService.getActiveOverride(courseId, sid);
   if (override) {
     dualTotals = {
@@ -155,6 +191,7 @@ async function computeStudentCourseGrade(course, studentId, options = {}) {
     policyMeta,
     fromStoredSnapshot: !!fromStoredSnapshot,
     gradingEngineVersion: options.gradingEngineVersion || getGradingEngineVersion(),
+    gradingPeriodBreakdown,
     ...snapshotBundle,
   };
 }
@@ -179,6 +216,9 @@ function toStudentGradeApiResponse(gradeResult, options = {}) {
     payload.policyMeta = gradeResult.policyMeta || null;
     if (gradeResult.gradeOverride) {
       payload.gradeOverride = gradeResult.gradeOverride;
+    }
+    if (gradeResult.gradingPeriodBreakdown) {
+      payload.gradingPeriodBreakdown = gradeResult.gradingPeriodBreakdown;
     }
   }
 
@@ -268,6 +308,7 @@ async function calculateCourseGradeForStudent(
     skipInstitution: options.skipInstitution,
     teacherPolicy: options.teacherPolicy,
     policyCache: options.policyCache,
+    gradingPeriodId: options.gradingPeriodId,
     ...(hasPrebuilt ? { allAssignments, grades, submissionMap } : {}),
   });
 

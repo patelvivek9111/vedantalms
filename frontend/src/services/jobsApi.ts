@@ -2,8 +2,15 @@ import api from './api';
 import { API_URL } from '../config';
 import type { AsyncJobEnqueueResult, AsyncJobStatus } from '../types/grading';
 
-export async function enqueueGradebookExport(courseId: string) {
-  const res = await api.post(`/grades/course/${courseId}/gradebook/export`);
+export async function enqueueGradebookExport(
+  courseId: string,
+  options?: { gradingPeriodId?: string }
+) {
+  const body =
+    options?.gradingPeriodId && options.gradingPeriodId !== 'all'
+      ? { gradingPeriodId: options.gradingPeriodId }
+      : undefined;
+  const res = await api.post(`/grades/course/${courseId}/gradebook/export`, body);
   return res.data as { success: boolean; data: AsyncJobEnqueueResult };
 }
 

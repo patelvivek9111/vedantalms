@@ -1,4 +1,9 @@
-const VALID_TERMS = ['Fall', 'Spring', 'Summer', 'Winter'];
+const {
+  VALID_TERMS,
+  TERM_SORT_ORDER,
+  formatAcademicYearLabel,
+  resolveAcademicYearStart,
+} = require('../shared/academic/terms.cjs');
 
 /**
  * Resolve academic term/year for a course (explicit semester or creation-date default).
@@ -19,7 +24,29 @@ function getSemesterFromCourse(course) {
   return { term, year };
 }
 
+function isValidTerm(term) {
+  return VALID_TERMS.includes(term);
+}
+
+function compareSemesters(a, b) {
+  const orderA = TERM_SORT_ORDER[a.term] ?? 0;
+  const orderB = TERM_SORT_ORDER[b.term] ?? 0;
+  if (a.year !== b.year) return b.year - a.year;
+  return orderB - orderA;
+}
+
+function formatCourseTranscriptLabel(course) {
+  if (course.academicYearLabel) return course.academicYearLabel;
+  const sem = getSemesterFromCourse(course);
+  return `${sem.term} ${sem.year}`;
+}
+
 module.exports = {
   VALID_TERMS,
   getSemesterFromCourse,
+  isValidTerm,
+  compareSemesters,
+  formatAcademicYearLabel,
+  resolveAcademicYearStart,
+  formatCourseTranscriptLabel,
 };

@@ -12,7 +12,11 @@ const courseGradingPeriodSchema = new mongoose.Schema(
     position: { type: Number, default: 0 },
     startDate: { type: Date, default: null },
     endDate: { type: Date, default: null },
+    // After this date, grades in the period are locked (Canvas "close date").
+    closeDate: { type: Date, default: null },
     closed: { type: Boolean, default: false },
+    // Optional Canvas-style period weight (percent). 0 / null → unweighted.
+    weight: { type: Number, default: null },
   },
   { timestamps: true }
 );

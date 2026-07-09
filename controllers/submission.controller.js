@@ -9,6 +9,7 @@ const { deleteFromCloudinary, extractPublicId, isCloudinaryConfigured } = requir
 const { createNotification } = require('../services/notification');
 const gradingPolicySnapshotService = require('../services/gradingPolicySnapshot.service');
 const gradeLifecycleService = require('../services/gradeLifecycle.service');
+const gradingPeriodAssignmentService = require('../services/gradingPeriodAssignment.service');
 const { getSemesterFromCourse } = require('../utils/semesterUtils');
 const fileAssetService = require('../services/fileAsset.service');
 const { assertCourseFilesMutable, resolveCourseForAssignment } = require('../services/fileLifecycle.service');
@@ -293,6 +294,13 @@ async function saveGradedSubmission(submission, auditMeta = {}) {
             }
           : undefined,
       });
+      const gradedAssignment = await Assignment.findById(submission.assignment)
+        .select('gradingPeriodId')
+        .lean();
+      await gradingPeriodAssignmentService.assertGradingPeriodEditable(
+        courseId,
+        gradedAssignment?.gradingPeriodId
+      );
     }
     await gradingPolicySnapshotService.stampSubmissionPolicySnapshot(submission);
   }

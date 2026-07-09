@@ -19,6 +19,7 @@ import {
   GraduationCap
 } from 'lucide-react';
 import InstitutionGradingPolicyTab from '../components/admin/InstitutionGradingPolicyTab';
+import AcademicSettingsTab from '../components/admin/AcademicSettingsTab';
 import OpsDashboardPanel from '../components/admin/OpsDashboardPanel';
 import AdminRecoveryCenter from '../components/admin/AdminRecoveryCenter';
 import { MobileAppShell } from '../components/common/MobileAppShell';
@@ -163,6 +164,7 @@ export function AdminSystemSettings() {
     { id: 'email', label: 'Email', icon: Bell },
     { id: 'storage', label: 'Storage', icon: Database },
     { id: 'grading', label: 'Grading', icon: GraduationCap },
+    { id: 'academic', label: 'Academic', icon: Globe },
     { id: 'operations', label: 'Operations', icon: RefreshCw }
   ];
 
@@ -615,6 +617,7 @@ export function AdminSystemSettings() {
         )}
 
         {activeTab === 'grading' && <InstitutionGradingPolicyTab />}
+        {activeTab === 'academic' && <AcademicSettingsTab />}
         {activeTab === 'operations' && (
           <div className="space-y-8">
             <OpsDashboardPanel />

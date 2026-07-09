@@ -11,7 +11,6 @@ const courseGradeLifecycleSchema = new mongoose.Schema(
     },
     term: {
       type: String,
-      enum: ['Fall', 'Spring', 'Summer', 'Winter'],
       required: true,
     },
     year: {

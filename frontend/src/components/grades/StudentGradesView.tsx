@@ -2,6 +2,12 @@ import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StudentGradeSidebar from '../common/StudentGradeSidebar';
 import { computeAssignmentGroupStats, normalizeResolvedPolicyForCourse } from '../../utils/gradebookCompute';
+import { ALL_GRADING_PERIODS } from '../../utils/gradingPeriods';
+import type {
+  GradingPeriod,
+  GradingPeriodSettings,
+  GradingPeriodBreakdownRow,
+} from '../../services/gradingApi';
 import {
   buildStudentVisibleGradesMap,
   discussionHasSubmissionForStudent,
@@ -20,6 +26,10 @@ interface StudentGradesViewProps {
   course: any;
   modules: any[];
   user: any;
+  gradingPeriods?: GradingPeriod[];
+  gradingPeriodSettings?: GradingPeriodSettings;
+  selectedGradingPeriod?: string;
+  onGradingPeriodChange?: (periodId: string) => void;
   studentGroupAssignments: any[];
   studentDiscussions: any[];
   gradebookData: {
@@ -31,6 +41,7 @@ interface StudentGradesViewProps {
   studentLetterGrade: string | null;
   studentFinalGrade?: number | null;
   studentFinalLetterGrade?: string | null;
+  studentGradingPeriodBreakdown?: GradingPeriodBreakdownRow[] | null;
   studentGradeSummaryReady: boolean;
   resolvedGradingPolicy?: import('../../utils/gradeUtils').ResolvedGradingPolicy | null;
   gradingPolicyLoading?: boolean;
@@ -140,6 +151,10 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
   course,
   modules,
   user,
+  gradingPeriods = [],
+  gradingPeriodSettings = { allowStudentAllPeriods: true, displayTotalsForAllPeriods: true },
+  selectedGradingPeriod = ALL_GRADING_PERIODS,
+  onGradingPeriodChange,
   studentGroupAssignments,
   studentDiscussions,
   gradebookData,
@@ -149,6 +164,7 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
   studentLetterGrade,
   studentFinalGrade,
   studentFinalLetterGrade,
+  studentGradingPeriodBreakdown = null,
   studentGradeSummaryReady,
   resolvedGradingPolicy = null,
   gradingPolicyLoading = false,
@@ -205,10 +221,20 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
       studentReplyCreatedAt: discussion.studentReplyCreatedAt ?? null,
       replies: discussion.replies || [],
       published: discussion.published !== false,
+      gradingPeriodId: discussion.gradingPeriodId ?? null,
     }));
 
-    return [...moduleAssignments, ...groupAssignments, ...gradedDiscussions];
-  }, [modules, studentGroupAssignments, studentDiscussions]);
+    const combined = [...moduleAssignments, ...groupAssignments, ...gradedDiscussions];
+    if (!selectedGradingPeriod || selectedGradingPeriod === ALL_GRADING_PERIODS) return combined;
+    return combined.filter(
+      (a: any) => a.gradingPeriodId && String(a.gradingPeriodId) === selectedGradingPeriod
+    );
+  }, [modules, studentGroupAssignments, studentDiscussions, selectedGradingPeriod]);
+
+  const showAllPeriodsOption = gradingPeriodSettings.allowStudentAllPeriods !== false;
+  const showCourseTotal =
+    selectedGradingPeriod !== ALL_GRADING_PERIODS ||
+    gradingPeriodSettings.displayTotalsForAllPeriods !== false;
 
   const effectiveGradingPolicy = useMemo(
     () => normalizeResolvedPolicyForCourse(course, resolvedGradingPolicy, studentAssignments),
@@ -270,24 +296,35 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
     assignments: any[];
   };
 
-  const assignmentGroupSummaryRows: AssignmentGroupSummaryRow[] = [
-    ...courseGroupsList.map((g: any) => ({
-      key: `cat-${normalizeAssignmentCategoryName(g.name) || 'row'}`,
-      displayName: g.name,
-      weightPercent: typeof g.weight === 'number' ? g.weight : Number(g.weight),
-      assignments: assignmentsForNamedGroup(g.name),
-    })),
-    ...(uncategorizedAssignmentsForSummary.length > 0
-      ? [
-          {
-            key: 'other-uncategorized',
-            displayName: 'Other (uncategorized)',
-            weightPercent: null,
-            assignments: uncategorizedAssignmentsForSummary,
-          },
-        ]
-      : []),
-  ];
+  const assignmentGroupSummaryRows: AssignmentGroupSummaryRow[] = useMemo(() => {
+    const rows: AssignmentGroupSummaryRow[] = [
+      ...courseGroupsList.map((g: any) => ({
+        key: `cat-${normalizeAssignmentCategoryName(g.name) || 'row'}`,
+        displayName: g.name,
+        weightPercent: typeof g.weight === 'number' ? g.weight : Number(g.weight),
+        assignments: assignmentsForNamedGroup(g.name),
+      })),
+      ...(uncategorizedAssignmentsForSummary.length > 0
+        ? [
+            {
+              key: 'other-uncategorized',
+              displayName: 'Other (uncategorized)',
+              weightPercent: null,
+              assignments: uncategorizedAssignmentsForSummary,
+            },
+          ]
+        : []),
+    ];
+    if (selectedGradingPeriod && selectedGradingPeriod !== ALL_GRADING_PERIODS) {
+      return rows.filter((row) => row.assignments.length > 0);
+    }
+    return rows;
+  }, [
+    courseGroupsList,
+    uncategorizedAssignmentsForSummary,
+    selectedGradingPeriod,
+    studentAssignments,
+  ]);
 
   const openAssignment = (assignment: any) => {
     navigate(getStudentGradeItemPath(course._id, assignment));
@@ -297,7 +334,7 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
     <div className="flex flex-col md:flex-row gap-4">
       <div className="flex-1">
         <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-4 border border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
             <div>
               <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-1">My Grades</h2>
               <p className="text-sm text-gray-600 dark:text-gray-400">Track your academic progress</p>
@@ -305,6 +342,31 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
                 Totals follow your course grading rules. Contact your instructor if a score looks incorrect.
               </p>
             </div>
+            {gradingPeriods.length > 0 && (
+              <div className="flex items-center gap-2">
+                <label
+                  htmlFor="student-grading-period"
+                  className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
+                  Period
+                </label>
+                <select
+                  id="student-grading-period"
+                  value={selectedGradingPeriod}
+                  onChange={(e) => onGradingPeriodChange?.(e.target.value)}
+                  className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                >
+                  {showAllPeriodsOption && (
+                    <option value={ALL_GRADING_PERIODS}>All grading periods</option>
+                  )}
+                  {gradingPeriods.map((p) => (
+                    <option key={p._id} value={p._id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           {/* Mobile */}
@@ -656,6 +718,8 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
         backendFinalLetterGrade={studentFinalLetterGrade}
         resolvedGradingPolicy={effectiveGradingPolicy}
         summaryReady={studentGradeSummaryReady}
+        showCourseTotal={showCourseTotal}
+        gradingPeriodBreakdown={studentGradingPeriodBreakdown}
       />
     </div>
   );

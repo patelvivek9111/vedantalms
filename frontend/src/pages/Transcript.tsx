@@ -7,6 +7,7 @@ import { API_URL } from '../config';
 import DataTable, { Column } from '../components/common/DataTable';
 import { MobileAppShell } from '../components/common/MobileAppShell';
 import { FORM_ERROR } from '../components/common/formStyles';
+import { downloadReportCard } from '../services/academicApi';
 import {
   calculateSGPA,
   calculateCGPA,
@@ -51,6 +52,14 @@ function StatCard({
   );
 }
 
+interface GradingPeriodBreakdownRow {
+  periodId: string;
+  periodName: string;
+  weight: number;
+  currentPercent: number | null;
+  letterGrade: string | null;
+}
+
 interface CourseGrade {
   courseId: string;
   courseTitle: string;
@@ -62,6 +71,10 @@ interface CourseGrade {
     term: string;
     year: number;
   };
+  academicYearLabel?: string | null;
+  scheduleType?: string;
+  periodLabel?: string;
+  gradingPeriodBreakdown?: GradingPeriodBreakdownRow[];
 }
 
 interface TranscriptData {
@@ -83,7 +96,21 @@ const Transcript: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [loadingAllCourses, setLoadingAllCourses] = useState(false);
   const [error, setError] = useState('');
-  const [availableSemesters, setAvailableSemesters] = useState<Array<{ term: string; year: number }>>([]);
+  const [availableSemesters, setAvailableSemesters] = useState<
+    Array<{ term: string; year: number; label?: string }>
+  >([]);
+  const [reportCardLoading, setReportCardLoading] = useState(false);
+
+  const selectedSemesterLabel = useMemo(() => {
+    if (!selectedSemester) return '';
+    const match = availableSemesters.find(
+      (s) => s.term === selectedSemester.term && s.year === selectedSemester.year
+    );
+    return match?.label || `${selectedSemester.term} ${selectedSemester.year}`;
+  }, [selectedSemester, availableSemesters]);
+
+  const hasCreditBearingCourses = (courses: CourseGrade[]) =>
+    courses.some((c) => (c.creditHours ?? 0) > 0);
 
   // Fetch available semesters
   useEffect(() => {
@@ -180,7 +207,8 @@ const Transcript: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availableSemesters.length]);
 
-  const formatGPA = (gpa?: number) => {
+  const formatGPA = (gpa?: number, courses?: CourseGrade[]) => {
+    if (courses && !hasCreditBearingCourses(courses)) return 'N/A';
     if (gpa === undefined || gpa === null) return 'N/A';
     return gpa.toFixed(2);
   };
@@ -198,7 +226,33 @@ const Transcript: React.FC = () => {
       key: 'courseTitle',
       label: 'Course Title',
       sortable: true,
+      render: (course) => (
+        <div>
+          <div>{course.courseTitle}</div>
+          {course.academicYearLabel && (
+            <div className="text-xs text-gray-500">{course.academicYearLabel}</div>
+          )}
+        </div>
+      ),
       className: ''
+    },
+    {
+      key: 'periodGrades',
+      label: 'Period grades',
+      render: (course) => {
+        const rows = course.gradingPeriodBreakdown || [];
+        if (!rows.length) return <span className="text-gray-400">—</span>;
+        return (
+          <div className="space-y-0.5 text-xs text-gray-600 dark:text-gray-400">
+            {rows.map((r) => (
+              <div key={r.periodId}>
+                {r.periodName}: {r.currentPercent != null ? `${r.currentPercent.toFixed(1)}%` : '—'}{' '}
+                {r.letterGrade ? `(${r.letterGrade})` : ''}
+              </div>
+            ))}
+          </div>
+        );
+      },
     },
     {
       key: 'creditHours',
@@ -267,6 +321,15 @@ const Transcript: React.FC = () => {
           {getIndianGradePoints(course.letterGrade).toFixed(1)} pts
         </span>
       </div>
+      {(course.gradingPeriodBreakdown || []).length > 0 && (
+        <div className="mt-2 space-y-0.5 border-t border-gray-100 pt-2 dark:border-gray-700">
+          {course.gradingPeriodBreakdown!.map((r) => (
+            <p key={r.periodId} className="text-[10px] text-gray-500 dark:text-gray-400">
+              {r.periodName}: {r.currentPercent != null ? `${r.currentPercent.toFixed(1)}%` : '—'}
+            </p>
+          ))}
+        </div>
+      )}
     </div>
   );
 
@@ -296,17 +359,17 @@ const Transcript: React.FC = () => {
           </label>
           <select
             id="transcript-semester-select"
-            value={selectedSemester ? `${selectedSemester.term}-${selectedSemester.year}` : ''}
+            value={selectedSemester ? `${selectedSemester.term}::${selectedSemester.year}` : ''}
             onChange={(e) => {
-              const [term, year] = e.target.value.split('-');
-              setSelectedSemester({ term, year: parseInt(year) });
+              const [term, year] = e.target.value.split('::');
+              if (term && year) setSelectedSemester({ term, year: parseInt(year, 10) });
             }}
             className={`compact-control ${CONTROL} ${CONTROL_TEXT} ${DESKTOP_CONTROL_TEXT} ${CONTROL_FOCUS} w-full cursor-pointer appearance-none bg-white px-3 pr-9 dark:bg-gray-800`}
           >
-            <option value="">Select a semester</option>
+            <option value="">Select reporting period</option>
             {availableSemesters.map((semester, index) => (
-              <option key={index} value={`${semester.term}-${semester.year}`}>
-                {semester.term} {semester.year}
+              <option key={index} value={`${semester.term}::${semester.year}`}>
+                {semester.label || `${semester.term} ${semester.year}`}
               </option>
             ))}
           </select>
@@ -316,6 +379,26 @@ const Transcript: React.FC = () => {
             aria-hidden
           />
         </div>
+
+        {selectedSemester && (
+          <button
+            type="button"
+            disabled={reportCardLoading}
+            onClick={async () => {
+              setReportCardLoading(true);
+              try {
+                await downloadReportCard(selectedSemester.term, selectedSemester.year);
+              } catch {
+                setError('Could not download report card.');
+              } finally {
+                setReportCardLoading(false);
+              }
+            }}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+          >
+            {reportCardLoading ? 'Preparing…' : 'Download report card (Excel)'}
+          </button>
+        )}
 
         {error && (
           <div className={FORM_ERROR}>
@@ -333,13 +416,13 @@ const Transcript: React.FC = () => {
             <div className="grid grid-cols-2 gap-2 p-2.5 sm:grid-cols-3 sm:gap-3 sm:p-3">
               <StatCard
                 label="CGPA"
-                value={formatGPA(calculateCGPA(allCoursesData.courses))}
+                value={formatGPA(calculateCGPA(allCoursesData.courses), allCoursesData.courses)}
                 sublabel="10-point scale"
                 valueClassName="text-blue-600 dark:text-blue-400"
               />
               <StatCard
                 label="Overall GPA"
-                value={formatGPA(calculateOverallGPA(allCoursesData.courses))}
+                value={formatGPA(calculateOverallGPA(allCoursesData.courses), allCoursesData.courses)}
                 sublabel="4-point scale"
                 valueClassName="text-blue-600 dark:text-blue-400"
               />
@@ -373,19 +456,19 @@ const Transcript: React.FC = () => {
             <div className={panelClass}>
               <div className={panelHeaderClass}>
                 <h2 className="text-[11px] font-semibold text-gray-900 dark:text-gray-100 sm:text-xs">
-                  {selectedSemester.term} {selectedSemester.year}
+                  {selectedSemesterLabel}
                 </h2>
               </div>
               <div className="grid grid-cols-2 gap-2 p-2.5 sm:grid-cols-3 sm:gap-3 sm:p-3">
                 <StatCard
                   label="SGPA"
-                  value={formatGPA(calculateSGPA(transcriptData.courses))}
+                  value={formatGPA(calculateSGPA(transcriptData.courses), transcriptData.courses)}
                   sublabel="10-point scale"
                   valueClassName="text-blue-600 dark:text-blue-400"
                 />
                 <StatCard
                   label="Semester GPA"
-                  value={formatGPA(calculateSemesterGPA(transcriptData.courses))}
+                  value={formatGPA(calculateSemesterGPA(transcriptData.courses), transcriptData.courses)}
                   sublabel="4-point scale"
                   valueClassName="text-blue-600 dark:text-blue-400"
                 />
@@ -400,7 +483,7 @@ const Transcript: React.FC = () => {
 
             {transcriptData.courses.length === 0 ? (
               <div className={`${panelClass} py-8 text-center text-[11px] text-gray-500 dark:text-gray-400 sm:text-xs`}>
-                No courses found for {selectedSemester.term} {selectedSemester.year}
+                No courses found for {selectedSemesterLabel}
               </div>
             ) : (
               <DataTable<CourseGrade>

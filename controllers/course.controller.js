@@ -44,7 +44,8 @@ exports.createCourse = async (req, res) => {
       });
     }
 
-    const { title, description, gradeScale, catalog, defaultColor, semester } = req.body;
+    const { title, description, gradeScale, catalog, defaultColor, semester, scheduleType, academicYearLabel } =
+      req.body;
     if (gradeScale) {
       const validationError = validateGradeScale(gradeScale);
       if (validationError) {
@@ -81,19 +82,57 @@ exports.createCourse = async (req, res) => {
       defaultSemester = { term, year };
     }
     
+    const validScheduleTypes = ['single_term', 'full_year', 'custom'];
+    const resolvedScheduleType =
+      scheduleType && validScheduleTypes.includes(scheduleType) ? scheduleType : 'single_term';
+
+    const academicCalendarService = require('../services/academicCalendar.service');
+    const academicSettings = await academicCalendarService.getAcademicSettings();
+    const instDefaults = academicCalendarService.resolveDefaultsForNewCourse(
+      academicSettings,
+      resolvedScheduleType
+    );
+
+    const mergedCatalog = { ...(catalog || {}) };
+    if (resolvedScheduleType === 'full_year' && instDefaults.startDate && !mergedCatalog.startDate) {
+      mergedCatalog.startDate = new Date(instDefaults.startDate);
+    }
+    if (resolvedScheduleType === 'full_year' && instDefaults.endDate && !mergedCatalog.endDate) {
+      mergedCatalog.endDate = new Date(instDefaults.endDate);
+    }
+    if (mergedCatalog.creditHours == null && instDefaults.creditHours != null) {
+      mergedCatalog.creditHours = instDefaults.creditHours;
+    }
+
+    const finalSemester = semester?.term && semester?.year ? semester : instDefaults.semester;
+
     const course = await Course.create({
       title,
       description,
       instructor: req.user.id,
       defaultColor: courseDefaultColor,
-      semester: defaultSemester,
+      semester: finalSemester,
+      scheduleType: resolvedScheduleType,
+      academicYearLabel:
+        academicYearLabel ||
+        (resolvedScheduleType === 'full_year' ? instDefaults.academicYearLabel : null),
       ...(gradeScale ? { gradeScale } : {}),
-      ...(catalog ? { catalog } : {})
+      ...(Object.keys(mergedCatalog).length ? { catalog: mergedCatalog } : catalog ? { catalog } : {}),
     });
+
+    if (resolvedScheduleType === 'full_year' && academicSettings.useInstitutionCalendar) {
+      await academicCalendarService.applyInstitutionCalendarToCourse(
+        course._id,
+        req.user._id,
+        academicSettings
+      );
+    }
+
+    const refreshed = await Course.findById(course._id).lean();
 
     res.status(201).json({
       success: true,
-      data: course
+      data: refreshed || course,
     });
   } catch (err) {
     console.error('Create course error:', err);
@@ -117,7 +156,7 @@ const DEFAULT_COURSE_GROUPS = [
 ];
 
 const COURSE_LIST_SELECT =
-  'title description instructor students published operationalStatus defaultColor catalog semester groups createdAt updatedAt enrollmentRequests enrollmentQrToken';
+  'title description instructor students published operationalStatus defaultColor catalog semester scheduleType academicYearLabel groups createdAt updatedAt enrollmentRequests enrollmentQrToken';
 
 function toCourseListSummary(course, user) {
   const o = { ...course };

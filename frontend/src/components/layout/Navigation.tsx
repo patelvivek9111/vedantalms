@@ -1,16 +1,14 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { performLogout } from '../../utils/authLogout';
 
 const Navigation: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-
-
   const handleLogout = () => {
-    logout();
-    navigate('/login');
+    void performLogout(logout, navigate);
   };
 
   return (

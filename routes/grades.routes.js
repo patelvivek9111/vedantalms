@@ -57,9 +57,29 @@ router.post(
   gradingPeriodController.createGradingPeriod
 );
 router.patch(
+  '/course/:courseId/grading-periods/settings',
+  protect,
+  gradingPeriodController.updateGradingPeriodSettings
+);
+router.post(
+  '/course/:courseId/grading-periods/templates',
+  protect,
+  gradingPeriodController.applyGradingPeriodTemplate
+);
+router.patch(
   '/course/:courseId/grading-periods/:periodId',
   protect,
   gradingPeriodController.updateGradingPeriod
+);
+router.get(
+  '/course/:courseId/grading-periods/:periodId/deletion-impact',
+  protect,
+  gradingPeriodController.getDeletionImpact
+);
+router.delete(
+  '/course/:courseId/grading-periods/:periodId',
+  protect,
+  gradingPeriodController.deleteGradingPeriod
 );
 router.get(
   '/course/:courseId/students/:studentId/grade-override',

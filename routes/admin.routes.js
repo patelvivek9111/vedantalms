@@ -38,6 +38,7 @@ router.patch('/security/config', protect, authorize('admin'), patchSecurityConfi
 router.get('/security/login-export', protect, authorize('admin'), exportLoginLog);
 router.get('/settings', protect, authorize('admin'), getSystemSettings);
 router.put('/settings', protect, authorize('admin'), updateSystemSettings);
+router.post('/academic/apply-calendar', protect, authorize('admin'), require('../controllers/academic.controller').applyInstitutionCalendar);
 router.post('/settings/test-email', protect, authorize('admin'), testEmailConfig);
 
 module.exports = router;

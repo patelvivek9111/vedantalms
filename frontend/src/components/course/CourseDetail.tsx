@@ -68,7 +68,7 @@ import MobileNavigation from '../course/MobileNavigation';
 import CourseSidebar from '../course/CourseSidebar';
 import StudentGradesView from '../grades/StudentGradesView';
 import GradebookView from '../grades/GradebookView';
-import AssignmentsSection from '../course/AssignmentsSection';
+import AssignmentsSection, { type AssignmentsSectionProps } from '../course/AssignmentsSection';
 import QuizzesSection from '../course/QuizzesSection';
 import ModulesSection from '../course/ModulesSection';
 import PollsSection from '../course/PollsSection';
@@ -79,6 +79,8 @@ import { useSubmissionIds } from '../../hooks/useSubmissionIds';
 import { usePaginatedGradebook } from '../../hooks/usePaginatedGradebook';
 import { useDiscussions } from '../../hooks/useDiscussions';
 import { useStudentGradeData } from '../../hooks/useStudentGradeData';
+import { fetchCourseGradingPeriods, type GradingPeriod, type GradingPeriodSettings, type GradingPeriodBreakdownRow } from '../../services/gradingApi';
+import { resolveCurrentGradingPeriodId, ALL_GRADING_PERIODS } from '../../utils/gradingPeriods';
 import { useGradeScaleManagement } from '../../hooks/useGradeScaleManagement';
 import { useAssignmentGroupsManagement } from '../../hooks/useAssignmentGroupsManagement';
 import { useGradingPolicy } from '../../hooks/useGradingPolicy';
@@ -120,6 +122,14 @@ const CourseDetail: React.FC = () => {
     import('../../hooks/usePaginatedGradebook').GradebookPolicyMeta | null
   >(null);
   const [instructorGradebookLoading, setInstructorGradebookLoading] = useState(false);
+  // Canvas-style grading period selection (shared across gradebook + student grades views).
+  const [gradingPeriods, setGradingPeriods] = useState<GradingPeriod[]>([]);
+  const [gradingPeriodSettings, setGradingPeriodSettings] = useState<GradingPeriodSettings>({
+    allowStudentAllPeriods: true,
+    displayTotalsForAllPeriods: true,
+  });
+  const [selectedGradingPeriod, setSelectedGradingPeriod] = useState<string>(ALL_GRADING_PERIODS);
+  const [gradingPeriodDefaulted, setGradingPeriodDefaulted] = useState(false);
   const isAdmin = user?.role === 'admin';
   const isInstitutionalDiscussionStaff = ['registrar', 'department_admin'].includes(user?.role || '');
   const isInstructor =
@@ -145,6 +155,9 @@ const CourseDetail: React.FC = () => {
   const [studentLetterGrade, setStudentLetterGrade] = useState<string | null>(null);
   const [studentFinalGrade, setStudentFinalGrade] = useState<number | null>(null);
   const [studentFinalLetterGrade, setStudentFinalLetterGrade] = useState<string | null>(null);
+  const [studentGradingPeriodBreakdown, setStudentGradingPeriodBreakdown] = useState<
+    GradingPeriodBreakdownRow[] | null
+  >(null);
   const [studentGradeSummaryReady, setStudentGradeSummaryReady] = useState(false);
   // Add state for graded discussions for student view
   const [studentDiscussions, setStudentDiscussions] = useState<any[]>([]);
@@ -316,11 +329,58 @@ const CourseDetail: React.FC = () => {
   }, [activeSection, fetchCourseAndModulesWithAssignments]);
 
   // Fetch graded discussions
+  const [discussionsRefreshToken, setDiscussionsRefreshToken] = useState(0);
   useDiscussions({
     course,
     setDiscussions,
     setDiscussionsLoading,
+    refreshToken: discussionsRefreshToken,
   });
+
+  // Load grading periods for the course and default to the current period (Canvas behavior).
+  const loadGradingPeriods = useCallback(async () => {
+    if (!course?._id) return;
+    try {
+      const res = await fetchCourseGradingPeriods(course._id);
+      const periods = res.success ? res.data || [] : [];
+      const settings = res.settings || {
+        allowStudentAllPeriods: true,
+        displayTotalsForAllPeriods: true,
+      };
+      setGradingPeriods(periods);
+      setGradingPeriodSettings(settings);
+      if (!gradingPeriodDefaulted && periods.length > 0) {
+        const current = resolveCurrentGradingPeriodId(periods);
+        if (current) setSelectedGradingPeriod(current);
+        setGradingPeriodDefaulted(true);
+      } else if (
+        user?.role === 'student' &&
+        settings.allowStudentAllPeriods === false &&
+        selectedGradingPeriod === ALL_GRADING_PERIODS
+      ) {
+        const current = resolveCurrentGradingPeriodId(periods);
+        if (current) setSelectedGradingPeriod(current);
+      }
+    } catch {
+      setGradingPeriods([]);
+    }
+  }, [course?._id, gradingPeriodDefaulted, user?.role, selectedGradingPeriod]);
+
+  // Re-pull assignments + discussions after grading-period changes reslot them.
+  const refreshGradedItems = useCallback(() => {
+    void fetchCourseAndModulesWithAssignments();
+    void loadGradingPeriods();
+    setDiscussionsRefreshToken((n) => n + 1);
+  }, [fetchCourseAndModulesWithAssignments, loadGradingPeriods]);
+
+  useEffect(() => {
+    void loadGradingPeriods();
+  }, [loadGradingPeriods]);
+
+  const gradingPeriodParam =
+    selectedGradingPeriod && selectedGradingPeriod !== ALL_GRADING_PERIODS
+      ? selectedGradingPeriod
+      : undefined;
 
   // Get sidebar configuration
   const { filteredNavigationItems, sidebarConfig } = useSidebarConfig({
@@ -553,10 +613,12 @@ const CourseDetail: React.FC = () => {
     isAdmin,
     course,
     user,
+    gradingPeriodId: gradingPeriodParam,
     setStudentTotalGrade,
     setStudentLetterGrade,
     setStudentFinalGrade,
     setStudentFinalLetterGrade,
+    setStudentGradingPeriodBreakdown,
     setStudentDiscussions,
     setStudentGroupAssignments,
     setStudentGradeSummaryReady,
@@ -569,6 +631,7 @@ const CourseDetail: React.FC = () => {
     isAdmin,
     courseId: id,
     refresh: gradebookRefresh,
+    gradingPeriodId: gradingPeriodParam,
     setGradebookData,
     setSubmissionMap,
     setGradebookLoading: setInstructorGradebookLoading,
@@ -601,7 +664,9 @@ const CourseDetail: React.FC = () => {
   const handleExportGradebookCSV = async () => {
     if (!id) return;
     try {
-      const res = await enqueueGradebookExport(id);
+      const res = await enqueueGradebookExport(id, {
+        gradingPeriodId: gradingPeriodParam,
+      });
       if (res.success && res.data.jobId) {
         if (res.data.downloadUrl) {
           setExportDownloadUrl(res.data.downloadUrl);
@@ -622,12 +687,21 @@ const CourseDetail: React.FC = () => {
       /* fall through to client export */
     }
     try {
+      const periodLabel =
+        selectedGradingPeriod === ALL_GRADING_PERIODS
+          ? 'All grading periods'
+          : gradingPeriods.find((p) => p._id === selectedGradingPeriod)?.name ||
+            'Selected period';
       await exportGradebookXlsx(
         gradebookData,
         course,
         submissionMap,
         studentSubmissions,
-        gradingPolicyManagement.resolved
+        gradingPolicyManagement.resolved,
+        {
+          studentTotals: gradebookStudentTotals,
+          periodLabel,
+        }
       );
       toast.success('Gradebook exported (this device).');
     } catch {
@@ -797,6 +871,7 @@ const CourseDetail: React.FC = () => {
             studentSubmissions={studentSubmissions}
             submissionMap={submissionMap}
             course={course}
+            onGradingPeriodsChanged={refreshGradedItems}
           />
         );
 
@@ -870,6 +945,10 @@ const CourseDetail: React.FC = () => {
             course={course}
             modules={modules}
             user={user}
+            gradingPeriods={gradingPeriods}
+            gradingPeriodSettings={gradingPeriodSettings}
+            selectedGradingPeriod={selectedGradingPeriod}
+            onGradingPeriodChange={setSelectedGradingPeriod}
             studentGroupAssignments={studentGroupAssignments}
             studentDiscussions={studentDiscussions}
             gradebookData={gradebookData}
@@ -879,6 +958,7 @@ const CourseDetail: React.FC = () => {
             studentLetterGrade={studentLetterGrade}
             studentFinalGrade={studentFinalGrade}
             studentFinalLetterGrade={studentFinalLetterGrade}
+            studentGradingPeriodBreakdown={studentGradingPeriodBreakdown}
             studentGradeSummaryReady={studentGradeSummaryReady}
             resolvedGradingPolicy={gradingPolicyManagement.resolved}
             gradingPolicyLoading={gradingPolicyManagement.loading}
@@ -908,6 +988,9 @@ const CourseDetail: React.FC = () => {
             courseId={id || ''}
             isGradebookLoading={instructorGradebookLoading}
             gradebookData={gradebookData}
+            gradingPeriods={gradingPeriods}
+            selectedGradingPeriod={selectedGradingPeriod}
+            onGradingPeriodChange={setSelectedGradingPeriod}
             studentTotals={gradebookStudentTotals}
             studentFinalTotals={gradebookStudentFinalTotals}
             gradeOverrides={gradebookOverrides}
@@ -1099,6 +1182,7 @@ const CourseDetail: React.FC = () => {
 
       {/* Main Content Area */}
       <div 
+        id="course-main-content"
         className={`flex-1 w-full overflow-visible lg:overflow-auto ${isMobileMenuOpen ? 'lg:overflow-auto overflow-hidden' : ''}`}
         {...(sectionSwipeHandlers.enabled ? {
           onTouchStart: sectionSwipeHandlers.onTouchStart,
