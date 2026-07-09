@@ -41,7 +41,7 @@ exports.getStudentCourseGrade = async (req, res) => {
     const courseId = req.params.courseId;
     const studentId = req.user._id;
     const gradingPeriodId =
-      req.query.gradingPeriodId && req.query.gradingPeriodId !== 'all'
+      req.query?.gradingPeriodId && req.query.gradingPeriodId !== 'all'
         ? String(req.query.gradingPeriodId)
         : null;
 
@@ -391,7 +391,7 @@ exports.getCourseGradebook = async (req, res) => {
       page: req.query.page,
       pageSize: req.query.pageSize,
       gradingPeriodId:
-        req.query.gradingPeriodId && req.query.gradingPeriodId !== 'all'
+        req.query?.gradingPeriodId && req.query.gradingPeriodId !== 'all'
           ? String(req.query.gradingPeriodId)
           : null,
     });

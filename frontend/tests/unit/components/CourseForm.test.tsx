@@ -6,6 +6,32 @@ import CourseForm from '@/components/course/CourseForm';
 import { useCourse } from '@/contexts/CourseContext';
 
 // Mock dependencies
+vi.mock('@/services/academicApi', () => ({
+  fetchAcademicSettings: vi.fn().mockResolvedValue({
+    success: true,
+    data: {
+      institutionMode: 'college',
+      defaultScheduleType: 'single_term',
+      calendarStyle: 'us',
+      calendarPreset: 'us_quarters',
+      academicYearStart: new Date().getFullYear(),
+      useInstitutionCalendar: true,
+      defaultCreditHoursSchool: 0,
+      defaultCreditHoursCollege: 3,
+      reportingTermSchool: 'Academic Year',
+      reportingTermCollege: 'Fall',
+      termOptions: [
+        { value: 'Fall', label: 'Fall' },
+        { value: 'Spring', label: 'Spring' },
+      ],
+    },
+  }),
+}));
+
+vi.mock('@/services/gradingApi', () => ({
+  fetchCourseGradingPeriods: vi.fn().mockResolvedValue({ success: true, data: [] }),
+}));
+
 vi.mock('@/contexts/CourseContext', () => ({
   useCourse: vi.fn(),
 }));

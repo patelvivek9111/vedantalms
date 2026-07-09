@@ -168,10 +168,14 @@ describe('controllers/submission + grades', () => {
 
     await gradesController.getStudentCourseGrade(req, res);
 
-    expect(calculateCourseGradeForStudent).toHaveBeenCalledWith('u1', {
-      _id: 'c1',
-      gradeScale: [],
-    });
+    expect(calculateCourseGradeForStudent).toHaveBeenCalledWith(
+      'u1',
+      { _id: 'c1', gradeScale: [] },
+      undefined,
+      undefined,
+      undefined,
+      { gradingPeriodId: null }
+    );
     expect(setJson).toHaveBeenCalled();
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({ currentPercent: 88, finalPercent: 75, totalPercent: 88 })

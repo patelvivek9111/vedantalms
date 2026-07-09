@@ -111,8 +111,9 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
 
   useEffect(() => {
     if (mode !== 'create') return;
-    void fetchAcademicSettings().then((res) => {
-      if (!res.success) return;
+    void fetchAcademicSettings()
+      .then((res) => {
+        if (!res?.success) return;
       setAcademicDefaults(res.data);
       if (res.data.termOptions?.length) setTermOptions(res.data.termOptions);
       setFormData((prev) => ({
@@ -134,7 +135,8 @@ const CourseForm: React.FC<CourseFormProps> = ({ mode }) => {
             ? String(res.data.defaultCreditHoursSchool ?? 0)
             : String(res.data.defaultCreditHoursCollege ?? 3),
       }));
-    });
+      })
+      .catch(() => {});
   }, [mode]);
 
   useEffect(() => {
