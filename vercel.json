@@ -65,7 +65,7 @@
       "destination": "https://vedantalms-backend.onrender.com/health/:path*"
     },
     {
-      "source": "/((?!assets/).*)",
+      "source": "/((?!assets/|favicon\\.ico|site\\.webmanifest|course-html-shared\\.css).*)",
       "destination": "/index.html"
     }
   ]
