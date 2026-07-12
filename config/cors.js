@@ -18,7 +18,13 @@ function getDevOrigins() {
 
 function getProductionOrigins(env = process.env) {
   const fromEnv = [env.FRONTEND_URL, ...parseExtraOrigins(env.CORS_EXTRA_ORIGINS)].filter(Boolean);
-  const defaults = ['https://www.vedantaed.com', 'https://vedantaed.com'];
+  // Primary: mysl8te.com. Keep vedantaed.com until old→new 301 cutover is done.
+  const defaults = [
+    'https://www.mysl8te.com',
+    'https://mysl8te.com',
+    'https://www.vedantaed.com',
+    'https://vedantaed.com',
+  ];
   return [...new Set([...defaults, ...fromEnv])];
 }
 

@@ -9,7 +9,7 @@ const { getSemesterFromCourse } = require('../utils/semesterUtils');
 
 async function buildStudentReportCardWorkbook(studentId, term, year) {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'Vedanta LMS';
+  workbook.creator = 'MySl8te';
   workbook.created = new Date();
 
   const meta = workbook.addWorksheet('Info');

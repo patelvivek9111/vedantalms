@@ -682,7 +682,7 @@ addModule({
   ],
 });
 
-const SYLLABUS_HTML = `<h1>${esc(COURSE_TITLE)}</h1><p><strong>Instructor of record:</strong> Vedanta LMS demo teacher account. <strong>Semester:</strong> ${esc(
+const SYLLABUS_HTML = `<h1>${esc(COURSE_TITLE)}</h1><p><strong>Instructor of record:</strong> MySl8te demo teacher account. <strong>Semester:</strong> ${esc(
   SEMESTER.term
 )} ${SEMESTER.year} (${SEMESTER.start.toLocaleDateString('en-IN', { dateStyle: 'medium' })} – ${SEMESTER.end.toLocaleDateString('en-IN', { dateStyle: 'medium' })}, Indian Standard Time).</p><h2>Course description</h2><p>${esc(
   COURSE_DESCRIPTION

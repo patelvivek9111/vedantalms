@@ -190,7 +190,7 @@ async function runDataIntegrityChecks(options = {}) {
 
 function formatHumanReport(result) {
   const lines = [
-    '=== Vedanta LMS Data Integrity Report ===',
+    '=== MySl8te Data Integrity Report ===',
     `Checked at: ${result.checkedAt}`,
     `Status: ${result.ok ? 'PASS' : 'FAIL'} (${result.issueCount} issue(s))`,
     '',

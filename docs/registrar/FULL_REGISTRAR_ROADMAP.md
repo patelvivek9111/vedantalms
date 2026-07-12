@@ -1,7 +1,7 @@
 # Full Canvas-Class Registrar — Implementation Roadmap
 
 **Status:** Planning document (not yet implemented)  
-**Owner:** Vedanta LMS platform team  
+**Owner:** MySl8te platform team  
 **Last updated:** 2026-07-09  
 **Related:** [CANVAS_PARITY_AUDIT.md](../grading/CANVAS_PARITY_AUDIT.md), [POLICY_CHANGE_UX.md](../grading/POLICY_CHANGE_UX.md), [security.md](../security.md)
 
@@ -9,12 +9,12 @@
 
 ## Purpose
 
-This document is the **source of truth for a future full Canvas-class registrar capability** in Vedanta LMS. Use it when prioritising features, writing PRDs, or scoping work for schools and colleges in the Indian market.
+This document is the **source of truth for a future full Canvas-class registrar capability** in MySl8te. Use it when prioritising features, writing PRDs, or scoping work for schools and colleges in the Indian market.
 
 It records:
 
 1. What “Canvas-like registrar” actually means (and what it does **not** mean)
-2. What Vedanta already ships today
+2. What MySl8te already ships today
 3. Every subsystem, data model, API, UI screen, workflow, and migration step needed to close the gap
 4. A phased rollout plan with realistic estimates
 
@@ -24,7 +24,7 @@ It records:
 
 Canvas does **not** ship a complete university ERP registrar. In production, “registrar” usually means:
 
-| Layer | Typical owner | Vedanta goal |
+| Layer | Typical owner | MySl8te goal |
 |-------|---------------|--------------|
 | Teaching & learning | LMS | **Strong today** |
 | Grade governance & official records | LMS + Registrar role | **Partial today** |
@@ -32,7 +32,7 @@ Canvas does **not** ship a complete university ERP registrar. In production, “
 | Fees, admissions, timetables | ERP | **Integrate, do not rebuild** |
 | Official transcripts & compliance exports | Registrar office | **Partial (API + student view)** |
 
-**Target definition for Vedanta:** everything Canvas Admin + SIS Import/Export provides for academic records, plus a dedicated **Registrar Office UI**, plus India-specific reporting hooks — **not** a replacement for Fedena, MasterSoft, Banner, or full college ERP.
+**Target definition for MySl8te:** everything Canvas Admin + SIS Import/Export provides for academic records, plus a dedicated **Registrar Office UI**, plus India-specific reporting hooks — **not** a replacement for Fedena, MasterSoft, Banner, or full college ERP.
 
 ---
 
@@ -84,7 +84,7 @@ From `middleware/academicPermissions.js`:
 
 ### 1.4 Canvas parity checklist (honest)
 
-| Canvas / industry capability | Vedanta today | After full build |
+| Canvas / industry capability | MySl8te today | After full build |
 |------------------------------|---------------|------------------|
 | Account terms | Per-course semester | Institution terms |
 | SIS CSV import | Staging stub | Full pipeline |
@@ -702,7 +702,7 @@ Reuse `asyncJob.model.js` and `AsyncJobBanner` patterns.
 
 ---
 
-## 16. Data migration from current Vedanta
+## 16. Data migration from current MySl8te
 
 ### M1 — Non-breaking additions
 

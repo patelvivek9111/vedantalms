@@ -101,7 +101,7 @@ function LogoMark({ className = '' }: { className?: string }) {
   return (
     <img
       src={logoSrc()}
-      alt="Vedanta"
+      alt="MySl8te"
       className={`block shrink-0 object-contain object-center ${className}`}
       width={200}
       height={64}
@@ -143,13 +143,13 @@ const LandingPage: React.FC = () => {
             to="/"
             className="group flex min-h-10 shrink-0 items-center gap-3 rounded-xl py-1.5 pl-1.5 pr-2.5 transition-colors hover:bg-slate-100/90 dark:hover:bg-slate-800/50 sm:min-h-11 sm:gap-3.5"
             onClick={closeMobile}
-            aria-label="Vedanta home"
+            aria-label="MySl8te home"
           >
             <span className="flex h-10 w-10 shrink-0 items-center justify-center sm:h-11 sm:w-11">
               <LogoMark className="max-h-[2.125rem] w-auto max-w-[2.6rem] sm:max-h-10 sm:max-w-[2.85rem]" />
             </span>
             <span className="hidden text-[1.0625rem] font-semibold leading-none tracking-[-0.04em] text-slate-900 dark:text-slate-50 sm:inline sm:text-[1.125rem]">
-              Vedanta
+              MySl8te
             </span>
           </Link>
 
@@ -235,14 +235,14 @@ const LandingPage: React.FC = () => {
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-indigo-600 dark:text-indigo-400">
               Learning platform
             </p>
-            <h1 className="mt-4 text-balance text-4xl font-semibold tracking-tight sm:text-5xl lg:text-[3.25rem] lg:leading-[1.1]">
-              Modern learning.
-              <span className="mt-1 block bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent dark:from-indigo-400 dark:to-violet-400">
-                Ancient wisdom.
+            <h1 className="mt-4 text-balance text-4xl font-semibold tracking-tight leading-[1.2] sm:text-5xl lg:text-[3.25rem] lg:leading-[1.25]">
+              Elevate the
+              <span className="mt-1 block bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text pb-1 text-transparent dark:from-indigo-400 dark:to-violet-400">
+                learning experience.
               </span>
             </h1>
             <p className="mt-6 max-w-xl text-pretty text-base leading-relaxed text-slate-600 dark:text-slate-400 sm:text-lg">
-              Vedanta brings courses, people, and outcomes together—so instructors spend less time juggling tools and
+              MySl8te brings courses, people, and outcomes together—so instructors spend less time juggling tools and
               students always know where to go next.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -345,13 +345,13 @@ const LandingPage: React.FC = () => {
                 About
               </p>
               <h2 className="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 sm:text-4xl">
-                About Vedanta
+                About MySl8te
               </h2>
               <p className="mt-2 text-sm font-medium text-slate-500 dark:text-slate-400">
                 Clarity over clutter—one calm place for your whole program.
               </p>
               <p className="mt-6 text-pretty text-base leading-relaxed text-slate-600 dark:text-slate-400 sm:text-lg">
-                Vedanta keeps lessons, conversations, grades, and scheduling in one place. Teachers stay in control of
+                MySl8te keeps lessons, conversations, grades, and scheduling in one place. Teachers stay in control of
                 enrollment: catalog when there is room, join codes and QR with optional instructor approval, and
                 waitlists that stay predictable when a section is full.
               </p>
@@ -427,7 +427,7 @@ const LandingPage: React.FC = () => {
                 <LogoMark className="h-11 max-w-[220px]" />
               </div>
               <p className="mt-5 max-w-sm text-sm leading-relaxed text-slate-400">
-                Modern learning. Ancient wisdom. A calmer place for courses, people, and outcomes.
+                Elevate the learning experience. A calmer place for courses, people, and outcomes.
               </p>
             </div>
             <div>
@@ -481,7 +481,7 @@ const LandingPage: React.FC = () => {
             </div>
           </div>
           <div className="mx-auto mt-12 max-w-6xl border-t border-white/[0.06] px-4 pt-8 text-center text-xs text-slate-500 sm:px-6 lg:px-8">
-            © {new Date().getFullYear()} Vedanta. All rights reserved.
+            © {new Date().getFullYear()} MySl8te. All rights reserved.
           </div>
         </footer>
       </div>

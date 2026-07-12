@@ -71,7 +71,7 @@ async function buildGradebookWorkbookBuffer(dataset, options = {}) {
   const { course, students, assignments, policyMeta } = dataset;
   const gradingPeriodId = options.gradingPeriodId || null;
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'Vedanta LMS';
+  workbook.creator = 'MySl8te';
   workbook.created = new Date();
 
   const courseId = course._id || course.id;

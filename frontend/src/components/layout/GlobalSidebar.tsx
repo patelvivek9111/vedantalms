@@ -163,7 +163,7 @@ export default function GlobalSidebar() {
       <div className="mb-3 flex flex-col items-center w-full px-2 shrink-0">
         {/* Logo placeholder */}
         <div className="w-12 h-12 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center border border-blue-700 dark:border-gray-600">
-          <span className="text-blue-800 dark:text-blue-300 text-lg font-bold">LMS</span>
+          <span className="text-blue-800 dark:text-blue-300 text-lg font-bold">MySl8te</span>
         </div>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto overflow-x-visible flex flex-col gap-1 items-center w-full px-2">

@@ -23,6 +23,9 @@ describe('CORS origin policy', () => {
 
   it('allows default production domains', () => {
     expect(
+      isOriginAllowed('https://mysl8te.com', { nodeEnv: 'production', env: { NODE_ENV: 'production' } })
+    ).toBe(true);
+    expect(
       isOriginAllowed('https://vedantaed.com', { nodeEnv: 'production', env: { NODE_ENV: 'production' } })
     ).toBe(true);
   });
@@ -61,6 +64,7 @@ describe('CORS origin policy', () => {
         'https://app.example.com',
         'https://staging.example.com',
         'https://preview.example.com',
+        'https://mysl8te.com',
         'https://vedantaed.com',
       ])
     );

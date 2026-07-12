@@ -1066,7 +1066,7 @@ exports.exportLoginLog = async (req, res) => {
       .digest('hex');
 
     const lines = [
-      '# Vedanta LMS signed login activity export',
+      '# MySl8te signed login activity export',
       `# generated_at=${new Date().toISOString()}`,
       `# window_days=${days}`,
       `# row_count=${activities.length}`,

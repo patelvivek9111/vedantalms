@@ -4,7 +4,7 @@ const systemSettingsSchema = new mongoose.Schema({
   general: {
     siteName: {
       type: String,
-      default: 'Learning Management System'
+      default: 'MySl8te'
     },
     siteDescription: {
       type: String,
@@ -72,7 +72,7 @@ const systemSettingsSchema = new mongoose.Schema({
     },
     fromName: {
       type: String,
-      default: 'LMS'
+      default: 'MySl8te'
     }
   },
   storage: {

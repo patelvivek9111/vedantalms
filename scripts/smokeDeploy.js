@@ -2,7 +2,7 @@
  * Post-deploy / staging smoke — health + login + one read + one write.
  * Usage:
  *   STAGING_API_URL=https://api.example.com STAGING_EMAIL=... STAGING_PASSWORD=... node scripts/smokeDeploy.js
- *   PRODUCTION_API_URL=https://vedantaed.com/api ... (same vars)
+ *   PRODUCTION_API_URL=https://mysl8te.com/api ... (same vars)
  */
 const base = process.env.STAGING_API_URL || process.env.PRODUCTION_API_URL || process.env.SMOKE_API_URL || 'http://127.0.0.1:5000';
 const email = process.env.STAGING_EMAIL || process.env.SMOKE_EMAIL || 'teacher@vidyalms.com';

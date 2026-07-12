@@ -200,7 +200,7 @@ export function Login() {
                 <div className="w-full px-1 leading-none">
                   <img
                     src={logoSrc}
-                    alt="Vedanta"
+                    alt="MySl8te"
                     width={640}
                     height={240}
                     className="mx-auto block h-40 w-auto max-h-[min(46dvh,380px)] max-w-full object-contain object-center sm:h-44 md:h-52 md:max-h-[min(50dvh,440px)]"

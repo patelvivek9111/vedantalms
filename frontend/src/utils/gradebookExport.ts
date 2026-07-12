@@ -116,7 +116,7 @@ export const exportGradebookXlsx = async (
   const lastCol = colIndexToLetter(numCols);
 
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'LMS';
+  workbook.creator = 'MySl8te';
   workbook.created = new Date();
 
   const ws = workbook.addWorksheet('Gradebook', {

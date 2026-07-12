@@ -4,7 +4,7 @@
  *
  * Usage:
  *   npm run scan:zap
- *   ZAP_TARGET=https://vedantaed.com npm run scan:zap
+ *   ZAP_TARGET=https://mysl8te.com npm run scan:zap
  *
  * Requires Docker. Reports: zap-report.html, zap-report.json (gitignored).
  */
@@ -12,7 +12,7 @@ const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-const target = (process.env.ZAP_TARGET || 'https://vedantaed.com').replace(/\/$/, '');
+const target = (process.env.ZAP_TARGET || 'https://mysl8te.com').replace(/\/$/, '');
 const rulesFile = path.join(process.cwd(), '.zap', 'rules.tsv');
 const image = process.env.ZAP_DOCKER_IMAGE || 'ghcr.io/zaproxy/zaproxy:stable';
 

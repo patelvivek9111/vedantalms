@@ -1,4 +1,4 @@
-# Canvas Grading Parity Audit — Vedanta LMS
+# Canvas Grading Parity Audit — MySl8te
 
 **Status:** Phase 8 complete (performance dedup)  
 **Engine version:** `1.2.0` (unchanged — infrastructure only)  
@@ -11,7 +11,7 @@
 
 ## Purpose
 
-This document records every known difference between Vedanta LMS grading behavior and
+This document records every known difference between MySl8te grading behavior and
 Instructure Canvas grading semantics, classifies each gap, and defines the incremental
 migration plan. It is the source of truth before any calculator logic changes.
 
@@ -41,7 +41,7 @@ These capabilities are **superior to or equal to Canvas** and must remain intact
 
 ## Grade mode definitions
 
-| Mode | Canvas name | Vedanta today | Target |
+| Mode | Canvas name | MySl8te today | Target |
 |------|-------------|---------------|--------|
 | **Current** | Current Grade | `calculateCurrentGradeWithWeightedGroups` (alias: `calculateFinalGradeWithWeightedGroups`) | `gradeMode: 'current'` |
 | **Final / Projected** | Final Grade | `calculateProjectedFinalGradeWithWeightedGroups` | `gradeMode: 'final'` |

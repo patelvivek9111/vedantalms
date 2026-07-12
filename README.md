@@ -1,8 +1,8 @@
-# Vedanta LMS — Learning Management System
+# MySl8te — Learning Management System
 
 A comprehensive Learning Management System built with **React**, **Node.js**, **Express**, and **MongoDB**. It supports courses, assignments, institutional grading, discussions, file workflows, QuizWave live sessions, and operational tooling for production teams.
 
-**Live site:** [vedantaed.com](https://vedantaed.com)
+**Live site:** [mysl8te.com](https://mysl8te.com)
 
 ---
 
@@ -27,7 +27,7 @@ A comprehensive Learning Management System built with **React**, **Node.js**, **
 
 ## Overview
 
-Vedanta LMS is a full-featured platform for educators and institutions: course shells, modules and pages, assignments and submissions, **policy-driven grading** with lifecycle controls, **transcripts**, **discussions** (including scaled reply storage and audit trails), **notifications and inbox**, **QuizWave** over Socket.IO, meetings (including Zoho hooks), and **data portability** (export/restore bundles with verification scripts).
+MySl8te is a full-featured platform for educators and institutions: course shells, modules and pages, assignments and submissions, **policy-driven grading** with lifecycle controls, **transcripts**, **discussions** (including scaled reply storage and audit trails), **notifications and inbox**, **QuizWave** over Socket.IO, meetings (including Zoho hooks), and **data portability** (export/restore bundles with verification scripts).
 
 **Product accents in this codebase**
 
@@ -568,7 +568,7 @@ Pull requests are welcome. Please run the relevant **Jest** / **Vitest** suites 
 
 ## Support
 
-Open a GitHub issue or contact your institution’s Vedanta LMS operators for production incidents (use the runbooks under `docs/operations/` when applicable).
+Open a GitHub issue or contact your institution’s MySl8te operators for production incidents (use the runbooks under `docs/operations/` when applicable).
 
 ---
 

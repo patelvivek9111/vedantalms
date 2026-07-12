@@ -1,6 +1,6 @@
 # Production guide
 
-Deploy, secure, scale, and recover Vedanta LMS in production.
+Deploy, secure, scale, and recover MySl8te in production.
 
 ---
 

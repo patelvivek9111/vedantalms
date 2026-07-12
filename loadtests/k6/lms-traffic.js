@@ -1,5 +1,5 @@
 /**
- * k6 VedantaLMS traffic script (70% student / 20% instructor / 10% admin).
+ * k6 MySl8te traffic script (70% student / 20% instructor / 10% admin).
  *
  * Prerequisites:
  *   k6 install — https://k6.io/docs/get-started/installation/

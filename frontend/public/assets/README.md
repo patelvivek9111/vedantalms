@@ -1,20 +1,18 @@
 # Logo Setup Instructions
 
-## Adding the Vedanta Logo
+## Adding the MySl8te Logo
 
-To complete the branding setup, please add your Vedanta logo image to this folder:
+Place the brand logo in this folder. The app currently references these legacy filenames:
 
-**File location:** `frontend/public/assets/vedanta-logo.png`
+- `Vedanta_logo.png` — landing / fallback
+- `Vedanta_logo1.png` — login page primary
 
 **Recommended specifications:**
-- Format: PNG (with transparent background preferred)
-- Size: At least 200x200 pixels for high quality
-- File name: `vedanta-logo.png`
+- Format: PNG (transparent background preferred)
+- Size: At least 200x200 pixels
 
-The logo will automatically display on:
-- Landing page (header and hero section)
+Replace those files with the MySl8te logo assets when ready (keep the same filenames, or update `LandingPage.tsx` / `Login.tsx` to point at new names).
+
+The logo displays on:
+- Landing page (header and footer)
 - Login page
-- Footer
-
-If the logo file is not found, the pages will fall back to a book icon.
-

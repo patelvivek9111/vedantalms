@@ -384,7 +384,7 @@ Sort default: largest \|Δ\| first.
 
 ## Canvas comparison
 
-| Behavior | Canvas | Vedanta (Phase 2) | Target |
+| Behavior | Canvas | MySl8te (Phase 2) | Target |
 |----------|--------|-------------------|--------|
 | Policy change recalculates grades | Yes (gradebook settings) | Yes, with preview + apply mode choice | ✅ |
 | Posted grade stability | Informal; students may see changes | **prospective_only** option (default suggested on POSTED) | ✅ |
@@ -392,7 +392,7 @@ Sort default: largest \|Δ\| first.
 | Per-submission policy history | Limited | Submission stamps used in prospective mode | ✅ |
 | Impact preview before save | No native bulk preview | Real per-student impact table | ✅ |
 
-Vedanta can exceed Canvas on **impact preview** and **explicit apply modes** while staying parity-compatible on math.
+MySl8te can exceed Canvas on **impact preview** and **explicit apply modes** while staying parity-compatible on math.
 
 ---
 

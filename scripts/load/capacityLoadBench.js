@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * VedantaLMS capacity load bench — realistic LMS traffic mix.
+ * MySl8te capacity load bench — realistic LMS traffic mix.
  * 70% student / 20% instructor / 10% admin sessions.
  *
  * Usage:

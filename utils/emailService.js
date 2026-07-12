@@ -61,10 +61,10 @@ async function sendEmail(to, subject, html, text = null) {
     console.log(`📧 EMAIL SERVICE: SMTP Port: ${emailConfig.smtpPort || 'NOT SET'}`);
     console.log(`📧 EMAIL SERVICE: SMTP User: ${emailConfig.smtpUser || 'NOT SET'}`);
     console.log(`📧 EMAIL SERVICE: From Email: ${emailConfig.fromEmail || emailConfig.smtpUser || 'NOT SET'}`);
-    console.log(`📧 EMAIL SERVICE: From Name: ${emailConfig.fromName || 'LMS'}`);
-
+    console.log(`📧 EMAIL SERVICE: From Name: ${emailConfig.fromName || 'MySl8te'}`);
+    
     const mailOptions = {
-      from: `"${emailConfig.fromName || 'LMS'}" <${emailConfig.fromEmail || emailConfig.smtpUser}>`,
+      from: `"${emailConfig.fromName || 'MySl8te'}" <${emailConfig.fromEmail || emailConfig.smtpUser}>`,
       to: Array.isArray(to) ? to.join(', ') : to,
       subject: subject,
       html: html,
@@ -92,7 +92,7 @@ async function sendEmail(to, subject, html, text = null) {
 async function sendNotificationEmail(userEmail, notification) {
   try {
     const settings = await SystemSettings.getSettings();
-    const siteName = settings.general?.siteName || 'LMS';
+    const siteName = settings.general?.siteName || 'MySl8te';
 
     const subject = `${siteName} - ${notification.title}`;
     

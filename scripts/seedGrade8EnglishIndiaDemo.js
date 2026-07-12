@@ -191,7 +191,7 @@ async function ensureDemoStudents(plainPassword) {
         password: plainPassword,
         role: 'student',
         profilePicture: avatarUrl(s.firstName, s.lastName),
-        bio: `Grade 8 student — ${s.firstName}'s demo profile for Vedanta LMS.`,
+        bio: `Grade 8 student — ${s.firstName}'s demo profile for MySl8te.`,
       });
       console.log(`[seed] Created student ${s.email}`);
     } else {

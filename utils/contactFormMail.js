@@ -50,7 +50,7 @@ async function sendContactInquiry({ name, organization, jobTitle, userCount, ext
     };
   }
 
-  const subject = `[Vedanta inquiry] ${organization} — ${name}`;
+  const subject = `[MySl8te inquiry] ${organization} — ${name}`;
   const text = [
     `Name: ${name}`,
     `Job title: ${jobTitle}`,
@@ -77,13 +77,13 @@ async function sendContactInquiry({ name, organization, jobTitle, userCount, ext
     .join('');
 
   const html = `<!DOCTYPE html><html><body style="font-family:system-ui,sans-serif;font-size:15px;color:#0f172a">
-<p>New inquiry from the Vedanta landing page.</p>
+<p>New inquiry from the MySl8te landing page.</p>
 <table style="border-collapse:collapse;max-width:640px">${rows}</table>
 </body></html>`;
 
   try {
     await transporter.sendMail({
-      from: `"Vedanta contact" <${from}>`,
+      from: `"MySl8te contact" <${from}>`,
       to,
       replyTo: undefined,
       subject,
