@@ -148,8 +148,8 @@ const LandingPage: React.FC = () => {
             <span className="flex h-10 w-10 shrink-0 items-center justify-center sm:h-11 sm:w-11">
               <LogoMark className="max-h-[2.125rem] w-auto max-w-[2.6rem] sm:max-h-10 sm:max-w-[2.85rem]" />
             </span>
-            <span className="hidden text-[1.0625rem] font-semibold leading-none tracking-[-0.04em] text-slate-900 dark:text-slate-50 sm:inline sm:text-[1.125rem]">
-              MySl8te
+            <span className="mysl8te-wordmark hidden text-[1.15rem] sm:inline sm:text-[1.3rem]">
+              MYSL8TE
             </span>
           </Link>
 
@@ -242,8 +242,8 @@ const LandingPage: React.FC = () => {
               </span>
             </h1>
             <p className="mt-6 max-w-xl text-pretty text-base leading-relaxed text-slate-600 dark:text-slate-400 sm:text-lg">
-              MySl8te brings courses, people, and outcomes together—so instructors spend less time juggling tools and
-              students always know where to go next.
+              <span className="mysl8te-wordmark text-[1em] align-baseline">MYSL8TE</span> brings courses, people, and
+              outcomes together—so instructors spend less time juggling tools and students always know where to go next.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
               <button
@@ -345,13 +345,14 @@ const LandingPage: React.FC = () => {
                 About
               </p>
               <h2 className="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 sm:text-4xl">
-                About MySl8te
+                About <span className="mysl8te-wordmark text-[inherit] tracking-[0.07em]">MYSL8TE</span>
               </h2>
               <p className="mt-2 text-sm font-medium text-slate-500 dark:text-slate-400">
                 Clarity over clutter—one calm place for your whole program.
               </p>
               <p className="mt-6 text-pretty text-base leading-relaxed text-slate-600 dark:text-slate-400 sm:text-lg">
-                MySl8te keeps lessons, conversations, grades, and scheduling in one place. Teachers stay in control of
+                <span className="mysl8te-wordmark text-[1em] align-baseline">MYSL8TE</span> keeps lessons, conversations,
+                grades, and scheduling in one place. Teachers stay in control of
                 enrollment: catalog when there is room, join codes and QR with optional instructor approval, and
                 waitlists that stay predictable when a section is full.
               </p>
@@ -423,8 +424,9 @@ const LandingPage: React.FC = () => {
         <footer className="relative z-10 border-t border-white/[0.06] pb-10 pt-12 text-slate-300">
           <div className="mx-auto grid max-w-6xl items-start gap-12 px-4 sm:grid-cols-2 sm:gap-x-10 sm:gap-y-12 sm:px-6 lg:grid-cols-4 lg:items-center lg:gap-x-8 lg:px-8">
             <div className="flex flex-col items-center text-center sm:col-span-2 lg:col-span-1 lg:items-start lg:text-left">
-              <div className="flex justify-center lg:justify-start">
-                <LogoMark className="h-11 max-w-[220px]" />
+              <div className="flex items-center justify-center gap-3 lg:justify-start">
+                <LogoMark className="h-11 w-auto max-w-[3.25rem]" />
+                <span className="mysl8te-wordmark mysl8te-wordmark--on-dark text-[1.35rem]">MYSL8TE</span>
               </div>
               <p className="mt-5 max-w-sm text-sm leading-relaxed text-slate-400">
                 Elevate the learning experience. A calmer place for courses, people, and outcomes.
@@ -481,7 +483,7 @@ const LandingPage: React.FC = () => {
             </div>
           </div>
           <div className="mx-auto mt-12 max-w-6xl border-t border-white/[0.06] px-4 pt-8 text-center text-xs text-slate-500 sm:px-6 lg:px-8">
-            © {new Date().getFullYear()} MySl8te. All rights reserved.
+            © {new Date().getFullYear()} <span className="mysl8te-wordmark mysl8te-wordmark--on-dark text-[inherit]">MYSL8TE</span>. All rights reserved.
           </div>
         </footer>
       </div>

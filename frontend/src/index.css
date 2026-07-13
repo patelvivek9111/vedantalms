@@ -2,6 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  /* Brand wordmark — pairs with the gold emblem (landing / app chrome) */
+  .mysl8te-wordmark {
+    font-family: 'Cinzel', 'Times New Roman', serif;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    line-height: 1;
+    text-transform: uppercase;
+    color: #0f172a;
+  }
+
+  .dark .mysl8te-wordmark,
+  .mysl8te-wordmark--on-dark {
+    color: #ffffff;
+  }
+}
+
 @layer base {
   html {
     font-size: 14px;
