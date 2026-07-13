@@ -40,7 +40,7 @@ const aboutHighlights = [
   },
 ] as const;
 
-const logoSrc = () => `${import.meta.env.BASE_URL}assets/Vedanta_logo.png`;
+const logoSrc = () => `${import.meta.env.BASE_URL}assets/MySl8te_logo.png`;
 
 const NAV = [
   { label: 'Home', to: '#top' },

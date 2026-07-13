@@ -22,8 +22,8 @@ export function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const redirectTo = loginRedirectPath(location.state);
-  const primaryLogo = `${import.meta.env.BASE_URL}assets/Vedanta_logo1.png`;
-  const fallbackLogo = `${import.meta.env.BASE_URL}assets/Vedanta_logo.png`;
+  const primaryLogo = `${import.meta.env.BASE_URL}assets/MySl8te_logo.png`;
+  const fallbackLogo = `${import.meta.env.BASE_URL}assets/MySl8te_logo.png`;
   const [logoSrc, setLogoSrc] = useState(primaryLogo);
 
   useEffect(() => {
