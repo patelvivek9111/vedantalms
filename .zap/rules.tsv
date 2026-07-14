@@ -4,4 +4,5 @@
 10055	IGNORE	(CSP wildcard on Vercel-hosted SPA static assets)
 10098	IGNORE	(Vercel static ACAO * on public assets; API CORS is app-controlled)
 10109	IGNORE	(Modern SPA — expected for React client)
+90003	IGNORE	(Third-party CSS without pinable SRI; Cinzel is self-hosted now)
 90004	IGNORE	(COEP not required for this LMS deployment model)

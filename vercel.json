@@ -24,7 +24,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; object-src 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tiny.cloud https://*.cloudinary.com; style-src 'self' 'unsafe-inline' https://cdn.tiny.cloud https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' data: https://cdn.tiny.cloud https://fonts.gstatic.com; connect-src 'self' https://vedantalms-backend.onrender.com wss://vedantalms-backend.onrender.com https://*.cloudinary.com https://cdn.tiny.cloud; frame-src 'self' blob: https://cdn.tiny.cloud"
+          "value": "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; object-src 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tiny.cloud https://*.cloudinary.com; style-src 'self' 'unsafe-inline' https://cdn.tiny.cloud; img-src 'self' data: blob: https:; font-src 'self' data: https://cdn.tiny.cloud; connect-src 'self' https://vedantalms-backend.onrender.com wss://vedantalms-backend.onrender.com https://*.cloudinary.com https://cdn.tiny.cloud; frame-src 'self' blob: https://cdn.tiny.cloud"
         }
       ]
     },

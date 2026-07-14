@@ -21,6 +21,7 @@
     "test:files": "vitest run tests/unit/files"
   },
   "dependencies": {
+    "@fontsource/cinzel": "^5.2.8",
     "@hello-pangea/dnd": "^18.0.1",
     "@reduxjs/toolkit": "^2.8.2",
     "@sentry/react": "^10.63.0",
