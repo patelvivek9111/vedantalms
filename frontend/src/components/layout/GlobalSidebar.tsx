@@ -160,10 +160,13 @@ export default function GlobalSidebar() {
         data-testid="global-sidebar"
         aria-label="Global navigation"
       >
-      <div className="mb-3 flex flex-col items-center w-full px-2 shrink-0">
-        {/* Logo placeholder */}
-        <div className="w-12 h-12 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center border border-blue-700 dark:border-gray-600">
-          <span className="mysl8te-wordmark text-lg">MYSL8TE</span>
+      <div className="mb-3 flex w-full shrink-0 justify-center">
+        <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-blue-700 bg-white dark:border-gray-600 dark:bg-gray-800">
+          <img
+            src={`${import.meta.env.BASE_URL}assets/Vedanta_logo.png`}
+            alt="MYSL8TE"
+            className="h-9 w-9 object-contain object-center"
+          />
         </div>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto overflow-x-visible flex flex-col gap-1 items-center w-full px-2">
