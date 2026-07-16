@@ -31,6 +31,9 @@ const transcriptLimiter = rateLimit({
   skip: skipLimit,
 });
 
+// GET /api/grades/student/summary?courseIds= — dashboard grade badges (batch)
+router.get('/student/summary', protect, gradesController.getStudentCourseGradesBatch);
+
 // GET /api/grades/student/course/:courseId
 router.get('/student/course/:courseId', protect, gradesController.getStudentCourseGrade);
 

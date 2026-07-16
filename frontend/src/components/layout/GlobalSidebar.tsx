@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   User, 
@@ -87,8 +88,18 @@ export default function GlobalSidebar() {
   const { unreadCount } = useUnreadMessages();
   const [showCourseDropdown, setShowCourseDropdown] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [courseDropdownPos, setCourseDropdownPos] = useState({ top: 0, left: 0 });
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const coursesButtonRef = useRef<HTMLButtonElement>(null);
+  const dropdownPanelRef = useRef<HTMLDivElement>(null);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const updateCourseDropdownPos = useCallback(() => {
+    const button = coursesButtonRef.current;
+    if (!button) return;
+    const rect = button.getBoundingClientRect();
+    setCourseDropdownPos({ top: rect.top, left: rect.right + 8 });
+  }, []);
 
   const prefersFinePointer =
     typeof window !== 'undefined' &&
@@ -97,7 +108,10 @@ export default function GlobalSidebar() {
   // Close dropdown when clicking/tapping outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent | TouchEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      const insideTrigger = dropdownRef.current?.contains(target);
+      const insidePanel = dropdownPanelRef.current?.contains(target);
+      if (!insideTrigger && !insidePanel) {
         setShowCourseDropdown(false);
         if (hideTimeoutRef.current) {
           clearTimeout(hideTimeoutRef.current);
@@ -117,12 +131,24 @@ export default function GlobalSidebar() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!showCourseDropdown) return undefined;
+    updateCourseDropdownPos();
+    window.addEventListener('resize', updateCourseDropdownPos);
+    window.addEventListener('scroll', updateCourseDropdownPos, true);
+    return () => {
+      window.removeEventListener('resize', updateCourseDropdownPos);
+      window.removeEventListener('scroll', updateCourseDropdownPos, true);
+    };
+  }, [showCourseDropdown, updateCourseDropdownPos]);
+
   // Handle mouse enter - show dropdown and clear any pending hide
   const handleMouseEnter = () => {
     if (hideTimeoutRef.current) {
       clearTimeout(hideTimeoutRef.current);
       hideTimeoutRef.current = null;
     }
+    updateCourseDropdownPos();
     setShowCourseDropdown(true);
   };
 
@@ -148,6 +174,72 @@ export default function GlobalSidebar() {
 
   const availableCourses = courses.filter((course) => course.published);
 
+  const courseDropdownPanel =
+    showCourseDropdown ? (
+      <div
+        ref={dropdownPanelRef}
+        className="fixed z-[100] w-auto min-w-48 rounded-lg border border-gray-200 bg-white py-2 shadow-lg dark:border-gray-700 dark:bg-gray-800"
+        style={{ top: courseDropdownPos.top, left: courseDropdownPos.left }}
+        onMouseEnter={prefersFinePointer ? handleMouseEnter : undefined}
+        onMouseLeave={prefersFinePointer ? handleMouseLeave : undefined}
+      >
+        {(!user || user.role !== 'teacher') && (
+          <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-700">
+            <span className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">Your Courses</span>
+          </div>
+        )}
+        {availableCourses.length > 0 ? availableCourses.map((course) => {
+          const isCurrentCourse = location.pathname.startsWith(`/courses/${course._id}`);
+          const courseCode = course.catalog?.courseCode || course.title;
+          return (
+            <Link
+              key={course._id}
+              to={`/courses/${course._id}`}
+              onClick={() => {
+                setShowCourseDropdown(false);
+              }}
+              className={`flex min-h-[44px] items-center px-3 py-2 text-sm transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 ${
+                isCurrentCourse ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+              }`}
+              title={course.title}
+            >
+              <div className="flex items-center justify-between">
+                <span className="truncate">{courseCode}</span>
+                {isCurrentCourse && (
+                  <div className="w-2 h-2 bg-blue-500 rounded-full ml-2"></div>
+                )}
+              </div>
+            </Link>
+          );
+        }) : user?.role === 'teacher' ? null : (
+          <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No courses available</div>
+        )}
+        {user?.role === 'teacher' && (
+          <>
+            {availableCourses.length > 0 && (
+              <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+            )}
+            <Link
+              to="/teacher/courses"
+              onClick={() => {
+                setShowCourseDropdown(false);
+              }}
+              className={`flex min-h-[44px] items-center px-3 py-2 text-sm font-medium transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 ${
+                location.pathname === '/teacher/courses' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span>My Courses</span>
+                {location.pathname === '/teacher/courses' && (
+                  <div className="w-2 h-2 bg-blue-500 rounded-full ml-2"></div>
+                )}
+              </div>
+            </Link>
+          </>
+        )}
+      </div>
+    ) : null;
+
 
   return (
     <>
@@ -169,7 +261,7 @@ export default function GlobalSidebar() {
           />
         </div>
       </div>
-      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-visible flex flex-col gap-1 items-center w-full px-2">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col gap-1 items-center w-full px-2">
         {getNavItems(user?.role || '').map(({ label, icon: Icon, to }) => {
           // Highlight 'Courses' for any /courses* route (but not /teacher/courses or /admin/courses)
           const isActive =
@@ -242,13 +334,16 @@ export default function GlobalSidebar() {
                 onMouseLeave={prefersFinePointer ? handleMouseLeave : undefined}
               >
                 <button
+                  ref={coursesButtonRef}
                   type="button"
                   onClick={() => {
                     if (hideTimeoutRef.current) {
                       clearTimeout(hideTimeoutRef.current);
                       hideTimeoutRef.current = null;
                     }
-                    setShowCourseDropdown(!showCourseDropdown);
+                    const next = !showCourseDropdown;
+                    if (next) updateCourseDropdownPos();
+                    setShowCourseDropdown(next);
                   }}
                   aria-expanded={showCourseDropdown}
                   aria-haspopup="true"
@@ -260,70 +355,6 @@ export default function GlobalSidebar() {
                     {label}
                   </span>
                 </button>
-                
-                {/* Course Dropdown */}
-                {showCourseDropdown && (
-                  <div 
-                    className="absolute left-full top-0 z-50 ml-2 w-auto min-w-48 rounded-lg border border-gray-200 bg-white py-2 shadow-lg dark:border-gray-700 dark:bg-gray-800"
-                    onMouseEnter={prefersFinePointer ? handleMouseEnter : undefined}
-                    onMouseLeave={prefersFinePointer ? handleMouseLeave : undefined}
-                  >
-                    {(!user || user.role !== 'teacher') && (
-                      <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-700">
-                        <span className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">Your Courses</span>
-                      </div>
-                    )}
-                    {availableCourses.length > 0 ? availableCourses.map((course) => {
-                      const isCurrentCourse = location.pathname.startsWith(`/courses/${course._id}`);
-                      const courseCode = course.catalog?.courseCode || course.title;
-                      return (
-                        <Link
-                          key={course._id}
-                          to={`/courses/${course._id}`}
-                          onClick={() => {
-                            setShowCourseDropdown(false);
-                          }}
-                          className={`flex min-h-[44px] items-center px-3 py-2 text-sm transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 ${
-                            isCurrentCourse ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
-                          }`}
-                          title={course.title}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="truncate">{courseCode}</span>
-                            {isCurrentCourse && (
-                              <div className="w-2 h-2 bg-blue-500 rounded-full ml-2"></div>
-                            )}
-                          </div>
-                        </Link>
-                      );
-                    }) : user?.role === 'teacher' ? null : (
-                      <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No courses available</div>
-                    )}
-                    {user?.role === 'teacher' && (
-                      <>
-                        {availableCourses.length > 0 && (
-                          <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
-                        )}
-                        <Link
-                          to="/teacher/courses"
-                          onClick={() => {
-                            setShowCourseDropdown(false);
-                          }}
-                          className={`flex min-h-[44px] items-center px-3 py-2 text-sm font-medium transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 ${
-                            location.pathname === '/teacher/courses' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span>My Courses</span>
-                            {location.pathname === '/teacher/courses' && (
-                              <div className="w-2 h-2 bg-blue-500 rounded-full ml-2"></div>
-                            )}
-                          </div>
-                        </Link>
-                      </>
-                    )}
-                  </div>
-                )}
               </div>
             );
           }
@@ -382,6 +413,7 @@ export default function GlobalSidebar() {
         </button>
       </div>
     </nav>
+    {typeof document !== 'undefined' ? createPortal(courseDropdownPanel, document.body) : courseDropdownPanel}
     </>
   );
 } 

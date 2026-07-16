@@ -20,6 +20,15 @@ const courseSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   }],
+  /** Materialized class average for teacher dashboard cards (Canvas-style). */
+  dashboardGradeSummary: {
+    classAverage: { type: Number, default: null },
+    studentCount: { type: Number, default: 0 },
+    gradedCount: { type: Number, default: 0 },
+    policyHash: { type: String, default: '' },
+    engineVersion: { type: String, default: '' },
+    computedAt: { type: Date, default: null },
+  },
   teachingAssistants: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

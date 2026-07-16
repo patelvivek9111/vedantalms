@@ -40,7 +40,7 @@ const aboutHighlights = [
   },
 ] as const;
 
-const logoSrc = () => `${import.meta.env.BASE_URL}assets/MySl8te_logo.png`;
+const logoSrc = () => `${import.meta.env.BASE_URL}assets/Vedanta_logo.png`;
 
 const NAV = [
   { label: 'Home', to: '#top' },
@@ -138,19 +138,28 @@ const LandingPage: React.FC = () => {
 
       {/* Nav */}
       <header className="sticky top-0 z-50 shrink-0 border-b border-slate-200/70 bg-white/90 shadow-sm shadow-slate-900/[0.03] backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-950/90 dark:shadow-black/20">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
+        <div className="relative mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
           <Link
             to="/"
-            className="group flex min-h-10 shrink-0 items-center gap-3 rounded-xl py-1.5 pl-1.5 pr-2.5 transition-colors hover:bg-slate-100/90 dark:hover:bg-slate-800/50 sm:min-h-11 sm:gap-3.5"
+            className="group relative z-10 flex min-h-10 shrink-0 items-center gap-3 rounded-xl py-1.5 pl-1.5 pr-2.5 transition-colors hover:bg-slate-100/90 dark:hover:bg-slate-800/50 sm:min-h-11 sm:gap-3.5"
             onClick={closeMobile}
             aria-label="MySl8te home"
           >
             <span className="flex h-10 w-10 shrink-0 items-center justify-center sm:h-11 sm:w-11">
               <LogoMark className="max-h-[2.125rem] w-auto max-w-[2.6rem] sm:max-h-10 sm:max-w-[2.85rem]" />
             </span>
-            <span className="mysl8te-wordmark hidden text-[1.15rem] sm:inline sm:text-[1.3rem]">
+            <span className="mysl8te-wordmark hidden text-[1.15rem] lg:inline lg:text-[1.3rem]">
               MYSL8TE
             </span>
+          </Link>
+
+          <Link
+            to="/"
+            className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 lg:hidden"
+            onClick={closeMobile}
+            aria-label="MySl8te home"
+          >
+            <span className="mysl8te-wordmark text-[1.15rem] sm:text-[1.25rem]">MYSL8TE</span>
           </Link>
 
           <nav className="hidden items-center gap-0.5 lg:flex" aria-label="Primary">
@@ -185,7 +194,7 @@ const LandingPage: React.FC = () => {
 
           <button
             type="button"
-            className="inline-flex rounded-lg p-2 text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 lg:hidden"
+            className="relative z-10 inline-flex rounded-lg p-2 text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 lg:hidden"
             aria-expanded={mobileNavOpen}
             aria-label={mobileNavOpen ? 'Close menu' : 'Open menu'}
             onClick={() => setMobileNavOpen((o) => !o)}

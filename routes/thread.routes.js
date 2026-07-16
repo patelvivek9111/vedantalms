@@ -1121,6 +1121,10 @@ router.post('/:threadId/grade', protect, authorize(['teacher', 'teaching_assista
     }
 
     await thread.save();
+    require('../services/dashboardGradeSummary.service').scheduleRefreshStudents(
+      context.course._id,
+      [studentId]
+    );
     await recordDiscussionAudit({
       req,
       thread,

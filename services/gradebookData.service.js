@@ -105,18 +105,24 @@ async function computeCourseClassAverage(courseId) {
 
   const assignments = await loadGradebookColumns(courseId);
   const policyCache = new Map();
-  const studentGrades = [];
 
-  for (const sid of studentIds) {
-    const result = await computeStudentCourseGrade(course, sid, {
-      audience: 'student',
-      assignments,
-      policyCache,
-    });
-    if (Number.isFinite(result.currentPercent)) {
-      studentGrades.push(result.currentPercent);
-    }
-  }
+  const percentResults = await Promise.all(
+    studentIds.map(async (sid) => {
+      try {
+        const result = await computeStudentCourseGrade(course, sid, {
+          audience: 'student',
+          assignments,
+          policyCache,
+          summaryOnly: true,
+        });
+        return Number.isFinite(result.currentPercent) ? result.currentPercent : null;
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  const studentGrades = percentResults.filter((value) => value !== null);
 
   const gradedCount = studentGrades.length;
   const average =

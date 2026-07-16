@@ -4,7 +4,13 @@ import { useCourse } from '../contexts/CourseContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ToDoPanel } from '../components/common/ToDoPanel';
 import { MoreVertical, Megaphone, MessageSquare, Palette, BookOpen, File, Settings, Bell, Folder, GripVertical, Search, QrCode } from 'lucide-react';
-import api, { updateUserPreferences } from '../services/api';
+import { updateUserPreferences } from '../services/api';
+import {
+  fetchCourseAveragesBatch,
+  fetchStudentCourseGradesBatch,
+  readDashboardGradesCache,
+  writeDashboardGradesCache,
+} from '../services/dashboardGradesService';
 import NotificationCenter from '../components/common/NotificationCenter';
 import MobileTopNav from '../components/common/MobileTopNav';
 import { BurgerMenu } from '../components/layout/BurgerMenu';
@@ -190,57 +196,62 @@ export function Dashboard() {
     }
 
     if (!courses || courses.length === 0) return;
+    if (!user?._id) return;
 
     let cancelled = false;
     const publishedCoursesList = courses.filter((course) => course.published);
     if (publishedCoursesList.length === 0) return;
 
     const courseIds = publishedCoursesList.map((c) => String(c._id));
+    const userId = String(user._id);
+    const cachedGrades = readDashboardGradesCache(userId);
 
-    setLoadingGrades((prev) => {
-      const next = { ...prev };
+    const hydrated: typeof courseGrades = {};
+    courseIds.forEach((id) => {
+      if (Object.prototype.hasOwnProperty.call(cachedGrades, id)) {
+        hydrated[id] = cachedGrades[id];
+      }
+    });
+
+    if (Object.keys(hydrated).length > 0) {
+      setCourseGrades((prev) => ({ ...hydrated, ...prev }));
+    }
+
+    setLoadingGrades(() => {
+      const next: Record<string, boolean> = {};
       courseIds.forEach((id) => {
-        next[id] = true;
+        next[id] = !Object.prototype.hasOwnProperty.call(hydrated, id);
       });
       return next;
     });
 
+    const applyGrades = (grades: typeof courseGrades) => {
+      if (cancelled) return;
+      setCourseGrades((prev) => {
+        const merged = { ...prev, ...grades };
+        writeDashboardGradesCache(userId, merged);
+        return merged;
+      });
+      setLoadingGrades((prev) => {
+        const next = { ...prev };
+        courseIds.forEach((courseId) => {
+          next[courseId] = false;
+        });
+        return next;
+      });
+    };
+
     const fetchTeacherAveragesBatch = async () => {
       try {
-        const response = await api.get(`/grades/courses/averages?courseIds=${courseIds.join(',')}`, {
-          timeout: 120000,
-        });
-        const averages = response.data?.averages || {};
-        if (cancelled) return;
-        setCourseGrades((prev) => {
-          const next = { ...prev };
-          courseIds.forEach((courseId) => {
-            const average = averages[courseId]?.average;
-            const hasAverage =
-              average !== null && average !== undefined && typeof average === 'number' && !isNaN(average);
-            next[courseId] = { grade: hasAverage ? average : null };
-          });
-          return next;
-        });
+        const grades = await fetchCourseAveragesBatch(courseIds);
+        applyGrades(grades);
       } catch {
         if (!cancelled) {
-          setCourseGrades((prev) => {
-            const next = { ...prev };
-            courseIds.forEach((courseId) => {
-              next[courseId] = { grade: null };
-            });
-            return next;
+          const fallback: typeof courseGrades = {};
+          courseIds.forEach((courseId) => {
+            fallback[courseId] = hydrated[courseId] ?? { grade: null };
           });
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingGrades((prev) => {
-            const next = { ...prev };
-            courseIds.forEach((courseId) => {
-              next[courseId] = false;
-            });
-            return next;
-          });
+          applyGrades(fallback);
         }
       }
     };
@@ -252,41 +263,22 @@ export function Dashboard() {
       };
     }
 
-    const fetchOne = async (courseId: string) => {
+    const fetchStudentGradesBatch = async () => {
       try {
-        const response = await api.get(`/grades/student/course/${courseId}`, {
-          timeout: 60000,
-        });
-        const totalPercent = response.data?.totalPercent;
-        const hasGrade =
-          totalPercent !== null &&
-          totalPercent !== undefined &&
-          typeof totalPercent === 'number' &&
-          !isNaN(totalPercent);
-        if (!cancelled) {
-          setCourseGrades((prev) => ({
-            ...prev,
-            [courseId]: {
-              grade: hasGrade ? totalPercent : null,
-              letter: response.data?.letterGrade || '',
-            },
-          }));
-        }
+        const grades = await fetchStudentCourseGradesBatch(courseIds);
+        applyGrades(grades);
       } catch {
         if (!cancelled) {
-          setCourseGrades((prev) => ({
-            ...prev,
-            [courseId]: { grade: null },
-          }));
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingGrades((prev) => ({ ...prev, [courseId]: false }));
+          const fallback: typeof courseGrades = {};
+          courseIds.forEach((courseId) => {
+            fallback[courseId] = hydrated[courseId] ?? { grade: null };
+          });
+          applyGrades(fallback);
         }
       }
     };
 
-    Promise.all(courseIds.map((id) => fetchOne(id)));
+    void fetchStudentGradesBatch();
 
     return () => {
       cancelled = true;

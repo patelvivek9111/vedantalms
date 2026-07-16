@@ -26,6 +26,7 @@ async function invalidateStudentCourseGrade(studentId, courseId) {
     delJson(`${STUDENT_GRADE_CACHE_PREFIX}:v4:${sid}:course:${cid}`),
     deleteKeysByPrefix(`${STUDENT_GRADE_CACHE_PREFIX}:v5:${sid}:course:${cid}:`),
   ]);
+  require('./dashboardGradeSummary.service').scheduleRefreshStudents(cid, [sid]);
   return bumpWorkflowCacheVersion(`student:${sid}:course:${cid}`);
 }
 
@@ -35,7 +36,19 @@ async function invalidateAllStudentCourseGrades(courseId) {
   const course = await Course.findById(courseId).select('students').lean();
   const studentIds = course?.students || [];
   if (!studentIds.length) return;
-  await Promise.all(studentIds.map((sid) => invalidateStudentCourseGrade(sid, courseId)));
+  const cid = String(courseId);
+  await Promise.all(
+    studentIds.map(async (sid) => {
+      const s = String(sid?._id || sid);
+      await Promise.all([
+        delJson(`${STUDENT_GRADE_CACHE_PREFIX}:v3:${s}:course:${cid}`),
+        delJson(`${STUDENT_GRADE_CACHE_PREFIX}:v4:${s}:course:${cid}`),
+        deleteKeysByPrefix(`${STUDENT_GRADE_CACHE_PREFIX}:v5:${s}:course:${cid}:`),
+      ]);
+      await bumpWorkflowCacheVersion(`student:${s}:course:${cid}`);
+    })
+  );
+  require('./dashboardGradeSummary.service').scheduleRefreshCourse(cid);
 }
 
 module.exports = {

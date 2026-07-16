@@ -155,6 +155,15 @@ async function computeStudentCourseGrade(course, studentId, options = {}) {
     };
   }
 
+  if (options.summaryOnly) {
+    return {
+      ...dualTotals,
+      studentId: sid,
+      audience,
+      ...(gradingPeriodBreakdown ? { gradingPeriodBreakdown } : {}),
+    };
+  }
+
   const assignmentGroups = studentGradeDetailService.buildAssignmentGroupBreakdown(
     sid,
     courseContext,
@@ -309,6 +318,7 @@ async function calculateCourseGradeForStudent(
     teacherPolicy: options.teacherPolicy,
     policyCache: options.policyCache,
     gradingPeriodId: options.gradingPeriodId,
+    summaryOnly: options.summaryOnly,
     ...(hasPrebuilt ? { allAssignments, grades, submissionMap } : {}),
   });
 

@@ -19,7 +19,6 @@ const { studentCourseGradeCacheKey } = require('../services/workflowCache.servic
 const gradingPolicyService = require('../services/gradingPolicy.service');
 const { generateResolvedPolicySnapshot } = require('../shared/grading/policySnapshot.cjs');
 const { getGradingEngineVersion } = require('../shared/grading/gradingEngineVersion.cjs');
-const { computeCourseClassAverage, computeCourseClassAverages } = require('../services/gradebookData.service');
 const gradebookHistoryService = require('../services/gradebookHistory.service');
 const courseStudentGradeOverrideService = require('../services/courseStudentGradeOverride.service');
 const gradeReleaseService = require('../services/gradeRelease.service');
@@ -72,6 +71,57 @@ exports.getStudentCourseGrade = async (req, res) => {
     const payload = toStudentGradeApiResponse(gradeResult);
     await setJson(cacheKey, payload, 60);
     res.json(payload);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// GET /api/grades/student/summary?courseIds=id1,id2 — dashboard card percentages (batch)
+exports.getStudentCourseGradesBatch = async (req, res) => {
+  try {
+    const raw = req.query.courseIds || req.query.ids || '';
+    const courseIds = String(raw)
+      .split(',')
+      .map((id) => id.trim())
+      .filter((id) => mongoose.Types.ObjectId.isValid(id));
+
+    if (!courseIds.length) {
+      return res.status(400).json({ message: 'courseIds query parameter is required' });
+    }
+
+    const maxBatch = parseInt(process.env.GRADES_STUDENT_SUMMARY_BATCH_MAX || '25', 10);
+    if (courseIds.length > maxBatch) {
+      return res.status(400).json({ message: `Maximum ${maxBatch} courseIds per request` });
+    }
+
+    const studentId = req.user._id;
+    const userIdStr = String(studentId);
+
+    const courses = await Course.find({ _id: { $in: courseIds } }).select('students').lean();
+    const enrolledCourseIds = courseIds.filter((courseId) => {
+      const course = courses.find((row) => String(row._id) === String(courseId));
+      if (!course) return false;
+      return (course.students || []).some(
+        (student) => String(student?._id || student) === userIdStr
+      );
+    });
+
+    const dashboardGradeSummary = require('../services/dashboardGradeSummary.service');
+    const grades = await dashboardGradeSummary.readStudentSummariesBatch(
+      studentId,
+      enrolledCourseIds
+    );
+
+    courseIds.forEach((courseId) => {
+      const id = String(courseId);
+      if (!grades[id]) {
+        grades[id] = { totalPercent: null, letterGrade: '' };
+      }
+    });
+
+    dashboardGradeSummary.scheduleStaleRefreshesForStudent(studentId, enrolledCourseIds);
+
+    res.json({ grades });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -266,6 +316,7 @@ exports.setStudentGradeOverride = async (req, res) => {
       { finalPercent: Number(finalPercent), letterGrade, reason },
       req.user._id
     );
+    await require('../services/workflowCache.service').invalidateStudentCourseGrade(studentId, courseId);
     res.json({ success: true, data: override });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -277,6 +328,7 @@ exports.clearStudentGradeOverride = async (req, res) => {
   try {
     const { courseId, studentId } = req.params;
     await courseStudentGradeOverrideService.clearFinalGradeOverride(courseId, studentId);
+    await require('../services/workflowCache.service').invalidateStudentCourseGrade(studentId, courseId);
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -288,11 +340,6 @@ exports.getCourseClassAverage = async (req, res) => {
   try {
     const courseId = req.params.courseId;
     const userId = req.user._id;
-    const cacheKey = `grades:course-average:v4:${courseId}:${userId}`;
-    const cached = await getJson(cacheKey);
-    if (cached) {
-      return res.json(cached);
-    }
 
     const course = await Course.findById(courseId).select('instructor').lean();
     if (!course) return res.status(404).json({ message: 'Course not found' });
@@ -307,8 +354,11 @@ exports.getCourseClassAverage = async (req, res) => {
       return res.status(403).json({ message: 'Not authorized to view class average' });
     }
 
-    const payload = await computeCourseClassAverage(courseId);
-    await setJson(cacheKey, payload, 45);
+    const dashboardGradeSummary = require('../services/dashboardGradeSummary.service');
+    const payload = (await dashboardGradeSummary.readClassAveragesBatch([courseId]))[
+      String(courseId)
+    ] || { average: null, studentCount: 0, gradedCount: 0 };
+    dashboardGradeSummary.scheduleStaleClassAverageRefreshes([courseId]);
     res.json(payload);
   } catch (error) {
     console.error('Error calculating class average:', error);
@@ -351,16 +401,11 @@ exports.getCourseClassAveragesBatch = async (req, res) => {
       }
     }
 
-    const cacheKey = `grades:course-averages-batch:v1:${userId}:${courseIds.sort().join(',')}`;
-    const cached = await getJson(cacheKey);
-    if (cached) {
-      return res.json(cached);
-    }
+    const dashboardGradeSummary = require('../services/dashboardGradeSummary.service');
+    const averages = await dashboardGradeSummary.readClassAveragesBatch(courseIds);
+    dashboardGradeSummary.scheduleStaleClassAverageRefreshes(courseIds);
 
-    const averages = await computeCourseClassAverages(courseIds);
-    const payload = { averages };
-    await setJson(cacheKey, payload, 45);
-    res.json(payload);
+    res.json({ averages });
   } catch (error) {
     console.error('Error calculating batch class averages:', error);
     res.status(500).json({ message: error.message });

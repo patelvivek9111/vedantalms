@@ -744,6 +744,11 @@ exports.enrollStudent = async (req, res) => {
     course.students.push(studentId);
     await course.save();
 
+    require('../services/dashboardGradeSummary.service').scheduleRefreshStudents(
+      course._id,
+      [studentId]
+    );
+
     // Populate the updated course data
     const updatedCourse = await Course.findById(course._id)
       .populate('instructor', 'firstName lastName email')
@@ -780,6 +785,7 @@ exports.unenrollStudent = async (req, res) => {
     // Remove student from course
     course.students = course.students.filter(id => id.toString() !== studentId);
     
+    let promotedStudentId = null;
     // Check if there are students on the waitlist and promote the first one
     if (course.waitlist && course.waitlist.length > 0) {
       try {
@@ -787,6 +793,7 @@ exports.unenrollStudent = async (req, res) => {
         
         // Add them to the course
         course.students.push(promotedStudent.student);
+        promotedStudentId = String(promotedStudent.student);
         
         // Update positions for remaining waitlist students
         course.waitlist.forEach((waitlistEntry, index) => {
@@ -817,6 +824,12 @@ exports.unenrollStudent = async (req, res) => {
     }
     
     await course.save();
+
+    const dashboardGradeSummary = require('../services/dashboardGradeSummary.service');
+    await dashboardGradeSummary.removeStudentSummary(courseId, studentId);
+    if (promotedStudentId) {
+      dashboardGradeSummary.scheduleRefreshStudents(courseId, [promotedStudentId]);
+    }
     
     // Populate the updated course data
     const updatedCourse = await Course.findById(course._id)

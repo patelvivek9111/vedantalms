@@ -11,6 +11,11 @@ jest.mock('../../utils/cache', () => ({
   setJson: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock('../../services/dashboardGradeSummary.service', () => ({
+  scheduleRefreshStudents: jest.fn(),
+  scheduleRefreshCourse: jest.fn(),
+}));
+
 const { delJson, deleteKeysByPrefix } = require('../../utils/cache');
 
 describe('student course grade cache keys', () => {
