@@ -134,6 +134,13 @@ export const ALL_NAV_OPTIONS: NavItem[] = [
     to: '/admin/security',
     activePaths: ['/admin/security'],
   },
+  {
+    id: 'registrar',
+    label: 'Registrar',
+    icon: FileText,
+    to: '/registrar',
+    activePaths: ['/registrar'],
+  },
 ];
 
 export const DEFAULT_NAV_ITEMS = ['dashboard', 'inbox', 'calendar', 'groups'];
@@ -141,7 +148,10 @@ export const DEFAULT_NAV_ITEMS = ['dashboard', 'inbox', 'calendar', 'groups'];
 export function getDefaultNavItemIds(role?: string): string[] {
   switch (role) {
     case 'admin':
-      return ['dashboard', 'inbox', 'admin-users', 'admin-settings'];
+      return ['dashboard', 'inbox', 'admin-users', 'registrar'];
+    case 'registrar':
+    case 'department_admin':
+      return ['registrar', 'inbox', 'account'];
     case 'teacher':
       return ['dashboard', 'inbox', 'calendar', 'catalog'];
     default:
@@ -176,6 +186,12 @@ export const NavCustomizationModal: React.FC<NavCustomizationModalProps> = ({
     }
     if (option.id === 'my-course') {
       return user?.role === 'teacher' || user?.role === 'admin';
+    }
+    if (option.id === 'registrar') {
+      return ['admin', 'registrar', 'department_admin', 'platform_admin'].includes(user?.role || '');
+    }
+    if (user?.role === 'registrar' || user?.role === 'department_admin') {
+      return ['registrar', 'inbox', 'account', 'dashboard'].includes(option.id);
     }
     return true;
   });

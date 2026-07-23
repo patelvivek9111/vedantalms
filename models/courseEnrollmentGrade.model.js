@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { courseChildTenantPlugin } = require('./plugins/courseChildTenant.plugin');
 
 /**
  * Canvas-style materialized enrollment grades for fast dashboard reads.
@@ -32,6 +33,8 @@ const courseEnrollmentGradeSchema = new mongoose.Schema(
 
 courseEnrollmentGradeSchema.index({ course: 1, student: 1 }, { unique: true });
 courseEnrollmentGradeSchema.index({ student: 1, course: 1 });
+
+courseEnrollmentGradeSchema.plugin(courseChildTenantPlugin, { coursePath: 'course' });
 
 module.exports =
   mongoose.models.CourseEnrollmentGrade ||

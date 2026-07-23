@@ -42,7 +42,7 @@ module.exports = async function maintenanceMode(req, res, next) {
   }
 
   const user = await resolveRequestUser(req);
-  if (user?.role === 'admin') {
+  if (user?.role === 'admin' || user?.role === 'platform_admin') {
     req.user = req.user || user;
     return next();
   }

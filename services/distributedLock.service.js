@@ -3,30 +3,7 @@ const { getCacheService } = require('./cache');
 
 const memoryLocks = new Map();
 
-async function acquireLock(key, ttlMs = 120000) {
-  const lockKey = `lock:${key}`;
-  const token = crypto.randomBytes(16).toString('hex');
-  const cache = getCacheService();
-
-  if (cache.provider === 'redis' && cache.adapter.isAvailable?.()) {
-    const redis = cache.adapter.getClient();
-    if (redis) {
-      const result = await redis.set(lockKey, token, 'PX', ttlMs, 'NX');
-      if (result === 'OK') {
-        return {
-          key: lockKey,
-          token,
-          release: async () => {
-            const script =
-              'if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end';
-            await redis.eval(script, 1, lockKey, token);
-          },
-        };
-      }
-      return null;
-    }
-  }
-
+function acquireMemoryLock(lockKey, token, ttlMs) {
   const now = Date.now();
   const existing = memoryLocks.get(lockKey);
   if (existing && existing.expiresAt > now) return null;
@@ -39,6 +16,41 @@ async function acquireLock(key, ttlMs = 120000) {
       if (cur && cur.token === token) memoryLocks.delete(lockKey);
     },
   };
+}
+
+async function acquireLock(key, ttlMs = 120000) {
+  const lockKey = `lock:${key}`;
+  const token = crypto.randomBytes(16).toString('hex');
+  const cache = getCacheService();
+
+  if (cache.provider === 'redis' && cache.adapter.isAvailable?.()) {
+    try {
+      const redis = cache.adapter.getClient();
+      if (redis) {
+        const result = await redis.set(lockKey, token, 'PX', ttlMs, 'NX');
+        if (result === 'OK') {
+          return {
+            key: lockKey,
+            token,
+            release: async () => {
+              try {
+                const script =
+                  'if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end';
+                await redis.eval(script, 1, lockKey, token);
+              } catch {
+                /* ignore release failures on dead clients */
+              }
+            },
+          };
+        }
+        return null;
+      }
+    } catch {
+      /* Redis unavailable — fall through to in-memory lock */
+    }
+  }
+
+  return acquireMemoryLock(lockKey, token, ttlMs);
 }
 
 async function withLock(key, fn, ttlMs = 120000) {

@@ -121,11 +121,18 @@ async function createFileAsset({
     await assertCourseFilesMutable(course, uploadedBy, { action: 'upload' });
   }
 
+  const { getTenantRootAccountId } = require('../utils/tenantContext');
+  const rootAccountId =
+    (uploadedBy && uploadedBy.rootAccountId) ||
+    getTenantRootAccountId() ||
+    null;
+
   const stored = await storeMulterFile(file, {
     category,
     courseId: courseId || 'global',
     cloudinaryFolder,
     resourceType,
+    rootAccountId,
   });
 
   let checksumSha256 = '';
@@ -148,7 +155,9 @@ async function createFileAsset({
     size: stored.size,
     checksumSha256,
     uploadedBy: uploadedBy._id || uploadedBy,
-    institutionId,
+    institutionId: rootAccountId ? String(rootAccountId) : institutionId,
+    rootAccountId: rootAccountId || undefined,
+    accountId: rootAccountId || undefined,
     courseId,
     assignmentId,
     submissionId,

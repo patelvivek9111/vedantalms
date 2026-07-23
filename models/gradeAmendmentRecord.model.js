@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { courseChildTenantPlugin } = require('./plugins/courseChildTenant.plugin');
 const { immutableAppendOnlyPlugin } = require('./plugins/immutableAppendOnly.plugin');
 
 /**
@@ -41,5 +42,7 @@ gradeAmendmentRecordSchema.index({ course: 1, term: 1, year: 1, sequence: -1 });
 gradeAmendmentRecordSchema.index({ lifecycle: 1 });
 
 gradeAmendmentRecordSchema.plugin(immutableAppendOnlyPlugin, { mode: 'amendment' });
+
+gradeAmendmentRecordSchema.plugin(courseChildTenantPlugin, { coursePath: 'course' });
 
 module.exports = mongoose.model('GradeAmendmentRecord', gradeAmendmentRecordSchema);

@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { courseChildTenantPlugin } = require('./plugins/courseChildTenant.plugin');
 
 const discussionReplySchema = new mongoose.Schema(
   {
@@ -166,6 +167,8 @@ discussionReplySchema.index(
   { threadId: 1, authorId: 1, idempotencyKey: 1 },
   { unique: true, partialFilterExpression: { idempotencyKey: { $type: 'string' } } }
 );
+
+discussionReplySchema.plugin(courseChildTenantPlugin, {});
 
 module.exports =
   mongoose.models.DiscussionReply || mongoose.model('DiscussionReply', discussionReplySchema);

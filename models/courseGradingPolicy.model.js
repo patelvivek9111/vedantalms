@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { courseChildTenantPlugin } = require('./plugins/courseChildTenant.plugin');
 
 const courseGradingPolicySchema = new mongoose.Schema(
   {
@@ -52,5 +53,7 @@ const courseGradingPolicySchema = new mongoose.Schema(
 courseGradingPolicySchema.statics.findByCourseId = function (courseId) {
   return this.findOne({ course: courseId }).lean();
 };
+
+courseGradingPolicySchema.plugin(courseChildTenantPlugin, { coursePath: 'course' });
 
 module.exports = mongoose.model('CourseGradingPolicy', courseGradingPolicySchema);

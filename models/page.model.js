@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { courseChildTenantPlugin } = require('./plugins/courseChildTenant.plugin');
 
 const pageSchema = new mongoose.Schema({
   title: {
@@ -41,5 +42,7 @@ pageSchema.pre('validate', function(next) {
   }
   next();
 });
+
+pageSchema.plugin(courseChildTenantPlugin, { modulePath: 'module' });
 
 module.exports = mongoose.model('Page', pageSchema); 

@@ -51,7 +51,10 @@ const fileAssetSchema = new mongoose.Schema(
     checksumSha256: { type: String, default: '' },
 
     uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    /** @deprecated Prefer rootAccountId — kept for export/backup compatibility */
     institutionId: { type: String, default: 'default' },
+    rootAccountId: { type: mongoose.Schema.Types.ObjectId, ref: 'Account', index: true },
+    accountId: { type: mongoose.Schema.Types.ObjectId, ref: 'Account', index: true },
 
     courseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Course' },
     assignmentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Assignment' },

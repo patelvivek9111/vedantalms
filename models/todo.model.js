@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { courseChildTenantPlugin } = require('./plugins/courseChildTenant.plugin');
 
 const todoSchema = new mongoose.Schema({
   title: { type: String, required: true },
@@ -23,5 +24,7 @@ const todoSchema = new mongoose.Schema({
   enrollmentCount: { type: Number, default: 0 },
   courseName: { type: String }
 });
+
+todoSchema.plugin(courseChildTenantPlugin, { coursePath: 'courseId' });
 
 module.exports = mongoose.model('Todo', todoSchema); 

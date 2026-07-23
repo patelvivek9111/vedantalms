@@ -1,7 +1,14 @@
 const request = require('supertest');
-const app = require('../../../server');
+const { waitForMongoConnection } = require('../../helpers');
 
 describe('QuizWave API', () => {
+  let app;
+
+  beforeAll(async () => {
+    await waitForMongoConnection();
+    app = require('../../../server');
+  });
+
   describe('QuizWave endpoints', () => {
     it('requires auth for course quiz routes', async () => {
       const res = await request(app).get('/api/quizwave/courses/507f1f77bcf86cd799439011');

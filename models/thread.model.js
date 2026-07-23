@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { courseChildTenantPlugin } = require('./plugins/courseChildTenant.plugin');
 
 const replySchema = new mongoose.Schema({
   content: {
@@ -302,5 +303,7 @@ threadSchema.pre('save', function(next) {
 });
 
 const Thread = mongoose.model('Thread', threadSchema);
+
+threadSchema.plugin(courseChildTenantPlugin, { coursePath: 'course' });
 
 module.exports = Thread; 

@@ -47,8 +47,18 @@ async function resolveCourseContext(asset) {
 /**
  * Institutional access decision for FileAsset download/stream/metadata.
  */
-async function assertCanAccessFileAsset(user, fileAssetId, { ip, requestId } = {}) {
+async function assertCanAccessFileAsset(user, fileAssetId, { ip, requestId, rootAccountId } = {}) {
   const asset = await loadFileAsset(fileAssetId);
+
+  const tenantId = rootAccountId || user?.rootAccountId;
+  if (
+    tenantId &&
+    asset.rootAccountId &&
+    String(asset.rootAccountId) !== String(tenantId) &&
+    user?.role !== 'platform_admin'
+  ) {
+    throw accessDenied('File belongs to a different institution');
+  }
 
   if (asset.visibility === 'public') {
     return { asset, course: null };
@@ -199,7 +209,8 @@ function createFileDownloadToken(fileAssetId, userId, options = {}) {
     ? options.ttlSeconds * 1000
     : parseInt(process.env.FILE_DOWNLOAD_TTL_MS || `${60 * 60 * 1000}`, 10);
   const expiresAt = Date.now() + ttlMs;
-  const payload = `${fileAssetId}|${userId}|${expiresAt}`;
+  const rootAccountId = options.rootAccountId ? String(options.rootAccountId) : '';
+  const payload = `${fileAssetId}|${userId}|${expiresAt}|${rootAccountId}`;
   const sig = crypto.createHmac('sha256', secret).update(payload).digest('hex');
   return {
     token: Buffer.from(`${payload}|${sig}`).toString('base64url'),
@@ -207,19 +218,40 @@ function createFileDownloadToken(fileAssetId, userId, options = {}) {
   };
 }
 
-function verifyFileDownloadToken(fileAssetId, userId, token) {
+function verifyFileDownloadToken(fileAssetId, userId, token, { rootAccountId } = {}) {
   const secret = process.env.FILE_DOWNLOAD_SECRET || process.env.JOB_DOWNLOAD_SECRET || process.env.JWT_SECRET || 'file-download-secret';
   try {
+    if (typeof token !== 'string' || !token || !/^[A-Za-z0-9_-]+$/.test(token)) {
+      return false;
+    }
     const decoded = Buffer.from(token, 'base64url').toString('utf8');
+    // Reject non-canonical encodings (e.g. padded/ignored junk that still decodes)
+    if (Buffer.from(decoded, 'utf8').toString('base64url') !== token) {
+      return false;
+    }
     const parts = decoded.split('|');
-    if (parts.length !== 4) return false;
-    const [payloadAssetId, payloadUserId, expiresAtPart, sig] = parts;
+    // Legacy: fileAssetId|userId|expires|sig
+    // Phase 5: fileAssetId|userId|expires|rootAccountId|sig
+    if (parts.length === 4) {
+      const [payloadAssetId, payloadUserId, expiresAtPart, sig] = parts;
+      if (payloadAssetId !== String(fileAssetId)) return false;
+      if (payloadUserId !== String(userId)) return false;
+      if (Date.now() > Number(expiresAtPart)) return false;
+      if (!/^[a-f0-9]{64}$/i.test(sig)) return false;
+      const payload = `${payloadAssetId}|${payloadUserId}|${expiresAtPart}`;
+      const expected = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+      return crypto.timingSafeEqual(Buffer.from(sig, 'utf8'), Buffer.from(expected, 'utf8'));
+    }
+    if (parts.length !== 5) return false;
+    const [payloadAssetId, payloadUserId, expiresAtPart, payloadRoot, sig] = parts;
     if (payloadAssetId !== String(fileAssetId)) return false;
     if (payloadUserId !== String(userId)) return false;
     if (Date.now() > Number(expiresAtPart)) return false;
-    const payload = `${payloadAssetId}|${payloadUserId}|${expiresAtPart}`;
+    if (rootAccountId && payloadRoot && String(rootAccountId) !== payloadRoot) return false;
+    if (!/^[a-f0-9]{64}$/i.test(sig)) return false;
+    const payload = `${payloadAssetId}|${payloadUserId}|${expiresAtPart}|${payloadRoot}`;
     const expected = crypto.createHmac('sha256', secret).update(payload).digest('hex');
-    return sig === expected;
+    return crypto.timingSafeEqual(Buffer.from(sig, 'utf8'), Buffer.from(expected, 'utf8'));
   } catch {
     return false;
   }

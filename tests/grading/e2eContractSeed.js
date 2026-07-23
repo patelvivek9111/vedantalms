@@ -42,12 +42,30 @@ function questionPoints(points = 100) {
 }
 
 async function seedGradingContractE2E() {
+  const Account = require('../../models/account.model');
+  let root = await Account.findOne({ parentAccountId: null, workflowState: { $ne: 'deleted' } });
+  if (!root) {
+    root = await Account.create({
+      name: 'Grading Contract Root',
+      code: `GCR${Date.now().toString(36).toUpperCase()}`,
+      parentAccountId: null,
+      institutionMode: 'mixed',
+    });
+  }
+  if (!root.rootAccountId || String(root.rootAccountId) !== String(root._id)) {
+    root.rootAccountId = root._id;
+    await root.save();
+  }
+  const rootAccountId = root._id;
+
   const teacher = await User.create({
     firstName: 'Contract',
     lastName: 'Teacher',
     email: `grading.contract.teacher.${Date.now()}@example.com`,
     password: 'password123',
     role: 'teacher',
+    rootAccountId,
+    accountId: rootAccountId,
   });
 
   const student = await User.create({
@@ -56,6 +74,8 @@ async function seedGradingContractE2E() {
     email: `grading.contract.student.${Date.now()}@example.com`,
     password: 'password123',
     role: 'student',
+    rootAccountId,
+    accountId: rootAccountId,
   });
 
   const course = await Course.create({
@@ -67,6 +87,8 @@ async function seedGradingContractE2E() {
     semester: { term: 'Spring', year: 2025 },
     groups: CONTRACT_GROUPS,
     gradeScale: CONTRACT_GRADE_SCALE,
+    rootAccountId,
+    accountId: rootAccountId,
   });
 
   const module = await Module.create({
@@ -235,6 +257,7 @@ async function seedGradingContractE2E() {
   };
 
   return {
+    rootAccountId: rootAccountId.toString(),
     courseId: course._id.toString(),
     teacherId: teacher._id.toString(),
     teacherToken: teacher.getSignedJwtToken(),

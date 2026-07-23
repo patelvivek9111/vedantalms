@@ -9,6 +9,10 @@ const {
   forgotPassword,
   resetPassword,
 } = require('../controllers/auth.controller');
+const {
+  acceptAccountInvite,
+  getAccountInvite,
+} = require('../controllers/admin.controller');
 const { protect } = require('../middleware/auth');
 const { validatePassword } = require('../utils/passwordPolicy');
 
@@ -46,5 +50,7 @@ router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', [passwordValidator], resetPassword);
 router.get('/me', protect, getMe);
 router.get('/login-activity', protect, getLoginActivity);
+router.get('/invites/:token', getAccountInvite);
+router.post('/accept-invite', [passwordValidator], acceptAccountInvite);
 
 module.exports = router;

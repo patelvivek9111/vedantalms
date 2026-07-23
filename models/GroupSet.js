@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { courseChildTenantPlugin } = require('./plugins/courseChildTenant.plugin');
 
 const groupSetSchema = new mongoose.Schema({
     name: {
@@ -36,5 +37,7 @@ const groupSetSchema = new mongoose.Schema({
 groupSetSchema.index({ course: 1, name: 1 }, { unique: true });
 
 const GroupSet = mongoose.model('GroupSet', groupSetSchema);
+
+groupSetSchema.plugin(courseChildTenantPlugin, { coursePath: 'course' });
 
 module.exports = GroupSet; 

@@ -6,6 +6,7 @@ const {
   SECTION_DEFINITIONS,
   DEFAULT_CHUNK_SIZE,
   resolveSectionNames,
+  getSectionDefinitions,
 } = require('../../shared/portability/sectionRegistry.cjs');
 const { markSectionComplete, isSectionComplete, readCheckpoint } = require('../../shared/portability/checkpoint.cjs');
 const fs = require('fs');
@@ -17,6 +18,7 @@ const { buildBlobManifestForExport } = require('./blobManifest.service');
 /**
  * Build institution-level portable export package (JSON sections + manifest).
  * Supports partial sections, resumable checkpoints, and chunked output.
+ * Pass rootAccountId to scope export to one tenant (Phase 5).
  */
 async function exportInstitutionBundle(options = {}) {
   const storage = getStorageService();
@@ -29,6 +31,7 @@ async function exportInstitutionBundle(options = {}) {
   const checkpointPath = exportRoot.resolvePath(checkpointRel);
 
   const sectionNames = resolveSectionNames(options.sections);
+  const sectionDefs = getSectionDefinitions(options.rootAccountId);
   const sections = [];
   const schemaVersions = { default: SCHEMA_VERSION };
   const chunkSize = options.chunkSize || DEFAULT_CHUNK_SIZE;
@@ -50,12 +53,12 @@ async function exportInstitutionBundle(options = {}) {
         recordCount: 0,
         contentHash,
         resumed: true,
-        schemaVersion: SECTION_DEFINITIONS[name]?.schemaVersion ?? SCHEMA_VERSION,
+        schemaVersion: sectionDefs[name]?.schemaVersion ?? SCHEMA_VERSION,
       });
       continue;
     }
 
-    const def = SECTION_DEFINITIONS[name];
+    const def = sectionDefs[name];
     if (!def) continue;
 
     schemaVersions[name] = def.schemaVersion ?? SCHEMA_VERSION;
@@ -67,7 +70,7 @@ async function exportInstitutionBundle(options = {}) {
         if (batch.length) batches.push(batch);
       }
       sectionMeta = await writeSectionChunks(exportRoot, batchId, name, batches.length ? batches : [[]], {
-        fromCursor: true,
+        fromCursor: false,
       });
     } else if (def.export) {
       const data = await def.export();
@@ -90,7 +93,7 @@ async function exportInstitutionBundle(options = {}) {
   }
 
   const manifest = buildExportManifest({
-    institutionId: options.institutionId || 'default',
+    institutionId: options.institutionId || options.rootAccountId || 'default',
     exportType: 'institution',
     schemaVersion: SCHEMA_VERSION,
     schemaVersions,

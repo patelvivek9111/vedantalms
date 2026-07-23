@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { courseChildTenantPlugin } = require('./plugins/courseChildTenant.plugin');
 
 const submissionSchema = new mongoose.Schema({
   assignment: {
@@ -229,5 +230,7 @@ submissionSchema.set('toJSON', { flattenMaps: true });
 
 const { portabilityMetadataPlugin } = require('./plugins/portabilityMetadata.plugin');
 submissionSchema.plugin(portabilityMetadataPlugin);
+
+submissionSchema.plugin(courseChildTenantPlugin, { modulePath: 'assignment' });
 
 module.exports = mongoose.models.Submission || mongoose.model('Submission', submissionSchema); 

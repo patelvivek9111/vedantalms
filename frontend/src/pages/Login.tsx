@@ -2,10 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { BookOpen, MessageCircle, Award, ArrowRight } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useTenant } from '../contexts/TenantContext';
 import { InteractiveEyes } from '../components/common/InteractiveEyes';
 import FloatingLabelInput from '../components/common/FloatingLabelInput';
 import FloatingLabelPasswordInput from '../components/common/FloatingLabelPasswordInput';
 import { loginRedirectPath } from '../utils/loginRedirect';
+import { API_URL } from '../config';
 
 export function Login() {
   const [email, setEmail] = useState('');
@@ -17,14 +19,73 @@ export function Login() {
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const emailInputRef = useRef<HTMLInputElement>(null);
-  const { login, user } = useAuth();
+  const { login, loginWithToken, user } = useAuth();
+  const { tenant } = useTenant();
   const logoFallbackUsed = useRef(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const redirectTo = loginRedirectPath(location.state);
-  const primaryLogo = `${import.meta.env.BASE_URL}assets/MySl8te_logo.png`;
+  const redirectTo = loginRedirectPath(location.state, user?.role);
+  const brandLogo = tenant?.brand?.logoUrl;
+  const primaryLogo = brandLogo || `${import.meta.env.BASE_URL}assets/MySl8te_logo.png`;
   const fallbackLogo = `${import.meta.env.BASE_URL}assets/MySl8te_logo.png`;
   const [logoSrc, setLogoSrc] = useState(primaryLogo);
+  const institutionName = tenant?.brand?.displayName || tenant?.name || 'MySl8te';
+  const wordmark = tenant?.brand?.wordmark || 'MYSL8TE';
+  const accent = tenant?.brand?.primaryColor || '#4F46E5';
+  const ssoProviders = (tenant?.authProviders || []).filter(
+    (p) => p.authType && p.authType !== 'password'
+  );
+  const passwordEnabled =
+    !tenant?.authProviders?.length ||
+    tenant.authProviders.some((p) => p.authType === 'password');
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const ssoToken = params.get('ssoToken');
+    const ssoError = params.get('ssoError');
+    if (ssoError) {
+      setError(ssoError);
+      return;
+    }
+    if (!ssoToken) return;
+
+    let cancelled = false;
+    const run = async () => {
+      setIsLoading(true);
+      try {
+        const loggedIn = await loginWithToken(ssoToken);
+        if (!cancelled) {
+          navigate(
+            params.get('returnTo') || loginRedirectPath(location.state, loggedIn.role),
+            { replace: true }
+          );
+        }
+      } catch (err: unknown) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'SSO login failed');
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [location.search, loginWithToken, navigate, redirectTo]);
+
+  const startSso = (providerId: string, authType: string) => {
+    const apiBase = (API_URL || '').replace(/\/$/, '');
+    const path =
+      authType === 'saml'
+        ? `/api/auth/sso/saml/${providerId}/start`
+        : `/api/auth/sso/oidc/${providerId}/start`;
+    window.location.href = `${apiBase}${path}?returnTo=${encodeURIComponent(redirectTo)}`;
+  };
+
+  useEffect(() => {
+    setLogoSrc(brandLogo || primaryLogo);
+  }, [brandLogo, primaryLogo]);
 
   useEffect(() => {
     if (user) {
@@ -98,8 +159,8 @@ export function Login() {
 
     setIsLoading(true);
     try {
-      await login(email, password);
-      navigate(redirectTo, { replace: true });
+      const loggedIn = await login(email, password);
+      navigate(loginRedirectPath(location.state, loggedIn.role), { replace: true });
     } catch (err: unknown) {
       const axiosMsg =
         err &&
@@ -232,8 +293,11 @@ export function Login() {
               />
 
               <h1 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-50 sm:text-xl">
-                Sign in
+                Sign in to {institutionName}
               </h1>
+              <p className="mt-1 text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
+                {wordmark}
+              </p>
               <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
                 Welcome back.{' '}
                 <span className="text-slate-500 dark:text-slate-500">New here?</span>{' '}
@@ -255,6 +319,30 @@ export function Login() {
                   {error}
                 </div>
               )}
+
+              {ssoProviders.length > 0 && (
+                <div className="space-y-2">
+                  {ssoProviders.map((p) => (
+                    <button
+                      key={String((p as { _id?: string })._id || p.authType + p.name)}
+                      type="button"
+                      onClick={() => {
+                        const id = (p as { _id?: string })._id;
+                        if (!id) return;
+                        startSso(id, p.authType);
+                      }}
+                      className="flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+                    >
+                      Continue with {p.name || p.authType}
+                    </button>
+                  ))}
+                  {passwordEnabled && (
+                    <p className="py-1 text-center text-xs uppercase tracking-wide text-slate-400">or</p>
+                  )}
+                </div>
+              )}
+
+              {passwordEnabled && (
               <div className="space-y-3">
                 <FloatingLabelInput
                   ref={emailInputRef}
@@ -299,14 +387,18 @@ export function Login() {
                   </Link>
                 </p>
               </div>
+              )}
 
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="mt-1 w-full rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:cursor-not-allowed disabled:opacity-55 dark:bg-indigo-500 dark:hover:bg-indigo-400 dark:focus-visible:outline-indigo-400 dark:focus-visible:outline-offset-slate-900 sm:py-3"
-              >
-                {isLoading ? 'Signing in…' : 'Sign in'}
-              </button>
+              {passwordEnabled && (
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  style={{ backgroundColor: accent }}
+                  className="mt-1 w-full rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-55 sm:py-3"
+                >
+                  {isLoading ? 'Signing in…' : 'Sign in'}
+                </button>
+              )}
             </form>
             </div>
           </div>

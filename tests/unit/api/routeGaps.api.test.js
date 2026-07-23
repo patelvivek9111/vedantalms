@@ -101,6 +101,7 @@ describe('§15 API route gaps — smoke coverage', () => {
     it('accepts a valid inquiry payload', async () => {
       const res = await request(app).post('/api/contact/inquiry').send({
         name: 'E2E Contact',
+        email: 'contact-test@example.com',
         organization: 'Vidya LMS',
         jobTitle: 'QA',
         userCount: '100-500',

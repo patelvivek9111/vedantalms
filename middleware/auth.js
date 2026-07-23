@@ -1,6 +1,11 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/user.model');
 const { extractTokenFromRequest } = require('../utils/authCookie');
+const { withTenantFilter, setRequestTenant, runWithTenant, getTenantContext } = require('../utils/tenantContext');
+
+function isPlatformAdmin(user) {
+  return user?.role === 'platform_admin';
+}
 
 // Protect routes
 exports.protect = async (req, res, next) => {
@@ -41,7 +46,37 @@ exports.protect = async (req, res, next) => {
     }
 
     req.user = user;
-    next();
+    req.isPlatformAdmin = isPlatformAdmin(user);
+
+    if (decoded.impersonatorId) {
+      req.impersonatorId = decoded.impersonatorId;
+      req.impersonationSessionId = decoded.impersonationSessionId;
+      req.isImpersonating = true;
+    }
+
+    // Hard tenancy: non-platform users must match resolved root account
+    // (impersonation tokens act as the target user and must also match)
+    if (!req.isPlatformAdmin && user.rootAccountId && req.rootAccountId) {
+      if (String(user.rootAccountId) !== String(req.rootAccountId)) {
+        return res.status(403).json({
+          success: false,
+          error: 'This account belongs to a different institution.',
+        });
+      }
+    }
+
+    // Platform admins may switch tenant via X-Account-Id already resolved in middleware;
+    // stamp context flag for downstream.
+    const ctx = getTenantContext() || {};
+    const nextCtx = {
+      ...ctx,
+      rootAccountId: req.rootAccountId || user.rootAccountId || ctx.rootAccountId,
+      accountId: req.accountId || req.rootAccountId || user.rootAccountId,
+      isPlatformAdmin: req.isPlatformAdmin,
+    };
+    setRequestTenant(req, nextCtx);
+
+    return runWithTenant(nextCtx, () => next());
   } catch (err) {
     return res.status(401).json({
       success: false,
@@ -72,3 +107,6 @@ exports.authorize = (...roles) => {
     next();
   };
 };
+
+exports.isPlatformAdmin = isPlatformAdmin;
+exports.withTenantFilter = withTenantFilter;

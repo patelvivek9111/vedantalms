@@ -71,6 +71,129 @@ async function processGradesFinalize(jobDoc) {
   return result;
 }
 
+async function processTermFinalize(jobDoc) {
+  const { termId, userId, courseIds } = jobDoc.payload;
+  const user = await User.findById(userId);
+  if (!user) throw new Error('Requesting user not found');
+  const rootAccountId = jobDoc.rootAccountId || jobDoc.payload?.rootAccountId;
+  const termGradeGovernance = require('./registrar/termGradeGovernance.service');
+
+  const preview = await termGradeGovernance.previewTermFinalize(rootAccountId, termId);
+  const targets = courseIds?.length
+    ? preview.readyCourseIds.filter((id) => courseIds.map(String).includes(String(id)))
+    : preview.readyCourseIds;
+
+  await updateProgress(jobDoc._id, 0, targets.length);
+  const results = [];
+  let completed = 0;
+  for (const courseId of targets) {
+    try {
+      const result = await gradeLifecycleService.transitionToFinalized(courseId, user);
+      const academicAuditService = require('./academicAudit.service');
+      await academicAuditService.recordAuditEvent({
+        actorId: user._id,
+        entityType: 'academic_term',
+        entityId: termId,
+        action: 'registrar.grades.finalized',
+        after: { courseId, frozenCount: result.frozenCount },
+        severity: 'critical',
+        rootAccountId,
+        metadata: { termId: String(termId), courseId: String(courseId), jobId: String(jobDoc._id) },
+      });
+      results.push({ courseId, ok: true, frozenCount: result.frozenCount, idempotent: result.idempotent });
+    } catch (err) {
+      results.push({ courseId, ok: false, message: err.message });
+    }
+    completed += 1;
+    await updateProgress(jobDoc._id, completed, targets.length);
+  }
+
+  return {
+    termId,
+    finalized: results.filter((r) => r.ok).length,
+    failed: results.filter((r) => !r.ok).length,
+    results,
+  };
+}
+
+async function processBulkTranscriptIssue(jobDoc) {
+  const User = require('../models/user.model');
+  const transcriptOffice = require('./registrar/transcriptOffice.service');
+  const user = await User.findById(jobDoc.requestedBy);
+  if (!user) throw new Error('Requesting user not found');
+  const {
+    term,
+    year,
+    studentIds,
+    notes,
+    templateId,
+    ip,
+  } = jobDoc.payload || {};
+  const rootAccountId = jobDoc.rootAccountId || jobDoc.payload?.rootAccountId;
+
+  const targets = Array.isArray(studentIds) ? studentIds : [];
+  await updateProgress(jobDoc._id, 0, targets.length);
+
+  const results = [];
+  let completed = 0;
+  for (const studentId of targets) {
+    try {
+      const issued = await transcriptOffice.issueWithPdf({
+        tenantId: rootAccountId,
+        studentId,
+        term,
+        year,
+        issuedBy: user,
+        notes,
+        ip,
+        templateId,
+      });
+      results.push({
+        studentId,
+        ok: true,
+        transcriptHash: issued.transcriptHash,
+        issueLogId: issued.log._id,
+      });
+    } catch (err) {
+      results.push({ studentId, ok: false, message: err.message, code: err.code });
+    }
+    completed += 1;
+    await updateProgress(jobDoc._id, completed, targets.length);
+  }
+
+  return {
+    term,
+    year: Number(year),
+    issued: results.filter((r) => r.ok).length,
+    failed: results.filter((r) => !r.ok).length,
+    results,
+  };
+}
+
+async function processSisImportApply(jobDoc) {
+  const sisOffice = require('./registrar/sisOffice.service');
+  const rootAccountId = jobDoc.rootAccountId || jobDoc.payload?.rootAccountId;
+  return sisOffice.applySyncBatch(jobDoc.payload.batchId, {
+    tenantId: rootAccountId,
+    actorId: jobDoc.requestedBy,
+    approvePending: jobDoc.payload?.approvePending !== false,
+  });
+}
+
+async function processSisGradeExport(jobDoc) {
+  const sisOffice = require('./registrar/sisOffice.service');
+  const rootAccountId = jobDoc.rootAccountId || jobDoc.payload?.rootAccountId;
+  return sisOffice.exportGradesPassback({
+    tenantId: rootAccountId,
+    accountId: rootAccountId,
+    term: jobDoc.payload?.term,
+    year: jobDoc.payload?.year,
+    academicTermId: jobDoc.payload?.academicTermId,
+    exportedBy: jobDoc.requestedBy,
+    notes: jobDoc.payload?.notes,
+  });
+}
+
 async function processGradesPolicyImpactPreview(jobDoc) {
   const { courseId, payload } = jobDoc.payload;
   const gradingPolicyImpactService = require('./gradingPolicyImpact.service');
@@ -258,12 +381,20 @@ async function runJobByType(jobDoc) {
   switch (jobDoc.type) {
     case 'grades.finalize':
       return processGradesFinalize(jobDoc);
+    case 'grades.term_finalize':
+      return processTermFinalize(jobDoc);
     case 'grades.recompute':
       return processGradesRecompute(jobDoc);
     case 'grades.policyImpactPreview':
       return processGradesPolicyImpactPreview(jobDoc);
     case 'transcript.regenerate':
       return processTranscriptRegenerate(jobDoc);
+    case 'transcript.bulk_issue':
+      return processBulkTranscriptIssue(jobDoc);
+    case 'sis.import_apply':
+      return processSisImportApply(jobDoc);
+    case 'sis.grade_export':
+      return processSisGradeExport(jobDoc);
     case 'export.gradebook':
       return processExportGradebook(jobDoc);
     case 'course.copy':
@@ -300,6 +431,17 @@ async function runJobByType(jobDoc) {
       const courseStorageAnalytics = require('./courseStorageAnalytics.service');
       return courseStorageAnalytics.aggregateCourseStorage(jobDoc.payload.courseId, {
         bypassCache: true,
+      });
+    }
+    case 'export.institution': {
+      const { exportInstitutionBundle } = require('./export/institutionalExport.service');
+      return exportInstitutionBundle({
+        rootAccountId: jobDoc.rootAccountId || jobDoc.payload?.rootAccountId,
+        sections: jobDoc.payload?.sections || ['users', 'courses', 'enrollments', 'systemSettings', 'fileAssets'],
+        includeBlobManifest: false,
+        registerBackup: jobDoc.payload?.registerBackup !== false,
+        notes: jobDoc.payload?.notes || 'Phase 5 tenant export',
+        institutionId: String(jobDoc.rootAccountId || jobDoc.payload?.rootAccountId || 'default'),
       });
     }
     default:

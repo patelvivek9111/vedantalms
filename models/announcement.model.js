@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { courseChildTenantPlugin } = require('./plugins/courseChildTenant.plugin');
 
 const commentSchema = new mongoose.Schema({
   author: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -36,5 +37,7 @@ const announcementSchema = new mongoose.Schema({
 
 const { portabilityMetadataPlugin } = require('./plugins/portabilityMetadata.plugin');
 announcementSchema.plugin(portabilityMetadataPlugin);
+
+announcementSchema.plugin(courseChildTenantPlugin, { coursePath: 'course' });
 
 module.exports = mongoose.model('Announcement', announcementSchema); 

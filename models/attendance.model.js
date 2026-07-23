@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { courseChildTenantPlugin } = require('./plugins/courseChildTenant.plugin');
 
 const attendanceSchema = new mongoose.Schema({
   course: {
@@ -47,5 +48,7 @@ attendanceSchema.index({ course: 1, student: 1, date: 1 });
 
 const { portabilityMetadataPlugin } = require('./plugins/portabilityMetadata.plugin');
 attendanceSchema.plugin(portabilityMetadataPlugin);
+
+attendanceSchema.plugin(courseChildTenantPlugin, { coursePath: 'course' });
 
 module.exports = mongoose.model('Attendance', attendanceSchema); 

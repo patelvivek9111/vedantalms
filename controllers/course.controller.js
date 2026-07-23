@@ -7,6 +7,20 @@ const {
   notifyCoursePublished,
   notifyCourseUnpublished,
 } = require('../services/notification/academicNotificationProducers.service');
+const { withTenantFilter, rootAccountIdFromRequest } = require('../utils/tenantContext');
+const {
+  resolveOrCreateTermFromSemester,
+  ensureOfferingAndSectionForCourse,
+  assertTermEnrollmentOpen,
+  accountSubtreeFilter,
+} = require('../services/tenancy/academicStructure.service');
+const AcademicTerm = require('../models/academicTerm.model');
+
+function assertSameTenant(doc, req) {
+  if (!doc?.rootAccountId || !req.rootAccountId) return true;
+  if (req.isPlatformAdmin || req.user?.role === 'platform_admin') return true;
+  return String(doc.rootAccountId) === String(req.rootAccountId);
+}
 
 // Earthy tone color palette for course cards
 const earthyColors = [
@@ -44,7 +58,7 @@ exports.createCourse = async (req, res) => {
       });
     }
 
-    const { title, description, gradeScale, catalog, defaultColor, semester, scheduleType, academicYearLabel } =
+    const { title, description, gradeScale, catalog, defaultColor, semester, scheduleType, academicYearLabel, academicTermId, sectionNumber, accountId } =
       req.body;
     if (gradeScale) {
       const validationError = validateGradeScale(gradeScale);
@@ -104,7 +118,31 @@ exports.createCourse = async (req, res) => {
       mergedCatalog.creditHours = instDefaults.creditHours;
     }
 
-    const finalSemester = semester?.term && semester?.year ? semester : instDefaults.semester;
+    const finalSemester = defaultSemester;
+    const rootId = req.rootAccountId || req.user.rootAccountId;
+    const owningAccountId = accountId || req.accountId || rootId;
+
+    let resolvedTermId = academicTermId || null;
+    if (resolvedTermId) {
+      const termDoc = await AcademicTerm.findOne(withTenantFilter({ _id: resolvedTermId }, rootId));
+      if (!termDoc) {
+        return res.status(400).json({ success: false, message: 'Invalid academicTermId for this institution' });
+      }
+      finalSemester.term = termDoc.legacyTermLabel || termDoc.name;
+      if (termDoc.legacyYear) finalSemester.year = termDoc.legacyYear;
+    } else {
+      const term = await resolveOrCreateTermFromSemester({
+        rootAccountId: rootId,
+        accountId: owningAccountId,
+        semester: finalSemester,
+        academicYearLabel:
+          academicYearLabel ||
+          (resolvedScheduleType === 'full_year' ? instDefaults.academicYearLabel : null),
+        startDate: mergedCatalog.startDate,
+        endDate: mergedCatalog.endDate,
+      });
+      if (term) resolvedTermId = term._id;
+    }
 
     const course = await Course.create({
       title,
@@ -116,9 +154,21 @@ exports.createCourse = async (req, res) => {
       academicYearLabel:
         academicYearLabel ||
         (resolvedScheduleType === 'full_year' ? instDefaults.academicYearLabel : null),
+      academicTermId: resolvedTermId,
+      sectionNumber: sectionNumber || '001',
+      rootAccountId: rootId,
+      accountId: owningAccountId,
       ...(gradeScale ? { gradeScale } : {}),
       ...(Object.keys(mergedCatalog).length ? { catalog: mergedCatalog } : catalog ? { catalog } : {}),
     });
+
+    try {
+      await ensureOfferingAndSectionForCourse(course, {
+        sectionNumber: course.sectionNumber || '001',
+      });
+    } catch (linkErr) {
+      console.warn('Course structure link skipped:', linkErr.message);
+    }
 
     if (resolvedScheduleType === 'full_year' && academicSettings.useInstitutionCalendar) {
       await academicCalendarService.applyInstitutionCalendarToCourse(
@@ -177,19 +227,35 @@ function toCourseListSummary(course, user) {
 
 exports.getCourses = async (req, res) => {
   try {
+    const tenantId = rootAccountIdFromRequest(req);
+    const termId = req.query.termId;
+    const accountId = req.query.accountId;
+
+    let baseFilter = withTenantFilter({}, tenantId);
+    if (accountId) {
+      baseFilter = await accountSubtreeFilter(tenantId, accountId);
+    }
+    if (termId) {
+      baseFilter.academicTermId = termId;
+    }
+
     let query;
-    if (req.user.role === 'admin') {
-      query = Course.find();
-    } else if (req.user.role === 'teacher') {
-      query = Course.find({ instructor: req.user.id });
+    if (req.user.role === 'admin' || req.user.role === 'platform_admin' || req.user.role === 'registrar') {
+      query = Course.find(baseFilter);
+    } else if (req.user.role === 'teacher' || req.user.role === 'department_admin') {
+      query = Course.find({ ...baseFilter, instructor: req.user.id });
     } else {
-      query = Course.find({ students: req.user.id, published: true });
+      query = Course.find({
+        ...baseFilter,
+        students: req.user.id,
+        published: true,
+      });
     }
 
     const populate = [
       { path: 'instructor', select: 'firstName lastName email' },
     ];
-    if (req.user.role === 'admin' || req.user.role === 'teacher') {
+    if (req.user.role === 'admin' || req.user.role === 'teacher' || req.user.role === 'platform_admin') {
       populate.push({ path: 'enrollmentRequests.student', select: 'firstName lastName email' });
     }
 
@@ -234,6 +300,13 @@ exports.getCourse = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Course not found'
+      });
+    }
+
+    if (!assertSameTenant(course, req)) {
+      return res.status(404).json({
+        success: false,
+        message: 'Course not found',
       });
     }
     
@@ -744,6 +817,19 @@ exports.enrollStudent = async (req, res) => {
     course.students.push(studentId);
     await course.save();
 
+    try {
+      const { activateEnrollment } = require('../services/registrar/enrollmentWrite.service');
+      await activateEnrollment({
+        course,
+        studentId,
+        actorId: req.user._id || req.user.id,
+        source: req.user.role === 'registrar' ? 'registrar' : 'teacher',
+        mirrorCourseStudents: false,
+      });
+    } catch (dwErr) {
+      console.warn('Enrollment dual-write (enroll) failed:', dwErr.message);
+    }
+
     require('../services/dashboardGradeSummary.service').scheduleRefreshStudents(
       course._id,
       [studentId]
@@ -784,6 +870,20 @@ exports.unenrollStudent = async (req, res) => {
     
     // Remove student from course
     course.students = course.students.filter(id => id.toString() !== studentId);
+
+    try {
+      const { deactivateEnrollment } = require('../services/registrar/enrollmentWrite.service');
+      await deactivateEnrollment({
+        course,
+        studentId,
+        actorId: req.user._id || req.user.id,
+        status: 'dropped',
+        reason: 'Teacher/admin unenroll',
+        mirrorCourseStudents: false,
+      });
+    } catch (dwErr) {
+      console.warn('Enrollment dual-write (unenroll) failed:', dwErr.message);
+    }
     
     let promotedStudentId = null;
     // Check if there are students on the waitlist and promote the first one
@@ -794,6 +894,19 @@ exports.unenrollStudent = async (req, res) => {
         // Add them to the course
         course.students.push(promotedStudent.student);
         promotedStudentId = String(promotedStudent.student);
+
+        try {
+          const { activateEnrollment } = require('../services/registrar/enrollmentWrite.service');
+          await activateEnrollment({
+            course,
+            studentId: promotedStudent.student,
+            actorId: req.user._id || req.user.id,
+            source: 'system',
+            mirrorCourseStudents: false,
+          });
+        } catch (dwErr) {
+          console.warn('Enrollment dual-write (promote) failed:', dwErr.message);
+        }
         
         // Update positions for remaining waitlist students
         course.waitlist.forEach((waitlistEntry, index) => {

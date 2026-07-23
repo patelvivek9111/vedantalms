@@ -13,12 +13,14 @@ async function storeMulterFile(file, options = {}) {
   const courseId = options.courseId ? String(options.courseId) : 'global';
   const assetId = options.assetId || crypto.randomBytes(12).toString('hex');
   const ext = path.extname(file.originalname || '') || '';
+  const { getTenantRootAccountId } = require('../utils/tenantContext');
+  const rootPrefix = options.rootAccountId || getTenantRootAccountId() || 'shared';
   const storageKey =
     category === 'profile'
-      ? `public/profile/${assetId}${ext}`
-      : `academic/${courseId}/${category}/${assetId}${ext}`;
+      ? `${rootPrefix}/public/profile/${assetId}${ext}`
+      : `${rootPrefix}/academic/${courseId}/${category}/${assetId}${ext}`;
 
-  const folder = options.cloudinaryFolder || `lms/academic/${category}`;
+  const folder = options.cloudinaryFolder || `lms/${rootPrefix}/academic/${category}`;
   const uploadResult = await storage.uploads.uploadFile(file, {
     folder,
     resource_type: options.resourceType || 'auto',
@@ -32,6 +34,7 @@ async function storeMulterFile(file, options = {}) {
     path: uploadResult.path || storageKey,
     size: file.size || uploadResult.metadata?.bytes || 0,
     providerUrl: uploadResult.url || null,
+    rootAccountId: rootPrefix !== 'shared' ? rootPrefix : null,
   };
 }
 

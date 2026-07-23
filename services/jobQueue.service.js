@@ -2,6 +2,7 @@ const { Queue, Worker } = require('bullmq');
 const AsyncJob = require('../models/asyncJob.model');
 const { isRedisConfigured, getBullmqConnection } = require('../utils/bullmqConnection');
 const { runJobByType } = require('./gradingJobProcessors');
+const { getTenantRootAccountId, runWithTenant } = require('../utils/tenantContext');
 
 const QUEUE_NAME = 'grading';
 let queue = null;
@@ -47,45 +48,77 @@ function getGradingQueue() {
 }
 
 async function executeJob(jobDoc) {
-  await AsyncJob.findByIdAndUpdate(jobDoc._id, { status: 'active' });
-  try {
-    const result = await runJobByType(jobDoc);
-    const updated = await AsyncJob.findByIdAndUpdate(
-      jobDoc._id,
-      { status: 'completed', result },
-      { new: true }
-    ).lean();
-    return updated;
-  } catch (error) {
-    await AsyncJob.findByIdAndUpdate(jobDoc._id, {
-      status: 'failed',
-      error: error.message || String(error),
-      failedAt: new Date(),
-    });
-    const academicAuditService = require('./academicAudit.service');
-    await academicAuditService
-      .recordAuditEvent({
-        actorId: jobDoc.requestedBy,
-        entityType: 'async_job',
-        entityId: String(jobDoc._id),
-        action: 'job_failed',
-        severity: 'critical',
-        metadata: { type: jobDoc.type, error: error.message },
-      })
-      .catch(() => {});
-    throw error;
+  const rootAccountId = jobDoc.rootAccountId || jobDoc.payload?.rootAccountId;
+  if (!rootAccountId) {
+    const err = new Error('AsyncJob missing rootAccountId');
+    err.code = 'JOB_MISSING_TENANT';
+    throw err;
   }
+
+  return runWithTenant({ rootAccountId }, async () => {
+    const ctxRoot = getTenantRootAccountId();
+    if (String(ctxRoot) !== String(rootAccountId)) {
+      const err = new Error('Job tenant context mismatch');
+      err.code = 'JOB_TENANT_MISMATCH';
+      throw err;
+    }
+
+    await AsyncJob.findByIdAndUpdate(jobDoc._id, { status: 'active' });
+    try {
+      const result = await runJobByType(jobDoc);
+      const updated = await AsyncJob.findByIdAndUpdate(
+        jobDoc._id,
+        { status: 'completed', result },
+        { new: true }
+      ).lean();
+      return updated;
+    } catch (error) {
+      await AsyncJob.findByIdAndUpdate(jobDoc._id, {
+        status: 'failed',
+        error: error.message || String(error),
+        failedAt: new Date(),
+      });
+      const academicAuditService = require('./academicAudit.service');
+      await academicAuditService
+        .recordAuditEvent({
+          actorId: jobDoc.requestedBy,
+          entityType: 'async_job',
+          entityId: String(jobDoc._id),
+          action: 'job_failed',
+          severity: 'critical',
+          rootAccountId,
+          metadata: { type: jobDoc.type, error: error.message },
+        })
+        .catch(() => {});
+      throw error;
+    }
+  });
 }
 
 async function runInline(jobDoc) {
   return executeJob(jobDoc);
 }
 
-async function enqueueJob(type, payload, requestedBy) {
+async function enqueueJob(type, payload, requestedBy, options = {}) {
+  const rootAccountId =
+    options.rootAccountId ||
+    payload?.rootAccountId ||
+    getTenantRootAccountId() ||
+    requestedBy?.rootAccountId ||
+    null;
+
+  if (!rootAccountId) {
+    const err = new Error('rootAccountId is required to enqueue jobs');
+    err.status = 400;
+    throw err;
+  }
+
+  const jobPayload = { ...(payload || {}), rootAccountId };
   const jobDoc = await AsyncJob.create({
     type,
-    payload,
+    payload: jobPayload,
     requestedBy: requestedBy._id || requestedBy,
+    rootAccountId,
     status: 'pending',
   });
 
@@ -104,7 +137,7 @@ async function enqueueJob(type, payload, requestedBy) {
   try {
     const bullJob = await q.add(
       type,
-      { jobId: String(jobDoc._id) },
+      { jobId: String(jobDoc._id), rootAccountId: String(rootAccountId) },
       {
         jobId: String(jobDoc._id),
         removeOnComplete: 100,

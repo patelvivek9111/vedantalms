@@ -265,8 +265,7 @@ router.get('/:courseId/students', protect, async (req, res) => {
       });
     }
 
-    const course = await Course.findById(courseId)
-      .populate('students', 'firstName lastName email profilePicture');
+    const course = await Course.findById(courseId);
     
     if (!course) {
       return res.status(404).json({
@@ -283,7 +282,11 @@ router.get('/:courseId/students', protect, async (req, res) => {
       });
     }
 
-    res.json(course.students);
+    const { listActiveStudents } = require('../services/registrar/rosterRead.service');
+    const students = await listActiveStudents(courseId, {
+      rootAccountId: course.rootAccountId,
+    });
+    res.json(students);
   } catch (err) {
     console.error('Get course students error:', err);
     res.status(500).json({ 
@@ -486,6 +489,24 @@ router.post('/:courseId/unenroll-self', protect, async (req, res) => {
     }
     
     await course.save();
+
+    try {
+      const {
+        deactivateEnrollment,
+        syncEnrollmentsFromCourseStudents,
+      } = require('../services/registrar/enrollmentWrite.service');
+      await deactivateEnrollment({
+        course,
+        studentId,
+        actorId: studentId,
+        status: 'dropped',
+        reason: 'Self unenroll',
+        mirrorCourseStudents: false,
+      });
+      await syncEnrollmentsFromCourseStudents(course);
+    } catch (dwErr) {
+      console.warn('Enrollment dual-write (unenroll-self) failed:', dwErr.message);
+    }
 
     // Refresh instructor enrollment to-dos (no roster-count card; one row for waitlist + pending joins)
     const Todo = require('../models/todo.model');
@@ -703,6 +724,23 @@ router.post('/:courseId/enrollment/:studentId/approve', protect, authorize('teac
     }, {
       arrayFilters: [{ 'elem.student': studentId }]
     });
+
+    try {
+      const Course = require('../models/course.model');
+      const courseForDw = await Course.findById(courseId);
+      if (courseForDw) {
+        const { activateEnrollment } = require('../services/registrar/enrollmentWrite.service');
+        await activateEnrollment({
+          course: courseForDw,
+          studentId,
+          actorId: req.user._id || req.user.id,
+          source: 'teacher',
+          mirrorCourseStudents: false,
+        });
+      }
+    } catch (dwErr) {
+      console.warn('Enrollment dual-write (approve) failed:', dwErr.message);
+    }
 
     // If the student was waitlisted, remove them from waitlist and update positions
     const updatedCourse = await Course.findById(courseId);

@@ -11,6 +11,10 @@ const CAPABILITIES = {
   RECOMPUTE_GRADES: 'recompute_grades',
   VIEW_LIFECYCLE: 'view_lifecycle',
   MANAGE_INSTITUTION_POLICY: 'manage_institution_policy',
+  MANAGE_ENROLLMENTS: 'manage_enrollments',
+  MANAGE_HOLDS: 'manage_holds',
+  MANAGE_SIS: 'manage_sis',
+  VIEW_REGISTRAR_DASHBOARD: 'view_registrar_dashboard',
 };
 
 const ROLE_CAPABILITIES = {
@@ -28,6 +32,8 @@ const ROLE_CAPABILITIES = {
     CAPABILITIES.AMEND_GRADES,
     CAPABILITIES.RECOMPUTE_GRADES,
     CAPABILITIES.VIEW_LIFECYCLE,
+    CAPABILITIES.MANAGE_ENROLLMENTS,
+    CAPABILITIES.VIEW_REGISTRAR_DASHBOARD,
   ],
   registrar: [
     CAPABILITIES.GRADE_DRAFT,
@@ -37,6 +43,10 @@ const ROLE_CAPABILITIES = {
     CAPABILITIES.RECOMPUTE_GRADES,
     CAPABILITIES.VIEW_LIFECYCLE,
     CAPABILITIES.MANAGE_INSTITUTION_POLICY,
+    CAPABILITIES.MANAGE_ENROLLMENTS,
+    CAPABILITIES.MANAGE_HOLDS,
+    CAPABILITIES.MANAGE_SIS,
+    CAPABILITIES.VIEW_REGISTRAR_DASHBOARD,
   ],
   admin: [
     CAPABILITIES.GRADE_DRAFT,
@@ -46,6 +56,23 @@ const ROLE_CAPABILITIES = {
     CAPABILITIES.RECOMPUTE_GRADES,
     CAPABILITIES.VIEW_LIFECYCLE,
     CAPABILITIES.MANAGE_INSTITUTION_POLICY,
+    CAPABILITIES.MANAGE_ENROLLMENTS,
+    CAPABILITIES.MANAGE_HOLDS,
+    CAPABILITIES.MANAGE_SIS,
+    CAPABILITIES.VIEW_REGISTRAR_DASHBOARD,
+  ],
+  platform_admin: [
+    CAPABILITIES.GRADE_DRAFT,
+    CAPABILITIES.POST_GRADES,
+    CAPABILITIES.FINALIZE_GRADES,
+    CAPABILITIES.AMEND_GRADES,
+    CAPABILITIES.RECOMPUTE_GRADES,
+    CAPABILITIES.VIEW_LIFECYCLE,
+    CAPABILITIES.MANAGE_INSTITUTION_POLICY,
+    CAPABILITIES.MANAGE_ENROLLMENTS,
+    CAPABILITIES.MANAGE_HOLDS,
+    CAPABILITIES.MANAGE_SIS,
+    CAPABILITIES.VIEW_REGISTRAR_DASHBOARD,
   ],
 };
 
@@ -58,8 +85,13 @@ function normalizeId(value) {
 }
 
 function isEnrolledStudent(user, course) {
-  if (!user || user.role !== 'student' || !course?.students?.length) return false;
+  if (!user || user.role !== 'student' || !course) return false;
   const sid = normalizeId(user);
+  // Prefer Enrollment of record when available (async check is used by callers via rosterRead)
+  if (course._enrollmentStudentIds instanceof Set) {
+    return course._enrollmentStudentIds.has(sid);
+  }
+  if (!course?.students?.length) return false;
   return course.students.some((s) => normalizeId(s) === sid);
 }
 

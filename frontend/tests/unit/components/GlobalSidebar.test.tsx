@@ -144,7 +144,7 @@ describe('GlobalSidebar', () => {
     // Active route should be highlighted - Dashboard links to '/'
     const dashboardLink = screen.getByText('Dashboard');
     const linkElement = dashboardLink.closest('a');
-    expect(linkElement).toHaveAttribute('href', '/');
+    expect(linkElement).toHaveAttribute('href', '/dashboard');
     // Active style now uses modern glass background
     expect(linkElement).toHaveClass('bg-white/[0.12]');
   });

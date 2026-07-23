@@ -3,11 +3,10 @@
     "target": "es6",
     "lib": ["dom", "es6"],
     "module": "esnext",
-    "moduleResolution": "node",
-    "baseUrl": ".",
+    "moduleResolution": "bundler",
     "paths": {
-      "@/*": ["src/*"],
-      "@tests/*": ["tests/*"],
+      "@/*": ["./src/*"],
+      "@tests/*": ["./tests/*"],
       "@lms-shared/grading": ["../shared/grading/index.d.ts"]
     },
     "jsx": "react",

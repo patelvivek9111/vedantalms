@@ -10,6 +10,8 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const mongoose = require('mongoose');
 const User = require('../models/user.model');
 const { resolveMongoDbName } = require('./resolveMongoDbName');
+const { ensureDefaultRootAccount } = require('../services/tenancy/ensureDefaultRootAccount.service');
+const { ensureAccountMembership } = require('../services/tenancy/accountMembership.service');
 
 const BASE_USERS = [
   {
@@ -25,6 +27,13 @@ const BASE_USERS = [
     role: 'admin',
     firstName: 'Demo',
     lastName: 'Admin',
+  },
+  {
+    email: 'registrar@vidyalms.com',
+    password: process.env.DEMO_REGISTRAR_PASSWORD || 'password123',
+    role: 'registrar',
+    firstName: 'Demo',
+    lastName: 'Registrar',
   },
 ];
 
@@ -51,8 +60,14 @@ async function main() {
     process.exit(1);
   }
   await mongoose.connect(uri, { dbName: resolveMongoDbName(uri) });
+  const root = await ensureDefaultRootAccount();
   for (const def of BASE_USERS) {
-    await upsertUser(def);
+    const user = await upsertUser(def);
+    await ensureAccountMembership({
+      user,
+      rootAccountId: root._id,
+      role: def.role,
+    });
   }
   await mongoose.disconnect();
 

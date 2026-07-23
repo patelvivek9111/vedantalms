@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { courseChildTenantPlugin } = require('./plugins/courseChildTenant.plugin');
 const { immutableAppendOnlyPlugin } = require('./plugins/immutableAppendOnly.plugin');
 
 /**
@@ -100,5 +101,7 @@ studentCourseGradeSnapshotSchema.index({ student: 1, course: 1 });
 studentCourseGradeSnapshotSchema.plugin(immutableAppendOnlyPlugin, { mode: 'snapshot' });
 const { portabilityMetadataPlugin } = require('./plugins/portabilityMetadata.plugin');
 studentCourseGradeSnapshotSchema.plugin(portabilityMetadataPlugin);
+
+studentCourseGradeSnapshotSchema.plugin(courseChildTenantPlugin, { coursePath: 'course' });
 
 module.exports = mongoose.model('StudentCourseGradeSnapshot', studentCourseGradeSnapshotSchema);

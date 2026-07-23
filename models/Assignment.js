@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { courseChildTenantPlugin } = require('./plugins/courseChildTenant.plugin');
 
 const assignmentSchema = new mongoose.Schema({
   title: {
@@ -171,5 +172,7 @@ assignmentSchema.index({ isGroupAssignment: 1, groupSet: 1, dueDate: 1 });
 
 const { portabilityMetadataPlugin } = require('./plugins/portabilityMetadata.plugin');
 assignmentSchema.plugin(portabilityMetadataPlugin);
+
+assignmentSchema.plugin(courseChildTenantPlugin, { modulePath: 'module' });
 
 module.exports = mongoose.models.Assignment || mongoose.model('Assignment', assignmentSchema); 

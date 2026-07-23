@@ -1,8 +1,8 @@
 const nodemailer = require('nodemailer');
 
-const DEFAULT_RECIPIENT = 'rbmsv123@gmail.com';
+const DEFAULT_RECIPIENT = 'patelvivek9111@gmail.com';
 
-let cachedTransporter = null;
+let cachedEnvTransporter = null;
 
 function escapeHtml(s) {
   if (s == null || s === '') return '';
@@ -14,8 +14,12 @@ function escapeHtml(s) {
     .replace(/'/g, '&#39;');
 }
 
-function getTransporter() {
-  if (cachedTransporter) return cachedTransporter;
+function inquiryRecipient() {
+  return (process.env.CONTACT_INQUIRY_RECIPIENT || DEFAULT_RECIPIENT).trim();
+}
+
+function getEnvTransporter() {
+  if (cachedEnvTransporter) return cachedEnvTransporter;
   const host = process.env.CONTACT_SMTP_HOST;
   const port = parseInt(process.env.CONTACT_SMTP_PORT || '587', 10);
   const user = process.env.CONTACT_SMTP_USER;
@@ -23,36 +27,49 @@ function getTransporter() {
   if (!host || !user || !pass) {
     return null;
   }
-  cachedTransporter = nodemailer.createTransport({
+  cachedEnvTransporter = nodemailer.createTransport({
     host,
     port,
     secure: port === 465,
     auth: { user, pass },
     tls: { rejectUnauthorized: process.env.CONTACT_SMTP_TLS_REJECT_UNAUTHORIZED !== 'false' },
   });
-  return cachedTransporter;
+  return cachedEnvTransporter;
 }
 
-/**
- * Send a public landing-page inquiry to CONTACT_INQUIRY_RECIPIENT (default rbmsv123@gmail.com).
- * Requires CONTACT_SMTP_HOST, CONTACT_SMTP_USER, CONTACT_SMTP_PASS (e.g. Gmail app password).
- */
-async function sendContactInquiry({ name, organization, jobTitle, userCount, extra }) {
-  const to = (process.env.CONTACT_INQUIRY_RECIPIENT || DEFAULT_RECIPIENT).trim();
-  const from = (process.env.CONTACT_SMTP_FROM || process.env.CONTACT_SMTP_USER || '').trim();
-  const transporter = getTransporter();
-  if (!transporter || !from) {
-    return {
-      ok: false,
-      code: 'SMTP_NOT_CONFIGURED',
-      message:
-        'Contact email is not configured on the server. Set CONTACT_SMTP_HOST, CONTACT_SMTP_USER, and CONTACT_SMTP_PASS.',
-    };
+async function getSystemSettingsMail() {
+  try {
+    const SystemSettings = require('../models/systemSettings.model');
+    const settings = await SystemSettings.getSettings();
+    const emailConfig = settings?.email;
+    if (!emailConfig?.smtpHost || !emailConfig?.smtpUser || !emailConfig?.smtpPassword) {
+      return null;
+    }
+    const port = emailConfig.smtpPort || 587;
+    const transporter = nodemailer.createTransport({
+      host: emailConfig.smtpHost,
+      port,
+      secure: port === 465,
+      auth: {
+        user: emailConfig.smtpUser,
+        pass: emailConfig.smtpPassword,
+      },
+      tls: { rejectUnauthorized: process.env.SMTP_TLS_REJECT_UNAUTHORIZED !== 'false' },
+    });
+    const from = (emailConfig.fromEmail || emailConfig.smtpUser || '').trim();
+    if (!from) return null;
+    return { transporter, from };
+  } catch (err) {
+    console.error('Contact inquiry: SystemSettings SMTP unavailable:', err.message);
+    return null;
   }
+}
 
+function buildBodies({ name, email, organization, jobTitle, userCount, extra }) {
   const subject = `[MySl8te inquiry] ${organization} — ${name}`;
   const text = [
     `Name: ${name}`,
+    `Email: ${email}`,
     `Job title: ${jobTitle}`,
     `Organization: ${organization}`,
     `Users / scale: ${userCount}`,
@@ -63,6 +80,7 @@ async function sendContactInquiry({ name, organization, jobTitle, userCount, ext
 
   const rows = [
     ['Name', name],
+    ['Email', email],
     ['Job title', jobTitle],
     ['Organization', organization],
     ['Users / scale', userCount],
@@ -81,20 +99,82 @@ async function sendContactInquiry({ name, organization, jobTitle, userCount, ext
 <table style="border-collapse:collapse;max-width:640px">${rows}</table>
 </body></html>`;
 
-  try {
-    await transporter.sendMail({
-      from: `"MySl8te contact" <${from}>`,
-      to,
-      replyTo: undefined,
-      subject,
-      text,
-      html,
-    });
-    return { ok: true };
-  } catch (err) {
-    console.error('Contact inquiry send failed:', err.message);
-    return { ok: false, code: 'SEND_FAILED', message: 'Could not send your message. Please try again later.' };
-  }
+  return { subject, text, html };
 }
 
-module.exports = { sendContactInquiry };
+async function sendWithNodemailer({ transporter, from, to, replyTo, subject, text, html }) {
+  await transporter.sendMail({
+    from: `"MySl8te contact" <${from}>`,
+    to,
+    replyTo: replyTo || undefined,
+    subject,
+    text,
+    html,
+  });
+  return { ok: true };
+}
+
+/**
+ * Send a public landing-page inquiry to CONTACT_INQUIRY_RECIPIENT
+ * (default patelvivek9111@gmail.com).
+ *
+ * Uses CONTACT_SMTP_* when set; otherwise falls back to admin SystemSettings SMTP.
+ * Requires a Gmail App Password (or other SMTP credentials) for delivery.
+ */
+async function sendContactInquiry({ name, email, organization, jobTitle, userCount, extra }) {
+  const to = inquiryRecipient();
+  const { subject, text, html } = buildBodies({
+    name,
+    email,
+    organization,
+    jobTitle,
+    userCount,
+    extra,
+  });
+
+  const envTransporter = getEnvTransporter();
+  const envFrom = (process.env.CONTACT_SMTP_FROM || process.env.CONTACT_SMTP_USER || '').trim();
+  if (envTransporter && envFrom) {
+    try {
+      return await sendWithNodemailer({
+        transporter: envTransporter,
+        from: envFrom,
+        to,
+        replyTo: email,
+        subject,
+        text,
+        html,
+      });
+    } catch (err) {
+      console.error('Contact inquiry SMTP (env) failed:', err.message);
+      return { ok: false, code: 'SEND_FAILED', message: 'Could not send your message. Please try again later.' };
+    }
+  }
+
+  const systemMail = await getSystemSettingsMail();
+  if (systemMail) {
+    try {
+      return await sendWithNodemailer({
+        transporter: systemMail.transporter,
+        from: systemMail.from,
+        to,
+        replyTo: email,
+        subject,
+        text,
+        html,
+      });
+    } catch (err) {
+      console.error('Contact inquiry SMTP (SystemSettings) failed:', err.message);
+      return { ok: false, code: 'SEND_FAILED', message: 'Could not send your message. Please try again later.' };
+    }
+  }
+
+  return {
+    ok: false,
+    code: 'SMTP_NOT_CONFIGURED',
+    message:
+      'Contact email is not configured on the server. Set CONTACT_SMTP_HOST, CONTACT_SMTP_USER, and CONTACT_SMTP_PASS (Gmail App Password).',
+  };
+}
+
+module.exports = { sendContactInquiry, DEFAULT_RECIPIENT };

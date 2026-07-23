@@ -283,14 +283,14 @@ export function AdminUserManagement() {
       const token = getMemoryAuthToken();
       const headers = { Authorization: `Bearer ${token}` };
 
-      // Use the register endpoint to create a new user
-      const response = await axios.post(`${API_URL}/api/auth/register`, {
+      // Provision inside this institution — does not replace the admin session
+      const response = await axios.post(`${API_URL}/api/admin/users`, {
         firstName: newUser.firstName,
         lastName: newUser.lastName,
         email: newUser.email,
         password: newUser.password,
         role: newUser.role
-      }, { headers });
+      }, { headers, withCredentials: true });
 
       if (response.data.success) {
         // Reset form

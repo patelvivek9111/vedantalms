@@ -12,6 +12,7 @@ const inquiryEndpoint = `${(API_URL || '').replace(/\/$/, '')}/api/contact/inqui
 export function ContactInquiryModal({ open, onOpenChange }: ContactInquiryModalProps) {
   const titleId = useId();
   const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [organization, setOrganization] = useState('');
   const [jobTitle, setJobTitle] = useState('');
   const [userCount, setUserCount] = useState('');
@@ -22,6 +23,7 @@ export function ContactInquiryModal({ open, onOpenChange }: ContactInquiryModalP
 
   const reset = useCallback(() => {
     setName('');
+    setEmail('');
     setOrganization('');
     setJobTitle('');
     setUserCount('');
@@ -53,6 +55,7 @@ export function ContactInquiryModal({ open, onOpenChange }: ContactInquiryModalP
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: name.trim(),
+          email: email.trim(),
           organization: organization.trim(),
           jobTitle: jobTitle.trim(),
           userCount: userCount.trim(),
@@ -145,6 +148,22 @@ export function ContactInquiryModal({ open, onOpenChange }: ContactInquiryModalP
               />
             </div>
             <div>
+              <label htmlFor="contact-email" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                Work email
+              </label>
+              <input
+                id="contact-email"
+                name="email"
+                type="email"
+                className={inputClass}
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                maxLength={254}
+              />
+            </div>
+            <div>
               <label htmlFor="contact-title" className="text-sm font-medium text-slate-700 dark:text-slate-300">
                 Your job title
               </label>
@@ -161,7 +180,7 @@ export function ContactInquiryModal({ open, onOpenChange }: ContactInquiryModalP
             </div>
             <div>
               <label htmlFor="contact-org" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                Organization
+                School / College name
               </label>
               <input
                 id="contact-org"

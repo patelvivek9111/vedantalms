@@ -28,17 +28,27 @@ import { performLogout } from '../../utils/authLogout';
 const getNavItems = (userRole: string) => {
   const baseItems = [
     { label: 'Account', icon: User, to: '/account' },
-    { label: 'Dashboard', icon: Gauge, to: '/' },
+    { label: 'Dashboard', icon: Gauge, to: '/dashboard' },
     { label: 'Courses', icon: BookOpen, to: '/courses' },
     { label: 'Calendar', icon: Calendar, to: '/calendar' },
     { label: 'Inbox', icon: Inbox, to: '/inbox' },
   ];
+
+  // Registrar office — distinct from teaching LMS shell
+  if (userRole === 'registrar' || userRole === 'department_admin') {
+    return [
+      { label: 'Account', icon: User, to: '/account' },
+      { label: 'Registrar', icon: FileText, to: '/registrar' },
+      { label: 'Inbox', icon: Inbox, to: '/inbox' },
+    ];
+  }
 
   // Add admin-specific items
   if (userRole === 'admin') {
     return [
       ...baseItems,
       { label: 'Users', icon: Users, to: '/admin/users' },
+      { label: 'Registrar', icon: FileText, to: '/registrar' },
       { label: 'Settings', icon: Settings, to: '/admin/settings' },
       { label: 'Security', icon: Shield, to: '/admin/security' },
     ];
@@ -266,8 +276,28 @@ export default function GlobalSidebar() {
           // Highlight 'Courses' for any /courses* route (but not /teacher/courses or /admin/courses)
           const isActive =
             (label === 'Courses' && (location.pathname.startsWith('/courses') || location.pathname === '/teacher/courses') && !location.pathname.startsWith('/admin/courses')) ||
-            (location.pathname === to && label !== 'Courses');
+            (label === 'Registrar' && location.pathname.startsWith('/registrar')) ||
+            (location.pathname === to && label !== 'Courses' && label !== 'Registrar');
           
+          // Dashboard home
+          if (label === 'Dashboard') {
+            const dashActive =
+              location.pathname === '/dashboard' || location.pathname === '/';
+            return (
+              <Link
+                key={label}
+                to="/dashboard"
+                className={`${sidebarNavBase} ${dashActive ? sidebarNavActive : sidebarNavInactive}`}
+              >
+                <SidebarActiveRail show={dashActive} />
+                <Icon className={`mb-1 h-5 w-5 transition-opacity duration-200 ${dashActive ? 'opacity-100' : 'opacity-90 group-hover:opacity-100'}`} />
+                <span className={`text-[11px] font-medium leading-tight tracking-tight ${dashActive ? 'font-semibold' : ''}`}>
+                  {label}
+                </span>
+              </Link>
+            );
+          }
+
           // Special handling for Account item to show profile picture
           if (label === 'Account') {
             return (

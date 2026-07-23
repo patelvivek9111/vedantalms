@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { courseChildTenantPlugin } = require('./plugins/courseChildTenant.plugin');
 
 const moduleSchema = new mongoose.Schema({
   title: {
@@ -57,5 +58,7 @@ moduleSchema.statics.cleanOrphanAssignments = async function() {
   }
   return { modulesUpdated, totalOrphans };
 };
+
+moduleSchema.plugin(courseChildTenantPlugin, { coursePath: 'course' });
 
 module.exports = mongoose.model('Module', moduleSchema); 

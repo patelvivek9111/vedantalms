@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { courseChildTenantPlugin } = require('./plugins/courseChildTenant.plugin');
 
 const courseGradingPeriodSchema = new mongoose.Schema(
   {
@@ -22,6 +23,8 @@ const courseGradingPeriodSchema = new mongoose.Schema(
 );
 
 courseGradingPeriodSchema.index({ course: 1, position: 1 });
+
+courseGradingPeriodSchema.plugin(courseChildTenantPlugin, { coursePath: 'course' });
 
 module.exports =
   mongoose.models.CourseGradingPeriod ||

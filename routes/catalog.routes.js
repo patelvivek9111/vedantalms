@@ -1,9 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const Course = require('../models/course.model');
+const AcademicTerm = require('../models/academicTerm.model');
 const { shapeCatalogCourse } = require('../services/catalogBrowse.service');
+const { withTenantFilter, rootAccountIdFromRequest } = require('../utils/tenantContext');
+const { accountSubtreeFilter } = require('../services/tenancy/academicStructure.service');
 
-// Public catalog endpoint
+// Public catalog endpoint (tenant-scoped; optional term / sub-account filters)
 router.get('/', async (req, res) => {
   try {
     let token;
@@ -21,16 +24,54 @@ router.get('/', async (req, res) => {
       }
     }
 
-    const courses = await Course.find({
-      'catalog.startDate': { $exists: true, $ne: null },
-      'catalog.endDate': { $exists: true, $ne: null },
-    })
+    const tenantId = rootAccountIdFromRequest(req);
+    let filter = withTenantFilter(
+      {
+        'catalog.startDate': { $exists: true, $ne: null },
+        'catalog.endDate': { $exists: true, $ne: null },
+      },
+      tenantId
+    );
+
+    if (req.query.accountId) {
+      filter = {
+        ...(await accountSubtreeFilter(tenantId, req.query.accountId)),
+        'catalog.startDate': { $exists: true, $ne: null },
+        'catalog.endDate': { $exists: true, $ne: null },
+      };
+    }
+    if (req.query.termId) {
+      filter.academicTermId = req.query.termId;
+    }
+
+    const courses = await Course.find(filter)
       .populate('instructor', 'firstName lastName email')
-      .select('title description instructor catalog published students enrollmentRequests waitlist operationalStatus')
+      .populate('academicTermId', 'name code status enrollmentOpenDate enrollmentCloseDate')
+      .select(
+        'title description instructor catalog published students enrollmentRequests waitlist operationalStatus academicTermId sectionNumber accountId'
+      )
       .lean();
 
     const userId = user?._id || user?.id;
-    res.json(courses.map((course) => shapeCatalogCourse(course, userId)));
+    const now = new Date();
+    const shaped = courses.map((course) => {
+      const row = shapeCatalogCourse(course, userId);
+      const term = course.academicTermId;
+      row.academicTerm = term
+        ? {
+            id: term._id,
+            name: term.name,
+            code: term.code,
+            status: term.status,
+            enrollmentOpen: AcademicTerm.isEnrollmentOpen(term, now),
+          }
+        : null;
+      row.sectionNumber = course.sectionNumber || null;
+      row.accountId = course.accountId || null;
+      return row;
+    });
+
+    res.json(shaped);
   } catch (err) {
     console.error('Get catalog error:', err);
     res.status(500).json({

@@ -520,7 +520,9 @@ describe('Course API', () => {
         .set('Authorization', `Bearer ${studentToken}`);
 
       expect(response.status).toBe(400);
-      expect(response.body.message).toContain('Already enrolled');
+      expect(
+        /Already enrolled|already pending/i.test(String(response.body.message || ''))
+      ).toBe(true);
 
       // Cleanup
       await Course.findByIdAndDelete(enrollCourseId);

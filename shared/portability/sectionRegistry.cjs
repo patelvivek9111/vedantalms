@@ -330,9 +330,87 @@ function resolveSectionNames(requested) {
   return SECTION_ORDER.filter((name) => set.has(name));
 }
 
+/**
+ * Tenant-scoped section defs for Phase 5 offboarding export.
+ * Falls back to global definitions when rootAccountId omitted.
+ */
+function getSectionDefinitions(rootAccountId) {
+  if (!rootAccountId) return SECTION_DEFINITIONS;
+  const rid = rootAccountId;
+  return {
+    ...SECTION_DEFINITIONS,
+    systemSettings: {
+      schemaVersion: SCHEMA_VERSION,
+      chunkable: false,
+      export: async () => {
+        const SystemSettings = require('../../models/systemSettings.model');
+        const doc = await SystemSettings.findOne({ rootAccountId: rid }).select('-__v').lean();
+        return leanExportDocs(doc ? [doc] : [], 'systemSettings');
+      },
+    },
+    users: {
+      schemaVersion: SCHEMA_VERSION,
+      chunkable: true,
+      cursor: cursorExporter('../../models/user.model', { rootAccountId: rid }, '-__v -password', 'users'),
+    },
+    courses: {
+      schemaVersion: SCHEMA_VERSION,
+      chunkable: true,
+      cursor: cursorExporter(
+        '../../models/course.model',
+        { rootAccountId: rid },
+        '-__v -enrollmentQrToken -enrollmentJoinCode',
+        'courses'
+      ),
+    },
+    enrollments: {
+      schemaVersion: SCHEMA_VERSION,
+      chunkable: false,
+      export: async () => {
+        const Course = require('../../models/course.model');
+        const courses = await Course.find({ rootAccountId: rid })
+          .select('title students instructor semester')
+          .sort({ _id: 1 })
+          .lean();
+        return courses.map((c) => ({
+          courseId: String(c._id),
+          title: c.title,
+          instructor: c.instructor ? String(c.instructor) : null,
+          studentIds: (c.students || []).map(String),
+          semester: c.semester,
+        }));
+      },
+    },
+    fileAssets: {
+      schemaVersion: SCHEMA_VERSION,
+      chunkable: true,
+      cursor: cursorExporter(
+        '../../models/fileAsset.model',
+        { isDeleted: false, rootAccountId: rid },
+        '-__v',
+        'fileAssets'
+      ),
+    },
+    permissionsRoles: {
+      schemaVersion: SCHEMA_VERSION,
+      chunkable: false,
+      export: async () => {
+        const User = require('../../models/user.model');
+        const users = await User.find({ rootAccountId: rid }).select('email role').sort({ _id: 1 }).lean();
+        return users.map((u) => ({
+          userId: String(u._id),
+          email: u.email,
+          role: u.role,
+        }));
+      },
+    },
+  };
+}
+
 module.exports = {
   SECTION_ORDER,
   SECTION_DEFINITIONS,
   DEFAULT_CHUNK_SIZE,
   resolveSectionNames,
+  getSectionDefinitions,
 };

@@ -2,11 +2,13 @@ import React, { Suspense } from 'react';
 import { lazyWithRetry } from './utils/lazyWithRetry';
 import { Routes, Route, Navigate, useParams, useLocation, Link } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { TenantProvider } from './contexts/TenantContext';
 import { CourseProvider } from './contexts/CourseContext';
 import { ModuleProvider } from './contexts/ModuleContext';
 import { PrivateRoute } from './components/common/PrivateRoute';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
+import { AcceptInvite } from './pages/AcceptInvite';
 import { PrivacyPolicy } from './pages/PrivacyPolicy';
 import { TermsOfService } from './pages/TermsOfService';
 import { ForgotPassword } from './pages/ForgotPassword';
@@ -46,7 +48,7 @@ import { useNetworkStatus } from './hooks/useNetworkStatus';
 import { useMessagingSocketConnection } from './hooks/inbox/useMessagingSocketConnection';
 import { useNotificationSocketConnection } from './hooks/notifications/useNotificationSocketConnection';
 import { useNotificationCrossTabSync } from './hooks/notifications/useNotificationCrossTabSync';
-import { loginRedirectPath } from './utils/loginRedirect';
+import { loginRedirectPath, homePathForRole } from './utils/loginRedirect';
 import { AdminPhoneGate } from './components/admin/AdminPhoneGate';
 const AdminDashboard = lazyWithRetry(() => import('./pages/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 const AdminUserManagement = lazyWithRetry(() => import('./pages/AdminUserManagement').then(m => ({ default: m.AdminUserManagement })));
@@ -54,6 +56,20 @@ const AdminAnalytics = lazyWithRetry(() => import('./pages/AdminAnalytics').then
 const AdminSystemSettings = lazyWithRetry(() => import('./pages/AdminSystemSettings').then(m => ({ default: m.AdminSystemSettings })));
 const AdminCourseOversight = lazyWithRetry(() => import('./pages/AdminCourseOversight').then(m => ({ default: m.AdminCourseOversight })));
 const AdminSecurity = lazyWithRetry(() => import('./pages/AdminSecurity').then(m => ({ default: m.AdminSecurity })));
+const RegistrarOffice = lazyWithRetry(() => import('./pages/registrar/RegistrarLayout').then(m => ({ default: m.RegistrarLayout })));
+const RegistrarDashboard = lazyWithRetry(() => import('./pages/registrar/RegistrarDashboard').then(m => ({ default: m.RegistrarDashboard })));
+const RegistrarTerms = lazyWithRetry(() => import('./pages/registrar/RegistrarTerms').then(m => ({ default: m.RegistrarTerms })));
+const RegistrarStudents = lazyWithRetry(() => import('./pages/registrar/RegistrarStudents').then(m => ({ default: m.RegistrarStudents })));
+const RegistrarStudentStub = lazyWithRetry(() => import('./pages/registrar/RegistrarStudentStub').then(m => ({ default: m.RegistrarStudent360 })));
+const RegistrarPrograms = lazyWithRetry(() => import('./pages/registrar/RegistrarPrograms').then(m => ({ default: m.RegistrarPrograms })));
+const RegistrarSections = lazyWithRetry(() => import('./pages/registrar/RegistrarSections').then(m => ({ default: m.RegistrarSections })));
+const RegistrarGradeStatus = lazyWithRetry(() => import('./pages/registrar/RegistrarGradeStatus').then(m => ({ default: m.RegistrarGradeStatus })));
+const RegistrarTranscripts = lazyWithRetry(() => import('./pages/registrar/RegistrarTranscripts').then(m => ({ default: m.RegistrarTranscripts })));
+const RegistrarReports = lazyWithRetry(() => import('./pages/registrar/RegistrarReports').then(m => ({ default: m.RegistrarReports })));
+const RegistrarOperations = lazyWithRetry(() => import('./pages/registrar/RegistrarOperations').then(m => ({ default: m.RegistrarOperations })));
+const RegistrarSis = lazyWithRetry(() => import('./pages/registrar/RegistrarSis').then(m => ({ default: m.RegistrarSis })));
+const RegistrarSettings = lazyWithRetry(() => import('./pages/registrar/RegistrarSettings').then(m => ({ default: m.RegistrarSettings })));
+const AdminAccountTree = lazyWithRetry(() => import('./pages/AdminAccountTree').then(m => ({ default: m.AdminAccountTree })));
 const TeacherCourseOversight = lazyWithRetry(() => import('./pages/TeacherCourseOversight').then(m => ({ default: m.TeacherCourseOversight })));
 const ModuleEditPage = lazyWithRetry(() => import('./pages/ModuleEditPage'));
 const PageEditPage = lazyWithRetry(() => import('./pages/PageEditPage'));
@@ -97,11 +113,19 @@ const CreateAssignmentFormWrapper = () => {
 };
 
 function Unauthorized() {
+  const { user } = useAuth();
+  const home = homePathForRole(user?.role);
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-      <div className="text-center">
+      <div className="text-center px-4">
         <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100">401</h1>
         <p className="mt-2 text-gray-600 dark:text-gray-400">You are not authorized to access this page.</p>
+        <Link
+          to={home}
+          className="mt-6 inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+        >
+          Go to your home
+        </Link>
       </div>
     </div>
   );
@@ -133,7 +157,11 @@ function AnnouncementsWrapper() {
 
 function DashboardWrapper() {
   const { user } = useAuth();
-  
+
+  if (user?.role === 'registrar' || user?.role === 'department_admin') {
+    return <Navigate to="/registrar" replace />;
+  }
+
   // Render admin dashboard for admin users
   if (user?.role === 'admin') {
     return (
@@ -142,7 +170,7 @@ function DashboardWrapper() {
       </AdminPhoneGate>
     );
   }
-  
+
   // Render regular dashboard for other users
   return <Dashboard />;
 }
@@ -163,7 +191,7 @@ function LoginRoute() {
   const { user } = useAuth();
   const location = useLocation();
   if (user) {
-    return <Navigate to={loginRedirectPath(location.state)} replace />;
+    return <Navigate to={loginRedirectPath(location.state, user.role)} replace />;
   }
   return <Login />;
 }
@@ -222,9 +250,13 @@ function AppContent() {
       >
         <Routes>
           {/* Public Routes */}
-          <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
+          <Route path="/" element={isAuthenticated ? <Navigate to={homePathForRole(user?.role)} replace /> : <LandingPage />} />
           <Route path="/login" element={<LoginRoute />} />
-          <Route path="/signup" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Signup />} />
+          <Route path="/signup" element={isAuthenticated ? <Navigate to={homePathForRole(user?.role)} replace /> : <Signup />} />
+          <Route
+            path="/accept-invite"
+            element={isAuthenticated ? <Navigate to={homePathForRole(user?.role)} replace /> : <AcceptInvite />}
+          />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/terms" element={<TermsOfService />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -482,7 +514,7 @@ function AppContent() {
           <Route
             path="/teacher/courses"
             element={
-              <PrivateRoute allowedRoles={['teacher']}>
+              <PrivateRoute allowedRoles={['teacher', 'admin']}>
                 {withRouteLoader(<TeacherCourseOversight />)}
               </PrivateRoute>
             }
@@ -511,6 +543,36 @@ function AppContent() {
               </AdminRoute>
             }
           />
+          <Route
+            path="/admin/accounts"
+            element={
+              <AdminRoute>
+                {withRouteLoader(<AdminAccountTree />)}
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/registrar"
+            element={
+              <PrivateRoute allowedRoles={['admin', 'registrar', 'department_admin', 'platform_admin']}>
+                {withRouteLoader(<RegistrarOffice />)}
+              </PrivateRoute>
+            }
+          >
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={withRouteLoader(<RegistrarDashboard />)} />
+            <Route path="terms" element={withRouteLoader(<RegistrarTerms />)} />
+            <Route path="students" element={withRouteLoader(<RegistrarStudents />)} />
+            <Route path="students/:studentId" element={withRouteLoader(<RegistrarStudentStub />)} />
+            <Route path="programs" element={withRouteLoader(<RegistrarPrograms />)} />
+            <Route path="sections" element={withRouteLoader(<RegistrarSections />)} />
+            <Route path="grades" element={withRouteLoader(<RegistrarGradeStatus />)} />
+            <Route path="transcripts" element={withRouteLoader(<RegistrarTranscripts />)} />
+            <Route path="reports" element={withRouteLoader(<RegistrarReports />)} />
+            <Route path="operations" element={withRouteLoader(<RegistrarOperations />)} />
+            <Route path="sis" element={withRouteLoader(<RegistrarSis />)} />
+            <Route path="settings" element={withRouteLoader(<RegistrarSettings />)} />
+          </Route>
           <Route
             path="/admin/backup"
             element={
@@ -580,11 +642,13 @@ function App() {
   return (
     <Provider store={store}>
       <ThemeProvider>
-        <AuthProvider>
-          <QueryProvider>
-            <AppShell />
-          </QueryProvider>
-        </AuthProvider>
+        <TenantProvider>
+          <AuthProvider>
+            <QueryProvider>
+              <AppShell />
+            </QueryProvider>
+          </AuthProvider>
+        </TenantProvider>
       </ThemeProvider>
     </Provider>
   );

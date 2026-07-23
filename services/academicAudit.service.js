@@ -1,4 +1,5 @@
 const SystemAuditEvent = require('../models/systemAuditEvent.model');
+const { getTenantRootAccountId } = require('../utils/tenantContext');
 
 async function recordAuditEvent({
   actorId,
@@ -11,6 +12,7 @@ async function recordAuditEvent({
   ip,
   requestId,
   metadata,
+  rootAccountId,
 }) {
   return SystemAuditEvent.create({
     actor: actorId,
@@ -23,6 +25,7 @@ async function recordAuditEvent({
     ip,
     requestId,
     metadata,
+    rootAccountId: rootAccountId || getTenantRootAccountId() || undefined,
   });
 }
 

@@ -161,11 +161,50 @@ const systemSettingsSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Ensure only one settings document exists
-systemSettingsSchema.statics.getSettings = async function() {
-  let settings = await this.findOne();
+systemSettingsSchema.add({
+  rootAccountId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Account',
+  },
+});
+
+systemSettingsSchema.index(
+  { rootAccountId: 1 },
+  { unique: true, partialFilterExpression: { rootAccountId: { $type: 'objectId' } } }
+);
+
+/**
+ * Per-root-account settings (Canvas account settings).
+ * @param {import('mongoose').Types.ObjectId|string} [rootAccountId]
+ */
+systemSettingsSchema.statics.getSettings = async function (rootAccountId) {
+  const { getTenantRootAccountId } = require('../utils/tenantContext');
+  let id = rootAccountId || getTenantRootAccountId();
+
+  if (!id) {
+    // Legacy / early boot: prefer any claimed doc, else create unscoped then claim later
+    let settings = await this.findOne({ rootAccountId: { $ne: null } }).sort({ updatedAt: -1 });
+    if (!settings) {
+      settings = await this.findOne();
+    }
+    if (!settings) {
+      settings = await this.create({});
+    }
+    return settings;
+  }
+
+  let settings = await this.findOne({ rootAccountId: id });
   if (!settings) {
-    settings = await this.create({});
+    // Adopt a single legacy unscoped document once
+    const orphan = await this.findOne({
+      $or: [{ rootAccountId: null }, { rootAccountId: { $exists: false } }],
+    });
+    if (orphan) {
+      orphan.rootAccountId = id;
+      await orphan.save();
+      return orphan;
+    }
+    settings = await this.create({ rootAccountId: id });
   }
   return settings;
 };

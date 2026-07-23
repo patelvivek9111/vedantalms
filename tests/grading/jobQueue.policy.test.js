@@ -13,10 +13,12 @@ describe('jobQueue (Wave D)', () => {
   let mongoServer;
   let contract;
   let registrar;
+  let previousMongoUri;
 
   beforeAll(async () => {
     applyJestExportPaths();
     process.env.FORCE_INLINE_JOBS = 'true';
+    previousMongoUri = process.env.MONGODB_URI;
     mongoServer = await createMongoMemoryServer();
     process.env.MONGODB_URI = mongoServer.getUri();
     await mongoose.connect(process.env.MONGODB_URI);
@@ -27,6 +29,8 @@ describe('jobQueue (Wave D)', () => {
       email: `reg.worker.${Date.now()}@example.com`,
       password: 'password123',
       role: 'registrar',
+      rootAccountId: contract.rootAccountId,
+      accountId: contract.rootAccountId,
     });
   }, 120000);
 
@@ -36,6 +40,14 @@ describe('jobQueue (Wave D)', () => {
       await mongoose.disconnect();
     }
     if (mongoServer) await mongoServer.stop();
+    const fs = require('fs');
+    const path = require('path');
+    const sharedUriFile = path.join(__dirname, '../.mongo-memory-uri');
+    if (fs.existsSync(sharedUriFile)) {
+      process.env.MONGODB_URI = fs.readFileSync(sharedUriFile, 'utf8').trim();
+    } else if (previousMongoUri) {
+      process.env.MONGODB_URI = previousMongoUri;
+    }
   });
 
   it('runs grades.finalize inline and marks job completed', async () => {
@@ -43,11 +55,12 @@ describe('jobQueue (Wave D)', () => {
     await gradeLifecycleService.transitionToPosted(contract.courseId, {
       _id: contract.teacherId,
       role: 'teacher',
+      rootAccountId: contract.rootAccountId,
     });
 
     const { job, async: isAsync } = await jobQueueService.enqueueJob(
       'grades.finalize',
-      { courseId: contract.courseId, userId: String(registrar._id) },
+      { courseId: contract.courseId, userId: String(registrar._id), rootAccountId: contract.rootAccountId },
       registrar
     );
 
@@ -59,7 +72,7 @@ describe('jobQueue (Wave D)', () => {
   it('runs export.gradebook inline with download token', async () => {
     const { job } = await jobQueueService.enqueueJob(
       'export.gradebook',
-      { courseId: contract.courseId },
+      { courseId: contract.courseId, rootAccountId: contract.rootAccountId },
       registrar
     );
 

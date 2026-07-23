@@ -6,10 +6,15 @@ const asyncJobSchema = new mongoose.Schema(
       type: String,
       enum: [
         'grades.finalize',
+        'grades.term_finalize',
         'grades.recompute',
         'grades.policyImpactPreview',
         'transcript.regenerate',
+        'transcript.bulk_issue',
+        'sis.import_apply',
+        'sis.grade_export',
         'export.gradebook',
+        'export.institution',
         'course.copy',
         'course.bulk',
         'maintenance.files',
@@ -23,6 +28,11 @@ const asyncJobSchema = new mongoose.Schema(
         'files.storage.recalculate',
       ],
       required: true,
+    },
+    rootAccountId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Account',
+      index: true,
     },
     status: {
       type: String,
@@ -49,5 +59,6 @@ const asyncJobSchema = new mongoose.Schema(
 asyncJobSchema.index({ requestedBy: 1, createdAt: -1 });
 asyncJobSchema.index({ status: 1, createdAt: -1 });
 asyncJobSchema.index({ type: 1, createdAt: -1 });
+asyncJobSchema.index({ rootAccountId: 1, status: 1, createdAt: -1 });
 
 module.exports = mongoose.model('AsyncJob', asyncJobSchema);

@@ -14,10 +14,17 @@ const {
   loadCourseGradeAssignments,
   buildStudentGradeInputs,
 } = require('./gradeCalculationInputs.service');
+const { listActiveStudentIds } = require('./registrar/rosterRead.service');
+const User = require('../models/user.model');
 
 function normalizeStudentId(id) {
   if (id && typeof id === 'object' && id._id) return String(id._id);
   return String(id);
+}
+
+async function resolveRosterStudentIds(course) {
+  const ids = await listActiveStudentIds(course._id, { rootAccountId: course.rootAccountId });
+  return (ids || []).map(normalizeStudentId);
 }
 
 function buildPolicyMeta(resolved, snapshotBundle) {
@@ -98,7 +105,7 @@ async function computeCourseClassAverage(courseId) {
     throw err;
   }
 
-  const studentIds = (course.students || []).map(normalizeStudentId);
+  const studentIds = await resolveRosterStudentIds(course);
   if (studentIds.length === 0) {
     return { average: null, studentCount: 0, gradedCount: 0 };
   }
@@ -164,7 +171,6 @@ async function getCourseGradebookPage(
 ) {
   const course = await Course.findById(courseId)
     .populate('instructor', 'firstName lastName email')
-    .populate('students', 'firstName lastName email profilePicture')
     .lean();
   if (!course) {
     const err = new Error('Course not found');
@@ -178,7 +184,15 @@ async function getCourseGradebookPage(
   });
   const snapshotBundle = generateResolvedPolicySnapshot(resolved);
 
-  const studentIds = (course.students || []).map(normalizeStudentId);
+  const studentIds = await resolveRosterStudentIds(course);
+  const rosterUsers = studentIds.length
+    ? await User.find({ _id: { $in: studentIds } })
+        .select('firstName lastName email profilePicture')
+        .lean()
+    : [];
+  const byId = new Map(rosterUsers.map((u) => [String(u._id), u]));
+  const orderedStudents = studentIds.map((id) => byId.get(String(id)) || { _id: id });
+
   const safePage = Math.max(1, parseInt(page, 10) || 1);
   const safePageSize = Math.min(200, Math.max(1, parseInt(pageSize, 10) || 50));
   const start = (safePage - 1) * safePageSize;
@@ -275,9 +289,7 @@ async function getCourseGradebookPage(
   }
 
   const students = await mapUsersWithResolvedProfilePictures(
-    (course.students || [])
-      .map((s) => (typeof s === 'object' ? s : { _id: s }))
-      .filter((s) => pageStudentIds.includes(String(s._id)))
+    orderedStudents.filter((s) => pageStudentIds.includes(String(s._id)))
   );
 
   return {
@@ -309,9 +321,7 @@ async function getCourseGradebookPage(
 }
 
 async function getFullGradebookDataset(courseId, policyCache, options = {}) {
-  const course = await Course.findById(courseId)
-    .populate('students', 'firstName lastName email profilePicture')
-    .lean();
+  const course = await Course.findById(courseId).lean();
   if (!course) {
     const err = new Error('Course not found');
     err.statusCode = 404;
@@ -326,15 +336,21 @@ async function getFullGradebookDataset(courseId, policyCache, options = {}) {
 
   const columnOptions = options.gradingPeriodId ? { gradingPeriodId: options.gradingPeriodId } : {};
   const assignments = await loadGradebookColumns(courseId, columnOptions);
-  const studentIds = (course.students || []).map(normalizeStudentId);
+  const studentIds = await resolveRosterStudentIds(course);
   const submissionMap = {};
   const grades =
     studentIds.length > 0
       ? await buildGradebookGrades(course, assignments, studentIds, cache, submissionMap)
       : {};
 
+  const rosterUsers = studentIds.length
+    ? await User.find({ _id: { $in: studentIds } })
+        .select('firstName lastName email profilePicture')
+        .lean()
+    : [];
+  const byId = new Map(rosterUsers.map((u) => [String(u._id), u]));
   const students = await mapUsersWithResolvedProfilePictures(
-    (course.students || []).map((s) => (typeof s === 'object' ? s : { _id: s }))
+    studentIds.map((id) => byId.get(String(id)) || { _id: id })
   );
 
   return {

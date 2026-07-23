@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { tenantScopePlugin } = require('./plugins/tenantScope.plugin');
 
 const LIFECYCLE_STATUSES = ['DRAFT', 'POSTED', 'FINALIZED', 'AMENDED'];
 
@@ -37,8 +38,11 @@ const courseGradeLifecycleSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+courseGradeLifecycleSchema.plugin(tenantScopePlugin);
+
 courseGradeLifecycleSchema.index({ course: 1, term: 1, year: 1 }, { unique: true });
 courseGradeLifecycleSchema.index({ course: 1, status: 1 });
+courseGradeLifecycleSchema.index({ rootAccountId: 1, status: 1, term: 1, year: 1 });
 
 courseGradeLifecycleSchema.statics.STATUSES = LIFECYCLE_STATUSES;
 

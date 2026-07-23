@@ -17,6 +17,8 @@ const EVENT_COPY = {
   upload_completed: { type: 'course', title: 'Upload complete', tone: 'success' },
   export_ready: { type: 'course', title: 'Export ready', tone: 'success' },
   grades_finalized: { type: 'course', title: 'Grades finalized', tone: 'info' },
+  transcript_ready: { type: 'system', title: 'Transcript ready', tone: 'success' },
+  sis_sync_errors: { type: 'system', title: 'SIS sync errors', tone: 'warning' },
   submission_locked: { type: 'assignment', title: 'Submission locked', tone: 'warning' },
   file_unsafe_blocked: { type: 'course', title: 'File blocked', tone: 'danger' },
   lifecycle_transition: { type: 'course', title: 'Grade lifecycle updated', tone: 'info' },

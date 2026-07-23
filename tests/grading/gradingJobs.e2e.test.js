@@ -22,12 +22,14 @@ describe('grading jobs E2E (Wave D)', () => {
   let app;
   let contract;
   let registrarToken;
+  let previousMongoUri;
 
   beforeAll(async () => {
     applyJestExportPaths();
     process.env.FORCE_INLINE_JOBS = 'true';
     process.env.DISABLE_RATE_LIMIT = 'true';
     process.env.GRADING_ASYNC_STUDENT_THRESHOLD = '1';
+    previousMongoUri = process.env.MONGODB_URI;
     mongoServer = await createMongoMemoryServer();
     process.env.MONGODB_URI = mongoServer.getUri();
     await mongoose.connect(process.env.MONGODB_URI);
@@ -40,6 +42,8 @@ describe('grading jobs E2E (Wave D)', () => {
       email: `reg.jobs.${Date.now()}@example.com`,
       password: 'password123',
       role: 'registrar',
+      rootAccountId: contract.rootAccountId,
+      accountId: contract.rootAccountId,
     });
     registrarToken = registrar.getSignedJwtToken();
   }, 120000);
@@ -49,6 +53,14 @@ describe('grading jobs E2E (Wave D)', () => {
     delete process.env.GRADING_ASYNC_STUDENT_THRESHOLD;
     if (mongoose.connection.readyState !== 0) await mongoose.disconnect();
     if (mongoServer) await mongoServer.stop();
+    const fs = require('fs');
+    const path = require('path');
+    const sharedUriFile = path.join(__dirname, '../.mongo-memory-uri');
+    if (fs.existsSync(sharedUriFile)) {
+      process.env.MONGODB_URI = fs.readFileSync(sharedUriFile, 'utf8').trim();
+    } else if (previousMongoUri) {
+      process.env.MONGODB_URI = previousMongoUri;
+    }
   });
 
   it('finalize returns job payload when async threshold met (inline completion)', async () => {

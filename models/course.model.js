@@ -134,6 +134,26 @@ const courseSchema = new mongoose.Schema({
     term: { type: String, default: 'Fall' },
     year: { type: Number, default: new Date().getFullYear() }
   },
+  /** Canvas AcademicTerm (institution registry). Dual-writes with semester. */
+  academicTermId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AcademicTerm',
+    default: null,
+    index: true,
+  },
+  offeringId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'CourseOffering',
+    default: null,
+    index: true,
+  },
+  sectionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'CourseSection',
+    default: null,
+    index: true,
+  },
+  sectionNumber: { type: String, default: '001', trim: true },
   /** Display label e.g. "2025–26" for year-long school courses. */
   academicYearLabel: { type: String, default: null, trim: true },
   /**
@@ -342,8 +362,14 @@ courseSchema.index({ students: 1 });
 courseSchema.index({ students: 1, published: 1, updatedAt: -1 });
 courseSchema.index({ 'catalog.isPublic': 1, 'catalog.startDate': 1, 'catalog.endDate': 1 });
 courseSchema.index({ 'catalog.courseCode': 1 });
+courseSchema.index({ rootAccountId: 1, instructor: 1, updatedAt: -1 });
+courseSchema.index({ rootAccountId: 1, students: 1, published: 1 });
+courseSchema.index({ rootAccountId: 1, academicTermId: 1 });
+courseSchema.index({ rootAccountId: 1, accountId: 1, published: 1 });
 
 const { portabilityMetadataPlugin } = require('./plugins/portabilityMetadata.plugin');
+const { tenantScopePlugin } = require('./plugins/tenantScope.plugin');
 courseSchema.plugin(portabilityMetadataPlugin);
+courseSchema.plugin(tenantScopePlugin);
 
 module.exports = mongoose.model('Course', courseSchema); 

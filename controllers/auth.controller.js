@@ -7,12 +7,14 @@ const { isPublicRegistrationDisabled, getSecurityPolicy } = require('../services
 const { setAuthCookie, clearAuthCookie } = require('../utils/authCookie');
 const { sendEmail } = require('../utils/emailService');
 const { resolveProfilePictureUrl } = require('../utils/profilePictureUrl');
+const { withTenantFilter } = require('../utils/tenantContext');
+const { ensureAccountMembership, findUserByLoginId } = require('../services/tenancy/accountMembership.service');
 
 const SELF_REGISTER_ROLES = new Set(['student']);
 const DEV_SELF_REGISTER_ROLES = new Set(['student', 'teacher']);
 
-function resolveRegistrationRole(requestedRole) {
-  if (isPublicRegistrationDisabled()) {
+function resolveRegistrationRole(requestedRole, rootAccountId) {
+  if (isPublicRegistrationDisabled(rootAccountId)) {
     return null;
   }
   if (process.env.NODE_ENV === 'production') {
@@ -39,6 +41,7 @@ async function sendAuthResponse(res, statusCode, user) {
       role: user.role,
       bio: user.bio || '',
       profilePicture,
+      rootAccountId: user.rootAccountId || null,
     },
   });
 }
@@ -69,7 +72,7 @@ exports.register = async (req, res) => {
       });
     }
 
-    const assignedRole = resolveRegistrationRole(role);
+    const assignedRole = resolveRegistrationRole(role, req.rootAccountId);
     if (!assignedRole) {
       return res.status(403).json({
         success: false,
@@ -77,7 +80,7 @@ exports.register = async (req, res) => {
       });
     }
 
-    if (getSecurityPolicy().maintenanceMode) {
+    if (getSecurityPolicy(req.rootAccountId).maintenanceMode) {
       return res.status(503).json({
         success: false,
         message: 'Registration is unavailable during maintenance.',
@@ -99,7 +102,9 @@ exports.register = async (req, res) => {
       });
     }
 
-    const existing = await User.findOne({ email });
+    const existing = await User.findOne(
+      withTenantFilter({ email }, req.rootAccountId)
+    );
     if (existing) {
       return res.status(400).json({
         success: false,
@@ -115,6 +120,15 @@ exports.register = async (req, res) => {
       role: assignedRole,
       bio: '',
       privacyConsentAt: new Date(),
+      rootAccountId: req.rootAccountId,
+      accountId: req.rootAccountId,
+    });
+
+    await ensureAccountMembership({
+      user,
+      rootAccountId: req.rootAccountId,
+      accountId: req.rootAccountId,
+      role: assignedRole,
     });
 
     return await sendAuthResponse(res, 201, user);
@@ -138,9 +152,32 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: 'Please provide an email and password' });
     }
 
-    const policy = getSecurityPolicy();
+    const policy = getSecurityPolicy(req.rootAccountId);
+    const normalizedEmail = String(email).toLowerCase().trim();
 
-    const user = await User.findOne({ email }).select('+password');
+    let user =
+      (await findUserByLoginId(req.rootAccountId, normalizedEmail)) ||
+      (await User.findOne(withTenantFilter({ email: normalizedEmail }, req.rootAccountId)).select(
+        '+password'
+      ));
+
+    // Migration window: claim legacy users missing rootAccountId (avoid save() so password is not re-hashed)
+    if (!user && req.rootAccountId) {
+      const legacy = await User.findOne({
+        email: normalizedEmail,
+        $or: [{ rootAccountId: null }, { rootAccountId: { $exists: false } }],
+      }).select('+password');
+      if (legacy) {
+        await User.updateOne(
+          { _id: legacy._id },
+          { $set: { rootAccountId: req.rootAccountId, accountId: req.rootAccountId } }
+        );
+        legacy.rootAccountId = req.rootAccountId;
+        legacy.accountId = req.rootAccountId;
+        user = legacy;
+      }
+    }
+
     if (!user) {
       await LoginActivity.create({
         userId: null,
@@ -205,6 +242,15 @@ exports.login = async (req, res) => {
     user.lastLogin = new Date();
     await user.save();
 
+    if (req.rootAccountId) {
+      await ensureAccountMembership({
+        user,
+        rootAccountId: req.rootAccountId,
+        accountId: req.rootAccountId,
+        role: user.role,
+      });
+    }
+
     return await sendAuthResponse(res, 200, user);
   } catch (err) {
     console.error('Login error:', err.message);
@@ -240,6 +286,7 @@ exports.getMe = async (req, res) => {
         role: user.role,
         bio: user.bio || '',
         profilePicture,
+        rootAccountId: user.rootAccountId || null,
       },
     });
   } catch (err) {

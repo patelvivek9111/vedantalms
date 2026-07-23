@@ -1,7 +1,9 @@
 const CourseGradeLifecycle = require('../models/courseGradeLifecycle.model');
 const GradeAmendmentRecord = require('../models/gradeAmendmentRecord.model');
 const GradingPolicyAudit = require('../models/gradingPolicyAudit.model');
+const Course = require('../models/course.model');
 const { Parser } = require('json2csv');
+const { withTenantFilter, rootAccountIdFromRequest } = require('../utils/tenantContext');
 
 function csvFromRows(rows) {
   if (!rows.length) return '';
@@ -11,8 +13,9 @@ function csvFromRows(rows) {
 
 exports.getTermCompletionReport = async (req, res) => {
   try {
+    const tenantId = rootAccountIdFromRequest(req);
     const { term, year } = req.query;
-    const query = {};
+    const query = withTenantFilter({}, tenantId);
     if (term) query.term = term;
     if (year) query.year = Number(year);
 
@@ -44,7 +47,9 @@ exports.getTermCompletionReport = async (req, res) => {
 
 exports.getAmendmentReport = async (req, res) => {
   try {
-    const rows = await GradeAmendmentRecord.find({})
+    const tenantId = rootAccountIdFromRequest(req);
+    const courseIds = await Course.find(withTenantFilter({}, tenantId)).distinct('_id');
+    const rows = await GradeAmendmentRecord.find({ course: { $in: courseIds } })
       .sort({ createdAt: -1 })
       .limit(parseInt(req.query.limit || '500', 10))
       .populate('course', 'title')
@@ -75,7 +80,13 @@ exports.getAmendmentReport = async (req, res) => {
 
 exports.getPolicyChangeReport = async (req, res) => {
   try {
-    const rows = await GradingPolicyAudit.find({})
+    const tenantId = rootAccountIdFromRequest(req);
+    const filter = tenantId
+      ? {
+          $or: [{ rootAccountId: tenantId }, { 'meta.rootAccountId': tenantId }],
+        }
+      : withTenantFilter({}, null);
+    const rows = await GradingPolicyAudit.find(filter)
       .sort({ createdAt: -1 })
       .limit(parseInt(req.query.limit || '500', 10))
       .populate('actor', 'firstName lastName email role')
@@ -103,7 +114,10 @@ exports.getPolicyChangeReport = async (req, res) => {
 
 exports.getFinalizedCoursesReport = async (req, res) => {
   try {
-    const rows = await CourseGradeLifecycle.find({ status: 'FINALIZED' })
+    const tenantId = rootAccountIdFromRequest(req);
+    const rows = await CourseGradeLifecycle.find(
+      withTenantFilter({ status: 'FINALIZED' }, tenantId)
+    )
       .populate('course', 'title catalog')
       .sort({ finalizedAt: -1 })
       .lean();
@@ -127,4 +141,36 @@ exports.getFinalizedCoursesReport = async (req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
+};
+
+/** India demo pack reports (CSV scaffolds). */
+exports.getIndiaReport = async (req, res) => {
+  try {
+    const tenantId = rootAccountIdFromRequest(req);
+    const indiaReports = require('../services/registrar/indiaReports.service');
+    const kind = req.params.kind;
+    const params = {
+      studentId: req.query.studentId || req.body?.studentId,
+      courseId: req.query.courseId || req.body?.courseId,
+      term: req.query.term || req.body?.term,
+      year: req.query.year || req.body?.year,
+    };
+    const data = await indiaReports.runIndiaReport(kind, tenantId, params);
+    if (req.query.format === 'csv') {
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${kind}.csv"`);
+      return res.send(data.csvText);
+    }
+    return res.json({ success: true, data });
+  } catch (error) {
+    return res.status(error.status || 500).json({ success: false, message: error.message });
+  }
+};
+
+exports.listIndiaReportKinds = async (req, res) => {
+  const indiaReports = require('../services/registrar/indiaReports.service');
+  return res.json({
+    success: true,
+    data: indiaReports.REPORT_KINDS.map((k) => ({ key: k })),
+  });
 };

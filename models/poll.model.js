@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { courseChildTenantPlugin } = require('./plugins/courseChildTenant.plugin');
 
 const pollSchema = new mongoose.Schema({
   course: {
@@ -91,5 +92,7 @@ pollSchema.methods.getWinningOptions = function() {
 
 const { portabilityMetadataPlugin } = require('./plugins/portabilityMetadata.plugin');
 pollSchema.plugin(portabilityMetadataPlugin);
+
+pollSchema.plugin(courseChildTenantPlugin, { coursePath: 'course' });
 
 module.exports = mongoose.model('Poll', pollSchema); 

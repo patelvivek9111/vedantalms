@@ -253,8 +253,10 @@ const LandingPage: React.FC = () => {
             <p className="mt-6 max-w-xl text-pretty text-base leading-relaxed text-slate-600 dark:text-slate-400 sm:text-lg">
               <span className="mysl8te-wordmark text-[1em] align-baseline">MYSL8TE</span> brings courses, people, and
               outcomes together—so instructors spend less time juggling tools and students always know where to go next.
+              Institutions also get a Registrar Office for terms, enrollments, grade finalization, transcripts, and CSV
+              SIS workflows—without claiming a full campus ERP.
             </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="mt-8">
               <button
                 type="button"
                 onClick={openContact}
@@ -263,12 +265,6 @@ const LandingPage: React.FC = () => {
                 Contact
                 <ArrowRight className="h-4 w-4" aria-hidden />
               </button>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Already have an account?{' '}
-                <Link to="/login" className="font-semibold text-indigo-600 underline-offset-2 hover:underline dark:text-indigo-400">
-                  Sign in
-                </Link>
-              </p>
             </div>
           </div>
           <div className="flex justify-center lg:justify-end">

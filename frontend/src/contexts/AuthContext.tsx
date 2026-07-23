@@ -12,6 +12,7 @@ export interface User {
   role: string;
   bio?: string;
   profilePicture?: string;
+  rootAccountId?: string | null;
 }
 
 interface AuthContextType {
@@ -20,7 +21,8 @@ interface AuthContextType {
   token: string | null;
   setToken: React.Dispatch<React.SetStateAction<string | null>>;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
+  loginWithToken: (token: string) => Promise<User>;
   signup: (firstName: string, lastName: string, email: string, password: string, termsAccepted: boolean) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -46,6 +48,7 @@ function mapUser(userData: Record<string, unknown>): User {
     role: String(userData.role),
     bio: String(userData.bio || ''),
     profilePicture: String(userData.profilePicture || ''),
+    rootAccountId: userData.rootAccountId ? String(userData.rootAccountId) : null,
   };
 }
 
@@ -94,6 +97,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setMemoryAuthToken(authToken);
     setToken(authToken);
     setUser(mapped);
+    return mapped;
+  };
+
+  const loginWithToken = async (authToken: string) => {
+    setMemoryAuthToken(authToken);
+    setToken(authToken);
+    const me = await api.get('/auth/me');
+    const userData = me.data?.data || me.data?.user || me.data;
+    const mapped = mapUser(userData);
+    setUser(mapped);
+    return mapped;
   };
 
   const signup = async (
@@ -132,7 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, setUser, token, setToken, loading, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, setUser, token, setToken, loading, login, loginWithToken, signup, logout }}>
       {children}
     </AuthContext.Provider>
   );

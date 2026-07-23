@@ -6,6 +6,10 @@ const {
   getRecentActivity,
   getAnalytics,
   getAllUsers,
+  createInstitutionUser,
+  createAccountInvite,
+  acceptAccountInvite,
+  getAccountInvite,
   updateUser,
   deleteUser,
   updateUserStatus,
@@ -26,6 +30,8 @@ router.get('/stats', protect, authorize('admin'), getSystemStats);
 router.get('/activity', protect, authorize('admin'), getRecentActivity);
 router.get('/analytics', protect, authorize('admin'), getAnalytics);
 router.get('/users', protect, authorize('admin'), getAllUsers);
+router.post('/users', protect, authorize('admin'), createInstitutionUser);
+router.post('/invites', protect, authorize('admin'), createAccountInvite);
 router.put('/users/:id', protect, authorize('admin'), updateUser);
 router.delete('/users/:id', protect, authorize('admin'), deleteUser);
 router.patch('/users/:id/status', protect, authorize('admin'), updateUserStatus);
@@ -40,6 +46,12 @@ router.get('/settings', protect, authorize('admin'), getSystemSettings);
 router.put('/settings', protect, authorize('admin'), updateSystemSettings);
 router.post('/academic/apply-calendar', protect, authorize('admin'), require('../controllers/academic.controller').applyInstitutionCalendar);
 router.post('/settings/test-email', protect, authorize('admin'), testEmailConfig);
+
+const accountTree = require('../controllers/accountTree.controller');
+router.get('/accounts', protect, authorize('admin', 'department_admin'), accountTree.listAccountTree);
+router.post('/accounts', protect, authorize('admin'), accountTree.createSubAccount);
+router.patch('/accounts/:id', protect, authorize('admin'), accountTree.updateSubAccount);
+router.post('/accounts/move-courses', protect, authorize('admin'), accountTree.moveCoursesToAccount);
 
 module.exports = router;
 

@@ -7,9 +7,33 @@ const Submission = require('../models/Submission');
 const Module = require('../models/module.model');
 const LoginActivity = require('../models/loginActivity.model');
 const SystemSettings = require('../models/systemSettings.model');
+const AccountInvite = require('../models/accountInvite.model');
+const { ACCOUNT_INVITE_ROLES } = require('../models/accountInvite.model');
 const fs = require('fs');
 const path = require('path');
 const { deleteUserAndRelatedData } = require('../services/userDeleteCascade.service');
+const { withTenantFilter, rootAccountIdFromRequest } = require('../utils/tenantContext');
+const { ensureAccountMembership } = require('../services/tenancy/accountMembership.service');
+const { accountSubtreeFilter } = require('../services/tenancy/academicStructure.service');
+const { validatePassword } = require('../utils/passwordPolicy');
+const { sendEmail } = require('../utils/emailService');
+
+const SCHOOL_MANAGED_ROLES = [
+  'student',
+  'teaching_assistant',
+  'teacher',
+  'designer',
+  'observer',
+  'department_admin',
+  'registrar',
+  'admin',
+];
+
+function assertSameTenantUser(user, req) {
+  if (!user?.rootAccountId || !req.rootAccountId) return true;
+  if (req.user?.role === 'platform_admin') return true;
+  return String(user.rootAccountId) === String(req.rootAccountId);
+}
 
 // Get system statistics
 exports.getSystemStats = async (req, res) => {
@@ -400,12 +424,13 @@ exports.getAnalytics = async (req, res) => {
   }
 };
 
-// Get all users for admin management
+// Get all users for admin management (tenant-scoped)
 exports.getAllUsers = async (req, res) => {
   try {
     const { role, status, search } = req.query;
-    
-    const query = {};
+    const tenantId = rootAccountIdFromRequest(req);
+
+    const query = withTenantFilter({}, tenantId);
     if (role && role !== 'all') {
       query.role = role;
     }
@@ -544,9 +569,14 @@ exports.deleteUser = async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
+    if (!assertSameTenantUser(user, req)) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
 
     if (user.role === 'admin') {
-      const adminCount = await User.countDocuments({ role: 'admin' });
+      const adminCount = await User.countDocuments(
+        withTenantFilter({ role: 'admin' }, rootAccountIdFromRequest(req))
+      );
       if (adminCount <= 1) {
         return res
           .status(400)
@@ -597,15 +627,20 @@ exports.updateUser = async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
+    if (!assertSameTenantUser(user, req)) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
 
     const { firstName, lastName, email, role } = req.body;
 
-    if (role && !['student', 'teacher', 'admin'].includes(role)) {
+    if (role && !SCHOOL_MANAGED_ROLES.includes(role)) {
       return res.status(400).json({ success: false, message: 'Invalid role' });
     }
     // Guard: don't demote the last remaining admin.
     if (role && role !== 'admin' && user.role === 'admin') {
-      const adminCount = await User.countDocuments({ role: 'admin' });
+      const adminCount = await User.countDocuments(
+        withTenantFilter({ role: 'admin' }, rootAccountIdFromRequest(req))
+      );
       if (adminCount <= 1) {
         return res
           .status(400)
@@ -616,7 +651,9 @@ exports.updateUser = async (req, res) => {
     if (typeof email === 'string' && email.trim()) {
       const normalized = email.trim().toLowerCase();
       if (normalized !== String(user.email).toLowerCase()) {
-        const existing = await User.findOne({ email: normalized, _id: { $ne: id } });
+        const existing = await User.findOne(
+          withTenantFilter({ email: normalized, _id: { $ne: id } }, rootAccountIdFromRequest(req))
+        );
         if (existing) {
           return res.status(409).json({ success: false, message: 'Email already in use' });
         }
@@ -628,6 +665,15 @@ exports.updateUser = async (req, res) => {
     if (role) user.role = role;
 
     await user.save();
+
+    if (req.rootAccountId) {
+      await ensureAccountMembership({
+        user,
+        rootAccountId: req.rootAccountId,
+        accountId: req.rootAccountId,
+        role: user.role,
+      });
+    }
 
     const safe = user.toObject();
     delete safe.password;
@@ -669,6 +715,9 @@ exports.updateUserStatus = async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
+    if (!assertSameTenantUser(user, req)) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
 
     user.accountStatus = status;
     if (status === 'suspended') {
@@ -692,12 +741,250 @@ exports.updateUserStatus = async (req, res) => {
   }
 };
 
-// Get all courses for admin oversight
+/**
+ * Create a user inside the current institution (does NOT log the admin in as that user).
+ * @route POST /api/admin/users
+ */
+exports.createInstitutionUser = async (req, res) => {
+  try {
+    const tenantId = rootAccountIdFromRequest(req);
+    if (!tenantId) {
+      return res.status(400).json({ success: false, message: 'Institution context required' });
+    }
+
+    const { firstName, lastName, email, password, role } = req.body || {};
+    if (!firstName || !lastName || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'firstName, lastName, email, and password are required',
+      });
+    }
+
+    const assignedRole = SCHOOL_MANAGED_ROLES.includes(role) ? role : 'student';
+    if (assignedRole === 'platform_admin') {
+      return res.status(403).json({ success: false, message: 'Cannot create platform admins here' });
+    }
+
+    const passwordCheck = validatePassword(password);
+    if (!passwordCheck.valid) {
+      return res.status(400).json({ success: false, message: passwordCheck.message });
+    }
+
+    const normalizedEmail = String(email).toLowerCase().trim();
+    const existing = await User.findOne(withTenantFilter({ email: normalizedEmail }, tenantId));
+    if (existing) {
+      return res.status(409).json({ success: false, message: 'User with this email already exists' });
+    }
+
+    try {
+      const { assertSeatAvailable } = require('../services/tenancy/accountQuota.service');
+      await assertSeatAvailable(tenantId, { additional: 1 });
+    } catch (seatErr) {
+      return res.status(seatErr.statusCode || seatErr.status || 403).json({
+        success: false,
+        message: seatErr.message,
+        code: seatErr.code,
+      });
+    }
+
+    const user = await User.create({
+      firstName: String(firstName).trim(),
+      lastName: String(lastName).trim(),
+      email: normalizedEmail,
+      password,
+      role: assignedRole,
+      rootAccountId: tenantId,
+      accountId: tenantId,
+      privacyConsentAt: new Date(),
+    });
+
+    await ensureAccountMembership({
+      user,
+      rootAccountId: tenantId,
+      accountId: tenantId,
+      role: assignedRole,
+    });
+
+    const safe = user.toObject();
+    delete safe.password;
+
+    return res.status(201).json({
+      success: true,
+      message: 'User created',
+      data: safe,
+    });
+  } catch (error) {
+    console.error('Error creating institution user:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to create user',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Invite a user by email (Canvas-style account invitation).
+ * @route POST /api/admin/invites
+ */
+exports.createAccountInvite = async (req, res) => {
+  try {
+    const tenantId = rootAccountIdFromRequest(req);
+    const { email, role } = req.body || {};
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'email is required' });
+    }
+    const inviteRole = ACCOUNT_INVITE_ROLES.includes(role) ? role : 'student';
+
+    try {
+      const { assertSeatAvailable } = require('../services/tenancy/accountQuota.service');
+      await assertSeatAvailable(tenantId, { additional: 1 });
+    } catch (seatErr) {
+      return res.status(seatErr.statusCode || seatErr.status || 403).json({
+        success: false,
+        message: seatErr.message,
+        code: seatErr.code,
+      });
+    }
+
+    const { invite, rawToken } = await AccountInvite.createInvite({
+      rootAccountId: tenantId,
+      accountId: tenantId,
+      email,
+      role: inviteRole,
+      invitedBy: req.user._id || req.user.id,
+    });
+
+    const frontendBase = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+    const inviteUrl = `${frontendBase}/accept-invite?token=${rawToken}`;
+
+    try {
+      await sendEmail(
+        String(email).toLowerCase().trim(),
+        `You're invited to join ${req.account?.name || 'MySl8te'}`,
+        `<p>You have been invited as <strong>${inviteRole}</strong>.</p>
+         <p><a href="${inviteUrl}">Accept invitation</a></p>
+         <p>This link expires at ${invite.expiresAt.toISOString()}.</p>`
+      );
+    } catch (mailErr) {
+      console.warn('Invite email failed:', mailErr.message);
+    }
+
+    return res.status(201).json({
+      success: true,
+      data: {
+        id: invite._id,
+        email: invite.email,
+        role: invite.role,
+        expiresAt: invite.expiresAt,
+        inviteUrl: process.env.NODE_ENV === 'production' ? undefined : inviteUrl,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Accept an invitation (public).
+ * @route POST /api/auth/accept-invite
+ */
+exports.acceptAccountInvite = async (req, res) => {
+  try {
+    const { token, firstName, lastName, password } = req.body || {};
+    if (!token || !firstName || !lastName || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'token, firstName, lastName, and password are required',
+      });
+    }
+
+    const passwordCheck = validatePassword(password);
+    if (!passwordCheck.valid) {
+      return res.status(400).json({ success: false, message: passwordCheck.message });
+    }
+
+    const tokenHash = AccountInvite.hashToken(token);
+    const invite = await AccountInvite.findOne({ tokenHash, acceptedAt: null });
+    if (!invite || invite.expiresAt < new Date()) {
+      return res.status(400).json({ success: false, message: 'Invitation is invalid or expired' });
+    }
+
+    const existing = await User.findOne(
+      withTenantFilter({ email: invite.email }, invite.rootAccountId)
+    );
+    if (existing) {
+      return res.status(409).json({ success: false, message: 'A user with this email already exists' });
+    }
+
+    const user = await User.create({
+      firstName: String(firstName).trim(),
+      lastName: String(lastName).trim(),
+      email: invite.email,
+      password,
+      role: invite.role,
+      rootAccountId: invite.rootAccountId,
+      accountId: invite.accountId || invite.rootAccountId,
+      privacyConsentAt: new Date(),
+    });
+
+    await ensureAccountMembership({
+      user,
+      rootAccountId: invite.rootAccountId,
+      accountId: invite.accountId || invite.rootAccountId,
+      role: invite.role,
+    });
+
+    invite.acceptedAt = new Date();
+    invite.acceptedUserId = user._id;
+    await invite.save();
+
+    const safe = user.toObject();
+    delete safe.password;
+    return res.status(201).json({ success: true, data: safe });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Preview invite (public).
+ * @route GET /api/auth/invites/:token
+ */
+exports.getAccountInvite = async (req, res) => {
+  try {
+    const tokenHash = AccountInvite.hashToken(req.params.token);
+    const invite = await AccountInvite.findOne({ tokenHash, acceptedAt: null }).lean();
+    if (!invite || invite.expiresAt < new Date()) {
+      return res.status(404).json({ success: false, message: 'Invitation not found or expired' });
+    }
+    return res.json({
+      success: true,
+      data: {
+        email: invite.email,
+        role: invite.role,
+        rootAccountId: invite.rootAccountId,
+        expiresAt: invite.expiresAt,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Get all courses for admin oversight (tenant-scoped)
 exports.getAllCourses = async (req, res) => {
   try {
-    const { status, published, search } = req.query;
-    
-    const query = {};
+    const { status, published, search, termId, accountId } = req.query;
+    const tenantId = rootAccountIdFromRequest(req);
+
+    let query = withTenantFilter({}, tenantId);
+    if (accountId) {
+      query = await accountSubtreeFilter(tenantId, accountId);
+    }
+    if (termId) {
+      query.academicTermId = termId;
+    }
     if (published && published !== 'all') {
       query.published = published === 'published';
     }

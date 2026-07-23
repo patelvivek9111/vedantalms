@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { immutableAppendOnlyPlugin } = require('./plugins/immutableAppendOnly.plugin');
+const { tenantScopePlugin } = require('./plugins/tenantScope.plugin');
 
 /**
  * Official transcript issuance record (registrar).
@@ -38,12 +39,24 @@ const transcriptIssueLogSchema = new mongoose.Schema(
     },
     notes: String,
     ip: String,
+    templateId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'TranscriptTemplate',
+    },
+    requestId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'TranscriptRequest',
+    },
+    verifyUrl: String,
   },
   { timestamps: true }
 );
 
+transcriptIssueLogSchema.plugin(tenantScopePlugin);
+
 transcriptIssueLogSchema.index({ student: 1, term: 1, year: 1, createdAt: -1 });
 transcriptIssueLogSchema.index({ transcriptHash: 1 });
+transcriptIssueLogSchema.index({ rootAccountId: 1, student: 1, createdAt: -1 });
 
 transcriptIssueLogSchema.plugin(immutableAppendOnlyPlugin, { mode: 'transcript_issue' });
 const { portabilityMetadataPlugin } = require('./plugins/portabilityMetadata.plugin');

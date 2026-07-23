@@ -48,7 +48,13 @@ async function getOrCreateLifecycle(course, options = {}) {
       term,
       year: Number(year),
       status: 'DRAFT',
+      rootAccountId: course.rootAccountId || undefined,
+      accountId: course.accountId || course.rootAccountId || undefined,
     });
+  } else if (!doc.rootAccountId && course.rootAccountId) {
+    doc.rootAccountId = course.rootAccountId;
+    doc.accountId = course.accountId || course.rootAccountId;
+    await doc.save();
   }
   return doc;
 }
@@ -142,7 +148,11 @@ async function batchFreezeCourseGrades(
   { amendmentSequence = 0, amendmentRecord = null, allowReplaceCurrent = false, policyCache } = {}
 ) {
   const { calculateCourseGradeForStudent } = require('./gradeCalculation.service');
-  const students = (course.students || []).map((id) =>
+  const { listActiveStudentIds } = require('./registrar/rosterRead.service');
+  const studentIds = await listActiveStudentIds(course._id, {
+    rootAccountId: course.rootAccountId,
+  });
+  const students = (studentIds || []).map((id) =>
     id && typeof id === 'object' && id._id ? id._id : id
   );
   const engineVersion = getGradingEngineVersion();
@@ -277,6 +287,18 @@ async function transitionToFinalized(courseId, user) {
     severity: 'critical',
   });
 
+  await academicAuditService
+    .recordAuditEvent({
+      actorId: user._id,
+      entityType: 'course_grade_lifecycle',
+      entityId: lifecycle._id,
+      action: 'registrar.grades.finalized',
+      after: { courseId: String(courseId), frozenCount, status: 'FINALIZED' },
+      severity: 'critical',
+      metadata: { courseId: String(courseId) },
+    })
+    .catch(() => {});
+
   notifyGradesFinalized({ course, actor: user }).catch((err) =>
     console.error('grades.finalized notification error:', err)
   );
@@ -389,6 +411,23 @@ async function transitionToAmended(courseId, user, { reason, ip } = {}) {
     ip,
     metadata: { courseId, term, year, frozenCount },
   });
+
+  await academicAuditService
+    .recordAuditEvent({
+      actorId: user._id,
+      entityType: 'grade_amendment',
+      entityId: amendment._id,
+      action: 'registrar.grades.amended',
+      after: {
+        courseId: String(courseId),
+        sequence,
+        reason: String(reason).trim(),
+      },
+      severity: 'critical',
+      ip,
+      metadata: { courseId: String(courseId), term, year },
+    })
+    .catch(() => {});
 
   const affectedStudentIds = (summary || [])
     .filter(

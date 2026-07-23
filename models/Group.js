@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { courseChildTenantPlugin } = require('./plugins/courseChildTenant.plugin');
 
 const groupSchema = new mongoose.Schema({
     name: {
@@ -77,5 +78,7 @@ groupSchema.pre('save', async function(next) {
 */
 
 const Group = mongoose.model('Group', groupSchema);
+
+groupSchema.plugin(courseChildTenantPlugin, { coursePath: 'course' });
 
 module.exports = Group; 

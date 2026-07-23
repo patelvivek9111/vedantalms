@@ -17,6 +17,78 @@ async function courseSelfEnroll(
 ) {
   await migrateExistingNotifications();
 
+  // Phase 3: institution term enrollment window
+  if (course.academicTermId) {
+    try {
+      const { assertTermEnrollmentOpen } = require('../services/tenancy/academicStructure.service');
+      const gate = await assertTermEnrollmentOpen(course.academicTermId);
+      if (!gate.ok) {
+        return {
+          statusCode: 403,
+          body: {
+            success: false,
+            joinState: 'term_enrollment_closed',
+            message: gate.message,
+          },
+        };
+      }
+    } catch (err) {
+      console.warn('Term enrollment check skipped:', err.message);
+    }
+  }
+
+  // Phase 4: registration holds
+  if (course.rootAccountId && (userRole === 'student' || enrollmentSource === 'catalog' || enrollmentSource === 'qr')) {
+    try {
+      const StudentHold = require('../models/studentHold.model');
+      const hold = await StudentHold.hasBlockingHold(course.rootAccountId, userId, {
+        registration: true,
+      });
+      if (hold) {
+        return {
+          statusCode: 403,
+          body: {
+            success: false,
+            joinState: 'hold_blocks_registration',
+            message: `Registration hold: ${hold.reason}`,
+            holdType: hold.holdType,
+          },
+        };
+      }
+    } catch (err) {
+      console.warn('Hold check skipped:', err.message);
+    }
+  }
+
+  // R7: enforce CourseSection.enrollmentMethod on self-enroll
+  let forceApprovalRequest = false;
+  if (course.sectionId && userRole === 'student') {
+    try {
+      const CourseSection = require('../models/courseSection.model');
+      const section = await CourseSection.findById(course.sectionId).select('enrollmentMethod').lean();
+      const method = section?.enrollmentMethod || 'open';
+      if (method === 'sis_only' || method === 'registrar_only') {
+        return {
+          statusCode: 403,
+          body: {
+            success: false,
+            joinState: 'enrollment_method_blocked',
+            message:
+              method === 'sis_only'
+                ? 'This section only accepts enrollments from SIS'
+                : 'This section only accepts registrar-managed enrollments',
+            enrollmentMethod: method,
+          },
+        };
+      }
+      if (method === 'approval') {
+        forceApprovalRequest = true;
+      }
+    } catch (err) {
+      console.warn('enrollmentMethod check skipped:', err.message);
+    }
+  }
+
   const refreshInstructorEnrollmentTodos = async (doc) => {
     await removeEnrollmentSummaryTodos(doc, Todo);
     await syncEnrollmentAttentionTodo(doc, Todo);
@@ -91,6 +163,7 @@ async function courseSelfEnroll(
     if (userRole === 'teacher') {
       course.students.push(userId);
       await course.save();
+      await dualWriteActive(course, userId, userId, 'teacher');
       await refreshInstructorEnrollmentTodos(course);
       return {
         statusCode: 200,
@@ -126,7 +199,8 @@ async function courseSelfEnroll(
   }
 
   const needsQrApproval =
-    enrollmentSource === 'qr' && (userRole === 'student' || userRole === 'admin');
+    forceApprovalRequest ||
+    (enrollmentSource === 'qr' && (userRole === 'student' || userRole === 'admin'));
 
   if (needsQrApproval) {
     course.enrollmentRequests.push({
@@ -142,18 +216,37 @@ async function courseSelfEnroll(
         success: true,
         awaitingTeacherApproval: true,
         courseTitle: course.title,
-        message: `Your request to join "${course.title}" has been sent. Please wait for your instructor to approve your enrollment.`,
+        message: forceApprovalRequest
+          ? `This section requires instructor approval. Your request to join "${course.title}" has been sent.`
+          : `Your request to join "${course.title}" has been sent. Please wait for your instructor to approve your enrollment.`,
+        enrollmentMethod: forceApprovalRequest ? 'approval' : undefined,
       },
     };
   }
 
   course.students.push(userId);
   await course.save();
+  await dualWriteActive(course, userId, userId, 'self');
   await refreshInstructorEnrollmentTodos(course);
   return {
     statusCode: 200,
     body: { success: true, message: 'Successfully enrolled in the course!' },
   };
+}
+
+async function dualWriteActive(course, studentId, actorId, source) {
+  try {
+    const { activateEnrollment } = require('../services/registrar/enrollmentWrite.service');
+    await activateEnrollment({
+      course,
+      studentId,
+      actorId,
+      source,
+      mirrorCourseStudents: false,
+    });
+  } catch (err) {
+    console.warn('Enrollment dual-write failed:', err.message);
+  }
 }
 
 async function ensureEnrollmentQrToken(Course, courseDoc) {

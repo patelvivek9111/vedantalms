@@ -1,4 +1,6 @@
 const mongoose = require('mongoose');
+const fs = require('fs');
+const path = require('path');
 
 const MONGO_CONNECT_OPTS = {
   serverSelectionTimeoutMS: 15_000,
@@ -6,12 +8,26 @@ const MONGO_CONNECT_OPTS = {
   bufferCommands: false,
 };
 
+function resolveTestMongoUri(explicitUri) {
+  if (explicitUri) return explicitUri;
+  const memoryUriFile = path.join(__dirname, '.mongo-memory-uri');
+  if (fs.existsSync(memoryUriFile)) {
+    const fromFile = fs.readFileSync(memoryUriFile, 'utf8').trim();
+    if (fromFile) {
+      process.env.MONGODB_URI = fromFile;
+      return fromFile;
+    }
+  }
+  return process.env.MONGODB_URI;
+}
+
 /**
  * Wait for MongoDB connection to be established.
  * Works with the shared in-memory server from tests/globalSetup.js or any explicit URI.
  * @param {string} [uri] - MongoDB connection URI (defaults to process.env.MONGODB_URI)
  */
-const waitForMongoConnection = async (uri = process.env.MONGODB_URI) => {
+const waitForMongoConnection = async (uri) => {
+  uri = resolveTestMongoUri(uri);
   if (!uri) {
     throw new Error('MONGODB_URI is not set');
   }
@@ -46,7 +62,16 @@ const waitForMongoConnection = async (uri = process.env.MONGODB_URI) => {
     await mongoose.disconnect();
   }
 
-  await mongoose.connect(uri, MONGO_CONNECT_OPTS);
+  try {
+    await mongoose.connect(uri, MONGO_CONNECT_OPTS);
+  } catch (err) {
+    const fallback = resolveTestMongoUri();
+    if (fallback && fallback !== uri) {
+      await mongoose.connect(fallback, MONGO_CONNECT_OPTS);
+    } else {
+      throw err;
+    }
+  }
 
   if (mongoose.connection.readyState !== 1) {
     throw new Error('MongoDB connection not ready after connect');

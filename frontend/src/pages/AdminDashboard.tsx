@@ -300,6 +300,30 @@ export function AdminDashboard() {
           </div>
         </Link>
 
+        <Link to="/admin/accounts" className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 hover:shadow-lg dark:hover:shadow-gray-700/50 transition-shadow">
+          <div className="flex items-center">
+            <div className="p-3 bg-teal-100 dark:bg-teal-900/50 rounded-lg">
+              <Database className="w-8 h-8 text-teal-600 dark:text-teal-400" />
+            </div>
+            <div className="ml-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Sub-accounts</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Departments and campus tree</p>
+            </div>
+          </div>
+        </Link>
+
+        <Link to="/registrar" className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 hover:shadow-lg dark:hover:shadow-gray-700/50 transition-shadow">
+          <div className="flex items-center">
+            <div className="p-3 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg">
+              <FileText className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
+            </div>
+            <div className="ml-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Registrar</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Office, terms, grades, reports</p>
+            </div>
+          </div>
+        </Link>
+
         <Link to="/admin/backup" className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 hover:shadow-lg dark:hover:shadow-gray-700/50 transition-shadow">
           <div className="flex items-center">
             <div className="p-3 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg">

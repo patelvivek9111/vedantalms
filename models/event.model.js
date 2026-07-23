@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { courseChildTenantPlugin } = require('./plugins/courseChildTenant.plugin');
 
 const eventSchema = new mongoose.Schema({
   title: { type: String, required: true },
@@ -10,5 +11,7 @@ const eventSchema = new mongoose.Schema({
   calendar: { type: String, required: true },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
 });
+
+eventSchema.plugin(courseChildTenantPlugin, { coursePath: 'course' });
 
 module.exports = mongoose.model('Event', eventSchema); 

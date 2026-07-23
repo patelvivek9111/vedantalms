@@ -1,9 +1,9 @@
 # Full Canvas-Class Registrar — Implementation Roadmap
 
-**Status:** Planning document (not yet implemented)  
+**Status:** Complete — R1–R8 done; see **§23 Eight-phase execution tracker**  
 **Owner:** MySl8te platform team  
-**Last updated:** 2026-07-09  
-**Related:** [CANVAS_PARITY_AUDIT.md](../grading/CANVAS_PARITY_AUDIT.md), [POLICY_CHANGE_UX.md](../grading/POLICY_CHANGE_UX.md), [security.md](../security.md)
+**Last updated:** 2026-07-23  
+**Related:** [CANVAS_PARITY_AUDIT.md](../grading/CANVAS_PARITY_AUDIT.md), [POLICY_CHANGE_UX.md](../grading/POLICY_CHANGE_UX.md), [security.md](../security.md), [CANVAS_MULTI_TENANT.md](../platform/CANVAS_MULTI_TENANT.md)
 
 ---
 
@@ -42,7 +42,7 @@ Canvas does **not** ship a complete university ERP registrar. In production, “
 
 | Area | Status | Location |
 |------|--------|----------|
-| `registrar` role + capabilities | Done | `middleware/academicPermissions.js` |
+| `registrar` role + capabilities | Done | `middleware/academicPermissions.js` (+ `manage_enrollments`, `manage_holds`, `manage_sis`) |
 | Grade lifecycle (DRAFT → POSTED → FINALIZED → AMENDED) | Done | `models/courseGradeLifecycle.model.js`, `CourseGradeLifecyclePanel` |
 | Frozen grade snapshots | Done | `models/studentCourseGradeSnapshot.model.js` |
 | Institution + course grading policy | Done | `institutionGradingPolicy`, `courseGradingPolicy` |
@@ -50,10 +50,17 @@ Canvas does **not** ship a complete university ERP registrar. In production, “
 | Course grading periods | Done | `models/courseGradingPeriod.model.js`, `GradingPeriodsModal` |
 | Transcript view (student) | Done | `frontend/src/pages/Transcript.tsx`, `/api/reports/transcript` |
 | Official transcript issuance (API) | Done | `services/transcriptIssuance.service.js`, `transcriptIssueLog.model.js` |
-| Registrar reports (API only) | Done | `/api/registrar/reports/*` |
-| SIS enrollment staging stubs | Stub | `services/sis/`, `sisStagingEnrollment.model.js` |
+| Registrar reports (API) | Done | `/api/registrar/reports/*` (tenant-scoped) |
+| Academic terms | Done | `models/academicTerm.model.js`, `/api/academic-structure/terms` |
+| Course offerings + sections | Done | `courseOffering`, `courseSection`, dual-write on course create |
+| Cross-list groups | Done (API) | `crossListGroup.model.js`, `POST /api/academic-structure/cross-lists` |
+| Enrollment of record | Done (dual-write) | `enrollment.model.js`, `enrollmentWrite.service.js`, roster dual-write |
+| Holds | Done (API + thin UI) | `studentHold.model.js`, `/api/registrar/holds` |
+| SIS stage → apply | Done (MVP) | `sisStagingEnrollment`, `sisJob`, `/api/registrar/sis/*` |
+| Registrar Office UI | Partial | `frontend/src/pages/RegistrarOffice.tsx` — summary / enrollments / holds / SIS tabs |
 | India calendar / institution mode | Done | `services/academicCalendar.service.js`, `systemSettings` |
-| Enrollment (teacher-led) | Partial | Catalog, QR, join codes, waitlist, instructor approval on `Course` |
+| Account / sub-account tree | Done | Multi-tenant `Account` model (see `CANVAS_MULTI_TENANT.md`) |
+| Enrollment (teacher-led) | Partial | Catalog, QR, join codes, waitlist, instructor approval — still dual with `Course.students[]` |
 
 ### 1.2 Registrar role capabilities today
 
@@ -67,36 +74,41 @@ From `middleware/academicPermissions.js`:
 | `manage_institution_policy` | Set institution-wide grading policy |
 | `view_lifecycle` | See grade lifecycle and audit data |
 | `post_grades` | Post grades (not limited to one course like teachers) |
+| `manage_enrollments` | Bulk enroll / drop / roster / term conclude |
+| `manage_holds` | Place / list / release student holds |
+| `manage_sis` | Stage / apply SIS enrollment batches |
 
 **Important separation (Canvas-aligned):** registrars **cannot** edit raw student submissions — they govern official records, not day-to-day grading (`canEditRawSubmission` returns false for `registrar`).
 
-### 1.3 Missing for “full registrar”
+### 1.3 Still missing for “full registrar”
 
-- No **Registrar Office** frontend (reports are API-only)
-- No **institutional term** entity (only per-course `semester`)
-- No **course sections** or cross-listing
-- No **enrollment of record** separate from `Course.students[]`
-- No **SIS import/export jobs** with reconciliation UI
-- No **grade passback** to external SIS
-- No **holds** blocking enrollment or transcript
-- No **student program/degree** tracking
-- No **bulk registrar-led enrollment** workflows
+- Rich **Registrar Office** (dashboard KPIs, term UX, section browser, student 360 — only thin tabs today)
+- **Enrollment rules engine** (prereqs, capacity, windows, preview before apply)
+- **Enrollment transfer**, waitlist promote APIs, full lifecycle UI
+- **Program / degree** + `studentProfile` + student 360° UI
+- **Institution grading periods** + **term-wide finalize** + grade-status matrix
+- **Transcript office** (templates, request queue, PDF + QR verify, bulk issue)
+- **Production SIS** (users/sections CSV, staging diff UI, grade passback, sync history)
+- **Cross-list wizard UI** (API exists)
+- **India compliance pack** (CBSE / university forms, bilingual, bonafide / TC)
+- **ERP hold webhooks** + **LTI 1.3 AGS** grade passback
+- Dedicated registrar **async jobs** + notification / audit event catalogue
 
 ### 1.4 Canvas parity checklist (honest)
 
 | Canvas / industry capability | MySl8te today | After full build |
 |------------------------------|---------------|------------------|
-| Account terms | Per-course semester | Institution terms |
-| SIS CSV import | Staging stub | Full pipeline |
+| Account terms | `AcademicTerm` + legacy course semester | Institution terms (office UX) |
+| SIS CSV import | Enrollment stage/apply MVP | Full pipeline + diff UI |
 | Grade export to SIS | No | Yes |
 | Grading period close | Per-course | Institution + course |
 | Finalize grades | Per-course | Per-course + bulk term |
-| Registrar role | API + course UI | Full office UI |
-| Cross-listed sections | No | Yes |
-| Enrollment of record | `Course.students[]` | `Enrollment` collection |
-| Official transcript | API | UI + PDF + bulk |
-| Holds | No | Yes |
-| SubAccount-scoped admin | Partial (`department_admin`) | Full tree |
+| Registrar role | APIs + thin `/registrar` | Full office UI |
+| Cross-listed sections | API only | API + wizard UI |
+| Enrollment of record | `Enrollment` + dual-write | Enrollment primary + rules engine |
+| Official transcript | API + student view | Office UI + PDF + bulk |
+| Holds | API + thin UI | Full enforcement UX + ERP webhook |
+| SubAccount-scoped admin | Account tree + filters | Dept-scoped office screens |
 
 ---
 
@@ -725,6 +737,8 @@ Reuse `asyncJob.model.js` and `AsyncJobBanner` patterns.
 
 ## 17. Phased implementation roadmap
 
+> **Superseded for execution tracking by §23 (eight phases).** The original six-phase plan below is kept for historical estimates; many Phase 1–4 foundations already landed via multi-tenant work (`CANVAS_MULTI_TENANT.md`).
+
 ### Phase 1 — Registrar Office MVP (8–10 weeks)
 
 | Deliverable | Detail |
@@ -849,31 +863,288 @@ Reuse: `tests/grading/transcriptRecompute.e2e.test.js`, `ferpaAccess.policy.test
 
 ### Say today
 
-- “Registrar-grade academic workflows — grade finalization, transcript issuance, amendment audit trails, institutional grading policy”
-- “Dedicated registrar role with finalize/amend permissions”
-- “Compliance-oriented grade snapshots and policy provenance”
+- “Registrar Office for terms, enrollments, grade finalization, transcripts, and CSV SIS import/export”
+- “Dedicated registrar role with finalize/amend permissions and amendment audit trails”
+- “Compliance-oriented grade snapshots, policy provenance, and public transcript verification”
+- “India demo pack: CBSE-style / UDISE / SGPA–CGPA exports, bonafide & TC certificates, ERP hold webhook and LTI AGS scaffolds”
 
 ### Do not imply today
 
-- “Full registrar office like Canvas + Banner”
-- “Complete university ERP”
-- “SIS sync live in production”
-- “Bulk registrar enrollment UI”
+- “Full registrar office like Canvas + Banner + complete university ERP”
+- “Live Banner / PeopleSoft / Fedena connectors in production”
+- “Board-certified CBSE forms or direct UDISE portal submission”
+- “Certified LTI 1.3 AGS partner grade sync”
 
 ### Roadmap line (optional in sales)
 
-- “Registrar Office UI, SIS import/export, and enrollment-of-record on the roadmap — see `docs/registrar/FULL_REGISTRAR_ROADMAP.md`”
+- “R1–R8 registrar phases are documented in `docs/registrar/FULL_REGISTRAR_ROADMAP.md` — ask for the current checklist, not a brochure claim.”
+
 
 ---
 
 ## 22. Immediate next step
 
-Start **Phase 1** only:
+**All eight registrar phases (R1–R8) are complete.** Use §23 checklists for demo claims; keep brochure messaging honest (§21).
 
-1. Registrar dashboard (existing APIs)  
-2. Academic term registry  
-3. Transcript issuance UI  
-4. Term-wide grade status view  
-5. Student search + enrollment history (read-only from current data)
+---
 
-This is honest for school/college demos and matches current product reality.
+## 23. Eight-phase execution tracker
+
+**How to use:** Complete one phase at a time. Mark `[x]` when done. Do not skip ahead for demo claims. Progress from multi-tenant work is pre-checked.
+
+| Phase | Name | Status |
+|-------|------|--------|
+| **R1** | Registrar Office shell, terms & reports | **Done** (2026-07-23) |
+| **R2** | Enrollment of record (complete) | **Done** (2026-07-23) |
+| **R3** | Student 360° & programs | **Done** (2026-07-23) |
+| **R4** | Term-wide grade governance | **Done** (2026-07-23) |
+| **R5** | Transcript & credentials office | **Done** (2026-07-23) |
+| **R6** | Production SIS pipeline | **Done** (2026-07-23) |
+| **R7** | Sections, cross-list UI & dept scope | **Done** (2026-07-23) |
+| **R8** | India compliance + ERP / LTI | **Done** (2026-07-23) |
+
+---
+
+### Phase R1 — Registrar Office shell, terms & reports
+
+**Goal:** Demo-ready office for principals/registrars using what already exists, without overclaiming ERP/SIS.
+
+**Depends on:** Multi-tenant Account + AcademicTerm APIs (done).
+
+**Implemented:** 2026-07-23
+
+#### Checklist
+- [x] `/registrar` route + role gate (admin/registrar)
+- [x] Thin tabs: enrollment summary, term enrollments, holds, SIS (now under `/registrar/operations`)
+- [x] `AcademicTerm` model + `/api/academic-structure/terms` CRUD
+- [x] Capabilities: `manage_enrollments`, `manage_holds`, `manage_sis`
+- [x] Tenant-scoped `/api/registrar/reports/*`
+- [x] Registrar layout with nav (`/registrar/dashboard`, terms, students, grades, transcripts, reports, operations, settings)
+- [x] Dashboard KPIs (`GET /api/registrar/dashboard` — enrollments, holds, SIS errors, unfinalized courses)
+- [x] Term management UI (list/create/edit deadlines + status) wired to academic-structure APIs
+- [x] Wire all existing registrar report endpoints with filters + CSV download
+- [x] Student search (name, email, ObjectId) → stub student page (`/api/registrar/students/search`, `/students/:id`)
+- [x] Transcript issue UI (wire `POST /api/reports/transcript/issue`)
+- [x] Term-wide grade status read view (`GET /api/registrar/terms/:termId/grade-status`; full finalize = R4)
+- [x] Route guards: `view_registrar_dashboard`; dept_admin allowed into Office (holds/SIS nav limited)
+- [x] Tests: `tests/unit/api/registrar.phaseR1.test.js` (+ phase3/4 regression green)
+- [x] Fix: `/api/registrar/reports/enrollment-summary` now mounted on reports router (was shadowed)
+
+**Exit:** Principals can open Registrar Office, manage terms, run reports, issue a transcript, see grade status — honestly scoped. ✅
+
+**Missing links noted for later:** Admission/`studentId` profile fields (R3). Term-wide finalize actions (R4). Full 360 tabs (R3).
+
+---
+
+### Phase R2 — Enrollment of record (complete)
+
+**Goal:** Enrollment is the system of record for registrar workflows; rules + bulk UX are trustworthy.
+
+**Depends on:** R1 shell; `Enrollment` dual-write (done).
+
+**Implemented:** 2026-07-23
+
+#### Checklist
+- [x] `Enrollment` model + indexes
+- [x] Dual-write from teacher enroll / self-enroll / approve / registrar bulk / SIS apply
+- [x] APIs: list term enrollments, section roster, bulk enroll, drop, conclude term, sync roster
+- [x] Backfill script `backfillEnrollmentsFromCourses.js`
+- [x] `rosterRead.service` for teaching UX reads
+- [x] Registration holds block self-enroll
+- [x] Enrollment rules engine (`services/registrar/enrollmentRules.service.js`)
+- [x] `POST /api/registrar/enrollments/preview` before bulk apply
+- [x] Transfer section/course A→B + preserve history (`POST .../enrollments/:id/transfer`)
+- [x] Waitlist promote API + Operations UI (`POST .../courses/:courseId/waitlist/promote`)
+- [x] Bulk enroll CSV upload with preview/results (`csv` / `rows` on bulk + preview)
+- [x] Enrollment history UI (term + status filter, transfer/patch forms) in Operations
+- [x] `PATCH /api/registrar/enrollments/:id` status/type with audit reason
+- [x] Dual-write cutover checklist: registrar writes only via `enrollmentWrite`; teaching UX still dual-writes intentionally (full cutover later)
+- [x] Tests: `tests/unit/api/registrar.phaseR2.test.js` (+ phase4 regression green)
+
+**Exit:** Registrar can preview → bulk enroll → drop/transfer with rule violations explained; teaching UX still works. ✅
+
+**Missing links noted for later:** Richer prerequisite grade checks (R3/R5 transcripts). Async BullMQ for huge CSV batches (optional; sync path handles typical loads).
+
+---
+
+### Phase R3 — Student 360° & programs
+
+**Goal:** One registrar view of a student; program/batch context for Indian colleges/schools.
+
+**Depends on:** R1 student search; R2 enrollment history APIs.
+
+**Implemented:** 2026-07-23
+
+#### Checklist
+- [x] User model + FERPA-style access helpers for registrar/admin
+- [x] Enrollment + hold records queryable per student
+- [x] R1 stub evolved into full 360° (`GET /api/registrar/students/:id`)
+- [x] Extend `User.studentProfile` (admissionNumber, batch, year, division, guardian, external SIS ids, documents)
+- [x] `Program` model + CRUD (`/api/registrar/programs`)
+- [x] Student 360° page tabs: Profile, Enrollments, Grades, Transcripts, Holds, Audit, Documents
+- [x] Documents tab stub (bonafide/TC via Transcripts Office — R8)
+- [x] Expand student APIs: grades snapshots, issued transcripts, audit trail, profile PATCH
+- [x] Dept_admin scoped to subtree students only (`studentScope.service`)
+- [x] Tests: `tests/unit/api/registrar.phaseR3.test.js` (student 403, admission search, dept scope)
+
+**Exit:** Registrar opens any student and sees enrollments, holds, finalized grades, issued transcripts. ✅
+
+**Missing links noted for later:** Richer document request workflows (R8). Deeper audit event catalogue as R4/R5 emit more registrar.* events.
+
+---
+
+### Phase R4 — Term-wide grade governance
+
+**Goal:** Registrar closes a term, not one course at a time.
+
+**Depends on:** R1 grade-status view; existing per-course lifecycle (done).
+
+**Implemented:** 2026-07-23
+
+#### Checklist
+- [x] Per-course grade lifecycle + snapshots + amend/recompute
+- [x] Institution + course grading policy + policy audit
+- [x] Per-course grading periods
+- [x] R1 read-only term grade-status matrix (`GET /api/registrar/terms/:termId/grade-status`)
+- [x] `InstitutionGradingPeriod` tied to `AcademicTerm`; inherit to sections (`POST .../grading-periods/inherit`)
+- [x] APIs: term finalize preview/apply, close grading period (`termGradeGovernance.service`)
+- [x] Bulk finalize async job (`grades.term_finalize`) via BullMQ + `asyncJob` (sync path when `async: false`)
+- [x] Grades dashboard widgets (`GET .../grades-dashboard`: unfinalized, amendments, missing snapshots, policy changes)
+- [x] Amendment queue + term finalize + periods UI (`RegistrarGradeStatus` tabs)
+- [x] Notifications: grades finalized / amended (existing academic notification producers)
+- [x] Audit events: `registrar.grades.finalized`, `registrar.grades.amended`
+- [x] Tests: `tests/unit/api/registrar.phaseR4.test.js` (+ R1 regression green)
+- [x] Fix: distributed lock falls back to memory when Redis client is not writeable (tests/local)
+
+**Exit:** Registrar finalizes all sections in a term with preview + job progress; amendments audited. ✅
+
+**Missing links noted for later:** Sections without `lmsCourseId` cannot finalize. Policy impact preview in Office (existing grading-policy docs).
+
+---
+
+### Phase R5 — Transcript & credentials office
+
+**Goal:** Official transcript operations live in Registrar Office, not only student self-serve + raw API.
+
+**Depends on:** R3 student 360; R4 finalized snapshots for “official”.
+
+**Implemented:** 2026-07-23
+
+#### Checklist
+- [x] Student unofficial transcript view
+- [x] `POST /api/reports/transcript/issue` + `transcriptIssueLog`
+- [x] Transcript hold blocks official issue
+- [x] Report card Excel export (existing reports)
+- [x] R1 Office UI: issue + history (`/registrar/transcripts`)
+- [x] `TranscriptTemplate` (PDF layout, locale, GPA scale legend, repeated-course policy)
+- [x] `TranscriptRequest` queue (unofficial/official/bonafide/migration_tc — all fulfillable)
+- [x] Official PDF generation + QR verification (`GET /api/public/transcript/verify/:hash`)
+- [x] Bulk issuance job (`transcript.bulk_issue`) + preview/apply APIs
+- [x] Office screens: Issue / Requests / Templates / Bulk tabs
+- [x] Configurable repeated-course + India GPA scales (10-point / 4-point / CBSE CGPA) on templates
+- [x] Notifications: `transcript_ready` via institutional notification
+- [x] Official issue requires FINALIZED/AMENDED only (`NOT_FINALIZED`)
+- [x] Tests: `tests/unit/api/registrar.phaseR5.test.js` (hold, not-finalized, verify hash, bulk)
+
+**Exit:** Registrar issues official PDFs singly or in bulk; public verify link works. ✅
+
+**Missing links noted for later:** ZIP download of bulk PDFs (job returns hashes; per-student PDF on single issue).
+
+---
+
+### Phase R6 — Production SIS pipeline
+
+**Goal:** CSV import/export schools can run without engineering help; grade passback after finalize.
+
+**Depends on:** R2 enrollments; R4 finalize for grade export.
+
+**Implemented:** 2026-07-23
+
+#### Checklist
+- [x] `SisStagingEnrollment` + `SisJob` (tenant-scoped)
+- [x] Stage → apply for enrollments
+- [x] Thin SIS tab (paste CSV / apply batch) + `/registrar/sis` office
+- [x] Capability `manage_sis`
+- [x] Standard CSVs: `users.csv`, `sections.csv`, `enrollments.csv`, `grades.csv` (export)
+- [x] `SisIntegrationConfig` + `SisSyncBatch` / `SisSyncRow` (diff + approve/reject)
+- [x] Staging inbox UI with per-row diff + approve/reject (+ conflict override audit)
+- [x] Sync history (`GET /sis/jobs`, `/sis/batches`) + `sis_sync_errors` notification
+- [x] Grade passback post-finalize (`GradePassbackRecord` + CSV export)
+- [x] Scheduled sync field on config (`schedule: manual`; cron deferred)
+- [x] Async jobs: `sis.import_apply`, `sis.grade_export`
+- [x] Resolve by `studentProfile.externalIds.sis` + `CourseSection.sisSectionId`
+- [x] Tests: `tests/unit/api/registrar.phaseR6.test.js` (round-trip, isolation, conflict audit)
+
+**Exit:** Registrar imports users/sections/enrollments with review; exports grades after finalize. ✅
+
+**Missing links noted for later:** Live Banner/PeopleSoft connectors (stubs remain). Cron worker for `schedule` (manual first). Full LTI AGS line-item sync remains scaffold-only (R8).
+
+---
+
+### Phase R7 — Sections, cross-list UI & department scope
+
+**Goal:** Catalog/sections are operable from Registrar Office; departments see only their subtree.
+
+**Depends on:** Academic structure models (done); R1 nav.
+
+**Implemented:** 2026-07-23
+
+**Product decision — cross-list gradebook:** Default **shared gradebook / shared content** (`sharedGradebook: true`). Member sections remount `lmsCourseId` to the primary section’s content course; enrollments remain per `sectionId`. Split gradebooks remain an opt-out in the wizard.
+
+#### Checklist
+- [x] `CourseOffering`, `CourseSection`, `CrossListGroup`
+- [x] Dual-write on course create; backfill academic structure
+- [x] APIs for offerings/sections/cross-lists + catalog `?termId=` / `?accountId=`
+- [x] Sub-account catalog filter helpers
+- [x] Account admin tree UI (`/admin/accounts`)
+- [x] Section browser UI (`/registrar/sections` — filter, publish, conclude, roster CSV)
+- [x] Cross-list wizard UI (shared vs per-section gradebook)
+- [x] Offering catalog management screens (same page tabs)
+- [x] Enforce `enrollmentMethod` end-to-end (self-enroll + rules: open / approval / registrar_only / sis_only)
+- [x] Department_admin Office scoping on sections/offerings/term enrollments/grade-status
+- [x] Migration M3 polish: structure gap report + backfill API (`/api/registrar/structure/*`)
+- [x] Tests: `tests/unit/api/registrar.phaseR7.test.js` (enrollmentMethod, shared cross-list, dept isolation, roster CSV)
+
+**Exit:** Registrar manages sections and cross-lists in UI; dept admins cannot see other faculties. ✅
+
+**Missing links noted for later:** Deeper split-gradebook teaching UX when sections keep distinct courses. Content remount does not merge historical gradebooks.
+
+---
+
+### Phase R8 — India compliance + ERP / LTI integrations
+
+**Goal:** India-ready reports and partner integrations — without building full ERP inside the LMS.
+
+**Depends on:** R4–R5 for grades/transcripts; R6 for export files.
+
+**Implemented:** 2026-07-23
+
+#### Done already
+- [x] India calendar / institution mode settings
+- [x] i18next scaffolding (app-wide)
+- [x] Explicit non-goals: fees, admissions, hostel, payroll (§18)
+
+#### Checklist
+- [x] School reports: CBSE-style mark sheet, class summary, UDISE-ready extract (`GET /api/registrar/reports/india/:kind`)
+- [x] College reports: university exam form, SGPA/CGPA statement, NAAC evidence pack
+- [x] Bonafide + transfer certificate request workflows (queue + fulfill PDF)
+- [x] Bilingual transcript templates (Hindi + English) on Transcripts Office + PDF labels
+- [x] ERP hold webhook `POST /api/integrations/erp/holds`
+- [x] LTI 1.3 AGS grade passback scaffold (readiness + submit-stub; wired from grade export when enabled)
+- [x] Custom REST SIS adapter hook (beyond CSV) — dry-run until `CUSTOM_REST_SIS_URL`
+- [x] Brochure messaging update (§21) to match shipped phases
+- [x] E2E: bulk enroll → grade → finalize → issue transcript → export grades (`tests/unit/api/registrar.phaseR8.test.js`)
+
+**Exit:** India demo pack + integration hooks; sales messaging stays honest.
+
+**Missing links noted for later:** Live Banner/PeopleSoft/Fedena connectors remain stubs. Full LTI 1.3 AGS line-item sync and board-certified CBSE / UDISE portal submit are out of scope. Partner field mappings stay pluggable.
+
+---
+
+### Tracker conventions
+
+1. **One phase at a time** — merge/demo claims only for checked items in the current + prior phases.
+2. **Update this §23** when a PR lands (checkbox + one-line note under the item if behavior differs from the doc).
+3. **If blocked**, add a bullet under that phase’s “Missing links” rather than silently skipping.
+4. **Do not rebuild** multi-tenant Account / Host tenancy here — see `CANVAS_MULTI_TENANT.md`.
+5. **Historical §17** (original 6-phase plan) remains for context; **§23 is the active plan**.

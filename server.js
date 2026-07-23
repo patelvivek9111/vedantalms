@@ -56,6 +56,18 @@ app.use(helmet({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// ACME HTTP-01 challenge (Let's Encrypt) — must be public and unauthenticated
+app.get('/.well-known/acme-challenge/:token', (req, res) => {
+  try {
+    const { getHttp01Authorization } = require('./services/tenancy/domainTls.service');
+    const auth = getHttp01Authorization(req.params.token);
+    if (!auth) return res.status(404).send('Not found');
+    return res.type('text/plain').send(auth);
+  } catch (err) {
+    return res.status(500).send(err.message);
+  }
+});
+
 const logger = pino({
   level: process.env.LOG_LEVEL || 'info',
   base: undefined
@@ -219,7 +231,9 @@ app.use(pinoHttp({
         id: req.requestId || req.id,
         auditCorrelationId: req.auditCorrelationId,
         method: req.method,
-        url: req.url
+        url: req.url,
+        rootAccountId: req.rootAccountId ? String(req.rootAccountId) : undefined,
+        tenantHost: req.tenantHost || undefined,
       };
     }
   }
@@ -243,7 +257,10 @@ app.use((req, res, next) => {
     }
     req.log.info({
       statusCode: res.statusCode,
-      durationMs: Number(durationMs.toFixed(2))
+      durationMs: Number(durationMs.toFixed(2)),
+      rootAccountId: req.rootAccountId ? String(req.rootAccountId) : undefined,
+      tenantHost: req.tenantHost || undefined,
+      impersonating: Boolean(req.isImpersonating),
     }, 'request.completed');
     costGovernanceMetrics.recordPollRequest(req.method, req.originalUrl || req.url);
   });
@@ -414,12 +431,37 @@ async function runMongoStartupTasks() {
   logStartupPhase('mongo.connected');
   const { initializeEmailService } = require('./utils/emailService');
   const { ensureCriticalIndexes } = require('./utils/ensureIndexes');
+  const { ensureDefaultRootAccount } = require('./services/tenancy/ensureDefaultRootAccount.service');
   logStartupPhase('indexes.syncing');
   await ensureCriticalIndexes(logger);
+  logStartupPhase('tenancy.bootstrap');
+  const rootAccount = await ensureDefaultRootAccount();
+  // Lightweight claim of orphan rows so existing deploys keep working
+  try {
+    const User = require('./models/user.model');
+    const Course = require('./models/course.model');
+    const orphanFilter = {
+      $or: [{ rootAccountId: null }, { rootAccountId: { $exists: false } }],
+    };
+    await User.updateMany(orphanFilter, {
+      $set: { rootAccountId: rootAccount._id, accountId: rootAccount._id },
+    });
+    await Course.updateMany(orphanFilter, {
+      $set: { rootAccountId: rootAccount._id, accountId: rootAccount._id },
+    });
+  } catch (err) {
+    logger.warn({ err }, 'tenancy.backfill.partial_failure');
+  }
   logStartupPhase('email.initializing');
   await initializeEmailService();
   const { refreshSecurityPolicyCache } = require('./services/securityPolicy.service');
-  await refreshSecurityPolicyCache();
+  await refreshSecurityPolicyCache(rootAccount._id);
+  try {
+    const { warmDedicatedShards } = require('./services/db/shardRegistry');
+    await warmDedicatedShards();
+  } catch (err) {
+    logger.warn({ err }, 'shard.warm.partial_failure');
+  }
   lifecycle.mongoStartupComplete = true;
   lifecycle.mongoStartupError = null;
   logStartupPhase('mongo.startup.complete');
@@ -512,9 +554,13 @@ app.use('/uploads', (req, res, next) => {
 });
 
 // Routes
+app.use('/api', require('./middleware/tenant').resolveTenant);
+app.use('/api', require('./middleware/tenantRateLimit').tenantRateLimit);
 app.use('/api', require('./middleware/maintenanceMode'));
+app.use('/api', require('./routes/platform.routes'));
 app.use('/api/contact', contactInquiryLimiter, require('./routes/contact.routes'));
 app.use('/api/auth', require('./routes/auth.routes'));
+app.use('/api/auth', require('./routes/sso.routes'));
 app.use('/api/catalog', require('./routes/catalog.routes'));
 app.use('/api/courses', require('./routes/course.routes'));
 app.use('/api/modules', require('./routes/module.routes'));
@@ -537,14 +583,18 @@ app.use('/api/inbox', require('./routes/inbox.routes'));
 app.use('/api', require('./routes/attendance.routes'));
 app.use('/api/polls', require('./routes/poll.routes'));
 app.use('/api/reports', require('./routes/reports.routes'));
+app.use('/api/public', require('./routes/public.routes'));
 app.use('/api/jobs', require('./routes/jobs.routes'));
 app.use('/api/registrar/reports', require('./routes/registrarReports.routes'));
+app.use('/api/registrar', require('./routes/registrar.routes'));
 app.use('/api/ops', require('./routes/ops.routes'));
 app.use('/api/admin', require('./routes/admin.routes'));
 app.use('/api/academic', require('./routes/academic.routes'));
+app.use('/api/academic-structure', require('./routes/academicStructure.routes'));
 app.use('/api/notifications', require('./routes/notification.routes').router);
 app.use('/api/quizwave', require('./routes/quizwave.routes'));
 app.use('/api/integrations/zoho-meeting', require('./routes/zohoMeeting.routes'));
+app.use('/api/integrations', require('./routes/integrations.routes'));
 app.use('/api/files', require('./routes/file.routes'));
 
 // Upload route for file uploads (staged FileAssets — Phase U3)

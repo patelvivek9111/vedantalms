@@ -365,6 +365,7 @@ exports.issueStudentTranscript = async (req, res) => {
       data: {
         issueLog: result.log,
         transcriptHash: result.transcriptHash,
+        verifyUrl: result.verifyUrl,
         courseCount: result.payload.courses.length,
       },
     });
