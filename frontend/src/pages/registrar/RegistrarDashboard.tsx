@@ -7,12 +7,29 @@ type DashboardData = {
   enrollments: { total: number; byStatus: { _id: string; count: number }[] };
   activeHolds: number;
   sisErrors: number;
+  sisHealth?: {
+    lastSyncAt?: string | null;
+    lastSyncStatus?: string | null;
+    errorRate?: number;
+    consecutiveFailures?: number;
+    openConflicts?: number;
+    schedule?: string;
+    provider?: string;
+  } | null;
   activeTerms: number;
   gradeStatus: { coursesLinked: number; finalized: number; unfinalized: number };
 };
 
+type IntegrationsStatus = {
+  ltiAgs?: { enabled?: boolean; ready?: boolean; note?: string; missing?: string[] };
+  erpHolds?: { configured?: boolean; deadLetterCount?: number; auth?: string };
+  boardSubmit?: { mode?: string; canSubmit?: boolean; note?: string };
+  sis?: { provider?: string; schedule?: string; lastSyncStatus?: string | null };
+};
+
 export function RegistrarDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
+  const [integrations, setIntegrations] = useState<IntegrationsStatus | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -22,8 +39,16 @@ export function RegistrarDashboard() {
       setLoading(true);
       setError('');
       try {
-        const res = await registrarGet<{ data: DashboardData }>('/api/registrar/dashboard');
-        if (!cancelled) setData(res.data);
+        const [dash, integ] = await Promise.all([
+          registrarGet<{ data: DashboardData }>('/api/registrar/dashboard'),
+          registrarGet<{ data: IntegrationsStatus }>('/api/registrar/integrations/status').catch(
+            () => ({ data: null })
+          ),
+        ]);
+        if (!cancelled) {
+          setData(dash.data);
+          setIntegrations(integ.data);
+        }
       } catch (err: unknown) {
         if (!cancelled) {
           setError(
@@ -53,11 +78,13 @@ export function RegistrarDashboard() {
   const cards = [
     { label: 'Enrollments', value: data?.enrollments.total ?? 0, to: '/registrar/operations' },
     { label: 'Active holds', value: data?.activeHolds ?? 0, to: '/registrar/operations' },
-    { label: 'SIS errors', value: data?.sisErrors ?? 0, to: '/registrar/sis' },
+    { label: 'SIS issues', value: data?.sisErrors ?? 0, to: '/registrar/sis' },
     { label: 'Active / grading terms', value: data?.activeTerms ?? 0, to: '/registrar/terms' },
     { label: 'Unfinalized courses', value: data?.gradeStatus.unfinalized ?? 0, to: '/registrar/grades' },
     { label: 'Finalized courses', value: data?.gradeStatus.finalized ?? 0, to: '/registrar/grades' },
   ];
+
+  const sis = data?.sisHealth;
 
   return (
     <div className="space-y-6">
@@ -73,6 +100,81 @@ export function RegistrarDashboard() {
           </Link>
         ))}
       </div>
+
+      {sis && (
+        <section className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <h2 className="text-sm font-medium text-gray-700 dark:text-gray-300">SIS sync health</h2>
+            <Link to="/registrar/sis" className="text-xs text-indigo-600">
+              Open SIS / retry →
+            </Link>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 text-sm">
+            <div>
+              <div className="text-xs text-gray-500">Provider / schedule</div>
+              <div>
+                {sis.provider || '—'} · {sis.schedule || 'manual'}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500">Last run</div>
+              <div>{sis.lastSyncAt ? new Date(sis.lastSyncAt).toLocaleString() : 'Never'}</div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500">Status / error rate</div>
+              <div>
+                {sis.lastSyncStatus || '—'} · {sis.errorRate ?? 0}%
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500">Conflicts / failures</div>
+              <div>
+                {sis.openConflicts ?? 0} open · {sis.consecutiveFailures ?? 0} streak
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {integrations && (
+        <section className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <h2 className="text-sm font-medium text-gray-700 dark:text-gray-300">Integration status</h2>
+            <Link to="/registrar/settings" className="text-xs text-indigo-600">
+              Settings →
+            </Link>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-3 text-sm">
+            <div>
+              <div className="text-xs text-gray-500">LTI AGS</div>
+              <div>
+                {integrations.ltiAgs?.ready
+                  ? 'Ready'
+                  : integrations.ltiAgs?.enabled
+                    ? 'Enabled (incomplete)'
+                    : 'Off'}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500">ERP holds</div>
+              <div>
+                {integrations.erpHolds?.configured ? 'Secret set' : 'Not configured'}
+                {(integrations.erpHolds?.deadLetterCount || 0) > 0
+                  ? ` · ${integrations.erpHolds?.deadLetterCount} DLQ`
+                  : ''}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500">Board submit</div>
+              <div>
+                {integrations.boardSubmit?.canSubmit
+                  ? 'Partner webhook'
+                  : integrations.boardSubmit?.mode || 'export_only'}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {(data?.enrollments.byStatus || []).length > 0 && (
         <section>

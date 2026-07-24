@@ -43,6 +43,36 @@ export function downloadCsv(filename: string, csvText: string) {
   URL.revokeObjectURL(url);
 }
 
+export function downloadPdfBase64(base64: string, filename: string) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  const blob = new Blob([bytes], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function downloadRegistrarJobFile(jobId: string, token: string, fallbackName = 'download.bin') {
+  const res = await axios.get(registrarUrl(`/api/registrar/jobs/${jobId}/download`), {
+    headers: registrarAuthHeaders(),
+    params: { token },
+    responseType: 'blob',
+  });
+  const disposition = String(res.headers['content-disposition'] || '');
+  const match = /filename="?([^"]+)"?/i.exec(disposition);
+  const filename = match?.[1] || fallbackName;
+  const url = URL.createObjectURL(res.data);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export type AcademicTerm = {
   _id: string;
   name: string;

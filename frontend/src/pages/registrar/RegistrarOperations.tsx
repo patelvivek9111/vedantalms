@@ -203,13 +203,27 @@ export function RegistrarOperations() {
         body.overrideReason = overrideReason;
       }
       const res = await registrarPost<{
-        data: { enrolled?: number; failed?: number; skipped?: number };
+        data: {
+          enrolled?: number;
+          failed?: number;
+          skipped?: number;
+          jobId?: string;
+          async?: boolean;
+          toEnroll?: number;
+          status?: string;
+        };
       }>('/api/registrar/enrollments/bulk', body);
-      setMessage(
-        `Bulk enroll: ${res.data?.enrolled || 0} ok, ${res.data?.skipped || 0} skipped, ${
-          res.data?.failed || 0
-        } failed`
-      );
+      if (res.data?.jobId) {
+        setMessage(
+          `Bulk enroll queued as job ${res.data.jobId} (${res.data.toEnroll || 0} rows, status ${res.data.status || 'pending'}). Poll GET /api/registrar/jobs/:jobId.`
+        );
+      } else {
+        setMessage(
+          `Bulk enroll: ${res.data?.enrolled || 0} ok, ${res.data?.skipped || 0} skipped, ${
+            res.data?.failed || 0
+          } failed`
+        );
+      }
       if (termId) await loadEnrollments(termId);
     } catch (err: unknown) {
       setError(
@@ -702,12 +716,33 @@ export function RegistrarOperations() {
       {tab === 'sis' && canSis && (
         <section className="space-y-4 text-sm">
           <p className="text-gray-600 dark:text-gray-400">
-            Full SIS import / staging inbox / grade export moved to{' '}
+            Full SIS import / staging inbox / grade export / live connectors:{' '}
             <a className="text-indigo-600 underline" href="/registrar/sis">
               Registrar → SIS
             </a>
             . Quick enrollment CSV still works below.
           </p>
+
+          <div className="rounded-md border border-gray-200 dark:border-gray-700 p-3 space-y-2 bg-gray-50 dark:bg-gray-950/40">
+            <h3 className="font-medium">SIS runbook</h3>
+            <ol className="list-decimal pl-5 space-y-1 text-gray-600 dark:text-gray-400">
+              <li>Prefer CSV fallback when the partner API is down — stage → inbox → apply.</li>
+              <li>
+                Conflicts require an explicit override reason (min 8 chars) in the SIS inbox; do not
+                auto-approve.
+              </li>
+              <li>
+                Failed apply rows: set batch ID → Retry failed on SIS, or re-pull via Config → Run sync
+                now.
+              </li>
+              <li>
+                Schedule: set hourly/nightly in Settings or SIS Config, then cron{' '}
+                <code>npm run worker:sis-sync -- --apply</code>.
+              </li>
+              <li>Live POST: set connector URL + env <code>*_SIS_DRY_RUN=false</code> for that provider.</li>
+            </ol>
+          </div>
+
           <p className="text-gray-600 dark:text-gray-400">
             CSV lines: <code>studentEmail,courseCode[,externalStudentId,externalCourseId]</code>
           </p>

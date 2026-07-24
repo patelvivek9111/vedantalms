@@ -859,16 +859,31 @@ async function exportGradesPassback({
   exportedBy,
   notes,
   markSent = false,
+  dryRun,
+  forceLive = false,
 }) {
   const built = await buildGradesExport(tenantId, { term, year, academicTermId });
   const batchId = newBatchId();
+  const cfg = await getOrCreateConfig(tenantId, accountId);
+  const provider = cfg.provider || 'csv';
+  const jobProvider = [
+    'banner',
+    'peoplesoft',
+    'workday',
+    'csv',
+    'custom_rest',
+    'fedena',
+    'mastersoft',
+  ].includes(provider)
+    ? provider
+    : 'csv';
 
   const record = await GradePassbackRecord.create({
     term: term || 'unknown',
     year: Number(year) || new Date().getFullYear(),
     academicTermId: academicTermId || null,
-    provider: 'csv',
-    channel: 'csv',
+    provider: jobProvider === 'csv' ? 'csv' : jobProvider,
+    channel: jobProvider === 'csv' ? 'csv' : 'rest',
     status: markSent ? 'sent' : 'exported',
     rowCount: built.count,
     csvText: built.csvText,
@@ -882,7 +897,7 @@ async function exportGradesPassback({
 
   await SisJob.create({
     jobType: 'grade_export',
-    provider: 'csv',
+    provider: jobProvider,
     batchId,
     status: 'completed',
     stagedCount: built.count,
@@ -897,7 +912,7 @@ async function exportGradesPassback({
   await SisSyncBatch.create({
     batchId,
     entityType: 'grade_export',
-    provider: 'csv',
+    provider: jobProvider,
     status: 'completed',
     stagedCount: built.count,
     appliedCount: built.count,
@@ -914,47 +929,61 @@ async function exportGradesPassback({
       entityType: 'grade_passback',
       entityId: record._id,
       action: 'registrar.sis.grades_exported',
-      after: { term, year: Number(year), rowCount: built.count },
+      after: { term, year: Number(year), rowCount: built.count, provider: jobProvider },
       severity: 'info',
       rootAccountId: tenantId,
       metadata: { batchId, term, year: Number(year) },
     })
     .catch(() => {});
 
-  let ltiStub = null;
+  let ltiAgsResult = null;
   try {
     const ltiAgs = require('../lti/ltiAgs.service');
-    ltiStub = await ltiAgs.submitScoresStub({
+    const cfg = await ltiAgs.resolvePlatformConfig(tenantId);
+    const ready = ltiAgs.platformReady(cfg);
+    const liveAgs = ltiAgs.isAgsEnabled(cfg) && ready.ready && (forceLive || dryRun === false);
+    ltiAgsResult = await ltiAgs.submitScores({
       tenantId,
       accountId: accountId || tenantId,
       term,
       year,
       rows: built.rows,
       exportedBy,
-      dryRun: true,
+      dryRun: !liveAgs,
+      courseId: built.rows[0]?.course_id || null,
     });
   } catch {
     /* optional */
   }
 
+  let adapterPush = null;
   let customRest = null;
   try {
-    const cfg = await getOrCreateConfig(tenantId, accountId);
-    if (cfg.provider === 'custom_rest') {
-      const { pushCustomRest } = require('../sis/adapters/customRest');
-      customRest = await pushCustomRest({
+    const { getAdapter } = require('../sis/adapters/registry');
+    const adapter = getAdapter(provider);
+    const pushDryRun = forceLive ? false : dryRun === true ? true : dryRun === false ? false : true;
+
+    if (provider !== 'csv' && adapter.push) {
+      adapterPush = await adapter.push({
         config: cfg,
+        fieldMappings: cfg.fieldMappings,
         payload: {
           entityType: 'grades',
           term,
           year: Number(year),
           rows: built.rows,
         },
-        dryRun: true,
+        dryRun: pushDryRun,
       });
+      if (provider === 'custom_rest') customRest = adapterPush;
+      if (adapterPush?.ok && !adapterPush.dryRun && markSent !== false) {
+        record.status = 'sent';
+        await record.save();
+      }
     }
-  } catch {
-    /* optional */
+  } catch (err) {
+    adapterPush = { ok: false, message: err.message };
+    if (provider === 'custom_rest') customRest = adapterPush;
   }
 
   return {
@@ -962,8 +991,10 @@ async function exportGradesPassback({
     csvText: built.csvText,
     count: built.count,
     batchId,
-    ltiStub,
+    ltiStub: ltiAgsResult,
+    ltiAgs: ltiAgsResult,
     customRest,
+    adapterPush,
   };
 }
 

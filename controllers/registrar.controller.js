@@ -21,8 +21,10 @@ const {
 const { checkEnrollmentRules, canOverrideRules } = require('../services/registrar/enrollmentRules.service');
 const {
   buildStudentScopeFilter,
+  buildAccountScopeFilter,
   assertCanAccessStudentApi,
 } = require('../services/registrar/studentScope.service');
+const { runBulkEnrollmentPairs, shouldUseAsyncBulk } = require('../services/registrar/bulkEnrollment.service');
 const { stageEnrollmentImport, applyStagingBatch } = require('../services/sis');
 const Program = require('../models/program.model');
 const StudentCourseGradeSnapshot = require('../models/studentCourseGradeSnapshot.model');
@@ -165,6 +167,7 @@ exports.bulkEnroll = async (req, res) => {
       overrideReason = '',
       csv,
       rows: bodyRows,
+      async: asyncFlag,
     } = req.body || {};
 
     let pairs = [];
@@ -200,85 +203,47 @@ exports.bulkEnroll = async (req, res) => {
       });
     }
 
-    const results = [];
-    for (const pair of pairs) {
-      if (pair.resolveError) {
-        results.push({
-          studentId: pair.studentId || pair.studentRef,
-          courseId: pair.course?._id || pair.courseRef,
-          ok: false,
-          message: pair.resolveError,
-        });
-        continue;
-      }
-      try {
-        const rules = await checkEnrollmentRules({
-          studentId: pair.studentId,
-          course: pair.course,
-          source: 'registrar',
-        });
-        const blocked = !rules.allowed;
-        if (blocked) {
-          const hard = rules.violations.filter((v) => !v.overrideable);
-          const already = rules.violations.some((v) => v.code === 'already_enrolled');
-          if (already) {
-            results.push({
-              studentId: pair.studentId,
-              courseId: pair.course._id,
-              ok: true,
-              skipped: true,
-              message: 'Already enrolled',
-              rules,
-            });
-            continue;
-          }
-          if (hard.length || !override || !canOverrideRules(req.user, rules)) {
-            results.push({
-              studentId: pair.studentId,
-              courseId: pair.course._id,
-              ok: false,
-              message: rules.violations.map((v) => v.message).join('; ') || 'Rules blocked enrollment',
-              rules,
-            });
-            continue;
-          }
-        }
-
-        const enrollment = await activateEnrollment({
-          course: pair.course,
-          studentId: pair.studentId,
-          actorId: req.user._id,
-          source: 'registrar',
+    if (shouldUseAsyncBulk(pairs.length, asyncFlag)) {
+      const jobQueueService = require('../services/jobQueue.service');
+      const serializablePairs = pairs.map((p) => ({
+        studentId: p.studentId ? String(p.studentId) : null,
+        courseId: p.course?._id ? String(p.course._id) : null,
+        studentRef: p.studentRef,
+        courseRef: p.courseRef,
+        resolveError: p.resolveError || null,
+      }));
+      const { job, async: isAsync } = await jobQueueService.enqueueJob(
+        'enrollment.bulk_csv',
+        {
+          pairs: serializablePairs,
+          override: Boolean(override),
+          overrideReason,
           enrollmentType: enrollmentType || 'regular',
-        });
-        results.push({
-          studentId: pair.studentId,
-          courseId: pair.course._id,
-          ok: true,
-          enrollmentId: enrollment._id,
-          overridden: Boolean(override && blocked),
-          overrideReason: override ? overrideReason : undefined,
-          rules,
-        });
-      } catch (err) {
-        results.push({
-          studentId: pair.studentId,
-          courseId: pair.course?._id,
-          ok: false,
-          message: err.message,
-        });
-      }
+          rootAccountId: tenantId,
+        },
+        req.user,
+        { rootAccountId: tenantId }
+      );
+      return res.status(isAsync ? 202 : 200).json({
+        success: true,
+        data: {
+          jobId: job._id,
+          status: job.status,
+          async: isAsync,
+          toEnroll: pairs.length,
+          result: job.result,
+        },
+      });
     }
 
-    return res.status(201).json({
-      success: true,
-      data: {
-        enrolled: results.filter((r) => r.ok && !r.skipped).length,
-        skipped: results.filter((r) => r.skipped).length,
-        failed: results.filter((r) => !r.ok).length,
-        results,
-      },
+    const data = await runBulkEnrollmentPairs({
+      pairs,
+      user: req.user,
+      override,
+      overrideReason,
+      enrollmentType,
     });
+    return res.status(201).json({ success: true, data });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
@@ -580,6 +545,30 @@ exports.placeHold = async (req, res) => {
       rootAccountId: tenantId,
       accountId: tenantId,
     });
+    const academicAuditService = require('../services/academicAudit.service');
+    await academicAuditService
+      .recordAuditEvent({
+        actorId: req.user._id,
+        entityType: 'User',
+        entityId: studentId,
+        action: 'registrar.hold.placed',
+        after: {
+          holdId: hold._id,
+          holdType: hold.holdType,
+          blocksRegistration: hold.blocksRegistration,
+          blocksTranscript: hold.blocksTranscript,
+        },
+        severity: 'warning',
+        ip: req.ip,
+        requestId: req.id || req.requestId,
+        rootAccountId: tenantId,
+        metadata: {
+          studentId: String(studentId),
+          holdType: hold.holdType,
+          holdId: String(hold._id),
+        },
+      })
+      .catch(() => {});
     return res.status(201).json({ success: true, data: hold });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
@@ -595,6 +584,25 @@ exports.releaseHold = async (req, res) => {
     hold.releasedAt = new Date();
     hold.releasedBy = req.user._id;
     await hold.save();
+    const academicAuditService = require('../services/academicAudit.service');
+    await academicAuditService
+      .recordAuditEvent({
+        actorId: req.user._id,
+        entityType: 'User',
+        entityId: hold.studentId,
+        action: 'registrar.hold.released',
+        after: { holdId: hold._id, holdType: hold.holdType },
+        severity: 'info',
+        ip: req.ip,
+        requestId: req.id || req.requestId,
+        rootAccountId: tenantId,
+        metadata: {
+          studentId: String(hold.studentId),
+          holdType: hold.holdType,
+          holdId: String(hold._id),
+        },
+      })
+      .catch(() => {});
     return res.json({ success: true, data: hold });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
@@ -865,6 +873,148 @@ exports.listGradePassbacks = async (req, res) => {
   }
 };
 
+exports.listSisAdapters = async (req, res) => {
+  try {
+    const sisSyncRunner = require('../services/registrar/sisSyncRunner.service');
+    return res.json({ success: true, data: sisSyncRunner.listAdapters() });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.getSisHealth = async (req, res) => {
+  try {
+    const tenantId = rootAccountIdFromRequest(req);
+    const sisSyncRunner = require('../services/registrar/sisSyncRunner.service');
+    const data = await sisSyncRunner.getHealth(tenantId);
+    return res.json({ success: true, data });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.runSisSync = async (req, res) => {
+  try {
+    const tenantId = rootAccountIdFromRequest(req);
+    const body = req.body || {};
+    const useAsync = body.async === true;
+
+    if (useAsync) {
+      const jobQueueService = require('../services/jobQueue.service');
+      const { job, async: isAsync } = await jobQueueService.enqueueJob(
+        'sis.scheduled_sync',
+        {
+          rootAccountId: tenantId,
+          direction: body.direction,
+          dryRun: body.dryRun === true,
+          forceLive: body.dryRun !== true,
+          autoApply: body.autoApply === true,
+          entityTypes: body.entityTypes,
+          term: body.term,
+          year: body.year,
+        },
+        req.user,
+        { rootAccountId: tenantId }
+      );
+      return res.status(isAsync ? 202 : 200).json({
+        success: true,
+        data: { jobId: job._id, status: job.status, async: isAsync, result: job.result },
+      });
+    }
+
+    const sisSyncRunner = require('../services/registrar/sisSyncRunner.service');
+    const data = await sisSyncRunner.runSync({
+      tenantId,
+      direction: body.direction,
+      dryRun: body.dryRun === true,
+      forceLive: body.dryRun !== true && body.live !== false,
+      autoApply: body.autoApply === true,
+      entityTypes: body.entityTypes,
+      term: body.term,
+      year: body.year,
+      actor: req.user,
+    });
+    return res.json({ success: true, data });
+  } catch (err) {
+    return res.status(err.status || 500).json({ success: false, message: err.message });
+  }
+};
+
+exports.retrySisBatch = async (req, res) => {
+  try {
+    const tenantId = rootAccountIdFromRequest(req);
+    const sisSyncRunner = require('../services/registrar/sisSyncRunner.service');
+    const data = await sisSyncRunner.retryBatch(tenantId, req.params.batchId, {
+      actor: req.user,
+      approvePending: req.body?.approvePending !== false,
+    });
+    return res.json({ success: true, data });
+  } catch (err) {
+    return res.status(err.status || 500).json({
+      success: false,
+      message: err.message,
+      code: err.code,
+    });
+  }
+};
+
+exports.getIntegrationsStatus = async (req, res) => {
+  try {
+    const tenantId = rootAccountIdFromRequest(req);
+    const { getIntegrationsStatus } = require('../services/registrar/integrationsStatus.service');
+    const data = await getIntegrationsStatus(tenantId);
+    return res.json({ success: true, data });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.getSisMappingPresets = async (req, res) => {
+  try {
+    const banner = require('../services/sis/adapters/banner');
+    const peoplesoft = require('../services/sis/adapters/peoplesoft');
+    const fedena = require('../services/sis/adapters/fedena');
+    return res.json({
+      success: true,
+      data: [
+        { id: 'banner', label: 'Banner', mappings: banner.DEFAULT_MAPPINGS },
+        { id: 'peoplesoft', label: 'PeopleSoft', mappings: peoplesoft.DEFAULT_MAPPINGS },
+        { id: 'fedena', label: 'Fedena', mappings: fedena.DEFAULT_MAPPINGS },
+        {
+          id: 'custom_rest',
+          label: 'Custom REST (identity)',
+          mappings: {
+            users: {
+              sis_id: 'sis_id',
+              email: 'email',
+              first_name: 'first_name',
+              last_name: 'last_name',
+            },
+            sections: {
+              sis_section_id: 'sis_section_id',
+              course_code: 'course_code',
+              term_code: 'term_code',
+            },
+            enrollments: {
+              sis_student_id: 'sis_student_id',
+              sis_section_id: 'sis_section_id',
+              status: 'status',
+            },
+            grades: {
+              sis_student_id: 'sis_student_id',
+              sis_section_id: 'sis_section_id',
+              final_grade: 'final_grade',
+              final_percent: 'final_percent',
+            },
+          },
+        },
+      ],
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 exports.enrollmentSummaryReport = async (req, res) => {
   try {
     const tenantId = rootAccountIdFromRequest(req);
@@ -900,7 +1050,7 @@ exports.getDashboard = async (req, res) => {
     const enrollmentMatch = { ...match };
     if (termId) enrollmentMatch.academicTermId = termId;
 
-    const [byStatus, activeHolds, sisErrorCount, activeTerms, courses] = await Promise.all([
+    const [byStatus, activeHolds, sisErrorCount, activeTerms, courses, sisHealth] = await Promise.all([
       Enrollment.aggregate([
         { $match: enrollmentMatch },
         { $group: { _id: '$status', count: { $sum: 1 } } },
@@ -921,6 +1071,9 @@ exports.getDashboard = async (req, res) => {
       )
         .select('_id academicTermId title')
         .lean(),
+      require('../services/registrar/sisSyncRunner.service')
+        .getHealth(tenantId)
+        .catch(() => null),
     ]);
 
     const courseIds = courses.map((c) => c._id);
@@ -938,6 +1091,9 @@ exports.getDashboard = async (req, res) => {
       else unfinalized += 1;
     }
 
+    const openSisIssues =
+      (sisHealth?.openConflicts || 0) + (sisHealth?.openErrors || 0) || sisErrorCount;
+
     return res.json({
       success: true,
       data: {
@@ -946,7 +1102,18 @@ exports.getDashboard = async (req, res) => {
           total: byStatus.reduce((n, r) => n + r.count, 0),
         },
         activeHolds,
-        sisErrors: sisErrorCount,
+        sisErrors: openSisIssues,
+        sisHealth: sisHealth
+          ? {
+              lastSyncAt: sisHealth.lastSyncAt,
+              lastSyncStatus: sisHealth.lastSyncStatus,
+              errorRate: sisHealth.errorRate,
+              consecutiveFailures: sisHealth.consecutiveFailures,
+              openConflicts: sisHealth.openConflicts,
+              schedule: sisHealth.schedule,
+              provider: sisHealth.provider,
+            }
+          : null,
         activeTerms,
         gradeStatus: {
           coursesLinked: courses.length,
@@ -1009,7 +1176,7 @@ exports.getStudentStub = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Student not found' });
     }
 
-    const [enrollments, holds, grades, transcripts, auditEvents] = await Promise.all([
+    const [enrollments, holds, grades, transcripts, auditEvents, documentRequests] = await Promise.all([
       Enrollment.find(withTenantFilter({ studentId: student._id }, tenantId))
         .populate('lmsCourseId', 'title catalog.courseCode')
         .populate('academicTermId', 'name code')
@@ -1043,6 +1210,11 @@ exports.getStudentStub = async (req, res) => {
       })
         .populate('actor', 'firstName lastName email role')
         .sort({ createdAt: -1 })
+        .limit(80)
+        .lean(),
+      require('../models/transcriptRequest.model')
+        .find(withTenantFilter({ studentId: student._id }, tenantId))
+        .sort({ requestedAt: -1 })
         .limit(50)
         .lean(),
     ]);
@@ -1078,6 +1250,10 @@ exports.getStudentStub = async (req, res) => {
     }
     enrollmentAudit.sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0));
 
+    const registrarEvents = (auditEvents || []).filter(
+      (ev) => typeof ev.action === 'string' && ev.action.startsWith('registrar.')
+    );
+
     return res.json({
       success: true,
       data: {
@@ -1088,11 +1264,13 @@ exports.getStudentStub = async (req, res) => {
         transcripts,
         audit: {
           system: auditEvents,
+          registrar: registrarEvents,
           enrollmentHistory: enrollmentAudit.slice(0, 50),
           amendments,
         },
         documents: student.studentProfile?.documents || [],
-        note: 'Bonafide / TC certificates: queue via /registrar/transcripts (request types bonafide, migration_tc).',
+        documentRequests,
+        note: 'Request bonafide / transfer certificates from the Documents tab, or via Transcripts Office.',
       },
     });
   } catch (err) {
@@ -1322,8 +1500,10 @@ const termGradeGovernance = require('../services/registrar/termGradeGovernance.s
 
 exports.previewTermFinalize = async (req, res) => {
   try {
-    const tenantId = rootAccountIdFromRequest(req);
-    const data = await termGradeGovernance.previewTermFinalize(tenantId, req.params.termId);
+    const { filter: accountFilter, tenantId } = await buildAccountScopeFilter(req);
+    const data = await termGradeGovernance.previewTermFinalize(tenantId, req.params.termId, {
+      accountFilter,
+    });
     return res.json({ success: true, data });
   } catch (err) {
     return res.status(err.status || 500).json({ success: false, message: err.message });
@@ -1332,9 +1512,21 @@ exports.previewTermFinalize = async (req, res) => {
 
 exports.applyTermFinalize = async (req, res) => {
   try {
-    const tenantId = rootAccountIdFromRequest(req);
-    const { async: asyncFlag, courseIds } = req.body || {};
-    const preview = await termGradeGovernance.previewTermFinalize(tenantId, req.params.termId);
+    const { filter: accountFilter, tenantId } = await buildAccountScopeFilter(req);
+    const { async: asyncFlag, courseIds, force = false } = req.body || {};
+    const preview = await termGradeGovernance.previewTermFinalize(tenantId, req.params.termId, {
+      accountFilter,
+    });
+
+    if (preview.unlinkedSections?.length && !force) {
+      return res.status(400).json({
+        success: false,
+        code: 'UNLINKED_SECTIONS',
+        message: `${preview.unlinkedSections.length} section(s) have no content course. Link or create before finalize, or pass force=true.`,
+        data: preview,
+      });
+    }
+
     const targets = Array.isArray(courseIds) && courseIds.length
       ? preview.readyCourseIds.filter((id) => courseIds.map(String).includes(String(id)))
       : preview.readyCourseIds;
@@ -1351,6 +1543,7 @@ exports.applyTermFinalize = async (req, res) => {
           termId: String(req.params.termId),
           userId: String(req.user._id),
           courseIds: targets,
+          force: Boolean(force),
           rootAccountId: tenantId,
         },
         req.user,
@@ -1373,6 +1566,25 @@ exports.applyTermFinalize = async (req, res) => {
       termId: req.params.termId,
       user: req.user,
       courseIds: targets,
+      force: Boolean(force),
+      accountFilter,
+    });
+    return res.json({ success: true, data });
+  } catch (err) {
+    return res.status(err.status || 500).json({
+      success: false,
+      message: err.message,
+      code: err.code,
+      data: err.data,
+    });
+  }
+};
+
+exports.getTermGradesDashboard = async (req, res) => {
+  try {
+    const { filter: accountFilter, tenantId } = await buildAccountScopeFilter(req);
+    const data = await termGradeGovernance.getTermGradesDashboard(tenantId, req.params.termId, {
+      accountFilter,
     });
     return res.json({ success: true, data });
   } catch (err) {
@@ -1380,11 +1592,41 @@ exports.applyTermFinalize = async (req, res) => {
   }
 };
 
-exports.getTermGradesDashboard = async (req, res) => {
+exports.repairCourseSnapshots = async (req, res) => {
+  try {
+    const { filter: accountFilter, tenantId } = await buildAccountScopeFilter(req);
+    const course = await Course.findOne(
+      withTenantFilter({ _id: req.params.courseId, ...accountFilter }, tenantId)
+    ).select('_id');
+    if (!course) {
+      return res.status(404).json({ success: false, message: 'Course not found in scope' });
+    }
+    const data = await termGradeGovernance.repairMissingSnapshots(
+      tenantId,
+      req.params.courseId,
+      req.user
+    );
+    return res.json({ success: true, data });
+  } catch (err) {
+    return res.status(err.status || 500).json({
+      success: false,
+      message: err.message,
+      code: err.code,
+    });
+  }
+};
+
+exports.linkOrCreateSectionCourse = async (req, res) => {
   try {
     const tenantId = rootAccountIdFromRequest(req);
-    const data = await termGradeGovernance.getTermGradesDashboard(tenantId, req.params.termId);
-    return res.json({ success: true, data });
+    const sectionOffice = require('../services/registrar/sectionOffice.service');
+    const { courseId, create } = req.body || {};
+    const data = await sectionOffice.linkOrCreateContentCourse(tenantId, req.params.sectionId, {
+      courseId: courseId || null,
+      create: create !== false && !courseId,
+      actor: req.user,
+    });
+    return res.status(data.created ? 201 : 200).json({ success: true, data });
   } catch (err) {
     return res.status(err.status || 500).json({ success: false, message: err.message });
   }
@@ -1467,13 +1709,71 @@ exports.getTermFinalizeJob = async (req, res) => {
       withTenantFilter(
         {
           _id: req.params.jobId,
-          type: { $in: ['grades.term_finalize', 'transcript.bulk_issue', 'sis.import_apply', 'sis.grade_export'] },
+          type: {
+            $in: [
+              'grades.term_finalize',
+              'transcript.bulk_issue',
+              'sis.import_apply',
+              'sis.grade_export',
+              'enrollment.bulk_csv',
+            ],
+          },
         },
         tenantId
       )
     ).lean();
     if (!job) return res.status(404).json({ success: false, message: 'Job not found' });
-    return res.json({ success: true, data: job });
+    return res.json({
+      success: true,
+      data: {
+        ...job,
+        hasDownload: Boolean(job.filePath && job.status === 'completed'),
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.downloadRegistrarJobExport = async (req, res) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const tenantId = rootAccountIdFromRequest(req);
+    const AsyncJob = require('../models/asyncJob.model');
+    const { verifyDownloadToken, getJobsDir } = require('../services/gradingJobProcessors');
+    const { jobId } = req.params;
+    const { token } = req.query;
+    if (!token) {
+      return res.status(400).json({ success: false, message: 'token query param is required' });
+    }
+
+    const job = await AsyncJob.findOne(
+      withTenantFilter(
+        {
+          _id: jobId,
+          type: { $in: ['transcript.bulk_issue', 'sis.grade_export', 'grades.term_finalize'] },
+        },
+        tenantId
+      )
+    );
+    if (!job || job.status !== 'completed' || !job.filePath) {
+      return res.status(404).json({ success: false, message: 'Export not available' });
+    }
+
+    if (job.downloadToken !== token && !verifyDownloadToken(jobId, token)) {
+      return res.status(403).json({ success: false, message: 'Invalid or expired download token' });
+    }
+    if (job.downloadExpiresAt && new Date() > new Date(job.downloadExpiresAt)) {
+      return res.status(410).json({ success: false, message: 'Download link expired' });
+    }
+
+    const resolved = path.resolve(job.filePath);
+    if (!resolved.startsWith(path.resolve(getJobsDir())) || !fs.existsSync(resolved)) {
+      return res.status(404).json({ success: false, message: 'File not found' });
+    }
+
+    return res.download(resolved, job.fileName || 'registrar-export.bin');
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
@@ -1516,6 +1816,7 @@ exports.listTranscriptRequests = async (req, res) => {
     const tenantId = rootAccountIdFromRequest(req);
     const data = await transcriptOffice.listRequests(tenantId, {
       status: req.query.status,
+      studentId: req.query.studentId,
       limit: req.query.limit,
     });
     return res.json({ success: true, data });
@@ -1531,7 +1832,12 @@ exports.createTranscriptRequest = async (req, res) => {
     if (!studentId || !term || !year) {
       return res.status(400).json({ success: false, message: 'studentId, term, and year are required' });
     }
-    const data = await transcriptOffice.createRequest(tenantId, req.body, req.user.accountId);
+    const data = await transcriptOffice.createRequest(
+      tenantId,
+      req.body,
+      req.user.accountId,
+      req.user._id
+    );
     return res.status(201).json({ success: true, data });
   } catch (err) {
     return res.status(err.status || 500).json({ success: false, message: err.message });

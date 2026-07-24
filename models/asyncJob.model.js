@@ -13,6 +13,8 @@ const asyncJobSchema = new mongoose.Schema(
         'transcript.bulk_issue',
         'sis.import_apply',
         'sis.grade_export',
+        'sis.scheduled_sync',
+        'enrollment.bulk_csv',
         'export.gradebook',
         'export.institution',
         'course.copy',

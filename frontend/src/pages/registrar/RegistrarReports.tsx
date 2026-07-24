@@ -1,6 +1,12 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { downloadCsv, registrarAuthHeaders, registrarGet, registrarUrl } from './registrarApi';
+import {
+  downloadCsv,
+  registrarAuthHeaders,
+  registrarGet,
+  registrarPost,
+  registrarUrl,
+} from './registrarApi';
 
 type ReportKey = 'term-completion' | 'amendments' | 'policy-changes' | 'finalized-courses';
 
@@ -38,6 +44,8 @@ export function RegistrarReports() {
   const [courseId, setCourseId] = useState('');
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [label, setLabel] = useState('');
+  const [boardNote, setBoardNote] = useState('');
+  const [submitMsg, setSubmitMsg] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -111,6 +119,34 @@ export function RegistrarReports() {
     }
   };
 
+  const submitBoard = async () => {
+    setError('');
+    setSubmitMsg('');
+    try {
+      const res = await registrarPost<{
+        data: { submitted?: boolean; mode?: string; message?: string; ok?: boolean };
+      }>(`/api/registrar/reports/india/${indiaKind}/submit`, {
+        term,
+        year: Number(year),
+        studentId: studentId || undefined,
+        courseId: courseId || undefined,
+      });
+      const d = res.data;
+      if (d?.submitted) {
+        setSubmitMsg(`Submitted via ${d.mode}`);
+      } else {
+        setSubmitMsg(d?.message || `Mode: ${d?.mode || 'export_only'} (CSV download still available)`);
+        setBoardNote(d?.message || '');
+      }
+    } catch (err: unknown) {
+      setError(
+        axios.isAxiosError(err) && err.response?.data?.message
+          ? String(err.response.data.message)
+          : 'Partner submit failed'
+      );
+    }
+  };
+
   const columns = rows[0] ? Object.keys(rows[0]) : [];
   const indiaMeta = INDIA.find((i) => i.key === indiaKind);
 
@@ -135,7 +171,8 @@ export function RegistrarReports() {
 
       {mode === 'india' && (
         <p className="text-xs text-gray-500">
-          Export scaffolds for school/college demos — not board-certified forms or government portal submissions.
+          {boardNote ||
+            'CSV extracts by default. Partner webhook submit when BOARD_SUBMIT_MODE=partner_webhook is configured.'}
         </p>
       )}
 
@@ -211,9 +248,23 @@ export function RegistrarReports() {
         <button type="button" onClick={() => void download()} className="rounded border px-3 py-1.5 text-sm">
           CSV
         </button>
+        {mode === 'india' && (
+          <button
+            type="button"
+            className="rounded border px-3 py-1.5 text-sm"
+            onClick={() => void submitBoard()}
+          >
+            Submit to partner
+          </button>
+        )}
       </div>
 
       {label && <p className="text-sm text-gray-600 dark:text-gray-400">{label}</p>}
+      {submitMsg && (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          {submitMsg}
+        </div>
+      )}
       {error && (
         <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</div>
       )}

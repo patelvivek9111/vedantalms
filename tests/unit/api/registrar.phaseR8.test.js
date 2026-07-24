@@ -276,16 +276,17 @@ describe('Registrar Phase R8 — India compliance + ERP / LTI', () => {
     expect(rootB).toBeTruthy();
   });
 
-  it('exposes LTI AGS readiness and submit stub', async () => {
+  it('exposes LTI AGS readiness and submit (not a stub)', async () => {
     const ready = await request(app)
       .get('/api/integrations/lti/readiness')
       .set('Host', 'localhost');
     expect(ready.status).toBe(200);
     expect(ready.body.data).toHaveProperty('agsEnabled');
     expect(ready.body.data.note).toMatch(/AGS|LTI/i);
+    expect(ready.body.data.stub).toBeUndefined();
 
-    const stub = await request(app)
-      .post('/api/integrations/lti/ags/submit-stub')
+    const submit = await request(app)
+      .post('/api/integrations/lti/ags/submit')
       .set('Host', 'localhost')
       .send({
         term: 'Fall',
@@ -293,11 +294,11 @@ describe('Registrar Phase R8 — India compliance + ERP / LTI', () => {
         dryRun: true,
         rows: [{ sis_student_id: 'S8-001', letter_grade: 'A' }],
       });
-    expect(stub.status).toBe(200);
-    expect(stub.body.data.stub).toBe(true);
-    expect(stub.body.data.recordId).toBeTruthy();
+    expect(submit.status).toBe(200);
+    expect(submit.body.data.stub).toBe(false);
+    expect(submit.body.data.recordId).toBeTruthy();
 
-    const rec = await GradePassbackRecord.findById(stub.body.data.recordId);
+    const rec = await GradePassbackRecord.findById(submit.body.data.recordId);
     expect(rec.channel).toBe('lti_ags');
     expect(rec.provider).toBe('lti');
   });

@@ -1,5 +1,6 @@
 const AcademicTerm = require('../../models/academicTerm.model');
 const Course = require('../../models/course.model');
+const CourseSection = require('../../models/courseSection.model');
 const CourseGradeLifecycle = require('../../models/courseGradeLifecycle.model');
 const CourseGradingPeriod = require('../../models/courseGradingPeriod.model');
 const InstitutionGradingPeriod = require('../../models/institutionGradingPeriod.model');
@@ -19,9 +20,25 @@ async function assertTerm(tenantId, termId) {
   return term;
 }
 
-async function listCoursesForTerm(tenantId, termId) {
-  return Course.find(withTenantFilter({ academicTermId: termId }, tenantId))
-    .select('title catalog academicTermId sectionNumber students semester')
+async function listCoursesForTerm(tenantId, termId, accountFilter = {}) {
+  return Course.find(withTenantFilter({ academicTermId: termId, ...accountFilter }, tenantId))
+    .select('title catalog academicTermId sectionNumber students semester accountId rootAccountId')
+    .lean();
+}
+
+async function listUnlinkedSections(tenantId, termId, accountFilter = {}) {
+  return CourseSection.find(
+    withTenantFilter(
+      {
+        academicTermId: termId,
+        $or: [{ lmsCourseId: null }, { lmsCourseId: { $exists: false } }],
+        ...accountFilter,
+      },
+      tenantId
+    )
+  )
+    .populate('offeringId', 'courseCode title')
+    .select('sectionNumber offeringId academicTermId status enrollmentMethod instructorId accountId')
     .lean();
 }
 
@@ -57,10 +74,26 @@ async function buildGradeStatusRows(tenantId, term, courses) {
   return { rows, counts };
 }
 
-async function previewTermFinalize(tenantId, termId) {
+function mapUnlinkedSections(sections) {
+  return (sections || []).map((s) => ({
+    sectionId: String(s._id),
+    sectionNumber: s.sectionNumber || '',
+    status: s.status || 'planned',
+    enrollmentMethod: s.enrollmentMethod || 'open',
+    offeringCode: s.offeringId?.courseCode || '',
+    offeringTitle: s.offeringId?.title || '',
+    repairHint: 'Link an existing LMS course or create a content course before term finalize.',
+  }));
+}
+
+async function previewTermFinalize(tenantId, termId, { accountFilter = {} } = {}) {
   const term = await assertTerm(tenantId, termId);
-  const courses = await listCoursesForTerm(tenantId, termId);
+  const [courses, unlinkedRaw] = await Promise.all([
+    listCoursesForTerm(tenantId, termId, accountFilter),
+    listUnlinkedSections(tenantId, termId, accountFilter),
+  ]);
   const { rows, counts } = await buildGradeStatusRows(tenantId, term, courses);
+  const unlinkedSections = mapUnlinkedSections(unlinkedRaw);
 
   const ready = rows.filter((r) => !['FINALIZED', 'AMENDED'].includes(r.lifecycleStatus));
   const alreadyFinalized = rows.filter((r) => ['FINALIZED', 'AMENDED'].includes(r.lifecycleStatus));
@@ -73,13 +106,33 @@ async function previewTermFinalize(tenantId, termId) {
     toFinalize: ready.length,
     alreadyFinalized: alreadyFinalized.length,
     missingSnapshots: missingSnapshots.length,
+    unlinkedSectionCount: unlinkedSections.length,
+    unlinkedSections,
     rows,
     readyCourseIds: ready.map((r) => r.courseId),
+    blockedByUnlinkedSections: unlinkedSections.length > 0,
   };
 }
 
-async function finalizeCoursesInTerm({ tenantId, termId, user, courseIds = null }) {
-  const preview = await previewTermFinalize(tenantId, termId);
+async function finalizeCoursesInTerm({
+  tenantId,
+  termId,
+  user,
+  courseIds = null,
+  force = false,
+  accountFilter = {},
+}) {
+  const preview = await previewTermFinalize(tenantId, termId, { accountFilter });
+  if (preview.unlinkedSections.length && !force) {
+    const err = new Error(
+      `${preview.unlinkedSections.length} section(s) have no content course (lmsCourseId). Link or create before finalize, or pass force=true.`
+    );
+    err.status = 400;
+    err.code = 'UNLINKED_SECTIONS';
+    err.data = preview;
+    throw err;
+  }
+
   const targetIds = courseIds?.length
     ? preview.readyCourseIds.filter((id) => courseIds.map(String).includes(String(id)))
     : preview.readyCourseIds;
@@ -118,18 +171,19 @@ async function finalizeCoursesInTerm({ tenantId, termId, user, courseIds = null 
     finalized: results.filter((r) => r.ok).length,
     failed: results.filter((r) => !r.ok).length,
     results,
+    unlinkedSectionsSkipped: force ? preview.unlinkedSections.length : 0,
   };
 }
 
-async function getTermGradesDashboard(tenantId, termId) {
-  const preview = await previewTermFinalize(tenantId, termId);
+async function getTermGradesDashboard(tenantId, termId, { accountFilter = {} } = {}) {
+  const preview = await previewTermFinalize(tenantId, termId, { accountFilter });
   const courseIds = preview.rows.map((r) => r.courseId);
 
   const [amendments, policyChanges, openPeriods] = await Promise.all([
     courseIds.length
       ? GradeAmendmentRecord.find({ course: { $in: courseIds } })
           .sort({ createdAt: -1 })
-          .limit(25)
+          .limit(50)
           .populate('course', 'title catalog.courseCode')
           .populate('amendedBy', 'firstName lastName email')
           .lean()
@@ -171,12 +225,64 @@ async function getTermGradesDashboard(tenantId, termId) {
       missingSnapshots: missingSnapshots.length,
       policyChangesSinceFinalize: policySinceFinalize.length,
       openInstitutionPeriods: openPeriods.length,
+      unlinkedSections: preview.unlinkedSectionCount,
     },
     amendments,
     policyChangesSinceFinalize: policySinceFinalize,
     openInstitutionPeriods: openPeriods,
     missingSnapshotRows: missingSnapshots,
+    unlinkedSections: preview.unlinkedSections,
   };
+}
+
+async function repairMissingSnapshots(tenantId, courseId, user) {
+  const course = await Course.findOne(withTenantFilter({ _id: courseId }, tenantId));
+  if (!course) {
+    const err = new Error('Course not found');
+    err.status = 404;
+    throw err;
+  }
+  const life = await CourseGradeLifecycle.findOne(
+    withTenantFilter({ course: courseId }, tenantId)
+  ).lean();
+  if (!life || !['FINALIZED', 'AMENDED', 'POSTED'].includes(life.status)) {
+    const err = new Error('Course must be POSTED/FINALIZED/AMENDED before repairing snapshots');
+    err.status = 400;
+    err.code = 'INVALID_LIFECYCLE';
+    throw err;
+  }
+
+  const term = life.term || course.semester?.term || 'Fall';
+  const year = life.year || course.semester?.year || new Date().getFullYear();
+  const status =
+    life.status === 'AMENDED' ? 'AMENDED' : life.status === 'POSTED' ? 'POSTED' : 'FINALIZED';
+  const { frozenCount, summary } = await gradeLifecycleService.batchFreezeCourseGrades(
+    course,
+    term,
+    year,
+    status,
+    { allowReplaceCurrent: true }
+  );
+
+  await CourseGradeLifecycle.updateOne(
+    withTenantFilter({ course: courseId }, tenantId),
+    { $set: { studentSnapshotCount: frozenCount } }
+  );
+
+  await academicAuditService
+    .recordAuditEvent({
+      actorId: user._id,
+      entityType: 'course',
+      entityId: courseId,
+      action: 'registrar.grades.snapshots_repaired',
+      after: { frozenCount, term, year, lifecycleStatus: life.status },
+      severity: 'warning',
+      rootAccountId: tenantId,
+      metadata: { courseId: String(courseId), term, year },
+    })
+    .catch(() => {});
+
+  return { courseId, frozenCount, term, year, lifecycleStatus: life.status, summary };
 }
 
 async function listInstitutionPeriods(tenantId, termId) {
@@ -186,9 +292,9 @@ async function listInstitutionPeriods(tenantId, termId) {
     .lean();
 }
 
-async function createInstitutionPeriod(tenantId, termId, body, user) {
+async function createInstitutionPeriod(tenantId, termId, body) {
   await assertTerm(tenantId, termId);
-  const period = await InstitutionGradingPeriod.create({
+  return InstitutionGradingPeriod.create({
     academicTermId: termId,
     name: String(body.name || '').trim(),
     position: body.position ?? 0,
@@ -200,7 +306,6 @@ async function createInstitutionPeriod(tenantId, termId, body, user) {
     rootAccountId: tenantId,
     accountId: tenantId,
   });
-  return period;
 }
 
 async function updateInstitutionPeriod(tenantId, periodId, body) {
@@ -233,7 +338,6 @@ async function closeInstitutionPeriod(tenantId, periodId, user) {
   period.closedBy = user._id;
   await period.save();
 
-  // Mirror close onto matching course periods in the term (by name/position)
   const courses = await listCoursesForTerm(tenantId, period.academicTermId);
   const courseIds = courses.map((c) => c._id);
   if (courseIds.length) {
@@ -249,9 +353,6 @@ async function closeInstitutionPeriod(tenantId, periodId, user) {
   return period;
 }
 
-/**
- * Copy institution grading periods onto courses in the term that lack periods.
- */
 async function inheritPeriodsToTermCourses(tenantId, termId) {
   const periods = await listInstitutionPeriods(tenantId, termId);
   if (!periods.length) {
@@ -284,6 +385,8 @@ module.exports = {
   previewTermFinalize,
   finalizeCoursesInTerm,
   getTermGradesDashboard,
+  repairMissingSnapshots,
+  listUnlinkedSections,
   listInstitutionPeriods,
   createInstitutionPeriod,
   updateInstitutionPeriod,

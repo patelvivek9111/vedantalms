@@ -20,6 +20,13 @@ export interface AcademicSettings {
   defaultCreditHoursCollege: number;
   reportingTermSchool: string;
   reportingTermCollege: string;
+  defaultEnrollmentMethod?: 'open' | 'approval' | 'registrar_only' | 'sis_only';
+  holdDefaults?: {
+    holdType?: string;
+    blocksRegistration?: boolean;
+    blocksTranscript?: boolean;
+    blocksGrades?: boolean;
+  };
 }
 
 export interface AcademicSettingsResponse extends AcademicSettings {

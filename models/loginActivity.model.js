@@ -1,10 +1,12 @@
 const mongoose = require('mongoose');
 
 const loginActivitySchema = new mongoose.Schema({
+  // Nullable when credentials reference an unknown email (failed login before user resolve).
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: false,
+    default: null,
   },
   timestamp: {
     type: Date,

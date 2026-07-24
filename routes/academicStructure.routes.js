@@ -27,8 +27,10 @@ router.post(
 );
 
 router.get('/cross-lists', protect, ctrl.listCrossLists);
+router.post('/cross-lists/preview', protect, authorize(...termRoles), ctrl.previewCrossListRemount);
 router.get('/cross-lists/:id', protect, ctrl.getCrossList);
 router.post('/cross-lists', protect, authorize(...termRoles), ctrl.createCrossList);
 router.patch('/cross-lists/:id', protect, authorize(...termRoles), ctrl.updateCrossList);
+router.get('/courses/:courseId/cross-list-siblings', protect, ctrl.listCrossListSiblings);
 
 module.exports = router;

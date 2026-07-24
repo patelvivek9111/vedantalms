@@ -169,8 +169,32 @@ exports.getIndiaReport = async (req, res) => {
 
 exports.listIndiaReportKinds = async (req, res) => {
   const indiaReports = require('../services/registrar/indiaReports.service');
+  const boardSubmit = require('../services/registrar/boardSubmit.service');
   return res.json({
     success: true,
     data: indiaReports.REPORT_KINDS.map((k) => ({ key: k })),
+    board: boardSubmit.getBoardHealth(),
   });
+};
+
+exports.submitIndiaReport = async (req, res) => {
+  try {
+    const tenantId = rootAccountIdFromRequest(req);
+    const boardSubmit = require('../services/registrar/boardSubmit.service');
+    const data = await boardSubmit.submitIndiaReport({
+      tenantId,
+      kind: req.params.kind,
+      params: {
+        studentId: req.body?.studentId || req.query.studentId,
+        courseId: req.body?.courseId || req.query.courseId,
+        term: req.body?.term || req.query.term,
+        year: req.body?.year || req.query.year,
+      },
+      submittedBy: req.user?._id,
+      dryRun: req.body?.dryRun === true,
+    });
+    return res.json({ success: true, data });
+  } catch (error) {
+    return res.status(error.status || 500).json({ success: false, message: error.message });
+  }
 };

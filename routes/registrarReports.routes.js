@@ -14,5 +14,10 @@ router.get('/policy-changes', registrarReportsController.getPolicyChangeReport);
 router.get('/finalized-courses', registrarReportsController.getFinalizedCoursesReport);
 router.get('/india', registrarReportsController.listIndiaReportKinds);
 router.get('/india/:kind', registrarReportsController.getIndiaReport);
+router.post(
+  '/india/:kind/submit',
+  requireCapability(CAPABILITIES.MANAGE_SIS),
+  registrarReportsController.submitIndiaReport
+);
 
 module.exports = router;

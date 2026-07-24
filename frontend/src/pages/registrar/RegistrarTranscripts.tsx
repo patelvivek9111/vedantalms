@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
-import { registrarGet, registrarPost, registrarPatch } from './registrarApi';
+import { registrarGet, registrarPost, registrarPatch, downloadPdfBase64, downloadRegistrarJobFile } from './registrarApi';
 
 type Tab = 'issue' | 'requests' | 'templates' | 'bulk';
 
@@ -36,19 +36,6 @@ type TranscriptRequest = {
   requestedAt?: string;
 };
 
-function downloadPdfBase64(base64: string, filename: string) {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-  const blob = new Blob([bytes], { type: 'application/pdf' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
 export function RegistrarTranscripts() {
   const [params] = useSearchParams();
   const [tab, setTab] = useState<Tab>('issue');
@@ -67,6 +54,10 @@ export function RegistrarTranscripts() {
     blocked?: number;
     rows?: Array<{ studentId: string; ok: boolean; message?: string }>;
   } | null>(null);
+  const [bulkJobId, setBulkJobId] = useState('');
+  const [bulkJobStatus, setBulkJobStatus] = useState('');
+  const [bulkDownloadToken, setBulkDownloadToken] = useState('');
+  const [bulkFileName, setBulkFileName] = useState('');
 
   const [tplName, setTplName] = useState('Official PDF');
   const [tplScale, setTplScale] = useState('india_10');
@@ -253,6 +244,8 @@ export function RegistrarTranscripts() {
 
   const applyBulk = async () => {
     setError('');
+    setBulkDownloadToken('');
+    setBulkFileName('');
     try {
       const res = await registrarPost<{
         data: { jobId?: string; issued?: number; failed?: number; toIssue?: number };
@@ -263,7 +256,9 @@ export function RegistrarTranscripts() {
         async: true,
       });
       if (res.data?.jobId) {
-        setMessage(`Bulk issue job queued (${res.data.toIssue || 0} students). Job: ${res.data.jobId}`);
+        setBulkJobId(String(res.data.jobId));
+        setBulkJobStatus('pending');
+        setMessage(`Bulk issue job queued (${res.data.toIssue || 0} students). Poll for ZIP when complete.`);
       } else {
         setMessage(`Issued ${res.data?.issued ?? 0}, failed ${res.data?.failed ?? 0}`);
       }
@@ -272,6 +267,55 @@ export function RegistrarTranscripts() {
         axios.isAxiosError(err) && err.response?.data?.message
           ? String(err.response.data.message)
           : 'Bulk issue failed'
+      );
+    }
+  };
+
+  const refreshBulkJob = async () => {
+    if (!bulkJobId) return;
+    try {
+      const res = await registrarGet<{
+        data: {
+          status: string;
+          progress?: { completed: number; total: number };
+          hasDownload?: boolean;
+          downloadToken?: string;
+          fileName?: string;
+          result?: { zip?: { downloadToken?: string; fileName?: string; pdfCount?: number } };
+        };
+      }>(`/api/registrar/jobs/${bulkJobId}`);
+      setBulkJobStatus(res.data?.status || '');
+      const token = res.data?.downloadToken || res.data?.result?.zip?.downloadToken || '';
+      const name = res.data?.fileName || res.data?.result?.zip?.fileName || 'transcripts-bulk.zip';
+      if (token) {
+        setBulkDownloadToken(token);
+        setBulkFileName(name);
+      }
+      const p = res.data?.progress;
+      setMessage(
+        `Bulk job ${res.data?.status}${p ? ` · ${p.completed}/${p.total}` : ''}${
+          res.data?.hasDownload ? ' · ZIP ready' : ''
+        }`
+      );
+    } catch (err: unknown) {
+      setError(
+        axios.isAxiosError(err) && err.response?.data?.message
+          ? String(err.response.data.message)
+          : 'Could not refresh bulk job'
+      );
+    }
+  };
+
+  const downloadBulkZip = async () => {
+    if (!bulkJobId || !bulkDownloadToken) return;
+    try {
+      await downloadRegistrarJobFile(bulkJobId, bulkDownloadToken, bulkFileName || 'transcripts-bulk.zip');
+      setMessage('ZIP download started');
+    } catch (err: unknown) {
+      setError(
+        axios.isAxiosError(err) && err.response?.data?.message
+          ? String(err.response.data.message)
+          : 'ZIP download failed'
       );
     }
   };
@@ -538,7 +582,7 @@ export function RegistrarTranscripts() {
         <div className="space-y-3 border rounded-md p-4 border-gray-200 dark:border-gray-700">
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Preview graduating / enrolled students for the term, then queue a{' '}
-            <code>transcript.bulk_issue</code> job.
+            <code>transcript.bulk_issue</code> job. When complete, download all issued PDFs as a ZIP.
           </p>
           <div className="grid grid-cols-2 gap-3">
             <label className="text-sm">
@@ -559,7 +603,7 @@ export function RegistrarTranscripts() {
               />
             </label>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button type="button" className="rounded border px-3 py-1.5 text-sm" onClick={() => void previewBulk()}>
               Preview
             </button>
@@ -570,6 +614,20 @@ export function RegistrarTranscripts() {
             >
               Queue bulk issue
             </button>
+            {bulkJobId && (
+              <button type="button" className="rounded border px-3 py-1.5 text-sm" onClick={() => void refreshBulkJob()}>
+                Refresh job ({bulkJobStatus || '…'})
+              </button>
+            )}
+            {bulkDownloadToken && (
+              <button
+                type="button"
+                className="rounded bg-emerald-600 text-white px-3 py-1.5 text-sm"
+                onClick={() => void downloadBulkZip()}
+              >
+                Download ZIP
+              </button>
+            )}
           </div>
           {bulkPreview?.rows && (
             <ul className="max-h-48 overflow-auto text-xs divide-y border rounded">

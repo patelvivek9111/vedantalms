@@ -1,6 +1,6 @@
 import React, { Suspense, useEffect, useState, useRef, useCallback } from 'react';
 import { getMemoryAuthToken, authFetchInit } from '../../utils/authToken';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useCourse } from '../../contexts/CourseContext';
 import { useAuth } from '../../contexts/AuthContext';
 import CreateModuleForm from '../modules/CreateModuleForm';
@@ -136,6 +136,40 @@ const CourseDetail: React.FC = () => {
     user?.role === 'teacher' &&
     normalizeMongoIdRef(course?.instructor) !== '' &&
     normalizeMongoIdRef(course?.instructor) === normalizeMongoIdRef(user?._id);
+  const [crossListSiblings, setCrossListSiblings] = useState<
+    Array<{
+      sectionId: string;
+      sectionNumber?: string;
+      offeringCode?: string;
+      openCourseUrl?: string | null;
+      openGradebookUrl?: string | null;
+    }>
+  >([]);
+
+  useEffect(() => {
+    if (!course?._id || !(isInstructor || isAdmin)) {
+      setCrossListSiblings([]);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await api.get(`/academic-structure/courses/${course._id}/cross-list-siblings`);
+        if (cancelled) return;
+        const data = res.data?.data;
+        if (data?.mode === 'split' && Array.isArray(data.siblings)) {
+          setCrossListSiblings(data.siblings);
+        } else {
+          setCrossListSiblings([]);
+        }
+      } catch {
+        if (!cancelled) setCrossListSiblings([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [course?._id, isInstructor, isAdmin]);
   const isCourseTeachingAssistant =
     user?.role === 'teaching_assistant' &&
     Array.isArray(course?.teachingAssistants) &&
@@ -1155,6 +1189,21 @@ const CourseDetail: React.FC = () => {
             />
           </div>
           <div className="h-px w-full shrink-0 bg-gray-200 dark:bg-gray-700" aria-hidden />
+          {crossListSiblings.length > 0 && (
+            <div className="pb-2 text-sm text-gray-600 dark:text-gray-300">
+              <span className="mr-2 font-medium text-gray-800 dark:text-gray-100">Also teaching (split cross-list):</span>
+              {crossListSiblings.map((sib) => (
+                <Link
+                  key={sib.sectionId}
+                  to={sib.openGradebookUrl || sib.openCourseUrl || '#'}
+                  className="mr-2 inline-block rounded bg-indigo-50 px-2 py-0.5 text-indigo-700 hover:underline dark:bg-indigo-950/50 dark:text-indigo-200"
+                >
+                  §{sib.sectionNumber}
+                  {sib.offeringCode ? ` ${sib.offeringCode}` : ''} → gradebook
+                </Link>
+              ))}
+            </div>
+          )}
           <div className="h-3 shrink-0" aria-hidden />
         </div>
       </div>

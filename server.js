@@ -14,6 +14,7 @@ const rateLimit = require('express-rate-limit');
 const pinoHttp = require('pino-http');
 const pino = require('pino');
 const { requestCorrelation } = require('./middleware/requestCorrelation');
+const { mongoSanitize } = require('./middleware/mongoSanitize');
 const { metricsAuth } = require('./middleware/metricsAuth');
 const { validateStartupEnv } = require('./config/startupValidation');
 const { resolveMongoDbName } = require('./scripts/resolveMongoDbName');
@@ -55,6 +56,8 @@ app.use(helmet({
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// Strip $-operator / dotted keys before any controller sees the request.
+app.use(mongoSanitize);
 
 // ACME HTTP-01 challenge (Let's Encrypt) — must be public and unauthenticated
 app.get('/.well-known/acme-challenge/:token', (req, res) => {
@@ -824,6 +827,10 @@ app.get('/health/ready', async (req, res) => {
           : null,
       nightlyOpsWorker:
         'Schedule npm run worker:nightly-ops -- --apply via cron (e.g. 03:00 UTC daily)',
+      sisSyncWorker:
+        'Schedule npm run worker:sis-sync -- --apply via cron (hourly or nightly per SisIntegrationConfig.schedule)',
+      erpHoldRetryWorker:
+        'Schedule npm run worker:erp-hold-retry via cron to drain failed ERP hold webhooks / DLQ',
       quizwaveCleanup:
         lifecycle.apiSchedulersEnabled
           ? null
@@ -1042,6 +1049,22 @@ if (process.env.NODE_ENV !== 'test') {
         await listenOnce();
         logStartupPhase('server.listening', { port: PORT });
         console.log(`✅ Server listening on http://localhost:${PORT}`);
+        if (process.env.NODE_ENV === 'production') {
+          try {
+            const { getSecurityPosture } = require('./services/securityPosture.service');
+            const posture = getSecurityPosture();
+            logger.info(
+              {
+                phase: 'security.posture',
+                summary: posture.summary,
+                checks: posture.checks,
+              },
+              'security.posture.startup'
+            );
+          } catch (postureErr) {
+            logger.warn({ err: postureErr }, 'security.posture.startup.failed');
+          }
+        }
         startApiSchedulers();
         const { startEmbeddedGradingWorkerIfNeeded } = require('./services/jobQueue.service');
         if (startEmbeddedGradingWorkerIfNeeded()) {

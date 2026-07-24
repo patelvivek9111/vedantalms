@@ -3,8 +3,9 @@ const Course = require('../../models/course.model');
 const StudentHold = require('../../models/studentHold.model');
 
 /**
- * Dual-write Enrollment of record alongside Course.students[].
- * Teaching UX continues to read Course roster.
+ * Enrollment of record writes (primary path for teaching + registrar).
+ * Course.students[] is mirrored when mirrorCourseStudents=true (default).
+ * Teaching UX should call these first; mutating Course.students alone is fallback-only.
  */
 
 async function resolveCourseContext(courseOrId) {

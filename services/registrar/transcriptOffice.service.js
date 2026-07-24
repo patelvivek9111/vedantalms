@@ -79,9 +79,10 @@ async function getDefaultTemplate(tenantId) {
     .lean();
 }
 
-async function listRequests(tenantId, { status, limit = 50 } = {}) {
+async function listRequests(tenantId, { status, studentId, limit = 50 } = {}) {
   const filter = withTenantFilter({}, tenantId);
   if (status) filter.status = status;
+  if (studentId) filter.studentId = studentId;
   return TranscriptRequest.find(filter)
     .sort({ requestedAt: -1 })
     .limit(Math.min(Number(limit) || 50, 200))
@@ -90,7 +91,7 @@ async function listRequests(tenantId, { status, limit = 50 } = {}) {
     .lean();
 }
 
-async function createRequest(tenantId, body, accountId) {
+async function createRequest(tenantId, body, accountId, actorId) {
   const student = await User.findOne(
     withTenantFilter({ _id: body.studentId }, tenantId)
   ).select('_id');
@@ -99,7 +100,7 @@ async function createRequest(tenantId, body, accountId) {
     err.status = 404;
     throw err;
   }
-  return TranscriptRequest.create({
+  const doc = await TranscriptRequest.create({
     studentId: body.studentId,
     term: String(body.term || '').trim(),
     year: Number(body.year),
@@ -113,6 +114,25 @@ async function createRequest(tenantId, body, accountId) {
     rootAccountId: tenantId,
     accountId: accountId || tenantId,
   });
+  await academicAuditService
+    .recordAuditEvent({
+      actorId: actorId || null,
+      entityType: 'User',
+      entityId: body.studentId,
+      action: 'registrar.transcript.request_created',
+      after: { type: doc.type, term: doc.term, year: doc.year, requestId: doc._id },
+      severity: 'info',
+      rootAccountId: tenantId,
+      metadata: {
+        studentId: String(body.studentId),
+        type: doc.type,
+        term: doc.term,
+        year: doc.year,
+        requestId: String(doc._id),
+      },
+    })
+    .catch(() => {});
+  return doc;
 }
 
 async function patchRequest(tenantId, id, body, user) {
@@ -278,6 +298,24 @@ async function fulfillRequest(tenantId, requestId, user, { ip } = {}) {
     doc.issuedAt = new Date();
     doc.processedBy = user._id;
     await doc.save();
+
+    await academicAuditService
+      .recordAuditEvent({
+        actorId: user._id,
+        entityType: 'User',
+        entityId: doc.studentId,
+        action: 'registrar.document.issued',
+        after: { type: doc.type, requestId: doc._id, locale },
+        severity: 'critical',
+        rootAccountId: tenantId,
+        metadata: {
+          studentId: String(doc.studentId),
+          type: doc.type,
+          requestId: String(doc._id),
+          locale,
+        },
+      })
+      .catch(() => {});
 
     return {
       certificate: true,

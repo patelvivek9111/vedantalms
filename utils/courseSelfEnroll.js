@@ -161,9 +161,7 @@ async function courseSelfEnroll(
 
   if (courseFull) {
     if (userRole === 'teacher') {
-      course.students.push(userId);
-      await course.save();
-      await dualWriteActive(course, userId, userId, 'teacher');
+      await enrollViaWritePrimary(course, userId, userId, 'teacher');
       await refreshInstructorEnrollmentTodos(course);
       return {
         statusCode: 200,
@@ -224,9 +222,7 @@ async function courseSelfEnroll(
     };
   }
 
-  course.students.push(userId);
-  await course.save();
-  await dualWriteActive(course, userId, userId, 'self');
+  await enrollViaWritePrimary(course, userId, userId, 'self');
   await refreshInstructorEnrollmentTodos(course);
   return {
     statusCode: 200,
@@ -234,7 +230,8 @@ async function courseSelfEnroll(
   };
 }
 
-async function dualWriteActive(course, studentId, actorId, source) {
+/** EnrollmentWrite primary; Course.students mirror is intentional fallback only. */
+async function enrollViaWritePrimary(course, studentId, actorId, source) {
   try {
     const { activateEnrollment } = require('../services/registrar/enrollmentWrite.service');
     await activateEnrollment({
@@ -242,11 +239,20 @@ async function dualWriteActive(course, studentId, actorId, source) {
       studentId,
       actorId,
       source,
-      mirrorCourseStudents: false,
+      mirrorCourseStudents: true,
     });
   } catch (err) {
-    console.warn('Enrollment dual-write failed:', err.message);
+    console.warn('EnrollmentWrite primary failed; Course.students fallback:', err.message);
+    const sid = String(studentId);
+    if (!(course.students || []).some((id) => String(id) === sid)) {
+      course.students.push(studentId);
+      await course.save();
+    }
   }
+}
+
+async function dualWriteActive(course, studentId, actorId, source) {
+  return enrollViaWritePrimary(course, studentId, actorId, source);
 }
 
 async function ensureEnrollmentQrToken(Course, courseDoc) {

@@ -9,7 +9,7 @@ const sisStagingEnrollmentSchema = new mongoose.Schema(
   {
     provider: {
       type: String,
-      enum: ['banner', 'peoplesoft', 'workday', 'csv'],
+      enum: ['banner', 'peoplesoft', 'workday', 'csv', 'custom_rest', 'fedena', 'mastersoft'],
       required: true,
     },
     externalStudentId: { type: String, required: true },

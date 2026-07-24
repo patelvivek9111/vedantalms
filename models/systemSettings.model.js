@@ -156,6 +156,18 @@ const systemSettingsSchema = new mongoose.Schema({
     defaultCreditHoursCollege: { type: Number, default: 3 },
     reportingTermSchool: { type: String, default: 'Academic Year' },
     reportingTermCollege: { type: String, default: 'Fall' },
+    /** Default enrollment method applied when creating new sections without an explicit method. */
+    defaultEnrollmentMethod: {
+      type: String,
+      enum: ['open', 'approval', 'registrar_only', 'sis_only'],
+      default: 'open',
+    },
+    holdDefaults: {
+      holdType: { type: String, default: 'registration' },
+      blocksRegistration: { type: Boolean, default: true },
+      blocksTranscript: { type: Boolean, default: false },
+      blocksGrades: { type: Boolean, default: false },
+    },
   },
 }, {
   timestamps: true

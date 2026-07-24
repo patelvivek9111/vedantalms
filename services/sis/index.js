@@ -215,6 +215,9 @@ const adapters = {
   peoplesoft: (rows, opts) => stageEnrollmentImport('peoplesoft', rows, opts),
   workday: (rows, opts) => stageEnrollmentImport('workday', rows, opts),
   csv: (rows, opts) => stageEnrollmentImport('csv', rows, opts),
+  custom_rest: (rows, opts) => stageEnrollmentImport('custom_rest', rows, opts),
+  fedena: (rows, opts) => stageEnrollmentImport('fedena', rows, opts),
+  mastersoft: (rows, opts) => stageEnrollmentImport('mastersoft', rows, opts),
 };
 
 module.exports = {

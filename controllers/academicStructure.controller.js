@@ -248,6 +248,9 @@ exports.listSections = async (req, res) => {
       status: req.query.status,
       accountId: req.query.accountId,
       search: req.query.search,
+      crossListGroupId: req.query.crossListGroupId,
+      lmsCourseId: req.query.lmsCourseId,
+      includeStats: req.query.includeStats === '1' || req.query.includeStats === 'true',
       limit: req.query.limit,
     });
     return res.json({ success: true, count: sections.length, data: sections });
@@ -305,6 +308,17 @@ exports.createSection = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Offering or term not found' });
     }
 
+    let resolvedEnrollmentMethod = enrollmentMethod;
+    if (!resolvedEnrollmentMethod) {
+      try {
+        const academicCalendarService = require('../services/academicCalendar.service');
+        const academic = await academicCalendarService.getAcademicSettings();
+        resolvedEnrollmentMethod = academic.defaultEnrollmentMethod || 'open';
+      } catch {
+        resolvedEnrollmentMethod = 'open';
+      }
+    }
+
     const section = await CourseSection.create({
       offeringId,
       academicTermId,
@@ -313,7 +327,7 @@ exports.createSection = async (req, res) => {
       teachingAssistantIds: teachingAssistantIds || [],
       meetingPattern: meetingPattern || '',
       maxEnrollment: maxEnrollment ?? null,
-      enrollmentMethod: enrollmentMethod || 'open',
+      enrollmentMethod: resolvedEnrollmentMethod,
       status: status || 'planned',
       lmsCourseId: lmsCourseId || null,
       rootAccountId: tenantId,
@@ -373,7 +387,15 @@ exports.createCrossList = async (req, res) => {
     }
     const tenantId = rootAccountIdFromRequest(req);
     const sectionOffice = require('../services/registrar/sectionOffice.service');
-    const { name, sectionIds, sharedGradebook, primarySectionId, sharedContentCourseId } = req.body || {};
+    const {
+      name,
+      sectionIds,
+      sharedGradebook,
+      primarySectionId,
+      sharedContentCourseId,
+      confirmRemount,
+      exportArchivesFirst,
+    } = req.body || {};
     const data = await sectionOffice.createCrossListGroup({
       tenantId,
       accountId: req.user.accountId,
@@ -383,8 +405,41 @@ exports.createCrossList = async (req, res) => {
       sharedGradebook,
       sharedContentCourseId,
       actorId: req.user._id,
+      actor: req.user,
+      confirmRemount: Boolean(confirmRemount),
+      exportArchivesFirst: Boolean(exportArchivesFirst),
     });
     return res.status(201).json({ success: true, data });
+  } catch (err) {
+    return res.status(err.status || 500).json({
+      success: false,
+      message: err.message,
+      code: err.code,
+      data: err.data,
+    });
+  }
+};
+
+exports.previewCrossListRemount = async (req, res) => {
+  try {
+    if (!canManageTerms(req.user)) {
+      return res.status(403).json({ success: false, message: 'Not authorized' });
+    }
+    const tenantId = rootAccountIdFromRequest(req);
+    const sectionOffice = require('../services/registrar/sectionOffice.service');
+    const data = await sectionOffice.previewCrossListRemount(tenantId, req.body || {});
+    return res.json({ success: true, data });
+  } catch (err) {
+    return res.status(err.status || 500).json({ success: false, message: err.message });
+  }
+};
+
+exports.listCrossListSiblings = async (req, res) => {
+  try {
+    const tenantId = rootAccountIdFromRequest(req);
+    const sectionOffice = require('../services/registrar/sectionOffice.service');
+    const data = await sectionOffice.listCrossListSiblings(tenantId, req.params.courseId);
+    return res.json({ success: true, data });
   } catch (err) {
     return res.status(err.status || 500).json({ success: false, message: err.message });
   }
@@ -419,10 +474,21 @@ exports.updateCrossList = async (req, res) => {
     }
     const tenantId = rootAccountIdFromRequest(req);
     const sectionOffice = require('../services/registrar/sectionOffice.service');
-    const data = await sectionOffice.updateCrossList(tenantId, req.params.id, req.body || {}, req.user._id);
+    const data = await sectionOffice.updateCrossList(
+      tenantId,
+      req.params.id,
+      req.body || {},
+      req.user._id,
+      req.user
+    );
     return res.json({ success: true, data });
   } catch (err) {
-    return res.status(err.status || 500).json({ success: false, message: err.message });
+    return res.status(err.status || 500).json({
+      success: false,
+      message: err.message,
+      code: err.code,
+      data: err.data,
+    });
   }
 };
 

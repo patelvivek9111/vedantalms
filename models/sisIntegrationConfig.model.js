@@ -17,11 +17,14 @@ const sisIntegrationConfigSchema = new mongoose.Schema(
       enum: ['import', 'export', 'bidirectional'],
       default: 'bidirectional',
     },
-    /** Manual first; cron string reserved for later workers */
+    /** manual | hourly | nightly | or cron-ish string */
     schedule: { type: String, default: 'manual' },
     fieldMappings: { type: mongoose.Schema.Types.Mixed, default: {} },
     credentialsRef: { type: String, default: '' },
     lastSyncAt: { type: Date, default: null },
+    lastSyncStatus: { type: String, default: '' },
+    lastSyncError: { type: String, default: '' },
+    consecutiveFailures: { type: Number, default: 0 },
     notes: { type: String, default: '' },
     isActive: { type: Boolean, default: true },
   },

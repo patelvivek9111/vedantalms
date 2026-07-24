@@ -1,40 +1,33 @@
 const express = require('express');
-const crypto = require('crypto');
-const StudentHold = require('../models/studentHold.model');
-const User = require('../models/user.model');
-const { withTenantFilter, rootAccountIdFromRequest } = require('../utils/tenantContext');
+const { rootAccountIdFromRequest } = require('../utils/tenantContext');
 const ltiAgs = require('../services/lti/ltiAgs.service');
-const academicAuditService = require('../services/academicAudit.service');
+const erpHoldWebhook = require('../services/integrations/erpHoldWebhook.service');
+const { protect } = require('../middleware/auth');
+const { requireCapability, CAPABILITIES } = require('../middleware/academicPermissions');
 
 const router = express.Router();
 
-function verifyErpSecret(req) {
-  const expected = process.env.ERP_HOLDS_WEBHOOK_SECRET || '';
-  if (!expected) return true;
-  const provided =
-    req.get('x-erp-signature') ||
-    req.get('x-webhook-secret') ||
-    req.body?.secret ||
-    '';
-  if (!provided) return false;
-  try {
-    const a = Buffer.from(String(provided));
-    const b = Buffer.from(String(expected));
-    if (a.length !== b.length) return false;
-    return crypto.timingSafeEqual(a, b);
-  } catch {
-    return false;
-  }
-}
-
 /**
  * POST /api/integrations/erp/holds
- * Upsert hold by externalHoldId.
+ * HMAC or shared-secret auth → event log → apply (retry/DLQ on failure).
  */
 router.post('/erp/holds', async (req, res) => {
   try {
-    if (!verifyErpSecret(req)) {
-      return res.status(401).json({ success: false, message: 'Invalid ERP webhook secret' });
+    if (!erpHoldWebhook.requireSecretInProduction()) {
+      return res.status(503).json({
+        success: false,
+        message: 'ERP_HOLDS_WEBHOOK_SECRET must be set in production',
+        code: 'ERP_SECRET_REQUIRED',
+      });
+    }
+
+    const auth = erpHoldWebhook.verifyErpAuth(req);
+    if (!auth.ok) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid ERP webhook signature or secret',
+        code: auth.reason || 'UNAUTHORIZED',
+      });
     }
 
     const tenantId = rootAccountIdFromRequest(req);
@@ -42,122 +35,146 @@ router.post('/erp/holds', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Tenant could not be resolved' });
     }
 
-    const {
-      externalHoldId,
-      studentId,
-      studentEmail,
-      sisId,
-      holdType = 'other',
-      reason = 'ERP hold',
-      active = true,
-      blocksRegistration = true,
-      blocksTranscript = false,
-      blocksGrades = false,
-    } = req.body || {};
+    const result = await erpHoldWebhook.ingestAndProcess({
+      tenantId,
+      payload: req.body || {},
+      auth,
+    });
 
-    if (!externalHoldId) {
-      return res.status(400).json({ success: false, message: 'externalHoldId is required' });
-    }
-
-    let student = null;
-    if (studentId) {
-      student = await User.findOne(withTenantFilter({ _id: studentId }, tenantId));
-    } else if (sisId) {
-      student = await User.findOne(
-        withTenantFilter({ 'studentProfile.externalIds.sis': String(sisId).trim() }, tenantId)
-      );
-    } else if (studentEmail) {
-      student = await User.findOne(
-        withTenantFilter({ email: String(studentEmail).toLowerCase().trim() }, tenantId)
-      );
-    }
-    if (!student) {
-      return res.status(404).json({ success: false, message: 'Student not found in tenant' });
-    }
-
-    let hold = await StudentHold.findOne(
-      withTenantFilter({ externalHoldId: String(externalHoldId) }, tenantId)
-    );
-
-    if (!active) {
-      if (hold) {
-        hold.isActive = false;
-        hold.releasedAt = new Date();
-        await hold.save();
-      }
-      return res.json({
-        success: true,
-        data: { action: hold ? 'released' : 'noop', hold },
+    if (!result.ok) {
+      const status = result.deadLetter ? 422 : result.statusCode || 500;
+      return res.status(status).json({
+        success: false,
+        message: result.error,
+        data: {
+          eventId: result.event?._id,
+          status: result.event?.status,
+          attempts: result.event?.attempts,
+          deadLetter: result.deadLetter,
+        },
       });
     }
 
-    if (hold) {
-      hold.holdType = holdType;
-      hold.reason = reason;
-      hold.blocksRegistration = Boolean(blocksRegistration);
-      hold.blocksTranscript = Boolean(blocksTranscript);
-      hold.blocksGrades = Boolean(blocksGrades);
-      hold.isActive = true;
-      hold.source = 'erp';
-      await hold.save();
-    } else {
-      hold = await StudentHold.create({
-        studentId: student._id,
-        holdType,
-        reason,
-        blocksRegistration: Boolean(blocksRegistration),
-        blocksTranscript: Boolean(blocksTranscript),
-        blocksGrades: Boolean(blocksGrades),
-        externalHoldId: String(externalHoldId),
-        source: 'erp',
-        placedBy: student._id,
-        isActive: true,
-        rootAccountId: tenantId,
-        accountId: student.accountId || tenantId,
-      });
-    }
-
-    await academicAuditService
-      .recordAuditEvent({
-        actorId: student._id,
-        entityType: 'student_hold',
-        entityId: hold._id,
-        action: 'integrations.erp.hold_upserted',
-        after: { externalHoldId, studentId: String(student._id), active: true },
-        severity: 'info',
-        rootAccountId: tenantId,
-        metadata: { source: 'erp', externalHoldId },
-      })
-      .catch(() => {});
-
-    return res.status(201).json({ success: true, data: { action: 'upserted', hold } });
+    return res.status(result.httpStatus || 201).json({
+      success: true,
+      data: {
+        action: result.action,
+        hold: result.hold,
+        eventId: result.event?._id,
+      },
+    });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
 });
 
-router.get('/lti/readiness', (req, res) => {
-  return res.json({ success: true, data: ltiAgs.getAgsReadiness() });
+router.get(
+  '/erp/holds/events',
+  protect,
+  requireCapability(CAPABILITIES.MANAGE_HOLDS),
+  async (req, res) => {
+    try {
+      const tenantId = rootAccountIdFromRequest(req);
+      const data = await erpHoldWebhook.listEvents(tenantId, {
+        status: req.query.status,
+        limit: req.query.limit,
+      });
+      return res.json({ success: true, data });
+    } catch (err) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  }
+);
+
+router.post(
+  '/erp/holds/events/:id/replay',
+  protect,
+  requireCapability(CAPABILITIES.MANAGE_HOLDS),
+  async (req, res) => {
+    try {
+      const tenantId = rootAccountIdFromRequest(req);
+      const result = await erpHoldWebhook.replayEvent(tenantId, req.params.id);
+      if (!result.ok) {
+        return res.status(result.statusCode || 500).json({
+          success: false,
+          message: result.error,
+          data: { eventId: result.event?._id, status: result.event?.status },
+        });
+      }
+      return res.json({
+        success: true,
+        data: { action: result.action, hold: result.hold, eventId: result.event?._id },
+      });
+    } catch (err) {
+      return res.status(err.status || 500).json({ success: false, message: err.message });
+    }
+  }
+);
+
+router.get('/lti/readiness', async (req, res) => {
+  const tenantId = rootAccountIdFromRequest(req);
+  const data = tenantId
+    ? await ltiAgs.getAgsReadinessAsync(tenantId)
+    : ltiAgs.getAgsReadiness();
+  return res.json({ success: true, data });
 });
 
-router.post('/lti/ags/submit-stub', async (req, res) => {
+async function handleAgsSubmit(req, res) {
   try {
     const tenantId = rootAccountIdFromRequest(req);
     if (!tenantId) {
       return res.status(400).json({ success: false, message: 'Tenant could not be resolved' });
     }
-    const data = await ltiAgs.submitScoresStub({
+    const data = await ltiAgs.submitScores({
       tenantId,
       accountId: tenantId,
       term: req.body?.term,
       year: req.body?.year,
       rows: req.body?.rows || [],
-      exportedBy: req.body?.exportedBy,
-      dryRun: req.body?.dryRun !== false,
+      exportedBy: req.body?.exportedBy || req.user?._id,
+      dryRun: req.body?.dryRun === true,
+      courseId: req.body?.courseId || null,
+      lineItemUrl: req.body?.lineItemUrl || null,
+      label: req.body?.label || 'Final grade',
     });
     return res.json({ success: true, data });
   } catch (err) {
-    return res.status(500).json({ success: false, message: err.message });
+    return res.status(err.status || 500).json({
+      success: false,
+      message: err.message,
+      code: err.code,
+    });
+  }
+}
+
+/** Live AGS submit */
+router.post('/lti/ags/submit', handleAgsSubmit);
+/** Backward-compatible alias */
+router.post('/lti/ags/submit-stub', handleAgsSubmit);
+
+router.post('/lti/ags/line-items/sync', async (req, res) => {
+  try {
+    const tenantId = rootAccountIdFromRequest(req);
+    if (!tenantId) {
+      return res.status(400).json({ success: false, message: 'Tenant could not be resolved' });
+    }
+    const data = await ltiAgs.ensureLineItem({
+      tenantId,
+      accountId: tenantId,
+      courseId: req.body?.courseId,
+      sectionId: req.body?.sectionId,
+      label: req.body?.label || 'Final grade',
+      scoreMaximum: req.body?.scoreMaximum || 100,
+      resourceLinkId: req.body?.resourceLinkId || '',
+      dryRun: req.body?.dryRun === true,
+    });
+    return res.json({ success: true, data });
+  } catch (err) {
+    return res.status(err.status || 500).json({
+      success: false,
+      message: err.message,
+      code: err.code,
+    });
   }
 });
 

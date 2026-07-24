@@ -805,18 +805,25 @@ exports.enrollStudent = async (req, res) => {
       });
     }
 
-    // Check if student is already enrolled
-    if (course.students.includes(studentId)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Student is already enrolled in this course'
-      });
+    // Check if student is already enrolled (Enrollment of record first)
+    try {
+      const { isActivelyEnrolled } = require('../services/registrar/rosterRead.service');
+      if (await isActivelyEnrolled(studentId, course._id, { rootAccountId: course.rootAccountId })) {
+        return res.status(400).json({
+          success: false,
+          message: 'Student is already enrolled in this course'
+        });
+      }
+    } catch {
+      if (course.students.includes(studentId)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Student is already enrolled in this course'
+        });
+      }
     }
 
-    // Add student to course
-    course.students.push(studentId);
-    await course.save();
-
+    // Primary write: Enrollment of record (mirrors Course.students). Fallback: legacy roster only.
     try {
       const { activateEnrollment } = require('../services/registrar/enrollmentWrite.service');
       await activateEnrollment({
@@ -824,10 +831,14 @@ exports.enrollStudent = async (req, res) => {
         studentId,
         actorId: req.user._id || req.user.id,
         source: req.user.role === 'registrar' ? 'registrar' : 'teacher',
-        mirrorCourseStudents: false,
+        mirrorCourseStudents: true,
       });
     } catch (dwErr) {
-      console.warn('Enrollment dual-write (enroll) failed:', dwErr.message);
+      console.warn('EnrollmentWrite primary (enroll) failed; Course.students fallback:', dwErr.message);
+      if (!course.students.some((id) => String(id) === String(studentId))) {
+        course.students.push(studentId);
+        await course.save();
+      }
     }
 
     require('../services/dashboardGradeSummary.service').scheduleRefreshStudents(
@@ -868,9 +879,7 @@ exports.unenrollStudent = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Course not found' });
     }
     
-    // Remove student from course
-    course.students = course.students.filter(id => id.toString() !== studentId);
-
+    // Primary: Enrollment of record (pulls Course.students). Fallback: legacy roster only.
     try {
       const { deactivateEnrollment } = require('../services/registrar/enrollmentWrite.service');
       await deactivateEnrollment({
@@ -879,10 +888,17 @@ exports.unenrollStudent = async (req, res) => {
         actorId: req.user._id || req.user.id,
         status: 'dropped',
         reason: 'Teacher/admin unenroll',
-        mirrorCourseStudents: false,
+        mirrorCourseStudents: true,
       });
+      // Refresh in-memory course.students after mirror pull
+      const refreshed = await Course.findById(courseId).select('students waitlist');
+      if (refreshed) {
+        course.students = refreshed.students;
+        course.waitlist = refreshed.waitlist;
+      }
     } catch (dwErr) {
-      console.warn('Enrollment dual-write (unenroll) failed:', dwErr.message);
+      console.warn('EnrollmentWrite primary (unenroll) failed; Course.students fallback:', dwErr.message);
+      course.students = course.students.filter(id => id.toString() !== studentId);
     }
     
     let promotedStudentId = null;
@@ -891,8 +907,7 @@ exports.unenrollStudent = async (req, res) => {
       try {
         const promotedStudent = course.waitlist.shift(); // Remove first student from waitlist
         
-        // Add them to the course
-        course.students.push(promotedStudent.student);
+        // Add them to the course via EnrollmentWrite primary
         promotedStudentId = String(promotedStudent.student);
 
         try {
@@ -902,10 +917,11 @@ exports.unenrollStudent = async (req, res) => {
             studentId: promotedStudent.student,
             actorId: req.user._id || req.user.id,
             source: 'system',
-            mirrorCourseStudents: false,
+            mirrorCourseStudents: true,
           });
         } catch (dwErr) {
-          console.warn('Enrollment dual-write (promote) failed:', dwErr.message);
+          console.warn('EnrollmentWrite primary (promote) failed; Course.students fallback:', dwErr.message);
+          course.students.push(promotedStudent.student);
         }
         
         // Update positions for remaining waitlist students

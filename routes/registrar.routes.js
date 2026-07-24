@@ -97,6 +97,11 @@ router.get(
   requireCapability(CAPABILITIES.VIEW_LIFECYCLE),
   ctrl.getTermFinalizeJob
 );
+router.get(
+  '/jobs/:jobId/download',
+  requireCapability(CAPABILITIES.VIEW_LIFECYCLE),
+  ctrl.downloadRegistrarJobExport
+);
 
 router.get(
   '/transcripts/templates',
@@ -163,6 +168,16 @@ router.get(
   '/sections/:sectionId/roster.csv',
   requireCapability(CAPABILITIES.MANAGE_ENROLLMENTS),
   ctrl.exportSectionRoster
+);
+router.post(
+  '/sections/:sectionId/link-course',
+  requireCapability(CAPABILITIES.MANAGE_ENROLLMENTS),
+  ctrl.linkOrCreateSectionCourse
+);
+router.post(
+  '/courses/:courseId/repair-snapshots',
+  requireCapability(CAPABILITIES.FINALIZE_GRADES),
+  ctrl.repairCourseSnapshots
 );
 router.get(
   '/structure/gaps',
@@ -267,5 +282,15 @@ router.put('/sis/config', requireCapability(CAPABILITIES.MANAGE_SIS), ctrl.updat
 router.get('/sis/grades/export', requireCapability(CAPABILITIES.MANAGE_SIS), ctrl.exportSisGrades);
 router.post('/sis/grades/export', requireCapability(CAPABILITIES.MANAGE_SIS), ctrl.exportSisGrades);
 router.get('/sis/grades/passbacks', requireCapability(CAPABILITIES.MANAGE_SIS), ctrl.listGradePassbacks);
+router.get('/sis/adapters', requireCapability(CAPABILITIES.MANAGE_SIS), ctrl.listSisAdapters);
+router.get('/sis/health', requireCapability(CAPABILITIES.MANAGE_SIS), ctrl.getSisHealth);
+router.post('/sis/sync/run', requireCapability(CAPABILITIES.MANAGE_SIS), ctrl.runSisSync);
+router.post('/sis/batches/:batchId/retry', requireCapability(CAPABILITIES.MANAGE_SIS), ctrl.retrySisBatch);
+router.get(
+  '/integrations/status',
+  requireCapability(CAPABILITIES.VIEW_REGISTRAR_DASHBOARD),
+  ctrl.getIntegrationsStatus
+);
+router.get('/sis/mapping-presets', requireCapability(CAPABILITIES.MANAGE_SIS), ctrl.getSisMappingPresets);
 
 module.exports = router;

@@ -72,13 +72,18 @@ async function processGradesFinalize(jobDoc) {
 }
 
 async function processTermFinalize(jobDoc) {
-  const { termId, userId, courseIds } = jobDoc.payload;
+  const { termId, userId, courseIds, force } = jobDoc.payload;
   const user = await User.findById(userId);
   if (!user) throw new Error('Requesting user not found');
   const rootAccountId = jobDoc.rootAccountId || jobDoc.payload?.rootAccountId;
   const termGradeGovernance = require('./registrar/termGradeGovernance.service');
 
   const preview = await termGradeGovernance.previewTermFinalize(rootAccountId, termId);
+  if (preview.unlinkedSections?.length && !force) {
+    throw new Error(
+      `${preview.unlinkedSections.length} section(s) have no content course. Repair or pass force=true.`
+    );
+  }
   const targets = courseIds?.length
     ? preview.readyCourseIds.filter((id) => courseIds.map(String).includes(String(id)))
     : preview.readyCourseIds;
@@ -116,8 +121,57 @@ async function processTermFinalize(jobDoc) {
   };
 }
 
+async function processEnrollmentBulkCsv(jobDoc) {
+  const User = require('../models/user.model');
+  const Course = require('../models/course.model');
+  const { withTenantFilter } = require('../utils/tenantContext');
+  const { runBulkEnrollmentPairs } = require('./registrar/bulkEnrollment.service');
+  const user = await User.findById(jobDoc.requestedBy);
+  if (!user) throw new Error('Requesting user not found');
+  const rootAccountId = jobDoc.rootAccountId || jobDoc.payload?.rootAccountId;
+  const {
+    pairs: rawPairs = [],
+    override = false,
+    overrideReason = '',
+    enrollmentType = 'regular',
+  } = jobDoc.payload || {};
+
+  const pairs = [];
+  for (const p of rawPairs) {
+    if (p.resolveError || !p.studentId || !p.courseId) {
+      pairs.push({
+        studentId: p.studentId,
+        course: null,
+        studentRef: p.studentRef,
+        courseRef: p.courseRef,
+        resolveError: p.resolveError || (!p.studentId ? 'Student not found' : 'Course not found'),
+      });
+      continue;
+    }
+    const course = await Course.findOne(withTenantFilter({ _id: p.courseId }, rootAccountId));
+    pairs.push({
+      studentId: p.studentId,
+      course,
+      studentRef: p.studentRef,
+      courseRef: p.courseRef,
+      resolveError: course ? null : 'Course not found',
+    });
+  }
+
+  await updateProgress(jobDoc._id, 0, pairs.length);
+  return runBulkEnrollmentPairs({
+    pairs,
+    user,
+    override,
+    overrideReason,
+    enrollmentType,
+    onProgress: (completed, total) => updateProgress(jobDoc._id, completed, total),
+  });
+}
+
 async function processBulkTranscriptIssue(jobDoc) {
   const User = require('../models/user.model');
+  const archiver = require('archiver');
   const transcriptOffice = require('./registrar/transcriptOffice.service');
   const user = await User.findById(jobDoc.requestedBy);
   if (!user) throw new Error('Requesting user not found');
@@ -135,6 +189,7 @@ async function processBulkTranscriptIssue(jobDoc) {
   await updateProgress(jobDoc._id, 0, targets.length);
 
   const results = [];
+  const pdfEntries = [];
   let completed = 0;
   for (const studentId of targets) {
     try {
@@ -154,11 +209,49 @@ async function processBulkTranscriptIssue(jobDoc) {
         transcriptHash: issued.transcriptHash,
         issueLogId: issued.log._id,
       });
+      if (issued.pdfBase64) {
+        const short = String(issued.transcriptHash || studentId).slice(0, 12);
+        pdfEntries.push({
+          name: `transcript-${short}.pdf`,
+          buffer: Buffer.from(issued.pdfBase64, 'base64'),
+        });
+      }
     } catch (err) {
       results.push({ studentId, ok: false, message: err.message, code: err.code });
     }
     completed += 1;
     await updateProgress(jobDoc._id, completed, targets.length);
+  }
+
+  let zipMeta = null;
+  if (pdfEntries.length) {
+    ensureJobsDir();
+    const fileName = `transcripts-bulk-${term}-${year}-${Date.now()}.zip`;
+    const filePath = path.join(getJobsDir(), fileName);
+    await new Promise((resolve, reject) => {
+      const output = fs.createWriteStream(filePath);
+      const archive = archiver('zip', { zlib: { level: 9 } });
+      output.on('close', resolve);
+      archive.on('error', reject);
+      archive.pipe(output);
+      for (const entry of pdfEntries) {
+        archive.append(entry.buffer, { name: entry.name });
+      }
+      archive.finalize();
+    });
+    const { token, expiresAt } = createDownloadToken(jobDoc._id);
+    await AsyncJob.findByIdAndUpdate(jobDoc._id, {
+      filePath,
+      fileName,
+      downloadToken: token,
+      downloadExpiresAt: expiresAt,
+    });
+    zipMeta = {
+      fileName,
+      pdfCount: pdfEntries.length,
+      downloadToken: token,
+      downloadExpiresAt: expiresAt,
+    };
   }
 
   return {
@@ -167,6 +260,7 @@ async function processBulkTranscriptIssue(jobDoc) {
     issued: results.filter((r) => r.ok).length,
     failed: results.filter((r) => !r.ok).length,
     results,
+    zip: zipMeta,
   };
 }
 
@@ -191,6 +285,24 @@ async function processSisGradeExport(jobDoc) {
     academicTermId: jobDoc.payload?.academicTermId,
     exportedBy: jobDoc.requestedBy,
     notes: jobDoc.payload?.notes,
+    dryRun: jobDoc.payload?.dryRun,
+    forceLive: jobDoc.payload?.forceLive === true,
+  });
+}
+
+async function processSisScheduledSync(jobDoc) {
+  const sisSyncRunner = require('./registrar/sisSyncRunner.service');
+  const rootAccountId = jobDoc.rootAccountId || jobDoc.payload?.rootAccountId;
+  return sisSyncRunner.runSync({
+    tenantId: rootAccountId,
+    direction: jobDoc.payload?.direction,
+    dryRun: jobDoc.payload?.dryRun === true,
+    forceLive: jobDoc.payload?.forceLive !== false && jobDoc.payload?.dryRun !== true,
+    autoApply: jobDoc.payload?.autoApply === true,
+    entityTypes: jobDoc.payload?.entityTypes,
+    term: jobDoc.payload?.term,
+    year: jobDoc.payload?.year,
+    actor: jobDoc.requestedBy ? { _id: jobDoc.requestedBy } : null,
   });
 }
 
@@ -391,10 +503,14 @@ async function runJobByType(jobDoc) {
       return processTranscriptRegenerate(jobDoc);
     case 'transcript.bulk_issue':
       return processBulkTranscriptIssue(jobDoc);
+    case 'enrollment.bulk_csv':
+      return processEnrollmentBulkCsv(jobDoc);
     case 'sis.import_apply':
       return processSisImportApply(jobDoc);
     case 'sis.grade_export':
       return processSisGradeExport(jobDoc);
+    case 'sis.scheduled_sync':
+      return processSisScheduledSync(jobDoc);
     case 'export.gradebook':
       return processExportGradebook(jobDoc);
     case 'course.copy':

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
-import { registrarGet, registrarPatch } from './registrarApi';
+import { registrarGet, registrarPatch, registrarPost, downloadPdfBase64 } from './registrarApi';
 
 type Tab = 'profile' | 'enrollments' | 'grades' | 'transcripts' | 'holds' | 'audit' | 'documents';
 
@@ -69,11 +69,22 @@ type Student360 = {
     issuedBy?: { email?: string };
   }[];
   audit?: {
-    system?: { action?: string; createdAt?: string; actor?: { email?: string } }[];
+    system?: { action?: string; createdAt?: string; actor?: { email?: string }; metadata?: Record<string, unknown> }[];
+    registrar?: { action?: string; createdAt?: string; actor?: { email?: string }; metadata?: Record<string, unknown> }[];
     enrollmentHistory?: { at?: string; status?: string; reason?: string; course?: { title?: string } }[];
     amendments?: { reason?: string; createdAt?: string; course?: { title?: string } }[];
   };
   documents?: { type?: string; label?: string; verifiedAt?: string }[];
+  documentRequests?: {
+    _id: string;
+    type: string;
+    status: string;
+    term?: string;
+    year?: number;
+    notes?: string;
+    requestedAt?: string;
+    issuedAt?: string;
+  }[];
   note?: string;
 };
 
@@ -113,6 +124,13 @@ export function RegistrarStudent360() {
     state: '',
     pincode: '',
   });
+  const [docForm, setDocForm] = useState({
+    type: 'bonafide',
+    term: 'Fall',
+    year: String(new Date().getFullYear()),
+    notes: '',
+  });
+  const [docBusy, setDocBusy] = useState(false);
 
   const setTab = (id: Tab) => {
     const next = new URLSearchParams(params);
@@ -192,6 +210,62 @@ export function RegistrarStudent360() {
       );
     } finally {
       setSaving(false);
+    }
+  };
+
+  const createDocumentRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!studentId) return;
+    setDocBusy(true);
+    setError('');
+    setMessage('');
+    try {
+      await registrarPost('/api/registrar/transcripts/requests', {
+        studentId,
+        type: docForm.type,
+        term: docForm.term.trim(),
+        year: Number(docForm.year),
+        notes: docForm.notes,
+      });
+      setMessage(`${docForm.type} request queued`);
+      await load();
+    } catch (err: unknown) {
+      setError(
+        axios.isAxiosError(err) && err.response?.data?.message
+          ? String(err.response.data.message)
+          : 'Request failed'
+      );
+    } finally {
+      setDocBusy(false);
+    }
+  };
+
+  const fulfillDocumentRequest = async (requestId: string) => {
+    setDocBusy(true);
+    setError('');
+    setMessage('');
+    try {
+      const res = await registrarPost<{
+        data: { pdfBase64?: string; type?: string; transcriptHash?: string; certificate?: boolean };
+      }>(`/api/registrar/transcripts/requests/${requestId}/fulfill`);
+      if (res.data?.pdfBase64) {
+        const label = res.data.certificate
+          ? `${res.data.type || 'certificate'}-${requestId.slice(-6)}`
+          : `transcript-${(res.data.transcriptHash || requestId).slice(0, 8)}`;
+        downloadPdfBase64(res.data.pdfBase64, `${label}.pdf`);
+        setMessage('PDF downloaded');
+      } else {
+        setMessage('Request fulfilled');
+      }
+      await load();
+    } catch (err: unknown) {
+      setError(
+        axios.isAxiosError(err) && err.response?.data?.message
+          ? String(err.response.data.message)
+          : 'Fulfill failed'
+      );
+    } finally {
+      setDocBusy(false);
     }
   };
 
@@ -399,6 +473,28 @@ export function RegistrarStudent360() {
       {tab === 'audit' && (
         <div className="space-y-4 text-sm">
           <section>
+            <h3 className="font-medium mb-2">Registrar events</h3>
+            <ul className="divide-y border rounded-md border-gray-200 dark:border-gray-700">
+              {(data.audit?.registrar || []).map((ev, i) => (
+                <li key={i} className="px-3 py-2">
+                  <div className="font-medium">{ev.action}</div>
+                  <div className="text-gray-600 dark:text-gray-400">
+                    {ev.actor?.email || 'system'}
+                    {ev.metadata?.type ? ` · ${String(ev.metadata.type)}` : ''}
+                    {ev.metadata?.holdType ? ` · ${String(ev.metadata.holdType)}` : ''}
+                    {ev.metadata?.term ? ` · ${String(ev.metadata.term)} ${String(ev.metadata.year || '')}` : ''}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {ev.createdAt ? new Date(ev.createdAt).toLocaleString() : ''}
+                  </div>
+                </li>
+              ))}
+              {!data.audit?.registrar?.length && (
+                <li className="px-3 py-3 text-gray-500">No registrar.* events for this student yet.</li>
+              )}
+            </ul>
+          </section>
+          <section>
             <h3 className="font-medium mb-2">Enrollment history</h3>
             <ul className="divide-y border rounded-md border-gray-200 dark:border-gray-700">
               {(data.audit?.enrollmentHistory || []).map((h, i) => (
@@ -448,21 +544,113 @@ export function RegistrarStudent360() {
       )}
 
       {tab === 'documents' && (
-        <div className="space-y-3 text-sm">
+        <div className="space-y-4 text-sm">
           <p className="text-gray-600 dark:text-gray-400">
-            {data.note || 'Bonafide / transfer certificate request workflows land in Phase R8.'}
+            {data.note || 'Queue and fulfill bonafide / transfer certificates for this student.'}
           </p>
-          <ul className="divide-y border rounded-md border-gray-200 dark:border-gray-700">
-            {(data.documents || data.student.studentProfile?.documents || []).map((d, i) => (
-              <li key={i} className="px-3 py-2">
-                {d.label || d.type || 'Document'}
-                {d.verifiedAt ? ` · verified ${new Date(d.verifiedAt).toLocaleDateString()}` : ''}
-              </li>
-            ))}
-            {!(data.documents || data.student.studentProfile?.documents || []).length && (
-              <li className="px-3 py-3 text-gray-500">No documents on file.</li>
-            )}
-          </ul>
+          <form
+            onSubmit={createDocumentRequest}
+            className="grid gap-2 sm:grid-cols-2 border rounded-md p-3 border-gray-200 dark:border-gray-700 max-w-2xl"
+          >
+            <label>
+              Type
+              <select
+                className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+                value={docForm.type}
+                onChange={(e) => setDocForm((f) => ({ ...f, type: e.target.value }))}
+              >
+                <option value="bonafide">Bonafide</option>
+                <option value="migration_tc">Transfer / migration TC</option>
+                <option value="official">Official transcript</option>
+                <option value="unofficial">Unofficial transcript</option>
+              </select>
+            </label>
+            <label>
+              Term
+              <input
+                className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+                value={docForm.term}
+                onChange={(e) => setDocForm((f) => ({ ...f, term: e.target.value }))}
+                required
+              />
+            </label>
+            <label>
+              Year
+              <input
+                type="number"
+                className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+                value={docForm.year}
+                onChange={(e) => setDocForm((f) => ({ ...f, year: e.target.value }))}
+                required
+              />
+            </label>
+            <label>
+              Notes
+              <input
+                className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+                value={docForm.notes}
+                onChange={(e) => setDocForm((f) => ({ ...f, notes: e.target.value }))}
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={docBusy}
+              className="sm:col-span-2 rounded bg-indigo-600 text-white px-3 py-1.5 w-fit"
+            >
+              {docBusy ? 'Working…' : 'Create request'}
+            </button>
+          </form>
+
+          <div>
+            <h3 className="font-medium mb-2">Requests</h3>
+            <ul className="divide-y border rounded-md border-gray-200 dark:border-gray-700">
+              {(data.documentRequests || []).map((r) => (
+                <li key={r._id} className="px-3 py-2 flex justify-between gap-2 items-start">
+                  <div>
+                    <div className="font-medium">
+                      {r.type} · {r.status}
+                    </div>
+                    <div className="text-gray-500">
+                      {r.term} {r.year}
+                      {r.notes ? ` · ${r.notes}` : ''}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {r.requestedAt ? new Date(r.requestedAt).toLocaleString() : ''}
+                      {r.issuedAt ? ` · issued ${new Date(r.issuedAt).toLocaleString()}` : ''}
+                    </div>
+                  </div>
+                  {['pending', 'approved'].includes(r.status) && (
+                    <button
+                      type="button"
+                      className="text-blue-600 shrink-0"
+                      disabled={docBusy}
+                      onClick={() => void fulfillDocumentRequest(r._id)}
+                    >
+                      Fulfill PDF
+                    </button>
+                  )}
+                </li>
+              ))}
+              {!(data.documentRequests || []).length && (
+                <li className="px-3 py-3 text-gray-500">No document requests yet.</li>
+              )}
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="font-medium mb-2">Profile documents</h3>
+            <ul className="divide-y border rounded-md border-gray-200 dark:border-gray-700">
+              {(data.documents || data.student.studentProfile?.documents || []).map((d, i) => (
+                <li key={i} className="px-3 py-2">
+                  {d.label || d.type || 'Document'}
+                  {d.verifiedAt ? ` · verified ${new Date(d.verifiedAt).toLocaleDateString()}` : ''}
+                </li>
+              ))}
+              {!(data.documents || data.student.studentProfile?.documents || []).length && (
+                <li className="px-3 py-3 text-gray-500">No documents on file.</li>
+              )}
+            </ul>
+          </div>
         </div>
       )}
     </div>

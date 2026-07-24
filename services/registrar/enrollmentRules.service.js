@@ -207,17 +207,69 @@ async function checkEnrollmentRules({
         {
           $project: {
             code: { $toUpper: { $ifNull: ['$course.catalog.courseCode', ''] } },
+            lmsCourseId: 1,
+            status: 1,
           },
         },
         { $match: { code: { $in: codes } } },
       ]);
       const metCodes = new Set(met.map((m) => m.code));
+      const courseIdsByCode = new Map();
+      for (const m of met) {
+        if (!courseIdsByCode.has(m.code)) courseIdsByCode.set(m.code, []);
+        courseIdsByCode.get(m.code).push(m.lmsCourseId);
+      }
       const missing = codes.filter((c) => !metCodes.has(c));
-      if (missing.length) {
+
+      const belowMinGrade = [];
+      const needsGrade = prereqs.filter((p) => String(p.minGrade || '').trim());
+      if (needsGrade.length) {
+        const StudentCourseGradeSnapshot = require('../../models/studentCourseGradeSnapshot.model');
+        const { getGradePoints } = require('./transcriptGpa.service');
+        for (const p of needsGrade) {
+          const code = String(p.courseCode || '').toUpperCase();
+          const minGrade = String(p.minGrade || '').trim().toUpperCase();
+          if (!code || !minGrade || !metCodes.has(code)) continue;
+          const courseIds = courseIdsByCode.get(code) || [];
+          const snaps = await StudentCourseGradeSnapshot.find({
+            student: studentId,
+            course: { $in: courseIds },
+            lifecycleStatus: { $in: ['FINALIZED', 'AMENDED', 'POSTED'] },
+          })
+            .select('letterGrade')
+            .lean();
+          if (!snaps.length) {
+            belowMinGrade.push({ courseCode: code, minGrade, earned: null });
+            continue;
+          }
+          const best = snaps.reduce((a, b) =>
+            getGradePoints(a.letterGrade) >= getGradePoints(b.letterGrade) ? a : b
+          );
+          if (getGradePoints(best.letterGrade) < getGradePoints(minGrade)) {
+            belowMinGrade.push({
+              courseCode: code,
+              minGrade,
+              earned: best.letterGrade,
+            });
+          }
+        }
+      }
+
+      if (missing.length || belowMinGrade.length) {
+        const parts = [];
+        if (missing.length) parts.push(`Missing: ${missing.join(', ')}`);
+        if (belowMinGrade.length) {
+          parts.push(
+            `Below min grade: ${belowMinGrade
+              .map((b) => `${b.courseCode} (need ${b.minGrade}, have ${b.earned || 'none'})`)
+              .join('; ')}`
+          );
+        }
         const item = {
           code: 'prerequisites_not_met',
-          message: `Missing prerequisites: ${missing.join(', ')}`,
+          message: `Prerequisites not met — ${parts.join(' · ')}`,
           missing,
+          belowMinGrade,
           overrideable: true,
         };
         if (source === 'self') violations.push(item);

@@ -1,6 +1,15 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 import { AcademicTerm, registrarGet, registrarPost } from './registrarApi';
+import {
+  fetchEffectiveCoursePolicy,
+  fetchInstitutionPolicyImpactSummary,
+  previewCoursePolicyImpact,
+  type InstitutionPolicyImpactSummary,
+  type PolicyImpactPreview as PolicyImpactPreviewData,
+} from '../../services/gradingApi';
+import PolicyImpactPreview from '../../components/grades/PolicyImpactPreview';
+import { downloadPolicyImpactCsv } from '../../utils/exportImpactCsv';
 
 type GradeRow = {
   courseId: string;
@@ -19,6 +28,26 @@ type Widgets = {
   missingSnapshots: number;
   policyChangesSinceFinalize: number;
   openInstitutionPeriods: number;
+  unlinkedSections?: number;
+};
+
+type UnlinkedSection = {
+  sectionId: string;
+  sectionNumber?: string;
+  status?: string;
+  offeringCode?: string;
+  offeringTitle?: string;
+  repairHint?: string;
+};
+
+type PolicyChange = {
+  _id: string;
+  entityType?: string;
+  entityId?: string;
+  action?: string;
+  createdAt?: string;
+  actor?: { email?: string };
+  after?: { policyHash?: string };
 };
 
 type Amendment = {
@@ -41,7 +70,7 @@ type Period = {
   weight?: number | null;
 };
 
-type Tab = 'matrix' | 'finalize' | 'amendments' | 'periods';
+type Tab = 'matrix' | 'finalize' | 'amendments' | 'repair' | 'periods' | 'policy';
 
 export function RegistrarGradeStatus() {
   const [terms, setTerms] = useState<AcademicTerm[]>([]);
@@ -51,16 +80,29 @@ export function RegistrarGradeStatus() {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [widgets, setWidgets] = useState<Widgets | null>(null);
   const [amendments, setAmendments] = useState<Amendment[]>([]);
+  const [policyChanges, setPolicyChanges] = useState<PolicyChange[]>([]);
+  const [missingSnapshotRows, setMissingSnapshotRows] = useState<GradeRow[]>([]);
+  const [unlinkedSections, setUnlinkedSections] = useState<UnlinkedSection[]>([]);
   const [periods, setPeriods] = useState<Period[]>([]);
-  const [preview, setPreview] = useState<{ toFinalize?: number; alreadyFinalized?: number } | null>(
-    null
-  );
+  const [preview, setPreview] = useState<{
+    toFinalize?: number;
+    alreadyFinalized?: number;
+    unlinkedSectionCount?: number;
+    blockedByUnlinkedSections?: boolean;
+  } | null>(null);
+  const [forceFinalize, setForceFinalize] = useState(false);
   const [periodForm, setPeriodForm] = useState({ name: '', position: '0', weight: '' });
   const [jobId, setJobId] = useState('');
   const [jobStatus, setJobStatus] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [institutionImpact, setInstitutionImpact] = useState<InstitutionPolicyImpactSummary | null>(null);
+  const [impactCourseId, setImpactCourseId] = useState('');
+  const [impactPreview, setImpactPreview] = useState<PolicyImpactPreviewData | null>(null);
+  const [impactLoading, setImpactLoading] = useState(false);
+  const [impactSaveReason, setImpactSaveReason] = useState('');
 
   useEffect(() => {
     void (async () => {
@@ -84,18 +126,28 @@ export function RegistrarGradeStatus() {
     setLoading(true);
     setError('');
     try {
-      const res = await registrarGet<{
-        data: {
-          rows: GradeRow[];
-          counts: Record<string, number>;
-          widgets: Widgets;
-          amendments: Amendment[];
-        };
-      }>(`/api/registrar/terms/${id}/grades-dashboard`);
+      const [res, impactRes] = await Promise.all([
+        registrarGet<{
+          data: {
+            rows: GradeRow[];
+            counts: Record<string, number>;
+            widgets: Widgets;
+            amendments: Amendment[];
+            policyChangesSinceFinalize?: PolicyChange[];
+            missingSnapshotRows?: GradeRow[];
+            unlinkedSections?: UnlinkedSection[];
+          };
+        }>(`/api/registrar/terms/${id}/grades-dashboard`),
+        fetchInstitutionPolicyImpactSummary().catch(() => null),
+      ]);
       setRows(res.data?.rows || []);
       setCounts(res.data?.counts || {});
       setWidgets(res.data?.widgets || null);
       setAmendments(res.data?.amendments || []);
+      setPolicyChanges(res.data?.policyChangesSinceFinalize || []);
+      setMissingSnapshotRows(res.data?.missingSnapshotRows || []);
+      setUnlinkedSections(res.data?.unlinkedSections || []);
+      if (impactRes?.success) setInstitutionImpact(impactRes.data);
     } catch (err: unknown) {
       setError(
         axios.isAxiosError(err) && err.response?.data?.message
@@ -121,12 +173,23 @@ export function RegistrarGradeStatus() {
 
   const runPreview = async () => {
     setError('');
-    const res = await registrarPost<{ data: { toFinalize: number; alreadyFinalized: number } }>(
-      `/api/registrar/terms/${termId}/finalize/preview`,
-      {}
-    );
+    const res = await registrarPost<{
+      data: {
+        toFinalize: number;
+        alreadyFinalized: number;
+        unlinkedSectionCount?: number;
+        blockedByUnlinkedSections?: boolean;
+        unlinkedSections?: UnlinkedSection[];
+      };
+    }>(`/api/registrar/terms/${termId}/finalize/preview`, {});
     setPreview(res.data);
-    setMessage(`Preview: ${res.data?.toFinalize || 0} to finalize, ${res.data?.alreadyFinalized || 0} already done`);
+    if (res.data?.unlinkedSections) setUnlinkedSections(res.data.unlinkedSections);
+    setMessage(
+      `Preview: ${res.data?.toFinalize || 0} to finalize, ${res.data?.alreadyFinalized || 0} already done` +
+        (res.data?.unlinkedSectionCount
+          ? `, ${res.data.unlinkedSectionCount} unlinked section(s) block finalize`
+          : '')
+    );
   };
 
   const applyFinalize = async () => {
@@ -142,7 +205,7 @@ export function RegistrarGradeStatus() {
           failed?: number;
           toFinalize?: number;
         };
-      }>(`/api/registrar/terms/${termId}/finalize`, { async: true });
+      }>(`/api/registrar/terms/${termId}/finalize`, { async: true, force: forceFinalize });
       if (res.data?.jobId) {
         setJobId(String(res.data.jobId));
         setJobStatus(res.data.status || 'pending');
@@ -156,11 +219,55 @@ export function RegistrarGradeStatus() {
       }
       await loadDashboard(termId);
     } catch (err: unknown) {
+      if (axios.isAxiosError(err) && err.response?.data?.code === 'UNLINKED_SECTIONS') {
+        const data = err.response.data.data as { unlinkedSections?: UnlinkedSection[] } | undefined;
+        if (data?.unlinkedSections) setUnlinkedSections(data.unlinkedSections);
+        setTab('repair');
+      }
       setError(
         axios.isAxiosError(err) && err.response?.data?.message
           ? String(err.response.data.message)
           : 'Finalize failed'
       );
+    }
+  };
+
+  const createContentCourse = async (sectionId: string) => {
+    setBusy(true);
+    setError('');
+    try {
+      await registrarPost(`/api/registrar/sections/${sectionId}/link-course`, { create: true });
+      setMessage('Content course created and linked');
+      await loadDashboard(termId);
+    } catch (err: unknown) {
+      setError(
+        axios.isAxiosError(err) && err.response?.data?.message
+          ? String(err.response.data.message)
+          : 'Link/create failed'
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const repairSnapshots = async (courseId: string) => {
+    setBusy(true);
+    setError('');
+    try {
+      const res = await registrarPost<{ data: { frozenCount?: number } }>(
+        `/api/registrar/courses/${courseId}/repair-snapshots`,
+        {}
+      );
+      setMessage(`Repaired snapshots (${res.data?.frozenCount ?? 0} frozen)`);
+      await loadDashboard(termId);
+    } catch (err: unknown) {
+      setError(
+        axios.isAxiosError(err) && err.response?.data?.message
+          ? String(err.response.data.message)
+          : 'Repair failed'
+      );
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -205,11 +312,38 @@ export function RegistrarGradeStatus() {
     setMessage(`Inherited ${res.data?.applied || 0} period rows onto courses`);
   };
 
+  const runCourseImpactPreview = async (courseId: string) => {
+    setImpactLoading(true);
+    setImpactCourseId(courseId);
+    setError('');
+    setImpactPreview(null);
+    try {
+      const effective = await fetchEffectiveCoursePolicy(courseId);
+      const policy = effective?.data?.policy || effective?.data;
+      const res = await previewCoursePolicyImpact(courseId, {
+        policy,
+        applyMode: 'retroactive_all',
+      });
+      setImpactPreview(res.data || res);
+      setMessage(`Impact preview loaded for course ${courseId.slice(-6)}`);
+    } catch (err: unknown) {
+      setError(
+        axios.isAxiosError(err) && err.response?.data?.message
+          ? String(err.response.data.message)
+          : 'Policy impact preview failed'
+      );
+    } finally {
+      setImpactLoading(false);
+    }
+  };
+
   const tabs: { id: Tab; label: string }[] = [
     { id: 'matrix', label: 'Status matrix' },
     { id: 'finalize', label: 'Term finalize' },
     { id: 'amendments', label: 'Amendments' },
+    { id: 'repair', label: 'Repair queue' },
     { id: 'periods', label: 'Grading periods' },
+    { id: 'policy', label: 'Policy impact' },
   ];
 
   return (
@@ -235,12 +369,13 @@ export function RegistrarGradeStatus() {
       </div>
 
       {widgets && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5 text-sm">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 text-sm">
           {(
             [
               ['Unfinalized', widgets.unfinalized],
               ['Amendments', widgets.amendmentsThisTerm],
               ['Missing snapshots', widgets.missingSnapshots],
+              ['Unlinked sections', widgets.unlinkedSections ?? unlinkedSections.length],
               ['Policy changes since finalize', widgets.policyChangesSinceFinalize],
               ['Open periods', widgets.openInstitutionPeriods],
             ] as const
@@ -300,6 +435,7 @@ export function RegistrarGradeStatus() {
                   <th className="px-3 py-2">Students</th>
                   <th className="px-3 py-2">Snapshots</th>
                   <th className="px-3 py-2">Finalized</th>
+                  <th className="px-3 py-2">Policy</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -316,11 +452,23 @@ export function RegistrarGradeStatus() {
                     <td className="px-3 py-2">
                       {r.finalizedAt ? new Date(r.finalizedAt).toLocaleString() : '—'}
                     </td>
+                    <td className="px-3 py-2">
+                      <button
+                        type="button"
+                        className="text-blue-600 text-xs"
+                        onClick={() => {
+                          setTab('policy');
+                          void runCourseImpactPreview(r.courseId);
+                        }}
+                      >
+                        Preview impact
+                      </button>
+                    </td>
                   </tr>
                 ))}
                 {!rows.length && (
                   <tr>
-                    <td colSpan={6} className="px-3 py-4 text-gray-500">
+                    <td colSpan={7} className="px-3 py-4 text-gray-500">
                       No courses linked to this term.
                     </td>
                   </tr>
@@ -335,8 +483,24 @@ export function RegistrarGradeStatus() {
         <div className="space-y-3 text-sm max-w-xl">
           <p className="text-gray-600 dark:text-gray-400">
             Preview then finalize all non-finalized courses in the term. Large runs use the{' '}
-            <code>grades.term_finalize</code> async job.
+            <code>grades.term_finalize</code> async job. Unlinked sections must be repaired first (or force).
           </p>
+          {(unlinkedSections.length > 0 || preview?.blockedByUnlinkedSections) && (
+            <div className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-100">
+              {unlinkedSections.length || preview?.unlinkedSectionCount || 0} section(s) lack a content course.{' '}
+              <button type="button" className="underline" onClick={() => setTab('repair')}>
+                Open repair queue
+              </button>
+            </div>
+          )}
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={forceFinalize}
+              onChange={(e) => setForceFinalize(e.target.checked)}
+            />
+            Force finalize (skip unlinked-section block)
+          </label>
           <div className="flex flex-wrap gap-2">
             <button type="button" className="rounded border px-3 py-1.5" onClick={() => void runPreview()}>
               Preview
@@ -358,6 +522,12 @@ export function RegistrarGradeStatus() {
             <div className="rounded border px-3 py-2">
               Ready: <strong>{preview.toFinalize}</strong> · Already finalized:{' '}
               <strong>{preview.alreadyFinalized}</strong>
+              {preview.unlinkedSectionCount != null && (
+                <>
+                  {' '}
+                  · Unlinked: <strong>{preview.unlinkedSectionCount}</strong>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -379,6 +549,67 @@ export function RegistrarGradeStatus() {
           ))}
           {!amendments.length && <li className="px-3 py-4 text-gray-500">No amendments this term.</li>}
         </ul>
+      )}
+
+      {tab === 'repair' && (
+        <div className="space-y-6 text-sm">
+          <section>
+            <h3 className="font-medium mb-2">Unlinked sections (no lmsCourseId)</h3>
+            <ul className="divide-y border rounded-md border-gray-200 dark:border-gray-700">
+              {unlinkedSections.map((s) => (
+                <li key={s.sectionId} className="px-3 py-2 flex justify-between gap-2 items-start">
+                  <div>
+                    <div className="font-medium">
+                      {s.offeringCode || ''} {s.offeringTitle || 'Offering'} · sec {s.sectionNumber || '—'}
+                    </div>
+                    <div className="text-gray-500">{s.status} · {s.repairHint}</div>
+                  </div>
+                  <button
+                    type="button"
+                    className="text-blue-600 shrink-0"
+                    disabled={busy}
+                    onClick={() => void createContentCourse(s.sectionId)}
+                  >
+                    Create &amp; link course
+                  </button>
+                </li>
+              ))}
+              {!unlinkedSections.length && (
+                <li className="px-3 py-3 text-gray-500">All sections in scope have a content course.</li>
+              )}
+            </ul>
+          </section>
+          <section>
+            <h3 className="font-medium mb-2">Missing snapshots (FINALIZED/AMENDED)</h3>
+            <ul className="divide-y border rounded-md border-gray-200 dark:border-gray-700">
+              {missingSnapshotRows.map((r) => (
+                <li key={r.courseId} className="px-3 py-2 flex justify-between gap-2 items-start">
+                  <div>
+                    <div className="font-medium">
+                      {r.courseCode ? `${r.courseCode} · ` : ''}
+                      {r.title}
+                    </div>
+                    <div className="text-gray-500">
+                      {r.lifecycleStatus} · students {r.studentCount ?? '—'} · snapshots{' '}
+                      {r.studentSnapshotCount}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="text-blue-600 shrink-0"
+                    disabled={busy}
+                    onClick={() => void repairSnapshots(r.courseId)}
+                  >
+                    Repair snapshots
+                  </button>
+                </li>
+              ))}
+              {!missingSnapshotRows.length && (
+                <li className="px-3 py-3 text-gray-500">No missing-snapshot courses in scope.</li>
+              )}
+            </ul>
+          </section>
+        </div>
       )}
 
       {tab === 'periods' && (
@@ -431,6 +662,78 @@ export function RegistrarGradeStatus() {
             ))}
             {!periods.length && <li className="px-3 py-4 text-gray-500">No institution periods yet.</li>}
           </ul>
+        </div>
+      )}
+
+      {tab === 'policy' && (
+        <div className="space-y-4 text-sm">
+          {institutionImpact && institutionImpact.totalPublishedCourses > 0 && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-100">
+              Institution defaults would recalculate live grades in{' '}
+              <strong>{institutionImpact.liveRecalcCourseCount}</strong> published course
+              {institutionImpact.liveRecalcCourseCount === 1 ? '' : 's'}.{' '}
+              <strong>{institutionImpact.finalizedCourseCount}</strong> finalized course
+              {institutionImpact.finalizedCourseCount === 1 ? '' : 's'} keep frozen snapshots.
+            </div>
+          )}
+
+          <section>
+            <h3 className="font-medium mb-2">Policy changes since earliest finalize</h3>
+            <ul className="divide-y border rounded-md border-gray-200 dark:border-gray-700">
+              {policyChanges.map((p) => (
+                <li key={p._id} className="px-3 py-2">
+                  <div className="font-medium">
+                    {p.action || 'policy change'} · {p.entityType || 'entity'}
+                  </div>
+                  <div className="text-gray-500">
+                    {p.actor?.email || 'system'}
+                    {p.after?.policyHash ? ` · hash ${String(p.after.policyHash).slice(0, 10)}…` : ''}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {p.createdAt ? new Date(p.createdAt).toLocaleString() : ''}
+                  </div>
+                </li>
+              ))}
+              {!policyChanges.length && (
+                <li className="px-3 py-3 text-gray-500">No policy audit rows since finalize for this term.</li>
+              )}
+            </ul>
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="font-medium">Per-course impact preview</h3>
+            <p className="text-gray-600 dark:text-gray-400">
+              Uses the course&apos;s current effective policy with retroactive apply mode (same engine as the
+              grading policy modal).
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {rows.slice(0, 12).map((r) => (
+                <button
+                  key={r.courseId}
+                  type="button"
+                  className={`rounded border px-2 py-1 text-xs ${
+                    impactCourseId === r.courseId ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950' : ''
+                  }`}
+                  disabled={impactLoading}
+                  onClick={() => void runCourseImpactPreview(r.courseId)}
+                >
+                  {r.courseCode || r.title.slice(0, 18) || r.courseId.slice(-6)}
+                </button>
+              ))}
+            </div>
+            {impactLoading && <p className="text-gray-500">Loading impact…</p>}
+            {impactPreview && (
+              <div className="space-y-2">
+                <PolicyImpactPreview
+                  impact={impactPreview}
+                  loading={impactLoading}
+                  saveReason={impactSaveReason}
+                  onSaveReasonChange={setImpactSaveReason}
+                  onExportCsv={() => downloadPolicyImpactCsv(impactPreview)}
+                />
+              </div>
+            )}
+          </section>
         </div>
       )}
     </div>

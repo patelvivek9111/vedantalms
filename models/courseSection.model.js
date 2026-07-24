@@ -55,6 +55,12 @@ const courseSectionSchema = new mongoose.Schema(
       default: null,
       index: true,
     },
+    /** Prior content course when remounted into a shared cross-list (archive pointer; not merged). */
+    previousLmsCourseId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Course',
+      default: null,
+    },
   },
   { timestamps: true }
 );

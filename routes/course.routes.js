@@ -714,13 +714,12 @@ router.post('/:courseId/enrollment/:studentId/approve', protect, authorize('teac
       { action: 'approve' }
     );
     
-    // Update enrollment request status in course
+    // Update enrollment request status, then EnrollmentWrite primary (mirrors students[])
     await Course.findByIdAndUpdate(courseId, {
       $set: {
         'enrollmentRequests.$[elem].status': 'approved',
         'enrollmentRequests.$[elem].responseDate': new Date()
       },
-      $push: { students: studentId }
     }, {
       arrayFilters: [{ 'elem.student': studentId }]
     });
@@ -735,11 +734,12 @@ router.post('/:courseId/enrollment/:studentId/approve', protect, authorize('teac
           studentId,
           actorId: req.user._id || req.user.id,
           source: 'teacher',
-          mirrorCourseStudents: false,
+          mirrorCourseStudents: true,
         });
       }
     } catch (dwErr) {
-      console.warn('Enrollment dual-write (approve) failed:', dwErr.message);
+      console.warn('EnrollmentWrite primary (approve) failed; Course.students fallback:', dwErr.message);
+      await Course.findByIdAndUpdate(courseId, { $addToSet: { students: studentId } });
     }
 
     // If the student was waitlisted, remove them from waitlist and update positions

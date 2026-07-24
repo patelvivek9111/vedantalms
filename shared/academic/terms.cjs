@@ -139,6 +139,13 @@ function defaultAcademicSettings() {
     defaultCreditHoursCollege: 3,
     reportingTermSchool: 'Academic Year',
     reportingTermCollege: 'Fall',
+    defaultEnrollmentMethod: 'open',
+    holdDefaults: {
+      holdType: 'registration',
+      blocksRegistration: true,
+      blocksTranscript: false,
+      blocksGrades: false,
+    },
   };
 }
 

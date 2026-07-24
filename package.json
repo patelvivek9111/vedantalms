@@ -15,6 +15,8 @@
     "worker:notification-fanout": "node workers/notificationFanoutWorker.js",
     "worker:file-scan": "node workers/fileScanWorker.js",
     "worker:nightly-ops": "node workers/nightlyOpsWorker.js",
+    "worker:sis-sync": "node workers/sisSyncWorker.js",
+    "worker:erp-hold-retry": "node workers/erpHoldRetryWorker.js",
     "worker:timed-quiz-sweep": "node workers/timedQuizSweepWorker.js",
     "obs:up": "docker compose -f monitoring/docker-compose.observability.yml up -d",
     "obs:down": "docker compose -f monitoring/docker-compose.observability.yml down",
@@ -240,7 +242,7 @@
     "react-dom": "^18.2.0",
     "react-icons": "^5.5.0",
     "react-markdown": "^9.0.1",
-    "react-router-dom": "^6.22.3",
+    "react-router-dom": "^7.18.1",
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
     "tailwindcss": "^3.4.1"
