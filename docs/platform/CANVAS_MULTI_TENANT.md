@@ -2,7 +2,7 @@
  * Canvas-style multi-institution platform (MySl8te)
  *
  * Single source of truth for Phases 1–5.
- * Related: docs/registrar/FULL_REGISTRAR_ROADMAP.md
+ * Related: docs/archive/FULL_REGISTRAR_ROADMAP.md (archived)
  */
 
 # Overview

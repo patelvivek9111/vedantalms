@@ -3,7 +3,7 @@
 **Status:** Planning document (foundations partially shipped)  
 **Owner:** MySl8te platform team  
 **Last updated:** 2026-07-10  
-**Related:** [FULL_REGISTRAR_ROADMAP.md](../registrar/FULL_REGISTRAR_ROADMAP.md), [CANVAS_PARITY_AUDIT.md](../grading/CANVAS_PARITY_AUDIT.md)
+**Related:** [FULL_REGISTRAR_ROADMAP.md](../archive/FULL_REGISTRAR_ROADMAP.md) (archived), [CANVAS_PARITY_AUDIT.md](../archive/CANVAS_PARITY_AUDIT.md) (archived)
 
 ---
 
@@ -167,7 +167,7 @@ NEP promotes:
      ABC Portal (abc.gov.in)    Institution ERP / SIS
 ```
 
-Depends on [FULL_REGISTRAR_ROADMAP.md](../registrar/FULL_REGISTRAR_ROADMAP.md) for:
+Depends on [FULL_REGISTRAR_ROADMAP.md](../archive/FULL_REGISTRAR_ROADMAP.md) (archived) for:
 - `Enrollment` of record
 - `Program` model (shared)
 - `AcademicTerm` registry
@@ -631,7 +631,7 @@ DEPOSIT_ABC_CREDITS
 
 | Dependency | Why |
 |------------|-----|
-| [FULL_REGISTRAR_ROADMAP.md](../registrar/FULL_REGISTRAR_ROADMAP.md) Phase 2 | `Enrollment` of record for CBCS registration |
+| [FULL_REGISTRAR_ROADMAP.md](../archive/FULL_REGISTRAR_ROADMAP.md) Phase 2 (archived) | `Enrollment` of record for CBCS registration |
 | Registrar `AcademicTerm` | Semester credit caps |
 | Registrar `Program` (shared) | Same model as Section 4.1 |
 | Finalized grade snapshots | ABC deposit trigger |

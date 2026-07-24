@@ -17,5 +17,11 @@ Historical certification reports, one-time rollout checklists, and superseded lo
 - **regression-testing-report.md** — Snapshot report from 2026-06-17
 - **capacity-2500-certification-checklist.md** — Load-test certification record
 - **discussion-*.md** — Discussion subsystem rollout and certification checklists (Phases D–G)
+- **security-remediation-plan.md** — Completed Jul 2026 pentest checklist (live rules: [security.md](../security.md))
+- **CANVAS_PARITY_AUDIT.md** — Completed grading parity audit (Phases 1–8)
+- **POLICY_CHANGE_UX.md** — Completed policy-change UX design spec
+- **FULL_REGISTRAR_ROADMAP.md** — Completed registrar R1–R8 implementation tracker
+
+Active platform reference (not archived): [CANVAS_MULTI_TENANT.md](../platform/CANVAS_MULTI_TENANT.md).
 
 These are kept for audit trail and institutional reference; they are not required for daily development.

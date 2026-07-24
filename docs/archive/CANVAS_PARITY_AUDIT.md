@@ -284,7 +284,7 @@ Tests: `tests/grading/canvasParity.audit.test.js` and `canvasParityComprehensive
 
 | Action | Path |
 |--------|------|
-| Created | `docs/grading/CANVAS_PARITY_AUDIT.md` |
+| Created | `docs/archive/CANVAS_PARITY_AUDIT.md` |
 | Created | `tests/grading/canvasParity.fixtures.js` |
 | Created | `tests/grading/canvasParity.audit.test.js` |
 | Created | `frontend/tests/fixtures/grading/canvasParity.fixtures.ts` |

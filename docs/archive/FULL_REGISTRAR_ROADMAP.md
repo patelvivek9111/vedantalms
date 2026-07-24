@@ -3,7 +3,7 @@
 **Status:** Complete — R1–R8 done; see **§23 Eight-phase execution tracker**  
 **Owner:** MySl8te platform team  
 **Last updated:** 2026-07-23  
-**Related:** [CANVAS_PARITY_AUDIT.md](../grading/CANVAS_PARITY_AUDIT.md), [POLICY_CHANGE_UX.md](../grading/POLICY_CHANGE_UX.md), [security.md](../security.md), [CANVAS_MULTI_TENANT.md](../platform/CANVAS_MULTI_TENANT.md)
+**Related:** [CANVAS_PARITY_AUDIT.md](./CANVAS_PARITY_AUDIT.md), [POLICY_CHANGE_UX.md](./POLICY_CHANGE_UX.md), [security.md](../security.md), [CANVAS_MULTI_TENANT.md](../platform/CANVAS_MULTI_TENANT.md)
 
 ---
 
@@ -46,7 +46,7 @@ Canvas does **not** ship a complete university ERP registrar. In production, “
 | Grade lifecycle (DRAFT → POSTED → FINALIZED → AMENDED) | Done | `models/courseGradeLifecycle.model.js`, `CourseGradeLifecyclePanel` |
 | Frozen grade snapshots | Done | `models/studentCourseGradeSnapshot.model.js` |
 | Institution + course grading policy | Done | `institutionGradingPolicy`, `courseGradingPolicy` |
-| Policy audit + impact preview | Done | `gradingPolicyAudit`, `docs/grading/POLICY_CHANGE_UX.md` |
+| Policy audit + impact preview | Done | `gradingPolicyAudit`, `docs/archive/POLICY_CHANGE_UX.md` |
 | Course grading periods | Done | `models/courseGradingPeriod.model.js`, `GradingPeriodsModal` |
 | Transcript view (student) | Done | `frontend/src/pages/Transcript.tsx`, `/api/reports/transcript` |
 | Official transcript issuance (API) | Done | `services/transcriptIssuance.service.js`, `transcriptIssueLog.model.js` |
@@ -877,7 +877,7 @@ Reuse: `tests/grading/transcriptRecompute.e2e.test.js`, `ferpaAccess.policy.test
 
 ### Roadmap line (optional in sales)
 
-- “R1–R8 registrar phases are documented in `docs/registrar/FULL_REGISTRAR_ROADMAP.md` — ask for the current checklist, not a brochure claim.”
+- “R1–R8 registrar phases are documented in `docs/archive/FULL_REGISTRAR_ROADMAP.md` — ask for the current checklist, not a brochure claim.”
 
 
 ---

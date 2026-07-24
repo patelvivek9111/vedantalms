@@ -150,3 +150,7 @@ blob-report/
 # Captured test/stdout dumps at repo root
 /*-results.txt
 /test-api-results.txt
+/tests-*-out*.txt
+
+# Local CI artifact downloads
+.ci-artifacts/
