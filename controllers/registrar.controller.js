@@ -1023,7 +1023,7 @@ exports.getStudentStub = async (req, res) => {
         .sort({ placedAt: -1 })
         .limit(100)
         .lean(),
-      StudentCourseGradeSnapshot.find({ student: student._id })
+      StudentCourseGradeSnapshot.find(withTenantFilter({ student: student._id }, tenantId))
         .populate('course', 'title catalog.courseCode rootAccountId')
         .sort({ year: -1, term: 1, createdAt: -1 })
         .limit(100)
@@ -1047,9 +1047,7 @@ exports.getStudentStub = async (req, res) => {
         .lean(),
     ]);
 
-    const gradeRows = (grades || []).filter(
-      (g) => !tenantId || !g.course?.rootAccountId || String(g.course.rootAccountId) === String(tenantId)
-    );
+    const gradeRows = grades || [];
 
     const courseIds = [
       ...enrollments.map((e) => e.lmsCourseId?._id || e.lmsCourseId),

@@ -9,9 +9,16 @@ const { sendEmail } = require('../utils/emailService');
 const { resolveProfilePictureUrl } = require('../utils/profilePictureUrl');
 const { withTenantFilter } = require('../utils/tenantContext');
 const { ensureAccountMembership, findUserByLoginId } = require('../services/tenancy/accountMembership.service');
+const academicAuditService = require('../services/academicAudit.service');
 
 const SELF_REGISTER_ROLES = new Set(['student']);
 const DEV_SELF_REGISTER_ROLES = new Set(['student', 'teacher']);
+
+function isLegacyUserClaimEnabled() {
+  const raw = process.env.ALLOW_LEGACY_USER_CLAIM;
+  if (raw == null || raw === '') return true;
+  return !['0', 'false', 'no', 'off'].includes(String(raw).trim().toLowerCase());
+}
 
 function resolveRegistrationRole(requestedRole, rootAccountId) {
   if (isPublicRegistrationDisabled(rootAccountId)) {
@@ -161,13 +168,17 @@ exports.login = async (req, res) => {
         '+password'
       ));
 
-    // Migration window: claim legacy users missing rootAccountId (avoid save() so password is not re-hashed)
-    if (!user && req.rootAccountId) {
+    // Migration window: claim legacy users missing rootAccountId (env-gated; disable after backfill).
+    if (!user && req.rootAccountId && isLegacyUserClaimEnabled()) {
       const legacy = await User.findOne({
         email: normalizedEmail,
         $or: [{ rootAccountId: null }, { rootAccountId: { $exists: false } }],
       }).select('+password');
       if (legacy) {
+        const before = {
+          rootAccountId: legacy.rootAccountId || null,
+          accountId: legacy.accountId || null,
+        };
         await User.updateOne(
           { _id: legacy._id },
           { $set: { rootAccountId: req.rootAccountId, accountId: req.rootAccountId } }
@@ -175,6 +186,28 @@ exports.login = async (req, res) => {
         legacy.rootAccountId = req.rootAccountId;
         legacy.accountId = req.rootAccountId;
         user = legacy;
+
+        await academicAuditService
+          .recordAuditEvent({
+            actorId: legacy._id,
+            entityType: 'User',
+            entityId: legacy._id,
+            action: 'auth.legacy_user_claimed',
+            before,
+            after: {
+              rootAccountId: req.rootAccountId,
+              accountId: req.rootAccountId,
+            },
+            severity: 'warning',
+            ip: req.ip || req.connection?.remoteAddress,
+            requestId: req.id || req.requestId,
+            rootAccountId: req.rootAccountId,
+            metadata: {
+              email: normalizedEmail,
+              host: req.get?.('host') || req.tenantHost || null,
+            },
+          })
+          .catch(() => {});
       }
     }
 
