@@ -18,6 +18,7 @@ export function Login() {
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [isTouchUi, setIsTouchUi] = useState(false);
   const emailInputRef = useRef<HTMLInputElement>(null);
   const { login, loginWithToken, user } = useAuth();
   const { tenant } = useTenant();
@@ -85,6 +86,35 @@ export function Login() {
   useEffect(() => {
     setLogoSrc(brandLogo || primaryLogo);
   }, [brandLogo, primaryLogo]);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(pointer: coarse)');
+    const sync = () => setIsTouchUi(mq.matches || 'ontouchstart' in window);
+    sync();
+    mq.addEventListener?.('change', sync);
+    return () => mq.removeEventListener?.('change', sync);
+  }, []);
+
+  // iOS Safari scrolls the document to keep the caret visible; pin scroll while typing
+  // so InteractiveEyes / keyboard chrome cannot nudge the page on each keystroke.
+  useEffect(() => {
+    if (!isEmailFocused && !isPasswordFocused) return;
+    const lockedY = window.scrollY;
+    const lockScroll = () => {
+      if (window.scrollY !== lockedY) {
+        window.scrollTo(0, lockedY);
+      }
+    };
+    window.addEventListener('scroll', lockScroll, { passive: true });
+    const vv = window.visualViewport;
+    vv?.addEventListener('resize', lockScroll);
+    vv?.addEventListener('scroll', lockScroll);
+    return () => {
+      window.removeEventListener('scroll', lockScroll);
+      vv?.removeEventListener('resize', lockScroll);
+      vv?.removeEventListener('scroll', lockScroll);
+    };
+  }, [isEmailFocused, isPasswordFocused]);
 
   useEffect(() => {
     if (user) {
@@ -279,10 +309,10 @@ export function Login() {
                 <div className="-mt-1 flex w-full justify-center sm:-mt-1.5">
                   <div className="origin-center scale-[0.72] opacity-[0.95] sm:scale-[0.76]">
                     <InteractiveEyes
-                      isPasswordFocused={isPasswordFocused}
-                      isUsernameFocused={isEmailFocused}
-                      usernameValue={email}
-                      passwordValue={password}
+                      isPasswordFocused={isTouchUi ? false : isPasswordFocused}
+                      isUsernameFocused={isTouchUi ? false : isEmailFocused}
+                      usernameValue={isTouchUi ? '' : email}
+                      passwordValue={isTouchUi ? '' : password}
                       hasError={!!error}
                       isLoading={isLoading}
                     />

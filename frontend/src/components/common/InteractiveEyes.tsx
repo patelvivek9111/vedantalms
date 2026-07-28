@@ -110,7 +110,10 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
     const measureSpan = document.createElement('span');
     measureSpan.style.visibility = 'hidden';
     measureSpan.style.position = 'absolute';
+    measureSpan.style.left = '-9999px';
+    measureSpan.style.top = '0';
     measureSpan.style.whiteSpace = 'pre';
+    measureSpan.setAttribute('aria-hidden', 'true');
     document.body.appendChild(measureSpan);
 
     const usernameInput = document.getElementById('email-address') as HTMLInputElement;
@@ -119,14 +122,16 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
       return;
     }
 
+    let rafId = 0;
     const updateEyePosition = () => {
       if (!usernameInput) return;
       
       // Check if username input is actually focused (more reliable than state)
       if (document.activeElement !== usernameInput) return;
       
+      cancelAnimationFrame(rafId);
       // Use requestAnimationFrame to ensure DOM is updated
-      requestAnimationFrame(() => {
+      rafId = requestAnimationFrame(() => {
         if (!usernameInput) return;
         
         // Double-check focus state
@@ -192,32 +197,35 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
         const eyeX = (relativePosition - 0.5) * 0.8;
         const eyeY = 0.3; // Look down
         
-        setEyePosition({ x: eyeX, y: eyeY });
+        setEyePosition((prev) =>
+          Math.abs(prev.x - eyeX) < 0.001 && Math.abs(prev.y - eyeY) < 0.001
+            ? prev
+            : { x: eyeX, y: eyeY }
+        );
       });
     };
 
     // Update on various events to catch all cursor movements
-    const events = ['keyup', 'keydown', 'keypress', 'click', 'input', 'select', 'focus', 'mousemove', 'scroll'];
+    // Do NOT depend on usernameValue — recreating this effect per keystroke
+    // appends/removes DOM nodes and makes iOS Safari scroll-jump while typing.
+    const events = ['keyup', 'keydown', 'click', 'input', 'select', 'focus'];
     events.forEach(event => {
       usernameInput.addEventListener(event, updateEyePosition);
     });
     
-    // Also use interval to catch cursor movements that might be missed
-    const intervalId = setInterval(updateEyePosition, 100);
-    
     // Initial position
-    setTimeout(updateEyePosition, 0);
+    updateEyePosition();
 
     return () => {
+      cancelAnimationFrame(rafId);
       events.forEach(event => {
         usernameInput.removeEventListener(event, updateEyePosition);
       });
-      clearInterval(intervalId);
       if (document.body.contains(measureSpan)) {
         document.body.removeChild(measureSpan);
       }
     };
-  }, [isUsernameFocused, isPasswordFocused, usernameValue]);
+  }, [isUsernameFocused, isPasswordFocused]);
 
   // Track text cursor position in password field (for eye position, only when peeking)
   useEffect(() => {
@@ -229,7 +237,10 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
     const measureSpan = document.createElement('span');
     measureSpan.style.visibility = 'hidden';
     measureSpan.style.position = 'absolute';
+    measureSpan.style.left = '-9999px';
+    measureSpan.style.top = '0';
     measureSpan.style.whiteSpace = 'pre';
+    measureSpan.setAttribute('aria-hidden', 'true');
     document.body.appendChild(measureSpan);
 
     const passwordInput = document.getElementById('password') as HTMLInputElement;
@@ -341,32 +352,31 @@ export const InteractiveEyes: React.FC<InteractiveEyesProps> = ({
         const eyeX = (relativePosition - 0.5) * 0.8;
         // Eyes look down since input field is below
         const eyeY = 0.3; // Look down
-        setEyePosition({ x: eyeX, y: eyeY });
+        setEyePosition((prev) =>
+          Math.abs(prev.x - eyeX) < 0.001 && Math.abs(prev.y - eyeY) < 0.001
+            ? prev
+            : { x: eyeX, y: eyeY }
+        );
       });
     };
 
-    // Update on various events
-    const events = ['keyup', 'keydown', 'keypress', 'click', 'input', 'select', 'focus', 'mousemove', 'scroll'];
+    // Update on input events only — avoid per-keystroke effect teardown (iOS scroll jump)
+    const events = ['keyup', 'keydown', 'click', 'input', 'select', 'focus'];
     events.forEach(event => {
       passwordInput.addEventListener(event, updateEyePosition);
     });
     
-    // Also use interval to catch cursor movements
-    const intervalId = setInterval(updateEyePosition, 100);
-    
-    // Initial position
-    setTimeout(updateEyePosition, 0);
+    updateEyePosition();
 
     return () => {
       events.forEach(event => {
         passwordInput.removeEventListener(event, updateEyePosition);
       });
-      clearInterval(intervalId);
       if (document.body.contains(measureSpan)) {
         document.body.removeChild(measureSpan);
       }
     };
-  }, [isPasswordFocused, passwordValue, peekAnimation.isPeeking, peekAnimation.progress]);
+  }, [isPasswordFocused]);
 
   // Blink animation (only when not typing password) - random intervals for natural look with double-blink
   useEffect(() => {
