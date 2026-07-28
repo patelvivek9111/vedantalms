@@ -24,7 +24,19 @@ accountBrandSchema.statics.getForRoot = async function (rootAccountId) {
   if (!rootAccountId) return null;
   let doc = await this.findOne({ rootAccountId });
   if (!doc) {
-    doc = await this.create({ rootAccountId });
+    const Account = require('./account.model');
+    const account = await Account.findById(rootAccountId).select('name').lean();
+    doc = await this.create({
+      rootAccountId,
+      displayName: account?.name || '',
+    });
+  } else if (!doc.displayName) {
+    const Account = require('./account.model');
+    const account = await Account.findById(rootAccountId).select('name').lean();
+    if (account?.name) {
+      doc.displayName = account.name;
+      await doc.save();
+    }
   }
   return doc;
 };

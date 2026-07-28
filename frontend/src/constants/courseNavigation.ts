@@ -13,6 +13,7 @@ import {
   ClipboardCheck,
   GraduationCap,
   Video,
+  Library,
 } from 'lucide-react';
 
 export interface NavigationItem {
@@ -30,6 +31,7 @@ export const navigationItems: NavigationItem[] = [
   { id: 'pages', label: 'Pages', icon: FileText },
   { id: 'assignments', label: 'Assignments', icon: PenTool },
   { id: 'quizzes', label: 'Quizzes', icon: ClipboardCheck },
+  { id: 'rubrics', label: 'Rubrics', icon: Library, roles: ['teacher', 'admin'] },
   { id: 'discussions', label: 'Discussions', icon: MessageSquare },
   { id: 'announcements', label: 'Announcements', icon: Megaphone },
   { id: 'polls', label: 'Polls', icon: BarChart3 },

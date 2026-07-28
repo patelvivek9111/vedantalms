@@ -132,6 +132,23 @@ async function sendContactInquiry({ name, email, organization, jobTitle, userCou
     extra,
   });
 
+  const systemMail = await getSystemSettingsMail();
+  if (systemMail) {
+    try {
+      return await sendWithNodemailer({
+        transporter: systemMail.transporter,
+        from: systemMail.from,
+        to,
+        replyTo: email,
+        subject,
+        text,
+        html,
+      });
+    } catch (err) {
+      console.error('Contact inquiry SMTP (SystemSettings) failed:', err.message);
+    }
+  }
+
   const envTransporter = getEnvTransporter();
   const envFrom = (process.env.CONTACT_SMTP_FROM || process.env.CONTACT_SMTP_USER || '').trim();
   if (envTransporter && envFrom) {
@@ -151,29 +168,11 @@ async function sendContactInquiry({ name, email, organization, jobTitle, userCou
     }
   }
 
-  const systemMail = await getSystemSettingsMail();
-  if (systemMail) {
-    try {
-      return await sendWithNodemailer({
-        transporter: systemMail.transporter,
-        from: systemMail.from,
-        to,
-        replyTo: email,
-        subject,
-        text,
-        html,
-      });
-    } catch (err) {
-      console.error('Contact inquiry SMTP (SystemSettings) failed:', err.message);
-      return { ok: false, code: 'SEND_FAILED', message: 'Could not send your message. Please try again later.' };
-    }
-  }
-
   return {
     ok: false,
     code: 'SMTP_NOT_CONFIGURED',
     message:
-      'Contact email is not configured on the server. Set CONTACT_SMTP_HOST, CONTACT_SMTP_USER, and CONTACT_SMTP_PASS (Gmail App Password).',
+      'Contact email is not configured. Set Admin → System Settings email, or CONTACT_SMTP_* for the platform host.',
   };
 }
 

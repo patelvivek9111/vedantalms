@@ -33,6 +33,52 @@ function isArchivedCourse(course) {
   return course?.operationalStatus === 'archived';
 }
 
+/**
+ * Canvas effective lock time:
+ * - lockAt if set
+ * - else dueDate when lockAfterDue !== false
+ * - else null (late submit allowed until manually locked)
+ */
+function getEffectiveLockAt(assignment) {
+  if (assignment?.lockAt) {
+    const lockAt = new Date(assignment.lockAt);
+    if (Number.isFinite(lockAt.getTime())) return lockAt;
+  }
+  if (assignment?.lockAfterDue !== false && assignment?.dueDate) {
+    const due = new Date(assignment.dueDate);
+    if (Number.isFinite(due.getTime())) return due;
+  }
+  return null;
+}
+
+/**
+ * Shared availability resolver (Canvas parity).
+ * @returns {{ kind: 'locked_manual'|'locked_until'|'locked_after'|'open', until?: Date, at?: Date, from?: Date|null, due?: Date|null, lockAt?: Date|null }}
+ */
+function getAssignmentAvailability(assignment, now = new Date()) {
+  if (assignment?.locked === true) {
+    return { kind: 'locked_manual', at: now };
+  }
+
+  const from = assignment?.availableFrom ? new Date(assignment.availableFrom) : null;
+  if (from && Number.isFinite(from.getTime()) && now < from) {
+    return { kind: 'locked_until', until: from };
+  }
+
+  const lockAt = getEffectiveLockAt(assignment);
+  if (lockAt && now > lockAt) {
+    return { kind: 'locked_after', at: lockAt };
+  }
+
+  const due = assignment?.dueDate ? new Date(assignment.dueDate) : null;
+  return {
+    kind: 'open',
+    from: from && Number.isFinite(from.getTime()) ? from : null,
+    due: due && Number.isFinite(due.getTime()) ? due : null,
+    lockAt,
+  };
+}
+
 async function loadAssignmentContext(assignmentOrId) {
   const assignment =
     assignmentOrId && typeof assignmentOrId === 'object' && assignmentOrId._id
@@ -68,7 +114,7 @@ function assertStudentEnrollment(user, course) {
   }
 }
 
-function assertPublishedVisibility({ assignment, module }, now = new Date()) {
+function assertPublishedVisibility({ assignment, module }) {
   if (module && module.published === false) {
     throw accessError('Module is not published', 403, 'MODULE_NOT_PUBLISHED', {
       moduleId: normalizeId(module),
@@ -79,15 +125,6 @@ function assertPublishedVisibility({ assignment, module }, now = new Date()) {
     throw accessError('Assignment is not published', 404, 'ASSIGNMENT_NOT_PUBLISHED', {
       assignmentId: normalizeId(assignment),
     });
-  }
-
-  if (assignment.availableFrom) {
-    const availableFrom = new Date(assignment.availableFrom);
-    if (Number.isFinite(availableFrom.getTime()) && now < availableFrom) {
-      throw accessError('Assignment is not available yet', 403, 'ASSIGNMENT_NOT_AVAILABLE', {
-        availableFrom: availableFrom.toISOString(),
-      });
-    }
   }
 }
 
@@ -177,6 +214,8 @@ async function assertStudentCanViewAssignment(user, assignmentOrId, options = {}
             assignmentPublished: assignment.published === true,
             modulePublished: module ? module.published !== false : true,
             availableFrom: assignment.availableFrom || null,
+            lockAt: assignment.lockAt || null,
+            locked: assignment.locked === true,
           }
         : null,
     };
@@ -185,7 +224,8 @@ async function assertStudentCanViewAssignment(user, assignmentOrId, options = {}
   assertStudentEnrollment(user, course);
 
   try {
-    assertPublishedVisibility({ assignment, module }, options.now || new Date());
+    // Students may view before unlock / after lock (Canvas lock page). Publish still required.
+    assertPublishedVisibility({ assignment, module });
   } catch (visibilityError) {
     if (await studentHasGradedSubmission(user._id, assignment)) {
       return { ...context, previewMetadata: null, gradedAccess: true };
@@ -193,7 +233,11 @@ async function assertStudentCanViewAssignment(user, assignmentOrId, options = {}
     throw visibilityError;
   }
 
-  return { ...context, previewMetadata: null };
+  return {
+    ...context,
+    previewMetadata: null,
+    availability: getAssignmentAvailability(assignment, options.now || new Date()),
+  };
 }
 
 async function assertStudentCanSubmitAssignment(user, assignmentOrId, options = {}) {
@@ -206,16 +250,25 @@ async function assertStudentCanSubmitAssignment(user, assignmentOrId, options = 
 
   await assertCourseAllowsSubmission(course);
 
-  if (assignment.dueDate && assignment.lockAfterDue !== false) {
-    const dueDate = new Date(assignment.dueDate);
-    if (Number.isFinite(dueDate.getTime()) && now > dueDate) {
-      throw accessError('Assignment is past due', 400, 'ASSIGNMENT_PAST_DUE', {
-        dueDate: dueDate.toISOString(),
-      });
-    }
+  const availability = getAssignmentAvailability(assignment, now);
+  if (availability.kind === 'locked_manual') {
+    throw accessError('Assignment is locked', 403, 'ASSIGNMENT_LOCKED', {
+      locked: true,
+    });
+  }
+  if (availability.kind === 'locked_until') {
+    throw accessError('Assignment is not available yet', 403, 'ASSIGNMENT_NOT_AVAILABLE', {
+      availableFrom: availability.until?.toISOString?.() || null,
+    });
+  }
+  if (availability.kind === 'locked_after') {
+    throw accessError('Assignment is locked', 400, 'ASSIGNMENT_LOCKED_AFTER', {
+      lockAt: availability.at?.toISOString?.() || null,
+      dueDate: assignment.dueDate ? new Date(assignment.dueDate).toISOString() : null,
+    });
   }
 
-  return context;
+  return { ...context, availability };
 }
 
 module.exports = {
@@ -223,4 +276,6 @@ module.exports = {
   assertStudentCanSubmitAssignment,
   loadAssignmentContext,
   studentHasGradedSubmission,
+  getEffectiveLockAt,
+  getAssignmentAvailability,
 };

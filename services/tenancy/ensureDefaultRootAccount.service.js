@@ -6,7 +6,7 @@ const SystemSettings = require('../../models/systemSettings.model');
 const InstitutionGradingPolicy = require('../../models/institutionGradingPolicy.model');
 
 const DEFAULT_CODE = (process.env.DEFAULT_ROOT_ACCOUNT_CODE || 'DEFAULT').toUpperCase();
-const DEFAULT_NAME = process.env.DEFAULT_ROOT_ACCOUNT_NAME || 'Default Institution';
+const DEFAULT_NAME = process.env.DEFAULT_ROOT_ACCOUNT_NAME || 'Example Institution';
 
 function hostsFromEnv() {
   const hosts = new Set();
@@ -53,11 +53,26 @@ async function ensureDefaultRootAccount() {
       institutionMode: 'mixed',
       timezone: process.env.TZ || 'UTC',
     });
+  } else if (
+    root.code === DEFAULT_CODE &&
+    (root.name === 'Default Institution' ||
+      (process.env.DEFAULT_ROOT_ACCOUNT_NAME && root.name !== DEFAULT_NAME))
+  ) {
+    root.name = DEFAULT_NAME;
+    await root.save();
   }
 
   if (!root.rootAccountId || String(root.rootAccountId) !== String(root._id)) {
     root.rootAccountId = root._id;
     await root.save();
+  }
+
+  try {
+    const { reconcileInstitutionMode } = require('./institutionMode.service');
+    await reconcileInstitutionMode(root._id);
+    root = (await Account.findById(root._id)) || root;
+  } catch (err) {
+    console.warn('[tenancy] institutionMode reconcile:', err.message);
   }
 
   const hosts = hostsFromEnv();

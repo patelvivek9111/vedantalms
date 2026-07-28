@@ -3,8 +3,9 @@ const SystemSettings = require('../models/systemSettings.model');
 const academicAuditService = require('./academicAudit.service');
 const { deleteStoredBlob } = require('./fileStorage.service');
 
-async function getRetentionSettings() {
-  const settings = await SystemSettings.findOne().lean();
+async function getRetentionSettings(rootAccountId) {
+  const settingsDoc = await SystemSettings.getSettings(rootAccountId);
+  const settings = settingsDoc?.toObject ? settingsDoc.toObject() : settingsDoc;
   const storage = settings?.storage || {};
   return {
     retentionDays: storage.retentionDays ?? 365,

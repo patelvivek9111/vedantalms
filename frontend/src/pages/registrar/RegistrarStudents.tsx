@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { registrarGet } from './registrarApi';
+import { ru } from './registrarUi';
 
 type StudentRow = {
   _id: string;
@@ -42,12 +43,12 @@ export function RegistrarStudents() {
   };
 
   return (
-    <div className="space-y-4">
-      <form onSubmit={search} className="flex flex-wrap gap-2 items-end">
-        <label className="text-sm flex-1 min-w-[200px]">
-            Search students
+    <div className={ru.page}>
+      <form onSubmit={search} className={`${ru.card} flex flex-wrap gap-2 items-end`}>
+        <label className={`${ru.label} flex-1 min-w-[200px]`}>
+          Search students
           <input
-            className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1.5"
+            className={ru.input}
             placeholder="Name, email, admission #, or student id"
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -55,24 +56,22 @@ export function RegistrarStudents() {
             required
           />
         </label>
-        <button type="submit" className="rounded bg-indigo-600 text-white px-3 py-1.5 text-sm">
+        <button type="submit" className={ru.btnPrimary}>
           Search
         </button>
       </form>
 
-      {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</div>
-      )}
-      {loading && <p className="text-sm text-gray-500">Searching…</p>}
+      {error && <div className={ru.alertError}>{error}</div>}
+      {loading && <p className={ru.muted}>Searching…</p>}
 
-      <ul className="divide-y border rounded-md border-gray-200 dark:border-gray-700 text-sm">
+      <ul className={ru.list}>
         {rows.map((s) => (
-          <li key={s._id} className="px-3 py-3 flex justify-between gap-2">
+          <li key={s._id} className={`${ru.listItem} flex justify-between gap-2`}>
             <div>
               <div className="font-medium">
                 {s.firstName} {s.lastName}
               </div>
-              <div className="text-gray-500">
+              <div className={ru.muted}>
                 {s.email}
                 {s.studentProfile?.admissionNumber ? ` · Adm ${s.studentProfile.admissionNumber}` : ''}
                 {typeof s.studentProfile?.programId === 'object' && s.studentProfile.programId?.code
@@ -80,13 +79,13 @@ export function RegistrarStudents() {
                   : ''}
               </div>
             </div>
-            <Link className="text-blue-600 hover:underline" to={`/registrar/students/${s._id}`}>
+            <Link className={ru.link} to={`/registrar/students/${s._id}`}>
               Open
             </Link>
           </li>
         ))}
         {!loading && !rows.length && (
-          <li className="px-3 py-4 text-gray-500">No results. Search by name or email.</li>
+          <li className={ru.empty}>No results. Search by name or email.</li>
         )}
       </ul>
     </div>

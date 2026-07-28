@@ -4,17 +4,37 @@ import type { Location } from 'react-router-dom';
 export function homePathForRole(role: string | undefined | null): string {
   const r = String(role || '').toLowerCase();
   if (r === 'registrar' || r === 'department_admin') return '/registrar';
-  if (r === 'admin' || r === 'platform_admin') return '/dashboard';
+  if (r === 'platform_admin') return '/admin/institutions';
+  if (r === 'admin') return '/dashboard';
   return '/dashboard';
+}
+
+/** Paths a platform_admin may use (tenant boss — not school LMS). */
+export function isPlatformAdminAllowedPath(pathname: string): boolean {
+  return (
+    pathname.startsWith('/admin/institutions') ||
+    pathname.startsWith('/account') ||
+    pathname === '/login' ||
+    pathname === '/privacy' ||
+    pathname === '/terms' ||
+    pathname.startsWith('/forgot-password') ||
+    pathname.startsWith('/reset-password')
+  );
 }
 
 function roleCanAccessPath(role: string | undefined | null, pathname: string): boolean {
   const r = String(role || '').toLowerCase();
+  if (r === 'platform_admin') {
+    return isPlatformAdminAllowedPath(pathname);
+  }
+  if (pathname.startsWith('/admin/institutions')) {
+    return false;
+  }
   if (pathname.startsWith('/admin')) {
-    return r === 'admin' || r === 'platform_admin';
+    return r === 'admin';
   }
   if (pathname.startsWith('/registrar')) {
-    return ['admin', 'registrar', 'department_admin', 'platform_admin'].includes(r);
+    return ['admin', 'registrar', 'department_admin'].includes(r);
   }
   if (pathname.startsWith('/teacher/')) {
     return r === 'teacher' || r === 'admin';

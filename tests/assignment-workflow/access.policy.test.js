@@ -40,15 +40,26 @@ function assignment(overrides = {}) {
     availableFrom: new Date('2026-01-01T00:00:00.000Z'),
     dueDate: new Date('2026-02-01T00:00:00.000Z'),
     lockAfterDue: true,
+    locked: false,
+    lockAt: null,
     ...overrides,
   };
 }
 
-function mockContext({ modulePublished = true, assignmentPublished = true, availableFrom, coursePatch = {} } = {}) {
-  Assignment.findById.mockResolvedValue(assignment({
-    published: assignmentPublished,
-    availableFrom: availableFrom ?? new Date('2026-01-01T00:00:00.000Z'),
-  }));
+function mockContext({
+  modulePublished = true,
+  assignmentPublished = true,
+  availableFrom,
+  assignmentPatch = {},
+  coursePatch = {},
+} = {}) {
+  Assignment.findById.mockResolvedValue(
+    assignment({
+      published: assignmentPublished,
+      availableFrom: availableFrom ?? new Date('2026-01-01T00:00:00.000Z'),
+      ...assignmentPatch,
+    })
+  );
   Module.findById.mockReturnValue({
     populate: jest.fn().mockResolvedValue({
       _id: 'module1',
@@ -62,53 +73,73 @@ function mockContext({ modulePublished = true, assignmentPublished = true, avail
 describe('assignment access policy', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    Submission.findOne.mockReturnValue({ select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(null) }) });
-    Group.findOne.mockReturnValue({ select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(null) }) });
+    Submission.findOne.mockReturnValue({
+      select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(null) }),
+    });
+    Group.findOne.mockReturnValue({
+      select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(null) }),
+    });
   });
 
   it.each([
     [false, true, new Date('2026-01-01T00:00:00.000Z'), 'MODULE_NOT_PUBLISHED'],
     [true, false, new Date('2026-01-01T00:00:00.000Z'), 'ASSIGNMENT_NOT_PUBLISHED'],
-    [true, true, new Date('2026-02-01T00:00:00.000Z'), 'ASSIGNMENT_NOT_AVAILABLE'],
+    // Canvas: students may view before unlock (lock banner); publish still required.
+    [true, true, new Date('2026-02-01T00:00:00.000Z'), null],
     [true, true, new Date('2026-01-01T00:00:00.000Z'), null],
-  ])('student matrix module=%s assignment=%s availableFrom=%s', async (modulePublished, assignmentPublished, availableFrom, expectedCode) => {
-    mockContext({ modulePublished, assignmentPublished, availableFrom });
-    if (expectedCode) {
-      await expect(access.assertStudentCanViewAssignment(student, 'assignment1', { now })).rejects.toMatchObject({
-        code: expectedCode,
-      });
-    } else {
-      await expect(access.assertStudentCanViewAssignment(student, 'assignment1', { now })).resolves.toMatchObject({
-        assignment: expect.objectContaining({ _id: 'assignment1' }),
-      });
+  ])(
+    'student matrix module=%s assignment=%s availableFrom=%s',
+    async (modulePublished, assignmentPublished, availableFrom, expectedCode) => {
+      mockContext({ modulePublished, assignmentPublished, availableFrom });
+      if (expectedCode) {
+        await expect(
+          access.assertStudentCanViewAssignment(student, 'assignment1', { now })
+        ).rejects.toMatchObject({
+          code: expectedCode,
+        });
+      } else {
+        await expect(
+          access.assertStudentCanViewAssignment(student, 'assignment1', { now })
+        ).resolves.toMatchObject({
+          assignment: expect.objectContaining({ _id: 'assignment1' }),
+        });
+      }
     }
-  });
+  );
 
   it('blocks student submission after finalized course term', async () => {
     mockContext();
     gradeLifecycleService.getLifecycle.mockResolvedValue({ status: 'FINALIZED' });
-    await expect(access.assertStudentCanSubmitAssignment(student, 'assignment1', { now })).rejects.toMatchObject({
+    await expect(
+      access.assertStudentCanSubmitAssignment(student, 'assignment1', { now })
+    ).rejects.toMatchObject({
       code: 'COURSE_GRADES_FINALIZED',
     });
   });
 
   it('blocks student submission in archived courses', async () => {
     mockContext({ coursePatch: { operationalStatus: 'archived' } });
-    await expect(access.assertStudentCanSubmitAssignment(student, 'assignment1', { now })).rejects.toMatchObject({
+    await expect(
+      access.assertStudentCanSubmitAssignment(student, 'assignment1', { now })
+    ).rejects.toMatchObject({
       code: 'COURSE_ARCHIVED',
     });
   });
 
   it('allows authorized staff preview and returns preview metadata', async () => {
     mockContext({ modulePublished: false, assignmentPublished: false });
-    await expect(access.assertStudentCanViewAssignment(teacher, 'assignment1', { preview: true, now })).resolves.toMatchObject({
+    await expect(
+      access.assertStudentCanViewAssignment(teacher, 'assignment1', { preview: true, now })
+    ).resolves.toMatchObject({
       previewMetadata: expect.objectContaining({
         preview: true,
         assignmentPublished: false,
         modulePublished: false,
       }),
     });
-    await expect(access.assertStudentCanViewAssignment(ta, 'assignment1', { preview: true, now })).resolves.toMatchObject({
+    await expect(
+      access.assertStudentCanViewAssignment(ta, 'assignment1', { preview: true, now })
+    ).resolves.toMatchObject({
       previewMetadata: expect.objectContaining({ preview: true }),
     });
   });
@@ -123,7 +154,9 @@ describe('assignment access policy', () => {
       }),
     });
 
-    await expect(access.assertStudentCanViewAssignment(student, 'assignment1', { now })).rejects.toMatchObject({
+    await expect(
+      access.assertStudentCanViewAssignment(student, 'assignment1', { now })
+    ).rejects.toMatchObject({
       code: 'MODULE_NOT_PUBLISHED',
     });
 
@@ -134,17 +167,22 @@ describe('assignment access policy', () => {
         course: course(),
       }),
     });
-    await expect(access.assertStudentCanViewAssignment(student, 'assignment1', { now })).resolves.toMatchObject({
+    await expect(
+      access.assertStudentCanViewAssignment(student, 'assignment1', { now })
+    ).resolves.toMatchObject({
       module: expect.objectContaining({ _id: 'module2', published: true }),
     });
   });
 
-  it('does not carry stale availability from copied assignments', async () => {
-    Assignment.findById.mockResolvedValueOnce(assignment({
-      _id: 'copied-assignment',
-      availableFrom: new Date('2026-02-01T00:00:00.000Z'),
-    }));
-    Module.findById.mockReturnValueOnce({
+  it('allows view before unlock but blocks submit until availableFrom', async () => {
+    const futureFrom = new Date('2026-02-01T00:00:00.000Z');
+    Assignment.findById.mockResolvedValue(
+      assignment({
+        _id: 'copied-assignment',
+        availableFrom: futureFrom,
+      })
+    );
+    Module.findById.mockReturnValue({
       populate: jest.fn().mockResolvedValue({
         _id: 'module1',
         published: true,
@@ -152,9 +190,61 @@ describe('assignment access policy', () => {
       }),
     });
 
-    await expect(access.assertStudentCanViewAssignment(student, 'copied-assignment', { now })).rejects.toMatchObject({
+    await expect(
+      access.assertStudentCanViewAssignment(student, 'copied-assignment', { now })
+    ).resolves.toMatchObject({
+      availability: expect.objectContaining({ kind: 'locked_until' }),
+    });
+
+    await expect(
+      access.assertStudentCanSubmitAssignment(student, 'copied-assignment', { now })
+    ).rejects.toMatchObject({
       code: 'ASSIGNMENT_NOT_AVAILABLE',
       details: expect.objectContaining({ availableFrom: '2026-02-01T00:00:00.000Z' }),
+    });
+  });
+
+  it('blocks submit when manually locked but still allows view', async () => {
+    mockContext({ assignmentPatch: { locked: true } });
+    await expect(
+      access.assertStudentCanViewAssignment(student, 'assignment1', { now })
+    ).resolves.toMatchObject({
+      availability: { kind: 'locked_manual' },
+    });
+    await expect(
+      access.assertStudentCanSubmitAssignment(student, 'assignment1', { now })
+    ).rejects.toMatchObject({
+      code: 'ASSIGNMENT_LOCKED',
+    });
+  });
+
+  it('blocks submit after lockAt even when due date is later', async () => {
+    mockContext({
+      assignmentPatch: {
+        dueDate: new Date('2026-02-01T00:00:00.000Z'),
+        lockAt: new Date('2026-01-10T00:00:00.000Z'),
+        lockAfterDue: false,
+      },
+    });
+    await expect(
+      access.assertStudentCanSubmitAssignment(student, 'assignment1', { now })
+    ).rejects.toMatchObject({
+      code: 'ASSIGNMENT_LOCKED_AFTER',
+    });
+  });
+
+  it('allows late submit when lockAfterDue is false and lockAt is unset', async () => {
+    mockContext({
+      assignmentPatch: {
+        dueDate: new Date('2026-01-01T00:00:00.000Z'),
+        lockAfterDue: false,
+        lockAt: null,
+      },
+    });
+    await expect(
+      access.assertStudentCanSubmitAssignment(student, 'assignment1', { now })
+    ).resolves.toMatchObject({
+      availability: expect.objectContaining({ kind: 'open' }),
     });
   });
 
@@ -166,9 +256,37 @@ describe('assignment access policy', () => {
       }),
     });
 
-    await expect(access.assertStudentCanViewAssignment(student, 'assignment1', { now })).resolves.toMatchObject({
+    await expect(
+      access.assertStudentCanViewAssignment(student, 'assignment1', { now })
+    ).resolves.toMatchObject({
       assignment: expect.objectContaining({ _id: 'assignment1' }),
       gradedAccess: true,
+    });
+  });
+
+  describe('getAssignmentAvailability', () => {
+    it('prefers lockAt over due-based lock', () => {
+      const result = access.getAssignmentAvailability(
+        assignment({
+          dueDate: new Date('2026-01-10T00:00:00.000Z'),
+          lockAt: new Date('2026-01-20T00:00:00.000Z'),
+          lockAfterDue: true,
+        }),
+        now
+      );
+      expect(result.kind).toBe('open');
+    });
+
+    it('locks after due when lockAfterDue and no lockAt', () => {
+      const result = access.getAssignmentAvailability(
+        assignment({
+          dueDate: new Date('2026-01-01T00:00:00.000Z'),
+          lockAt: null,
+          lockAfterDue: true,
+        }),
+        now
+      );
+      expect(result.kind).toBe('locked_after');
     });
   });
 });

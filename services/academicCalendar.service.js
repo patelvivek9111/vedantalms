@@ -11,16 +11,37 @@ const {
   getTermOptionsForMode,
   CALENDAR_PRESETS,
 } = require('../shared/academic/terms.cjs');
+const {
+  setInstitutionMode,
+  reconcileInstitutionMode,
+} = require('./tenancy/institutionMode.service');
+const { getTenantRootAccountId } = require('../utils/tenantContext');
 
 async function getAcademicSettings() {
   const settings = await SystemSettings.getSettings();
   const raw = settings.academic?.toObject?.() || settings.academic || {};
-  return { ...defaultAcademicSettings(), ...raw };
+  const rootId = getTenantRootAccountId() || settings.rootAccountId;
+  let mode = raw.institutionMode || 'mixed';
+  if (rootId) {
+    mode = await reconcileInstitutionMode(rootId);
+  }
+  return { ...defaultAcademicSettings(), ...raw, institutionMode: mode };
 }
 
 async function updateAcademicSettings(patch) {
   const settings = await SystemSettings.getSettings();
-  settings.academic = { ...(settings.academic?.toObject?.() || settings.academic || {}), ...patch };
+  const nextPatch = { ...(patch || {}) };
+  const rootId = getTenantRootAccountId() || settings.rootAccountId;
+
+  if (nextPatch.institutionMode != null && rootId) {
+    await setInstitutionMode(rootId, nextPatch.institutionMode);
+    delete nextPatch.institutionMode;
+  }
+
+  settings.academic = {
+    ...(settings.academic?.toObject?.() || settings.academic || {}),
+    ...nextPatch,
+  };
   await settings.save();
   return getAcademicSettings();
 }

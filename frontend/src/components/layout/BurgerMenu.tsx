@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { 
   Menu, ArrowLeft, User as UserIcon, Settings, Megaphone, ClipboardList, 
-  HelpCircle, LogOut, CheckSquare, Sun, Moon, Users, Shield, BookOpen, BarChart3, Gauge, Check
+  HelpCircle, LogOut, CheckSquare, Sun, Moon, Users, Shield, BookOpen, BarChart3, Gauge, Check, Database
 } from 'lucide-react';
 
 const SECTION_LABEL =
@@ -469,6 +469,28 @@ export const BurgerMenu: React.FC<BurgerMenuProps> = ({
               </div>
             </div>
             
+            {user?.role === 'platform_admin' && (
+              <div className="border-b border-gray-200 py-2 dark:border-gray-700">
+                <div className="px-4 py-2">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    Platform
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowBurgerMenu(false);
+                    setBurgerMenuSection(null);
+                    navigate('/admin/institutions');
+                  }}
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 touch-manipulation dark:text-gray-300 dark:hover:bg-gray-700"
+                >
+                  <Database className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                  <span>Institutions</span>
+                </button>
+              </div>
+            )}
+
             {user?.role === 'admin' && (
               <div className="border-b border-gray-200 py-2 dark:border-gray-700">
                 <div className="px-4 py-2">

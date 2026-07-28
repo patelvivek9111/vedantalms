@@ -117,7 +117,7 @@ const DatePicker: React.FC<DatePickerProps> = ({
           {...props}
           id={inputId}
           type={inputType}
-          value={value}
+          value={value ?? ''}
           onChange={handleChange}
           onFocus={handleFocus}
           onBlur={handleBlur}

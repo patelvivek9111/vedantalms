@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 import { AcademicTerm, registrarGet, registrarPost } from './registrarApi';
+import { ru } from './registrarUi';
 import {
   fetchEffectiveCoursePolicy,
   fetchInstitutionPolicyImpactSummary,
@@ -10,6 +11,8 @@ import {
 } from '../../services/gradingApi';
 import PolicyImpactPreview from '../../components/grades/PolicyImpactPreview';
 import { downloadPolicyImpactCsv } from '../../utils/exportImpactCsv';
+import { useRegistrarMode } from './useRegistrarMode';
+import type { GradeSubTab } from './registrarMode';
 
 type GradeRow = {
   courseId: string;
@@ -73,6 +76,7 @@ type Period = {
 type Tab = 'matrix' | 'finalize' | 'amendments' | 'repair' | 'periods' | 'policy';
 
 export function RegistrarGradeStatus() {
+  const { flags, isSchool } = useRegistrarMode();
   const [terms, setTerms] = useState<AcademicTerm[]>([]);
   const [termId, setTermId] = useState('');
   const [tab, setTab] = useState<Tab>('matrix');
@@ -222,7 +226,7 @@ export function RegistrarGradeStatus() {
       if (axios.isAxiosError(err) && err.response?.data?.code === 'UNLINKED_SECTIONS') {
         const data = err.response.data.data as { unlinkedSections?: UnlinkedSection[] } | undefined;
         if (data?.unlinkedSections) setUnlinkedSections(data.unlinkedSections);
-        setTab('repair');
+        setTab('matrix');
       }
       setError(
         axios.isAxiosError(err) && err.response?.data?.message
@@ -337,22 +341,29 @@ export function RegistrarGradeStatus() {
     }
   };
 
-  const tabs: { id: Tab; label: string }[] = [
+  const allTabs: { id: Tab; label: string }[] = [
     { id: 'matrix', label: 'Status matrix' },
     { id: 'finalize', label: 'Term finalize' },
     { id: 'amendments', label: 'Amendments' },
     { id: 'repair', label: 'Repair queue' },
-    { id: 'periods', label: 'Grading periods' },
+    { id: 'periods', label: isSchool ? 'Grading periods' : 'Grading periods' },
     { id: 'policy', label: 'Policy impact' },
   ];
+  const tabs = allTabs.filter((t) => flags.gradeTabs.includes(t.id as GradeSubTab));
+
+  useEffect(() => {
+    if (!flags.gradeTabs.includes(tab as GradeSubTab)) {
+      setTab((flags.gradeTabs[0] || 'matrix') as Tab);
+    }
+  }, [flags.gradeTabs, tab]);
 
   return (
-    <div className="space-y-4">
+    <div className={ru.page}>
       <div className="flex flex-wrap gap-3 items-end">
-        <label className="text-sm">
+        <label className={ru.label}>
           Term
           <select
-            className="mt-1 block rounded border dark:bg-gray-800 px-2 py-1"
+            className={ru.select}
             value={termId}
             onChange={(e) => setTermId(e.target.value)}
           >
@@ -363,7 +374,7 @@ export function RegistrarGradeStatus() {
             ))}
           </select>
         </label>
-        <button type="button" className="text-sm text-blue-600" onClick={() => void loadDashboard(termId)}>
+        <button type="button" className={`${ru.link} text-sm`} onClick={() => void loadDashboard(termId)}>
           Refresh
         </button>
       </div>
@@ -380,25 +391,22 @@ export function RegistrarGradeStatus() {
               ['Open periods', widgets.openInstitutionPeriods],
             ] as const
           ).map(([label, value]) => (
-            <div key={label} className="rounded border border-gray-200 dark:border-gray-700 px-3 py-2">
-              <div className="text-xs text-gray-500 uppercase">{label}</div>
-              <div className="text-xl font-semibold">{value}</div>
+            <div key={label} className={ru.kpi}>
+              <span className={ru.kpiAccent} aria-hidden />
+              <div className={ru.kpiLabel}>{label}</div>
+              <div className={ru.kpiValue}>{value}</div>
             </div>
           ))}
         </div>
       )}
 
-      <div className="flex flex-wrap gap-1 border-b pb-2 border-gray-200 dark:border-gray-700">
+      <div className={ru.tabRow}>
         {tabs.map((t) => (
           <button
             key={t.id}
             type="button"
             onClick={() => setTab(t.id)}
-            className={`px-3 py-1.5 text-sm rounded-md ${
-              tab === t.id
-                ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
-                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-            }`}
+            className={tab === t.id ? ru.tabActive : ru.tab}
           >
             {t.label}
           </button>
@@ -406,26 +414,26 @@ export function RegistrarGradeStatus() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</div>
+        <div className={ru.alertError}>{error}</div>
       )}
       {message && (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+        <div className={ru.alertOk}>
           {message}
         </div>
       )}
 
-      {loading && <p className="text-sm text-gray-500">Loading…</p>}
+      {loading && <p className={ru.muted}>Loading…</p>}
 
       {tab === 'matrix' && (
         <>
           <div className="flex flex-wrap gap-2 text-sm">
             {Object.entries(counts).map(([k, v]) => (
-              <span key={k} className="rounded bg-gray-100 dark:bg-gray-800 px-2 py-1">
+              <span key={k} className={ru.pill}>
                 {k}: <strong>{v}</strong>
               </span>
             ))}
           </div>
-          <div className="overflow-x-auto border rounded-md border-gray-200 dark:border-gray-700">
+          <div className={`overflow-x-auto ${ru.card} !p-0`}>
             <table className="min-w-full text-sm">
               <thead className="bg-gray-50 dark:bg-gray-800 text-left">
                 <tr>
@@ -455,7 +463,7 @@ export function RegistrarGradeStatus() {
                     <td className="px-3 py-2">
                       <button
                         type="button"
-                        className="text-blue-600 text-xs"
+                        className={`${ru.link} text-xs`}
                         onClick={() => {
                           setTab('policy');
                           void runCourseImpactPreview(r.courseId);
@@ -468,7 +476,7 @@ export function RegistrarGradeStatus() {
                 ))}
                 {!rows.length && (
                   <tr>
-                    <td colSpan={7} className="px-3 py-4 text-gray-500">
+                    <td colSpan={7} className={ru.empty}>
                       No courses linked to this term.
                     </td>
                   </tr>
@@ -486,11 +494,15 @@ export function RegistrarGradeStatus() {
             <code>grades.term_finalize</code> async job. Unlinked sections must be repaired first (or force).
           </p>
           {(unlinkedSections.length > 0 || preview?.blockedByUnlinkedSections) && (
-            <div className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-100">
+            <div className={ru.pillWarn}>
               {unlinkedSections.length || preview?.unlinkedSectionCount || 0} section(s) lack a content course.{' '}
-              <button type="button" className="underline" onClick={() => setTab('repair')}>
-                Open repair queue
-              </button>
+              {flags.gradeTabs.includes('repair') ? (
+                <button type="button" className="underline" onClick={() => setTab('repair')}>
+                  Open repair queue
+                </button>
+              ) : (
+                <span>Link them under Classes / Sections before finalize.</span>
+              )}
             </div>
           )}
           <label className="flex items-center gap-2">
@@ -502,24 +514,24 @@ export function RegistrarGradeStatus() {
             Force finalize (skip unlinked-section block)
           </label>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className="rounded border px-3 py-1.5" onClick={() => void runPreview()}>
+            <button type="button" className={ru.btnSecondary} onClick={() => void runPreview()}>
               Preview
             </button>
             <button
               type="button"
-              className="rounded bg-indigo-600 text-white px-3 py-1.5"
+              className={ru.btnPrimary}
               onClick={() => void applyFinalize()}
             >
               Finalize term
             </button>
             {jobId && (
-              <button type="button" className="rounded border px-3 py-1.5" onClick={() => void refreshJob()}>
+              <button type="button" className={ru.btnSecondary} onClick={() => void refreshJob()}>
                 Refresh job ({jobStatus || '…'})
               </button>
             )}
           </div>
           {preview && (
-            <div className="rounded border px-3 py-2">
+            <div className={ru.cardMuted}>
               Ready: <strong>{preview.toFinalize}</strong> · Already finalized:{' '}
               <strong>{preview.alreadyFinalized}</strong>
               {preview.unlinkedSectionCount != null && (
@@ -534,7 +546,7 @@ export function RegistrarGradeStatus() {
       )}
 
       {tab === 'amendments' && (
-        <ul className="divide-y border rounded-md text-sm border-gray-200 dark:border-gray-700">
+        <ul className={ru.list}>
           {amendments.map((a) => (
             <li key={a._id} className="px-3 py-2">
               <div className="font-medium">
@@ -547,7 +559,7 @@ export function RegistrarGradeStatus() {
               </div>
             </li>
           ))}
-          {!amendments.length && <li className="px-3 py-4 text-gray-500">No amendments this term.</li>}
+          {!amendments.length && <li className={ru.empty}>No amendments this term.</li>}
         </ul>
       )}
 
@@ -555,7 +567,7 @@ export function RegistrarGradeStatus() {
         <div className="space-y-6 text-sm">
           <section>
             <h3 className="font-medium mb-2">Unlinked sections (no lmsCourseId)</h3>
-            <ul className="divide-y border rounded-md border-gray-200 dark:border-gray-700">
+            <ul className={ru.list}>
               {unlinkedSections.map((s) => (
                 <li key={s.sectionId} className="px-3 py-2 flex justify-between gap-2 items-start">
                   <div>
@@ -566,7 +578,7 @@ export function RegistrarGradeStatus() {
                   </div>
                   <button
                     type="button"
-                    className="text-blue-600 shrink-0"
+                    className={`${ru.link} shrink-0`}
                     disabled={busy}
                     onClick={() => void createContentCourse(s.sectionId)}
                   >
@@ -575,13 +587,13 @@ export function RegistrarGradeStatus() {
                 </li>
               ))}
               {!unlinkedSections.length && (
-                <li className="px-3 py-3 text-gray-500">All sections in scope have a content course.</li>
+                <li className={ru.empty}>All sections in scope have a content course.</li>
               )}
             </ul>
           </section>
           <section>
             <h3 className="font-medium mb-2">Missing snapshots (FINALIZED/AMENDED)</h3>
-            <ul className="divide-y border rounded-md border-gray-200 dark:border-gray-700">
+            <ul className={ru.list}>
               {missingSnapshotRows.map((r) => (
                 <li key={r.courseId} className="px-3 py-2 flex justify-between gap-2 items-start">
                   <div>
@@ -596,7 +608,7 @@ export function RegistrarGradeStatus() {
                   </div>
                   <button
                     type="button"
-                    className="text-blue-600 shrink-0"
+                    className={`${ru.link} shrink-0`}
                     disabled={busy}
                     onClick={() => void repairSnapshots(r.courseId)}
                   >
@@ -605,7 +617,7 @@ export function RegistrarGradeStatus() {
                 </li>
               ))}
               {!missingSnapshotRows.length && (
-                <li className="px-3 py-3 text-gray-500">No missing-snapshot courses in scope.</li>
+                <li className={ru.empty}>No missing-snapshot courses in scope.</li>
               )}
             </ul>
           </section>
@@ -614,7 +626,7 @@ export function RegistrarGradeStatus() {
 
       {tab === 'periods' && (
         <div className="space-y-4 text-sm">
-          <form onSubmit={createPeriod} className="grid gap-2 sm:grid-cols-4 border rounded-md p-3">
+          <form onSubmit={createPeriod} className={`${ru.card} grid gap-2 sm:grid-cols-4`}>
             <input
               className="rounded border dark:bg-gray-800 px-2 py-1"
               placeholder="Period name"
@@ -634,14 +646,14 @@ export function RegistrarGradeStatus() {
               value={periodForm.weight}
               onChange={(e) => setPeriodForm((f) => ({ ...f, weight: e.target.value }))}
             />
-            <button type="submit" className="rounded bg-indigo-600 text-white px-3 py-1.5">
+            <button type="submit" className={ru.btnPrimary}>
               Add period
             </button>
           </form>
-          <button type="button" className="text-blue-600" onClick={() => void inheritPeriods()}>
+          <button type="button" className={ru.link} onClick={() => void inheritPeriods()}>
             Inherit periods onto courses missing periods
           </button>
-          <ul className="divide-y border rounded-md border-gray-200 dark:border-gray-700">
+          <ul className={ru.list}>
             {periods.map((p) => (
               <li key={p._id} className="px-3 py-2 flex justify-between gap-2">
                 <div>
@@ -654,13 +666,13 @@ export function RegistrarGradeStatus() {
                   </div>
                 </div>
                 {p.status === 'open' && (
-                  <button type="button" className="text-blue-600" onClick={() => void closePeriod(p._id)}>
+                  <button type="button" className={ru.link} onClick={() => void closePeriod(p._id)}>
                     Close
                   </button>
                 )}
               </li>
             ))}
-            {!periods.length && <li className="px-3 py-4 text-gray-500">No institution periods yet.</li>}
+            {!periods.length && <li className={ru.empty}>No institution periods yet.</li>}
           </ul>
         </div>
       )}
@@ -668,7 +680,7 @@ export function RegistrarGradeStatus() {
       {tab === 'policy' && (
         <div className="space-y-4 text-sm">
           {institutionImpact && institutionImpact.totalPublishedCourses > 0 && (
-            <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-100">
+            <div className={`${ru.cardMuted} px-3 py-2`}>
               Institution defaults would recalculate live grades in{' '}
               <strong>{institutionImpact.liveRecalcCourseCount}</strong> published course
               {institutionImpact.liveRecalcCourseCount === 1 ? '' : 's'}.{' '}
@@ -679,7 +691,7 @@ export function RegistrarGradeStatus() {
 
           <section>
             <h3 className="font-medium mb-2">Policy changes since earliest finalize</h3>
-            <ul className="divide-y border rounded-md border-gray-200 dark:border-gray-700">
+            <ul className={ru.list}>
               {policyChanges.map((p) => (
                 <li key={p._id} className="px-3 py-2">
                   <div className="font-medium">
@@ -695,7 +707,7 @@ export function RegistrarGradeStatus() {
                 </li>
               ))}
               {!policyChanges.length && (
-                <li className="px-3 py-3 text-gray-500">No policy audit rows since finalize for this term.</li>
+                <li className={ru.empty}>No policy audit rows since finalize for this term.</li>
               )}
             </ul>
           </section>
@@ -711,9 +723,7 @@ export function RegistrarGradeStatus() {
                 <button
                   key={r.courseId}
                   type="button"
-                  className={`rounded border px-2 py-1 text-xs ${
-                    impactCourseId === r.courseId ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950' : ''
-                  }`}
+                  className={`text-xs ${impactCourseId === r.courseId ? ru.tabActive : ru.tab}`}
                   disabled={impactLoading}
                   onClick={() => void runCourseImpactPreview(r.courseId)}
                 >

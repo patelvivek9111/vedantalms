@@ -8,8 +8,13 @@ interface ImagePreviewProps {
 
 const ImagePreview: React.FC<ImagePreviewProps> = ({ url, alt }) => {
   const [broken, setBroken] = useState(false);
+  const canEmbed =
+    url.startsWith('blob:') ||
+    url.startsWith('data:') ||
+    url.startsWith('http://') ||
+    url.startsWith('https://');
 
-  if (!url.startsWith('blob:') && !url.startsWith('data:')) {
+  if (!canEmbed) {
     return <LoadingInline label="Loading image…" />;
   }
   if (broken) {

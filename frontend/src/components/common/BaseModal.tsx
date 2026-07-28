@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { useSwipeGesture } from '../../hooks/useSwipeGesture';
 import { hapticNavigation } from '../../utils/hapticFeedback';
@@ -21,7 +22,7 @@ export interface BaseModalProps {
   loading?: boolean;
   ariaLabelledBy?: string;
   ariaDescribedBy?: string;
-  enableSwipeToDismiss?: boolean; // Enable swipe down to dismiss (mobile only)
+  enableSwipeToDismiss?: boolean;
 }
 
 const sizeClasses = {
@@ -50,16 +51,14 @@ const BaseModal: React.FC<BaseModalProps> = ({
   loading = false,
   ariaLabelledBy,
   ariaDescribedBy,
-  enableSwipeToDismiss = true // Default to true for mobile UX
+  enableSwipeToDismiss = true
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const TRANSITION_MS = 300;
 
-  // Swipe to dismiss (mobile only)
   const handleSwipeDown = () => {
     if (!loading && enableSwipeToDismiss) {
       hapticNavigation();
@@ -72,13 +71,12 @@ const BaseModal: React.FC<BaseModalProps> = ({
 
   const swipeHandlers = useSwipeGesture({
     onSwipeDown: handleSwipeDown,
-    threshold: 100, // Require more distance for dismiss
+    threshold: 100,
     velocityThreshold: 0.5,
     preventDefault: false,
     enabled: swipeEnabled
   });
 
-  // Handle open/close animations
   useEffect(() => {
     if (isOpen) {
       previousActiveElement.current = document.activeElement as HTMLElement;
@@ -103,7 +101,6 @@ const BaseModal: React.FC<BaseModalProps> = ({
     };
   }, [isOpen]);
 
-  // Handle escape key
   useEffect(() => {
     if (!isOpen || !closeOnEscape) return;
 
@@ -117,7 +114,6 @@ const BaseModal: React.FC<BaseModalProps> = ({
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isOpen, closeOnEscape, loading, onClose]);
 
-  // Focus trap - keep focus within modal
   useEffect(() => {
     if (!isOpen || !modalRef.current) return;
 
@@ -128,7 +124,6 @@ const BaseModal: React.FC<BaseModalProps> = ({
     const firstElement = focusableElements[0];
     const lastElement = focusableElements[focusableElements.length - 1];
 
-    // Focus first element when modal opens
     if (firstElement && !loading) {
       firstElement.focus();
     }
@@ -137,17 +132,13 @@ const BaseModal: React.FC<BaseModalProps> = ({
       if (e.key !== 'Tab') return;
 
       if (e.shiftKey) {
-        // Shift + Tab
         if (document.activeElement === firstElement) {
           e.preventDefault();
           lastElement?.focus();
         }
-      } else {
-        // Tab
-        if (document.activeElement === lastElement) {
-          e.preventDefault();
-          firstElement?.focus();
-        }
+      } else if (document.activeElement === lastElement) {
+        e.preventDefault();
+        firstElement?.focus();
       }
     };
 
@@ -155,60 +146,47 @@ const BaseModal: React.FC<BaseModalProps> = ({
     return () => modal.removeEventListener('keydown', handleTabKey);
   }, [isOpen, loading]);
 
-  // Handle overlay click
-  const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (closeOnOverlayClick && !loading && e.target === overlayRef.current) {
-      onClose();
-    }
-  };
-
-  const handleTransitionEnd = (e: React.TransitionEvent<HTMLDivElement>) => {
-    if (e.target !== overlayRef.current || e.propertyName !== 'opacity') return;
-    if (!isOpen) {
-      setIsVisible(false);
-    }
-  };
-
   if (!isVisible && !isOpen) return null;
 
-  return (
+  // Portal to body so page transforms/overflow cannot trap the dialog.
+  // Backdrop is z-0; panel is relative z-10 — without this, fixed backdrop
+  // sits above the dialog and eats all clicks (dull, stuck UI).
+  const modal = (
     <div
-      ref={overlayRef}
-      onTransitionEnd={handleTransitionEnd}
-      className={`fixed inset-0 z-50 overflow-y-auto transition-opacity duration-300 ${
+      className={`fixed inset-0 z-[200] overflow-y-auto transition-opacity duration-300 ${
         isAnimating ? 'opacity-100' : 'opacity-0'
       } ${!isOpen ? 'pointer-events-none' : ''} ${overlayClassName}`}
-      onClick={handleOverlayClick}
       role="dialog"
       aria-modal="true"
       aria-labelledby={ariaLabelledBy}
       aria-describedby={ariaDescribedBy}
     >
-      <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-        {/* Backdrop overlay */}
-        <div
-          className={`fixed inset-0 bg-black transition-opacity duration-300 ${
-            isAnimating ? 'bg-opacity-50' : 'bg-opacity-0'
-          }`}
-          aria-hidden="true"
-        />
+      {/* Backdrop — click closes; must stay under the panel */}
+      <div
+        className={`fixed inset-0 z-0 bg-black transition-opacity duration-300 ${
+          isAnimating ? 'bg-opacity-50' : 'bg-opacity-0'
+        }`}
+        aria-hidden="true"
+        onClick={() => {
+          if (closeOnOverlayClick && !loading) onClose();
+        }}
+      />
 
-        {/* Modal container */}
+      <div className="relative z-10 flex min-h-full items-center justify-center p-4">
         <div
           ref={modalRef}
-          className={`inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all duration-300 sm:my-8 sm:align-middle w-full ${sizeClasses[size]} ${
-            isAnimating
-              ? 'translate-y-0 opacity-100 scale-100'
-              : 'translate-y-4 opacity-0 scale-95'
+          className={`w-full bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transition-opacity duration-300 ${sizeClasses[size]} ${
+            isAnimating ? 'opacity-100' : 'opacity-0'
           } ${className}`}
           onClick={(e) => e.stopPropagation()}
-          {...(swipeEnabled ? {
-            onTouchStart: swipeHandlers.onTouchStart,
-            onTouchMove: swipeHandlers.onTouchMove,
-            onTouchEnd: swipeHandlers.onTouchEnd
-          } : {})}
+          {...(swipeEnabled
+            ? {
+                onTouchStart: swipeHandlers.onTouchStart,
+                onTouchMove: swipeHandlers.onTouchMove,
+                onTouchEnd: swipeHandlers.onTouchEnd,
+              }
+            : {})}
         >
-          {/* Header */}
           {(title || showCloseButton) && (
             <div
               className={`flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-700 ${headerClassName}`}
@@ -235,15 +213,10 @@ const BaseModal: React.FC<BaseModalProps> = ({
             </div>
           )}
 
-          {/* Body */}
-          <div
-            className={`px-4 sm:px-6 py-4 sm:py-6 ${bodyClassName}`}
-            id={ariaDescribedBy}
-          >
+          <div className={`px-4 sm:px-6 py-4 sm:py-6 ${bodyClassName}`} id={ariaDescribedBy}>
             {children}
           </div>
 
-          {/* Footer */}
           {footer && (
             <div
               className={`px-4 sm:px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 ${footerClassName}`}
@@ -252,11 +225,10 @@ const BaseModal: React.FC<BaseModalProps> = ({
             </div>
           )}
 
-          {/* Loading overlay */}
           {loading && (
             <div className="absolute inset-0 bg-white dark:bg-gray-800 bg-opacity-75 flex items-center justify-center z-10">
               <div className="flex flex-col items-center gap-2">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 dark:border-blue-400"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 dark:border-blue-400" />
                 <p className="text-sm text-gray-600 dark:text-gray-400">Loading...</p>
               </div>
             </div>
@@ -265,7 +237,9 @@ const BaseModal: React.FC<BaseModalProps> = ({
       </div>
     </div>
   );
+
+  if (typeof document === 'undefined') return modal;
+  return createPortal(modal, document.body);
 };
 
 export default BaseModal;
-

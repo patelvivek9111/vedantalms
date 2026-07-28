@@ -56,6 +56,33 @@ export function getExtension(name: string): string {
   return parts.length > 1 ? parts.pop()!.toLowerCase() : '';
 }
 
+/** Basename from a path or URL (strips query/hash). */
+export function fileNameFromUrl(url: string): string {
+  if (!url) return '';
+  try {
+    const path = /^https?:\/\//i.test(url) ? new URL(url).pathname : url.split(/[?#]/)[0];
+    const base = path.split('/').filter(Boolean).pop() || '';
+    return decodeURIComponent(base);
+  } catch {
+    return (url.split('/').pop() || '').split(/[?#]/)[0];
+  }
+}
+
+export function mimeTypeFromFileName(name: string): string | undefined {
+  const ext = getExtension(name);
+  if (ext === 'pdf') return 'application/pdf';
+  if (['jpg', 'jpeg'].includes(ext)) return 'image/jpeg';
+  if (ext === 'png') return 'image/png';
+  if (ext === 'gif') return 'image/gif';
+  if (ext === 'webp') return 'image/webp';
+  if (ext === 'docx') {
+    return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  }
+  if (ext === 'doc') return 'application/msword';
+  if (ext === 'txt') return 'text/plain';
+  return undefined;
+}
+
 export type PreviewKind = 'image' | 'pdf' | 'text' | 'audio' | 'video' | 'office' | 'unsupported';
 
 const OFFICE_EXTENSIONS = ['doc', 'docx', 'odt', 'ppt', 'pptx', 'odp', 'xls', 'xlsx', 'ods', 'rtf'];
@@ -124,12 +151,20 @@ export function mapUploadResponse(file: Record<string, unknown>): NormalizedFile
   const rawId = file.fileAssetId || file._id || extractedId;
   const id =
     rawId && isMongoObjectId(String(rawId)) ? String(rawId) : extractedId || undefined;
+  const fromUrl = fileNameFromUrl(url);
+  const name = String(
+    file.originalname || file.originalName || file.name || fromUrl || 'file'
+  );
+  const mimeType =
+    typeof file.mimeType === 'string' && file.mimeType
+      ? file.mimeType
+      : mimeTypeFromFileName(name);
   return {
     fileAssetId: id,
-    name: String(file.originalname || file.originalName || file.name || 'file'),
+    name,
     url: url || (id ? buildSecureDownloadPath(id) : ''),
     size: typeof file.size === 'number' ? file.size : undefined,
-    mimeType: typeof file.mimeType === 'string' ? file.mimeType : undefined,
+    mimeType,
     status: 'done',
   };
 }
@@ -155,12 +190,19 @@ export function normalizeLegacyFiles(
       if (fileAssetId) {
         return {
           fileAssetId,
-          name: '',
+          name: fileNameFromUrl(item) || '',
           url: isMongoObjectId(item) ? buildSecureDownloadPath(fileAssetId) : item,
+          mimeType: mimeTypeFromFileName(fileNameFromUrl(item)),
           status: 'done' as const,
         };
       }
-      return { name: item.split('/').pop() || 'attachment', url: item, status: 'done' };
+      const name = fileNameFromUrl(item) || 'attachment';
+      return {
+        name,
+        url: item,
+        mimeType: mimeTypeFromFileName(name),
+        status: 'done' as const,
+      };
     }
     const url = String(item.url || item.path || '');
     const id = String(item.fileAssetId || item._id || extractFileAssetId(url) || '');
@@ -168,7 +210,8 @@ export function normalizeLegacyFiles(
       ...item,
       fileAssetId: id || item.fileAssetId,
       path: url || (id ? buildSecureDownloadPath(id) : ''),
-      originalname: item.name || item.originalname || item.originalName,
+      originalname:
+        item.name || item.originalname || item.originalName || fileNameFromUrl(url),
     });
   });
 }
@@ -195,7 +238,8 @@ export function normalizeSubmissionAttachments(submission: {
   files?: Array<string | Record<string, unknown>>;
   fileAssets?: Array<string | Record<string, unknown>>;
 }): NormalizedFile[] {
-  const secureClientFiles = (submission.clientFiles || []).filter((a) => {
+  const clientFiles = submission.clientFiles || [];
+  const secureClientFiles = clientFiles.filter((a) => {
     const url = String(a.url || a.path || '');
     const id = String(a.fileAssetId || a._id || extractFileAssetId(url) || '');
     return Boolean(id && isMongoObjectId(id));
@@ -215,15 +259,34 @@ export function normalizeSubmissionAttachments(submission: {
     return assetIds.map((id, index) => {
       const legacy = legacyFiles[index] ?? legacyFiles[0];
       const legacyNorm = legacy ? normalizeLegacyFiles([legacy])[0] : null;
-      const name = preferFileDisplayName(legacyNorm?.name || '', legacyNorm?.name);
+      const fromClient = clientFiles[index] || clientFiles[0];
+      const clientNorm = fromClient ? normalizeLegacyFiles([fromClient])[0] : null;
+      const name = preferFileDisplayName(
+        legacyNorm?.name || clientNorm?.name || '',
+        clientNorm?.name || legacyNorm?.name
+      );
       return {
         fileAssetId: id,
         name: name || 'attachment',
         url: buildSecureDownloadPath(id),
-        mimeType: legacyNorm?.mimeType,
+        mimeType: legacyNorm?.mimeType || clientNorm?.mimeType,
         status: 'done' as const,
       };
     });
+  }
+
+  // Prefer enriched clientFiles (legacy CDN objects with originalName) over raw strings.
+  if (clientFiles.length) {
+    return normalizeLegacyFiles(clientFiles);
+  }
+
+  // Student APIs often put enriched client file objects on `files` (with fileAssetId
+  // or legacy CDN URLs). Prefer normalizing those objects over treating them as paths.
+  const filesAsClientObjects = legacyFiles.filter(
+    (f): f is Record<string, unknown> => typeof f === 'object' && f !== null
+  );
+  if (filesAsClientObjects.length) {
+    return normalizeLegacyFiles(filesAsClientObjects);
   }
 
   if (legacyFiles.length) {
@@ -252,7 +315,8 @@ export function normalizeAttachmentSources(source: {
   attachments?: Array<string | Record<string, unknown>>;
   fileAssets?: Array<string | Record<string, unknown>>;
 }): NormalizedFile[] {
-  const secureAttachmentFiles = (source.attachmentFiles || []).filter((a) => {
+  const attachmentFiles = source.attachmentFiles || [];
+  const secureAttachmentFiles = attachmentFiles.filter((a) => {
     const url = String(a.url || a.path || '');
     const id = String(a.fileAssetId || a._id || extractFileAssetId(url) || '');
     return Boolean(id && isMongoObjectId(id));
@@ -275,11 +339,33 @@ export function normalizeAttachmentSources(source: {
       });
     });
   }
+
+  // Already-normalized or legacy client file objects (Cloudinary URLs, etc.)
+  if (attachmentFiles.length) {
+    return normalizeLegacyFiles(attachmentFiles);
+  }
+
   const raw =
     source.attachments?.length
       ? source.attachments
       : (source.fileAssets || []).map((id) => (typeof id === 'string' ? id : String(id)));
   return normalizeLegacyFiles(raw);
+}
+
+/** True when the list is already NormalizedFile-shaped (avoid destructive re-normalization). */
+export function isNormalizedFileList(
+  files: Array<string | Record<string, unknown> | NormalizedFile>
+): files is NormalizedFile[] {
+  if (!files.length) return false;
+  return files.every((f) => {
+    if (!f || typeof f !== 'object') return false;
+    const rec = f as Record<string, unknown>;
+    const hasName = typeof rec.name === 'string' && rec.name.length > 0;
+    const hasUrl = typeof rec.url === 'string' && rec.url.length > 0;
+    const hasId =
+      typeof rec.fileAssetId === 'string' && isMongoObjectId(String(rec.fileAssetId));
+    return hasName && (hasUrl || hasId);
+  });
 }
 
 export function fileAccessErrorMessage(status?: number, fallback?: string): string {

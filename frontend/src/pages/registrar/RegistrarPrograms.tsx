@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 import { registrarGet, registrarPatch, registrarPost } from './registrarApi';
+import { ru } from './registrarUi';
+import { useRegistrarMode } from './useRegistrarMode';
 
 type Program = {
   _id: string;
@@ -13,7 +15,16 @@ type Program = {
   description?: string;
 };
 
-const empty = {
+const emptySchool = {
+  code: '',
+  name: '',
+  level: 'school',
+  durationTerms: '0',
+  requiredCredits: '0',
+  description: '',
+};
+
+const emptyCollege = {
   code: '',
   name: '',
   level: 'ug',
@@ -23,12 +34,18 @@ const empty = {
 };
 
 export function RegistrarPrograms() {
+  const { flags, isSchool, loading: modeLoading } = useRegistrarMode();
+  const empty = isSchool ? emptySchool : emptyCollege;
   const [programs, setPrograms] = useState<Program[]>([]);
-  const [form, setForm] = useState(empty);
+  const [form, setForm] = useState(emptyCollege);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!modeLoading && !editingId) setForm(empty);
+  }, [isSchool, modeLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -88,90 +105,93 @@ export function RegistrarPrograms() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className={ru.page}>
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</div>
+        <div className={ru.alertError}>{error}</div>
       )}
       {message && (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+        <div className={ru.alertOk}>
           {message}
         </div>
       )}
 
       <form
         onSubmit={submit}
-        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 border rounded-md p-4 border-gray-200 dark:border-gray-700 text-sm"
+        className={`${ru.card} grid gap-3 sm:grid-cols-2 lg:grid-cols-3 text-sm`}
       >
-        <h2 className="sm:col-span-2 lg:col-span-3 text-lg font-medium">
-          {editingId ? 'Edit program' : 'Create program'}
+        <h2 className={`${ru.sectionTitle} sm:col-span-2 lg:col-span-3 text-lg`}>
+          {editingId ? `Edit ${isSchool ? 'stream' : 'program'}` : `Create ${isSchool ? 'stream' : 'program'}`}
         </h2>
-        <label>
+        <p className={`${ru.muted} sm:col-span-2 lg:col-span-3 -mt-1`}>{flags.programsHint}</p>
+        <label className={ru.label}>
           Code
           <input
-            className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+            className={ru.input}
             value={form.code}
             onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
             required
             disabled={Boolean(editingId)}
           />
         </label>
-        <label className="sm:col-span-2">
+        <label className={`${ru.label} sm:col-span-2`}>
           Name
           <input
-            className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+            className={ru.input}
             value={form.name}
             onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
             required
           />
         </label>
-        <label>
+        <label className={ru.label}>
           Level
           <select
-            className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+            className={ru.select}
             value={form.level}
             onChange={(e) => setForm((f) => ({ ...f, level: e.target.value }))}
           >
-            {['ug', 'pg', 'diploma', 'school', 'certificate', 'other'].map((l) => (
+            {(isSchool ? ['school', 'other'] : ['ug', 'pg', 'diploma', 'school', 'certificate', 'other']).map(
+              (l) => (
               <option key={l} value={l}>
                 {l}
               </option>
-            ))}
+            )
+            )}
           </select>
         </label>
-        <label>
+        <label className={ru.label}>
           Duration (terms)
           <input
             type="number"
-            className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+            className={ru.input}
             value={form.durationTerms}
             onChange={(e) => setForm((f) => ({ ...f, durationTerms: e.target.value }))}
           />
         </label>
-        <label>
+        <label className={ru.label}>
           Required credits
           <input
             type="number"
-            className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+            className={ru.input}
             value={form.requiredCredits}
             onChange={(e) => setForm((f) => ({ ...f, requiredCredits: e.target.value }))}
           />
         </label>
-        <label className="sm:col-span-2 lg:col-span-3">
+        <label className={`${ru.label} sm:col-span-2 lg:col-span-3`}>
           Description
           <input
-            className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+            className={ru.input}
             value={form.description}
             onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
           />
         </label>
         <div className="sm:col-span-2 lg:col-span-3 flex gap-2">
-          <button type="submit" className="rounded bg-indigo-600 text-white px-3 py-1.5">
+          <button type="submit" className={ru.btnPrimary}>
             {editingId ? 'Save' : 'Create'}
           </button>
           {editingId && (
             <button
               type="button"
-              className="rounded border px-3 py-1.5"
+              className={ru.btnSecondary}
               onClick={() => {
                 setEditingId(null);
                 setForm(empty);
@@ -184,25 +204,25 @@ export function RegistrarPrograms() {
       </form>
 
       <section>
-        <h2 className="text-lg font-medium mb-2">Programs</h2>
+        <h2 className={`${ru.sectionTitle} text-lg mb-2`}>{flags.programsTitle}</h2>
         {loading ? (
-          <p className="text-sm text-gray-500">Loading…</p>
+          <p className={ru.muted}>Loading…</p>
         ) : (
-          <ul className="divide-y border rounded-md text-sm border-gray-200 dark:border-gray-700">
+          <ul className={ru.list}>
             {programs.map((p) => (
-              <li key={p._id} className="px-3 py-3 flex justify-between gap-2">
+              <li key={p._id} className={`${ru.listItem} flex justify-between gap-2`}>
                 <div>
                   <div className="font-medium">
                     {p.code} · {p.name}
                   </div>
-                  <div className="text-gray-500">
+                  <div className={ru.muted}>
                     {p.level} · {p.durationTerms || 0} terms · {p.requiredCredits || 0} credits
                     {p.isActive === false ? ' · inactive' : ''}
                   </div>
                 </div>
                 <button
                   type="button"
-                  className="text-blue-600"
+                  className={ru.link}
                   onClick={() => {
                     setEditingId(p._id);
                     setForm({
@@ -219,7 +239,7 @@ export function RegistrarPrograms() {
                 </button>
               </li>
             ))}
-            {!programs.length && <li className="px-3 py-4 text-gray-500">No programs yet.</li>}
+            {!programs.length && <li className={ru.empty}>No programs yet.</li>}
           </ul>
         )}
       </section>

@@ -3,12 +3,13 @@ import { Paperclip, Eye, X } from 'lucide-react';
 import {
   normalizeLegacyFiles,
   normalizeAttachmentSources,
+  isNormalizedFileList,
   type NormalizedFile,
 } from '../../utils/fileTypes';
 import FilePreviewModal from './FilePreviewModal';
 
 interface FileAttachmentChipsProps {
-  files?: Array<string | Record<string, unknown>>;
+  files?: Array<string | Record<string, unknown> | NormalizedFile>;
   attachmentSources?: {
     attachmentFiles?: Array<Record<string, unknown>>;
     attachments?: Array<string | Record<string, unknown>>;
@@ -25,8 +26,21 @@ function normalizeChipFiles(props: FileAttachmentChipsProps): NormalizedFile[] {
   }
   const files = props.files;
   if (!files?.length) return [];
+
+  // Callers like AssignmentGrading already run normalizeSubmissionAttachments —
+  // do not re-run normalizeAttachmentSources (it used to drop legacy CDN files).
+  if (isNormalizedFileList(files)) {
+    return files;
+  }
+
   const first = files[0];
-  if (typeof first === 'object' && first !== null && ('originalName' in first || 'fileAssetId' in first)) {
+  if (
+    typeof first === 'object' &&
+    first !== null &&
+    ('originalName' in first ||
+      (typeof (first as { fileAssetId?: unknown }).fileAssetId === 'string' &&
+        (first as { fileAssetId: string }).fileAssetId.length === 24))
+  ) {
     return normalizeAttachmentSources({
       attachmentFiles: files as Array<Record<string, unknown>>,
     });
@@ -57,23 +71,23 @@ const FileAttachmentChips: React.FC<FileAttachmentChipsProps> = ({
     <>
       <ul className={`flex flex-wrap gap-2 mt-2 ${className}`} aria-label="Attachments">
         {normalized.map((f, i) => (
-          <li key={f.fileAssetId || i}>
-            <div className="inline-flex items-center gap-1 rounded-full bg-gray-100 dark:bg-gray-800 px-3 py-1 text-xs">
-              <Paperclip className="w-3 h-3 shrink-0 text-gray-500" aria-hidden />
+          <li key={f.fileAssetId || f.url || i}>
+            <div className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-700 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200">
+              <Paperclip className="w-3 h-3 shrink-0 text-slate-400" aria-hidden />
               <button
                 type="button"
-                className="hover:underline text-left"
+                className="font-medium hover:text-slate-900 dark:hover:text-white"
                 onClick={(e) => openPreview(f, e)}
               >
                 {f.name}
               </button>
               <button
                 type="button"
-                className="text-indigo-600 dark:text-indigo-400 hover:opacity-80"
+                className="text-slate-500 hover:text-sky-600 dark:text-slate-400 dark:hover:text-sky-400"
                 aria-label={`Preview ${f.name}`}
                 onClick={(e) => openPreview(f, e)}
               >
-                <Eye className="w-3 h-3" />
+                <Eye className="w-3.5 h-3.5" />
               </button>
               {removable && onRemove && (
                 <button

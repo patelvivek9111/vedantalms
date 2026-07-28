@@ -34,7 +34,7 @@ const CourseSidebar: React.FC<CourseSidebarProps> = ({
     <aside 
       className={`${isMobileDevice 
         ? 'w-full fixed left-0 top-20 bottom-16 z-[95]' 
-        : 'w-64 relative mr-8 mt-0 self-start sticky top-4 z-auto'
+        : 'w-56 shrink-0 relative mr-4 mt-0 self-start sticky top-4 z-auto xl:w-64 xl:mr-5'
       } transition-transform duration-300 ease-in-out ${
         isMobileMenuOpen && isMobileDevice ? 'translate-x-0' : isMobileDevice ? '-translate-x-full' : 'translate-x-0'
       } bg-transparent ${className ?? ''}`}

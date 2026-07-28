@@ -1268,10 +1268,10 @@ exports.patchSecurityConfig = async (req, res) => {
       maxLoginAttempts,
       disablePublicRegistration,
       maintenanceMode,
+      sessionTimeout,
     } = req.body;
 
-    let settings = await SystemSettings.findOne();
-    if (!settings) settings = await SystemSettings.create({});
+    const settings = await SystemSettings.getSettings();
 
     if (passwordMinLength != null) {
       settings.security.passwordMinLength = Math.max(6, Math.min(128, parseInt(passwordMinLength, 10) || 8));
@@ -1282,6 +1282,9 @@ exports.patchSecurityConfig = async (req, res) => {
     if (maxLoginAttempts != null) {
       settings.security.maxLoginAttempts = Math.max(3, Math.min(20, parseInt(maxLoginAttempts, 10) || 5));
     }
+    if (sessionTimeout != null) {
+      settings.security.sessionTimeout = Math.max(5, Math.min(60 * 24 * 30, parseInt(sessionTimeout, 10) || 30));
+    }
     if (disablePublicRegistration != null) {
       settings.security.disablePublicRegistration = Boolean(disablePublicRegistration);
     }
@@ -1291,10 +1294,10 @@ exports.patchSecurityConfig = async (req, res) => {
 
     await settings.save();
     const { refreshSecurityPolicyCache } = require('../services/securityPolicy.service');
-    await refreshSecurityPolicyCache();
+    await refreshSecurityPolicyCache(settings.rootAccountId);
     const { getSecurityPolicy } = require('../services/securityPolicy.service');
     const { passwordPolicyMessage } = require('../utils/passwordPolicy');
-    const policy = getSecurityPolicy();
+    const policy = getSecurityPolicy(settings.rootAccountId);
 
     res.json({
       success: true,
@@ -1405,69 +1408,86 @@ exports.getSystemSettings = async (req, res) => {
 // @access  Private (Admin)
 exports.updateSystemSettings = async (req, res) => {
   try {
-    let settings = await SystemSettings.findOne();
-    
-    if (!settings) {
-      // Create new settings if none exist
-      settings = new SystemSettings(req.body);
-    } else {
-      // Update existing settings
-      if (req.body.general) {
-        settings.general = { ...settings.general, ...req.body.general };
-      }
-      if (req.body.security) {
-        settings.security = { ...settings.security, ...req.body.security };
-      }
-      if (req.body.email) {
-        // Only update password if a new one is provided (not '***')
-        const emailUpdate = { ...req.body.email };
-        if (emailUpdate.smtpPassword === '***' || emailUpdate.smtpPassword === '') {
-          delete emailUpdate.smtpPassword;
-        }
-        settings.email = { ...settings.email, ...emailUpdate };
-      }
-      if (req.body.storage) {
-        settings.storage = { ...settings.storage, ...req.body.storage };
-      }
-      if (req.body.academic) {
-        settings.academic = { ...(settings.academic?.toObject?.() || settings.academic || {}), ...req.body.academic };
-      }
+    const settings = await SystemSettings.getSettings();
+
+    if (req.body.general) {
+      settings.general = { ...settings.general.toObject?.() || settings.general || {}, ...req.body.general };
     }
-    
+    if (req.body.security) {
+      settings.security = { ...settings.security.toObject?.() || settings.security || {}, ...req.body.security };
+    }
+    if (req.body.email) {
+      const emailUpdate = { ...req.body.email };
+      if (emailUpdate.smtpPassword === '***' || emailUpdate.smtpPassword === '') {
+        delete emailUpdate.smtpPassword;
+      }
+      settings.email = { ...settings.email.toObject?.() || settings.email || {}, ...emailUpdate };
+    }
+    if (req.body.storage) {
+      settings.storage = { ...settings.storage.toObject?.() || settings.storage || {}, ...req.body.storage };
+    }
+    if (req.body.academic) {
+      const academicPatch = {
+        ...(settings.academic?.toObject?.() || settings.academic || {}),
+        ...req.body.academic,
+      };
+      if (req.body.academic.institutionMode != null && settings.rootAccountId) {
+        const { setInstitutionMode } = require('../services/tenancy/institutionMode.service');
+        await setInstitutionMode(settings.rootAccountId, req.body.academic.institutionMode);
+        academicPatch.institutionMode = req.body.academic.institutionMode;
+      }
+      settings.academic = academicPatch;
+    }
+    if (req.body.messaging) {
+      settings.messaging = {
+        ...(settings.messaging?.toObject?.() || settings.messaging || {}),
+        ...req.body.messaging,
+      };
+    }
+
     await settings.save();
-    
+
+    // Canvas: Account.name is canonical — siteName mirrors identity
+    if (req.body.general?.siteName && settings.rootAccountId) {
+      const { syncInstitutionIdentity } = require('../services/tenancy/institutionIdentity.service');
+      await syncInstitutionIdentity(settings.rootAccountId, req.body.general.siteName);
+    }
+
     const { refreshSecurityPolicyCache } = require('../services/securityPolicy.service');
-    await refreshSecurityPolicyCache();
-    
-    // Re-initialize email service if email settings were updated
+    await refreshSecurityPolicyCache(settings.rootAccountId);
+
+    try {
+      const { clearUploadSettingsCache } = require('../utils/fileSettings');
+      clearUploadSettingsCache();
+    } catch {
+      /* optional */
+    }
+
     if (req.body.email) {
       try {
         const { initializeEmailService } = require('../utils/emailService');
         await initializeEmailService();
-        console.log('Email service re-initialized after settings update');
       } catch (emailError) {
         console.warn('Warning: Could not re-initialize email service:', emailError.message);
-        // Don't fail the request if email re-init fails
       }
     }
-    
-    // Don't send the password in response
+
     const settingsResponse = settings.toObject();
     if (settingsResponse.email && settingsResponse.email.smtpPassword) {
       settingsResponse.email.smtpPassword = '***';
     }
-    
+
     res.json({
       success: true,
       data: settingsResponse,
-      message: 'System settings updated successfully'
+      message: 'System settings updated successfully',
     });
   } catch (err) {
     console.error('Error in updateSystemSettings:', err);
     res.status(500).json({
       success: false,
       message: 'Error updating system settings',
-      error: err.message
+      error: err.message,
     });
   }
 };

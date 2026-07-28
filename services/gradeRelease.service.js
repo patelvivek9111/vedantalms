@@ -9,9 +9,20 @@ function isReleased(submission, assignment) {
   return isScoreReleased(submission, assignment);
 }
 
+/**
+ * Whether quiz answer keys / per-question breakdown are visible to the student.
+ * Overall written feedback and rubric comments ship with a visible score
+ * (see redactSubmissionForStudent) — they are not gated by this flag.
+ * Manual post: requires feedbackReleasedAt (or quiz reveal flags).
+ * Immediate / on_grade: released with the visible score.
+ */
 function feedbackReleased(submission, assignment) {
   if (!isReleased(submission, assignment)) return false;
   if (submission.feedbackReleasedAt) return true;
+
+  const mode = releaseModeForAssignment(assignment);
+  if (mode !== 'manual') return true;
+
   return Boolean(
     submission.autoGraded ||
       assignment?.showCorrectAnswers ||
@@ -57,20 +68,24 @@ function redactSubmissionForStudent(submission, assignment) {
     delete payload.questionGrades;
     delete payload.autoQuestionGrades;
     delete payload.feedback;
+    delete payload.rubricAssessment;
     payload.teacherApproved = false;
     payload.gradeHidden = true;
     return payload;
   }
 
   if (!visibility.feedbackVisible) {
+    // Hold back quiz answer keys / per-question grades until feedback is posted.
+    // Overall written feedback + files ship with the visible grade (same as rubric comments).
     delete payload.questionGrades;
     delete payload.autoQuestionGrades;
-    delete payload.feedback;
-    delete payload.teacherFeedbackFiles;
-    delete payload.teacherFeedbackFileAssets;
-    delete payload.teacherFeedbackClientFiles;
     payload.showCorrectAnswers = false;
     payload.showStudentAnswers = false;
+  }
+
+  // Attach assignment rubric snapshot for student breakdown UI when present on populated assignment
+  if (assignment?.rubric?.criteria?.length && payload.rubricAssessment) {
+    payload.assignmentRubric = assignment.rubric;
   }
 
   return payload;

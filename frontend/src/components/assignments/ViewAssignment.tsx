@@ -6,9 +6,9 @@ import { API_URL } from '../../config';
 import ReactMarkdown from 'react-markdown';
 import { format } from 'date-fns';
 import { safeFormatDate } from '../../utils/dateUtils';
-import { Lock, Unlock, HelpCircle, CheckCircle, Circle, Bookmark, BarChart3, Edit, Eye, X, Download, Calendar, Clock, Trash2, Users } from 'lucide-react';
+import { Lock, Unlock, HelpCircle, CheckCircle, Circle, Bookmark, BarChart3, Edit, Eye, X, Download, Calendar, Clock, Trash2, Users, ClipboardList } from 'lucide-react';
 import FilePreviewModal from '../files/FilePreviewModal';
-import { normalizeLegacyFiles, type NormalizedFile } from '../../utils/fileTypes';
+import { normalizeSubmissionAttachments, normalizeTeacherFeedbackAttachments, type NormalizedFile } from '../../utils/fileTypes';
 import AssignmentFileUploadSection from './AssignmentFileUploadSection';
 import { isPaperUploadQuiz } from '../../utils/quizSubmissionMode';
 import FileAttachmentChips from '../files/FileAttachmentChips';
@@ -24,6 +24,10 @@ import ConfirmationModal from '../common/ConfirmationModal';
 import BackButton from '../common/BackButton';
 import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 import { resolveSubmissionDisplayGrade } from '../../utils/submissionGrades';
+import { RubricViewer } from './RubricViewer';
+import { CanvasAssignmentShowHeader } from './canvas/CanvasAssignmentShowHeader';
+import { resolveCanvasAvailability } from './canvas/canvasFormat';
+import StudentSubmissionSidebar from './StudentSubmissionSidebar';
 
 interface ViewAssignmentProps {
   courseId?: string;
@@ -64,6 +68,7 @@ interface Assignment {
   content?: string;
   dueDate: string;
   availableFrom?: string;
+  lockAt?: string | null;
   questions?: Question[];
   attachments?: string[];
   attachmentFiles?: Array<Record<string, unknown>>;
@@ -80,9 +85,22 @@ interface Assignment {
   groupSet?: string;
   group?: string;
   isOfflineAssignment?: boolean;
+  lockAfterDue?: boolean;
+  locked?: boolean;
   displayMode?: 'single' | 'scrollable';
   showCorrectAnswers?: boolean;
   showStudentAnswers?: boolean;
+  rubric?: {
+    title?: string;
+    pointsPossible?: number;
+    criteria?: Array<{
+      id: string;
+      description: string;
+      longDescription?: string;
+      points: number;
+      ratings: Array<{ id: string; description: string; points: number }>;
+    }>;
+  };
   createdBy?: {
     _id: string;
   };
@@ -116,13 +134,25 @@ interface Submission {
   grade?: number | null;
   finalGrade?: number | null;
   feedback?: string;
-  files?: Array<string | { url?: string; path?: string; name?: string; originalname?: string }>;
+  rubricAssessment?: {
+    score?: number;
+    pointsPossible?: number;
+    criterionAssessments?: Record<
+      string,
+      { points: number; ratingId?: string | null; comments?: string }
+    >;
+  };
+  files?: Array<string | Record<string, unknown>>;
+  fileAssets?: Array<string | Record<string, unknown>>;
+  clientFiles?: Array<Record<string, unknown>>;
   autoGraded?: boolean;
   autoGrade?: number;
   teacherApproved?: boolean;
   questionGrades?: Record<string, number> | Map<string, number>;
   autoQuestionGrades?: Record<string, number> | Map<string, number>;
-  teacherFeedbackFiles?: Array<string | { url?: string; path?: string; name?: string; originalname?: string }>;
+  teacherFeedbackFiles?: Array<string | Record<string, unknown>>;
+  teacherFeedbackFileAssets?: Array<string | Record<string, unknown>>;
+  teacherFeedbackClientFiles?: Array<Record<string, unknown>>;
   showCorrectAnswers?: boolean;
   showStudentAnswers?: boolean;
   timeSpent?: number;
@@ -137,11 +167,6 @@ interface UploadedFile {
   name: string;
   url: string;
   size?: number;
-}
-
-function toPreviewFile(file: string | Record<string, unknown>): NormalizedFile {
-  const [normalized] = normalizeLegacyFiles([file]);
-  return normalized || { name: 'attachment', url: '', status: 'done' };
 }
 
 interface QuestionStat {
@@ -397,6 +422,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
   const [isStartingQuiz, setIsStartingQuiz] = useState<boolean>(false);
   const [studentGroupId, setStudentGroupId] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState<boolean>(false);
+  const [isLocking, setIsLocking] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState<number>(0);
   const [answeredQuestions, setAnsweredQuestions] = useState<Set<number>>(new Set());
   const [markedQuestions, setMarkedQuestions] = useState<Set<number>>(new Set());
@@ -412,6 +438,8 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
   const [showQuestionPicker, setShowQuestionPicker] = useState<boolean>(false);
   const [shuffledOptions, setShuffledOptions] = useState<Record<number, Question['rightItems']>>({});
   const [previewModalFile, setPreviewModalFile] = useState<NormalizedFile | null>(null);
+  const [showTeacherRubric, setShowTeacherRubric] = useState(false);
+  const [showStudentRubric, setShowStudentRubric] = useState(false);
   const [hasAutoSubmitted, setHasAutoSubmitted] = useState<boolean>(false);
   const handleSubmitRef = useRef<(() => Promise<void>) | null>(null);
 
@@ -686,8 +714,15 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
               if (submissionRes.data?.answers) {
                 setAnswers(parseSubmissionAnswers(submissionRes.data.answers, assignmentData.questions));
               }
+            } else {
+              setSubmission(null);
+              hasSubmission = false;
             }
-          } catch (err) {
+          } catch (err: any) {
+            // Assignment missing still 404s; no-submission now returns 200 null.
+            if (err?.response?.status !== 404) {
+              console.error('Failed to load student submission', err?.message || err);
+            }
             setSubmission(null);
             hasSubmission = false;
           }
@@ -986,8 +1021,17 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
       setError('You are not a member of any group for this group assignment.');
       return;
     }
-    if (isPaperUploadQuiz(assignment) && uploadedFiles.length === 0) {
-      setError('Please upload at least one file before submitting your quiz.');
+    const requiresFileUpload =
+      isPaperUploadQuiz(assignment) ||
+      (Boolean(assignment?.allowStudentUploads) &&
+        !assignment?.isGradedQuiz &&
+        !assignment?.isOfflineAssignment);
+    if (requiresFileUpload && uploadedFiles.length === 0) {
+      setError(
+        isPaperUploadQuiz(assignment)
+          ? 'Please upload at least one file before submitting your quiz.'
+          : 'Please upload at least one file before submitting this assignment.'
+      );
       return;
     }
     setIsSubmitting(true);
@@ -1090,6 +1134,28 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
     }
   };
 
+  const handleToggleLock = async () => {
+    if (!user || (user.role !== 'teacher' && user.role !== 'admin') || !assignment) return;
+    setIsLocking(true);
+    try {
+      const endpoint = assignment.locked ? 'unlock' : 'lock';
+      const res = await api.post(`/assignments/${id}/${endpoint}`, {});
+      const locked =
+        typeof res.data?.locked === 'boolean'
+          ? res.data.locked
+          : Boolean(res.data?.data?.locked);
+      setAssignment((prev) => (prev ? { ...prev, locked } : null));
+    } catch (err: any) {
+      logger.error(
+        'Error toggling assignment lock',
+        err instanceof Error ? err : new Error(String(err))
+      );
+      setError(err.response?.data?.message || 'Error toggling lock status');
+    } finally {
+      setIsLocking(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-32">
@@ -1111,13 +1177,27 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
   }
 
   const isCreator = isInstructor && assignment?.createdBy?._id === user?._id;
-  const isPastDue = new Date() > new Date(assignment?.dueDate);
+  const availability = resolveCanvasAvailability(assignment);
+  const isLockedManual = !viewAsStudent && availability.kind === 'locked_manual';
+  const isLockedUntil = !viewAsStudent && availability.kind === 'locked_until';
+  const isLockedAfter = !viewAsStudent && availability.kind === 'locked_after';
+  const isPastDue =
+    isLockedAfter ||
+    (!viewAsStudent &&
+      new Date() > new Date(assignment?.dueDate) &&
+      assignment?.lockAfterDue !== false);
   /** Teachers previewing as student can interact even if the real due date passed. */
-  const effectivePastDue = viewAsStudent ? false : isPastDue;
-  const canInteractAsStudent = showStudentExperience && !effectivePastDue;
+  const effectivePastDue = viewAsStudent ? false : isLockedAfter || isLockedManual;
+  const canInteractAsStudent = showStudentExperience && !effectivePastDue && !isLockedUntil && !isLockedManual;
   const isTeacherDashboard = isInstructor && !studentPreviewMode;
   /** In student preview, ignore any loaded submission so the UI stays blank. */
   const activeSubmission = viewAsStudent ? null : submission;
+  const studentSubmissionFiles = submission
+    ? normalizeSubmissionAttachments(submission)
+    : [];
+  const studentFeedbackFiles = submission
+    ? normalizeTeacherFeedbackAttachments(submission)
+    : [];
   /** Students must start timed quizzes first; teachers in preview see questions immediately. */
   const canShowQuestionPanel =
     !isTeacherDashboard &&
@@ -1162,23 +1242,100 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
   const showStudentSubmitButton =
     isStudent && !activeSubmission && (!assignment.isTimedQuiz || quizStarted);
   const showMobileAssignmentSubmitBar = showStudentSubmitButton && !showMobileQuizChrome;
-  const hasAssignmentInfoContent =
-    !!activeSubmission ||
-    !!assignmentGradeScore ||
+  const requiresFileUploadForSubmit =
+    paperUploadQuiz ||
+    (Boolean(assignment.allowStudentUploads) &&
+      !assignment.isGradedQuiz &&
+      !assignment.isOfflineAssignment);
+  const hasRubricForStudent = Boolean(assignment.rubric?.criteria?.length);
+  const hasTeacherAttachments = Boolean(
+    assignment.fileAssets?.length || assignment.attachments?.length || assignment.attachmentFiles?.length
+  );
+  const teacherAttachmentsChips = hasTeacherAttachments ? (
+    <div>
+      <p className="mb-2 text-sm font-medium text-slate-500 dark:text-slate-400">Attachments</p>
+      <FileAttachmentChips
+        attachmentSources={{
+          attachmentFiles: assignment.attachmentFiles,
+          attachments: assignment.attachments,
+          fileAssets: assignment.fileAssets,
+        }}
+        className="mt-0"
+      />
+    </div>
+  ) : null;
+  const canvasScoreLabel =
+    assignmentGradeScore != null
+      ? `${assignmentGradeScore.earned} / ${assignmentGradeScore.maxPoints}`
+      : null;
+  const canvasPrimary =
+    !showStudentExperience || isLockedUntil || isLockedAfter || isLockedManual || showMobileQuizLayout
+      ? null
+      : isQuiz && !paperUploadQuiz && !activeSubmission && assignment.isTimedQuiz && !quizStarted
+        ? {
+            label: 'Take the Quiz',
+            onClick: () => {
+              void startQuiz();
+            },
+            disabled: false,
+          }
+        : isQuiz && !paperUploadQuiz && !activeSubmission && !assignment.isTimedQuiz && !isQuizTakingMode
+          ? {
+              label: 'Take the Quiz',
+              onClick: () => {
+                document.getElementById('assignment-questions')?.scrollIntoView({ behavior: 'smooth' });
+              },
+              disabled: false,
+            }
+          : paperUploadQuiz && canInteractAsStudent && !activeSubmission
+            ? {
+                label: 'Submit Quiz',
+                onClick: () => {
+                  void handleSubmit();
+                },
+                disabled: isSubmitting || uploadedFiles.length === 0,
+              }
+            : showStudentSubmitButton && !isQuiz
+              ? {
+                  label: 'Submit',
+                  onClick: () => {
+                    void handleSubmit();
+                  },
+                  disabled:
+                    isSubmitting ||
+                    (requiresFileUploadForSubmit && uploadedFiles.length === 0),
+                }
+              : null;
+  const hasStudentBodyContent =
     (isStudent && typeof submission?.feedback === 'string' && submission.feedback.trim() !== '') ||
     (isStudent && (submission?.teacherFeedbackFiles?.length ?? 0) > 0) ||
     (isStudent && submission?.gradeVisibility?.mode === 'hidden') ||
     (isStudent && !!submission?.autoGraded) ||
     (isStudent && (submission?.files?.length ?? 0) > 0) ||
+    (!!activeSubmission && !!assignmentGradeScore && showMobileQuizLayout);
+  const hasAssignmentInfoContent =
+    hasStudentBodyContent ||
+    !!activeSubmission ||
+    !!assignmentGradeScore ||
     isInstructor ||
     (isCreator && !viewAsStudent);
-  // On mobile, instructors don't need this card: the title is already in the top nav, the
-  // body is student-only/desktop-only, and the actions live in the analytics "Quick Actions"
-  // panel (dashboard) or the dedicated preview banner. So it renders empty — hide it.
+  // On mobile, instructors don't need this card: the title is already in the top nav.
   const hideAssignmentInfoOnMobile = showMobileQuizLayout || !hasAssignmentInfoContent || isInstructor;
+  /** Students use header + right submission sidebar; skip the old bottom body card. */
+  const useStudentSidebarLayout = showStudentExperience && !showMobileQuizLayout;
+  const showTopInfoCard =
+    showMobileQuizLayout ||
+    isTeacherDashboard ||
+    (useStudentSidebarLayout ? false : showStudentExperience ? hasStudentBodyContent : true);
 
   return (
-    <div className="min-h-screen w-full bg-slate-50 dark:bg-slate-950">
+    <div
+      className={
+        useStudentSidebarLayout
+          ? 'w-full bg-transparent'
+          : 'min-h-screen w-full bg-slate-50 dark:bg-slate-950'
+      }
+    >
       {/* Top Navigation Bar (Mobile Only) */}
       <nav className="lg:hidden fixed top-0 left-0 right-0 z-[150] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
         <div className="relative flex items-center justify-between px-4 py-3 gap-2">
@@ -1194,9 +1351,87 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
         </div>
       </nav>
 
-      <div className={`w-full px-0 sm:px-4 lg:px-8 py-2 sm:py-6 lg:py-8 ${showMobileQuizLayout ? 'pt-[calc(3.5rem+1.25rem)] pb-2' : 'pt-[calc(3.5rem+1.25rem)]'} lg:pt-4 max-w-full overflow-x-hidden ${showMobileQuizLayout ? 'mobile-quiz-chrome-clearance' : 'mobile-bottom-nav-clearance'}`}>
-        <div className={`bg-white dark:bg-slate-900 sm:shadow-sm sm:ring-1 sm:ring-slate-200/80 dark:sm:ring-slate-700/80 sm:rounded-2xl max-w-full overflow-hidden ${hideAssignmentInfoOnMobile ? 'hidden sm:block sm:p-6' : 'p-3 sm:p-6'}`}>
-          <div className="flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-start sm:justify-between max-w-full">
+      <div
+        className={`w-full max-w-full overflow-x-hidden ${
+          useStudentSidebarLayout
+            ? 'px-0 py-0 pt-[calc(3.5rem+1.25rem)] lg:pt-0 mobile-bottom-nav-clearance'
+            : `${showMobileQuizLayout ? 'px-0 sm:px-4 lg:px-8 py-2 sm:py-6 lg:py-8 pt-[calc(3.5rem+1.25rem)] pb-2' : 'px-0 sm:px-4 lg:px-8 py-2 sm:py-6 lg:py-8 pt-[calc(3.5rem+1.25rem)]'} lg:pt-4 ${showMobileQuizLayout ? 'mobile-quiz-chrome-clearance' : 'mobile-bottom-nav-clearance'}`
+        }`}
+      >
+        {useStudentSidebarLayout ? (
+          <div className="mb-4 grid grid-cols-1 items-start gap-4 md:grid-cols-[minmax(0,1fr)_17rem] lg:grid-cols-[minmax(0,1fr)_18rem] lg:gap-5">
+            <div className="min-w-0">
+              <CanvasAssignmentShowHeader
+                assignment={assignment}
+                mode={isQuiz ? 'quiz' : 'assignment'}
+                hidePageTitle
+                hasSubmission={Boolean(activeSubmission)}
+                late={Boolean(
+                  activeSubmission?.submittedAt &&
+                    assignment.dueDate &&
+                    new Date(activeSubmission.submittedAt) > new Date(assignment.dueDate)
+                )}
+                scoreLabel={canvasScoreLabel}
+                showPrimaryAction={Boolean(canvasPrimary)}
+                primaryActionLabel={canvasPrimary?.label}
+                primaryActionDisabled={Boolean(canvasPrimary?.disabled)}
+                onPrimaryAction={canvasPrimary?.onClick}
+                showViewRubric={hasRubricForStudent}
+                viewRubricExpanded={showStudentRubric}
+                onViewRubric={() => setShowStudentRubric((v) => !v)}
+                attachmentsContent={teacherAttachmentsChips}
+              />
+              {showStudentRubric && hasRubricForStudent && assignment.rubric ? (
+                <div className="mt-3">
+                  <RubricViewer
+                    rubric={assignment.rubric}
+                    title={assignment.rubric.title || 'Assignment rubric'}
+                  />
+                </div>
+              ) : null}
+            </div>
+            <StudentSubmissionSidebar
+              className="w-full md:sticky md:top-4"
+              submittedAt={activeSubmission?.submittedAt}
+              late={Boolean(
+                activeSubmission?.submittedAt &&
+                  assignment.dueDate &&
+                  new Date(activeSubmission.submittedAt) > new Date(assignment.dueDate)
+              )}
+              feedback={
+                isStudent || viewAsStudent
+                  ? typeof submission?.feedback === 'string'
+                    ? submission.feedback
+                    : ''
+                  : ''
+              }
+              submissionFiles={studentSubmissionFiles}
+              feedbackFiles={studentFeedbackFiles}
+              gradeHidden={submission?.gradeVisibility?.mode === 'hidden'}
+              autoGraded={Boolean(submission?.autoGraded)}
+              teacherApproved={Boolean(submission?.teacherApproved)}
+              autoGradeLabel={
+                submission?.autoGrade != null
+                  ? `${Number.isInteger(Number(submission.autoGrade)) ? Number(submission.autoGrade) : Number(submission.autoGrade).toFixed(2)} points`
+                  : null
+              }
+              finalGradeLabel={
+                submission?.finalGrade != null || submission?.grade != null
+                  ? `${(() => {
+                      const grade = Number(submission.finalGrade || submission.grade);
+                      return Number.isInteger(grade) ? grade.toString() : grade.toFixed(2);
+                    })()} points`
+                  : null
+              }
+              onPreviewFile={setPreviewModalFile}
+            />
+          </div>
+        ) : null}
+
+        {showTopInfoCard ? (
+        <div className={`bg-white dark:bg-slate-900 sm:shadow-sm sm:ring-1 sm:ring-slate-200/80 dark:sm:ring-slate-700/80 sm:rounded-xl max-w-full overflow-hidden ${hideAssignmentInfoOnMobile ? 'hidden sm:block sm:p-6' : 'p-3 sm:p-6'} ${showStudentExperience && !showMobileQuizLayout ? 'sm:rounded-xl' : ''}`}>
+          {/* Legacy title chrome — instructors / quiz-taking mobile only (students use Canvas header above) */}
+          <div className={`flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-start sm:justify-between max-w-full ${showStudentExperience && !showMobileQuizLayout ? 'hidden' : ''}`}>
             <div className="flex-1 min-w-0 w-full max-w-full">
               <div className={`flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-start sm:justify-between sm:border-b-0 sm:pb-0 ${showMobileQuizLayout || !activeSubmission ? 'hidden sm:flex' : 'border-b border-slate-200/80 pb-4 dark:border-slate-700/80'}`}>
                 <div className="min-w-0 flex-1">
@@ -1227,90 +1462,88 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+
+          <div className="flex-1 min-w-0 w-full max-w-full">
             {/* Show feedback if student and feedback exists */}
             {isStudent && submission && typeof submission.feedback === 'string' && submission.feedback.trim() !== '' && (
-              <div className="mt-4 bg-gradient-to-r from-yellow-50 to-yellow-50/50 dark:from-yellow-900/30 dark:to-yellow-900/10 border-l-4 border-yellow-400 dark:border-yellow-500 shadow-sm sm:shadow-md rounded-lg p-3 sm:p-4 overflow-hidden max-w-full transition-all duration-200">
-                <div className="flex items-center space-x-2 mb-2">
-                  <div className="w-1 h-5 bg-yellow-400 dark:bg-yellow-500 rounded-full"></div>
-                  <div className="text-yellow-800 dark:text-yellow-200 font-semibold text-sm sm:text-base break-words">Instructor Feedback</div>
-                </div>
-                <div className="text-yellow-900 dark:text-yellow-100 whitespace-pre-line break-words overflow-wrap-anywhere text-sm sm:text-base leading-relaxed pl-3">{submission.feedback}</div>
+              <div className="mt-1 rounded-xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-800/40 sm:mt-0">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Instructor Feedback
+                </h3>
+                <p className="mt-2 whitespace-pre-line break-words text-sm leading-relaxed text-slate-800 dark:text-slate-100">
+                  {submission.feedback}
+                </p>
               </div>
             )}
 
             {/* Show teacher feedback files if student and files exist */}
-            {isStudent && submission && submission.teacherFeedbackFiles && submission.teacherFeedbackFiles.length > 0 && (
-              <div className="mt-4 bg-gradient-to-r from-indigo-50 to-indigo-50/50 dark:from-indigo-900/30 dark:to-indigo-900/10 border-l-4 border-indigo-400 dark:border-indigo-500 shadow-sm sm:shadow-md rounded-lg p-3 sm:p-4 overflow-hidden max-w-full transition-all duration-200">
-                <div className="flex items-center space-x-2 mb-2">
-                  <div className="w-1 h-5 bg-indigo-400 dark:bg-indigo-500 rounded-full"></div>
-                  <div className="text-indigo-800 dark:text-indigo-200 font-semibold text-sm sm:text-base break-words">Instructor Feedback Files</div>
-                </div>
-                <p className="text-xs sm:text-sm text-indigo-700 dark:text-indigo-300 mb-3 break-words pl-3">
-                  Your instructor has uploaded annotated files with feedback:
+            {isStudent && studentFeedbackFiles.length > 0 && (
+              <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Instructor Feedback Files
+                </h3>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                  Annotated files from your instructor
                 </p>
-                <div className="space-y-2.5 max-w-full">
-                  {submission.teacherFeedbackFiles.map((file, index) => {
-                    const fileUrl = typeof file === 'string' ? file : (file.url || file.path || '');
-                    const fileName = typeof file === 'string' 
-                      ? file.split('/').pop() || `Feedback File ${index + 1}`
-                      : (file.name || file.originalname || (file as { originalName?: string }).originalName || `Feedback File ${index + 1}`);
-                    return (
-                      <div key={index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 p-3 sm:p-3 bg-white dark:bg-gray-900 rounded-lg border border-indigo-200/50 dark:border-indigo-700/50 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden max-w-full">
-                        <div className="flex items-start sm:items-center space-x-3 flex-1 min-w-0 w-full sm:w-auto">
-                          <div className="flex-shrink-0 w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center">
-                            <svg className="w-5 h-5 sm:w-4 sm:h-4 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="mt-3 space-y-2">
+                  {studentFeedbackFiles.map((file, index) => (
+                      <div key={file.fileAssetId || file.url || index} className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50/50 p-3 sm:flex-row sm:items-center sm:justify-between dark:border-slate-700 dark:bg-slate-800/40">
+                        <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-200/80 dark:bg-slate-700">
+                            <svg className="h-4 w-4 text-slate-600 dark:text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
                           </div>
-                          <span className="text-sm sm:text-sm text-gray-900 dark:text-gray-100 break-all overflow-wrap-anywhere word-break break-word flex-1 min-w-0 font-medium">{fileName}</span>
+                          <span className="min-w-0 flex-1 break-all text-sm font-medium text-slate-900 dark:text-slate-100">{file.name || `Feedback File ${index + 1}`}</span>
                         </div>
-                        <div className="flex items-center space-x-3 sm:ml-2 flex-shrink-0 self-start sm:self-center pl-11 sm:pl-0">
+                        <div className="flex shrink-0 items-center gap-2 self-start pl-12 sm:self-center sm:pl-0">
                           <button
                             type="button"
-                            onClick={() => setPreviewModalFile(toPreviewFile(file))}
-                            className="flex items-center space-x-1.5 px-3 py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors duration-200 flex-shrink-0 active:scale-95"
+                            onClick={() => setPreviewModalFile(file)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                             title="Preview file"
                           >
-                            <Eye className="w-4 h-4" />
-                            <span className="text-xs font-medium sm:hidden">Preview</span>
+                            <Eye className="h-4 w-4" />
+                            <span className="sm:hidden">Preview</span>
                           </button>
                           <a
-                            href={fileUrl}
+                            href={file.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center space-x-1.5 px-3 py-2 bg-indigo-600 dark:bg-indigo-500 text-white rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-600 transition-colors duration-200 flex-shrink-0 active:scale-95 shadow-sm"
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
                             title="Download file"
                           >
-                            <Download className="w-4 h-4" />
-                            <span className="text-xs font-medium">Download</span>
+                            <Download className="h-4 w-4" />
+                            Download
                           </a>
                         </div>
                       </div>
-                    );
-                  })}
+                    ))}
                 </div>
               </div>
             )}
             
             {/* Show auto-grading status for students */}
             {isStudent && submission?.gradeVisibility?.mode === 'hidden' && (
-              <div className="mt-4 rounded border-l-4 border-amber-400 bg-amber-50 p-4 text-amber-900 dark:border-amber-600 dark:bg-amber-900/20 dark:text-amber-100">
+              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
                 Your work has been received. Your grade is awaiting instructor release.
               </div>
             )}
             {isStudent && submission && submission.autoGraded && (
-              <div className="mt-4 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-400 dark:border-blue-600 p-4 rounded">
-                <div className="text-blue-800 dark:text-blue-200 font-semibold mb-1">
+              <div className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-4 dark:border-sky-800 dark:bg-sky-950/30">
+                <div className="text-sm font-semibold text-sky-900 dark:text-sky-100">
                   {submission.teacherApproved ? 'Grading Complete' : 'Auto-Graded'}
                 </div>
-                <div className="text-blue-900 dark:text-blue-100">
+                <div className="mt-1 text-sm text-sky-900/90 dark:text-sky-100/90">
                   {submission.teacherApproved ? (
                     <>
                       <div>Final Grade: {(() => {
                         const grade = Number(submission.finalGrade || submission.grade);
                         return Number.isInteger(grade) ? grade.toString() : grade.toFixed(2);
                       })()} points</div>
-                      <div className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                      <div className="mt-1 text-xs text-sky-800/80 dark:text-sky-200/80">
                         Multiple choice questions were auto-graded. Other questions were graded by your instructor.
                       </div>
                     </>
@@ -1320,7 +1553,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                         const grade = Number(submission.autoGrade);
                         return Number.isInteger(grade) ? grade.toString() : grade.toFixed(2);
                       })()} points</div>
-                      <div className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                      <div className="mt-1 text-xs text-sky-800/80 dark:text-sky-200/80">
                         Multiple choice questions have been auto-graded. Your instructor will review and approve the final grade.
                       </div>
                     </>
@@ -1330,95 +1563,72 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
             )}
 
             {/* Show submitted files for students */}
-            {isStudent && submission && submission.files && submission.files.length > 0 && (
-              <div className="mt-4 bg-gradient-to-r from-gray-50 to-gray-50/50 dark:from-gray-800 dark:to-gray-800/50 border border-gray-200 dark:border-gray-700 shadow-sm sm:shadow-md rounded-lg p-3 sm:p-4 overflow-hidden max-w-full transition-all duration-200">
-                <div className="flex items-center space-x-2 mb-3">
-                  <div className="w-1 h-5 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
-                  <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-100">Your Submitted Files:</h3>
-                </div>
-                <div className="space-y-2.5 max-w-full">
-                  {submission.files.map((file, index) => {
-                    const fileUrl = typeof file === 'string' ? file : (file.url || file.path || '');
-                    const fileName = typeof file === 'string' 
-                      ? file.split('/').pop() || `File ${index + 1}`
-                      : (file.name || file.originalname || `File ${index + 1}`);
-                    return (
-                      <div key={index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 p-3 bg-white dark:bg-gray-900 border border-gray-200/50 dark:border-gray-600/50 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden max-w-full">
-                        <div className="flex items-start sm:items-center space-x-3 flex-1 min-w-0 w-full sm:w-auto">
-                          <div className="flex-shrink-0 w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                            <svg className="w-5 h-5 sm:w-4 sm:h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            {isStudent && studentSubmissionFiles.length > 0 && (
+              <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Your Submitted Files
+                </h3>
+                <div className="mt-3 space-y-2">
+                  {studentSubmissionFiles.map((file, index) => (
+                      <div key={file.fileAssetId || file.url || index} className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50/50 p-3 sm:flex-row sm:items-center sm:justify-between dark:border-slate-700 dark:bg-slate-800/40">
+                        <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-200/80 dark:bg-slate-700">
+                            <svg className="h-4 w-4 text-slate-600 dark:text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 break-all overflow-wrap-anywhere word-break break-word">{fileName}</p>
-                          </div>
+                          <p className="min-w-0 flex-1 break-all text-sm font-medium text-slate-900 dark:text-slate-100">{file.name || `File ${index + 1}`}</p>
                         </div>
-                        <div className="flex items-center space-x-3 sm:ml-2 flex-shrink-0 self-start sm:self-center pl-11 sm:pl-0">
+                        <div className="flex shrink-0 items-center gap-2 self-start pl-12 sm:self-center sm:pl-0">
                           <button
                             type="button"
-                            onClick={() => setPreviewModalFile(toPreviewFile(file))}
-                            className="flex items-center space-x-1.5 px-3 py-2 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 flex-shrink-0 active:scale-95"
+                            onClick={() => setPreviewModalFile(file)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                             title="Preview file"
                           >
-                            <Eye className="w-4 h-4" />
-                            <span className="text-xs font-medium sm:hidden">Preview</span>
+                            <Eye className="h-4 w-4" />
+                            <span className="sm:hidden">Preview</span>
                           </button>
                           <a
-                            href={fileUrl}
+                            href={file.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center space-x-1.5 px-3 py-2 bg-indigo-600 dark:bg-indigo-500 text-white rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-600 transition-colors duration-200 flex-shrink-0 active:scale-95 shadow-sm"
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
                             title="Open in new tab"
                           >
-                            <Download className="w-4 h-4" />
-                            <span className="text-xs font-medium">Open</span>
+                            <Download className="h-4 w-4" />
+                            Open
                           </a>
                         </div>
                       </div>
-                    );
-                  })}
+                    ))}
                 </div>
               </div>
             )}
 
 
           </div>
-          <div className={`flex space-x-2 ${isQuizTakingMode ? 'hidden sm:flex' : ''}`}>
-            {showStudentSubmitButton && (
+          {/* Submit lives in Canvas header for students; teacher actions live in Assignment Analytics */}
+          {showStudentSubmitButton && !(showStudentExperience && !showMobileQuizLayout) ? (
+            <div className={`flex space-x-2 ${isQuizTakingMode ? 'hidden sm:flex' : ''}`}>
               <button
                 onClick={handleSubmit}
-                disabled={isSubmitting}
+                disabled={isSubmitting || (requiresFileUploadForSubmit && uploadedFiles.length === 0)}
                 className="hidden sm:inline-flex min-h-[44px] items-center rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-600"
               >
                 {isSubmitting ? 'Submitting...' : 'Submit Assignment'}
               </button>
-            )}
-            {isInstructor && !studentPreviewMode && (
-              <button
-                type="button"
-                onClick={enterStudentPreview}
-                className="inline-flex items-center px-4 py-2 border border-amber-300 dark:border-amber-600 text-sm font-medium rounded-md text-amber-900 dark:text-amber-100 bg-amber-50 dark:bg-amber-900/40 hover:bg-amber-100 dark:hover:bg-amber-900/60"
-              >
-                <Eye className="h-4 w-4 mr-2" />
-                Student preview
-              </button>
-            )}
-            {isCreator && !viewAsStudent && (
-              <button
-                onClick={handleDelete}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 dark:bg-red-500 dark:bg-red-500 hover:bg-red-700 dark:hover:bg-red-600 dark:hover:bg-red-600 dark:bg-red-500"
-              >
-                Delete
-              </button>
-            )}
-          </div>
+            </div>
+          ) : null}
         </div>
-        </div>
+        ) : null}
 
 
 
-        {!isTeacherDashboard && (assignment.fileAssets?.length || assignment.attachments?.length) ? (
+        {/* Standalone attachments for non-Canvas student chrome (mobile quiz / teacher paths). */}
+        {!isTeacherDashboard &&
+        hasTeacherAttachments &&
+        !(showStudentExperience && !showMobileQuizLayout) ? (
           <div className="mt-6">
             <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Attachments</h3>
             <FileAttachmentChips
@@ -1499,7 +1709,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
         {isTeacherDashboard && (
           <div className="mt-8">
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
-                    <div className="flex items-center justify-between mb-6">
+                    <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex items-center space-x-3">
                         <svg className="w-8 h-8 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -1509,16 +1719,36 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                           <p className="text-blue-700 dark:text-blue-300">Real-time statistics and performance metrics</p>
                         </div>
                       </div>
-                      {loadingStats && (
-                        <div className="flex items-center space-x-2 text-blue-600 dark:text-blue-400">
-                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 dark:border-blue-400"></div>
-                          <span>Loading stats...</span>
-                        </div>
-                      )}
+                      <div className="flex flex-wrap items-center gap-2">
+                        {loadingStats && (
+                          <div className="flex items-center space-x-2 text-blue-600 dark:text-blue-400">
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 dark:border-blue-400"></div>
+                            <span>Loading stats...</span>
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={enterStudentPreview}
+                          className="inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100 dark:border-amber-600 dark:bg-amber-900/40 dark:text-amber-100 dark:hover:bg-amber-900/60"
+                        >
+                          <Eye className="mr-2 h-4 w-4" />
+                          Student preview
+                        </button>
+                        {isCreator ? (
+                          <button
+                            type="button"
+                            onClick={handleDelete}
+                            className="inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
 
                     {/* Key Metrics */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                       <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-lg p-4 border border-blue-200 dark:border-blue-800 shadow-sm">
                         <div className="flex items-center justify-between">
                           <div>
@@ -1556,8 +1786,8 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                       </div>
 
                       <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-lg p-4 border border-blue-200 dark:border-blue-800 shadow-sm">
-                        <div className="flex items-center justify-between">
-                          <div>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0">
                             <p className="text-sm font-medium text-purple-600 dark:text-purple-400">Average Grade</p>
                             <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
                               {submissionStats.averageGrade > 0 ? submissionStats.averageGrade.toFixed(1) : '0'} pts
@@ -1570,14 +1800,64 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                                   : 'No points specified'}
                             </p>
                           </div>
-                          <svg className="w-8 h-8 text-purple-400 dark:text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-8 h-8 shrink-0 text-purple-400 dark:text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                           </svg>
                         </div>
                       </div>
 
-
+                      <div className="rounded-lg border border-blue-200 bg-white p-4 shadow-sm dark:border-blue-800 dark:bg-gray-800">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-sky-600 dark:text-sky-400">Rubric</p>
+                            <p
+                              className="mt-1 truncate text-lg font-bold text-sky-900 dark:text-sky-100"
+                              title={
+                                assignment.rubric?.criteria?.length
+                                  ? assignment.rubric.title || 'Assignment rubric'
+                                  : undefined
+                              }
+                            >
+                              {assignment.rubric?.criteria?.length
+                                ? assignment.rubric.title || 'Assignment rubric'
+                                : 'No rubric'}
+                            </p>
+                            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                              {assignment.rubric?.criteria?.length
+                                ? `${assignment.rubric.criteria.length} criteria · ${assignment.rubric.pointsPossible ?? assignment.totalPoints ?? 0} pts`
+                                : 'Not attached to this assignment'}
+                            </p>
+                          </div>
+                          {assignment.rubric?.criteria?.length ? (
+                            <button
+                              type="button"
+                              title={showTeacherRubric ? 'Close rubric' : 'Open rubric'}
+                              aria-label={showTeacherRubric ? 'Close rubric' : 'Open rubric'}
+                              aria-pressed={showTeacherRubric}
+                              onClick={() => setShowTeacherRubric((v) => !v)}
+                              className={`shrink-0 rounded-lg p-2 transition ${
+                                showTeacherRubric
+                                  ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-200'
+                                  : 'text-sky-500 hover:bg-sky-50 dark:text-sky-400 dark:hover:bg-sky-900/30'
+                              }`}
+                            >
+                              <ClipboardList className="h-6 w-6" />
+                            </button>
+                          ) : (
+                            <ClipboardList className="h-8 w-8 shrink-0 text-sky-300 dark:text-sky-700" />
+                          )}
+                        </div>
+                      </div>
                     </div>
+
+                    {showTeacherRubric && assignment.rubric?.criteria?.length ? (
+                      <div className="mb-6">
+                        <RubricViewer
+                          rubric={assignment.rubric}
+                          title={assignment.rubric.title || 'Assignment rubric'}
+                        />
+                      </div>
+                    ) : null}
 
                     {/* Engagement Metrics */}
                     <div className="mb-8 grid grid-cols-1 items-stretch gap-6 md:grid-cols-3">
@@ -1682,6 +1962,18 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                             </span>
                           </div>
                           <div className="flex justify-between">
+                            <span className="text-gray-600 dark:text-gray-400">Manually locked:</span>
+                            <span
+                              className={`font-medium ${
+                                assignment.locked
+                                  ? 'text-amber-600 dark:text-amber-400'
+                                  : 'text-green-600 dark:text-green-400'
+                              }`}
+                            >
+                              {assignment.locked ? 'Yes' : 'No'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
                             <span className="text-gray-600 dark:text-gray-400 dark:text-gray-400">Due Date:</span>
                             <span className="font-medium text-gray-900 dark:text-gray-100 dark:text-gray-100">{safeFormatDate(assignment.dueDate, 'MMM d, yyyy')}</span>
                           </div>
@@ -1714,17 +2006,41 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                           </button>
                           <button
                             onClick={handleTogglePublish}
-                            className="w-full text-left px-3 py-2 text-sm bg-purple-50 dark:bg-purple-900/50 hover:bg-purple-100 dark:hover:bg-purple-900/70 rounded-md transition-colors flex items-center space-x-2 text-gray-900 dark:text-gray-100 dark:text-gray-100"
+                            disabled={isPublishing}
+                            className="w-full text-left px-3 py-2 text-sm bg-purple-50 dark:bg-purple-900/50 hover:bg-purple-100 dark:hover:bg-purple-900/70 rounded-md transition-colors flex items-center space-x-2 text-gray-900 dark:text-gray-100 dark:text-gray-100 disabled:opacity-60"
                           >
                             {assignment.published ? (
                               <>
                                 <Lock className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                                <span>Unpublish</span>
+                                <span>{isPublishing ? 'Updating…' : 'Unpublish'}</span>
                               </>
                             ) : (
                               <>
                                 <Unlock className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                                <span>Publish</span>
+                                <span>{isPublishing ? 'Updating…' : 'Publish'}</span>
+                              </>
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleToggleLock}
+                            disabled={isLocking}
+                            className="w-full text-left px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors flex items-center space-x-2 text-gray-900 dark:text-gray-100 disabled:opacity-60"
+                            title={
+                              assignment.locked
+                                ? 'Unlock so students can submit (schedule dates still apply)'
+                                : 'Lock now — students can view but cannot submit'
+                            }
+                          >
+                            {assignment.locked ? (
+                              <>
+                                <Unlock className="h-4 w-4 text-slate-600 dark:text-slate-300" />
+                                <span>{isLocking ? 'Unlocking…' : 'Unlock assignment'}</span>
+                              </>
+                            ) : (
+                              <>
+                                <Lock className="h-4 w-4 text-slate-600 dark:text-slate-300" />
+                                <span>{isLocking ? 'Locking…' : 'Lock assignment'}</span>
                               </>
                             )}
                           </button>
@@ -1767,7 +2083,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
               activeSubmission?.showStudentAnswers || assignment.showStudentAnswers);
 
           return (
-            <div className={hideAssignmentInfoOnMobile ? 'mt-3 lg:mt-8' : 'mt-8'}>
+            <div id="assignment-questions" className={hideAssignmentInfoOnMobile ? 'mt-3 lg:mt-8' : 'mt-8'}>
               {/* Show questions for students, but not in teacher dashboard */}
               {canShowQuestionPanel && shouldShowQuestions ? (
                 canInteractAsStudent && !activeSubmission && assignment.displayMode === 'single' ? (
@@ -2068,8 +2384,8 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                             isStudent ? (
                               <button
                                 onClick={handleSubmit}
-                                disabled={isSubmitting}
-                                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+                                disabled={isSubmitting || (requiresFileUploadForSubmit && uploadedFiles.length === 0)}
+                                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
                               >
                                 {isSubmitting ? 'Submitting...' : 'Submit Assignment'}
                               </button>
@@ -2106,8 +2422,8 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                             isStudent ? (
                               <button
                                 onClick={handleSubmit}
-                                disabled={isSubmitting}
-                                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600"
+                                disabled={isSubmitting || (requiresFileUploadForSubmit && uploadedFiles.length === 0)}
+                                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600 disabled:cursor-not-allowed disabled:opacity-50"
                               >
                                 {isSubmitting ? 'Submitting...' : 'Submit Assignment'}
                               </button>
@@ -2798,7 +3114,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
                       <div className="mt-8 hidden lg:block">
                         <button
                           onClick={handleSubmit}
-                          disabled={isSubmitting}
+                          disabled={isSubmitting || (requiresFileUploadForSubmit && uploadedFiles.length === 0)}
                           className="inline-flex min-h-[44px] items-center rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-600"
                         >
                           {isSubmitting ? 'Submitting...' : 'Submit Assignment'}
@@ -2842,7 +3158,7 @@ const ViewAssignment: React.FC<ViewAssignmentProps> = ({ courseId: propCourseId 
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={isSubmitting}
+              disabled={isSubmitting || (requiresFileUploadForSubmit && uploadedFiles.length === 0)}
               className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 active:scale-[0.99] disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-600"
             >
               {isSubmitting ? 'Submitting...' : 'Submit Assignment'}

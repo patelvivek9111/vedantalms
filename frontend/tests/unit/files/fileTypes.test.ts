@@ -71,4 +71,33 @@ describe('fileTypes', () => {
     expect(normalized[0].name).toContain('.pdf');
     expect(detectPreviewKind(normalized[0])).toBe('pdf');
   });
+
+  it('recovers pdf preview kind from legacy cloudinary client file objects', () => {
+    const cloudinaryUrl =
+      'https://res.cloudinary.com/dwvlv5wrv/raw/upload/v1763689235/lms/uploads/files-1763689234116-123547927_pwuq3f.pdf';
+    const normalized = normalizeSubmissionAttachments({
+      clientFiles: [{ url: cloudinaryUrl, legacy: true, originalName: 'VResume1.pdf' }],
+      files: [{ url: cloudinaryUrl, legacy: true }],
+      fileAssets: [],
+    });
+    expect(normalized).toHaveLength(1);
+    expect(normalized[0].name).toContain('.pdf');
+    expect(detectPreviewKind(normalized[0])).toBe('pdf');
+  });
+
+  it('keeps legacy attachmentFiles when normalizeAttachmentSources has no mongo ids', async () => {
+    const { normalizeAttachmentSources, isNormalizedFileList } = await import(
+      '../../../src/utils/fileTypes'
+    );
+    const cloudinaryUrl =
+      'https://res.cloudinary.com/dwvlv5wrv/raw/upload/v1/lms/uploads/VResume1.pdf';
+    const out = normalizeAttachmentSources({
+      attachmentFiles: [
+        { url: cloudinaryUrl, name: 'VResume1.pdf', status: 'done' },
+      ],
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0].name).toBe('VResume1.pdf');
+    expect(isNormalizedFileList(out)).toBe(true);
+  });
 });

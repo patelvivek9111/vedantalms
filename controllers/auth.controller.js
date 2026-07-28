@@ -35,7 +35,7 @@ function resolveRegistrationRole(requestedRole, rootAccountId) {
 
 async function sendAuthResponse(res, statusCode, user) {
   const token = user.getSignedJwtToken();
-  setAuthCookie(res, token);
+  setAuthCookie(res, token, user.rootAccountId);
   const profilePicture = await resolveProfilePictureUrl(user.profilePicture || '', { userId: user._id });
   return res.status(statusCode).json({
     success: true,

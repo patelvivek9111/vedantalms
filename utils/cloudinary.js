@@ -172,7 +172,10 @@ const extractPublicId = (url) => {
   return null;
 };
 
-function getSignedCloudinaryUrl(url, { download = true, resourceType = 'auto' } = {}) {
+function getSignedCloudinaryUrl(
+  url,
+  { download = true, resourceType = 'auto', fileName } = {}
+) {
   if (!url || !url.includes('cloudinary.com')) return null;
   const publicId = extractPublicId(url);
   if (!publicId) return null;
@@ -180,11 +183,19 @@ function getSignedCloudinaryUrl(url, { download = true, resourceType = 'auto' } 
     resourceType && resourceType !== 'auto'
       ? resourceType
       : inferResourceTypeFromUrl(url, 'image');
+  let flags;
+  if (download) {
+    const safeName = String(fileName || '')
+      .replace(/[/\\?%*:|"<>]/g, '_')
+      .replace(/\s+/g, '_')
+      .slice(0, 120);
+    flags = safeName ? `attachment:${safeName}` : 'attachment';
+  }
   return cloudinary.url(publicId, {
     resource_type: resolvedType,
     secure: true,
     sign_url: true,
-    ...(download ? { flags: 'attachment' } : {}),
+    ...(flags ? { flags } : {}),
   });
 }
 

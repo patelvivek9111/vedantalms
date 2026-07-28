@@ -130,7 +130,9 @@ const AssignmentViewWrapper: React.FC = () => {
         </div>
       </div>
 
-      <div className={`flex w-full lg:mx-auto lg:max-w-7xl print:block ${isMobileDevice ? 'flex-col' : 'flex-row'}`}>
+      <div
+        className={`flex w-full items-start lg:mx-auto lg:max-w-7xl print:block ${isMobileDevice ? 'flex-col' : 'flex-row'}`}
+      >
         {isMobileMenuOpen && isMobileDevice && (
           <div
             className="print:hidden fixed inset-0 z-[90] bg-black bg-opacity-50 lg:hidden"
@@ -150,9 +152,10 @@ const AssignmentViewWrapper: React.FC = () => {
         />
 
         <div
-          className={`w-full flex-1 overflow-visible print:pt-0 lg:overflow-auto ${isMobileMenuOpen && isMobileDevice ? 'overflow-hidden lg:overflow-auto' : ''}`}
+          className={`min-w-0 w-full flex-1 overflow-visible print:pt-0 lg:overflow-auto ${isMobileMenuOpen && isMobileDevice ? 'overflow-hidden lg:overflow-auto' : ''}`}
         >
-          <div className="w-full px-3 pb-6 pt-2 sm:container sm:mx-auto sm:px-4 print:px-0 print:py-0 lg:pt-3">
+          {/* Flush to course sidebar gutter — avoid container/mx-auto which leaves a dead gap */}
+          <div className="w-full px-3 pb-6 pt-2 sm:px-0 sm:pr-4 print:px-0 print:py-0 lg:pt-0">
             <ViewAssignment courseId={cid} />
           </div>
         </div>

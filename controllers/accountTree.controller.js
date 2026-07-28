@@ -139,6 +139,10 @@ exports.updateSubAccount = async (req, res) => {
       account.parentAccountId = parent._id;
     }
     await account.save();
+    if (name != null && String(account._id) === String(rootId)) {
+      const { syncInstitutionIdentity } = require('../services/tenancy/institutionIdentity.service');
+      await syncInstitutionIdentity(rootId, account.name);
+    }
     return res.json({ success: true, data: account });
   } catch (err) {
     return res.status(err.status || 500).json({ success: false, message: err.message });

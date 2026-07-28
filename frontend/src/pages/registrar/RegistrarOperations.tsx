@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
+import { ru } from './registrarUi';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   AcademicTerm,
@@ -338,18 +339,14 @@ export function RegistrarOperations() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap gap-2 border-b border-gray-200 dark:border-gray-700 pb-2">
+    <div className={ru.page}>
+      <div className={ru.tabRow}>
         {tabs.map((t) => (
           <button
             key={t.id}
             type="button"
             onClick={() => setTab(t.id)}
-            className={`px-3 py-1.5 text-sm rounded-md ${
-              tab === t.id
-                ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
-                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-            }`}
+            className={tab === t.id ? ru.tabActive : ru.tab}
           >
             {t.label}
           </button>
@@ -357,12 +354,12 @@ export function RegistrarOperations() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 dark:bg-red-950/40 px-3 py-2 text-sm text-red-800">
+        <div className={ru.alertError}>
           {error}
         </div>
       )}
       {message && (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-2 text-sm text-emerald-800">
+        <div className={ru.alertOk}>
           {message}
         </div>
       )}
@@ -371,7 +368,7 @@ export function RegistrarOperations() {
         <section className="space-y-3">
           <h2 className="text-lg font-medium">Enrollment summary</h2>
           {loading && !summary ? (
-            <p className="text-sm text-gray-500">Loading…</p>
+            <p className={ru.muted}>Loading…</p>
           ) : (
             <div className="flex flex-wrap gap-4 text-sm">
               <div>
@@ -393,7 +390,7 @@ export function RegistrarOperations() {
             <label className="text-sm">
               Term
               <select
-                className="mt-1 block rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-800 px-2 py-1"
+                className={ru.input}
                 value={termId}
                 onChange={(e) => setTermId(e.target.value)}
               >
@@ -407,7 +404,7 @@ export function RegistrarOperations() {
             <label className="text-sm">
               Status
               <select
-                className="mt-1 block rounded border dark:bg-gray-800 px-2 py-1"
+                className={ru.input}
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
               >
@@ -420,7 +417,7 @@ export function RegistrarOperations() {
             </label>
             <button
               type="button"
-              className="text-sm text-blue-600"
+              className={`${ru.link} text-sm`}
               onClick={() => termId && void loadEnrollments(termId)}
             >
               Refresh
@@ -429,49 +426,49 @@ export function RegistrarOperations() {
 
           <form
             onSubmit={doTransfer}
-            className="grid gap-2 sm:grid-cols-3 text-sm border rounded-md p-3 border-gray-200 dark:border-gray-700"
+            className={`${ru.card} grid gap-2 sm:grid-cols-3 text-sm`}
           >
             <h3 className="sm:col-span-3 font-medium">Transfer enrollment</h3>
             <input
-              className="rounded border px-2 py-1 dark:bg-gray-800"
+              className={ru.input}
               placeholder="Enrollment ID"
               value={transferEnrollmentId}
               onChange={(e) => setTransferEnrollmentId(e.target.value)}
               required
             />
             <input
-              className="rounded border px-2 py-1 dark:bg-gray-800"
+              className={ru.input}
               placeholder="Target course ID"
               value={transferToCourseId}
               onChange={(e) => setTransferToCourseId(e.target.value)}
               required
             />
             <input
-              className="rounded border px-2 py-1 dark:bg-gray-800"
+              className={ru.input}
               placeholder="Reason"
               value={transferReason}
               onChange={(e) => setTransferReason(e.target.value)}
               required
             />
-            <button type="submit" className="sm:col-span-3 rounded bg-indigo-600 text-white px-3 py-1.5">
+            <button type="submit" className={`sm:col-span-3 ${ru.btnPrimary}`}>
               Transfer
             </button>
           </form>
 
           <form
             onSubmit={doPatch}
-            className="grid gap-2 sm:grid-cols-3 text-sm border rounded-md p-3 border-gray-200 dark:border-gray-700"
+            className={`${ru.card} grid gap-2 sm:grid-cols-3 text-sm`}
           >
             <h3 className="sm:col-span-3 font-medium">Update enrollment status</h3>
             <input
-              className="rounded border px-2 py-1 dark:bg-gray-800"
+              className={ru.input}
               placeholder="Enrollment ID"
               value={patchId}
               onChange={(e) => setPatchId(e.target.value)}
               required
             />
             <select
-              className="rounded border px-2 py-1 dark:bg-gray-800"
+              className={ru.input}
               value={patchStatus}
               onChange={(e) => setPatchStatus(e.target.value)}
             >
@@ -482,7 +479,7 @@ export function RegistrarOperations() {
               ))}
             </select>
             <input
-              className="rounded border px-2 py-1 dark:bg-gray-800"
+              className={ru.input}
               placeholder="Audit reason (required)"
               value={patchReason}
               onChange={(e) => setPatchReason(e.target.value)}
@@ -493,7 +490,7 @@ export function RegistrarOperations() {
             </button>
           </form>
 
-          <ul className="divide-y divide-gray-200 dark:divide-gray-700 border border-gray-200 dark:border-gray-700 rounded-md text-sm">
+          <ul className={ru.list}>
             {enrollments.map((row) => (
               <li key={row._id} className="px-3 py-2 space-y-1">
                 <div className="flex justify-between gap-2">
@@ -507,12 +504,12 @@ export function RegistrarOperations() {
                   {row._id}
                   <button
                     type="button"
-                    className="ml-2 text-blue-600"
+                    className={`ml-2 ${ru.link}`}
                     onClick={() => setTransferEnrollmentId(row._id)}
                   >
                     use for transfer
                   </button>
-                  <button type="button" className="ml-2 text-blue-600" onClick={() => setPatchId(row._id)}>
+                  <button type="button" className={`ml-2 ${ru.link}`} onClick={() => setPatchId(row._id)}>
                     use for patch
                   </button>
                 </div>
@@ -524,7 +521,7 @@ export function RegistrarOperations() {
               </li>
             ))}
             {!enrollments.length && (
-              <li className="px-3 py-4 text-gray-500">No enrollments for this term/filter.</li>
+              <li className={ru.empty}>No enrollments for this term/filter.</li>
             )}
           </ul>
         </section>
@@ -536,21 +533,21 @@ export function RegistrarOperations() {
             Preview runs the enrollment rules engine. CSV format:{' '}
             <code>studentEmailOrId,courseCodeOrId</code>
           </p>
-          <form onSubmit={bulkEnroll} className="grid gap-2 border rounded-md p-3 border-gray-200 dark:border-gray-700">
+          <form onSubmit={bulkEnroll} className={`${ru.card} grid gap-2`}>
             <input
-              className="rounded border px-2 py-1 dark:bg-gray-800"
+              className={ru.input}
               placeholder="Course ID (single-course mode)"
               value={bulkCourseId}
               onChange={(e) => setBulkCourseId(e.target.value)}
             />
             <input
-              className="rounded border px-2 py-1 dark:bg-gray-800"
+              className={ru.input}
               placeholder="Student IDs (comma/space separated)"
               value={bulkStudentIds}
               onChange={(e) => setBulkStudentIds(e.target.value)}
             />
             <textarea
-              className="w-full min-h-[100px] rounded border px-2 py-1 font-mono text-xs dark:bg-gray-800"
+              className={`${ru.textarea} min-h-[100px]`}
               placeholder={'student@school.edu,CS101\n68abc...,MATH201'}
               value={bulkCsv}
               onChange={(e) => setBulkCsv(e.target.value)}
@@ -561,7 +558,7 @@ export function RegistrarOperations() {
             </label>
             {override && (
               <input
-                className="rounded border px-2 py-1 dark:bg-gray-800"
+                className={ru.input}
                 placeholder="Override reason (required)"
                 value={overrideReason}
                 onChange={(e) => setOverrideReason(e.target.value)}
@@ -569,17 +566,17 @@ export function RegistrarOperations() {
               />
             )}
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => void runPreview()} className="rounded border px-3 py-1.5">
+              <button type="button" onClick={() => void runPreview()} className={ru.btnSecondary}>
                 Preview rules
               </button>
-              <button type="submit" className="rounded bg-indigo-600 text-white px-3 py-1.5">
+              <button type="submit" className={ru.btnPrimary}>
                 Apply bulk enroll
               </button>
             </div>
           </form>
 
           {preview && (
-            <ul className="divide-y border rounded-md border-gray-200 dark:border-gray-700">
+            <ul className={ru.list}>
               {preview.map((row, i) => (
                 <li key={i} className="px-3 py-2">
                   <div className="font-medium">
@@ -613,23 +610,23 @@ export function RegistrarOperations() {
             <label className="flex-1 min-w-[200px]">
               Course ID
               <input
-                className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+                className={ru.input}
                 value={waitlistCourseId}
                 onChange={(e) => setWaitlistCourseId(e.target.value)}
               />
             </label>
-            <button type="button" className="rounded border px-3 py-1.5" onClick={() => void loadWaitlist()}>
+            <button type="button" className={ru.btnSecondary} onClick={() => void loadWaitlist()}>
               Load waitlist
             </button>
             <button
               type="button"
-              className="rounded bg-indigo-600 text-white px-3 py-1.5"
+              className={ru.btnPrimary}
               onClick={() => void promoteWaitlist()}
             >
               Promote first
             </button>
           </div>
-          <ul className="divide-y border rounded-md border-gray-200 dark:border-gray-700">
+          <ul className={ru.list}>
             {waitlist.map((w, i) => (
               <li key={i} className="px-3 py-2 flex justify-between gap-2">
                 <span>
@@ -637,14 +634,14 @@ export function RegistrarOperations() {
                 </span>
                 <button
                   type="button"
-                  className="text-blue-600"
+                  className={ru.link}
                   onClick={() => void promoteWaitlist(w.student?._id)}
                 >
                   Promote
                 </button>
               </li>
             ))}
-            {!waitlist.length && <li className="px-3 py-4 text-gray-500">No waitlist loaded.</li>}
+            {!waitlist.length && <li className={ru.empty}>No waitlist loaded.</li>}
           </ul>
         </section>
       )}
@@ -653,17 +650,17 @@ export function RegistrarOperations() {
         <section className="space-y-4">
           <form
             onSubmit={placeHold}
-            className="grid gap-2 sm:grid-cols-2 text-sm border rounded-md p-3 border-gray-200 dark:border-gray-700"
+            className={`${ru.card} grid gap-2 sm:grid-cols-2 text-sm`}
           >
             <input
-              className="rounded border px-2 py-1 dark:bg-gray-800"
+              className={ru.input}
               placeholder="Student ID"
               value={holdForm.studentId}
               onChange={(e) => setHoldForm((f) => ({ ...f, studentId: e.target.value }))}
               required
             />
             <select
-              className="rounded border px-2 py-1 dark:bg-gray-800"
+              className={ru.input}
               value={holdForm.holdType}
               onChange={(e) => setHoldForm((f) => ({ ...f, holdType: e.target.value }))}
             >
@@ -688,12 +685,12 @@ export function RegistrarOperations() {
               />
               Blocks transcript
             </label>
-            <button type="submit" className="sm:col-span-2 rounded bg-indigo-600 text-white px-3 py-1.5">
+            <button type="submit" className={`sm:col-span-2 ${ru.btnPrimary}`}>
               Place hold
             </button>
           </form>
 
-          <ul className="divide-y divide-gray-200 dark:divide-gray-700 border rounded-md border-gray-200 dark:border-gray-700">
+          <ul className={ru.list}>
             {holds.map((h) => (
               <li key={h._id} className="flex items-start justify-between gap-3 px-3 py-3 text-sm">
                 <div>
@@ -703,7 +700,7 @@ export function RegistrarOperations() {
                   </div>
                   <div className="text-gray-600 dark:text-gray-400 mt-0.5">{h.reason}</div>
                 </div>
-                <button type="button" onClick={() => void releaseHold(h._id)} className="text-blue-600">
+                <button type="button" onClick={() => void releaseHold(h._id)} className={ru.link}>
                   Release
                 </button>
               </li>
@@ -717,13 +714,13 @@ export function RegistrarOperations() {
         <section className="space-y-4 text-sm">
           <p className="text-gray-600 dark:text-gray-400">
             Full SIS import / staging inbox / grade export / live connectors:{' '}
-            <a className="text-indigo-600 underline" href="/registrar/sis">
+            <a className={ru.link} href="/registrar/sis">
               Registrar → SIS
             </a>
             . Quick enrollment CSV still works below.
           </p>
 
-          <div className="rounded-md border border-gray-200 dark:border-gray-700 p-3 space-y-2 bg-gray-50 dark:bg-gray-950/40">
+          <div className={`${ru.cardMuted} space-y-2`}>
             <h3 className="font-medium">SIS runbook</h3>
             <ol className="list-decimal pl-5 space-y-1 text-gray-600 dark:text-gray-400">
               <li>Prefer CSV fallback when the partner API is down — stage → inbox → apply.</li>
@@ -752,11 +749,11 @@ export function RegistrarOperations() {
             onChange={(e) => setSisCsv(e.target.value)}
             placeholder="student@school.edu,CS101"
           />
-          <button type="button" onClick={() => void stageSis()} className="rounded bg-indigo-600 text-white px-3 py-1.5">
+          <button type="button" onClick={() => void stageSis()} className={ru.btnPrimary}>
             Stage import
           </button>
 
-          <ul className="divide-y border rounded-md border-gray-200 dark:border-gray-700">
+          <ul className={ru.list}>
             {sisRows.map((row) => (
               <li key={row._id} className="px-3 py-2 flex flex-wrap justify-between gap-2">
                 <span>
@@ -764,13 +761,13 @@ export function RegistrarOperations() {
                   {row.applyError ? ` (${row.applyError})` : ''}
                 </span>
                 {row.status === 'pending' && (
-                  <button type="button" className="text-blue-600" onClick={() => void applySis(row.batchId)}>
+                  <button type="button" className={ru.link} onClick={() => void applySis(row.batchId)}>
                     Apply batch
                   </button>
                 )}
               </li>
             ))}
-            {!sisRows.length && <li className="px-3 py-4 text-gray-500">No staged rows.</li>}
+            {!sisRows.length && <li className={ru.empty}>No staged rows.</li>}
           </ul>
         </section>
       )}

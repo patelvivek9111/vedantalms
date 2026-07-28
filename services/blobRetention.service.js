@@ -39,8 +39,9 @@ function ensureQuarantineDir() {
   if (!fs.existsSync(QUARANTINE_DIR)) fs.mkdirSync(QUARANTINE_DIR, { recursive: true });
 }
 
-async function getBlobRetentionDays() {
-  const settings = await SystemSettings.findOne().lean();
+async function getBlobRetentionDays(rootAccountId) {
+  const settingsDoc = await SystemSettings.getSettings(rootAccountId);
+  const settings = settingsDoc?.toObject ? settingsDoc.toObject() : settingsDoc;
   const storage = settings?.storage || {};
   return storage.deletedBlobRetentionDays ?? storage.deletedFileRetentionDays ?? 30;
 }

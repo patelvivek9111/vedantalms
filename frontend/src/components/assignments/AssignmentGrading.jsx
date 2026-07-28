@@ -29,6 +29,7 @@ import {
 } from '../../utils/submissionAnswers';
 import FileAttachmentChips from '../files/FileAttachmentChips';
 import FileAttachmentPanel from '../files/FileAttachmentPanel';
+import { SpeedGraderRubricPanel } from './SpeedGraderRubricPanel';
 
 function questionTypeLabel(type) {
   if (type === 'multiple-choice') return 'Multiple choice';
@@ -96,6 +97,7 @@ const AssignmentGrading = () => {
   const [showUnsavedChangesConfirm, setShowUnsavedChangesConfirm] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [overallGrade, setOverallGrade] = useState('');
+  const [rubricAssessmentMap, setRubricAssessmentMap] = useState({});
   const feedbackTimeoutRef = useRef(null);
   const lastSavedFeedbackRef = useRef('');
   const lastSavedFeedbackFilesRef = useRef('');
@@ -436,6 +438,13 @@ const AssignmentGrading = () => {
             ? String(savedData.overallGrade)
             : resolveSubmissionPointsGrade(selectedSubmission)
         );
+        const existingAssessment =
+          savedData.rubricAssessment || selectedSubmission.rubricAssessment;
+        if (existingAssessment?.criterionAssessments) {
+          setRubricAssessmentMap(existingAssessment.criterionAssessments);
+        } else {
+          setRubricAssessmentMap({});
+        }
         // Prefer offline saved feedback, then server feedback
         const feedbackText = savedData.feedback ?? selectedSubmission.feedback ?? '';
       setFeedback(feedbackText);
@@ -627,8 +636,21 @@ const AssignmentGrading = () => {
     }
     
     const hasQuestions = Array.isArray(assignment?.questions) && assignment.questions.length > 0;
+    const hasRubric =
+      Array.isArray(assignment?.rubric?.criteria) && assignment.rubric.criteria.length > 0;
+    const useRubricForGrading = hasRubric && assignment?.useRubricForGrading !== false;
 
-    if (!approveGrade && !hasQuestions) {
+    if (useRubricForGrading && !approveGrade) {
+      const missing = assignment.rubric.criteria.filter(
+        (c) => rubricAssessmentMap[c.id]?.points == null && !rubricAssessmentMap[c.id]?.ratingId
+      );
+      if (missing.length) {
+        toast.error(`Select a rating for: ${missing.map((c) => c.description).join(', ')}`);
+        return;
+      }
+    }
+
+    if (!approveGrade && !hasQuestions && !useRubricForGrading) {
       const maxPoints = assignment?.totalPoints || 100;
       const validation = validateGrade(overallGrade, maxPoints);
       if (!validation.valid) {
@@ -759,6 +781,14 @@ const AssignmentGrading = () => {
         }
       }
 
+      if (
+        Array.isArray(assignment?.rubric?.criteria) &&
+        assignment.rubric.criteria.length > 0 &&
+        Object.keys(rubricAssessmentMap).length > 0
+      ) {
+        payload.rubricAssessment = { criterionAssessments: rubricAssessmentMap };
+      }
+
       const response = await api.put(`/submissions/${selectedSubmission._id}`, payload);
 
       // Mark as synced in offline storage after successful save
@@ -839,6 +869,9 @@ const AssignmentGrading = () => {
       }
       setQuestionGrades(updatedGrades);
       setOverallGrade(resolveSubmissionPointsGrade(response.data));
+      if (response.data.rubricAssessment?.criterionAssessments) {
+        setRubricAssessmentMap(response.data.rubricAssessment.criterionAssessments);
+      }
       lastSavedGradesRef.current = { ...updatedGrades };
       lastSavedFeedbackRef.current = feedback;
       lastSavedFeedbackFilesRef.current = fileAssetIdsFromFiles(feedbackFiles).join(',');
@@ -1679,6 +1712,21 @@ const AssignmentGrading = () => {
                   </div>
                 )}
 
+                {/* Rubric SpeedGrader (Phase 2) */}
+                {assignment.rubric?.criteria?.length > 0 && (
+                  <SpeedGraderRubricPanel
+                    rubric={assignment.rubric}
+                    value={rubricAssessmentMap}
+                    useForGrading={assignment.useRubricForGrading !== false}
+                    disabled={isGrading}
+                    onChange={(next, score) => {
+                      setRubricAssessmentMap(next);
+                      setOverallGrade(String(score));
+                      setHasUnsavedChanges(true);
+                    }}
+                  />
+                )}
+
                 {/* Upload-only / no-question assignments: single overall grade */}
                 {(!assignment.questions || assignment.questions.length === 0) && (
                   <div className="mb-6 border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-900">
@@ -1696,12 +1744,19 @@ const AssignmentGrading = () => {
                           setOverallGrade(e.target.value);
                           setHasUnsavedChanges(true);
                         }}
+                        disabled={
+                          assignment.rubric?.criteria?.length > 0 &&
+                          assignment.useRubricForGrading !== false
+                        }
                         className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         aria-label="Overall submission grade"
                       />
                     </div>
                     <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                      Review uploaded files and feedback above, then enter the total points earned.
+                      {assignment.rubric?.criteria?.length > 0 &&
+                      assignment.useRubricForGrading !== false
+                        ? 'Score is filled from the rubric ratings above.'
+                        : 'Review uploaded files and feedback above, then enter the total points earned.'}
                     </p>
                   </div>
                 )}

@@ -6,9 +6,11 @@ describe('legacy assignment compatibility', () => {
     const legacyAssignment = { _id: 'a1', published: true };
     const legacySubmission = { _id: 's1', assignment: 'a1', grade: 87 };
 
+    // Legacy graded work with no manual-hold policy releases score + overall feedback together.
     expect(gradeReleaseService.resolveStudentGradeVisibility(legacySubmission, legacyAssignment)).toMatchObject({
-      mode: 'score_only',
+      mode: 'score_and_feedback',
       scoreVisible: true,
+      feedbackVisible: true,
     });
   });
 

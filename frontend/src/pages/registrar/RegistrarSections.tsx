@@ -2,6 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { registrarGet, registrarPost, registrarPatch, downloadCsv } from './registrarApi';
+import { ru } from './registrarUi';
+import { useRegistrarMode } from './useRegistrarMode';
+import type { SectionsSubTab } from './registrarMode';
 import { API_URL } from '../../config';
 import { getMemoryAuthToken } from '../../utils/authToken';
 import type { AcademicTerm } from './registrarApi';
@@ -68,6 +71,7 @@ const METHOD_HELP: Record<string, string> = {
 };
 
 export function RegistrarSections() {
+  const { flags, isSchool } = useRegistrarMode();
   const [tab, setTab] = useState<Tab>('sections');
   const [terms, setTerms] = useState<AcademicTerm[]>([]);
   const [termId, setTermId] = useState('');
@@ -365,12 +369,19 @@ export function RegistrarSections() {
     }
   };
 
-  const tabs: { id: Tab; label: string }[] = [
-    { id: 'sections', label: 'Sections' },
+  const allTabs: { id: Tab; label: string }[] = [
+    { id: 'sections', label: isSchool ? 'Classes' : 'Sections' },
     { id: 'offerings', label: 'Offerings' },
     { id: 'crosslist', label: 'Cross-list' },
     { id: 'structure', label: 'Structure' },
   ];
+  const tabs = allTabs.filter((t) => flags.sectionsTabs.includes(t.id as SectionsSubTab));
+
+  useEffect(() => {
+    if (!flags.sectionsTabs.includes(tab as SectionsSubTab)) {
+      setTab((flags.sectionsTabs[0] || 'sections') as Tab);
+    }
+  }, [flags.sectionsTabs, tab]);
 
   const toggleXl = (id: string) => {
     setXlSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -380,33 +391,39 @@ export function RegistrarSections() {
   const methodLabel = (m?: string) => m || 'open';
 
   return (
-    <div className="space-y-6 max-w-5xl">
-      <p className="text-sm text-gray-600 dark:text-gray-400">
-        Manage catalog offerings, term sections, and cross-lists. See{' '}
-        <code className="text-xs">docs/registrar/CROSS_LIST_GRADEBOOKS.md</code> for shared vs split
-        gradebook rules (remount never merges history).
+    <div className={`${ru.page} max-w-5xl`}>
+      <p className={ru.muted}>
+        {isSchool
+          ? 'Manage class sections for each term and link them to teacher LMS courses.'
+          : (
+            <>
+              Manage catalog offerings, term sections, and cross-lists. See{' '}
+              <code className="text-xs">docs/registrar/CROSS_LIST_GRADEBOOKS.md</code> for shared vs split
+              gradebook rules (remount never merges history).
+            </>
+          )}
       </p>
 
-      <div className="flex flex-wrap gap-2 border-b border-gray-200 dark:border-gray-700 pb-2">
+      {tabs.length > 1 && (
+      <div className={ru.tabRow}>
         {tabs.map((t) => (
           <button
             key={t.id}
             type="button"
             onClick={() => setTab(t.id)}
-            className={`rounded px-3 py-1.5 text-sm ${
-              tab === t.id ? 'bg-indigo-600 text-white' : 'border border-gray-300 dark:border-gray-600'
-            }`}
+            className={tab === t.id ? ru.tabActive : ru.tab}
           >
             {t.label}
           </button>
         ))}
       </div>
+      )}
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</div>
+        <div className={ru.alertError}>{error}</div>
       )}
       {message && (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+        <div className={ru.alertOk}>
           {message}
         </div>
       )}
@@ -417,7 +434,7 @@ export function RegistrarSections() {
             <label className="text-sm">
               Term
               <select
-                className="mt-1 block rounded border dark:bg-gray-800 px-2 py-1"
+                className={ru.input}
                 value={termId}
                 onChange={(e) => setTermId(e.target.value)}
               >
@@ -432,7 +449,7 @@ export function RegistrarSections() {
             <label className="text-sm">
               Status
               <select
-                className="mt-1 block rounded border dark:bg-gray-800 px-2 py-1"
+                className={ru.input}
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
               >
@@ -443,7 +460,7 @@ export function RegistrarSections() {
                 <option value="cancelled">cancelled</option>
               </select>
             </label>
-            <button type="button" className="rounded border px-3 py-1.5 text-sm" onClick={() => void loadSections()}>
+            <button type="button" className={ru.btnSecondary} onClick={() => void loadSections()}>
               Refresh
             </button>
           </div>
@@ -451,14 +468,14 @@ export function RegistrarSections() {
           {mixedOfferingBanners.map((o) => (
             <div
               key={o.code}
-              className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-100"
+              className={`${ru.alertInfo} text-sm`}
             >
               Offering <strong>{o.code}</strong> {o.title}: mixed linked/unlinked ({o.linked}/{o.total}{' '}
               linked). Create content courses for unlinked sections before term finalize.
             </div>
           ))}
 
-          <ul className="divide-y border rounded-md text-sm border-gray-200 dark:border-gray-700">
+          <ul className={ru.list}>
             {sections.map((s) => {
               const linked = s.contentLinked ?? Boolean(s.lmsCourseId);
               const mode = s.crossListMode;
@@ -482,7 +499,7 @@ export function RegistrarSections() {
                           {linked ? 'Linked' : 'Unlinked'}
                         </span>
                         {mode && (
-                          <span className="rounded bg-indigo-100 text-indigo-800 px-1.5 py-0.5 dark:bg-indigo-900/40 dark:text-indigo-200">
+                          <span className={ru.pill}>
                             {mode} cross-list
                           </span>
                         )}
@@ -511,24 +528,24 @@ export function RegistrarSections() {
                     </div>
                     <span className="flex flex-wrap gap-2 items-start">
                       {s.openCourseUrl && (
-                        <Link className="text-blue-600" to={s.openCourseUrl}>
+                        <Link className={ru.link} to={s.openCourseUrl}>
                           Open course
                         </Link>
                       )}
                       {s.openGradebookUrl && (
-                        <Link className="text-blue-600" to={s.openGradebookUrl}>
+                        <Link className={ru.link} to={s.openGradebookUrl}>
                           Gradebook
                         </Link>
                       )}
                       {s.archiveCourseUrl && (
-                        <Link className="text-blue-600" to={s.archiveCourseUrl}>
+                        <Link className={ru.link} to={s.archiveCourseUrl}>
                           Archive gradebook
                         </Link>
                       )}
                       {!linked && (
                         <button
                           type="button"
-                          className="text-blue-600"
+                          className={ru.link}
                           disabled={busy}
                           onClick={() => void linkContent(s._id)}
                         >
@@ -538,7 +555,7 @@ export function RegistrarSections() {
                       {s.status !== 'published' && (
                         <button
                           type="button"
-                          className="text-blue-600"
+                          className={ru.link}
                           onClick={() => void patchSection(s._id, { publish: true })}
                         >
                           Publish
@@ -547,7 +564,7 @@ export function RegistrarSections() {
                       {s.status === 'published' && (
                         <button
                           type="button"
-                          className="text-blue-600"
+                          className={ru.link}
                           onClick={() => void patchSection(s._id, { conclude: true })}
                         >
                           Conclude
@@ -555,14 +572,14 @@ export function RegistrarSections() {
                       )}
                       <button
                         type="button"
-                        className="text-blue-600"
+                        className={ru.link}
                         onClick={() => void exportRoster(s._id, s.sectionNumber)}
                       >
                         Roster CSV
                       </button>
                       <button
                         type="button"
-                        className="text-blue-600"
+                        className={ru.link}
                         onClick={() => {
                           const next = expanded ? '' : s._id;
                           setExpandedId(next);
@@ -581,11 +598,11 @@ export function RegistrarSections() {
                       : '—'}
                   </div>
                   {expanded && (
-                    <div className="rounded border border-gray-200 dark:border-gray-700 p-3 space-y-3 bg-gray-50 dark:bg-gray-900/40">
+                    <div className={`${ru.cardMuted} space-y-3`}>
                       <label className="block text-sm max-w-xs">
                         Enrollment method
                         <select
-                          className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+                          className={ru.input}
                           value={methodLabel(s.enrollmentMethod)}
                           onChange={(e) =>
                             void patchSection(s._id, { enrollmentMethod: e.target.value })
@@ -628,7 +645,7 @@ export function RegistrarSections() {
                                   {sid && (
                                     <button
                                       type="button"
-                                      className="text-blue-600"
+                                      className={ru.link}
                                       disabled={busy}
                                       onClick={() => void promoteWaitlist(s._id, sid)}
                                     >
@@ -646,7 +663,7 @@ export function RegistrarSections() {
                         {linked && waitlist.length > 0 && (
                           <button
                             type="button"
-                            className="mt-2 text-blue-600 text-xs"
+                            className={`mt-2 ${ru.link} text-xs`}
                             disabled={busy}
                             onClick={() => void promoteWaitlist(s._id)}
                           >
@@ -659,7 +676,7 @@ export function RegistrarSections() {
                 </li>
               );
             })}
-            {!sections.length && <li className="px-3 py-4 text-gray-500">No sections for this filter.</li>}
+            {!sections.length && <li className={ru.empty}>No sections for this filter.</li>}
           </ul>
         </section>
       )}
@@ -668,12 +685,12 @@ export function RegistrarSections() {
         <section className="space-y-4">
           <form
             onSubmit={createOffering}
-            className="grid gap-3 border rounded-md p-4 border-gray-200 dark:border-gray-700 max-w-lg"
+            className={`${ru.card} grid gap-3 max-w-lg`}
           >
             <label className="text-sm">
               Course code
               <input
-                className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+                className={ru.input}
                 value={offCode}
                 onChange={(e) => setOffCode(e.target.value)}
                 required
@@ -682,39 +699,39 @@ export function RegistrarSections() {
             <label className="text-sm">
               Title
               <input
-                className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+                className={ru.input}
                 value={offTitle}
                 onChange={(e) => setOffTitle(e.target.value)}
                 required
               />
             </label>
-            <button type="submit" className="rounded bg-indigo-600 text-white px-3 py-1.5 text-sm w-fit">
+            <button type="submit" className={`${ru.btnPrimary} w-fit`}>
               Create offering
             </button>
           </form>
-          <ul className="divide-y border rounded-md text-sm border-gray-200 dark:border-gray-700">
+          <ul className={ru.list}>
             {offerings.map((o) => (
               <li key={o._id} className="px-3 py-2">
                 <strong>{o.courseCode}</strong> — {o.title}
                 {o.credits != null ? ` · ${o.credits} cr` : ''}
               </li>
             ))}
-            {!offerings.length && <li className="px-3 py-4 text-gray-500">No offerings yet.</li>}
+            {!offerings.length && <li className={ru.empty}>No offerings yet.</li>}
           </ul>
         </section>
       )}
 
       {tab === 'crosslist' && (
         <section className="space-y-4">
-          <div className="border rounded-md p-4 border-gray-200 dark:border-gray-700 space-y-3 max-w-xl">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+          <div className={`${ru.card} space-y-3 max-w-xl`}>
+            <p className={ru.muted}>
               Shared gradebook (default): member sections remount to the primary content course — history is
               archived, not merged. Split keeps distinct gradebooks with Open course / Gradebook links.
             </p>
             <label className="text-sm block">
               Group name
               <input
-                className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+                className={ru.input}
                 value={xlName}
                 onChange={(e) => setXlName(e.target.value)}
               />
@@ -746,21 +763,21 @@ export function RegistrarSections() {
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                className="rounded border px-3 py-1.5 text-sm"
+                className={ru.btnSecondary}
                 onClick={() => void previewCrossList()}
               >
                 Preview remount
               </button>
               <button
                 type="button"
-                className="rounded bg-indigo-600 text-white px-3 py-1.5 text-sm"
+                className={ru.btnPrimary}
                 onClick={() => void createCrossList()}
               >
                 Create cross-list
               </button>
             </div>
             {xlPreview && (
-              <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-100 space-y-2">
+              <div className={`${ru.alertInfo} space-y-2 text-sm`}>
                 <p>{xlPreview.note}</p>
                 {xlPreview.requiresConfirm && (
                   <>
@@ -797,20 +814,20 @@ export function RegistrarSections() {
               </div>
             )}
           </div>
-          <ul className="divide-y border rounded-md text-sm border-gray-200 dark:border-gray-700">
+          <ul className={ru.list}>
             {crossLists.map((g) => (
               <li key={g._id} className="px-3 py-2">
                 {g.name} · {g.sharedGradebook !== false ? 'shared gradebook' : 'split gradebooks'} ·{' '}
                 {(g.sectionIds || []).length} sections
               </li>
             ))}
-            {!crossLists.length && <li className="px-3 py-4 text-gray-500">No cross-lists yet.</li>}
+            {!crossLists.length && <li className={ru.empty}>No cross-lists yet.</li>}
           </ul>
         </section>
       )}
 
       {tab === 'structure' && (
-        <section className="space-y-3 border rounded-md p-4 border-gray-200 dark:border-gray-700 text-sm">
+        <section className={`${ru.card} space-y-3 text-sm`}>
           <p>
             Published courses: <strong>{gaps?.totalPublished ?? '—'}</strong> · Missing offering/section:{' '}
             <strong>{gaps?.missingStructure ?? '—'}</strong>
@@ -822,7 +839,7 @@ export function RegistrarSections() {
           {gaps?.contentRootNote && <p className="text-gray-500">{gaps.contentRootNote}</p>}
           <button
             type="button"
-            className="rounded bg-indigo-600 text-white px-3 py-1.5"
+            className={ru.btnPrimary}
             onClick={() => void runBackfill()}
           >
             Backfill missing structure

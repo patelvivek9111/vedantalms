@@ -12,8 +12,8 @@ const { ZIP_DIR } = require('../services/bulkDownload.service');
 const { isPathInside } = require('../config/paths');
 const { getSignedCloudinaryUrl } = require('../utils/cloudinary');
 
-function redirectToRemotePreview(res, url, { download = false } = {}) {
-  const signed = getSignedCloudinaryUrl(url, { download, resourceType: 'auto' });
+function redirectToRemotePreview(res, url, { download = false, fileName } = {}) {
+  const signed = getSignedCloudinaryUrl(url, { download, resourceType: 'auto', fileName });
   return res.redirect(302, signed || url);
 }
 
@@ -57,17 +57,29 @@ exports.getFileMetadata = async (req, res) => {
   }
 };
 
-function applyFileResponseHeaders(res, asset, { download = true, contentType } = {}) {
-  res.setHeader('Content-Type', contentType || asset.mimeType || 'application/octet-stream');
-  if (download) {
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="${encodeURIComponent(asset.originalName || 'download')}"`
-    );
-  }
+/** RFC 5987 Content-Disposition so browsers save the uploaded original filename. */
+function buildContentDisposition(disposition, originalName) {
+  const fallback = disposition === 'attachment' ? 'download' : 'file';
+  const name = String(originalName || fallback).replace(/[\r\n"]/g, '_').trim() || fallback;
+  const asciiFallback = name.replace(/[^\x20-\x7E]/g, '_') || fallback;
+  const encoded = encodeURIComponent(name);
+  return `${disposition}; filename="${asciiFallback}"; filename*=UTF-8''${encoded}`;
 }
 
-async function streamAssetToResponse(req, res, asset, { download = true } = {}) {
+function applyFileResponseHeaders(res, asset, { download = true, contentType } = {}) {
+  res.setHeader('Content-Type', contentType || asset.mimeType || 'application/octet-stream');
+  res.setHeader(
+    'Content-Disposition',
+    buildContentDisposition(download ? 'attachment' : 'inline', asset.originalName)
+  );
+}
+
+/**
+ * Stream or download a FileAsset.
+ * allowRedirect=false forces a same-origin body (required for in-browser blob previews).
+ * Cloudinary 302 redirects break authenticated fetch().blob() due to CORS.
+ */
+async function streamAssetToResponse(req, res, asset, { download = true, allowRedirect = true } = {}) {
   await academicAuditService.recordAuditEvent({
     actorId: req.user?._id,
     entityType: 'file_asset',
@@ -75,13 +87,18 @@ async function streamAssetToResponse(req, res, asset, { download = true } = {}) 
     action: download ? 'file_download' : 'file_stream',
     ip: req.ip,
     requestId: req.requestId,
-    metadata: { category: asset.category },
+    metadata: { category: asset.category, allowRedirect },
   }).catch(() => {});
 
-  if (asset.provider === 'cloudinary' && asset.metadata?.providerUrl) {
+  if (
+    allowRedirect &&
+    asset.provider === 'cloudinary' &&
+    asset.metadata?.providerUrl
+  ) {
     const signedUrl = getSignedCloudinaryUrl(asset.metadata.providerUrl, {
       download,
       resourceType: asset.metadata?.resourceType || 'auto',
+      fileName: asset.originalName,
     });
     if (signedUrl) {
       return res.redirect(302, signedUrl);
@@ -178,7 +195,8 @@ exports.streamFile = async (req, res) => {
       requestId: req.requestId,
     });
     assertSafeForDownload(asset);
-    await streamAssetToResponse(req, res, asset, { download: false });
+    // Never redirect: preview iframes fetch this into a blob: URL (same-origin required).
+    await streamAssetToResponse(req, res, asset, { download: false, allowRedirect: false });
   } catch (error) {
     if (!res.headersSent) {
       res.status(error.statusCode || 500).json({ success: false, message: error.message });

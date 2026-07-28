@@ -13,6 +13,7 @@ import {
   FileText,
   Shield,
   Settings,
+  Database,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -141,12 +142,21 @@ export const ALL_NAV_OPTIONS: NavItem[] = [
     to: '/registrar',
     activePaths: ['/registrar'],
   },
+  {
+    id: 'institutions',
+    label: 'Institutions',
+    icon: Database,
+    to: '/admin/institutions',
+    activePaths: ['/admin/institutions'],
+  },
 ];
 
 export const DEFAULT_NAV_ITEMS = ['dashboard', 'inbox', 'calendar', 'groups'];
 
 export function getDefaultNavItemIds(role?: string): string[] {
   switch (role) {
+    case 'platform_admin':
+      return ['institutions', 'account'];
     case 'admin':
       return ['dashboard', 'inbox', 'admin-users', 'registrar'];
     case 'registrar':
@@ -178,6 +188,12 @@ export const NavCustomizationModal: React.FC<NavCustomizationModalProps> = ({
 
   // Filter available options based on user role
   const availableOptions = ALL_NAV_OPTIONS.filter(option => {
+    if (user?.role === 'platform_admin') {
+      return ['institutions', 'account'].includes(option.id);
+    }
+    if (option.id === 'institutions') {
+      return user?.role === 'platform_admin';
+    }
     if (option.id === 'report') {
       return user?.role === 'student';
     }
@@ -188,7 +204,7 @@ export const NavCustomizationModal: React.FC<NavCustomizationModalProps> = ({
       return user?.role === 'teacher' || user?.role === 'admin';
     }
     if (option.id === 'registrar') {
-      return ['admin', 'registrar', 'department_admin', 'platform_admin'].includes(user?.role || '');
+      return ['admin', 'registrar', 'department_admin'].includes(user?.role || '');
     }
     if (user?.role === 'registrar' || user?.role === 'department_admin') {
       return ['registrar', 'inbox', 'account', 'dashboard'].includes(option.id);

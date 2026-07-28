@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { registrarGet } from './registrarApi';
+import { ru } from './registrarUi';
 
 type DashboardData = {
   enrollments: { total: number; byStatus: { _id: string; count: number }[] };
@@ -26,6 +27,40 @@ type IntegrationsStatus = {
   boardSubmit?: { mode?: string; canSubmit?: boolean; note?: string };
   sis?: { provider?: string; schedule?: string; lastSyncStatus?: string | null };
 };
+
+function StatCard({
+  label,
+  value,
+  to,
+  hint,
+}: {
+  label: string;
+  value: number;
+  to: string;
+  hint?: string;
+}) {
+  return (
+    <Link to={to} className={ru.kpi}>
+      <span className={ru.kpiAccent} aria-hidden />
+      <div className={ru.kpiLabel}>{label}</div>
+      <div className={ru.kpiValue}>{value}</div>
+      {hint ? <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{hint}</div> : null}
+    </Link>
+  );
+}
+
+function StatusPill({
+  ok,
+  warn,
+  children,
+}: {
+  ok?: boolean;
+  warn?: boolean;
+  children: React.ReactNode;
+}) {
+  const cls = ok ? ru.pillOk : warn ? ru.pillWarn : ru.pillOff;
+  return <span className={cls}>{children}</span>;
+}
 
 export function RegistrarDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
@@ -66,142 +101,193 @@ export function RegistrarDashboard() {
     };
   }, []);
 
-  if (loading) return <p className="text-sm text-gray-500">Loading dashboard…</p>;
-  if (error) {
+  if (loading) {
     return (
-      <div className="rounded-md border border-red-200 bg-red-50 dark:bg-red-950/40 px-3 py-2 text-sm text-red-800">
-        {error}
+      <div className={`${ru.card} ${ru.muted}`}>
+        <div className="h-4 w-40 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-24 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
+          ))}
+        </div>
       </div>
     );
   }
 
+  if (error) {
+    return <div className={ru.alertError}>{error}</div>;
+  }
+
   const cards = [
-    { label: 'Enrollments', value: data?.enrollments.total ?? 0, to: '/registrar/operations' },
-    { label: 'Active holds', value: data?.activeHolds ?? 0, to: '/registrar/operations' },
-    { label: 'SIS issues', value: data?.sisErrors ?? 0, to: '/registrar/sis' },
-    { label: 'Active / grading terms', value: data?.activeTerms ?? 0, to: '/registrar/terms' },
-    { label: 'Unfinalized courses', value: data?.gradeStatus.unfinalized ?? 0, to: '/registrar/grades' },
-    { label: 'Finalized courses', value: data?.gradeStatus.finalized ?? 0, to: '/registrar/grades' },
+    {
+      label: 'Enrollments',
+      value: data?.enrollments.total ?? 0,
+      to: '/registrar/operations',
+      hint: 'Active roster seats',
+    },
+    {
+      label: 'Active holds',
+      value: data?.activeHolds ?? 0,
+      to: '/registrar/operations',
+      hint: 'Blocking registration / records',
+    },
+    {
+      label: 'SIS issues',
+      value: data?.sisErrors ?? 0,
+      to: '/registrar/sis',
+      hint: 'Conflicts & rejected rows',
+    },
+    {
+      label: 'Active / grading terms',
+      value: data?.activeTerms ?? 0,
+      to: '/registrar/terms',
+    },
+    {
+      label: 'Unfinalized courses',
+      value: data?.gradeStatus.unfinalized ?? 0,
+      to: '/registrar/grades',
+      hint: 'Need registrar finalize',
+    },
+    {
+      label: 'Finalized courses',
+      value: data?.gradeStatus.finalized ?? 0,
+      to: '/registrar/grades',
+    },
   ];
 
   const sis = data?.sisHealth;
+  const quickLinks = [
+    { to: '/registrar/terms', label: 'Manage terms' },
+    { to: '/registrar/students', label: 'Search students' },
+    { to: '/registrar/transcripts', label: 'Issue transcript' },
+    { to: '/registrar/reports', label: 'Reports' },
+    { to: '/registrar/sis', label: 'SIS inbox' },
+    { to: '/registrar/settings', label: 'Settings' },
+  ];
 
   return (
-    <div className="space-y-6">
+    <div className={ru.page}>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {cards.map((c) => (
-          <Link
-            key={c.label}
-            to={c.to}
-            className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 hover:border-indigo-400 transition-colors"
-          >
-            <div className="text-xs uppercase tracking-wide text-gray-500">{c.label}</div>
-            <div className="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100">{c.value}</div>
-          </Link>
+          <StatCard key={c.label} {...c} />
         ))}
       </div>
 
-      {sis && (
-        <section className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-            <h2 className="text-sm font-medium text-gray-700 dark:text-gray-300">SIS sync health</h2>
-            <Link to="/registrar/sis" className="text-xs text-indigo-600">
-              Open SIS / retry →
-            </Link>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 text-sm">
-            <div>
-              <div className="text-xs text-gray-500">Provider / schedule</div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        {sis && (
+          <section className={ru.card}>
+            <div className={ru.cardHead}>
+              <h2 className={ru.cardTitle}>SIS sync health</h2>
+              <Link to="/registrar/sis" className={ru.cardAction}>
+                Open SIS / retry →
+              </Link>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                {sis.provider || '—'} · {sis.schedule || 'manual'}
+                <div className="text-xs font-medium text-slate-500">Provider / schedule</div>
+                <div className="mt-1 text-sm font-medium text-slate-900 dark:text-slate-100">
+                  {sis.provider || '—'} · {sis.schedule || 'manual'}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs font-medium text-slate-500">Last run</div>
+                <div className="mt-1 text-sm font-medium text-slate-900 dark:text-slate-100">
+                  {sis.lastSyncAt ? new Date(sis.lastSyncAt).toLocaleString() : 'Never'}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs font-medium text-slate-500">Status</div>
+                <div className="mt-1.5">
+                  <StatusPill
+                    ok={sis.lastSyncStatus === 'ok' || sis.lastSyncStatus === 'completed'}
+                    warn={Boolean(sis.errorRate && sis.errorRate > 0)}
+                  >
+                    {sis.lastSyncStatus || '—'} · {sis.errorRate ?? 0}% errors
+                  </StatusPill>
+                </div>
+              </div>
+              <div>
+                <div className="text-xs font-medium text-slate-500">Conflicts</div>
+                <div className="mt-1.5">
+                  <StatusPill warn={(sis.openConflicts ?? 0) > 0} ok={(sis.openConflicts ?? 0) === 0}>
+                    {sis.openConflicts ?? 0} open · {sis.consecutiveFailures ?? 0} fail streak
+                  </StatusPill>
+                </div>
               </div>
             </div>
-            <div>
-              <div className="text-xs text-gray-500">Last run</div>
-              <div>{sis.lastSyncAt ? new Date(sis.lastSyncAt).toLocaleString() : 'Never'}</div>
-            </div>
-            <div>
-              <div className="text-xs text-gray-500">Status / error rate</div>
-              <div>
-                {sis.lastSyncStatus || '—'} · {sis.errorRate ?? 0}%
-              </div>
-            </div>
-            <div>
-              <div className="text-xs text-gray-500">Conflicts / failures</div>
-              <div>
-                {sis.openConflicts ?? 0} open · {sis.consecutiveFailures ?? 0} streak
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
+          </section>
+        )}
 
-      {integrations && (
-        <section className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-            <h2 className="text-sm font-medium text-gray-700 dark:text-gray-300">Integration status</h2>
-            <Link to="/registrar/settings" className="text-xs text-indigo-600">
-              Settings →
-            </Link>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-3 text-sm">
-            <div>
-              <div className="text-xs text-gray-500">LTI AGS</div>
-              <div>
-                {integrations.ltiAgs?.ready
-                  ? 'Ready'
-                  : integrations.ltiAgs?.enabled
-                    ? 'Enabled (incomplete)'
-                    : 'Off'}
+        {integrations && (
+          <section className={ru.card}>
+            <div className={ru.cardHead}>
+              <h2 className={ru.cardTitle}>Integration status</h2>
+              <Link to="/registrar/settings" className={ru.cardAction}>
+                Settings →
+              </Link>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm text-slate-600 dark:text-slate-300">LTI AGS</span>
+                <StatusPill ok={integrations.ltiAgs?.ready} warn={integrations.ltiAgs?.enabled}>
+                  {integrations.ltiAgs?.ready
+                    ? 'Ready'
+                    : integrations.ltiAgs?.enabled
+                      ? 'Enabled (incomplete)'
+                      : 'Off'}
+                </StatusPill>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm text-slate-600 dark:text-slate-300">ERP holds</span>
+                <StatusPill
+                  ok={integrations.erpHolds?.configured}
+                  warn={(integrations.erpHolds?.deadLetterCount || 0) > 0}
+                >
+                  {integrations.erpHolds?.configured ? 'Secret set' : 'Not configured'}
+                  {(integrations.erpHolds?.deadLetterCount || 0) > 0
+                    ? ` · ${integrations.erpHolds?.deadLetterCount} DLQ`
+                    : ''}
+                </StatusPill>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm text-slate-600 dark:text-slate-300">Board submit</span>
+                <StatusPill ok={integrations.boardSubmit?.canSubmit}>
+                  {integrations.boardSubmit?.canSubmit
+                    ? 'Partner webhook'
+                    : integrations.boardSubmit?.mode || 'export_only'}
+                </StatusPill>
               </div>
             </div>
-            <div>
-              <div className="text-xs text-gray-500">ERP holds</div>
-              <div>
-                {integrations.erpHolds?.configured ? 'Secret set' : 'Not configured'}
-                {(integrations.erpHolds?.deadLetterCount || 0) > 0
-                  ? ` · ${integrations.erpHolds?.deadLetterCount} DLQ`
-                  : ''}
-              </div>
-            </div>
-            <div>
-              <div className="text-xs text-gray-500">Board submit</div>
-              <div>
-                {integrations.boardSubmit?.canSubmit
-                  ? 'Partner webhook'
-                  : integrations.boardSubmit?.mode || 'export_only'}
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
+          </section>
+        )}
+      </div>
 
       {(data?.enrollments.byStatus || []).length > 0 && (
-        <section>
-          <h2 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Enrollment by status</h2>
-          <div className="flex flex-wrap gap-3 text-sm">
+        <section className={ru.card}>
+          <h2 className={ru.sectionTitle}>Enrollment by status</h2>
+          <div className="flex flex-wrap gap-2">
             {data!.enrollments.byStatus.map((row) => (
-              <span key={row._id} className="rounded-md bg-gray-100 dark:bg-gray-800 px-2 py-1">
-                {row._id}: <strong>{row.count}</strong>
+              <span key={row._id} className={ru.pill}>
+                {row._id}: <strong className="ml-1">{row.count}</strong>
               </span>
             ))}
           </div>
         </section>
       )}
 
-      <section className="flex flex-wrap gap-3 text-sm">
-        <Link className="text-blue-600 hover:underline" to="/registrar/terms">
-          Manage terms
-        </Link>
-        <Link className="text-blue-600 hover:underline" to="/registrar/students">
-          Search students
-        </Link>
-        <Link className="text-blue-600 hover:underline" to="/registrar/transcripts">
-          Issue transcript
-        </Link>
-        <Link className="text-blue-600 hover:underline" to="/registrar/reports">
-          Reports
-        </Link>
+      <section className={ru.cardMuted}>
+        <h2 className={ru.sectionTitle}>Quick actions</h2>
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {quickLinks.map((l) => (
+            <Link
+              key={l.to}
+              to={l.to}
+              className="rounded-lg border border-slate-200/80 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:border-sky-300 hover:text-sky-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-sky-700"
+            >
+              {l.label}
+            </Link>
+          ))}
+        </div>
       </section>
     </div>
   );

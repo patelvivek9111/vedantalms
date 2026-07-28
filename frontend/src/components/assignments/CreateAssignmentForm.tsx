@@ -32,6 +32,8 @@ import ConfirmationModal from '../common/ConfirmationModal';
 import FileAttachmentPanel from '../files/FileAttachmentPanel';
 import GradingPeriodPicker from '../grades/GradingPeriodPicker';
 import GradingPeriodsModal from '../grades/GradingPeriodsModal';
+import { AssignmentRubricEditor } from './AssignmentRubricEditor';
+import type { RubricSnapshot } from './RubricViewer';
 import { normalizeAttachmentSources } from '../../utils/fileTypes';
 import type { NormalizedFile } from '../../utils/fileTypes';
 
@@ -125,6 +127,7 @@ interface FormData {
   description: string;
   availableFrom: string;
   dueDate: string;
+  lockAt: string;
   attachments: File[];
   moduleId: string;
   totalPoints: number;
@@ -167,6 +170,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
     description: '',
     availableFrom: '', // Blank for new assignments
     dueDate: '', // Blank for new assignments
+    lockAt: '',
     attachments: [],
     moduleId: '',
     totalPoints: 0,
@@ -203,6 +207,8 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
   const [submissionCount, setSubmissionCount] = useState(0);
   const [hasSubmissions, setHasSubmissions] = useState(false);
   const [totalPointsInput, setTotalPointsInput] = useState<string>('');
+  const [rubricDraft, setRubricDraft] = useState<RubricSnapshot | null>(null);
+  const [rubricId, setRubricId] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({});
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
@@ -216,7 +222,14 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
   // Load draft on mount (only for create mode)
   useEffect(() => {
     if (!editMode && draft) {
-      setFormData(draft);
+      // Merge so newer fields (e.g. lockAt) stay defined when restoring older drafts.
+      setFormData((prev) => ({
+        ...prev,
+        ...draft,
+        availableFrom: draft.availableFrom ?? '',
+        dueDate: draft.dueDate ?? '',
+        lockAt: draft.lockAt ?? '',
+      }));
     }
   }, [editMode, draft]);
 
@@ -240,6 +253,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
         description: '',
         availableFrom: '',
         dueDate: '',
+        lockAt: '',
         attachments: [],
         moduleId: '',
         totalPoints: 0,
@@ -416,6 +430,9 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
         description: stripHtml(assignmentData.description || ''),
         availableFrom: availableFromDate,
         dueDate: assignmentData.dueDate ? format(new Date(assignmentData.dueDate), "yyyy-MM-dd'T'HH:mm") : '',
+        lockAt: assignmentData.lockAt
+          ? format(new Date(assignmentData.lockAt), "yyyy-MM-dd'T'HH:mm")
+          : '',
         attachments: [],
         moduleId:
           typeof assignmentData.module === 'string'
@@ -448,6 +465,24 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
       setGradingPeriodId(assignmentData.gradingPeriodId ? String(assignmentData.gradingPeriodId) : null);
       setExistingAttachments(assignmentData.attachments || []);
       setAttachmentFiles(normalizeAttachmentSources(assignmentData));
+      if (assignmentData.rubric?.criteria?.length) {
+        const linkedId = assignmentData.rubricId
+          ? String(assignmentData.rubricId)
+          : assignmentData.rubric.rubricId
+            ? String(assignmentData.rubric.rubricId)
+            : null;
+        setRubricDraft({
+          title: assignmentData.rubric.title || 'Assignment rubric',
+          criteria: assignmentData.rubric.criteria,
+          pointsPossible: assignmentData.rubric.pointsPossible,
+          freeFormCriterionComments: assignmentData.rubric.freeFormCriterionComments !== false,
+          rubricId: linkedId,
+        });
+        setRubricId(linkedId);
+      } else {
+        setRubricDraft(null);
+        setRubricId(null);
+      }
       // Set totalPointsInput for offline assignments in edit mode
       if (assignmentData.isOfflineAssignment || assignmentData.quizSubmissionMode === 'paper_upload') {
         const calculatedTotalPoints = assignmentData.questions?.reduce((sum: number, q: any) => sum + (q.points || 0), 0) || assignmentData.totalPoints || 0;
@@ -548,29 +583,40 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
 
   const validateDates = () => {
     let isValid = true;
+    const nextErrors: { [key: string]: string } = {};
+
     if (!formData.availableFrom || formData.availableFrom.trim() === '') {
-      setFieldErrors(prev => ({ ...prev, availableFrom: 'Available from date is required' }));
+      nextErrors.availableFrom = 'Available from date is required';
       isValid = false;
-    } else {
-      setFieldErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors.availableFrom;
-        return newErrors;
-      });
     }
     if (!formData.dueDate || formData.dueDate.trim() === '') {
-      setFieldErrors(prev => ({ ...prev, dueDate: 'Due date is required' }));
+      nextErrors.dueDate = 'Due date is required';
       isValid = false;
-    } else if (formData.availableFrom && new Date(formData.availableFrom) >= new Date(formData.dueDate)) {
-      setFieldErrors(prev => ({ ...prev, dueDate: 'Due date must be after available from date' }));
+    } else if (
+      formData.availableFrom &&
+      new Date(formData.availableFrom) >= new Date(formData.dueDate)
+    ) {
+      nextErrors.dueDate = 'Due date must be after available from date';
       isValid = false;
-    } else {
-      setFieldErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors.dueDate;
-        return newErrors;
-      });
     }
+
+    if (
+      formData.lockAt &&
+      formData.lockAt.trim() !== '' &&
+      formData.dueDate &&
+      new Date(formData.lockAt) < new Date(formData.dueDate)
+    ) {
+      nextErrors.lockAt = 'Available until must be on or after the due date';
+      isValid = false;
+    }
+
+    setFieldErrors((prev) => {
+      const merged = { ...prev };
+      delete merged.availableFrom;
+      delete merged.dueDate;
+      delete merged.lockAt;
+      return { ...merged, ...nextErrors };
+    });
     return isValid;
   };
 
@@ -704,6 +750,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
       formDataToSend.append('description', formData.description);
       formDataToSend.append('availableFrom', formData.availableFrom);
       formDataToSend.append('dueDate', formData.dueDate);
+      formDataToSend.append('lockAt', formData.lockAt || '');
       if (moduleIdValue) formDataToSend.append('moduleId', moduleIdValue);
       formDataToSend.append('totalPoints', formData.totalPoints.toString());
       formDataToSend.append('questions', JSON.stringify(formData.questions));
@@ -725,6 +772,17 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
       formDataToSend.append('defaultGradeHidden', formData.defaultGradeHidden.toString());
       formDataToSend.append('lockAfterDue', formData.lockAfterDue.toString());
       formDataToSend.append('isOfflineAssignment', formData.isOfflineAssignment.toString());
+      if (rubricDraft?.criteria?.length) {
+        formDataToSend.append('rubric', JSON.stringify(rubricDraft));
+        formDataToSend.append('useRubricForGrading', 'true');
+        formDataToSend.append('syncTotalPointsFromRubric', 'true');
+        if (rubricId) formDataToSend.append('rubricId', rubricId);
+        if (rubricDraft.pointsPossible != null) {
+          formDataToSend.set('totalPoints', String(rubricDraft.pointsPossible));
+        }
+      } else if (editMode && assignmentData?.rubricId) {
+        formDataToSend.append('clearRubric', 'true');
+      }
       if (formData.isGroupAssignment && formData.groupSetId) {
         formDataToSend.append('groupSet', formData.groupSetId);
       }
@@ -1152,7 +1210,7 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
             )}
             <FormFieldGroup
               title="Schedule"
-              description="Set when the assignment becomes available and when it's due"
+              description="Set when the assignment unlocks, when it is due, and when it locks"
             >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <DatePicker
@@ -1161,10 +1219,10 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
                   label="Available From"
                   showTime={true}
                   required
-                  value={formData.availableFrom}
+                  value={formData.availableFrom ?? ''}
                   onChange={(e) => {
                     setFormData({ ...formData, availableFrom: e.target.value });
-                    if (fieldErrors.availableFrom || fieldErrors.dueDate) {
+                    if (fieldErrors.availableFrom || fieldErrors.dueDate || fieldErrors.lockAt) {
                       validateDates();
                     }
                   }}
@@ -1177,10 +1235,10 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
                   label="Due Date"
                   showTime={true}
                   required
-                  value={formData.dueDate}
+                  value={formData.dueDate ?? ''}
                   onChange={(e) => {
                     setFormData({ ...formData, dueDate: e.target.value });
-                    if (fieldErrors.dueDate) {
+                    if (fieldErrors.dueDate || fieldErrors.lockAt) {
                       validateDates();
                     }
                   }}
@@ -1188,7 +1246,44 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
                   error={fieldErrors.dueDate}
                   helperText={formData.availableFrom ? `Must be after ${new Date(formData.availableFrom).toLocaleString()}` : ''}
                 />
+                <DatePicker
+                  id="assignment-lock-at"
+                  name="lockAt"
+                  label="Available Until"
+                  showTime={true}
+                  value={formData.lockAt ?? ''}
+                  onChange={(e) => {
+                    setFormData({ ...formData, lockAt: e.target.value ?? '' });
+                    if (fieldErrors.lockAt) {
+                      validateDates();
+                    }
+                  }}
+                  onBlur={validateDates}
+                  error={fieldErrors.lockAt}
+                  helperText={
+                    formData.dueDate
+                      ? 'Optional. Must be on or after the due date. Leave blank to use Lock after due date.'
+                      : 'Optional lock / available-until date'
+                  }
+                />
               </div>
+              <label className="mt-4 flex items-start gap-3 text-sm text-slate-700 dark:text-slate-200">
+                <input
+                  type="checkbox"
+                  className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  checked={formData.lockAfterDue}
+                  onChange={(e) =>
+                    setFormData({ ...formData, lockAfterDue: e.target.checked })
+                  }
+                />
+                <span>
+                  <span className="font-medium">Lock after due date</span>
+                  <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
+                    When Available Until is empty, students cannot submit after the due date.
+                    Uncheck to allow late submissions until you lock the assignment manually.
+                  </span>
+                </span>
+              </label>
               <GradingPeriodPicker
                 courseId={courseId}
                 value={gradingPeriodId}
@@ -1705,6 +1800,25 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
                 </FormFieldGroup>
               </>
             )}
+
+            {/* Rubric: all assignment types except online auto-graded quizzes */}
+            {!(formData.isGradedQuiz && formData.quizSubmissionMode === 'online') && (
+              <AssignmentRubricEditor
+                value={rubricDraft}
+                courseId={courseId}
+                onBankRubricIdChange={setRubricId}
+                onChange={(next) => {
+                  setRubricDraft(next);
+                  if (!next) setRubricId(null);
+                  if (next?.rubricId) setRubricId(String(next.rubricId));
+                  if (next?.pointsPossible != null) {
+                    setFormData((prev) => ({ ...prev, totalPoints: next.pointsPossible || 0 }));
+                    setTotalPointsInput(String(next.pointsPossible || 0));
+                  }
+                }}
+                disabled={isSubmitting}
+              />
+            )}
             
             {/* Navigation buttons for both offline and regular assignments */}
             <FormNavBar onBack={prevStep}>
@@ -1744,6 +1858,14 @@ const CreateAssignmentForm: React.FC<CreateAssignmentFormProps> = ({
             <p>Total Points: {formData.totalPoints}</p>
             <p>Available From: {new Date(formData.availableFrom).toLocaleString()}</p>
             <p>Due: {new Date(formData.dueDate).toLocaleString()}</p>
+            {formData.lockAt ? (
+              <p>Available Until: {new Date(formData.lockAt).toLocaleString()}</p>
+            ) : (
+              <p>
+                Lock after due date:{' '}
+                {formData.lockAfterDue ? 'Yes (locks at due date)' : 'No (late submissions allowed)'}
+              </p>
+            )}
             {formData.allowStudentUploads && (
               <p className="text-blue-600 font-medium">✓ Students can upload files</p>
             )}

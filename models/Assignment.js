@@ -26,9 +26,19 @@ const assignmentSchema = new mongoose.Schema({
     type: Date,
     required: true
   },
+  /** Canvas "Until" / lock at — when set, overrides due-based auto-lock. */
+  lockAt: {
+    type: Date,
+    default: null
+  },
   lockAfterDue: {
     type: Boolean,
     default: true
+  },
+  /** Manual teacher lock (independent of schedule dates). */
+  locked: {
+    type: Boolean,
+    default: false
   },
   attachments: [{
     type: String // Legacy URL paths — prefer fileAssets
@@ -148,6 +158,21 @@ const assignmentSchema = new mongoose.Schema({
     type: Number,
     min: 0,
     default: 0
+  },
+  /** Optional Canvas-style rubric (Phase 1: definition + student view; Phase 2: SpeedGrader). */
+  rubricId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Rubric',
+    default: null,
+  },
+  /** Frozen copy of rubric at attach time so bank edits do not rewrite past assignments. */
+  rubric: {
+    type: mongoose.Schema.Types.Mixed,
+    default: undefined,
+  },
+  useRubricForGrading: {
+    type: Boolean,
+    default: false,
   },
   isExtraCredit: {
     type: Boolean,

@@ -19,15 +19,31 @@ const BYTES_PER_GB = 1024 * 1024 * 1024;
 
 async function getQuotaSettings(rootAccountId) {
   const id = rootAccountId || getTenantRootAccountId();
-  const settings = id
-    ? await SystemSettings.getSettings(id)
-    : await SystemSettings.findOne().lean();
+  const settings = await SystemSettings.getSettings(id);
   const lean = settings?.toObject ? settings.toObject() : settings;
   const storage = lean?.storage || {};
+  let maxStoragePerUserBytes = (storage.maxStoragePerUser ?? 100) * BYTES_PER_GB;
+  let maxStoragePerCourseBytes = (storage.maxStoragePerCourse ?? 50) * BYTES_PER_GB;
+  let institutionWarningBytes = (storage.institutionWarningGb ?? 500) * BYTES_PER_GB;
+
+  // Canvas: AccountQuota is the platform hard cap; soft limits cannot exceed it
+  if (id) {
+    try {
+      const { ensureQuota } = require('./tenancy/accountQuota.service');
+      const quota = await ensureQuota(id);
+      const hard = quota.maxStorageBytes || Number.MAX_SAFE_INTEGER;
+      maxStoragePerUserBytes = Math.min(maxStoragePerUserBytes, hard);
+      maxStoragePerCourseBytes = Math.min(maxStoragePerCourseBytes, hard);
+      institutionWarningBytes = Math.min(institutionWarningBytes, hard);
+    } catch {
+      /* ignore */
+    }
+  }
+
   return {
-    maxStoragePerUserBytes: (storage.maxStoragePerUser ?? 100) * BYTES_PER_GB,
-    maxStoragePerCourseBytes: (storage.maxStoragePerCourse ?? 50) * BYTES_PER_GB,
-    institutionWarningBytes: (storage.institutionWarningGb ?? 500) * BYTES_PER_GB,
+    maxStoragePerUserBytes,
+    maxStoragePerCourseBytes,
+    institutionWarningBytes,
     adminOverride: Boolean(storage.quotaAdminOverride),
   };
 }

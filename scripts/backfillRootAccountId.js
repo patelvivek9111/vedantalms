@@ -1,8 +1,7 @@
 /**
  * Phase 1 tenancy backfill:
- * - Ensure default root Account + domains
- * - Assign rootAccountId on User, Course, FileAsset, SystemSettings, InstitutionGradingPolicy
- * - Drop legacy global unique index on users.email when present
+ * - Ensure example/default root Account + domains
+ * - Assign rootAccountId on core + registrar collections still missing tenancy
  *
  * Usage: node scripts/backfillRootAccountId.js
  */
@@ -43,16 +42,20 @@ async function dropLegacyEmailUniqueIndex() {
 }
 
 async function backfillCollection(modelName, rootId) {
-  const Model = mongoose.model(modelName);
-  const filter = {
-    $or: [{ rootAccountId: null }, { rootAccountId: { $exists: false } }],
-  };
-  const result = await Model.updateMany(filter, {
-    $set: { rootAccountId: rootId, accountId: rootId },
-  });
-  console.log(
-    `${modelName}: matched=${result.matchedCount ?? result.n} modified=${result.modifiedCount ?? result.nModified}`
-  );
+  try {
+    const Model = mongoose.model(modelName);
+    const filter = {
+      $or: [{ rootAccountId: null }, { rootAccountId: { $exists: false } }],
+    };
+    const result = await Model.updateMany(filter, {
+      $set: { rootAccountId: rootId, accountId: rootId },
+    });
+    console.log(
+      `${modelName}: matched=${result.matchedCount ?? result.n} modified=${result.modifiedCount ?? result.nModified}`
+    );
+  } catch (err) {
+    console.warn(`${modelName}: skip (${err.message})`);
+  }
 }
 
 async function main() {
@@ -65,27 +68,84 @@ async function main() {
   await dropLegacyEmailUniqueIndex();
 
   const root = await ensureDefaultRootAccount();
-  console.log(`Default root account ${root.code} id=${root._id}`);
+  console.log(`Example/default root account "${root.name}" code=${root.code} id=${root._id}`);
 
-  // Register models
-  require('../models/user.model');
-  require('../models/course.model');
-  require('../models/fileAsset.model');
-  require('../models/systemSettings.model');
-  require('../models/institutionGradingPolicy.model');
+  // Register models used by backfill
+  const modelFiles = [
+    'user.model',
+    'course.model',
+    'fileAsset.model',
+    'systemSettings.model',
+    'institutionGradingPolicy.model',
+    'enrollment.model',
+    'academicTerm.model',
+    'program.model',
+    'courseOffering.model',
+    'courseSection.model',
+    'crossListGroup.model',
+    'studentHold.model',
+    'courseGradeLifecycle.model',
+    'transcriptIssueLog.model',
+    'transcriptTemplate.model',
+    'sisJob.model',
+    'sisStagingEnrollment.model',
+    'sisSyncBatch.model',
+    'sisSyncRow.model',
+    'sisIntegrationConfig.model',
+    'gradePassbackRecord.model',
+    'asyncJob.model',
+    'systemAuditEvent.model',
+    'institutionGradingPeriod.model',
+  ];
+  for (const f of modelFiles) {
+    try {
+      require(`../models/${f}`);
+    } catch (err) {
+      console.warn(`require ${f}: ${err.message}`);
+    }
+  }
 
-  for (const name of ['User', 'Course', 'FileAsset', 'SystemSettings', 'InstitutionGradingPolicy']) {
+  const names = [
+    'User',
+    'Course',
+    'FileAsset',
+    'SystemSettings',
+    'InstitutionGradingPolicy',
+    'Enrollment',
+    'AcademicTerm',
+    'Program',
+    'CourseOffering',
+    'CourseSection',
+    'CrossListGroup',
+    'StudentHold',
+    'CourseGradeLifecycle',
+    'TranscriptIssueLog',
+    'TranscriptTemplate',
+    'SisJob',
+    'SisStagingEnrollment',
+    'SisSyncBatch',
+    'SisSyncRow',
+    'SisIntegrationConfig',
+    'GradePassbackRecord',
+    'AsyncJob',
+    'SystemAuditEvent',
+    'InstitutionGradingPeriod',
+  ];
+
+  for (const name of names) {
     await backfillCollection(name, root._id);
   }
 
-  // Align FileAsset.institutionId string for export tools
+  // Course-child rows (threads, submissions) pick up tenancy from Course via plugin / separate script:
+  // node scripts/backfillCourseChildRootAccountId.js
+
   const FileAsset = mongoose.model('FileAsset');
   await FileAsset.updateMany(
     { rootAccountId: root._id },
     { $set: { institutionId: String(root._id) } }
   );
 
-  console.log('Backfill complete');
+  console.log('Backfill complete — existing data belongs to this example institution.');
   await mongoose.disconnect();
 }
 

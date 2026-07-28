@@ -4,10 +4,11 @@ const academicAuditService = require('./academicAudit.service');
 const { getRetentionSettings } = require('./fileRetention.service');
 const blobRetention = require('./blobRetention.service');
 
-async function getGovernanceSettings() {
-  const settings = await SystemSettings.findOne().lean();
+async function getGovernanceSettings(rootAccountId) {
+  const settingsDoc = await SystemSettings.getSettings(rootAccountId);
+  const settings = settingsDoc?.toObject ? settingsDoc.toObject() : settingsDoc;
   const storage = settings?.storage || {};
-  const retention = await getRetentionSettings();
+  const retention = await getRetentionSettings(rootAccountId);
   return {
     legalHoldEnabled: storage.legalHoldEnabled !== false,
     archivedCourseRetentionDays: storage.archivedCourseRetentionDays ?? 730,

@@ -8,6 +8,7 @@ import {
   type AcademicSettingsResponse,
 } from '../../services/academicApi';
 import { registrarGet, registrarPatch, registrarAuthHeaders, registrarUrl } from './registrarApi';
+import { ru } from './registrarUi';
 
 type Panel = 'grading' | 'calendar' | 'transcripts' | 'sis' | 'holds' | 'integrations' | 'links';
 
@@ -152,26 +153,22 @@ export function RegistrarSettings() {
   };
 
   return (
-    <div className="space-y-4 max-w-4xl">
+    <div className={`${ru.page} max-w-4xl`}>
       <div>
-        <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Registrar settings</h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+        <h2 className={ru.sectionTitle}>Registrar settings</h2>
+        <p className={`${ru.muted} mt-1`}>
           Institution defaults for grading, calendar, transcripts, holds, and SIS. Deep-links keep Programs,
           Accounts, and Admin as the single source of truth where noted.
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-1 border-b border-gray-200 dark:border-gray-700 pb-2">
+      <div className={ru.tabRow}>
         {PANELS.map((p) => (
           <button
             key={p.id}
             type="button"
             onClick={() => setPanel(p.id)}
-            className={`px-3 py-1.5 text-sm rounded-md ${
-              panel === p.id
-                ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
-                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-            }`}
+            className={panel === p.id ? ru.tabActive : ru.tab}
           >
             {p.label}
           </button>
@@ -179,26 +176,26 @@ export function RegistrarSettings() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</div>
+        <div className={ru.alertError}>{error}</div>
       )}
       {message && (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+        <div className={ru.alertOk}>
           {message}
         </div>
       )}
 
       {panel === 'grading' && (
-        <div className="rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden [&_.p-6]:p-4">
+        <div className={`${ru.card} overflow-hidden [&_.p-6]:p-4`}>
           <InstitutionGradingPolicyTab />
         </div>
       )}
 
       {panel === 'calendar' && academic && (
-        <div className="space-y-4 text-sm border rounded-md p-4 border-gray-200 dark:border-gray-700">
-          <label className="block max-w-xs">
+        <div className={`${ru.card} space-y-4 text-sm`}>
+          <label className={`${ru.label} max-w-xs`}>
             Calendar style
             <select
-              className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+              className={ru.select}
               value={academic.calendarStyle || 'us'}
               disabled={saving}
               onChange={(e) =>
@@ -212,23 +209,27 @@ export function RegistrarSettings() {
               <option value="india">India</option>
             </select>
           </label>
-          <label className="block max-w-xs">
+          <label className={`${ru.label} max-w-xs`}>
             Institution mode
             <select
-              className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+              className={ru.select}
               value={academic.institutionMode || 'mixed'}
               disabled={saving}
               onChange={(e) => void saveAcademic({ institutionMode: e.target.value as AcademicSettingsResponse['institutionMode'] })}
             >
-              <option value="mixed">Mixed</option>
-              <option value="college">College</option>
-              <option value="school">School</option>
+              <option value="mixed">Mixed (show all tools)</option>
+              <option value="college">College (full registrar + offerings/cross-lists)</option>
+              <option value="school">School (lean office — hide college-only tools)</option>
             </select>
           </label>
-          <label className="block max-w-xs">
+          <p className={ru.muted}>
+            Controls which Registrar tabs and sub-tools appear for this institution. Same value as
+            Platform → Institutions mode (kept in sync). Refresh the page after changing.
+          </p>
+          <label className={`${ru.label} max-w-xs`}>
             Default enrollment method (new sections)
             <select
-              className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+              className={ru.select}
               value={(academic as AcademicSettingsResponse & { defaultEnrollmentMethod?: string }).defaultEnrollmentMethod || 'open'}
               disabled={saving}
               onChange={(e) => void saveAcademic({ defaultEnrollmentMethod: e.target.value } as never)}
@@ -239,9 +240,9 @@ export function RegistrarSettings() {
               <option value="sis_only">SIS only</option>
             </select>
           </label>
-          <p className="text-gray-500">
+          <p className={ru.muted}>
             Full calendar presets and apply-to-courses live in{' '}
-            <Link className="text-blue-600 hover:underline" to="/admin/settings">
+            <Link className={ru.link} to="/admin/settings">
               Admin system settings
             </Link>
             .
@@ -250,11 +251,11 @@ export function RegistrarSettings() {
       )}
 
       {panel === 'transcripts' && (
-        <div className="space-y-3 text-sm border rounded-md p-4 border-gray-200 dark:border-gray-700">
-          <p className="text-gray-600 dark:text-gray-400">
+        <div className={`${ru.card} space-y-3 text-sm`}>
+          <p className={ru.muted}>
             Set the default template used for official issue and bulk ZIP jobs. Edit layouts under Transcripts.
           </p>
-          <ul className="divide-y border rounded-md border-gray-200 dark:border-gray-700">
+          <ul className={ru.list}>
             {templates.map((t) => (
               <li key={t._id} className="px-3 py-2 flex justify-between gap-2 items-center">
                 <div>
@@ -269,7 +270,7 @@ export function RegistrarSettings() {
                 {!t.isDefault && (
                   <button
                     type="button"
-                    className="text-blue-600"
+                    className={ru.link}
                     disabled={saving}
                     onClick={() => void setDefaultTemplate(t._id)}
                   >
@@ -278,24 +279,24 @@ export function RegistrarSettings() {
                 )}
               </li>
             ))}
-            {!templates.length && <li className="px-3 py-3 text-gray-500">No templates yet.</li>}
+            {!templates.length && <li className={ru.empty}>No templates yet.</li>}
           </ul>
-          <Link className="text-blue-600 hover:underline" to="/registrar/transcripts?tab=templates">
+          <Link className={ru.link} to="/registrar/transcripts?tab=templates">
             Manage templates →
           </Link>
         </div>
       )}
 
       {panel === 'sis' && (
-        <div className="space-y-3 text-sm border rounded-md p-4 border-gray-200 dark:border-gray-700 max-w-lg">
-          <p className="text-gray-600 dark:text-gray-400">
+        <div className={`${ru.card} space-y-3 text-sm max-w-lg`}>
+          <p className={ru.muted}>
             Provider: <strong>{sis?.provider || 'csv'}</strong>
             {sis?.syncDirection ? ` · direction ${sis.syncDirection}` : ''}
           </p>
-          <label className="block">
+          <label className={ru.label}>
             Sync schedule
             <select
-              className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+              className={ru.select}
               value={sis?.schedule || 'manual'}
               disabled={saving}
               onChange={(e) => void saveSisSchedule(e.target.value)}
@@ -305,22 +306,22 @@ export function RegistrarSettings() {
               <option value="nightly">Nightly (npm run worker:sis-sync -- --apply)</option>
             </select>
           </label>
-          <Link className="text-blue-600 hover:underline" to="/registrar/sis?tab=config">
+          <Link className={ru.link} to="/registrar/sis?tab=config">
             Open full SIS config →
           </Link>
         </div>
       )}
 
       {panel === 'holds' && academic && (
-        <div className="space-y-3 text-sm border rounded-md p-4 border-gray-200 dark:border-gray-700 max-w-lg">
-          <p className="text-gray-600 dark:text-gray-400">
+        <div className={`${ru.card} space-y-3 text-sm max-w-lg`}>
+          <p className={ru.muted}>
             Defaults used when placing holds from Operations (UI presets). Place/release still happens on the
             Operations or Student page.
           </p>
-          <label className="block">
+          <label className={ru.label}>
             Default hold type
             <select
-              className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+              className={ru.select}
               value={holdDefaults.holdType || 'registration'}
               disabled={saving}
               onChange={(e) =>
@@ -359,7 +360,7 @@ export function RegistrarSettings() {
             </label>
           ))}
           <Link
-            className="text-blue-600 hover:underline inline-block"
+            className={`${ru.link} inline-block`}
             to={`/registrar/operations?holdType=${encodeURIComponent(holdDefaults.holdType || 'registration')}`}
           >
             Place a hold in Operations →
@@ -368,8 +369,8 @@ export function RegistrarSettings() {
       )}
 
       {panel === 'integrations' && (
-        <div className="space-y-3 text-sm border rounded-md p-4 border-gray-200 dark:border-gray-700 max-w-xl">
-          <p className="text-gray-600 dark:text-gray-400">
+        <div className={`${ru.card} space-y-3 text-sm max-w-xl`}>
+          <p className={ru.muted}>
             Live readiness for LTI AGS, ERP hold webhooks, and India board partner submit. Configure via
             environment (see .env.example).
           </p>
@@ -412,13 +413,13 @@ export function RegistrarSettings() {
               </div>
             </dl>
           ) : (
-            <p className="text-gray-500">Could not load integration status.</p>
+            <p className={ru.muted}>Could not load integration status.</p>
           )}
           <div className="flex flex-wrap gap-3">
-            <Link className="text-blue-600 hover:underline" to="/registrar/sis">
+            <Link className={ru.link} to="/registrar/sis">
               SIS office →
             </Link>
-            <Link className="text-blue-600 hover:underline" to="/registrar/reports">
+            <Link className={ru.link} to="/registrar/reports">
               India reports →
             </Link>
             <span className="text-xs text-gray-500">
@@ -431,31 +432,31 @@ export function RegistrarSettings() {
       {panel === 'links' && (
         <ul className="list-disc pl-5 space-y-2 text-sm text-gray-700 dark:text-gray-300">
           <li>
-            <Link className="text-blue-600 hover:underline" to="/registrar/programs">
+            <Link className={ru.link} to="/registrar/programs">
               Programs
             </Link>{' '}
             — degree / stream catalog
           </li>
           <li>
-            <Link className="text-blue-600 hover:underline" to="/admin/settings">
+            <Link className={ru.link} to="/admin/settings">
               Admin system settings
             </Link>{' '}
             — full academic calendar & institution tools
           </li>
           <li>
-            <Link className="text-blue-600 hover:underline" to="/admin/accounts">
+            <Link className={ru.link} to="/admin/accounts">
               Sub-accounts
             </Link>{' '}
             — department tree
           </li>
           <li>
-            <Link className="text-blue-600 hover:underline" to="/registrar/operations">
+            <Link className={ru.link} to="/registrar/operations">
               Operations
             </Link>{' '}
             — holds & enrollment tools
           </li>
           <li>
-            <Link className="text-blue-600 hover:underline" to="/registrar/sis">
+            <Link className={ru.link} to="/registrar/sis">
               SIS office
             </Link>{' '}
             — import inbox & grade export

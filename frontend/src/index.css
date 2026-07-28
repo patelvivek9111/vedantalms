@@ -17,6 +17,15 @@
   .mysl8te-wordmark--on-dark {
     color: #ffffff;
   }
+
+  /* Registrar Office — subtle polish for nested forms still using raw Tailwind */
+  .registrar-office {
+    --ru-focus: 2px solid rgb(14 165 233 / 0.35);
+  }
+
+  .registrar-office ::selection {
+    background: rgb(14 165 233 / 0.2);
+  }
 }
 
 @layer base {

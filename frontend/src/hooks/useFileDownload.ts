@@ -1,7 +1,27 @@
 import { useCallback, useState } from 'react';
-import { getMemoryAuthToken, authFetchInit } from '../utils/authToken';
+import { getMemoryAuthToken } from '../utils/authToken';
 import { refreshDownloadToken, resolveSecureFileUrl } from '../services/fileUploadApi';
 import { extractFileAssetId, fileAccessErrorMessage } from '../utils/fileTypes';
+import { resolveDownloadFileName } from '../utils/filePreviewBlob';
+
+function triggerNamedBlobDownload(blob: Blob, fileName: string) {
+  const safeName = resolveDownloadFileName(fileName);
+  const named =
+    blob instanceof File && blob.name === safeName
+      ? blob
+      : new File([blob], safeName, {
+          type: blob.type || 'application/octet-stream',
+        });
+  const objectUrl = URL.createObjectURL(named);
+  const a = document.createElement('a');
+  a.href = objectUrl;
+  a.download = safeName;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(objectUrl);
+}
 
 export function useFileDownload() {
   const [error, setError] = useState<string | null>(null);
@@ -35,29 +55,31 @@ export function useFileDownload() {
       setError(null);
       setLoading(true);
       try {
-        let target = resolveSecureFileUrl(url);
         const id = fileAssetId || extractFileAssetId(url);
-        if (id && !url.includes('token=')) {
-          const refreshed = await refreshDownloadToken(id);
-          if (refreshed?.downloadUrl) target = resolveSecureFileUrl(refreshed.downloadUrl);
+        const safeName = resolveDownloadFileName(fileName);
+        // Prefer same-origin /stream (proxied) so Cloudinary redirects don't break blob download.
+        if (id) {
+          const { fetchAuthenticatedFileBlob } = await import('../services/fileUploadApi');
+          const blob = await fetchAuthenticatedFileBlob(id, 'stream', { fileName: safeName });
+          triggerNamedBlobDownload(blob, safeName);
+          return;
         }
+
+        let target = resolveSecureFileUrl(url);
         const token = getMemoryAuthToken();
         const res = await fetch(target, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
+          credentials: 'include',
         });
         if (!res.ok) {
           setError(fileAccessErrorMessage(res.status));
           return;
         }
         const blob = await res.blob();
-        const objectUrl = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = objectUrl;
-        a.download = fileName || 'download';
-        a.click();
-        URL.revokeObjectURL(objectUrl);
+        triggerNamedBlobDownload(blob, safeName);
       } catch (err: unknown) {
-        const status = (err as { response?: { status?: number } })?.response?.status;
+        const status = (err as { response?: { status?: number }; status?: number })?.status
+          ?? (err as { response?: { status?: number } })?.response?.status;
         setError(fileAccessErrorMessage(status, 'Download failed'));
       } finally {
         setLoading(false);

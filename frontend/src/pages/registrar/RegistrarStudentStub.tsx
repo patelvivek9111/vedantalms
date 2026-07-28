@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { registrarGet, registrarPatch, registrarPost, downloadPdfBase64 } from './registrarApi';
+import { ru } from './registrarUi';
 
 type Tab = 'profile' | 'enrollments' | 'grades' | 'transcripts' | 'holds' | 'audit' | 'documents';
 
@@ -269,9 +270,9 @@ export function RegistrarStudent360() {
     }
   };
 
-  if (loading) return <p className="text-sm text-gray-500">Loading student…</p>;
+  if (loading) return <p className={ru.muted}>Loading student…</p>;
   if (error && !data) {
-    return <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</div>;
+    return <div className={ru.alertError}>{error}</div>;
   }
   if (!data) return null;
 
@@ -280,15 +281,15 @@ export function RegistrarStudent360() {
     typeof s.studentProfile?.programId === 'object' ? s.studentProfile.programId : null;
 
   return (
-    <div className="space-y-6">
+    <div className={ru.page}>
       <div>
-        <Link to="/registrar/students" className="text-sm text-blue-600 hover:underline">
+        <Link to="/registrar/students" className={`${ru.link} text-sm`}>
           ← Back to search
         </Link>
-        <h2 className="text-xl font-semibold mt-2">
+        <h2 className={`${ru.title} mt-2 text-xl`}>
           {s.firstName} {s.lastName}
         </h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
+        <p className={ru.muted}>
           {s.email} · {s.accountStatus || 'active'}
           {s.studentProfile?.admissionNumber ? ` · Adm ${s.studentProfile.admissionNumber}` : ''}
           {program?.code ? ` · ${program.code}` : ''}
@@ -296,25 +297,21 @@ export function RegistrarStudent360() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</div>
+        <div className={ru.alertError}>{error}</div>
       )}
       {message && (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+        <div className={ru.alertOk}>
           {message}
         </div>
       )}
 
-      <div className="flex flex-wrap gap-1 border-b border-gray-200 dark:border-gray-700 pb-2">
+      <div className={ru.tabRow}>
         {TABS.map((t) => (
           <button
             key={t.id}
             type="button"
             onClick={() => setTab(t.id)}
-            className={`px-3 py-1.5 text-sm rounded-md ${
-              tab === t.id
-                ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
-                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-            }`}
+            className={tab === t.id ? ru.tabActive : ru.tab}
           >
             {t.label}
           </button>
@@ -338,19 +335,19 @@ export function RegistrarStudent360() {
               ['pincode', 'Pincode'],
             ] as const
           ).map(([key, label]) => (
-            <label key={key} className="block">
+            <label key={key} className={ru.label}>
               {label}
               <input
-                className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+                className={ru.input}
                 value={form[key]}
                 onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
               />
             </label>
           ))}
-          <label className="block sm:col-span-2">
+          <label className={`${ru.label} sm:col-span-2`}>
             Program
             <select
-              className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+              className={ru.select}
               value={form.programId}
               onChange={(e) => setForm((f) => ({ ...f, programId: e.target.value }))}
             >
@@ -365,7 +362,7 @@ export function RegistrarStudent360() {
           <button
             type="submit"
             disabled={saving}
-            className="sm:col-span-2 rounded bg-indigo-600 text-white px-3 py-1.5 w-fit"
+            className={`sm:col-span-2 ${ru.btnPrimary} w-fit`}
           >
             {saving ? 'Saving…' : 'Save profile'}
           </button>
@@ -373,7 +370,7 @@ export function RegistrarStudent360() {
       )}
 
       {tab === 'enrollments' && (
-        <ul className="divide-y border rounded-md text-sm border-gray-200 dark:border-gray-700">
+        <ul className={ru.list}>
           {data.enrollments.map((e) => (
             <li key={e._id} className="px-3 py-2 flex justify-between gap-2">
               <span>
@@ -386,12 +383,12 @@ export function RegistrarStudent360() {
               </span>
             </li>
           ))}
-          {!data.enrollments.length && <li className="px-3 py-3 text-gray-500">No enrollments.</li>}
+          {!data.enrollments.length && <li className={ru.empty}>No enrollments.</li>}
         </ul>
       )}
 
       {tab === 'grades' && (
-        <div className="overflow-x-auto border rounded-md border-gray-200 dark:border-gray-700">
+        <div className={`overflow-x-auto ${ru.card} !p-0`}>
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 dark:bg-gray-800 text-left">
               <tr>
@@ -418,7 +415,7 @@ export function RegistrarStudent360() {
               ))}
               {!data.grades.length && (
                 <tr>
-                  <td colSpan={5} className="px-3 py-4 text-gray-500">
+                  <td colSpan={5} className={ru.empty}>
                     No frozen grade snapshots yet.
                   </td>
                 </tr>
@@ -430,10 +427,10 @@ export function RegistrarStudent360() {
 
       {tab === 'transcripts' && (
         <div className="space-y-3">
-          <Link className="text-sm text-blue-600 hover:underline" to={`/registrar/transcripts?studentId=${s._id}`}>
+          <Link className={`${ru.link} text-sm`} to={`/registrar/transcripts?studentId=${s._id}`}>
             Issue official transcript
           </Link>
-          <ul className="divide-y border rounded-md text-sm border-gray-200 dark:border-gray-700">
+          <ul className={ru.list}>
             {data.transcripts.map((t) => (
               <li key={t._id} className="px-3 py-2">
                 {t.term} {t.year} · {t.courseCount ?? 0} courses · {t.transcriptHash || 'no hash'}
@@ -444,14 +441,14 @@ export function RegistrarStudent360() {
               </li>
             ))}
             {!data.transcripts.length && (
-              <li className="px-3 py-3 text-gray-500">No official issuances yet.</li>
+              <li className={ru.empty}>No official issuances yet.</li>
             )}
           </ul>
         </div>
       )}
 
       {tab === 'holds' && (
-        <ul className="divide-y border rounded-md text-sm border-gray-200 dark:border-gray-700">
+        <ul className={ru.list}>
           {data.holds.map((h) => (
             <li key={h._id} className="px-3 py-2">
               <div className="font-medium">
@@ -466,7 +463,7 @@ export function RegistrarStudent360() {
               </div>
             </li>
           ))}
-          {!data.holds.length && <li className="px-3 py-3 text-gray-500">No holds on record.</li>}
+          {!data.holds.length && <li className={ru.empty}>No holds on record.</li>}
         </ul>
       )}
 
@@ -474,7 +471,7 @@ export function RegistrarStudent360() {
         <div className="space-y-4 text-sm">
           <section>
             <h3 className="font-medium mb-2">Registrar events</h3>
-            <ul className="divide-y border rounded-md border-gray-200 dark:border-gray-700">
+            <ul className={ru.list}>
               {(data.audit?.registrar || []).map((ev, i) => (
                 <li key={i} className="px-3 py-2">
                   <div className="font-medium">{ev.action}</div>
@@ -490,13 +487,13 @@ export function RegistrarStudent360() {
                 </li>
               ))}
               {!data.audit?.registrar?.length && (
-                <li className="px-3 py-3 text-gray-500">No registrar.* events for this student yet.</li>
+                <li className={ru.empty}>No registrar.* events for this student yet.</li>
               )}
             </ul>
           </section>
           <section>
             <h3 className="font-medium mb-2">Enrollment history</h3>
-            <ul className="divide-y border rounded-md border-gray-200 dark:border-gray-700">
+            <ul className={ru.list}>
               {(data.audit?.enrollmentHistory || []).map((h, i) => (
                 <li key={i} className="px-3 py-2">
                   {h.status} — {h.reason || '—'} · {h.course?.title || ''}
@@ -504,13 +501,13 @@ export function RegistrarStudent360() {
                 </li>
               ))}
               {!data.audit?.enrollmentHistory?.length && (
-                <li className="px-3 py-3 text-gray-500">No enrollment status history.</li>
+                <li className={ru.empty}>No enrollment status history.</li>
               )}
             </ul>
           </section>
           <section>
             <h3 className="font-medium mb-2">Amendments</h3>
-            <ul className="divide-y border rounded-md border-gray-200 dark:border-gray-700">
+            <ul className={ru.list}>
               {(data.audit?.amendments || []).map((a, i) => (
                 <li key={i} className="px-3 py-2">
                   {a.course?.title || 'Course'} — {a.reason || 'amendment'}
@@ -520,13 +517,13 @@ export function RegistrarStudent360() {
                 </li>
               ))}
               {!data.audit?.amendments?.length && (
-                <li className="px-3 py-3 text-gray-500">No amendments.</li>
+                <li className={ru.empty}>No amendments.</li>
               )}
             </ul>
           </section>
           <section>
             <h3 className="font-medium mb-2">System events</h3>
-            <ul className="divide-y border rounded-md border-gray-200 dark:border-gray-700">
+            <ul className={ru.list}>
               {(data.audit?.system || []).map((ev, i) => (
                 <li key={i} className="px-3 py-2">
                   {ev.action} · {ev.actor?.email || 'system'}
@@ -536,7 +533,7 @@ export function RegistrarStudent360() {
                 </li>
               ))}
               {!data.audit?.system?.length && (
-                <li className="px-3 py-3 text-gray-500">No system audit events yet.</li>
+                <li className={ru.empty}>No system audit events yet.</li>
               )}
             </ul>
           </section>
@@ -550,12 +547,12 @@ export function RegistrarStudent360() {
           </p>
           <form
             onSubmit={createDocumentRequest}
-            className="grid gap-2 sm:grid-cols-2 border rounded-md p-3 border-gray-200 dark:border-gray-700 max-w-2xl"
+            className={`${ru.card} grid gap-2 sm:grid-cols-2 max-w-2xl`}
           >
             <label>
               Type
               <select
-                className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+                className={ru.input}
                 value={docForm.type}
                 onChange={(e) => setDocForm((f) => ({ ...f, type: e.target.value }))}
               >
@@ -568,7 +565,7 @@ export function RegistrarStudent360() {
             <label>
               Term
               <input
-                className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+                className={ru.input}
                 value={docForm.term}
                 onChange={(e) => setDocForm((f) => ({ ...f, term: e.target.value }))}
                 required
@@ -578,7 +575,7 @@ export function RegistrarStudent360() {
               Year
               <input
                 type="number"
-                className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+                className={ru.input}
                 value={docForm.year}
                 onChange={(e) => setDocForm((f) => ({ ...f, year: e.target.value }))}
                 required
@@ -587,7 +584,7 @@ export function RegistrarStudent360() {
             <label>
               Notes
               <input
-                className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+                className={ru.input}
                 value={docForm.notes}
                 onChange={(e) => setDocForm((f) => ({ ...f, notes: e.target.value }))}
               />
@@ -595,7 +592,7 @@ export function RegistrarStudent360() {
             <button
               type="submit"
               disabled={docBusy}
-              className="sm:col-span-2 rounded bg-indigo-600 text-white px-3 py-1.5 w-fit"
+              className={`sm:col-span-2 ${ru.btnPrimary} w-fit`}
             >
               {docBusy ? 'Working…' : 'Create request'}
             </button>
@@ -603,7 +600,7 @@ export function RegistrarStudent360() {
 
           <div>
             <h3 className="font-medium mb-2">Requests</h3>
-            <ul className="divide-y border rounded-md border-gray-200 dark:border-gray-700">
+            <ul className={ru.list}>
               {(data.documentRequests || []).map((r) => (
                 <li key={r._id} className="px-3 py-2 flex justify-between gap-2 items-start">
                   <div>
@@ -622,7 +619,7 @@ export function RegistrarStudent360() {
                   {['pending', 'approved'].includes(r.status) && (
                     <button
                       type="button"
-                      className="text-blue-600 shrink-0"
+                      className={`${ru.link} shrink-0`}
                       disabled={docBusy}
                       onClick={() => void fulfillDocumentRequest(r._id)}
                     >
@@ -632,14 +629,14 @@ export function RegistrarStudent360() {
                 </li>
               ))}
               {!(data.documentRequests || []).length && (
-                <li className="px-3 py-3 text-gray-500">No document requests yet.</li>
+                <li className={ru.empty}>No document requests yet.</li>
               )}
             </ul>
           </div>
 
           <div>
             <h3 className="font-medium mb-2">Profile documents</h3>
-            <ul className="divide-y border rounded-md border-gray-200 dark:border-gray-700">
+            <ul className={ru.list}>
               {(data.documents || data.student.studentProfile?.documents || []).map((d, i) => (
                 <li key={i} className="px-3 py-2">
                   {d.label || d.type || 'Document'}
@@ -647,7 +644,7 @@ export function RegistrarStudent360() {
                 </li>
               ))}
               {!(data.documents || data.student.studentProfile?.documents || []).length && (
-                <li className="px-3 py-3 text-gray-500">No documents on file.</li>
+                <li className={ru.empty}>No documents on file.</li>
               )}
             </ul>
           </div>

@@ -18,6 +18,7 @@ const {
   notifyAssignmentUpdated,
   notifyAssignmentPublished,
 } = require('../services/notification/academicNotificationProducers.service');
+const rubricService = require('../services/rubric.service');
 const {
   parseQuizSubmissionMode,
   isPaperUploadQuiz,
@@ -25,6 +26,37 @@ const {
   validatePaperUploadQuizPayload,
 } = require('../utils/quizSubmissionMode');
 const { readMapField, hasMapFieldValue } = require('../utils/mongooseSerialize');
+
+function parseOptionalDate(value) {
+  if (value === undefined || value === null || value === '') return null;
+  const d = new Date(value);
+  return Number.isFinite(d.getTime()) ? d : null;
+}
+
+function parseBooleanFlag(value, defaultValue) {
+  if (value === undefined) return defaultValue;
+  return value === 'true' || value === true;
+}
+
+/** Canvas schedule: availableFrom <= dueDate; lockAt (if set) >= dueDate. */
+function validateAssignmentSchedule({ availableFrom, dueDate, lockAt }) {
+  const from = availableFrom ? new Date(availableFrom) : null;
+  const due = dueDate ? new Date(dueDate) : null;
+  const until = lockAt ? new Date(lockAt) : null;
+
+  if (from && due && Number.isFinite(from.getTime()) && Number.isFinite(due.getTime()) && from >= due) {
+    const err = new Error('Available from must be before the due date');
+    err.statusCode = 400;
+    err.code = 'INVALID_ASSIGNMENT_SCHEDULE';
+    throw err;
+  }
+  if (until && due && Number.isFinite(until.getTime()) && Number.isFinite(due.getTime()) && until < due) {
+    const err = new Error('Available until / lock at must be on or after the due date');
+    err.statusCode = 400;
+    err.code = 'INVALID_ASSIGNMENT_LOCK_AT';
+    throw err;
+  }
+}
 
 /** Plain object or Mongoose doc → assignment JSON with computed totalPoints (matches getModuleAssignments). */
 const enrichAssignmentTotalPoints = (a) => {
@@ -77,16 +109,18 @@ exports.createAssignment = async (req, res) => {
       }
     }
 
+    const lockAt = parseOptionalDate(req.body.lockAt);
+    validateAssignmentSchedule({ availableFrom, dueDate, lockAt });
+
     // Build assignment data object
     const assignmentData = {
       title,
       description,
       availableFrom,
       dueDate,
-      lockAfterDue:
-        req.body.lockAfterDue !== undefined
-          ? req.body.lockAfterDue === 'true' || req.body.lockAfterDue === true
-          : true,
+      lockAt,
+      lockAfterDue: parseBooleanFlag(req.body.lockAfterDue, true),
+      locked: false,
       attachments,
       fileAssets: fileAssetIds,
       createdBy: req.user._id,
@@ -145,6 +179,19 @@ exports.createAssignment = async (req, res) => {
       });
     }
 
+    try {
+      const resolvedRubric = await rubricService.resolveAssignmentRubricFields(req.body, {
+        user: req.user,
+        req,
+        courseId: course?._id,
+      });
+      if (resolvedRubric) {
+        rubricService.applyRubricToAssignment(assignment, resolvedRubric);
+      }
+    } catch (rubricErr) {
+      return res.status(rubricErr.status || 400).json({ message: rubricErr.message });
+    }
+
     await assignment.save();
     if (assignment.published) {
       notifyAssignmentCreated({
@@ -162,7 +209,7 @@ exports.createAssignment = async (req, res) => {
         fs.unlink(file.path).catch(err => console.error('Error deleting file:', err))
       ));
     }
-    res.status(500).json({ message: error.message });
+    res.status(error.statusCode || 500).json({ message: error.message, code: error.code });
   }
 };
 
@@ -411,7 +458,17 @@ exports.updateAssignment = async (req, res) => {
     assignment.description = description || assignment.description;
     assignment.availableFrom = availableFrom || assignment.availableFrom;
     assignment.dueDate = dueDate || assignment.dueDate;
-    if (req.body.lockAfterDue !== undefined) assignment.lockAfterDue = req.body.lockAfterDue === 'true' || req.body.lockAfterDue === true;
+    if (req.body.lockAfterDue !== undefined) {
+      assignment.lockAfterDue = parseBooleanFlag(req.body.lockAfterDue, assignment.lockAfterDue !== false);
+    }
+    if (req.body.lockAt !== undefined) {
+      assignment.lockAt = parseOptionalDate(req.body.lockAt);
+    }
+    validateAssignmentSchedule({
+      availableFrom: assignment.availableFrom,
+      dueDate: assignment.dueDate,
+      lockAt: assignment.lockAt,
+    });
     if (group !== undefined || req.body.groupId !== undefined) {
       assignmentGroupService.applyAssignmentGroupSelection(assignment, course, {
         group,
@@ -523,7 +580,20 @@ exports.updateAssignment = async (req, res) => {
         assignment.questions = [];
       }
     }
-    
+
+    try {
+      const resolvedRubric = await rubricService.resolveAssignmentRubricFields(req.body, {
+        user: req.user,
+        req,
+        courseId: course?._id,
+      });
+      if (resolvedRubric) {
+        rubricService.applyRubricToAssignment(assignment, resolvedRubric);
+      }
+    } catch (rubricErr) {
+      return res.status(rubricErr.status || 400).json({ message: rubricErr.message });
+    }
+
     await assignment.save();
     if (assignment.published) {
       notifyAssignmentUpdated({
@@ -633,6 +703,38 @@ exports.toggleAssignmentPublish = async (req, res) => {
   } catch (err) {
     console.error('Toggle assignment publish error:', err);
     res.status(500).json({ success: false, message: 'Server error during publish toggle', error: err.message });
+  }
+};
+
+/** Manual Canvas-style lock (blocks student submit; view still allowed). */
+exports.lockAssignment = async (req, res) => {
+  try {
+    const assignment = await Assignment.findById(req.params.id);
+    if (!assignment) {
+      return res.status(404).json({ success: false, message: 'Assignment not found' });
+    }
+    assignment.locked = true;
+    await assignment.save();
+    res.json({ success: true, locked: true, data: enrichAssignmentTotalPoints(assignment) });
+  } catch (err) {
+    console.error('Lock assignment error:', err);
+    res.status(500).json({ success: false, message: 'Server error locking assignment', error: err.message });
+  }
+};
+
+/** Clear manual lock (schedule dates still apply). */
+exports.unlockAssignment = async (req, res) => {
+  try {
+    const assignment = await Assignment.findById(req.params.id);
+    if (!assignment) {
+      return res.status(404).json({ success: false, message: 'Assignment not found' });
+    }
+    assignment.locked = false;
+    await assignment.save();
+    res.json({ success: true, locked: false, data: enrichAssignmentTotalPoints(assignment) });
+  } catch (err) {
+    console.error('Unlock assignment error:', err);
+    res.status(500).json({ success: false, message: 'Server error unlocking assignment', error: err.message });
   }
 };
 

@@ -115,6 +115,14 @@ const submissionSchema = new mongoose.Schema({
   gradedAt: {
     type: Date
   },
+  /**
+   * Canvas-style rubric scoring (Phase 2).
+   * When useRubricForGrading on the assignment, score drives grade/finalGrade.
+   */
+  rubricAssessment: {
+    type: mongoose.Schema.Types.Mixed,
+    default: undefined,
+  },
   submissionText: {
     type: String
   },

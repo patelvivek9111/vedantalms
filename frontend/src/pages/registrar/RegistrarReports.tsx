@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { ru } from './registrarUi';
 import {
   downloadCsv,
   registrarAuthHeaders,
@@ -151,18 +152,18 @@ export function RegistrarReports() {
   const indiaMeta = INDIA.find((i) => i.key === indiaKind);
 
   return (
-    <div className="space-y-4">
-      <div className="flex gap-2">
+    <div className={ru.page}>
+      <div className={ru.tabRow}>
         <button
           type="button"
-          className={`rounded px-3 py-1.5 text-sm ${mode === 'core' ? 'bg-indigo-600 text-white' : 'border'}`}
+          className={mode === 'core' ? ru.tabActive : ru.tab}
           onClick={() => setMode('core')}
         >
           Core reports
         </button>
         <button
           type="button"
-          className={`rounded px-3 py-1.5 text-sm ${mode === 'india' ? 'bg-indigo-600 text-white' : 'border'}`}
+          className={mode === 'india' ? ru.tabActive : ru.tab}
           onClick={() => setMode('india')}
         >
           India pack
@@ -177,10 +178,10 @@ export function RegistrarReports() {
       )}
 
       <div className="flex flex-wrap gap-3 items-end">
-        <label className="text-sm">
+        <label className={ru.label}>
           Report
           <select
-            className="mt-1 block rounded border dark:bg-gray-800 px-2 py-1"
+            className={ru.select}
             value={mode === 'core' ? report : indiaKind}
             onChange={(e) => {
               if (mode === 'core') setReport(e.target.value as ReportKey);
@@ -200,38 +201,38 @@ export function RegistrarReports() {
                 ))}
           </select>
         </label>
-        <label className="text-sm">
+        <label className={ru.label}>
           Term
           <input
-            className="mt-1 block rounded border dark:bg-gray-800 px-2 py-1"
+            className={ru.input}
             value={term}
             onChange={(e) => setTerm(e.target.value)}
           />
         </label>
-        <label className="text-sm">
+        <label className={ru.label}>
           Year
           <input
             type="number"
-            className="mt-1 block w-28 rounded border dark:bg-gray-800 px-2 py-1"
+            className={`${ru.input} w-28`}
             value={year}
             onChange={(e) => setYear(e.target.value)}
           />
         </label>
         {mode === 'india' && indiaMeta?.needsStudent && (
-          <label className="text-sm">
+          <label className={ru.label}>
             Student ID
             <input
-              className="mt-1 block rounded border dark:bg-gray-800 px-2 py-1"
+              className={ru.input}
               value={studentId}
               onChange={(e) => setStudentId(e.target.value)}
             />
           </label>
         )}
         {mode === 'india' && indiaMeta?.needsCourse && (
-          <label className="text-sm">
+          <label className={ru.label}>
             Course ID
             <input
-              className="mt-1 block rounded border dark:bg-gray-800 px-2 py-1"
+              className={ru.input}
               value={courseId}
               onChange={(e) => setCourseId(e.target.value)}
             />
@@ -241,17 +242,17 @@ export function RegistrarReports() {
           type="button"
           onClick={() => void load()}
           disabled={loading}
-          className="rounded bg-indigo-600 text-white px-3 py-1.5 text-sm"
+          className={ru.btnPrimary}
         >
           {loading ? 'Loading…' : 'Run'}
         </button>
-        <button type="button" onClick={() => void download()} className="rounded border px-3 py-1.5 text-sm">
+        <button type="button" onClick={() => void download()} className={ru.btnSecondary}>
           CSV
         </button>
         {mode === 'india' && (
           <button
             type="button"
-            className="rounded border px-3 py-1.5 text-sm"
+            className={ru.btnSecondary}
             onClick={() => void submitBoard()}
           >
             Submit to partner
@@ -259,18 +260,18 @@ export function RegistrarReports() {
         )}
       </div>
 
-      {label && <p className="text-sm text-gray-600 dark:text-gray-400">{label}</p>}
+      {label && <p className={ru.muted}>{label}</p>}
       {submitMsg && (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+        <div className={ru.alertOk}>
           {submitMsg}
         </div>
       )}
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</div>
+        <div className={ru.alertError}>{error}</div>
       )}
 
       {rows.length > 0 && (
-        <div className="overflow-auto border rounded-md border-gray-200 dark:border-gray-700">
+        <div className={`overflow-auto ${ru.card} !p-0`}>
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 dark:bg-gray-800">
               <tr>

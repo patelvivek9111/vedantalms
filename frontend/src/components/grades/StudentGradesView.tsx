@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StudentGradeSidebar from '../common/StudentGradeSidebar';
 import { computeAssignmentGroupStats, normalizeResolvedPolicyForCourse } from '../../utils/gradebookCompute';
@@ -21,6 +21,8 @@ import {
   resolveStudentGradeRowDisplay,
   type StudentGradeRowDisplay,
 } from './GradeStatusBadge';
+import { RubricAssessmentViewer } from '../assignments/RubricViewer';
+import { ClipboardList, MessageSquarePlus } from 'lucide-react';
 
 interface StudentGradesViewProps {
   course: any;
@@ -82,6 +84,10 @@ type StudentAssignmentRowModel = {
   maxPoints: number;
   assignmentFeedback: string;
   hasSubmission: boolean;
+  rubricAssessment: any | null;
+  assignmentRubric: any | null;
+  showRubricBreakdown: boolean;
+  showRubricComments: boolean;
 };
 
 function buildStudentAssignmentRowModel(
@@ -126,12 +132,31 @@ function buildStudentAssignmentRowModel(
       ? submission.feedback.trim()
       : '';
 
+  const rubricAssessment =
+    !rowDisplay.scoreHidden && submission?.rubricAssessment?.criterionAssessments
+      ? submission.rubricAssessment
+      : null;
+  const assignmentRubric =
+    submission?.assignmentRubric ||
+    (typeof submission?.assignment === 'object' ? submission.assignment?.rubric : null) ||
+    assignment?.rubric ||
+    null;
+  const showRubricBreakdown = Boolean(
+    rubricAssessment && assignmentRubric?.criteria?.length && !rowDisplay.scoreHidden
+  );
+  // Criterion comments are part of the graded rubric — show whenever the rubric is shown.
+  const showRubricComments = showRubricBreakdown;
+
   return {
     assignment,
     rowDisplay,
     maxPoints: assignmentMaxPoints(assignment),
     assignmentFeedback,
     hasSubmission,
+    rubricAssessment,
+    assignmentRubric,
+    showRubricBreakdown,
+    showRubricComments,
   };
 }
 
@@ -170,6 +195,7 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
   gradingPolicyLoading = false,
 }) => {
   const navigate = useNavigate();
+  const [expandedRubricId, setExpandedRubricId] = useState<string | null>(null);
 
   if (!user?._id) {
     return (
@@ -182,18 +208,19 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
   const studentId = String(user._id);
 
   const studentAssignments = useMemo(() => {
-    const moduleAssignments = modules.flatMap((module: any) =>
-      (module.assignments || []).map((assignment: any) => {
+    const moduleAssignments: any[] = [];
+    for (const module of modules || []) {
+      for (const assignment of module.assignments || []) {
         const dueDateRaw =
           assignment.dueDate || assignment.due_date || assignment.discussionDueDate || null;
-        return {
+        moduleAssignments.push({
           ...assignment,
           moduleTitle: module.title,
           isDiscussion: false,
           dueDate: dueDateRaw ? new Date(dueDateRaw) : null,
-        };
-      })
-    );
+        });
+      }
+    }
 
     const groupAssignments = studentGroupAssignments.map((assignment: any) => ({
       ...assignment,
@@ -371,21 +398,37 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
 
           {/* Mobile */}
           <div className="md:hidden space-y-3">
-            {assignmentRows.map(({ assignment, rowDisplay, maxPoints, assignmentFeedback }, idx) => (
+            {assignmentRows.map(
+              ({
+                assignment,
+                rowDisplay,
+                maxPoints,
+                assignmentFeedback,
+                showRubricBreakdown,
+                rubricAssessment,
+                assignmentRubric,
+                showRubricComments,
+              }, idx) => {
+                const rowId = String(assignment._id);
+                const expanded = expandedRubricId === rowId;
+                return (
               <div
                 key={`student-assignment-mobile-${assignment._id}-${idx}`}
-                role="button"
-                tabIndex={0}
-                onClick={() => openAssignment(assignment)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    openAssignment(assignment);
-                  }
-                }}
-                className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 cursor-pointer transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 dark:active:bg-gray-600"
-                aria-label={`Open ${assignment.title}`}
+                className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 transition-colors"
               >
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openAssignment(assignment)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      openAssignment(assignment);
+                    }
+                  }}
+                  className="cursor-pointer hover:opacity-90"
+                  aria-label={`Open ${assignment.title}`}
+                >
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1">
                     <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-base mb-1">
@@ -409,23 +452,58 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
                     <div className="text-sm">{renderScoreDisplay(rowDisplay, maxPoints)}</div>
                   </div>
                 </div>
-                {assignmentFeedback ? (
+                </div>
+                {showRubricBreakdown ? (
                   <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
                     <button
                       type="button"
-                      className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 transition-colors duration-150 text-sm font-medium flex items-center"
+                      className="inline-flex items-center gap-1.5 text-[#0374B5] hover:underline text-sm font-medium"
                       onClick={(e) => {
                         e.stopPropagation();
-                        openAssignment(assignment);
+                        setExpandedRubricId(expanded ? null : rowId);
                       }}
                     >
-                      <span className="mr-2">💬</span>
-                      View Feedback
+                      <ClipboardList className="h-4 w-4" />
+                      {expanded ? 'Close Rubric' : 'Open Rubric'}
                     </button>
+                    {expanded ? (
+                      <div className="mt-3 space-y-3">
+                        <RubricAssessmentViewer
+                          rubric={assignmentRubric}
+                          assessment={rubricAssessment}
+                          showComments={showRubricComments}
+                          onClose={() => setExpandedRubricId(null)}
+                        />
+                        {assignmentFeedback ? (
+                          <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-800 dark:bg-amber-950/30">
+                            <div className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                              Instructor Feedback
+                            </div>
+                            <p className="mt-1 whitespace-pre-wrap text-sm text-amber-950 dark:text-amber-100">
+                              {assignmentFeedback}
+                            </p>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+                {!showRubricBreakdown && assignmentFeedback ? (
+                  <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                    <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-800 dark:bg-amber-950/30">
+                      <div className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                        Instructor Feedback
+                      </div>
+                      <p className="mt-1 whitespace-pre-wrap text-sm text-amber-950 dark:text-amber-100">
+                        {assignmentFeedback}
+                      </p>
+                    </div>
                   </div>
                 ) : null}
               </div>
-            ))}
+                );
+              }
+            )}
           </div>
 
           {/* Desktop */}
@@ -452,9 +530,22 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {assignmentRows.map(({ assignment, rowDisplay, maxPoints, assignmentFeedback }, idx) => (
+                {assignmentRows.map(
+                  ({
+                    assignment,
+                    rowDisplay,
+                    maxPoints,
+                    assignmentFeedback,
+                    showRubricBreakdown,
+                    rubricAssessment,
+                    assignmentRubric,
+                    showRubricComments,
+                  }, idx) => {
+                    const rowId = String(assignment._id);
+                    const expanded = expandedRubricId === rowId;
+                    return (
+                  <React.Fragment key={`student-assignment-${assignment._id}-${idx}`}>
                   <tr
-                    key={`student-assignment-${assignment._id}-${idx}`}
                     className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-150 cursor-pointer"
                     onClick={() => openAssignment(assignment)}
                   >
@@ -481,24 +572,76 @@ const StudentGradesView: React.FC<StudentGradesViewProps> = ({
                       {maxPoints}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      {assignmentFeedback ? (
-                        <button
-                          type="button"
-                          className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 transition-colors duration-150"
-                          title="View feedback"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openAssignment(assignment);
-                          }}
-                        >
-                          <span role="img" aria-label="Comment" className="text-sm">
-                            💬
-                          </span>
-                        </button>
-                      ) : null}
+                      <div className="inline-flex items-center justify-center gap-2">
+                        {showRubricBreakdown ? (
+                          <button
+                            type="button"
+                            title={expanded ? 'Close Rubric' : 'Open Rubric'}
+                            className="rounded p-1.5 text-[#0374B5] hover:bg-sky-50 dark:hover:bg-sky-950/40"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandedRubricId(expanded ? null : rowId);
+                            }}
+                          >
+                            <ClipboardList className="h-4 w-4" />
+                          </button>
+                        ) : null}
+                        {assignmentFeedback ? (
+                          <button
+                            type="button"
+                            className="rounded p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                            title="View feedback"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openAssignment(assignment);
+                            }}
+                          >
+                            <MessageSquarePlus className="h-4 w-4" />
+                          </button>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
-                ))}
+                  {expanded && showRubricBreakdown ? (
+                    <tr className="bg-white dark:bg-slate-900">
+                      <td colSpan={6} className="px-4 py-3 space-y-3">
+                        <RubricAssessmentViewer
+                          rubric={assignmentRubric}
+                          assessment={rubricAssessment}
+                          showComments={showRubricComments}
+                          onClose={() => setExpandedRubricId(null)}
+                        />
+                        {assignmentFeedback ? (
+                          <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-800 dark:bg-amber-950/30">
+                            <div className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                              Instructor Feedback
+                            </div>
+                            <p className="mt-1 whitespace-pre-wrap text-sm text-amber-950 dark:text-amber-100">
+                              {assignmentFeedback}
+                            </p>
+                          </div>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ) : null}
+                  {!expanded && !showRubricBreakdown && assignmentFeedback ? (
+                    <tr className="bg-white dark:bg-slate-900">
+                      <td colSpan={6} className="px-4 py-3">
+                        <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-800 dark:bg-amber-950/30">
+                          <div className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                            Instructor Feedback
+                          </div>
+                          <p className="mt-1 whitespace-pre-wrap text-sm text-amber-950 dark:text-amber-100">
+                            {assignmentFeedback}
+                          </p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : null}
+                  </React.Fragment>
+                    );
+                  }
+                )}
               </tbody>
             </table>
           </div>

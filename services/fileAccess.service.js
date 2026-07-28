@@ -7,7 +7,6 @@ const {
   isEnrolledStudent,
   isCourseGradingStaff,
   canViewCourseGrades,
-  canAccessStudentRecord,
   ADMIN_ROLES,
   REGISTRAR_ROLES,
 } = require('../middleware/academicPermissions');
@@ -81,7 +80,9 @@ async function assertCanAccessFileAsset(user, fileAssetId, { ip, requestId, root
     return { asset, course: await resolveCourseContext(asset) };
   }
 
-  if (String(asset.uploadedBy) === String(user._id) && asset.accessScope?.ownerOnly !== false) {
+  // Uploader can always read their own file. `ownerOnly: false` means others may also
+  // access (via course/enrollment rules below) — it must not block the owner.
+  if (String(asset.uploadedBy) === String(user._id)) {
     return { asset, course: await resolveCourseContext(asset) };
   }
 
@@ -132,9 +133,9 @@ async function assertCanAccessFileAsset(user, fileAssetId, { ip, requestId, root
       return { asset, course };
     }
     if (isCourseGradingStaff(user, course) || canViewCourseGrades(user, course)) {
-      if (sub && !canAccessStudentRecord(user, sub.student)) {
-        throw accessDenied();
-      }
+      // Course grading staff may read submission files for students in this course.
+      // Do not use canAccessStudentRecord here — that helper only allows self-access
+      // for non-admin roles, so it incorrectly 403s every teacher/TA.
       return { asset, course };
     }
     throw accessDenied();
@@ -162,9 +163,7 @@ async function assertCanAccessFileAsset(user, fileAssetId, { ip, requestId, root
       return { asset, course };
     }
     if (isCourseGradingStaff(user, course) || canViewCourseGrades(user, course)) {
-      if (sub && !canAccessStudentRecord(user, sub.student)) {
-        throw accessDenied();
-      }
+      // Same as submission: instructors/TAs need course-scoped access while grading.
       return { asset, course };
     }
     throw accessDenied();

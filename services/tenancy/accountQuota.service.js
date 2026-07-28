@@ -12,15 +12,22 @@ async function ensureQuota(rootAccountId, { planCode } = {}) {
     throw err;
   }
   let doc = await AccountQuota.findOne({ rootAccountId });
+  const Account = require('../../models/account.model');
+  const account = await Account.findById(rootAccountId).select('planCode').lean();
+  const accountPlan = planCode || account?.planCode || 'standard';
+
   if (!doc) {
-    const plan = planCode || 'standard';
-    const defaults = AccountQuota.defaultsForPlan(plan);
+    const defaults = AccountQuota.defaultsForPlan(accountPlan);
     doc = await AccountQuota.create({
       rootAccountId,
       accountId: rootAccountId,
-      planCode: plan,
+      planCode: accountPlan,
       ...defaults,
     });
+  } else if (account?.planCode && doc.planCode !== account.planCode && !planCode) {
+    // Heal drift: Account.planCode is canonical label from platform
+    doc.planCode = account.planCode;
+    await doc.save();
   }
   return doc;
 }
@@ -48,6 +55,14 @@ async function updateQuota(rootAccountId, patch = {}) {
     doc.apiRateLimitPerMinute = defaults.apiRateLimitPerMinute;
   }
   await doc.save();
+
+  if (patch.planCode) {
+    const Account = require('../../models/account.model');
+    await Account.updateOne(
+      { _id: rootAccountId, parentAccountId: null },
+      { $set: { planCode: patch.planCode } }
+    );
+  }
   return doc;
 }
 

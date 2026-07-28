@@ -48,9 +48,13 @@ import { useNetworkStatus } from './hooks/useNetworkStatus';
 import { useMessagingSocketConnection } from './hooks/inbox/useMessagingSocketConnection';
 import { useNotificationSocketConnection } from './hooks/notifications/useNotificationSocketConnection';
 import { useNotificationCrossTabSync } from './hooks/notifications/useNotificationCrossTabSync';
-import { loginRedirectPath, homePathForRole } from './utils/loginRedirect';
+import { loginRedirectPath, homePathForRole, isPlatformAdminAllowedPath } from './utils/loginRedirect';
 import { AdminPhoneGate } from './components/admin/AdminPhoneGate';
 const AdminDashboard = lazyWithRetry(() => import('./pages/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
+const AdminAccountTree = lazyWithRetry(() => import('./pages/AdminAccountTree').then(m => ({ default: m.AdminAccountTree })));
+const AdminPlatformInstitutions = lazyWithRetry(() =>
+  import('./pages/AdminPlatformInstitutions').then((m) => ({ default: m.AdminPlatformInstitutions }))
+);
 const AdminUserManagement = lazyWithRetry(() => import('./pages/AdminUserManagement').then(m => ({ default: m.AdminUserManagement })));
 const AdminAnalytics = lazyWithRetry(() => import('./pages/AdminAnalytics').then(m => ({ default: m.AdminAnalytics })));
 const AdminSystemSettings = lazyWithRetry(() => import('./pages/AdminSystemSettings').then(m => ({ default: m.AdminSystemSettings })));
@@ -69,7 +73,6 @@ const RegistrarReports = lazyWithRetry(() => import('./pages/registrar/Registrar
 const RegistrarOperations = lazyWithRetry(() => import('./pages/registrar/RegistrarOperations').then(m => ({ default: m.RegistrarOperations })));
 const RegistrarSis = lazyWithRetry(() => import('./pages/registrar/RegistrarSis').then(m => ({ default: m.RegistrarSis })));
 const RegistrarSettings = lazyWithRetry(() => import('./pages/registrar/RegistrarSettings').then(m => ({ default: m.RegistrarSettings })));
-const AdminAccountTree = lazyWithRetry(() => import('./pages/AdminAccountTree').then(m => ({ default: m.AdminAccountTree })));
 const TeacherCourseOversight = lazyWithRetry(() => import('./pages/TeacherCourseOversight').then(m => ({ default: m.TeacherCourseOversight })));
 const ModuleEditPage = lazyWithRetry(() => import('./pages/ModuleEditPage'));
 const PageEditPage = lazyWithRetry(() => import('./pages/PageEditPage'));
@@ -162,7 +165,12 @@ function DashboardWrapper() {
     return <Navigate to="/registrar" replace />;
   }
 
-  // Render admin dashboard for admin users
+  // Platform admins manage tenants — not school admin stats APIs
+  if (user?.role === 'platform_admin') {
+    return <Navigate to="/admin/institutions" replace />;
+  }
+
+  // Render admin dashboard for institution admins
   if (user?.role === 'admin') {
     return (
       <AdminPhoneGate>
@@ -225,6 +233,13 @@ function AppContent() {
   useMessagingSocketConnection(user?._id, token);
   useNotificationSocketConnection(user?._id, token);
   useNotificationCrossTabSync(user?._id);
+
+  if (
+    user?.role === 'platform_admin' &&
+    !isPlatformAdminAllowedPath(location.pathname)
+  ) {
+    return <Navigate to="/admin/institutions" replace />;
+  }
 
   return (
     <MobileKeyboardProvider>
@@ -552,9 +567,19 @@ function AppContent() {
             }
           />
           <Route
+            path="/admin/institutions"
+            element={
+              <PrivateRoute allowedRoles={['platform_admin']}>
+                <AdminPhoneGate>
+                  {withRouteLoader(<AdminPlatformInstitutions />)}
+                </AdminPhoneGate>
+              </PrivateRoute>
+            }
+          />
+          <Route
             path="/registrar"
             element={
-              <PrivateRoute allowedRoles={['admin', 'registrar', 'department_admin', 'platform_admin']}>
+              <PrivateRoute allowedRoles={['admin', 'registrar', 'department_admin']}>
                 {withRouteLoader(<RegistrarOffice />)}
               </PrivateRoute>
             }

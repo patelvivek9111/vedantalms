@@ -11,11 +11,15 @@ import { NavCountBadge } from '../common/NavCountBadge';
 
 function filterBottomNavForRole(items: NavItem[], role?: string): NavItem[] {
   return items.filter((item) => {
+    if (role === 'platform_admin') {
+      return ['institutions', 'account'].includes(item.id);
+    }
+    if (item.id === 'institutions') return false;
     if (item.id === 'report' && role !== 'student') return false;
     if (item.id.startsWith('admin-') && role !== 'admin') return false;
     if (
       item.id === 'registrar' &&
-      !['admin', 'registrar', 'department_admin', 'platform_admin'].includes(role || '')
+      !['admin', 'registrar', 'department_admin'].includes(role || '')
     ) {
       return false;
     }

@@ -6,6 +6,7 @@ const {
 const {
   canAccessStudentRecord,
   isEnrolledStudent,
+  isCourseGradingStaff,
 } = require('../../middleware/academicPermissions');
 
 describe('file access — download tokens', () => {
@@ -40,5 +41,13 @@ describe('file access — FERPA enrollment', () => {
   test('student record isolation', () => {
     expect(canAccessStudentRecord({ _id: 's1', role: 'student' }, 's1')).toBe(true);
     expect(canAccessStudentRecord({ _id: 's1', role: 'student' }, 's2')).toBe(false);
+  });
+
+  test('course instructor is grading staff even though canAccessStudentRecord is self-only', () => {
+    const teacher = { _id: 't1', role: 'teacher' };
+    expect(isCourseGradingStaff(teacher, course)).toBe(true);
+    // Regression: submission file ACL used to require canAccessStudentRecord for staff,
+    // which always fails for teachers viewing a student's upload.
+    expect(canAccessStudentRecord(teacher, 's1')).toBe(false);
   });
 });

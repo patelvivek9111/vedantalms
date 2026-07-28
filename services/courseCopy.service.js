@@ -145,6 +145,8 @@ async function copyCourseContent(sourceCourseId, {
         gradeReleaseMode: a.gradeReleaseMode,
         defaultGradeHidden: a.defaultGradeHidden,
         lockAfterDue: a.lockAfterDue,
+        lockAt: a.lockAt || null,
+        locked: false,
         published: false,
         createdBy: requestedBy._id || requestedBy,
       });

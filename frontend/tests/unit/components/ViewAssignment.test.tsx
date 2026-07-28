@@ -74,7 +74,7 @@ describe('ViewAssignment — student read path', () => {
     mockedUseAuth.mockReturnValue({ user: studentUser });
     mockedApi.get.mockImplementation((url: string) => {
       if (url.startsWith('/submissions/student/')) {
-        return Promise.reject(new Error('no submission'));
+        return Promise.resolve({ data: null });
       }
       if (url.startsWith('/assignments/')) {
         return Promise.resolve({ data: assignmentPayload });

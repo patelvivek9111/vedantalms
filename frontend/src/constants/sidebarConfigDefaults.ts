@@ -27,6 +27,7 @@ export const DEFAULT_SIDEBAR_STUDENT_VISIBILITY: Record<string, boolean> = {
   assignments: true,
   quizzes: true,
   quizwave: true,
+  rubrics: false,
   discussions: true,
   announcements: true,
   polls: true,
@@ -110,5 +111,5 @@ export function shouldHideFromSidebarItemsColumn(role: string | undefined, itemI
 
 /** Right “Student Visibility” column: omit toggles for links students never get. */
 export function shouldHideFromStudentVisibilityColumn(_role: string | undefined, itemId: string): boolean {
-  return itemId === 'gradebook';
+  return itemId === 'gradebook' || itemId === 'rubrics';
 }

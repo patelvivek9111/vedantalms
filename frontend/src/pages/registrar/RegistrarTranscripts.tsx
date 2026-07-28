@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { registrarGet, registrarPost, registrarPatch, downloadPdfBase64, downloadRegistrarJobFile } from './registrarApi';
+import { ru } from './registrarUi';
 
 type Tab = 'issue' | 'requests' | 'templates' | 'bulk';
 
@@ -332,23 +333,19 @@ export function RegistrarTranscripts() {
   ];
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <p className="text-sm text-gray-600 dark:text-gray-400">
+    <div className={`${ru.page} max-w-3xl`}>
+      <p className={ru.muted}>
         Official transcripts use FINALIZED/AMENDED grades only. PDFs include a QR verification link.
         Transcript holds block issuance.
       </p>
 
-      <div className="flex flex-wrap gap-2 border-b border-gray-200 dark:border-gray-700 pb-2">
+      <div className={ru.tabRow}>
         {tabs.map((t) => (
           <button
             key={t.id}
             type="button"
             onClick={() => setTab(t.id)}
-            className={`rounded px-3 py-1.5 text-sm ${
-              tab === t.id
-                ? 'bg-indigo-600 text-white'
-                : 'border border-gray-300 dark:border-gray-600'
-            }`}
+            className={tab === t.id ? ru.tabActive : ru.tab}
           >
             {t.label}
           </button>
@@ -356,51 +353,50 @@ export function RegistrarTranscripts() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</div>
+        <div className={ru.alertError}>{error}</div>
       )}
       {message && (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+        <div className={ru.alertOk}>
           {message}
         </div>
       )}
 
       {tab === 'issue' && (
-        <form onSubmit={issue} className="grid gap-3 border rounded-md p-4 border-gray-200 dark:border-gray-700">
-          <label className="text-sm">
+        <form onSubmit={issue} className={`${ru.card} grid gap-3`}>
+          <label className={ru.label}>
             Student ID
             <input
-              className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+              className={ru.input}
               value={studentId}
               onChange={(e) => setStudentId(e.target.value)}
               required
             />
           </label>
           <div className="grid grid-cols-2 gap-3">
-            <label className="text-sm">
+            <label className={ru.label}>
               Term
               <input
-                className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+                className={ru.input}
                 value={term}
                 onChange={(e) => setTerm(e.target.value)}
                 required
               />
             </label>
-            <label className="text-sm">
+            <label className={ru.label}>
               Year
               <input
                 type="number"
-                className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+                className={ru.input}
                 value={year}
                 onChange={(e) => setYear(e.target.value)}
                 required
               />
             </label>
           </div>
-          <label className="text-sm">
+          <label className={ru.label}>
             Template
             <select
-              className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
-              value={templateId}
+              className={ru.select}
               onChange={(e) => setTemplateId(e.target.value)}
             >
               <option value="">Default</option>
@@ -411,10 +407,10 @@ export function RegistrarTranscripts() {
               ))}
             </select>
           </label>
-          <label className="text-sm">
+          <label className={ru.label}>
             Request type
             <select
-              className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+              className={ru.select}
               value={requestType}
               onChange={(e) => setRequestType(e.target.value)}
             >
@@ -424,28 +420,28 @@ export function RegistrarTranscripts() {
               <option value="migration_tc">Transfer / migration TC</option>
             </select>
           </label>
-          <label className="text-sm">
+          <label className={ru.label}>
             Notes (optional)
             <input
-              className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+              className={ru.input}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
             />
           </label>
           <div className="flex flex-wrap gap-2">
-            <button type="submit" className="rounded bg-indigo-600 text-white px-3 py-1.5 text-sm">
+            <button type="submit" className={ru.btnPrimary}>
               Issue official PDF
             </button>
             <button
               type="button"
-              className="rounded border px-3 py-1.5 text-sm"
+              className={ru.btnSecondary}
               onClick={() => void createRequest()}
             >
               Queue request
             </button>
             <button
               type="button"
-              className="rounded border px-3 py-1.5 text-sm"
+              className={ru.btnSecondary}
               onClick={() => void loadHistory()}
             >
               Load history
@@ -455,7 +451,7 @@ export function RegistrarTranscripts() {
       )}
 
       {tab === 'issue' && history.length > 0 && (
-        <ul className="divide-y border rounded-md text-sm border-gray-200 dark:border-gray-700">
+        <ul className={ru.list}>
           {history.map((h) => (
             <li key={h._id} className="px-3 py-2">
               {h.term} {h.year} ·{' '}
@@ -464,7 +460,7 @@ export function RegistrarTranscripts() {
                 <>
                   {' '}
                   ·{' '}
-                  <a className="text-indigo-600 underline" href={h.verifyUrl} target="_blank" rel="noreferrer">
+                  <a className={ru.link} href={h.verifyUrl} target="_blank" rel="noreferrer">
                     verify
                   </a>
                 </>
@@ -477,10 +473,10 @@ export function RegistrarTranscripts() {
 
       {tab === 'requests' && (
         <div className="space-y-3">
-          <button type="button" className="rounded border px-3 py-1.5 text-sm" onClick={() => void loadRequests()}>
+          <button type="button" className={ru.btnSecondary} onClick={() => void loadRequests()}>
             Refresh
           </button>
-          <ul className="divide-y border rounded-md text-sm border-gray-200 dark:border-gray-700">
+          <ul className={ru.list}>
             {requests.length === 0 && <li className="px-3 py-2 text-gray-500">No requests</li>}
             {requests.map((r) => (
               <li key={r._id} className="px-3 py-2 flex flex-wrap items-center justify-between gap-2">
@@ -492,7 +488,7 @@ export function RegistrarTranscripts() {
                   <span className="flex gap-2">
                     <button
                       type="button"
-                      className="rounded bg-indigo-600 text-white px-2 py-1 text-xs"
+                      className={`${ru.btnPrimary} px-2 py-1 text-xs`}
                       onClick={() => void fulfillRequest(r._id)}
                     >
                       Fulfill
@@ -500,7 +496,7 @@ export function RegistrarTranscripts() {
                     {r.status === 'pending' && (
                       <button
                         type="button"
-                        className="rounded border px-2 py-1 text-xs"
+                        className={`${ru.btnSecondary} px-2 py-1 text-xs`}
                         onClick={() => void rejectRequest(r._id)}
                       >
                         Reject
@@ -516,22 +512,21 @@ export function RegistrarTranscripts() {
 
       {tab === 'templates' && (
         <div className="space-y-4">
-          <form onSubmit={createTemplate} className="grid gap-3 border rounded-md p-4 border-gray-200 dark:border-gray-700">
-            <label className="text-sm">
+          <form onSubmit={createTemplate} className={`${ru.card} grid gap-3`}>
+            <label className={ru.label}>
               Name
               <input
-                className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+                className={ru.input}
                 value={tplName}
                 onChange={(e) => setTplName(e.target.value)}
                 required
               />
             </label>
             <div className="grid grid-cols-2 gap-3">
-              <label className="text-sm">
+              <label className={ru.label}>
                 GPA scale
                 <select
-                  className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
-                  value={tplScale}
+                  className={ru.select}
                   onChange={(e) => setTplScale(e.target.value)}
                 >
                   <option value="india_10">India 10-point</option>
@@ -539,10 +534,10 @@ export function RegistrarTranscripts() {
                   <option value="cbse_cgpa">CBSE CGPA</option>
                 </select>
               </label>
-              <label className="text-sm">
+              <label className={ru.label}>
                 Locale
                 <select
-                  className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+                  className={ru.select}
                   value={tplLocale}
                   onChange={(e) => setTplLocale(e.target.value)}
                 >
@@ -550,10 +545,10 @@ export function RegistrarTranscripts() {
                   <option value="hi">Hindi + English labels</option>
                 </select>
               </label>
-              <label className="text-sm">
+              <label className={ru.label}>
                 Repeated courses
                 <select
-                  className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+                  className={ru.select}
                   value={tplRepeat}
                   onChange={(e) => setTplRepeat(e.target.value)}
                 >
@@ -563,11 +558,11 @@ export function RegistrarTranscripts() {
                 </select>
               </label>
             </div>
-            <button type="submit" className="rounded bg-indigo-600 text-white px-3 py-1.5 text-sm w-fit">
+            <button type="submit" className={`${ru.btnPrimary} w-fit`}>
               Create template
             </button>
           </form>
-          <ul className="divide-y border rounded-md text-sm border-gray-200 dark:border-gray-700">
+          <ul className={ru.list}>
             {templates.map((t) => (
               <li key={t._id} className="px-3 py-2">
                 {t.name} · {t.format}/{t.locale} · {t.gpaScale} · repeat:{t.repeatedCoursePolicy}
@@ -579,50 +574,50 @@ export function RegistrarTranscripts() {
       )}
 
       {tab === 'bulk' && (
-        <div className="space-y-3 border rounded-md p-4 border-gray-200 dark:border-gray-700">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+        <div className={`${ru.card} space-y-3`}>
+          <p className={ru.muted}>
             Preview graduating / enrolled students for the term, then queue a{' '}
             <code>transcript.bulk_issue</code> job. When complete, download all issued PDFs as a ZIP.
           </p>
           <div className="grid grid-cols-2 gap-3">
-            <label className="text-sm">
+            <label className={ru.label}>
               Term
               <input
-                className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+                className={ru.input}
                 value={term}
                 onChange={(e) => setTerm(e.target.value)}
               />
             </label>
-            <label className="text-sm">
+            <label className={ru.label}>
               Year
               <input
                 type="number"
-                className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+                className={ru.input}
                 value={year}
                 onChange={(e) => setYear(e.target.value)}
               />
             </label>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className="rounded border px-3 py-1.5 text-sm" onClick={() => void previewBulk()}>
+            <button type="button" className={ru.btnSecondary} onClick={() => void previewBulk()}>
               Preview
             </button>
             <button
               type="button"
-              className="rounded bg-indigo-600 text-white px-3 py-1.5 text-sm"
+              className={ru.btnPrimary}
               onClick={() => void applyBulk()}
             >
               Queue bulk issue
             </button>
             {bulkJobId && (
-              <button type="button" className="rounded border px-3 py-1.5 text-sm" onClick={() => void refreshBulkJob()}>
+              <button type="button" className={ru.btnSecondary} onClick={() => void refreshBulkJob()}>
                 Refresh job ({bulkJobStatus || '…'})
               </button>
             )}
             {bulkDownloadToken && (
               <button
                 type="button"
-                className="rounded bg-emerald-600 text-white px-3 py-1.5 text-sm"
+                className={ru.btnPrimary}
                 onClick={() => void downloadBulkZip()}
               >
                 Download ZIP

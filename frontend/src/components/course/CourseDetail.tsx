@@ -70,6 +70,7 @@ import StudentGradesView from '../grades/StudentGradesView';
 import GradebookView from '../grades/GradebookView';
 import AssignmentsSection, { type AssignmentsSectionProps } from '../course/AssignmentsSection';
 import QuizzesSection from '../course/QuizzesSection';
+import CourseRubricsSection from '../course/CourseRubricsSection';
 import ModulesSection from '../course/ModulesSection';
 import PollsSection from '../course/PollsSection';
 import CourseMeetingsSection from '../course/CourseMeetingsSection';
@@ -923,6 +924,10 @@ const CourseDetail: React.FC = () => {
             course={course}
           />
         );
+
+      case 'rubrics':
+        if (!(isInstructor || isAdmin)) return null;
+        return <CourseRubricsSection courseId={String(course?._id || id || '')} />;
 
       case 'discussions':
         return (

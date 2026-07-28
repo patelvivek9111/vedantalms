@@ -145,7 +145,8 @@ userSchema.methods.getSignedJwtToken = function() {
     rid: this.rootAccountId ? String(this.rootAccountId) : undefined,
   };
   const secret = resolveJwtSecret();
-  const expire = process.env.JWT_EXPIRE || '7d';
+  const { resolveJwtExpireString } = require('../utils/jwtExpire');
+  const expire = resolveJwtExpireString(this.rootAccountId);
   const token = jwt.sign(payload, secret, { expiresIn: expire });
   return token;
 };

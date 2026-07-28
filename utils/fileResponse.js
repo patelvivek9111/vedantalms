@@ -30,7 +30,21 @@ async function buildClientFileList(doc, userId = null) {
     if (typeof url !== 'string') continue;
     if (url.includes('/api/files/')) continue;
     if (!seenUrls.has(url)) {
-      merged.push({ url, legacy: true });
+      const originalName = (() => {
+        try {
+          const path = /^https?:\/\//i.test(url) ? new URL(url).pathname : url.split(/[?#]/)[0];
+          return decodeURIComponent(path.split('/').filter(Boolean).pop() || '') || undefined;
+        } catch {
+          return (url.split('/').pop() || '').split(/[?#]/)[0] || undefined;
+        }
+      })();
+      merged.push({
+        url,
+        path: url,
+        legacy: true,
+        originalName,
+        name: originalName,
+      });
       seenUrls.add(url);
     }
   }
@@ -58,7 +72,21 @@ async function buildTeacherFeedbackClientFiles(doc, userId = null) {
     if (typeof url !== 'string') continue;
     if (url.includes('/api/files/')) continue;
     if (!seenUrls.has(url)) {
-      merged.push({ url, legacy: true });
+      const originalName = (() => {
+        try {
+          const path = /^https?:\/\//i.test(url) ? new URL(url).pathname : url.split(/[?#]/)[0];
+          return decodeURIComponent(path.split('/').filter(Boolean).pop() || '') || undefined;
+        } catch {
+          return (url.split('/').pop() || '').split(/[?#]/)[0] || undefined;
+        }
+      })();
+      merged.push({
+        url,
+        path: url,
+        legacy: true,
+        originalName,
+        name: originalName,
+      });
       seenUrls.add(url);
     }
   }

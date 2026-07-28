@@ -48,6 +48,10 @@ router.delete('/:id', protect, authorize(['teacher', 'admin']), assignmentContro
 // Toggle assignment publish status (teacher/admin only)
 router.patch('/:id/publish', protect, authorize(['teacher', 'admin']), toggleAssignmentPublish);
 
+// Manual Canvas-style lock / unlock (teacher/admin only)
+router.post('/:id/lock', protect, authorize(['teacher', 'admin']), assignmentController.lockAssignment);
+router.post('/:id/unlock', protect, authorize(['teacher', 'admin']), assignmentController.unlockAssignment);
+
 // Get all group assignments for a group set
 router.get('/groupset/:groupSetId', protect, assignmentController.getGroupSetAssignments);
 

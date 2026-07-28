@@ -284,6 +284,9 @@ export function AdminSystemSettings() {
                   onChange={(e) => handleConfigChange('general', 'siteName', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
                 />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Institution display name (synced with Account name and login brand).
+                </p>
               </div>
 
               <div>
@@ -366,6 +369,9 @@ export function AdminSystemSettings() {
                   onChange={(e) => handleConfigChange('security', 'sessionTimeout', parseInt(e.target.value))}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
                 />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Controls login session length for this institution (JWT + cookie). Applies on next login.
+                </p>
               </div>
 
               <div>
@@ -526,6 +532,9 @@ export function AdminSystemSettings() {
         {activeTab === 'storage' && (
           <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Storage Settings</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Soft limits for this institution. The platform plan quota is the hard ceiling and cannot be exceeded.
+            </p>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
               <div>

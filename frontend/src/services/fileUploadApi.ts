@@ -1,6 +1,7 @@
 import api, { getImageUrl } from './api';
 import { getMemoryAuthToken } from '../utils/authToken';
 import { extractFileAssetId, isMongoObjectId, buildSecureDownloadPath, mapUploadResponse, type NormalizedFile } from '../utils/fileTypes';
+import { coercePreviewBlob } from '../utils/filePreviewBlob';
 
 export interface UploadOptions {
   category?: string;
@@ -181,7 +182,8 @@ export async function fetchAuthenticatedFile(
 
 export async function fetchAuthenticatedFileBlob(
   fileAssetId: string,
-  resourcePath = 'stream'
+  resourcePath = 'stream',
+  options: { fileName?: string; mimeType?: string } = {}
 ): Promise<Blob> {
   const res = await fetchAuthenticatedFile(fileAssetId, resourcePath);
   if (!res.ok) {
@@ -189,7 +191,17 @@ export async function fetchAuthenticatedFileBlob(
     (err as Error & { status?: number }).status = res.status;
     throw err;
   }
-  return res.blob();
+  const raw = await res.blob();
+  const headerType = res.headers.get('Content-Type') || undefined;
+  const kind =
+    options.mimeType?.includes('pdf') || options.fileName?.toLowerCase().endsWith('.pdf')
+      ? ('pdf' as const)
+      : undefined;
+  return coercePreviewBlob(raw, {
+    mimeType: options.mimeType || headerType,
+    fileName: options.fileName,
+    kind,
+  });
 }
 
 export async function fetchFileVersions(fileAssetId: string) {

@@ -1,13 +1,8 @@
 const AUTH_COOKIE_NAME = 'lms_auth';
+const { resolveJwtExpireMs } = require('./jwtExpire');
 
-function parseJwtExpireMs() {
-  const raw = process.env.JWT_EXPIRE || '7d';
-  const match = /^(\d+)([dhms])$/.exec(String(raw).trim());
-  if (!match) return 7 * 24 * 60 * 60 * 1000;
-  const n = parseInt(match[1], 10);
-  const unit = match[2];
-  const multipliers = { d: 86400000, h: 3600000, m: 60000, s: 1000 };
-  return n * (multipliers[unit] || 86400000);
+function parseJwtExpireMs(rootAccountId) {
+  return resolveJwtExpireMs(rootAccountId);
 }
 
 function useSecureAuthCookies() {
@@ -17,19 +12,19 @@ function useSecureAuthCookies() {
   return frontend.startsWith('https://');
 }
 
-function authCookieOptions() {
+function authCookieOptions(rootAccountId) {
   const secure = useSecureAuthCookies();
   return {
     httpOnly: true,
     secure,
     sameSite: secure ? 'strict' : 'lax',
     path: '/',
-    maxAge: parseJwtExpireMs(),
+    maxAge: parseJwtExpireMs(rootAccountId),
   };
 }
 
-function setAuthCookie(res, token) {
-  res.cookie(AUTH_COOKIE_NAME, token, authCookieOptions());
+function setAuthCookie(res, token, rootAccountId) {
+  res.cookie(AUTH_COOKIE_NAME, token, authCookieOptions(rootAccountId));
 }
 
 function clearAuthCookie(res) {

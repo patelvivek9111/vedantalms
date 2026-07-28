@@ -18,8 +18,8 @@ exports.getAcademicSettings = async (req, res) => {
 
 exports.updateAcademicSettings = async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ success: false, message: 'Admin only' });
+    if (!['admin', 'registrar'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: 'Admin or registrar only' });
     }
     const data = await academicCalendarService.updateAcademicSettings(req.body || {});
     res.json({ success: true, data });
@@ -30,8 +30,8 @@ exports.updateAcademicSettings = async (req, res) => {
 
 exports.applyInstitutionCalendar = async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ success: false, message: 'Admin only' });
+    if (!['admin', 'registrar'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: 'Admin or registrar only' });
     }
     const result = await academicCalendarService.applyInstitutionCalendarToAllFullYearCourses(
       req.user._id

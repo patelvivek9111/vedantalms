@@ -26,6 +26,14 @@ import { NavCountBadge } from '../common/NavCountBadge';
 import { performLogout } from '../../utils/authLogout';
 
 const getNavItems = (userRole: string) => {
+  // Platform boss — tenants only, not school LMS / registrar
+  if (userRole === 'platform_admin') {
+    return [
+      { label: 'Account', icon: User, to: '/account' },
+      { label: 'Institutions', icon: Database, to: '/admin/institutions' },
+    ];
+  }
+
   const baseItems = [
     { label: 'Account', icon: User, to: '/account' },
     { label: 'Dashboard', icon: Gauge, to: '/dashboard' },

@@ -140,7 +140,11 @@ exports.updateRootAccount = async (req, res) => {
 
     if (name != null) account.name = String(name).trim();
     if (timezone != null) account.timezone = timezone;
-    if (institutionMode != null) account.institutionMode = institutionMode;
+    if (institutionMode != null) {
+      const { setInstitutionMode } = require('../services/tenancy/institutionMode.service');
+      await setInstitutionMode(account._id, institutionMode);
+      account.institutionMode = institutionMode;
+    }
     if (registrarContactEmail != null) account.registrarContactEmail = registrarContactEmail;
     if (planCode != null) {
       account.planCode = planCode;
@@ -154,6 +158,10 @@ exports.updateRootAccount = async (req, res) => {
     }
 
     await account.save();
+    if (name != null) {
+      const { syncInstitutionIdentity } = require('../services/tenancy/institutionIdentity.service');
+      await syncInstitutionIdentity(account._id, account.name);
+    }
     clearTenantCache();
     return res.json({ success: true, data: account });
   } catch (err) {

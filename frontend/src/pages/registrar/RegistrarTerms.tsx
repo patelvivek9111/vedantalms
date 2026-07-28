@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 import { AcademicTerm, registrarGet, registrarPatch, registrarPost } from './registrarApi';
+import { ru } from './registrarUi';
 
 const emptyForm = {
   name: '',
@@ -118,11 +119,11 @@ export function RegistrarTerms() {
   };
 
   const field = (key: keyof typeof emptyForm, label: string, type = 'text') => (
-    <label className="text-sm block">
+    <label className={ru.label}>
       {label}
       <input
         type={type}
-        className="mt-1 w-full rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-800 px-2 py-1"
+        className={ru.input}
         value={form[key]}
         onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
         required={key === 'name' || key === 'code'}
@@ -132,29 +133,29 @@ export function RegistrarTerms() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className={ru.page}>
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</div>
+        <div className={ru.alertError}>{error}</div>
       )}
       {message && (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+        <div className={ru.alertOk}>
           {message}
         </div>
       )}
 
       <form
         onSubmit={submit}
-        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 border border-gray-200 dark:border-gray-700 rounded-md p-4"
+        className={`${ru.card} grid gap-3 sm:grid-cols-2 lg:grid-cols-3`}
       >
-        <h2 className="sm:col-span-2 lg:col-span-3 text-lg font-medium">
+        <h2 className={`${ru.sectionTitle} sm:col-span-2 lg:col-span-3 text-lg`}>
           {editingId ? 'Edit term' : 'Create term'}
         </h2>
         {field('name', 'Name')}
         {field('code', 'Code')}
-        <label className="text-sm block">
+        <label className={ru.label}>
           Type
           <select
-            className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+            className={ru.select}
             value={form.termType}
             onChange={(e) => setForm((f) => ({ ...f, termType: e.target.value }))}
           >
@@ -165,10 +166,10 @@ export function RegistrarTerms() {
             ))}
           </select>
         </label>
-        <label className="text-sm block">
+        <label className={ru.label}>
           Status
           <select
-            className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+            className={ru.select}
             value={form.status}
             onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
           >
@@ -189,11 +190,11 @@ export function RegistrarTerms() {
         {field('gradingPeriodCloseDate', 'Grading period close', 'date')}
         {field('finalizeDeadline', 'Finalize deadline', 'date')}
         <div className="sm:col-span-2 lg:col-span-3 flex gap-2">
-          <button type="submit" className="rounded bg-indigo-600 text-white px-3 py-1.5 text-sm">
+          <button type="submit" className={ru.btnPrimary}>
             {editingId ? 'Save changes' : 'Create term'}
           </button>
           {editingId && (
-            <button type="button" onClick={resetForm} className="rounded border px-3 py-1.5 text-sm">
+            <button type="button" onClick={resetForm} className={ru.btnSecondary}>
               Cancel
             </button>
           )}
@@ -201,30 +202,30 @@ export function RegistrarTerms() {
       </form>
 
       <section>
-        <h2 className="text-lg font-medium mb-2">Terms</h2>
+        <h2 className={`${ru.sectionTitle} text-lg mb-2`}>Terms</h2>
         {loading ? (
-          <p className="text-sm text-gray-500">Loading…</p>
+          <p className={ru.muted}>Loading…</p>
         ) : (
-          <ul className="divide-y border rounded-md border-gray-200 dark:border-gray-700 text-sm">
+          <ul className={ru.list}>
             {terms.map((t) => (
-              <li key={t._id} className="px-3 py-3 flex flex-wrap justify-between gap-2">
+              <li key={t._id} className={`${ru.listItem} flex flex-wrap justify-between gap-2`}>
                 <div>
                   <div className="font-medium">
                     {t.name} <span className="text-gray-500 font-normal">({t.code})</span>
                   </div>
-                  <div className="text-gray-500 mt-0.5">
+                  <div className={`${ru.muted} mt-0.5`}>
                     {t.status} · {t.termType}
                     {t.enrollmentOpenDate || t.enrollmentCloseDate
                       ? ` · enroll ${toDateInput(t.enrollmentOpenDate) || '—'} → ${toDateInput(t.enrollmentCloseDate) || '—'}`
                       : ''}
                   </div>
                 </div>
-                <button type="button" className="text-blue-600" onClick={() => startEdit(t)}>
+                <button type="button" className={ru.link} onClick={() => startEdit(t)}>
                   Edit
                 </button>
               </li>
             ))}
-            {!terms.length && <li className="px-3 py-4 text-gray-500">No terms yet.</li>}
+            {!terms.length && <li className={ru.empty}>No terms yet.</li>}
           </ul>
         )}
       </section>

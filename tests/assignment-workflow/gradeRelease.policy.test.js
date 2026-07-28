@@ -26,13 +26,14 @@ describe('grade release visibility', () => {
       _id: 's1',
       assignment: 'a1',
       grade: 88,
-      feedback: 'Private until later',
+      feedback: 'Visible with the grade',
       gradesReleasedAt: new Date('2026-01-01T00:00:00.000Z'),
     };
 
     const redacted = redactSubmissionForStudent(submission, assignment);
     expect(redacted.grade).toBe(88);
-    expect(redacted.feedback).toBeUndefined();
+    // Overall written feedback ships with the visible score (not a separate manual post).
+    expect(redacted.feedback).toBe('Visible with the grade');
     expect(redacted.gradeVisibility.mode).toBe('score_only');
   });
 
@@ -74,5 +75,121 @@ describe('grade release visibility', () => {
       mode: 'score_only',
       scoreVisible: true,
     });
+  });
+
+  it('hides rubricAssessment when the score is not released', () => {
+    const assignment = {
+      _id: 'a1',
+      gradeReleaseMode: 'manual',
+      rubric: {
+        criteria: [{ id: 'c1', description: 'Clarity', points: 4, ratings: [] }],
+        pointsPossible: 4,
+      },
+    };
+    const submission = {
+      _id: 's1',
+      assignment: 'a1',
+      grade: 4,
+      rubricAssessment: {
+        score: 4,
+        pointsPossible: 4,
+        criterionAssessments: { c1: { points: 4, ratingId: null, comments: 'Clear' } },
+      },
+    };
+
+    const redacted = redactSubmissionForStudent(submission, assignment);
+    expect(redacted.rubricAssessment).toBeUndefined();
+    expect(redacted.assignmentRubric).toBeUndefined();
+  });
+
+  it('keeps rubric criterion comments with the graded rubric even on score-only release', () => {
+    const assignment = {
+      _id: 'a1',
+      gradeReleaseMode: 'manual',
+      rubric: {
+        criteria: [{ id: 'c1', description: 'Clarity', points: 4, ratings: [] }],
+        pointsPossible: 4,
+      },
+    };
+    const submission = {
+      _id: 's1',
+      assignment: 'a1',
+      grade: 4,
+      gradesReleasedAt: new Date('2026-01-01T00:00:00.000Z'),
+      feedback: 'Overall note for the student',
+      rubricAssessment: {
+        score: 4,
+        pointsPossible: 4,
+        criterionAssessments: { c1: { points: 4, ratingId: 'r1', comments: 'Clear writing' } },
+      },
+    };
+
+    const redacted = redactSubmissionForStudent(submission, assignment);
+    expect(redacted.gradeVisibility.mode).toBe('score_only');
+    expect(redacted.feedback).toBe('Overall note for the student');
+    expect(redacted.assignmentRubric).toEqual(assignment.rubric);
+    expect(redacted.rubricAssessment.criterionAssessments.c1).toMatchObject({
+      points: 4,
+      ratingId: 'r1',
+      comments: 'Clear writing',
+    });
+  });
+
+  it('keeps rubric criterion comments when feedback is released', () => {
+    const assignment = {
+      _id: 'a1',
+      gradeReleaseMode: 'manual',
+      rubric: {
+        criteria: [{ id: 'c1', description: 'Clarity', points: 4, ratings: [] }],
+        pointsPossible: 4,
+      },
+    };
+    const submission = {
+      _id: 's1',
+      assignment: 'a1',
+      grade: 4,
+      gradesReleasedAt: new Date('2026-01-01T00:00:00.000Z'),
+      feedbackReleasedAt: new Date('2026-01-01T00:00:00.000Z'),
+      rubricAssessment: {
+        score: 4,
+        pointsPossible: 4,
+        criterionAssessments: { c1: { points: 4, ratingId: null, comments: 'Clear writing' } },
+      },
+    };
+
+    const redacted = redactSubmissionForStudent(submission, assignment);
+    expect(redacted.gradeVisibility.mode).toBe('score_and_feedback');
+    expect(redacted.rubricAssessment.criterionAssessments.c1.comments).toBe('Clear writing');
+    expect(redacted.assignmentRubric).toEqual(assignment.rubric);
+  });
+
+  it('shows rubric criterion comments with immediate grade release (no separate feedback post)', () => {
+    const assignment = {
+      _id: 'a1',
+      gradeReleaseMode: 'immediate',
+      rubric: {
+        criteria: [{ id: 'c1', description: 'Clarity', points: 4, ratings: [] }],
+        pointsPossible: 4,
+      },
+    };
+    const submission = {
+      _id: 's1',
+      assignment: 'a1',
+      grade: 4,
+      gradeHidden: false,
+      rubricAssessment: {
+        score: 4,
+        pointsPossible: 4,
+        criterionAssessments: {
+          c1: { points: 3, ratingId: 'r1', comments: 'there are few mistakes' },
+        },
+      },
+    };
+
+    const redacted = redactSubmissionForStudent(submission, assignment);
+    expect(redacted.gradeVisibility.mode).toBe('score_and_feedback');
+    expect(redacted.rubricAssessment.criterionAssessments.c1.comments).toBe(
+      'there are few mistakes'
+    );
   });
 });

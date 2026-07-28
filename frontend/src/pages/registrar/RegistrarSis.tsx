@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { registrarGet, registrarPost, registrarPatch } from './registrarApi';
+import { ru } from './registrarUi';
+import { useRegistrarMode } from './useRegistrarMode';
+import type { SisSubTab } from './registrarMode';
 import { API_URL } from '../../config';
 import { getMemoryAuthToken } from '../../utils/authToken';
 
@@ -98,6 +101,7 @@ function downloadText(filename: string, text: string, mime = 'text/csv') {
 }
 
 export function RegistrarSis() {
+  const { flags, isSchool } = useRegistrarMode();
   const [tab, setTab] = useState<SisTab>('import');
   const [kind, setKind] = useState<'users' | 'sections' | 'enrollments'>('users');
   const [csvText, setCsvText] = useState('');
@@ -383,7 +387,7 @@ export function RegistrarSis() {
       'sis_enrollment_id,sis_section_id,sis_student_id,role,status\nE1,SEC1,S001,student,active',
   };
 
-  const tabs: { id: SisTab; label: string }[] = [
+  const allTabs: { id: SisTab; label: string }[] = [
     { id: 'import', label: 'Import' },
     { id: 'inbox', label: 'Staging inbox' },
     { id: 'jobs', label: 'Sync history' },
@@ -391,23 +395,29 @@ export function RegistrarSis() {
     { id: 'health', label: 'Health' },
     { id: 'config', label: 'Config' },
   ];
+  const tabs = allTabs.filter((t) => flags.sisTabs.includes(t.id as SisSubTab));
+
+  useEffect(() => {
+    if (!flags.sisTabs.includes(tab)) {
+      setTab(flags.sisTabs[0] || 'import');
+    }
+  }, [flags.sisTabs, tab]);
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <p className="text-sm text-gray-600 dark:text-gray-400">
-        CSV-first SIS pipeline with live connectors (custom REST, Banner, PeopleSoft, Fedena). Stage →
-        review → apply; schedule via worker:sis-sync.
+    <div className={`${ru.page} max-w-4xl`}>
+      <p className={ru.muted}>
+        {isSchool
+          ? 'CSV import/export for school rosters and grades. Live connectors optional if your board/SIS partner is connected.'
+          : 'CSV-first SIS pipeline with live connectors (custom REST, Banner, PeopleSoft, Fedena). Stage → review → apply; schedule via worker:sis-sync.'}
       </p>
 
-      <div className="flex flex-wrap gap-2 border-b border-gray-200 dark:border-gray-700 pb-2">
+      <div className={ru.tabRow}>
         {tabs.map((t) => (
           <button
             key={t.id}
             type="button"
             onClick={() => setTab(t.id)}
-            className={`rounded px-3 py-1.5 text-sm ${
-              tab === t.id ? 'bg-indigo-600 text-white' : 'border border-gray-300 dark:border-gray-600'
-            }`}
+            className={tab === t.id ? ru.tabActive : ru.tab}
           >
             {t.label}
           </button>
@@ -415,17 +425,17 @@ export function RegistrarSis() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</div>
+        <div className={ru.alertError}>{error}</div>
       )}
       {message && (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+        <div className={ru.alertOk}>
           {message}
         </div>
       )}
 
       {conflictRow && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-w-lg w-full rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 space-y-3 shadow-lg">
+          <div className={`${ru.card} max-w-lg w-full space-y-3`}>
             <h3 className="font-medium text-sm">Override SIS conflict</h3>
             <p className="text-xs text-gray-600 dark:text-gray-400">
               {conflictRow.entityType} · {conflictRow.externalKey}. Approving overwrites LMS values with
@@ -442,7 +452,7 @@ export function RegistrarSis() {
               </pre>
             </div>
             <textarea
-              className="w-full min-h-[72px] rounded border px-2 py-1 text-sm dark:bg-gray-800"
+              className={`${ru.textarea} min-h-[72px] text-sm font-sans`}
               placeholder="Why is this override safe? (required)"
               value={overrideReason}
               onChange={(e) => setOverrideReason(e.target.value)}
@@ -450,14 +460,14 @@ export function RegistrarSis() {
             <div className="flex justify-end gap-2">
               <button
                 type="button"
-                className="rounded border px-3 py-1.5 text-sm"
+                className={ru.btnSecondary}
                 onClick={() => setConflictRow(null)}
               >
                 Cancel
               </button>
               <button
                 type="button"
-                className="rounded bg-amber-600 text-white px-3 py-1.5 text-sm"
+                className={ru.btnDanger}
                 onClick={() => void confirmConflictOverride()}
               >
                 Confirm override
@@ -469,10 +479,10 @@ export function RegistrarSis() {
 
       {tab === 'import' && (
         <section className="space-y-3">
-          <label className="text-sm block">
+          <label className={ru.label}>
             File type
             <select
-              className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+              className={ru.select}
               value={kind}
               onChange={(e) => setKind(e.target.value as typeof kind)}
             >
@@ -482,12 +492,12 @@ export function RegistrarSis() {
             </select>
           </label>
           <textarea
-            className="w-full min-h-[160px] rounded border px-2 py-1 font-mono text-xs dark:bg-gray-800"
+            className={`${ru.textarea} min-h-[160px]`}
             value={csvText}
             onChange={(e) => setCsvText(e.target.value)}
             placeholder={placeholders[kind]}
           />
-          <button type="button" onClick={() => void stageImport()} className="rounded bg-indigo-600 text-white px-3 py-1.5 text-sm">
+          <button type="button" onClick={() => void stageImport()} className={ru.btnPrimary}>
             Stage import
           </button>
         </section>
@@ -499,22 +509,22 @@ export function RegistrarSis() {
             <label>
               Batch ID
               <input
-                className="mt-1 block rounded border dark:bg-gray-800 px-2 py-1"
+                className={ru.input}
                 value={batchId}
                 onChange={(e) => setBatchId(e.target.value)}
               />
             </label>
-            <button type="button" className="rounded border px-3 py-1.5" onClick={() => void loadInbox()}>
+            <button type="button" className={ru.btnSecondary} onClick={() => void loadInbox()}>
               Refresh
             </button>
-            <button type="button" className="rounded bg-indigo-600 text-white px-3 py-1.5" onClick={() => void applyBatch()}>
+            <button type="button" className={ru.btnPrimary} onClick={() => void applyBatch()}>
               Apply batch
             </button>
-            <button type="button" className="rounded border px-3 py-1.5" onClick={() => void retryBatch()}>
+            <button type="button" className={ru.btnSecondary} onClick={() => void retryBatch()}>
               Retry failed
             </button>
           </div>
-          <ul className="divide-y border rounded-md border-gray-200 dark:border-gray-700">
+          <ul className={ru.list}>
             {inbox.map((row) => (
               <li key={row._id} className="px-3 py-2 space-y-1">
                 <div className="flex flex-wrap justify-between gap-2">
@@ -526,7 +536,7 @@ export function RegistrarSis() {
                     <span className="flex gap-2">
                       <button
                         type="button"
-                        className="text-blue-600"
+                        className={ru.link}
                         onClick={() => void approveRow(row._id, row.status === 'conflict')}
                       >
                         Approve{row.status === 'conflict' ? ' (override…)' : ''}
@@ -545,13 +555,13 @@ export function RegistrarSis() {
                 {row.diff?.created && <div className="text-xs text-gray-500">New record (create on apply)</div>}
               </li>
             ))}
-            {!inbox.length && <li className="px-3 py-4 text-gray-500">No staging rows.</li>}
+            {!inbox.length && <li className={ru.empty}>No staging rows.</li>}
           </ul>
         </section>
       )}
 
       {tab === 'jobs' && (
-        <ul className="divide-y border rounded-md text-sm border-gray-200 dark:border-gray-700">
+        <ul className={ru.list}>
           {jobs.map((j) => (
             <li key={j._id} className="px-3 py-2">
               {j.jobType} · batch {j.batchId} · {j.status} · staged {j.stagedCount ?? 0} · applied{' '}
@@ -559,13 +569,13 @@ export function RegistrarSis() {
               {j.createdAt ? new Date(j.createdAt).toLocaleString() : ''}
             </li>
           ))}
-          {!jobs.length && <li className="px-3 py-4 text-gray-500">No SIS jobs yet.</li>}
+          {!jobs.length && <li className={ru.empty}>No SIS jobs yet.</li>}
         </ul>
       )}
 
       {tab === 'export' && (
-        <section className="space-y-3 border rounded-md p-4 border-gray-200 dark:border-gray-700">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+        <section className={`${ru.card} space-y-3`}>
+          <p className={ru.muted}>
             Export FINALIZED/AMENDED snapshots as grades.csv. Live connectors also POST when dry-run is
             off.
           </p>
@@ -573,7 +583,7 @@ export function RegistrarSis() {
             <label className="text-sm">
               Term
               <input
-                className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+                className={ru.input}
                 value={term}
                 onChange={(e) => setTerm(e.target.value)}
               />
@@ -582,21 +592,21 @@ export function RegistrarSis() {
               Year
               <input
                 type="number"
-                className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+                className={ru.input}
                 value={year}
                 onChange={(e) => setYear(e.target.value)}
               />
             </label>
           </div>
-          <button type="button" className="rounded bg-indigo-600 text-white px-3 py-1.5 text-sm" onClick={() => void exportGrades()}>
+          <button type="button" className={ru.btnPrimary} onClick={() => void exportGrades()}>
             Download grades.csv
           </button>
         </section>
       )}
 
       {tab === 'health' && (
-        <section className="space-y-3 border rounded-md p-4 border-gray-200 dark:border-gray-700 text-sm">
-          <button type="button" className="rounded border px-3 py-1.5" onClick={() => void loadHealth()}>
+        <section className={`${ru.card} space-y-3 text-sm`}>
+          <button type="button" className={ru.btnSecondary} onClick={() => void loadHealth()}>
             Refresh health
           </button>
           {health ? (
@@ -644,11 +654,11 @@ export function RegistrarSis() {
       )}
 
       {tab === 'config' && config && (
-        <section className="space-y-3 border rounded-md p-4 border-gray-200 dark:border-gray-700 text-sm">
+        <section className={`${ru.card} space-y-3 text-sm`}>
           <label className="block">
             Provider
             <select
-              className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+              className={ru.input}
               value={config.provider || 'csv'}
               onChange={(e) => setConfig({ ...config, provider: e.target.value })}
             >
@@ -671,7 +681,7 @@ export function RegistrarSis() {
           <label className="block">
             Sync direction
             <select
-              className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+              className={ru.input}
               value={config.syncDirection || 'bidirectional'}
               onChange={(e) => setConfig({ ...config, syncDirection: e.target.value })}
             >
@@ -683,7 +693,7 @@ export function RegistrarSis() {
           <label className="block">
             Schedule
             <select
-              className="mt-1 w-full rounded border dark:bg-gray-800 px-2 py-1"
+              className={ru.input}
               value={config.schedule || 'manual'}
               onChange={(e) => setConfig({ ...config, schedule: e.target.value })}
             >
@@ -692,9 +702,9 @@ export function RegistrarSis() {
               <option value="nightly">nightly (worker:sis-sync)</option>
             </select>
           </label>
-          <fieldset className="space-y-2 border rounded p-3 border-gray-200 dark:border-gray-700">
+          <fieldset className={`${ru.cardMuted} space-y-2`}>
             <legend className="px-1 text-xs font-medium">Field mappings (LMS←SIS)</legend>
-            <button type="button" className="text-xs text-indigo-600" onClick={() => void applyPreset()}>
+            <button type="button" className={`${ru.link} text-xs`} onClick={() => void applyPreset()}>
               Apply provider preset
             </button>
             {(['users', 'sections', 'enrollments', 'grades'] as const).map((entity) => (
@@ -718,7 +728,7 @@ export function RegistrarSis() {
             SIS is source of truth
           </label>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className="rounded bg-indigo-600 text-white px-3 py-1.5" onClick={() => void saveConfig()}>
+            <button type="button" className={ru.btnPrimary} onClick={() => void saveConfig()}>
               Save config
             </button>
             <button
@@ -732,7 +742,7 @@ export function RegistrarSis() {
             <button
               type="button"
               disabled={syncBusy || config.provider === 'csv'}
-              className="rounded bg-emerald-700 text-white px-3 py-1.5 disabled:opacity-50"
+              className={`${ru.btnPrimary} disabled:opacity-50`}
               onClick={() => void runSyncNow(false)}
             >
               Run sync now

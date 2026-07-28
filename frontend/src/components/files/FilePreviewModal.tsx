@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import api from '../../services/api';
-import { X, Download } from 'lucide-react';
+import { Download } from 'lucide-react';
 import BaseModal from '../common/BaseModal';
 import {
   detectPreviewKind,
@@ -21,7 +21,7 @@ import { isDocxFile } from '../../utils/fileTypes';
 import { useFileDownload } from '../../hooks/useFileDownload';
 import { buildStreamUrl } from '../../services/fileUploadApi';
 import FileAccessBanner from './FileAccessBanner';
-import { useAuthenticatedFileBlob } from '../../hooks/useAuthenticatedFileBlob';
+import { useAuthenticatedFileBlob, useLegacyDirectBlobUrl } from '../../hooks/useAuthenticatedFileBlob';
 import { LoadingInline } from '../../design-system';
 
 interface FilePreviewModalProps {
@@ -68,20 +68,17 @@ function resolveLegacyDirectUrl(file: NormalizedFile, secureAssetId: string | nu
 
 const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, open, onClose }) => {
   const { downloadFile, error: downloadError, clearError } = useFileDownload();
-  const closeRef = useRef<HTMLButtonElement>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewStreamUrl, setPreviewStreamUrl] = useState<string | null>(null);
   const [previewCorrupted, setPreviewCorrupted] = useState(false);
   const [resolvedFile, setResolvedFile] = useState<NormalizedFile | null>(null);
   const [accessError, setAccessError] = useState('');
-  const [legacyBlobUrl, setLegacyBlobUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open || !file) {
       setPreviewStreamUrl(null);
       setResolvedFile(null);
       setAccessError('');
-      setLegacyBlobUrl(null);
       return;
     }
 
@@ -167,45 +164,36 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, open, onClose
     : ('unsupported' as const);
   const needsBlob =
     open &&
-    (Boolean(fileAssetId) || Boolean(legacyDirectUrl)) &&
+    Boolean(fileAssetId) &&
     (kind === 'pdf' || kind === 'image' || kind === 'video' || kind === 'audio');
   const { blobUrl, loading: blobLoading, error: blobError } = useAuthenticatedFileBlob(
     fileAssetId,
     needsBlob && Boolean(fileAssetId),
-    'stream'
+    {
+      // Always stream: backend proxies Cloudinary so fetch().blob() stays same-origin.
+      resourcePath: 'stream',
+      fileName: previewFile?.name,
+      mimeType: previewFile?.mimeType,
+    }
   );
 
-  useEffect(() => {
-    if (!open || !legacyDirectUrl || !needsBlob || fileAssetId) {
-      setLegacyBlobUrl(null);
-      return;
-    }
-
-    let revoked: string | null = null;
-    setLegacyBlobUrl(null);
-
-    fetch(legacyDirectUrl)
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error(`File fetch failed (${res.status})`);
-        }
-        return res.blob();
-      })
-      .then((blob) => {
-        revoked = URL.createObjectURL(blob);
-        setLegacyBlobUrl(revoked);
-      })
-      .catch(() => {
-        setAccessError('Unable to load this file preview. Try downloading the file instead.');
-      });
-
-    return () => {
-      if (revoked) URL.revokeObjectURL(revoked);
-    };
-  }, [open, legacyDirectUrl, needsBlob, fileAssetId]);
+  const needsLegacyBlob =
+    open &&
+    !fileAssetId &&
+    Boolean(legacyDirectUrl) &&
+    (kind === 'pdf' || kind === 'image' || kind === 'video' || kind === 'audio');
+  const {
+    blobUrl: legacyBlobUrl,
+    loading: legacyBlobLoading,
+    error: legacyBlobError,
+  } = useLegacyDirectBlobUrl(legacyDirectUrl, needsLegacyBlob, {
+    name: previewFile?.name,
+    mimeType: previewFile?.mimeType,
+  });
 
   const effectiveBlobUrl = blobUrl || legacyBlobUrl;
-  const isBlobLoading = fileAssetId ? blobLoading : needsBlob && !legacyBlobUrl && !accessError;
+  const isBlobLoading = fileAssetId ? blobLoading : legacyBlobLoading;
+  const legacyFetchFailed = Boolean(legacyBlobError);
 
   useEffect(() => {
     if (!open) return;
@@ -227,6 +215,7 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, open, onClose
       title={display.name}
       size="xl"
       ariaLabelledBy="file-preview-title"
+      showCloseButton
     >
       <div className="flex justify-end gap-2 mb-3">
         <button
@@ -243,19 +232,10 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, open, onClose
         >
           <Download className="w-4 h-4" /> Download
         </button>
-        <button
-          ref={closeRef}
-          type="button"
-          className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
-          onClick={onClose}
-          aria-label="Close preview"
-        >
-          <X className="w-5 h-5" />
-        </button>
       </div>
 
       <FileAccessBanner
-        message={accessError || downloadError || blobError}
+        message={accessError || downloadError || blobError || legacyBlobError}
         onDismiss={() => {
           clearError();
           setAccessError('');
@@ -274,9 +254,9 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, open, onClose
       {!fileAssetId && !legacyDirectUrl ? (
         <UnsupportedFileBanner />
       ) : kind === 'image' ? (
-        effectiveBlobUrl ? (
-          <ImagePreview url={effectiveBlobUrl} alt={display.name} />
-        ) : blobError ? (
+        effectiveBlobUrl || (legacyFetchFailed && legacyDirectUrl) ? (
+          <ImagePreview url={effectiveBlobUrl || (legacyDirectUrl as string)} alt={display.name} />
+        ) : blobError || legacyFetchFailed ? (
           <UnsupportedFileBanner />
         ) : (
           <LoadingInline label="Loading image…" />
@@ -284,8 +264,30 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, open, onClose
       ) : kind === 'pdf' ? (
         effectiveBlobUrl ? (
           <PdfPreview url={effectiveBlobUrl} title={display.name} />
-        ) : blobError ? (
-          <UnsupportedFileBanner />
+        ) : blobError || legacyFetchFailed ? (
+          <div className="space-y-3">
+            <UnsupportedFileBanner />
+            <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
+              {fileAssetId ? (
+                <button
+                  type="button"
+                  className="text-indigo-600 underline"
+                  onClick={() => void downloadFile(display.url, display.name, fileAssetId)}
+                >
+                  Download PDF
+                </button>
+              ) : legacyDirectUrl ? (
+                <a
+                  href={legacyDirectUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-indigo-600 underline"
+                >
+                  Open PDF in a new tab
+                </a>
+              ) : null}
+            </p>
+          </div>
         ) : (
           <LoadingInline label="Loading PDF…" />
         )

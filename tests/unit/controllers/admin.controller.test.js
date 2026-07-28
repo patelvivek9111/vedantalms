@@ -82,11 +82,13 @@ describe('controllers/admin.controller', () => {
   test('updateSystemSettings preserves masked password placeholder', async () => {
     const save = jest.fn().mockResolvedValue(true);
     const toObject = jest.fn(() => ({ email: { smtpPassword: 'actual' } }));
-    SystemSettings.findOne.mockResolvedValue({
+    SystemSettings.getSettings.mockResolvedValue({
       general: {},
       security: {},
       email: { smtpPassword: 'actual', smtpUser: 'user' },
       storage: {},
+      academic: {},
+      rootAccountId: null,
       save,
       toObject
     });

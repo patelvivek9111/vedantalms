@@ -7,6 +7,7 @@ import { format } from 'date-fns';
 import { safeFormatDate } from '../../utils/dateUtils';
 import { Lock, Unlock } from 'lucide-react';
 import { parseSubmissionAnswers } from '../../utils/submissionAnswers';
+import { API_URL } from '../../config';
 
 const AssignmentDetails = () => {
   const { id } = useParams();
@@ -33,7 +34,7 @@ const AssignmentDetails = () => {
         const assignmentRes = await axios.get(`${API_URL}/api/assignments/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        const assignmentData = assignmentRes.data;
+        const assignmentData = assignmentRes.data?.data || assignmentRes.data;
         // Ensure questions and attachments are arrays
         if (assignmentData) {
           assignmentData.questions = Array.isArray(assignmentData.questions) ? assignmentData.questions : [];

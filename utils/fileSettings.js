@@ -27,9 +27,10 @@ async function loadUploadSettings() {
     return cachedSettings;
   }
   try {
-    const doc = await SystemSettings.findOne().lean();
-    const maxMb = doc?.general?.maxFileSize ?? 10;
-    const allowed = doc?.general?.allowedFileTypes;
+    const doc = await SystemSettings.getSettings();
+    const lean = doc?.toObject ? doc.toObject() : doc;
+    const maxMb = lean?.general?.maxFileSize ?? 10;
+    const allowed = lean?.general?.allowedFileTypes;
     cachedSettings = {
       maxFileSizeBytes: Math.max(1, Number(maxMb) || 10) * 1024 * 1024,
       allowedMimeTypes: mapAllowedTypesToMimes(allowed),

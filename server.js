@@ -570,6 +570,7 @@ app.use('/api/modules', require('./routes/module.routes'));
 app.use('/api/pages', require('./routes/page.routes'));
 app.use('/api/users', require('./routes/user.routes'));
 app.use('/api/assignments', require('./routes/assignment.routes'));
+app.use('/api/rubrics', require('./routes/rubric.routes'));
 app.use('/api/submissions', require('./routes/submission.routes'));
 const discussionRouteMetrics = require('./middleware/discussionRouteMetrics');
 app.use('/api/threads', discussionRouteMetrics('threads'), require('./routes/thread.routes'));

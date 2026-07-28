@@ -23,6 +23,7 @@ const timedQuizAttemptService = require('../services/timedQuizAttempt.service');
 const gradeReleaseService = require('../services/gradeRelease.service');
 const submissionVersionService = require('../services/submissionVersion.service');
 const observability = require('../services/workflowObservability.service');
+const rubricService = require('../services/rubric.service');
 const workflowCache = require('../services/workflowCache.service');
 const { isPaperUploadQuiz } = require('../utils/quizSubmissionMode');
 
@@ -789,7 +790,11 @@ exports.getAssignmentSubmissions = async (req, res) => {
     const data = await Promise.all(
       pageItems.map(async (submission) => {
         const row = serializeSubmissionForApi(submission);
-        row.clientFiles = await buildClientFileList(submission, req.user._id);
+        const clientFiles = await buildClientFileList(submission, req.user._id);
+        row.clientFiles = clientFiles;
+        // Match student submission payload so grading preview uses the same
+        // enriched file objects (fileAssetId / originalName / legacy URL).
+        row.files = clientFiles;
         row.teacherFeedbackClientFiles = await buildTeacherFeedbackClientFiles(submission, req.user._id);
         return row;
       })
@@ -865,7 +870,23 @@ exports.getStudentSubmissionsForCourse = async (req, res) => {
 // Grade a submission
 exports.gradeSubmission = async (req, res) => {
   try {
-    const { grade, feedback, questionGrades, useIndividualGrades, memberGrades, approveGrade, showCorrectAnswers, showStudentAnswers, studentId, excused, releaseGrade, hideGrade, releaseFeedback, teacherFeedbackFileAssetIds } = req.body;
+    const {
+      grade,
+      feedback,
+      questionGrades,
+      useIndividualGrades,
+      memberGrades,
+      approveGrade,
+      showCorrectAnswers,
+      showStudentAnswers,
+      studentId,
+      excused,
+      releaseGrade,
+      hideGrade,
+      releaseFeedback,
+      teacherFeedbackFileAssetIds,
+      rubricAssessment,
+    } = req.body;
     let submission = await Submission.findById(req.params.id).populate('group');
 
     // If submission doesn't exist, check if this is for an offline assignment
@@ -908,6 +929,8 @@ exports.gradeSubmission = async (req, res) => {
       submission.excused = true;
       submission.grade = undefined;
       submission.finalGrade = undefined;
+      submission.rubricAssessment = undefined;
+      if (typeof submission.markModified === 'function') submission.markModified('rubricAssessment');
       submission.teacherApproved = true;
       submission.gradedBy = req.user._id;
       submission.gradedAt = new Date();
@@ -1147,6 +1170,25 @@ exports.gradeSubmission = async (req, res) => {
       }
     } else {
       // Traditional grading for non-auto-graded submissions
+      let rubricApplied = false;
+      if (rubricAssessment != null) {
+        const assignmentForRubric = await Assignment.findById(submission.assignment);
+        if (!assignmentForRubric?.rubric?.criteria?.length) {
+          return res.status(400).json({ message: 'Assignment has no rubric attached' });
+        }
+        try {
+          const applied = rubricService.applyRubricAssessmentToSubmission(
+            submission,
+            assignmentForRubric,
+            rubricAssessment,
+            { userId: req.user._id }
+          );
+          rubricApplied = applied.useForGrading;
+        } catch (rubricErr) {
+          return res.status(rubricErr.status || 400).json({ message: rubricErr.message });
+        }
+      }
+
       if (useIndividualGrades && submission.group) {
         submission.useIndividualGrades = true;
         submission.memberGrades = [];
@@ -1170,7 +1212,7 @@ exports.gradeSubmission = async (req, res) => {
         submission.grade = membersGraded > 0 ? totalGrade / membersGraded : 0;
         submission.finalGrade = submission.grade;
 
-      } else {
+      } else if (!rubricApplied) {
         submission.useIndividualGrades = false;
         // Only validate grade if it's provided and not approving auto-grade
         if (grade !== undefined && !approveGrade) {
@@ -1181,6 +1223,8 @@ exports.gradeSubmission = async (req, res) => {
           submission.grade = parsedGrade;
           submission.finalGrade = parsedGrade;
         }
+      } else {
+        submission.useIndividualGrades = false;
       }
       
       if (questionGrades) {
@@ -1222,7 +1266,9 @@ exports.gradeSubmission = async (req, res) => {
       }
     }
 
-    submission.feedback = feedback;
+    if (feedback !== undefined) {
+      submission.feedback = feedback;
+    }
 
     const assignmentDoc = await Assignment.findById(submission.assignment);
     if (assignmentDoc) {
@@ -1409,7 +1455,8 @@ exports.getStudentSubmission = async (req, res) => {
       });
       
       if (!group) {
-        return res.status(404).json({ message: 'You are not a member of any group for this assignment' });
+        // Not in a group yet — treat like no submission (assignment still loads).
+        return res.status(200).json(null);
       }
       
       submission = await Submission.findOne({
@@ -1425,12 +1472,15 @@ exports.getStudentSubmission = async (req, res) => {
     }
 
     if (!submission) {
-      return res.status(404).json({ message: 'Submission not found' });
+      // No submission yet is a normal state — avoid 404 noise in the browser console.
+      return res.status(200).json(null);
     }
 
     const visibility = gradeReleaseService.resolveStudentGradeVisibility(submission, assignment);
     const payload = gradeReleaseService.redactSubmissionForStudent(submission, assignment);
-    payload.files = await buildClientFileList(submission, req.user._id);
+    const clientFiles = await buildClientFileList(submission, req.user._id);
+    payload.clientFiles = clientFiles;
+    payload.files = clientFiles;
     if (visibility.feedbackVisible) {
       const feedbackClientFiles = await buildTeacherFeedbackClientFiles(submission, req.user._id);
       payload.teacherFeedbackFiles = feedbackClientFiles;
@@ -1573,7 +1623,7 @@ exports.getSubmissionTimeline = async (req, res) => {
 // Create or update a manual grade for an offline assignment
 exports.createOrUpdateManualGrade = async (req, res) => {
   try {
-    const { assignmentId, studentId, grade, feedback } = req.body;
+    const { assignmentId, studentId, grade, feedback, rubricAssessment } = req.body;
     
     if (!assignmentId || !studentId) {
       return res.status(400).json({ message: 'Assignment ID and Student ID are required' });
@@ -1605,9 +1655,27 @@ exports.createOrUpdateManualGrade = async (req, res) => {
         submittedAt: new Date()
       });
     }
+
+    let rubricApplied = false;
+    if (rubricAssessment != null) {
+      if (!assignment.rubric?.criteria?.length) {
+        return res.status(400).json({ message: 'Assignment has no rubric attached' });
+      }
+      try {
+        const applied = rubricService.applyRubricAssessmentToSubmission(
+          submission,
+          assignment,
+          rubricAssessment,
+          { userId: req.user._id }
+        );
+        rubricApplied = applied.useForGrading;
+      } catch (rubricErr) {
+        return res.status(rubricErr.status || 400).json({ message: rubricErr.message });
+      }
+    }
     
-    // Update grade if provided
-    if (grade !== undefined && grade !== null) {
+    // Update grade if provided (skipped when rubric already set the score)
+    if (!rubricApplied && grade !== undefined && grade !== null) {
       const gradeNum = parseFloat(grade);
       if (isNaN(gradeNum) || gradeNum < 0) {
         return res.status(400).json({ message: 'Invalid grade format' });
@@ -1623,11 +1691,13 @@ exports.createOrUpdateManualGrade = async (req, res) => {
       }
       
       submission.grade = gradeNum;
+      submission.finalGrade = gradeNum;
       submission.gradedBy = req.user._id;
       submission.gradedAt = new Date();
-    } else if (grade === null) {
+    } else if (!rubricApplied && grade === null) {
       // Remove grade
       submission.grade = undefined;
+      submission.finalGrade = undefined;
     }
     
     if (feedback !== undefined) {

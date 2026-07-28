@@ -81,7 +81,13 @@ async function provisionRootAccount({
   }
 
   await AccountBrand.getForRoot(account._id);
-  await SystemSettings.create({ rootAccountId: account._id });
+  await SystemSettings.create({
+    rootAccountId: account._id,
+    academic: { institutionMode },
+    general: { siteName: String(name).trim() },
+  });
+  const { syncInstitutionIdentity } = require('./institutionIdentity.service');
+  await syncInstitutionIdentity(account._id, name);
   await InstitutionGradingPolicy.create({
     key: `account:${account._id}`,
     rootAccountId: account._id,
