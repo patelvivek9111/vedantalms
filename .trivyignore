@@ -1,0 +1,7 @@
+# Trivy ignore — reviewed acceptances for CI HIGH/CRITICAL gate.
+#
+# GHSA-qwww-vcr4-c8h2 (react-router RSC CSRF): only affects unstable RSC APIs.
+# This app uses BrowserRouter SPA mode (frontend/src/main.tsx) and does not use
+# React Router Framework/RSC mode. No v7 backport is published yet; revisit when
+# react-router 7.x ships a patched release or we migrate to 8.x + React 19.
+GHSA-qwww-vcr4-c8h2

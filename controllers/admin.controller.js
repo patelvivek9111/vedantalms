@@ -18,6 +18,14 @@ const { accountSubtreeFilter } = require('../services/tenancy/academicStructure.
 const { validatePassword } = require('../utils/passwordPolicy');
 const { sendEmail } = require('../utils/emailService');
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 const SCHOOL_MANAGED_ROLES = [
   'student',
   'teaching_assistant',
@@ -856,15 +864,18 @@ exports.createAccountInvite = async (req, res) => {
     });
 
     const frontendBase = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
-    const inviteUrl = `${frontendBase}/accept-invite?token=${rawToken}`;
+    const inviteUrl = `${frontendBase}/accept-invite?token=${encodeURIComponent(rawToken)}`;
+    const safeRole = escapeHtml(inviteRole);
+    const safeInviteUrl = escapeHtml(inviteUrl);
+    const safeExpiresAt = escapeHtml(invite.expiresAt.toISOString());
 
     try {
       await sendEmail(
         String(email).toLowerCase().trim(),
         `You're invited to join ${req.account?.name || 'MySl8te'}`,
-        `<p>You have been invited as <strong>${inviteRole}</strong>.</p>
-         <p><a href="${inviteUrl}">Accept invitation</a></p>
-         <p>This link expires at ${invite.expiresAt.toISOString()}.</p>`
+        `<p>You have been invited as <strong>${safeRole}</strong>.</p>
+         <p><a href="${safeInviteUrl}">Accept invitation</a></p>
+         <p>This link expires at ${safeExpiresAt}.</p>`
       );
     } catch (mailErr) {
       console.warn('Invite email failed:', mailErr.message);
