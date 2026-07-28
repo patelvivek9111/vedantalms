@@ -29,7 +29,6 @@ export function Login() {
   const primaryLogo = brandLogo || `${import.meta.env.BASE_URL}assets/MySl8te_logo.png`;
   const fallbackLogo = `${import.meta.env.BASE_URL}assets/MySl8te_logo.png`;
   const [logoSrc, setLogoSrc] = useState(primaryLogo);
-  const institutionName = tenant?.brand?.displayName || tenant?.name || 'MySl8te';
   const wordmark = tenant?.brand?.wordmark || 'MYSL8TE';
   const accent = tenant?.brand?.primaryColor || '#4F46E5';
   const ssoProviders = (tenant?.authProviders || []).filter(
@@ -195,7 +194,7 @@ export function Login() {
   ] as const;
 
   return (
-    <div className="relative min-h-[100dvh] overflow-x-hidden bg-slate-50 dark:bg-slate-950">
+    <div className="relative min-h-[100svh] overflow-x-hidden bg-slate-50 dark:bg-slate-950">
       <div
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_90%_55%_at_50%_-15%,rgba(99,102,241,0.18),transparent)] dark:bg-[radial-gradient(ellipse_85%_50%_at_50%_-20%,rgba(129,140,248,0.22),transparent)]"
         aria-hidden
@@ -214,7 +213,11 @@ export function Login() {
         aria-hidden
       />
 
-      <div className="relative flex min-h-[100dvh] items-center justify-center px-4 py-4 sm:px-6 sm:py-6 [@media(max-height:700px)]:items-start [@media(max-height:700px)]:py-3">
+      {/*
+        Mobile: top-align with stable svh (not dvh). Dynamic viewport units resize
+        as the iOS keyboard settles, which reflows a centered card on every keystroke.
+      */}
+      <div className="relative flex min-h-[100svh] items-start justify-center px-4 pb-4 pt-3 sm:px-6 sm:pb-6 sm:pt-5 lg:items-center lg:py-6">
         <div className="flex w-full max-w-6xl flex-col items-stretch justify-center gap-8 lg:flex-row lg:items-center lg:gap-10 xl:gap-14">
           {/* Left column — desktop only */}
           <aside className="order-2 hidden min-w-0 flex-1 flex-col justify-center text-left lg:order-1 lg:flex lg:pr-4 xl:pr-8">
@@ -264,7 +267,7 @@ export function Login() {
                     alt="MySl8te"
                     width={640}
                     height={240}
-                    className="mx-auto block h-40 w-auto max-h-[min(46dvh,380px)] max-w-full object-contain object-center sm:h-44 md:h-52 md:max-h-[min(50dvh,440px)]"
+                    className="mx-auto block h-36 w-auto max-w-full object-contain object-center sm:h-44 md:h-52"
                     decoding="async"
                     onError={() => {
                       if (logoFallbackUsed.current) return;
@@ -293,7 +296,7 @@ export function Login() {
               />
 
               <h1 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-50 sm:text-xl">
-                Sign in to {institutionName}
+                Sign in
               </h1>
               <p className="mt-1 text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
                 {wordmark}

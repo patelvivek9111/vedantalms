@@ -31,28 +31,7 @@ const FloatingLabelPasswordInput: React.FC<FloatingLabelPasswordInputProps> = ({
 
   const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
     setIsFocused(true);
-    
-    // Auto-scroll to input on mobile devices when focused
-    const scrollToInput = () => {
-      if (inputRef.current) {
-        // Check if it's a mobile device
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || 
-                        (window.innerWidth <= 768 && 'ontouchstart' in window);
-        
-        if (isMobile) {
-          // Scroll input into view, centered vertically
-          setTimeout(() => {
-            inputRef.current?.scrollIntoView({
-              behavior: 'smooth',
-              block: 'center',
-              inline: 'nearest'
-            });
-          }, 300); // Delay to account for keyboard animation
-        }
-      }
-    };
-    
-    scrollToInput();
+    // Avoid scrollIntoView on iOS — see FloatingLabelInput.
     onFocus?.(e);
   };
 
