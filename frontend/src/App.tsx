@@ -13,6 +13,7 @@ import { PrivacyPolicy } from './pages/PrivacyPolicy';
 import { TermsOfService } from './pages/TermsOfService';
 import { ForgotPassword } from './pages/ForgotPassword';
 import { ResetPassword } from './pages/ResetPassword';
+import { StudentActivation } from './pages/StudentActivation';
 import { Dashboard } from './pages/Dashboard';
 import CourseList from './components/course/CourseList';
 import CourseForm from './components/course/CourseForm';
@@ -246,7 +247,7 @@ function AppContent() {
     <div
       className={
         isAuthenticated
-          ? 'min-h-dvh bg-gray-100 dark:bg-slate-950 dark:text-white'
+          ? 'flex min-h-dvh flex-col bg-gray-50 dark:bg-slate-950 dark:text-white'
           : 'flex min-h-dvh flex-col bg-slate-50 dark:bg-slate-950 dark:text-slate-100'
       }
     >
@@ -259,7 +260,7 @@ function AppContent() {
         tabIndex={-1}
         className={
           isAuthenticated
-            ? 'pb-[calc(4rem+env(safe-area-inset-bottom,0px))] lg:pb-10 lg:pl-20 print:pb-0 print:pl-0 transition-all duration-300 outline-none'
+            ? 'flex min-h-dvh flex-1 flex-col bg-gray-50 dark:bg-gray-900 pb-[calc(4rem+env(safe-area-inset-bottom,0px))] lg:pb-10 lg:pl-20 print:pb-0 print:pl-0 transition-all duration-300 outline-none'
             : 'flex min-h-0 flex-1 flex-col print:pb-0'
         }
       >
@@ -276,6 +277,10 @@ function AppContent() {
           <Route path="/terms" element={<TermsOfService />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route
+            path="/activate"
+            element={isAuthenticated ? <Navigate to={homePathForRole(user?.role)} replace /> : <StudentActivation />}
+          />
           <Route path="/unauthorized" element={<Unauthorized />} />
           
           {/* Protected Routes */}

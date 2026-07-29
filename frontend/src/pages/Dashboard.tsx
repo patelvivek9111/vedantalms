@@ -561,7 +561,7 @@ export function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="flex min-h-full flex-1 flex-col bg-gray-50 dark:bg-gray-900">
       <MobileTopNav
         title="Dashboard"
         leftAction="user"
@@ -583,9 +583,9 @@ export function Dashboard() {
         onSwipeRight={swipeEnabled ? handleSwipeRight : undefined}
         enabled={swipeEnabled}
         preventScrollInterference={true}
-        className="min-h-screen"
+        className="min-h-full flex-1"
       >
-        <PullToRefresh onRefresh={handleRefresh} className="min-h-screen">
+        <PullToRefresh onRefresh={handleRefresh} className="min-h-full">
           <div className="container mx-auto flex flex-col gap-4 px-4 py-3 pt-20 lg:flex-row lg:gap-8 lg:px-6 lg:py-8 lg:pt-8">
           {/* Main dashboard content */}
           <div className="flex-1">

@@ -209,6 +209,122 @@ async function stageUsersImport({ tenantId, accountId, rows, csvText, provider =
   return { batchId, staged: docs.length };
 }
 
+async function stageRosterImport({ tenantId, accountId, rows, csvText, provider = 'csv', createdBy }) {
+  const PendingStudentRoster = require('../../models/pendingStudentRoster.model');
+  const parsed = rows?.length ? rows : parseCsvText(csvText).rows;
+  const batchId = newBatchId();
+  const docs = [];
+
+  for (const raw of parsed) {
+    const studentId = pick(raw, ['student_id', 'studentid', 'admission_number', 'admissionnumber', 'sis_id']);
+    const firstName = pick(raw, ['first_name', 'firstname', 'first']);
+    const lastName = pick(raw, ['last_name', 'lastname', 'last']);
+    if (!studentId || !firstName || !lastName) continue;
+
+    const proposed = {
+      studentId,
+      firstName,
+      middleName: pick(raw, ['middle_name', 'middlename', 'middle']),
+      lastName,
+    };
+
+    const currentRow = await PendingStudentRoster.findOne(
+      withTenantFilter({ studentId }, tenantId)
+    ).lean();
+
+    const current = currentRow
+      ? {
+          studentId: currentRow.studentId,
+          firstName: currentRow.firstName,
+          middleName: currentRow.middleName || '',
+          lastName: currentRow.lastName,
+          status: currentRow.status,
+        }
+      : null;
+
+    const hasConflict = current && current.status === 'claimed';
+    const diff = computeDiff(
+      current
+        ? {
+            studentId: current.studentId,
+            firstName: current.firstName,
+            middleName: current.middleName,
+            lastName: current.lastName,
+          }
+        : null,
+      proposed
+    );
+
+    docs.push({
+      batchId,
+      entityType: 'roster',
+      externalKey: studentId,
+      status: hasConflict ? 'conflict' : 'pending',
+      proposed,
+      current,
+      diff,
+      rawPayload: raw,
+      rootAccountId: tenantId,
+      accountId: accountId || tenantId,
+    });
+  }
+
+  if (!docs.length) return { batchId, staged: 0 };
+
+  await SisSyncRow.insertMany(docs);
+  await createBatchAndJob({
+    tenantId,
+    accountId,
+    batchId,
+    entityType: 'roster',
+    provider,
+    stagedCount: docs.length,
+    createdBy,
+    jobType: 'roster_import',
+  });
+
+  return { batchId, staged: docs.length };
+}
+
+async function applyRosterRow(tenantId, row, actorId) {
+  const PendingStudentRoster = require('../../models/pendingStudentRoster.model');
+  const p = row.proposed || {};
+  const studentId = String(p.studentId || '').trim();
+  const firstName = String(p.firstName || '').trim();
+  const lastName = String(p.lastName || '').trim();
+  if (!studentId || !firstName || !lastName) {
+    throw new Error('Roster row missing studentId, firstName, or lastName');
+  }
+
+  const existing = await PendingStudentRoster.findOne(withTenantFilter({ studentId }, tenantId));
+  if (existing?.status === 'claimed') {
+    throw new Error('Cannot update a claimed roster entry');
+  }
+
+  if (existing) {
+    existing.firstName = firstName;
+    existing.middleName = String(p.middleName || '').trim();
+    existing.lastName = lastName;
+    await existing.save();
+  } else {
+    await PendingStudentRoster.create({
+      rootAccountId: tenantId,
+      studentId,
+      firstName,
+      middleName: String(p.middleName || '').trim(),
+      lastName,
+      status: 'pending',
+    });
+  }
+
+  row.status = 'applied';
+  row.appliedAt = new Date();
+  row.reviewedBy = actorId;
+  row.applyError = '';
+  await row.save();
+  return true;
+}
+
 async function stageSectionsImport({ tenantId, accountId, rows, csvText, provider = 'csv', createdBy }) {
   const parsed = rows?.length ? rows : parseCsvText(csvText).rows;
   const batchId = newBatchId();
@@ -653,6 +769,8 @@ async function applySyncBatch(batchId, { tenantId, actorId, approvePending = tru
         await applyUserRow(tenantId, row, actorId);
       } else if (row.entityType === 'section') {
         await applySectionRow(tenantId, row, actorId);
+      } else if (row.entityType === 'roster') {
+        await applyRosterRow(tenantId, row, actorId);
       } else if (row.entityType === 'enrollment') {
         // Apply via legacy enrollment staging for dual-write consistency
         continue;
@@ -1013,6 +1131,7 @@ module.exports = {
   stageUsersImport,
   stageSectionsImport,
   stageEnrollmentsImport,
+  stageRosterImport,
   listSyncRows,
   listBatches,
   patchSyncRow,

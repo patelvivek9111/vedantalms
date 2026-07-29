@@ -9,7 +9,7 @@ const sisSyncRowSchema = new mongoose.Schema(
     batchId: { type: String, required: true, index: true },
     entityType: {
       type: String,
-      enum: ['user', 'section', 'enrollment'],
+      enum: ['user', 'section', 'enrollment', 'roster'],
       required: true,
     },
     externalKey: { type: String, required: true, trim: true },

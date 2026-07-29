@@ -630,6 +630,17 @@ exports.stageSisImport = async (req, res) => {
       });
       return res.status(201).json({ success: true, data: result });
     }
+    if (entity === 'roster' || entity === 'rosters') {
+      const result = await sisOffice.stageRosterImport({
+        tenantId,
+        accountId: req.user.accountId,
+        rows,
+        csvText,
+        provider,
+        createdBy: req.user._id,
+      });
+      return res.status(201).json({ success: true, data: result });
+    }
     if (entity === 'sections' || entity === 'section') {
       const result = await sisOffice.stageSectionsImport({
         tenantId,

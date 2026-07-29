@@ -64,6 +64,20 @@ const accountSchema = new mongoose.Schema(
     affiliationBody: { type: String, default: '', trim: true },
     udiseCode: { type: String, default: '', trim: true },
     registrarContactEmail: { type: String, default: '', trim: true, lowercase: true },
+    /**
+     * School email domain for auto-generated student logins (e.g. lincolnhigh.edu).
+     * Used when studentEmailMode === 'auto-generate'.
+     */
+    domain: { type: String, default: '', trim: true, lowercase: true },
+    /**
+     * already-provided: students get emails via SIS users import; skip self-service activation.
+     * auto-generate: students claim via /activate and receive a generated school email.
+     */
+    studentEmailMode: {
+      type: String,
+      enum: ['auto-generate', 'already-provided'],
+      default: 'already-provided',
+    },
     address: {
       line1: { type: String, default: '' },
       city: { type: String, default: '' },

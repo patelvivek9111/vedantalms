@@ -67,6 +67,8 @@ exports.getCurrentTenant = async (req, res) => {
         workflowState: account.workflowState,
         institutionMode: account.institutionMode,
         timezone: account.timezone,
+        studentEmailMode: account.studentEmailMode || 'already-provided',
+        studentActivationEnabled: account.studentEmailMode === 'auto-generate' && Boolean(account.domain),
         brand,
         domains,
         authProviders: providers,

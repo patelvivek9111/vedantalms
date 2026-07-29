@@ -305,6 +305,15 @@ const contactInquiryLimiter = rateLimit({
   skip: skipApiRateLimit
 });
 
+const studentActivationLimiter = rateLimit({
+  windowMs: parseInt(process.env.STUDENT_ACTIVATION_WINDOW_MS || `${15 * 60 * 1000}`, 10),
+  max: parseInt(process.env.STUDENT_ACTIVATION_MAX || '10', 10),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many activation attempts. Please try again later.' },
+  skip: skipApiRateLimit
+});
+
 const writeLimiter = rateLimit({
   windowMs: parseInt(process.env.WRITE_RATE_LIMIT_WINDOW_MS || `${60 * 1000}`, 10),
   max: parseInt(process.env.WRITE_RATE_LIMIT_MAX || '240', 10),
@@ -562,6 +571,7 @@ app.use('/api', require('./middleware/tenantRateLimit').tenantRateLimit);
 app.use('/api', require('./middleware/maintenanceMode'));
 app.use('/api', require('./routes/platform.routes'));
 app.use('/api/contact', contactInquiryLimiter, require('./routes/contact.routes'));
+app.use('/api/student-activation', studentActivationLimiter, require('./routes/studentActivation.routes'));
 app.use('/api/auth', require('./routes/auth.routes'));
 app.use('/api/auth', require('./routes/sso.routes'));
 app.use('/api/catalog', require('./routes/catalog.routes'));

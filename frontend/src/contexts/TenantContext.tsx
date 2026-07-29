@@ -15,6 +15,8 @@ export type TenantInfo = {
   code: string;
   institutionMode?: string;
   timezone?: string;
+  studentEmailMode?: 'auto-generate' | 'already-provided';
+  studentActivationEnabled?: boolean;
   brand?: TenantBrand;
   authProviders?: Array<{ _id?: string; authType: string; name: string }>;
   publicRegistrationDisabled?: boolean;

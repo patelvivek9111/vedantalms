@@ -14,6 +14,7 @@ const sisJobSchema = new mongoose.Schema(
         'grade_export',
         'user_import',
         'section_import',
+        'roster_import',
         'scheduled_sync',
       ],
       required: true,

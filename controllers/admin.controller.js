@@ -919,8 +919,26 @@ exports.acceptAccountInvite = async (req, res) => {
     const existing = await User.findOne(
       withTenantFilter({ email: invite.email }, invite.rootAccountId)
     );
+
+    // Pre-provisioned activation: set password on the claim-created user.
     if (existing) {
-      return res.status(409).json({ success: false, message: 'A user with this email already exists' });
+      if (!existing.pendingPasswordSetup) {
+        return res.status(409).json({ success: false, message: 'A user with this email already exists' });
+      }
+      existing.firstName = String(firstName).trim();
+      existing.lastName = String(lastName).trim();
+      existing.password = password;
+      existing.pendingPasswordSetup = false;
+      existing.privacyConsentAt = existing.privacyConsentAt || new Date();
+      await existing.save();
+
+      invite.acceptedAt = new Date();
+      invite.acceptedUserId = existing._id;
+      await invite.save();
+
+      const safe = existing.toObject();
+      delete safe.password;
+      return res.status(200).json({ success: true, data: safe });
     }
 
     const user = await User.create({

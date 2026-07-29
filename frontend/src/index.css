@@ -423,16 +423,11 @@ input[type="number"] {
   border-width: 0;
 }
 
-/* Live region for screen reader announcements */
-[role="status"],
-[role="alert"],
-[aria-live] {
-  position: absolute;
-  left: -10000px;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-}
+/*
+ * Do NOT visually hide [role="alert"] / [aria-live] globally.
+ * Visible error banners use role="alert"; screen-reader-only live
+ * regions should opt in with .sr-only (see ScreenReaderAnnouncement).
+ */
 
 /* Safe Area Insets for notched devices (iOS) and Android navigation bars */
 .safe-area-inset-top {

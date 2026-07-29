@@ -219,7 +219,7 @@ exports.login = async (req, res) => {
         success: false,
         failureReason: 'User not found',
       });
-      return res.status(401).json({ message: 'Invalid credentials' });
+      return res.status(401).json({ message: 'Incorrect Username or Password.' });
     }
 
     if (policy.maintenanceMode && user.role !== 'admin') {
@@ -249,7 +249,7 @@ exports.login = async (req, res) => {
         success: false,
         failureReason: 'Invalid password',
       });
-      return res.status(401).json({ message: 'Invalid credentials' });
+      return res.status(401).json({ message: 'Incorrect Username or Password.' });
     }
 
     if (user.accountStatus === 'suspended') {

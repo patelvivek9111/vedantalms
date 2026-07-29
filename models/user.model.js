@@ -10,6 +10,11 @@ const userSchema = new mongoose.Schema({
     required: [true, 'First name is required'],
     trim: true
   },
+  middleName: {
+    type: String,
+    default: '',
+    trim: true
+  },
   lastName: {
     type: String,
     required: [true, 'Last name is required'],
@@ -21,6 +26,18 @@ const userSchema = new mongoose.Schema({
     lowercase: true,
     trim: true,
     match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
+  },
+  /** Personal / contact email (e.g. for activation invites and account recovery). */
+  personalEmail: {
+    type: String,
+    default: '',
+    lowercase: true,
+    trim: true
+  },
+  /** True when account was created via self-service activation and password is not set yet. */
+  pendingPasswordSetup: {
+    type: Boolean,
+    default: false
   },
   password: {
     type: String,

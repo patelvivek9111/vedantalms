@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
+import axios from 'axios';
 import { BookOpen, MessageCircle, Award, ArrowRight } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTenant } from '../contexts/TenantContext';
@@ -8,6 +9,29 @@ import FloatingLabelInput from '../components/common/FloatingLabelInput';
 import FloatingLabelPasswordInput from '../components/common/FloatingLabelPasswordInput';
 import { loginRedirectPath } from '../utils/loginRedirect';
 import { API_URL } from '../config';
+
+const CREDENTIALS_ERROR = 'Incorrect Username or Password.';
+
+function messageFromLoginError(err: unknown): string {
+  if (!axios.isAxiosError(err)) {
+    return CREDENTIALS_ERROR;
+  }
+  const status = err.response?.status;
+  const raw = err.response?.data?.message;
+  const apiMessage = typeof raw === 'string' ? raw.trim() : '';
+
+  // Wrong email/password — always use the clear on-page copy.
+  if (
+    status === 401 ||
+    /invalid credentials/i.test(apiMessage) ||
+    /incorrect.*(username|email|password)/i.test(apiMessage)
+  ) {
+    return CREDENTIALS_ERROR;
+  }
+
+  if (apiMessage) return apiMessage;
+  return CREDENTIALS_ERROR;
+}
 
 export function Login() {
   const [email, setEmail] = useState('');
@@ -20,6 +44,7 @@ export function Login() {
   const [passwordError, setPasswordError] = useState('');
   const [isTouchUi, setIsTouchUi] = useState(false);
   const emailInputRef = useRef<HTMLInputElement>(null);
+  const errorAlertRef = useRef<HTMLDivElement>(null);
   const { login, loginWithToken, user } = useAuth();
   const { tenant } = useTenant();
   const logoFallbackUsed = useRef(false);
@@ -125,8 +150,13 @@ export function Login() {
   useEffect(() => {
     setEmail('');
     setPassword('');
-    setError('');
+    // Do not clear `error` here — SSO errors are set in another mount effect.
   }, []);
+
+  useEffect(() => {
+    if (!error) return;
+    errorAlertRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [error]);
 
   const validateEmail = (emailValue: string) => {
     if (!emailValue) {
@@ -191,16 +221,8 @@ export function Login() {
       const loggedIn = await login(email, password);
       navigate(loginRedirectPath(location.state, loggedIn.role), { replace: true });
     } catch (err: unknown) {
-      const axiosMsg =
-        err &&
-        typeof err === 'object' &&
-        'response' in err &&
-        (err as { response?: { data?: { message?: string } } }).response?.data?.message;
-      setError(
-        typeof axiosMsg === 'string' && axiosMsg.trim()
-          ? axiosMsg
-          : 'Failed to login. Please check your credentials.'
-      );
+      setError(messageFromLoginError(err));
+    } finally {
       setIsLoading(false);
     }
   };
@@ -343,16 +365,7 @@ export function Login() {
               </p>
             </div>
 
-            <form className="mt-4 space-y-3 sm:mt-5" onSubmit={handleSubmit}>
-              {error && (
-                <div
-                  role="alert"
-                  className="rounded-xl border border-rose-200/90 bg-rose-50/90 px-4 py-3 text-sm text-rose-900 dark:border-rose-900/50 dark:bg-rose-950/35 dark:text-rose-100"
-                >
-                  {error}
-                </div>
-              )}
-
+            <form className="mt-4 space-y-3 sm:mt-5" onSubmit={handleSubmit} noValidate>
               {ssoProviders.length > 0 && (
                 <div className="space-y-2">
                   {ssoProviders.map((p) => (
@@ -420,6 +433,17 @@ export function Login() {
                   </Link>
                 </p>
               </div>
+              )}
+
+              {error && (
+                <div
+                  ref={errorAlertRef}
+                  role="alert"
+                  aria-live="assertive"
+                  className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-100"
+                >
+                  {error}
+                </div>
               )}
 
               {passwordEnabled && (
