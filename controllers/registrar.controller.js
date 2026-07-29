@@ -1779,8 +1779,11 @@ exports.downloadRegistrarJobExport = async (req, res) => {
       return res.status(410).json({ success: false, message: 'Download link expired' });
     }
 
-    const resolved = path.resolve(job.filePath);
-    if (!resolved.startsWith(path.resolve(getJobsDir())) || !fs.existsSync(resolved)) {
+    // filePath is server-written on the AsyncJob; still constrain to the jobs dir.
+    const { isPathInside } = require('../config/paths');
+    const jobsDir = path.resolve(getJobsDir());
+    const resolved = path.resolve(jobsDir, path.basename(job.filePath)); // nosemgrep: javascript.express.security.audit.express-path-join-resolve-traversal.express-path-join-resolve-traversal
+    if (!isPathInside(jobsDir, resolved) || !fs.existsSync(resolved)) {
       return res.status(404).json({ success: false, message: 'File not found' });
     }
 
