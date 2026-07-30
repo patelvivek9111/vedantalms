@@ -6,6 +6,8 @@ import { getMemoryAuthToken } from '../utils/authToken';
 import { MobileAppShell } from '../components/common/MobileAppShell';
 import { useAuth } from '../contexts/AuthContext';
 
+type StudentEmailMode = 'auto-generate' | 'already-provided';
+
 type Institution = {
   _id: string;
   name: string;
@@ -14,11 +16,22 @@ type Institution = {
   timezone?: string;
   planCode?: string;
   workflowState?: string;
+  domain?: string;
+  studentEmailMode?: StudentEmailMode;
   createdAt?: string;
+};
+
+type EmailDraft = {
+  studentEmailMode: StudentEmailMode;
+  domain: string;
 };
 
 function authHeaders() {
   return { Authorization: `Bearer ${getMemoryAuthToken()}` };
+}
+
+function activationEnabled(mode: StudentEmailMode, domain: string) {
+  return mode === 'auto-generate' && Boolean(domain.trim());
 }
 
 const emptyForm = {
@@ -38,6 +51,8 @@ export function AdminPlatformInstitutions() {
   const { user } = useAuth();
   const [rows, setRows] = useState<Institution[]>([]);
   const [form, setForm] = useState(emptyForm);
+  const [emailDrafts, setEmailDrafts] = useState<Record<string, EmailDraft>>({});
+  const [savingEmailId, setSavingEmailId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -50,7 +65,16 @@ export function AdminPlatformInstitutions() {
     setError('');
     try {
       const res = await axios.get(`${API_URL}/api/platform/accounts`, { headers: authHeaders() });
-      setRows(res.data?.data || []);
+      const data = (res.data?.data || []) as Institution[];
+      setRows(data);
+      const drafts: Record<string, EmailDraft> = {};
+      for (const row of data) {
+        drafts[row._id] = {
+          studentEmailMode: row.studentEmailMode === 'auto-generate' ? 'auto-generate' : 'already-provided',
+          domain: row.domain || '',
+        };
+      }
+      setEmailDrafts(drafts);
     } catch (err: unknown) {
       setError(
         axios.isAxiosError(err) && err.response?.data?.message
@@ -119,6 +143,35 @@ export function AdminPlatformInstitutions() {
           ? String(err.response.data.message)
           : 'Update failed'
       );
+    }
+  };
+
+  const saveEmailSettings = async (id: string) => {
+    if (!canManage) return;
+    const draft = emailDrafts[id];
+    if (!draft) return;
+    setSavingEmailId(id);
+    setError('');
+    setMessage('');
+    try {
+      await axios.patch(
+        `${API_URL}/api/platform/accounts/${id}`,
+        {
+          studentEmailMode: draft.studentEmailMode,
+          domain: draft.domain.trim().toLowerCase(),
+        },
+        { headers: authHeaders() }
+      );
+      setMessage('Student email settings saved');
+      await load();
+    } catch (err: unknown) {
+      setError(
+        axios.isAxiosError(err) && err.response?.data?.message
+          ? String(err.response.data.message)
+          : 'Failed to save student email settings'
+      );
+    } finally {
+      setSavingEmailId(null);
     }
   };
 
@@ -245,34 +298,119 @@ export function AdminPlatformInstitutions() {
             </h2>
           </div>
           <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-            {rows.map((row) => (
-              <li key={row._id} className="px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-sm">
-                <div>
-                  <div className="font-medium text-slate-900 dark:text-slate-50">
-                    {row.name}{' '}
-                    <span className="text-xs font-normal text-slate-500">({row.code})</span>
+            {rows.map((row) => {
+              const draft = emailDrafts[row._id] || {
+                studentEmailMode: 'already-provided' as StudentEmailMode,
+                domain: '',
+              };
+              const activateOn = activationEnabled(draft.studentEmailMode, draft.domain);
+              return (
+                <li key={row._id} className="px-4 py-4 space-y-3 text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className="font-medium text-slate-900 dark:text-slate-50">
+                        {row.name}{' '}
+                        <span className="text-xs font-normal text-slate-500">({row.code})</span>
+                      </div>
+                      <div className="text-xs text-slate-500 mt-0.5">
+                        {row.workflowState || 'active'} · plan {row.planCode || 'standard'} · id{' '}
+                        <code>{row._id}</code>
+                      </div>
+                    </div>
+                    <label className="text-xs text-slate-600 dark:text-slate-300">
+                      Mode
+                      <select
+                        className="ml-2 rounded border border-slate-200 px-2 py-1 dark:border-slate-600 dark:bg-slate-950"
+                        value={row.institutionMode || 'mixed'}
+                        onChange={(e) => void patchMode(row._id, e.target.value)}
+                        disabled={!canManage}
+                        title="Same setting as Registrar → Settings → Institution mode"
+                      >
+                        <option value="school">school</option>
+                        <option value="college">college</option>
+                        <option value="mixed">mixed</option>
+                      </select>
+                    </label>
                   </div>
-                  <div className="text-xs text-slate-500 mt-0.5">
-                    {row.workflowState || 'active'} · plan {row.planCode || 'standard'} · id{' '}
-                    <code>{row._id}</code>
+
+                  <div className="rounded-lg border border-slate-100 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-950/50 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">
+                        Student email / activation
+                      </h3>
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                          activateOn
+                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
+                            : 'bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                        }`}
+                        title={
+                          activateOn
+                            ? '/activate is reachable for this institution'
+                            : '/activate is not available until auto-generate mode has a domain'
+                        }
+                      >
+                        {activateOn ? '/activate enabled' : '/activate off'}
+                      </span>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                        Student email mode
+                        <select
+                          className="mt-1 w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-950"
+                          value={draft.studentEmailMode}
+                          disabled={!canManage}
+                          onChange={(e) =>
+                            setEmailDrafts((prev) => ({
+                              ...prev,
+                              [row._id]: {
+                                ...draft,
+                                studentEmailMode: e.target.value as StudentEmailMode,
+                              },
+                            }))
+                          }
+                        >
+                          <option value="already-provided">Already provided (SIS import)</option>
+                          <option value="auto-generate">Auto-generate (self-service activation)</option>
+                        </select>
+                      </label>
+                      {draft.studentEmailMode === 'auto-generate' && (
+                        <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                          Email domain
+                          <input
+                            className="mt-1 w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-950"
+                            value={draft.domain}
+                            disabled={!canManage}
+                            placeholder="lincolnhigh.edu"
+                            onChange={(e) =>
+                              setEmailDrafts((prev) => ({
+                                ...prev,
+                                [row._id]: { ...draft, domain: e.target.value },
+                              }))
+                            }
+                          />
+                        </label>
+                      )}
+                      <div className="flex items-end">
+                        <button
+                          type="button"
+                          disabled={!canManage || savingEmailId === row._id}
+                          onClick={() => void saveEmailSettings(row._id)}
+                          className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-sky-600"
+                        >
+                          {savingEmailId === row._id ? 'Saving…' : 'Save email settings'}
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Auto-generate lets students claim accounts at <code>/activate</code> using a
+                      pre-loaded roster. Already-provided means school emails come from the SIS users
+                      import instead.
+                    </p>
                   </div>
-                </div>
-                <label className="text-xs text-slate-600 dark:text-slate-300">
-                  Mode
-                  <select
-                    className="ml-2 rounded border border-slate-200 px-2 py-1 dark:border-slate-600 dark:bg-slate-950"
-                    value={row.institutionMode || 'mixed'}
-                    onChange={(e) => void patchMode(row._id, e.target.value)}
-                    disabled={!canManage}
-                    title="Same setting as Registrar → Settings → Institution mode"
-                  >
-                    <option value="school">school</option>
-                    <option value="college">college</option>
-                    <option value="mixed">mixed</option>
-                  </select>
-                </label>
-              </li>
-            ))}
+                </li>
+              );
+            })}
             {!loading && !rows.length && (
               <li className="px-4 py-8 text-center text-sm text-slate-500">No institutions yet.</li>
             )}

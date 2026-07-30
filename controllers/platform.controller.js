@@ -137,8 +137,16 @@ exports.updateRootAccount = async (req, res) => {
     const account = await loadRootAccount(req.params.id);
     if (!account) return res.status(404).json({ success: false, message: 'Account not found' });
 
-    const { name, timezone, institutionMode, planCode, workflowState, registrarContactEmail } =
-      req.body || {};
+    const {
+      name,
+      timezone,
+      institutionMode,
+      planCode,
+      workflowState,
+      registrarContactEmail,
+      domain,
+      studentEmailMode,
+    } = req.body || {};
 
     if (name != null) account.name = String(name).trim();
     if (timezone != null) account.timezone = timezone;
@@ -157,6 +165,47 @@ exports.updateRootAccount = async (req, res) => {
         return res.status(400).json({ success: false, message: 'Invalid workflowState' });
       }
       account.workflowState = workflowState;
+    }
+
+    let nextDomain = account.domain || '';
+    if (domain !== undefined) {
+      const normalizedDomain = String(domain || '')
+        .trim()
+        .toLowerCase()
+        .replace(/^@/, '');
+      if (normalizedDomain === '') {
+        nextDomain = '';
+      } else if (
+        !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(normalizedDomain) ||
+        normalizedDomain.includes('@') ||
+        /\s/.test(normalizedDomain)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            'Invalid domain. Use a hostname like lincolnhigh.edu (letters, numbers, hyphens, at least one dot; no @ or spaces).',
+        });
+      } else {
+        nextDomain = normalizedDomain;
+      }
+      account.domain = nextDomain;
+    }
+
+    if (studentEmailMode !== undefined) {
+      if (!['auto-generate', 'already-provided'].includes(studentEmailMode)) {
+        return res.status(400).json({
+          success: false,
+          message: "studentEmailMode must be 'auto-generate' or 'already-provided'",
+        });
+      }
+      if (studentEmailMode === 'auto-generate' && !nextDomain) {
+        return res.status(400).json({
+          success: false,
+          message:
+            'domain is required when studentEmailMode is auto-generate (self-service activation needs an email domain)',
+        });
+      }
+      account.studentEmailMode = studentEmailMode;
     }
 
     await account.save();

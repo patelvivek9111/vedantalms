@@ -103,7 +103,7 @@ function downloadText(filename: string, text: string, mime = 'text/csv') {
 export function RegistrarSis() {
   const { flags, isSchool } = useRegistrarMode();
   const [tab, setTab] = useState<SisTab>('import');
-  const [kind, setKind] = useState<'users' | 'sections' | 'enrollments'>('users');
+  const [kind, setKind] = useState<'users' | 'sections' | 'enrollments' | 'roster'>('users');
   const [csvText, setCsvText] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -385,6 +385,8 @@ export function RegistrarSis() {
       'sis_section_id,course_code,term_code,section,instructor_email,max_enrollment,title\nSEC1,CS101,FALL26,1,teach@school.edu,40,Intro CS',
     enrollments:
       'sis_enrollment_id,sis_section_id,sis_student_id,role,status\nE1,SEC1,S001,student,active',
+    roster:
+      'student_id,first_name,middle_name,last_name\n12345678,John,Michael,Smith\n87654321,Ada,,Lovelace',
   };
 
   const allTabs: { id: SisTab; label: string }[] = [
@@ -489,6 +491,7 @@ export function RegistrarSis() {
               <option value="users">users.csv</option>
               <option value="sections">sections.csv</option>
               <option value="enrollments">enrollments.csv</option>
+              <option value="roster">roster.csv</option>
             </select>
           </label>
           <textarea
@@ -525,7 +528,21 @@ export function RegistrarSis() {
             </button>
           </div>
           <ul className={ru.list}>
-            {inbox.map((row) => (
+            {inbox.map((row) => {
+              const proposed = row.proposed || {};
+              const rosterSummary =
+                row.entityType === 'roster'
+                  ? [
+                      [proposed.firstName, proposed.middleName, proposed.lastName]
+                        .filter((p) => p != null && String(p).trim() !== '')
+                        .join(' '),
+                      proposed.studentId ? `ID ${String(proposed.studentId)}` : '',
+                      proposed.status ? `status ${String(proposed.status)}` : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')
+                  : '';
+              return (
               <li key={row._id} className="px-3 py-2 space-y-1">
                 <div className="flex flex-wrap justify-between gap-2">
                   <span>
@@ -547,6 +564,9 @@ export function RegistrarSis() {
                     </span>
                   )}
                 </div>
+                {rosterSummary && (
+                  <div className="text-xs text-gray-600 dark:text-gray-400">{rosterSummary}</div>
+                )}
                 {row.diff?.fields && Object.keys(row.diff.fields).length > 0 && (
                   <pre className="text-xs bg-gray-50 dark:bg-gray-900 p-2 rounded overflow-auto">
                     {JSON.stringify(row.diff.fields, null, 2)}
@@ -554,7 +574,8 @@ export function RegistrarSis() {
                 )}
                 {row.diff?.created && <div className="text-xs text-gray-500">New record (create on apply)</div>}
               </li>
-            ))}
+              );
+            })}
             {!inbox.length && <li className={ru.empty}>No staging rows.</li>}
           </ul>
         </section>

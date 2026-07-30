@@ -280,4 +280,51 @@ describe('Phase 5 platform ops + isolation hardening', () => {
     expect(res.body.data.maxSeats).toBeGreaterThan(0);
     expect(res.body.data.shard).toBeTruthy();
   });
+
+  it('rejects auto-generate studentEmailMode without a domain', async () => {
+    const res = await request(app)
+      .patch(`/api/platform/accounts/${rootA._id}`)
+      .set('Host', 'localhost')
+      .set('Authorization', `Bearer ${platformToken}`)
+      .send({ studentEmailMode: 'auto-generate', domain: '' });
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/domain/i);
+  });
+
+  it('rejects invalid domain formats for student email settings', async () => {
+    const res = await request(app)
+      .patch(`/api/platform/accounts/${rootA._id}`)
+      .set('Host', 'localhost')
+      .set('Authorization', `Bearer ${platformToken}`)
+      .send({ studentEmailMode: 'auto-generate', domain: 'not a domain@bad' });
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/domain/i);
+  });
+
+  it('accepts valid domain + auto-generate mode and persists for round-trip', async () => {
+    const save = await request(app)
+      .patch(`/api/platform/accounts/${rootA._id}`)
+      .set('Host', 'localhost')
+      .set('Authorization', `Bearer ${platformToken}`)
+      .send({ studentEmailMode: 'auto-generate', domain: 'LincolnHigh.EDU' });
+    expect(save.status).toBe(200);
+    expect(save.body.data.studentEmailMode).toBe('auto-generate');
+    expect(save.body.data.domain).toBe('lincolnhigh.edu');
+
+    const list = await request(app)
+      .get('/api/platform/accounts')
+      .set('Host', 'localhost')
+      .set('Authorization', `Bearer ${platformToken}`);
+    expect(list.status).toBe(200);
+    const row = (list.body.data || []).find((a) => String(a._id) === String(rootA._id));
+    expect(row).toBeTruthy();
+    expect(row.studentEmailMode).toBe('auto-generate');
+    expect(row.domain).toBe('lincolnhigh.edu');
+
+    clearTenantCache();
+    const tenant = await request(app).get('/api/tenant/current').set('Host', 'localhost');
+    expect(tenant.status).toBe(200);
+    expect(tenant.body.data.studentEmailMode).toBe('auto-generate');
+    expect(tenant.body.data.studentActivationEnabled).toBe(true);
+  });
 });
