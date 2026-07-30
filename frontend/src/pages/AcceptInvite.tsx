@@ -16,6 +16,7 @@ export function AcceptInvite() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [password, setPassword] = useState('');
+  const [pendingPasswordSetup, setPendingPasswordSetup] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -35,8 +36,15 @@ export function AcceptInvite() {
       .get(`/auth/invites/${token}`)
       .then((res) => {
         if (res.data?.success) {
-          setEmail(res.data.data.email);
-          setRole(res.data.data.role);
+          const data = res.data.data;
+          setEmail(data.email);
+          setRole(data.role);
+          const isActivation = Boolean(data.pendingPasswordSetup);
+          setPendingPasswordSetup(isActivation);
+          if (isActivation) {
+            setFirstName(data.firstName || '');
+            setLastName(data.lastName || '');
+          }
         } else {
           setError('Invitation not found');
         }
@@ -50,13 +58,29 @@ export function AcceptInvite() {
     setError('');
     setSubmitting(true);
     try {
-      await api.post('/auth/accept-invite', {
-        token,
-        firstName,
-        lastName,
-        password,
+      const body: {
+        token: string;
+        password: string;
+        firstName?: string;
+        lastName?: string;
+      } = { token, password };
+      // Activation: names are roster-verified server-side; still send for shared API compatibility (ignored).
+      if (pendingPasswordSetup) {
+        body.firstName = firstName || 'Student';
+        body.lastName = lastName || 'User';
+      } else {
+        body.firstName = firstName;
+        body.lastName = lastName;
+      }
+      await api.post('/auth/accept-invite', body);
+      navigate('/login', {
+        replace: true,
+        state: {
+          message: pendingPasswordSetup
+            ? 'Password set. Please sign in.'
+            : 'Account created. Please sign in.',
+        },
       });
-      navigate('/login', { replace: true, state: { message: 'Account created. Please sign in.' } });
     } catch (err: unknown) {
       const msg =
         err &&
@@ -73,7 +97,11 @@ export function AcceptInvite() {
     <div className="flex min-h-[100dvh] items-center justify-center bg-slate-50 px-4 py-10 dark:bg-slate-950">
       <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-50">Join {title}</h1>
-        <p className="mt-1 text-sm text-slate-500">Accept your invitation to create an account.</p>
+        <p className="mt-1 text-sm text-slate-500">
+          {pendingPasswordSetup
+            ? 'Set a password to finish activating your account.'
+            : 'Accept your invitation to create an account.'}
+        </p>
 
         {loading ? (
           <p className="mt-6 text-sm text-slate-500">Loading invitation…</p>
@@ -86,20 +114,34 @@ export function AcceptInvite() {
             <p className="text-sm text-slate-600 dark:text-slate-300">
               Invited as <span className="font-medium">{role}</span> · {email}
             </p>
-            <FloatingLabelInput
-              id="invite-first"
-              label="First name"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              required
-            />
-            <FloatingLabelInput
-              id="invite-last"
-              label="Last name"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              required
-            />
+            {pendingPasswordSetup ? (
+              <p
+                className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"
+                data-testid="activation-verified-name"
+              >
+                Verified name:{' '}
+                <span className="font-medium">
+                  {firstName} {lastName}
+                </span>
+              </p>
+            ) : (
+              <>
+                <FloatingLabelInput
+                  id="invite-first"
+                  label="First name"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  required
+                />
+                <FloatingLabelInput
+                  id="invite-last"
+                  label="Last name"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  required
+                />
+              </>
+            )}
             <FloatingLabelPasswordInput
               id="invite-password"
               label="Password"
@@ -117,7 +159,13 @@ export function AcceptInvite() {
               disabled={submitting}
               className="w-full rounded-xl bg-indigo-600 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
             >
-              {submitting ? 'Creating…' : 'Create account'}
+              {submitting
+                ? pendingPasswordSetup
+                  ? 'Saving…'
+                  : 'Creating…'
+                : pendingPasswordSetup
+                  ? 'Set password'
+                  : 'Create account'}
             </button>
             <p className="text-center text-sm text-slate-500">
               Already have an account?{' '}

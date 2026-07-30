@@ -69,7 +69,10 @@ describe('Student self-service account activation', () => {
     await Promise.all([
       PendingStudentRoster.deleteMany({ rootAccountId: root._id }),
       StudentActivationAttempt.deleteMany({ rootAccountId: root._id }),
-      AccountInvite.deleteMany({ rootAccountId: root._id, email: /@lincolnhigh\.edu$/i }),
+      AccountInvite.deleteMany({
+        rootAccountId: root._id,
+        email: /@(lincolnhigh\.edu|activate\.example\.com)$/i,
+      }),
       activationUserIds.length
         ? AccountUser.deleteMany({ rootAccountId: root._id, userId: { $in: activationUserIds } })
         : Promise.resolve(),
@@ -367,13 +370,21 @@ describe('Student self-service account activation', () => {
     expect(match).toBeTruthy();
     const rawToken = match[1];
 
+    const preview = await request(app)
+      .get(`/api/auth/invites/${rawToken}`)
+      .set('Host', HOST);
+    expect(preview.status).toBe(200);
+    expect(preview.body.data.pendingPasswordSetup).toBe(true);
+    expect(preview.body.data.firstName).toBe('John');
+    expect(preview.body.data.lastName).toBe('Smith');
+
     const accept = await request(app)
       .post('/api/auth/accept-invite')
       .set('Host', HOST)
       .send({
         token: rawToken,
-        firstName: 'John',
-        lastName: 'Smith',
+        firstName: 'Hacker',
+        lastName: 'Alias',
         password: 'Password1!',
       });
 
@@ -382,8 +393,68 @@ describe('Student self-service account activation', () => {
 
     const user = await User.findOne({ email: 'jms1234@lincolnhigh.edu' }).select('+password');
     expect(user.pendingPasswordSetup).toBe(false);
+    // Roster-verified identity must not be overwritten by accept-invite body.
+    expect(user.firstName).toBe('John');
+    expect(user.lastName).toBe('Smith');
     const ok = await user.matchPassword('Password1!');
     expect(ok).toBe(true);
+  });
+
+  test('normal admin invite accept still uses submitted firstName/lastName', async () => {
+    const { ensureAccountMembership } = require('../../../services/tenancy/accountMembership.service');
+    const admin = await User.create({
+      firstName: 'Admin',
+      lastName: 'Invite',
+      email: 'admin-invite@activate.example.com',
+      password: 'Password1!',
+      role: 'admin',
+      rootAccountId: root._id,
+      accountId: root._id,
+    });
+    await ensureAccountMembership({
+      user: admin,
+      rootAccountId: root._id,
+      role: 'admin',
+    });
+
+    const login = await request(app)
+      .post('/api/auth/login')
+      .set('Host', HOST)
+      .send({ email: 'admin-invite@activate.example.com', password: 'Password1!' });
+    expect(login.body.token).toBeTruthy();
+
+    const inviteRes = await request(app)
+      .post('/api/admin/invites')
+      .set('Host', HOST)
+      .set('Authorization', `Bearer ${login.body.token}`)
+      .send({ email: 'fresh.invitee@activate.example.com', role: 'teacher' });
+    expect(inviteRes.status).toBe(201);
+    const inviteUrl = inviteRes.body.data.inviteUrl;
+    const rawToken = new URL(inviteUrl).searchParams.get('token');
+    expect(rawToken).toBeTruthy();
+
+    const preview = await request(app)
+      .get(`/api/auth/invites/${rawToken}`)
+      .set('Host', HOST);
+    expect(preview.status).toBe(200);
+    expect(preview.body.data.pendingPasswordSetup).toBe(false);
+
+    const accept = await request(app)
+      .post('/api/auth/accept-invite')
+      .set('Host', HOST)
+      .send({
+        token: rawToken,
+        firstName: 'Fresh',
+        lastName: 'Teacher',
+        password: 'Password1!',
+      });
+    expect(accept.status).toBe(201);
+
+    const user = await User.findOne({ email: 'fresh.invitee@activate.example.com' });
+    expect(user.firstName).toBe('Fresh');
+    expect(user.lastName).toBe('Teacher');
+    expect(user.role).toBe('teacher');
+    expect(user.pendingPasswordSetup).toBeFalsy();
   });
 });
 

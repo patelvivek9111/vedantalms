@@ -898,10 +898,10 @@ If you did not expect this email, you can ignore it.`
 exports.acceptAccountInvite = async (req, res) => {
   try {
     const { token, firstName, lastName, password } = req.body || {};
-    if (!token || !firstName || !lastName || !password) {
+    if (!token || !password) {
       return res.status(400).json({
         success: false,
-        message: 'token, firstName, lastName, and password are required',
+        message: 'token and password are required',
       });
     }
 
@@ -920,13 +920,11 @@ exports.acceptAccountInvite = async (req, res) => {
       withTenantFilter({ email: invite.email }, invite.rootAccountId)
     );
 
-    // Pre-provisioned activation: set password on the claim-created user.
+    // Pre-provisioned activation: set password only — roster-verified name must not change.
     if (existing) {
       if (!existing.pendingPasswordSetup) {
         return res.status(409).json({ success: false, message: 'A user with this email already exists' });
       }
-      existing.firstName = String(firstName).trim();
-      existing.lastName = String(lastName).trim();
       existing.password = password;
       existing.pendingPasswordSetup = false;
       existing.privacyConsentAt = existing.privacyConsentAt || new Date();
@@ -939,6 +937,13 @@ exports.acceptAccountInvite = async (req, res) => {
       const safe = existing.toObject();
       delete safe.password;
       return res.status(200).json({ success: true, data: safe });
+    }
+
+    if (!firstName || !lastName) {
+      return res.status(400).json({
+        success: false,
+        message: 'token, firstName, lastName, and password are required',
+      });
     }
 
     const user = await User.create({
@@ -982,6 +987,15 @@ exports.getAccountInvite = async (req, res) => {
     if (!invite || invite.expiresAt < new Date()) {
       return res.status(404).json({ success: false, message: 'Invitation not found or expired' });
     }
+
+    const existing = await User.findOne(
+      withTenantFilter({ email: invite.email }, invite.rootAccountId)
+    )
+      .select('firstName lastName pendingPasswordSetup')
+      .lean();
+
+    const pendingPasswordSetup = Boolean(existing?.pendingPasswordSetup);
+
     return res.json({
       success: true,
       data: {
@@ -989,6 +1003,13 @@ exports.getAccountInvite = async (req, res) => {
         role: invite.role,
         rootAccountId: invite.rootAccountId,
         expiresAt: invite.expiresAt,
+        pendingPasswordSetup,
+        ...(pendingPasswordSetup
+          ? {
+              firstName: existing.firstName || '',
+              lastName: existing.lastName || '',
+            }
+          : {}),
       },
     });
   } catch (error) {
