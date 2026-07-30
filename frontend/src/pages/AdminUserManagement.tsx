@@ -27,7 +27,7 @@ interface User {
   firstName: string;
   lastName: string;
   email: string;
-  role: 'student' | 'teacher' | 'admin';
+  role: string;
   status: 'active' | 'inactive' | 'suspended';
   lastLogin?: string;
   createdAt: string;
@@ -44,7 +44,9 @@ function hasRecordedLogin(user: User): boolean {
 }
 
 function filterUsersWithLogin(data: User[]): User[] {
-  return Array.isArray(data) ? data.filter(hasRecordedLogin) : [];
+  return Array.isArray(data)
+    ? data.filter((u) => u.role !== 'platform_admin' && hasRecordedLogin(u))
+    : [];
 }
 
 export function AdminUserManagement() {

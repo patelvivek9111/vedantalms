@@ -420,7 +420,7 @@ export function AdminPlatformInstitutions() {
         <p className="text-xs text-slate-500">
           Mode (school / college / mixed) is one shared setting per institution — Platform and
           Registrar Settings edit the same value. After create: point DNS/host to this app, log in as
-          the new admin on that host. Existing localhost data stays on DEFAULT / Example Institution.
+          the new admin on that host. Existing localhost data stays on the DEFAULT / MySL8TE root.
         </p>
       </div>
     </MobileAppShell>

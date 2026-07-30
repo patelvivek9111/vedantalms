@@ -256,12 +256,17 @@ async function claimStudentActivation({
       invitedBy: null,
     });
 
-    const frontendBase = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+    const frontendBase = (
+      process.env.FRONTEND_URL ||
+      process.env.PUBLIC_URL ||
+      process.env.APP_URL ||
+      'http://localhost:3000'
+    ).replace(/\/$/, '');
     const inviteUrl = `${frontendBase}/accept-invite?token=${encodeURIComponent(rawToken)}`;
     const accountName = account.name || 'MySl8te';
 
     try {
-      await sendEmail(
+      const mailResult = await sendEmail(
         String(personalEmail).toLowerCase().trim(),
         `Finish setting up your ${accountName} account`,
         `Your student account is ready to activate on ${accountName}.
@@ -272,8 +277,17 @@ Set your password using this link (expires at ${invite.expiresAt.toISOString()})
 
 ${inviteUrl}
 
-If you did not request this, contact your registrar.`
+If you did not request this, contact your registrar.`,
+        null,
+        { rootAccountId }
       );
+      if (!mailResult?.success) {
+        console.warn(
+          'Student activation invite email not sent:',
+          mailResult?.error || 'unknown',
+          { personalEmail: String(personalEmail).toLowerCase().trim(), schoolEmail }
+        );
+      }
     } catch (mailErr) {
       console.warn('Student activation invite email failed:', mailErr.message);
     }

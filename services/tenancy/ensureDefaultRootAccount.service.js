@@ -6,7 +6,7 @@ const SystemSettings = require('../../models/systemSettings.model');
 const InstitutionGradingPolicy = require('../../models/institutionGradingPolicy.model');
 
 const DEFAULT_CODE = (process.env.DEFAULT_ROOT_ACCOUNT_CODE || 'DEFAULT').toUpperCase();
-const DEFAULT_NAME = process.env.DEFAULT_ROOT_ACCOUNT_NAME || 'Example Institution';
+const DEFAULT_NAME = process.env.DEFAULT_ROOT_ACCOUNT_NAME || 'MySL8TE';
 
 function hostsFromEnv() {
   const hosts = new Set();
@@ -56,10 +56,17 @@ async function ensureDefaultRootAccount() {
   } else if (
     root.code === DEFAULT_CODE &&
     (root.name === 'Default Institution' ||
+      root.name === 'Example Institution' ||
       (process.env.DEFAULT_ROOT_ACCOUNT_NAME && root.name !== DEFAULT_NAME))
   ) {
     root.name = DEFAULT_NAME;
     await root.save();
+    try {
+      const { syncInstitutionIdentity } = require('./institutionIdentity.service');
+      await syncInstitutionIdentity(root._id, DEFAULT_NAME);
+    } catch (err) {
+      console.warn('[tenancy] identity sync after rename:', err.message);
+    }
   }
 
   if (!root.rootAccountId || String(root.rootAccountId) !== String(root._id)) {

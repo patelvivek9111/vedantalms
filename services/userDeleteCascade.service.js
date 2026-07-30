@@ -20,10 +20,19 @@ const ZohoMeetingConnection = require('../models/zohoMeetingConnection.model');
 const PasswordResetToken = require('../models/passwordResetToken.model');
 const Group = require('../models/Group');
 const { QuizResponse } = require('../models/quizwave.model');
+const AccountUser = require('../models/accountUser.model');
+const AccountInvite = require('../models/accountInvite.model');
+const PendingStudentRoster = require('../models/pendingStudentRoster.model');
 const { recordAuditEvent } = require('./academicAudit.service');
 
 function deletedCount(result) {
   return result?.deletedCount ?? result?.modifiedCount ?? 0;
+}
+
+/** Native delete — bypasses append-only mongoose hooks on audit collections. */
+async function deleteManyBypassingHooks(model, filter) {
+  const result = await model.collection.deleteMany(filter);
+  return result.deletedCount ?? 0;
 }
 
 /**
@@ -70,9 +79,10 @@ async function deleteUserAndRelatedData(userId, { actorId = null } = {}) {
   summary.deleted.gradeSnapshots = deletedCount(
     await StudentCourseGradeSnapshot.deleteMany({ student: userObjectId })
   );
-  summary.deleted.transcriptLogs = deletedCount(
-    await TranscriptIssueLog.deleteMany({ student: userObjectId })
-  );
+  // Append-only collection — native delete required for GDPR erasure.
+  summary.deleted.transcriptLogs = await deleteManyBypassingHooks(TranscriptIssueLog, {
+    student: userObjectId,
+  });
   summary.deleted.quizResponses = deletedCount(
     await QuizResponse.deleteMany({ student: userObjectId })
   );
@@ -139,6 +149,27 @@ async function deleteUserAndRelatedData(userId, { actorId = null } = {}) {
     await Group.updateMany(
       { members: userObjectId },
       { $pull: { members: userObjectId } }
+    )
+  );
+
+  summary.deleted.accountMemberships = deletedCount(
+    await AccountUser.deleteMany({ userId: userObjectId })
+  );
+  summary.deleted.accountInvites = deletedCount(
+    await AccountInvite.deleteMany({ email: String(user.email || '').toLowerCase() })
+  );
+  // Free claimed roster rows so the student ID can be re-activated if needed.
+  summary.deleted.rosterClaimReset = deletedCount(
+    await PendingStudentRoster.updateMany(
+      { claimedByUserId: userObjectId },
+      {
+        $set: {
+          status: 'pending',
+          claimedAt: null,
+          claimedByUserId: null,
+          middleNameMismatch: false,
+        },
+      }
     )
   );
 

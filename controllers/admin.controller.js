@@ -35,6 +35,17 @@ function assertSameTenantUser(user, req) {
   return String(user.rootAccountId) === String(req.rootAccountId);
 }
 
+function rejectPlatformAdminTarget(user, res) {
+  if (user?.role === 'platform_admin') {
+    res.status(403).json({
+      success: false,
+      message: 'Platform administrators cannot be managed from school admin',
+    });
+    return true;
+  }
+  return false;
+}
+
 // Get system statistics
 exports.getSystemStats = async (req, res) => {
   try {
@@ -424,14 +435,27 @@ exports.getAnalytics = async (req, res) => {
   }
 };
 
-// Get all users for admin management (tenant-scoped)
+// Get all users for admin management (tenant-scoped; never lists platform_admin)
 exports.getAllUsers = async (req, res) => {
   try {
     const { role, status, search } = req.query;
     const tenantId = rootAccountIdFromRequest(req);
 
-    const query = withTenantFilter({}, tenantId);
+    const query = withTenantFilter(
+      {
+        // Platform operators are not school-directory users.
+        role: { $ne: 'platform_admin' },
+      },
+      tenantId
+    );
     if (role && role !== 'all') {
+      if (role === 'platform_admin' || !SCHOOL_MANAGED_ROLES.includes(role)) {
+        return res.json({
+          success: true,
+          data: [],
+          pagination: { page: 1, limit: 50, total: 0, totalPages: 0 },
+        });
+      }
       query.role = role;
     }
     if (search) {
@@ -572,6 +596,7 @@ exports.deleteUser = async (req, res) => {
     if (!assertSameTenantUser(user, req)) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
+    if (rejectPlatformAdminTarget(user, res)) return;
 
     if (user.role === 'admin') {
       const adminCount = await User.countDocuments(
@@ -630,6 +655,7 @@ exports.updateUser = async (req, res) => {
     if (!assertSameTenantUser(user, req)) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
+    if (rejectPlatformAdminTarget(user, res)) return;
 
     const { firstName, lastName, email, role } = req.body;
 
@@ -718,6 +744,7 @@ exports.updateUserStatus = async (req, res) => {
     if (!assertSameTenantUser(user, req)) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
+    if (rejectPlatformAdminTarget(user, res)) return;
 
     user.accountStatus = status;
     if (status === 'suspended') {

@@ -4,9 +4,9 @@ const SystemSettings = require('../models/systemSettings.model');
 let transporter = null;
 
 // Initialize email transporter
-async function initializeEmailService() {
+async function initializeEmailService(rootAccountId = null) {
   try {
-    const settings = await SystemSettings.getSettings();
+    const settings = await SystemSettings.getSettings(rootAccountId);
     const emailConfig = settings.email;
 
     // Check if email is configured
@@ -39,22 +39,29 @@ async function initializeEmailService() {
   }
 }
 
-// Send email
-async function sendEmail(to, subject, html, text = null) {
+/**
+ * @param {string|string[]} to
+ * @param {string} subject
+ * @param {string} html
+ * @param {string|null} [text]
+ * @param {{ rootAccountId?: string|import('mongoose').Types.ObjectId }} [options]
+ */
+async function sendEmail(to, subject, html, text = null, options = {}) {
   try {
+    const rootAccountId = options?.rootAccountId || null;
     console.log(`📧 EMAIL SERVICE: Attempting to send email to: ${to}`);
     console.log(`📧 EMAIL SERVICE: Subject: ${subject}`);
     
     if (!transporter) {
       console.log(`📧 EMAIL SERVICE: Transporter not initialized, attempting to initialize...`);
-      const initialized = await initializeEmailService();
+      const initialized = await initializeEmailService(rootAccountId);
       if (!initialized) {
         console.log('❌ EMAIL SERVICE: Email service not available. Email not sent.');
         return { success: false, error: 'Email service not configured' };
       }
     }
 
-    const settings = await SystemSettings.getSettings();
+    const settings = await SystemSettings.getSettings(rootAccountId);
     const emailConfig = settings.email;
     
     console.log(`📧 EMAIL SERVICE: SMTP Host: ${emailConfig.smtpHost || 'NOT SET'}`);
