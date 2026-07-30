@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { registrarGet, registrarPost, registrarPatch } from './registrarApi';
 import { ru } from './registrarUi';
@@ -6,6 +6,23 @@ import { useRegistrarMode } from './useRegistrarMode';
 import type { SisSubTab } from './registrarMode';
 import { API_URL } from '../../config';
 import { getMemoryAuthToken } from '../../utils/authToken';
+
+/** Soft cap — institutional CSVs are typically well under this. */
+const MAX_CSV_UPLOAD_BYTES = 5 * 1024 * 1024;
+
+function isCsvFilename(name: string): boolean {
+  return String(name || '').trim().toLowerCase().endsWith('.csv');
+}
+
+/** Data rows ≈ non-empty lines minus header (rough preview for registrars). */
+function estimateCsvDataRows(text: string): number {
+  const lines = String(text || '')
+    .replace(/^\uFEFF/, '')
+    .split(/\r\n|\n|\r/)
+    .filter((line) => line.trim().length > 0);
+  if (lines.length <= 1) return 0;
+  return lines.length - 1;
+}
 
 type SisTab = 'import' | 'inbox' | 'jobs' | 'export' | 'config' | 'health';
 
@@ -105,6 +122,13 @@ export function RegistrarSis() {
   const [tab, setTab] = useState<SisTab>('import');
   const [kind, setKind] = useState<'users' | 'sections' | 'enrollments' | 'roster'>('users');
   const [csvText, setCsvText] = useState('');
+  const [csvFileName, setCsvFileName] = useState('');
+  const [csvRowCount, setCsvRowCount] = useState<number | null>(null);
+  const [showPasteCsv, setShowPasteCsv] = useState(false);
+  const [csvFileError, setCsvFileError] = useState('');
+  const [csvFileWarning, setCsvFileWarning] = useState('');
+  const [csvDragOver, setCsvDragOver] = useState(false);
+  const csvFileInputRef = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [inbox, setInbox] = useState<SyncRow[]>([]);
@@ -163,9 +187,66 @@ export function RegistrarSis() {
     if (tab === 'health') void loadHealth().catch(() => setHealth(null));
   }, [tab]);
 
+  const clearCsvFileMeta = () => {
+    setCsvFileName('');
+    setCsvRowCount(null);
+    setCsvFileError('');
+    setCsvFileWarning('');
+  };
+
+  const applyCsvText = (text: string, fileName = '') => {
+    const normalized = String(text || '').replace(/^\uFEFF/, '');
+    setCsvText(normalized);
+    setCsvFileName(fileName);
+    setCsvRowCount(fileName ? estimateCsvDataRows(normalized) : null);
+  };
+
+  const loadCsvFile = (file: File | null | undefined) => {
+    setCsvFileError('');
+    setCsvFileWarning('');
+    if (!file) return;
+
+    if (!isCsvFilename(file.name)) {
+      setCsvFileError('Please choose a .csv file.');
+      return;
+    }
+    if (file.size > MAX_CSV_UPLOAD_BYTES) {
+      setCsvFileError(
+        `This file is ${(file.size / (1024 * 1024)).toFixed(1)} MB. Upload files under 5 MB, or split the CSV.`
+      );
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setCsvFileWarning('Large CSV — the browser may take a moment to load it into the staging form.');
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = typeof reader.result === 'string' ? reader.result : '';
+      if (!text.trim()) {
+        setCsvFileError('That CSV file looks empty.');
+        clearCsvFileMeta();
+        setCsvText('');
+        return;
+      }
+      applyCsvText(text, file.name);
+      setCsvFileError('');
+    };
+    reader.onerror = () => {
+      setCsvFileError('Could not read that file. Try again or paste the CSV text instead.');
+      clearCsvFileMeta();
+    };
+    reader.readAsText(file);
+  };
+
   const stageImport = async () => {
     setError('');
     setMessage('');
+    setCsvFileError('');
+    if (!String(csvText || '').trim()) {
+      setCsvFileError('Add a CSV file or paste CSV text before staging.');
+      return;
+    }
     try {
       const res = await registrarPost<{ data: { batchId: string; staged: number } }>(
         `/api/registrar/sis/import/${kind}`,
@@ -494,12 +575,101 @@ export function RegistrarSis() {
               <option value="roster">roster.csv</option>
             </select>
           </label>
-          <textarea
-            className={`${ru.textarea} min-h-[160px]`}
-            value={csvText}
-            onChange={(e) => setCsvText(e.target.value)}
-            placeholder={placeholders[kind]}
-          />
+
+          <div className="space-y-2">
+            <p className={ru.label}>CSV file</p>
+            <div
+              onDragEnter={(e) => {
+                e.preventDefault();
+                setCsvDragOver(true);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setCsvDragOver(true);
+              }}
+              onDragLeave={() => setCsvDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setCsvDragOver(false);
+                loadCsvFile(e.dataTransfer.files?.[0]);
+              }}
+              className={`rounded-xl border border-dashed px-4 py-6 text-center transition ${
+                csvDragOver
+                  ? 'border-sky-500 bg-sky-50/80 dark:border-sky-400 dark:bg-sky-950/30'
+                  : 'border-slate-300 bg-slate-50/60 dark:border-slate-600 dark:bg-slate-900/40'
+              }`}
+            >
+              <p className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                Drop a .csv file here, or browse
+              </p>
+              <p className={`${ru.muted} mt-1 text-xs`}>
+                Loads into the same staging flow as paste. Max 5 MB.
+              </p>
+              <button
+                type="button"
+                className={`${ru.btnSecondary} mt-3`}
+                onClick={() => csvFileInputRef.current?.click()}
+              >
+                Choose CSV file
+              </button>
+              <input
+                ref={csvFileInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="sr-only"
+                onChange={(e) => {
+                  loadCsvFile(e.target.files?.[0]);
+                  e.target.value = '';
+                }}
+              />
+            </div>
+
+            {csvFileName && (
+              <p className={`${ru.alertInfo} text-sm`}>
+                Loaded <span className="font-medium">{csvFileName}</span>
+                {csvRowCount != null ? (
+                  <>
+                    {' '}
+                    · ~{csvRowCount.toLocaleString()} data row{csvRowCount === 1 ? '' : 's'}
+                    (excluding header)
+                  </>
+                ) : null}
+              </p>
+            )}
+            {csvFileWarning && <div className={ru.alertInfo}>{csvFileWarning}</div>}
+            {csvFileError && <div className={ru.alertError}>{csvFileError}</div>}
+          </div>
+
+          <div>
+            <button
+              type="button"
+              className={ru.link}
+              onClick={() => setShowPasteCsv((open) => !open)}
+            >
+              {showPasteCsv ? 'Hide paste CSV text' : 'or paste CSV text instead'}
+            </button>
+            {showPasteCsv && (
+              <textarea
+                className={`${ru.textarea} mt-2 min-h-[160px]`}
+                value={csvText}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setCsvText(next);
+                  if (csvFileName) {
+                    setCsvRowCount(estimateCsvDataRows(next));
+                  }
+                }}
+                placeholder={placeholders[kind]}
+              />
+            )}
+            {!showPasteCsv && csvText.trim() && !csvFileName && (
+              <p className={`${ru.muted} mt-1 text-xs`}>
+                Paste buffer has content ({estimateCsvDataRows(csvText).toLocaleString()} data rows).
+                Open paste to edit.
+              </p>
+            )}
+          </div>
+
           <button type="button" onClick={() => void stageImport()} className={ru.btnPrimary}>
             Stage import
           </button>

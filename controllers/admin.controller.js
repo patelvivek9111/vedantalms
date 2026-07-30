@@ -17,6 +17,7 @@ const { ensureAccountMembership } = require('../services/tenancy/accountMembersh
 const { accountSubtreeFilter } = require('../services/tenancy/academicStructure.service');
 const { validatePassword } = require('../utils/passwordPolicy');
 const { sendEmail } = require('../utils/emailService');
+const { buildAccountInviteEmail } = require('../utils/inviteEmailTemplate');
 
 const SCHOOL_MANAGED_ROLES = [
   'student',
@@ -885,19 +886,19 @@ exports.createAccountInvite = async (req, res) => {
     const frontendBase = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
     const inviteUrl = `${frontendBase}/accept-invite?token=${encodeURIComponent(rawToken)}`;
     const accountName = req.account?.name || 'MySl8te';
+    const mail = buildAccountInviteEmail({
+      accountName,
+      role: inviteRole,
+      inviteUrl,
+      expiresAt: invite.expiresAt,
+    });
 
     try {
-      // Plain text only — avoids HTML injection surface (same pattern as password-reset mail).
       await sendEmail(
         String(email).toLowerCase().trim(),
-        `You're invited to join ${accountName}`,
-        `You have been invited as ${inviteRole} on ${accountName}.
-
-Accept this invitation (link expires at ${invite.expiresAt.toISOString()}):
-
-${inviteUrl}
-
-If you did not expect this email, you can ignore it.`
+        mail.subject,
+        mail.html,
+        mail.text
       );
     } catch (mailErr) {
       console.warn('Invite email failed:', mailErr.message);

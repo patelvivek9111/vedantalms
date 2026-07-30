@@ -8,6 +8,7 @@ const { withTenantFilter } = require('../utils/tenantContext');
 const { ensureAccountMembership } = require('./tenancy/accountMembership.service');
 const { assertSeatAvailable } = require('./tenancy/accountQuota.service');
 const { sendEmail } = require('../utils/emailService');
+const { buildStudentActivationInviteEmail } = require('../utils/inviteEmailTemplate');
 
 const GENERIC_VERIFY_ERROR =
   "We couldn't verify your information. Please contact your registrar.";
@@ -264,21 +265,19 @@ async function claimStudentActivation({
     ).replace(/\/$/, '');
     const inviteUrl = `${frontendBase}/accept-invite?token=${encodeURIComponent(rawToken)}`;
     const accountName = account.name || 'MySl8te';
+    const mail = buildStudentActivationInviteEmail({
+      accountName,
+      schoolEmail,
+      inviteUrl,
+      expiresAt: invite.expiresAt,
+    });
 
     try {
       const mailResult = await sendEmail(
         String(personalEmail).toLowerCase().trim(),
-        `Finish setting up your ${accountName} account`,
-        `Your student account is ready to activate on ${accountName}.
-
-Your school login email will be: ${schoolEmail}
-
-Set your password using this link (expires at ${invite.expiresAt.toISOString()}):
-
-${inviteUrl}
-
-If you did not request this, contact your registrar.`,
-        null,
+        mail.subject,
+        mail.html,
+        mail.text,
         { rootAccountId }
       );
       if (!mailResult?.success) {

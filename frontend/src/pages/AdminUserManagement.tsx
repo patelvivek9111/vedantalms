@@ -170,7 +170,9 @@ export function AdminUserManagement() {
           firstName: user.firstName,
           lastName: user.lastName,
           email: user.email,
-          role: user.role,
+          role: (['student', 'teacher', 'admin'].includes(user.role)
+            ? user.role
+            : 'student') as 'student' | 'teacher' | 'admin',
         });
         setEditUserError('');
         setShowUserModal(true);
