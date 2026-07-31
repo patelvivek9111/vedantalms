@@ -1,6 +1,6 @@
 const nodemailer = require('nodemailer');
 
-const DEFAULT_RECIPIENT = 'patelvivek9111@gmail.com';
+const DEFAULT_RECIPIENT = 'info@mysl8te.com';
 
 let cachedEnvTransporter = null;
 
@@ -116,10 +116,9 @@ async function sendWithNodemailer({ transporter, from, to, replyTo, subject, tex
 
 /**
  * Send a public landing-page inquiry to CONTACT_INQUIRY_RECIPIENT
- * (default patelvivek9111@gmail.com).
+ * (default info@mysl8te.com).
  *
  * Uses CONTACT_SMTP_* when set; otherwise falls back to admin SystemSettings SMTP.
- * Requires a Gmail App Password (or other SMTP credentials) for delivery.
  */
 async function sendContactInquiry({ name, email, organization, jobTitle, userCount, extra }) {
   const to = inquiryRecipient();
@@ -131,11 +130,12 @@ async function sendContactInquiry({ name, email, organization, jobTitle, userCou
     userCount,
     extra,
   });
+  console.log(`Contact inquiry → to=${to} replyTo=${email} org=${organization}`);
 
   const systemMail = await getSystemSettingsMail();
   if (systemMail) {
     try {
-      return await sendWithNodemailer({
+      const sent = await sendWithNodemailer({
         transporter: systemMail.transporter,
         from: systemMail.from,
         to,
@@ -144,6 +144,8 @@ async function sendContactInquiry({ name, email, organization, jobTitle, userCou
         text,
         html,
       });
+      console.log(`Contact inquiry sent via SystemSettings SMTP to ${to}`);
+      return sent;
     } catch (err) {
       console.error('Contact inquiry SMTP (SystemSettings) failed:', err.message);
     }
@@ -153,7 +155,7 @@ async function sendContactInquiry({ name, email, organization, jobTitle, userCou
   const envFrom = (process.env.CONTACT_SMTP_FROM || process.env.CONTACT_SMTP_USER || '').trim();
   if (envTransporter && envFrom) {
     try {
-      return await sendWithNodemailer({
+      const sent = await sendWithNodemailer({
         transporter: envTransporter,
         from: envFrom,
         to,
@@ -162,6 +164,8 @@ async function sendContactInquiry({ name, email, organization, jobTitle, userCou
         text,
         html,
       });
+      console.log(`Contact inquiry sent via CONTACT_SMTP_* to ${to}`);
+      return sent;
     } catch (err) {
       console.error('Contact inquiry SMTP (env) failed:', err.message);
       return { ok: false, code: 'SEND_FAILED', message: 'Could not send your message. Please try again later.' };
