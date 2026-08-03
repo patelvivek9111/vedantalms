@@ -68,8 +68,13 @@ export function ContactInquiryModal({ open, onOpenChange }: ContactInquiryModalP
         }),
         signal: controller.signal,
       });
-      const data = (await res.json().catch(() => ({}))) as { message?: string; ok?: boolean };
-      if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as {
+        message?: string;
+        ok?: boolean;
+        mailSent?: boolean;
+      };
+      // Soft 200 with mailSent:false means the lead was saved but SMTP did not deliver.
+      if (!res.ok || data.mailSent === false || data.ok === false) {
         setError(data.message || CONTACT_ERROR_FALLBACK);
         return;
       }

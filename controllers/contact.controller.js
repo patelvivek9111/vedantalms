@@ -50,22 +50,29 @@ exports.postInquiry = async (req, res) => {
     });
 
     if (!result.ok) {
-      // Lead is still saved for platform provisioning even if mail fails/times out
+      // Lead may still be saved for follow-up, but never claim the email was sent.
       if (lead && (result.code === 'SMTP_NOT_CONFIGURED' || result.code === 'TIMEOUT')) {
-        return res.status(200).json({
-          ok: true,
+        const status = result.code === 'SMTP_NOT_CONFIGURED' ? 503 : 200;
+        return res.status(status).json({
+          ok: false,
+          mailSent: false,
           leadId: lead._id,
           message:
             result.code === 'TIMEOUT'
-              ? "Your inquiry was received. We'll be in touch."
-              : 'Inquiry saved. Email delivery is not configured on this server.',
+              ? "We saved your inquiry, but email delivery timed out. We'll still follow up — or email info@mysl8te.com."
+              : 'We saved your inquiry, but email is not configured on this server. Please email info@mysl8te.com directly.',
         });
       }
       const status = result.code === 'SMTP_NOT_CONFIGURED' ? 503 : 500;
-      return res.status(status).json({ message: result.message, leadId: lead?._id });
+      return res.status(status).json({
+        ok: false,
+        mailSent: false,
+        message: result.message,
+        leadId: lead?._id,
+      });
     }
 
-    return res.status(200).json({ ok: true, leadId: lead?._id });
+    return res.status(200).json({ ok: true, mailSent: true, leadId: lead?._id });
   } catch (error) {
     return res.status(500).json({ message: error.message || 'Unable to submit inquiry' });
   }

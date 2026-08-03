@@ -46,7 +46,7 @@ describe('contact.controller postInquiry timeouts', () => {
     jest.useRealTimers();
   });
 
-  it('returns 200 gracefully when SMTP hang times out, and lead is still saved', async () => {
+  it('returns 200 with mailSent:false when SMTP hang times out, and lead is still saved', async () => {
     const leadId = 'lead-timeout-1';
     ContactLead.create.mockResolvedValue({ _id: leadId, status: 'new' });
     sendContactInquiry.mockImplementation(
@@ -66,9 +66,10 @@ describe('contact.controller postInquiry timeouts', () => {
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
-        ok: true,
+        ok: false,
+        mailSent: false,
         leadId,
-        message: "Your inquiry was received. We'll be in touch.",
+        message: expect.stringMatching(/timed out|follow up|info@mysl8te\.com/i),
       })
     );
   });

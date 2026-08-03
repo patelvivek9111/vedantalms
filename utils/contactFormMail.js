@@ -1,7 +1,13 @@
 const nodemailer = require('nodemailer');
-const { smtpTransportTimeouts } = require('./smtpTransportTimeouts');
+const {
+  smtpTransportTimeouts,
+  CONTACT_INQUIRY_SEND_TIMEOUT_MS,
+} = require('./smtpTransportTimeouts');
 
 const DEFAULT_RECIPIENT = 'info@mysl8te.com';
+
+/** Per-transport attempt budget so a hung SystemSettings SMTP can fall through to CONTACT_SMTP_*. */
+const SMTP_ATTEMPT_TIMEOUT_MS = Math.min(8_000, CONTACT_INQUIRY_SEND_TIMEOUT_MS - 2_000);
 
 let cachedEnvTransporter = null;
 
@@ -117,11 +123,28 @@ async function sendWithNodemailer({ transporter, from, to, replyTo, subject, tex
   return { ok: true };
 }
 
+function withAttemptTimeout(promise, label) {
+  let timeoutId;
+  return Promise.race([
+    promise.finally(() => {
+      if (timeoutId) clearTimeout(timeoutId);
+    }),
+    new Promise((_, reject) => {
+      timeoutId = setTimeout(
+        () => reject(new Error(`${label} timed out after ${SMTP_ATTEMPT_TIMEOUT_MS}ms`)),
+        SMTP_ATTEMPT_TIMEOUT_MS
+      );
+    }),
+  ]);
+}
+
 /**
  * Send a public landing-page inquiry to CONTACT_INQUIRY_RECIPIENT
  * (default info@mysl8te.com).
  *
- * Uses CONTACT_SMTP_* when set; otherwise falls back to admin SystemSettings SMTP.
+ * Prefers CONTACT_SMTP_* (platform/host env) so production marketing mail does not
+ * depend on a tenant SystemSettings SMTP that may hang or be misconfigured.
+ * Falls back to Admin → System Settings SMTP when env is unset.
  */
 async function sendContactInquiry({ name, email, organization, jobTitle, userCount, extra }) {
   const to = inquiryRecipient();
@@ -135,52 +158,76 @@ async function sendContactInquiry({ name, email, organization, jobTitle, userCou
   });
   console.log(`Contact inquiry → to=${to} replyTo=${email} org=${organization}`);
 
-  const systemMail = await getSystemSettingsMail();
-  if (systemMail) {
-    try {
-      const sent = await sendWithNodemailer({
-        transporter: systemMail.transporter,
-        from: systemMail.from,
-        to,
-        replyTo: email,
-        subject,
-        text,
-        html,
-      });
-      console.log(`Contact inquiry sent via SystemSettings SMTP to ${to}`);
-      return sent;
-    } catch (err) {
-      console.error('Contact inquiry SMTP (SystemSettings) failed:', err.message);
-    }
-  }
+  const attempts = [];
 
   const envTransporter = getEnvTransporter();
   const envFrom = (process.env.CONTACT_SMTP_FROM || process.env.CONTACT_SMTP_USER || '').trim();
   if (envTransporter && envFrom) {
+    attempts.push({
+      label: 'CONTACT_SMTP_*',
+      run: () =>
+        sendWithNodemailer({
+          transporter: envTransporter,
+          from: envFrom,
+          to,
+          replyTo: email,
+          subject,
+          text,
+          html,
+        }),
+    });
+  }
+
+  const systemMail = await getSystemSettingsMail();
+  if (systemMail) {
+    attempts.push({
+      label: 'SystemSettings',
+      run: () =>
+        sendWithNodemailer({
+          transporter: systemMail.transporter,
+          from: systemMail.from,
+          to,
+          replyTo: email,
+          subject,
+          text,
+          html,
+        }),
+    });
+  }
+
+  if (attempts.length === 0) {
+    return {
+      ok: false,
+      code: 'SMTP_NOT_CONFIGURED',
+      message:
+        'Contact email is not configured. Set CONTACT_SMTP_* on the host, or Admin → System Settings email.',
+    };
+  }
+
+  let lastError = null;
+  for (const attempt of attempts) {
     try {
-      const sent = await sendWithNodemailer({
-        transporter: envTransporter,
-        from: envFrom,
-        to,
-        replyTo: email,
-        subject,
-        text,
-        html,
-      });
-      console.log(`Contact inquiry sent via CONTACT_SMTP_* to ${to}`);
+      const sent = await withAttemptTimeout(attempt.run(), attempt.label);
+      console.log(`Contact inquiry sent via ${attempt.label} to ${to}`);
       return sent;
     } catch (err) {
-      console.error('Contact inquiry SMTP (env) failed:', err.message);
-      return { ok: false, code: 'SEND_FAILED', message: 'Could not send your message. Please try again later.' };
+      lastError = err;
+      console.error(`Contact inquiry SMTP (${attempt.label}) failed:`, err.message);
     }
   }
 
+  const timedOut = /timed out/i.test(String(lastError?.message || ''));
   return {
     ok: false,
-    code: 'SMTP_NOT_CONFIGURED',
-    message:
-      'Contact email is not configured. Set Admin → System Settings email, or CONTACT_SMTP_* for the platform host.',
+    code: timedOut ? 'TIMEOUT' : 'SEND_FAILED',
+    message: timedOut
+      ? 'Email delivery timed out.'
+      : 'Could not send your message. Please try again later.',
   };
 }
 
-module.exports = { sendContactInquiry, DEFAULT_RECIPIENT };
+module.exports = {
+  sendContactInquiry,
+  DEFAULT_RECIPIENT,
+  SMTP_ATTEMPT_TIMEOUT_MS,
+};
