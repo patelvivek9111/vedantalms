@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const { smtpTransportTimeouts } = require('./smtpTransportTimeouts');
 
 const DEFAULT_RECIPIENT = 'info@mysl8te.com';
 
@@ -33,6 +34,7 @@ function getEnvTransporter() {
     secure: port === 465,
     auth: { user, pass },
     tls: { rejectUnauthorized: process.env.CONTACT_SMTP_TLS_REJECT_UNAUTHORIZED !== 'false' },
+    ...smtpTransportTimeouts(),
   });
   return cachedEnvTransporter;
 }
@@ -55,6 +57,7 @@ async function getSystemSettingsMail() {
         pass: emailConfig.smtpPassword,
       },
       tls: { rejectUnauthorized: process.env.SMTP_TLS_REJECT_UNAUTHORIZED !== 'false' },
+      ...smtpTransportTimeouts(),
     });
     const from = (emailConfig.fromEmail || emailConfig.smtpUser || '').trim();
     if (!from) return null;

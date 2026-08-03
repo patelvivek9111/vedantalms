@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const SystemSettings = require('../models/systemSettings.model');
+const { smtpTransportTimeouts } = require('./smtpTransportTimeouts');
 
 let transporter = null;
 
@@ -25,7 +26,8 @@ async function initializeEmailService(rootAccountId = null) {
       },
       tls: {
         rejectUnauthorized: process.env.SMTP_TLS_REJECT_UNAUTHORIZED !== 'false',
-      }
+      },
+      ...smtpTransportTimeouts(),
     });
 
     // Verify connection

@@ -8,6 +8,9 @@ export type ContactInquiryModalProps = {
 };
 
 const inquiryEndpoint = `${(API_URL || '').replace(/\/$/, '')}/api/contact/inquiry`;
+const CONTACT_FETCH_TIMEOUT_MS = 15_000;
+const CONTACT_ERROR_FALLBACK =
+  'Something went wrong — please try again or email us directly at info@mysl8te.com';
 
 export function ContactInquiryModal({ open, onOpenChange }: ContactInquiryModalProps) {
   const titleId = useId();
@@ -49,6 +52,8 @@ export function ContactInquiryModal({ open, onOpenChange }: ContactInquiryModalP
     e.preventDefault();
     setError(null);
     setSubmitting(true);
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), CONTACT_FETCH_TIMEOUT_MS);
     try {
       const res = await fetch(inquiryEndpoint, {
         method: 'POST',
@@ -61,16 +66,25 @@ export function ContactInquiryModal({ open, onOpenChange }: ContactInquiryModalP
           userCount: userCount.trim(),
           extra: extra.trim(),
         }),
+        signal: controller.signal,
       });
-      const data = (await res.json().catch(() => ({}))) as { message?: string };
+      const data = (await res.json().catch(() => ({}))) as { message?: string; ok?: boolean };
       if (!res.ok) {
-        setError(data.message || 'Something went wrong. Please try again.');
+        setError(data.message || CONTACT_ERROR_FALLBACK);
         return;
       }
       setSent(true);
-    } catch {
-      setError('Could not reach the server. Check your connection and try again.');
+    } catch (err) {
+      const aborted =
+        (err instanceof DOMException && err.name === 'AbortError') ||
+        (err instanceof Error && err.name === 'AbortError');
+      setError(
+        aborted
+          ? CONTACT_ERROR_FALLBACK
+          : 'Could not reach the server. Check your connection and try again, or email info@mysl8te.com.'
+      );
     } finally {
+      window.clearTimeout(timeoutId);
       setSubmitting(false);
     }
   };

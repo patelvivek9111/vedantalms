@@ -1,6 +1,7 @@
 const { validationResult } = require('express-validator');
 const { sendContactInquiry } = require('../utils/contactFormMail');
 const ContactLead = require('../models/contactLead.model');
+const { CONTACT_INQUIRY_SEND_TIMEOUT_MS } = require('../utils/smtpTransportTimeouts');
 
 exports.postInquiry = async (req, res) => {
   try {
@@ -30,18 +31,37 @@ exports.postInquiry = async (req, res) => {
       console.error('Contact lead persist failed:', leadErr.message);
     }
 
-    const result = await sendContactInquiry(payload);
+    let timeoutId;
+    const result = await Promise.race([
+      sendContactInquiry(payload),
+      new Promise((resolve) => {
+        timeoutId = setTimeout(
+          () =>
+            resolve({
+              ok: false,
+              code: 'TIMEOUT',
+              message: 'Email delivery timed out.',
+            }),
+          CONTACT_INQUIRY_SEND_TIMEOUT_MS
+        );
+      }),
+    ]).finally(() => {
+      if (timeoutId) clearTimeout(timeoutId);
+    });
 
     if (!result.ok) {
-      const status = result.code === 'SMTP_NOT_CONFIGURED' ? 503 : 500;
-      // Lead is still saved for platform provisioning even if mail fails
-      if (lead && result.code === 'SMTP_NOT_CONFIGURED') {
+      // Lead is still saved for platform provisioning even if mail fails/times out
+      if (lead && (result.code === 'SMTP_NOT_CONFIGURED' || result.code === 'TIMEOUT')) {
         return res.status(200).json({
           ok: true,
           leadId: lead._id,
-          message: 'Inquiry saved. Email delivery is not configured on this server.',
+          message:
+            result.code === 'TIMEOUT'
+              ? "Your inquiry was received. We'll be in touch."
+              : 'Inquiry saved. Email delivery is not configured on this server.',
         });
       }
+      const status = result.code === 'SMTP_NOT_CONFIGURED' ? 503 : 500;
       return res.status(status).json({ message: result.message, leadId: lead?._id });
     }
 
