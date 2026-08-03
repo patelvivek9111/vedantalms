@@ -30,7 +30,7 @@ describe('ContactInquiryModal timeouts', () => {
     vi.restoreAllMocks();
   });
 
-  it('aborts around 15s and shows an error instead of hanging on Sending…', async () => {
+  it('aborts around 40s and shows an error instead of hanging on Sending…', async () => {
     render(<ContactInquiryModal open onOpenChange={() => {}} />);
 
     fireEvent.change(screen.getByLabelText(/full name/i), { target: { value: 'Vivek' } });
@@ -45,7 +45,7 @@ describe('ContactInquiryModal timeouts', () => {
     expect(screen.getByRole('button', { name: /sending/i })).toBeDisabled();
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(15_000);
+      await vi.advanceTimersByTimeAsync(40_000);
     });
 
     await waitFor(() => {

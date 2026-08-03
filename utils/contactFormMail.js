@@ -1,13 +1,10 @@
 const nodemailer = require('nodemailer');
 const {
   smtpTransportTimeouts,
-  CONTACT_INQUIRY_SEND_TIMEOUT_MS,
+  SMTP_ATTEMPT_TIMEOUT_MS,
 } = require('./smtpTransportTimeouts');
 
 const DEFAULT_RECIPIENT = 'info@mysl8te.com';
-
-/** Per-transport attempt budget so a hung SystemSettings SMTP can fall through to CONTACT_SMTP_*. */
-const SMTP_ATTEMPT_TIMEOUT_MS = Math.min(8_000, CONTACT_INQUIRY_SEND_TIMEOUT_MS - 2_000);
 
 let cachedEnvTransporter = null;
 
@@ -38,6 +35,7 @@ function getEnvTransporter() {
     host,
     port,
     secure: port === 465,
+    requireTLS: port === 587,
     auth: { user, pass },
     tls: { rejectUnauthorized: process.env.CONTACT_SMTP_TLS_REJECT_UNAUTHORIZED !== 'false' },
     ...smtpTransportTimeouts(),
@@ -58,6 +56,7 @@ async function getSystemSettingsMail() {
       host: emailConfig.smtpHost,
       port,
       secure: port === 465,
+      requireTLS: port === 587,
       auth: {
         user: emailConfig.smtpUser,
         pass: emailConfig.smtpPassword,
@@ -112,7 +111,7 @@ function buildBodies({ name, email, organization, jobTitle, userCount, extra }) 
 }
 
 async function sendWithNodemailer({ transporter, from, to, replyTo, subject, text, html }) {
-  await transporter.sendMail({
+  const info = await transporter.sendMail({
     from: `"MySl8te contact" <${from}>`,
     to,
     replyTo: replyTo || undefined,
@@ -120,7 +119,10 @@ async function sendWithNodemailer({ transporter, from, to, replyTo, subject, tex
     text,
     html,
   });
-  return { ok: true };
+  console.log(
+    `Contact inquiry SMTP accepted messageId=${info.messageId || '(none)'} response=${info.response || '(none)'}`
+  );
+  return { ok: true, messageId: info.messageId || null };
 }
 
 function withAttemptTimeout(promise, label) {

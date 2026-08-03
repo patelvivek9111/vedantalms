@@ -74,8 +74,8 @@ describe('contact.controller postInquiry timeouts', () => {
     );
   });
 
-  it('bounds the hang to the configured ~12s timeout window', async () => {
-    expect(CONTACT_INQUIRY_SEND_TIMEOUT_MS).toBe(12_000);
+  it('bounds the hang to the configured contact send timeout window', async () => {
+    expect(CONTACT_INQUIRY_SEND_TIMEOUT_MS).toBe(35_000);
     ContactLead.create.mockResolvedValue({ _id: 'lead-2', status: 'new' });
     sendContactInquiry.mockImplementation(() => new Promise(() => {}));
 

@@ -8,7 +8,7 @@ export type ContactInquiryModalProps = {
 };
 
 const inquiryEndpoint = `${(API_URL || '').replace(/\/$/, '')}/api/contact/inquiry`;
-const CONTACT_FETCH_TIMEOUT_MS = 15_000;
+const CONTACT_FETCH_TIMEOUT_MS = 40_000;
 const CONTACT_ERROR_FALLBACK =
   'Something went wrong — please try again or email us directly at info@mysl8te.com';
 
