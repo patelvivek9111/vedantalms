@@ -79,12 +79,18 @@ test.describe.serial('§10 Student — login → submit → refresh', () => {
       (r) => r.request().method() === 'POST' && r.url().includes('/api/submissions') && r.ok(),
       { timeout: 60_000 }
     );
-    await page.getByRole('button', { name: 'Submit Assignment' }).first().click();
+    // Canvas student layout uses "Submit" / "Submit Assignment" depending on chrome.
+    const submitBtn = page
+      .getByRole('button', { name: /^(Submit Assignment|Submit)$/i })
+      .first();
+    await expect(submitBtn).toBeVisible({ timeout: 15_000 });
+    await submitBtn.click();
     await submitResponse;
-    await expect(page.getByText(/submitted/i).first()).toBeVisible({ timeout: 30_000 });
+    // Post-submit confirmation is "Turned In!" (sidebar), not legacy "Submitted".
+    await expect(page.getByText(/turned in/i).first()).toBeVisible({ timeout: 30_000 });
 
     await page.reload();
-    await expect(page.getByText(/submitted/i).first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(/turned in/i).first()).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText(answerText)).toBeVisible();
 
     const studentToken = await getAuthToken(request, student);

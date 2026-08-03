@@ -86,7 +86,7 @@ test.describe.serial('§5.2 Assignment — manual grading journey', () => {
     });
 
     await page.getByRole('button', { name: 'Submit Assignment' }).first().click();
-    await expect(page.getByText(/submitted|your score/i).first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/submitted|turned in|your score/i).first()).toBeVisible({ timeout: 30_000 });
   });
 
   test('teacher grades, releases, and student sees score', async ({ page, request }) => {

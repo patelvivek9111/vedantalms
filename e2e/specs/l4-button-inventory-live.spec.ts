@@ -395,8 +395,8 @@ test.describe.serial('§8.3–8.4 Assignment edit & grade controls', () => {
     await loginViaForm(page, temp.email, temp.password);
     await page.goto(`/assignments/${deleteGradeAssignmentId}/view`);
     await page.locator('textarea').first().fill('Submission to delete.');
-    await page.getByRole('button', { name: 'Submit Assignment' }).first().click();
-    await expect(page.getByText(/submitted/i).first()).toBeVisible({ timeout: 30_000 });
+    await page.getByRole('button', { name: /^(Submit Assignment|Submit)$/i }).first().click();
+    await expect(page.getByText(/turned in/i).first()).toBeVisible({ timeout: 30_000 });
 
     await clearSession(page);
     await loginViaForm(page, teacher.email, teacher.password);

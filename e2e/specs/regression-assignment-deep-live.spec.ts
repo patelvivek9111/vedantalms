@@ -361,7 +361,7 @@ test.describe.serial('§14.5 — file upload, preview, chunk init', () => {
     await page.locator('input[type="file"]').first().setInputFiles(samplePng);
     await expect(page.getByText('regression-sample.png')).toBeVisible({ timeout: 15_000 });
     await page.getByRole('button', { name: 'Submit Assignment' }).first().click();
-    await expect(page.getByText(/submitted|your score/i).first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/submitted|turned in|your score/i).first()).toBeVisible({ timeout: 30_000 });
   });
 
   test('chunk upload init — authenticated teacher can start session', async ({ request }) => {

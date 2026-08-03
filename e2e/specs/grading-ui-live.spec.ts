@@ -80,7 +80,7 @@ test.describe.serial('§6.2 Manual grading UI — live journeys', () => {
     await page.locator('textarea').first().fill(answerText);
     await page.locator('input[type="file"]').first().setInputFiles(samplePng);
     await page.getByRole('button', { name: 'Submit Assignment' }).first().click();
-    await expect(page.getByText(/submitted|your score/i).first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/submitted|turned in|your score/i).first()).toBeVisible({ timeout: 30_000 });
 
     const teacherToken = await getAuthToken(request, teacher);
     const subsRes = await request.get(`${apiURL}/api/submissions/assignment/${assignmentId}`, {
