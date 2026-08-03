@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getMemoryAuthToken, authFetchInit } from '../utils/authToken';
-import axios from 'axios';
-import { API_URL } from '../config';
+import api from '../services/api';
 import { 
   Settings, 
   Shield, 
@@ -56,12 +54,53 @@ interface SystemConfig {
     deletedFileRetentionDays?: number;
     zipRetentionHours?: number;
   };
+  academic?: Record<string, unknown>;
+  messaging?: Record<string, unknown>;
+}
+
+function normalizeSettingsFromApi(data: SystemConfig): SystemConfig {
+  const email = { ...(data.email || ({} as SystemConfig['email'])) };
+  return {
+    ...data,
+    email: {
+      smtpHost: email.smtpHost || '',
+      smtpPort: Number(email.smtpPort) || 587,
+      smtpUser: email.smtpUser || '',
+      smtpPassword: '',
+      fromEmail: email.fromEmail || '',
+      fromName: email.fromName || 'MySl8te',
+    },
+  };
+}
+
+function buildSettingsPayload(config: SystemConfig) {
+  const email = { ...config.email };
+  const typedPassword = String(email.smtpPassword || '').trim();
+  // Blank or leftover mask ⇒ keep existing SMTP password on the server.
+  if (!typedPassword || /^\*+$/.test(typedPassword)) {
+    delete (email as { smtpPassword?: string }).smtpPassword;
+  } else {
+    email.smtpPassword = typedPassword;
+  }
+  const port = Number(email.smtpPort);
+  email.smtpPort = Number.isFinite(port) && port > 0 ? port : 587;
+
+  return {
+    general: config.general,
+    security: config.security,
+    email,
+    storage: config.storage,
+    ...(config.academic ? { academic: config.academic } : {}),
+    ...(config.messaging ? { messaging: config.messaging } : {}),
+  };
 }
 
 export function AdminSystemSettings() {
   const [config, setConfig] = useState<SystemConfig | null>(null);
+  const [smtpPasswordConfigured, setSmtpPasswordConfigured] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [testingEmail, setTestingEmail] = useState(false);
   const [activeTab, setActiveTab] = useState('general');
   const [showPassword, setShowPassword] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -79,13 +118,12 @@ export function AdminSystemSettings() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const token = getMemoryAuthToken();
-        const headers = { Authorization: `Bearer ${token}` };
-        
-        const response = await axios.get(`${API_URL}/api/admin/settings`, { headers });
+        const response = await api.get('/admin/settings');
         
         if (response.data.success) {
-          setConfig(response.data.data);
+          const raw = response.data.data;
+          setSmtpPasswordConfigured(Boolean(raw?.email?.smtpPassword));
+          setConfig(normalizeSettingsFromApi(raw));
         }
       } catch (error) {
         setSaveMessage({ type: 'error', text: 'Failed to load system settings' });
@@ -115,19 +153,30 @@ export function AdminSystemSettings() {
     setSaving(true);
     setSaveMessage(null);
     try {
-      const token = getMemoryAuthToken();
-      const headers = { Authorization: `Bearer ${token}` };
-      
-      await axios.put(`${API_URL}/api/admin/settings`, config, { headers });
-      
-      setSaveMessage({ type: 'success', text: 'Settings saved successfully!' });
-      setTimeout(() => setSaveMessage(null), 3000);
-    } catch (error: any) {
-      setSaveMessage({ 
-        type: 'error', 
-        text: error.response?.data?.message || 'Failed to save settings' 
+      const payload = buildSettingsPayload(config);
+      const passwordChanging = Boolean(payload.email.smtpPassword);
+      const response = await api.put('/admin/settings', payload);
+      if (response.data?.data) {
+        const raw = response.data.data;
+        if (passwordChanging) setSmtpPasswordConfigured(true);
+        else setSmtpPasswordConfigured(Boolean(raw?.email?.smtpPassword) || smtpPasswordConfigured);
+        setConfig(normalizeSettingsFromApi(raw));
+      }
+      setSaveMessage({
+        type: 'success',
+        text: passwordChanging
+          ? 'Settings saved successfully (SMTP password updated).'
+          : 'Settings saved successfully!',
       });
-      setTimeout(() => setSaveMessage(null), 5000);
+      setTimeout(() => setSaveMessage(null), 4000);
+    } catch (error: any) {
+      const status = error.response?.status;
+      const message =
+        status === 401 || status === 403
+          ? 'Session expired or not authorized. Sign in again, then retry Save.'
+          : error.response?.data?.message || 'Failed to save settings';
+      setSaveMessage({ type: 'error', text: message });
+      setTimeout(() => setSaveMessage(null), 8000);
     } finally {
       setSaving(false);
     }
@@ -136,25 +185,26 @@ export function AdminSystemSettings() {
   const handleTestEmail = async () => {
     if (!config) return;
     
-    setLoading(true);
+    setTestingEmail(true);
     setSaveMessage(null);
     try {
-      const token = getMemoryAuthToken();
-      const headers = { Authorization: `Bearer ${token}` };
-      
-      const response = await axios.post(`${API_URL}/api/admin/settings/test-email`, config.email, { headers });
+      const response = await api.post('/admin/settings/test-email', buildSettingsPayload(config).email);
       
       if (response.data.success) {
         setSaveMessage({ type: 'success', text: response.data.message });
       }
     } catch (error: any) {
+      const status = error.response?.status;
       setSaveMessage({ 
         type: 'error', 
-        text: error.response?.data?.message || 'Failed to test email configuration' 
+        text:
+          status === 401 || status === 403
+            ? 'Session expired or not authorized. Sign in again, then retry the test.'
+            : error.response?.data?.message || 'Failed to test email configuration',
       });
     } finally {
-      setLoading(false);
-      setTimeout(() => setSaveMessage(null), 5000);
+      setTestingEmail(false);
+      setTimeout(() => setSaveMessage(null), 8000);
     }
   };
 
@@ -447,7 +497,13 @@ export function AdminSystemSettings() {
                   name="smtpPort"
                   type="number"
                   value={config.email.smtpPort}
-                  onChange={(e) => handleConfigChange('email', 'smtpPort', parseInt(e.target.value))}
+                  onChange={(e) =>
+                    handleConfigChange(
+                      'email',
+                      'smtpPort',
+                      Number.parseInt(e.target.value, 10) || 587
+                    )
+                  }
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
                 />
               </div>
@@ -466,16 +522,23 @@ export function AdminSystemSettings() {
               </div>
 
               <div>
-                <label htmlFor="smtpPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">SMTP Password</label>
+                <label htmlFor="smtpPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  SMTP Password
+                </label>
                 <div className="relative">
                   <input
                     id="smtpPassword"
                     name="smtpPassword"
-                    autoComplete="current-password"
+                    autoComplete="new-password"
                     type={showPassword ? 'text' : 'password'}
                     value={config.email.smtpPassword}
+                    placeholder={
+                      smtpPasswordConfigured
+                        ? 'Leave blank to keep current password'
+                        : 'Enter SMTP password'
+                    }
                     onChange={(e) => handleConfigChange('email', 'smtpPassword', e.target.value)}
-                    className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
+                    className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
                   />
                   <button
                     type="button"
@@ -485,6 +548,11 @@ export function AdminSystemSettings() {
                     {showPassword ? <EyeOff className="w-4 h-4 text-gray-400 dark:text-gray-500" /> : <Eye className="w-4 h-4 text-gray-400 dark:text-gray-500" />}
                   </button>
                 </div>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  {smtpPasswordConfigured
+                    ? 'A password is already saved. Type a new one only if you want to replace it, then click Save Changes.'
+                    : 'Required for sending mail. Save after entering it.'}
+                </p>
               </div>
 
               <div>
@@ -514,16 +582,17 @@ export function AdminSystemSettings() {
 
             <div className="flex items-center space-x-3">
               <button
+                type="button"
                 onClick={handleTestEmail}
-                disabled={loading}
+                disabled={testingEmail || saving}
                 className="flex items-center space-x-2 px-4 py-2 bg-green-600 dark:bg-green-500 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600 disabled:opacity-50"
               >
-                {loading ? (
+                {testingEmail ? (
                   <RefreshCw className="w-4 h-4 animate-spin" />
                 ) : (
                   <Bell className="w-4 h-4" />
                 )}
-                <span>{loading ? 'Testing...' : 'Test Email Configuration'}</span>
+                <span>{testingEmail ? 'Testing...' : 'Test Email Configuration'}</span>
               </button>
             </div>
           </div>

@@ -144,6 +144,9 @@ async function sendNotificationEmail(userEmail, notification) {
 
 module.exports = {
   initializeEmailService,
+  resetEmailTransporter() {
+    transporter = null;
+  },
   sendEmail,
   sendNotificationEmail
 };

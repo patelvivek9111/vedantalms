@@ -81,6 +81,7 @@ describe('controllers/admin.controller', () => {
 
   test('updateSystemSettings preserves masked password placeholder', async () => {
     const save = jest.fn().mockResolvedValue(true);
+    const markModified = jest.fn();
     const toObject = jest.fn(() => ({ email: { smtpPassword: 'actual' } }));
     SystemSettings.getSettings.mockResolvedValue({
       general: {},
@@ -90,6 +91,7 @@ describe('controllers/admin.controller', () => {
       academic: {},
       rootAccountId: null,
       save,
+      markModified,
       toObject
     });
 
@@ -106,6 +108,7 @@ describe('controllers/admin.controller', () => {
     await adminController.updateSystemSettings(req, res);
 
     expect(save).toHaveBeenCalled();
+    expect(markModified).toHaveBeenCalledWith('email');
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
   });
 

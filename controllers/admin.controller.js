@@ -1454,7 +1454,8 @@ exports.exportLoginLog = async (req, res) => {
 // @access  Private (Admin)
 exports.getSystemSettings = async (req, res) => {
   try {
-    const settings = await SystemSettings.getSettings();
+    const tenantId = rootAccountIdFromRequest(req);
+    const settings = await SystemSettings.getSettings(tenantId);
     
     // Don't send the password in response
     const settingsResponse = settings.toObject();
@@ -1481,23 +1482,32 @@ exports.getSystemSettings = async (req, res) => {
 // @access  Private (Admin)
 exports.updateSystemSettings = async (req, res) => {
   try {
-    const settings = await SystemSettings.getSettings();
+    const tenantId = rootAccountIdFromRequest(req);
+    const settings = await SystemSettings.getSettings(tenantId);
 
     if (req.body.general) {
       settings.general = { ...settings.general.toObject?.() || settings.general || {}, ...req.body.general };
+      settings.markModified('general');
     }
     if (req.body.security) {
       settings.security = { ...settings.security.toObject?.() || settings.security || {}, ...req.body.security };
+      settings.markModified('security');
     }
     if (req.body.email) {
       const emailUpdate = { ...req.body.email };
-      if (emailUpdate.smtpPassword === '***' || emailUpdate.smtpPassword === '') {
+      if (emailUpdate.smtpPassword === '***' || emailUpdate.smtpPassword === '' || /^\*+$/.test(String(emailUpdate.smtpPassword || '').trim())) {
         delete emailUpdate.smtpPassword;
       }
+      if (emailUpdate.smtpPort != null) {
+        const port = Number(emailUpdate.smtpPort);
+        emailUpdate.smtpPort = Number.isFinite(port) && port > 0 ? port : 587;
+      }
       settings.email = { ...settings.email.toObject?.() || settings.email || {}, ...emailUpdate };
+      settings.markModified('email');
     }
     if (req.body.storage) {
       settings.storage = { ...settings.storage.toObject?.() || settings.storage || {}, ...req.body.storage };
+      settings.markModified('storage');
     }
     if (req.body.academic) {
       const academicPatch = {
@@ -1510,12 +1520,14 @@ exports.updateSystemSettings = async (req, res) => {
         academicPatch.institutionMode = req.body.academic.institutionMode;
       }
       settings.academic = academicPatch;
+      settings.markModified('academic');
     }
     if (req.body.messaging) {
       settings.messaging = {
         ...(settings.messaging?.toObject?.() || settings.messaging || {}),
         ...req.body.messaging,
       };
+      settings.markModified('messaging');
     }
 
     await settings.save();
@@ -1538,8 +1550,9 @@ exports.updateSystemSettings = async (req, res) => {
 
     if (req.body.email) {
       try {
-        const { initializeEmailService } = require('../utils/emailService');
-        await initializeEmailService();
+        const { initializeEmailService, resetEmailTransporter } = require('../utils/emailService');
+        if (typeof resetEmailTransporter === 'function') resetEmailTransporter();
+        await initializeEmailService(settings.rootAccountId);
       } catch (emailError) {
         console.warn('Warning: Could not re-initialize email service:', emailError.message);
       }
