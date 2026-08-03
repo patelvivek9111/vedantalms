@@ -11,6 +11,17 @@ on:
       - 'e2e/helpers/live-auth.ts'
       - 'scripts/seedVisualE2e.js'
       - '.github/workflows/visual-regression.yml'
+  push:
+    branches: [main, master]
+    paths:
+      - 'frontend/src/**'
+      - 'frontend/index.html'
+      - 'e2e/specs/visual-snapshots.spec.ts'
+      - 'e2e/playwright.visual.config.ts'
+      - 'e2e/specs/snapshots/**'
+      - 'e2e/helpers/live-auth.ts'
+      - 'scripts/seedVisualE2e.js'
+      - '.github/workflows/visual-regression.yml'
   schedule:
     - cron: '0 5 * * *'
   workflow_dispatch:
@@ -24,7 +35,27 @@ permissions:
   contents: write
 
 jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      run_suite: ${{ steps.check.outputs.run_suite }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: check
+        name: Decide whether to run snapshot suite
+        run: |
+          # While BASELINE_REFRESH is present, Update Visual Baselines owns the
+          # refresh; comparing against stale PNGs would fail the suite.
+          if [ -f e2e/specs/snapshots/BASELINE_REFRESH ] && [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "BASELINE_REFRESH present — skipping compare (update workflow regenerates PNGs)."
+            echo "run_suite=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_suite=true" >> "$GITHUB_OUTPUT"
+          fi
+
   visual-snapshots:
+    needs: gate
+    if: needs.gate.outputs.run_suite == 'true'
     runs-on: ubuntu-latest
     env:
       MONGODB_URI: mongodb://127.0.0.1:27017/lms-visual-e2e
