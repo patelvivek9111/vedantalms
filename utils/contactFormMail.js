@@ -5,6 +5,8 @@ const {
 } = require('./smtpTransportTimeouts');
 
 const DEFAULT_RECIPIENT = 'info@mysl8te.com';
+/** Resend free tier uses HTTPS (port 443) — works on Render free where SMTP 25/465/587 are blocked. */
+const RESEND_API_URL = 'https://api.resend.com/emails';
 
 let cachedEnvTransporter = null;
 
@@ -20,6 +22,19 @@ function escapeHtml(s) {
 
 function inquiryRecipient() {
   return (process.env.CONTACT_INQUIRY_RECIPIENT || DEFAULT_RECIPIENT).trim();
+}
+
+function resendApiKey() {
+  return (process.env.RESEND_API_KEY || process.env.CONTACT_RESEND_API_KEY || '').trim();
+}
+
+function resendFromAddress() {
+  return (
+    process.env.CONTACT_RESEND_FROM ||
+    process.env.RESEND_FROM ||
+    process.env.CONTACT_SMTP_FROM ||
+    ''
+  ).trim();
 }
 
 function getEnvTransporter() {
@@ -125,6 +140,38 @@ async function sendWithNodemailer({ transporter, from, to, replyTo, subject, tex
   return { ok: true, messageId: info.messageId || null };
 }
 
+/**
+ * Send via Resend HTTPS API (port 443). Preferred on Render free tier.
+ * @see https://resend.com/docs/api-reference/emails/send-email
+ */
+async function sendWithResend({ apiKey, from, to, replyTo, subject, text, html }) {
+  const res = await fetch(RESEND_API_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: from.includes('<') ? from : `MySl8te contact <${from}>`,
+      to: [to],
+      reply_to: replyTo || undefined,
+      subject,
+      text,
+      html,
+    }),
+  });
+
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = body?.message || body?.error || res.statusText || `HTTP ${res.status}`;
+    throw new Error(`Resend API ${res.status}: ${detail}`);
+  }
+
+  const messageId = body?.id || null;
+  console.log(`Contact inquiry Resend accepted id=${messageId || '(none)'}`);
+  return { ok: true, messageId };
+}
+
 function withAttemptTimeout(promise, label) {
   let timeoutId;
   return Promise.race([
@@ -140,13 +187,17 @@ function withAttemptTimeout(promise, label) {
   ]);
 }
 
+function isTimeoutError(err) {
+  return /timed?\s*out|timeout/i.test(String(err?.message || ''));
+}
+
 /**
  * Send a public landing-page inquiry to CONTACT_INQUIRY_RECIPIENT
  * (default info@mysl8te.com).
  *
- * Prefers CONTACT_SMTP_* (platform/host env) so production marketing mail does not
- * depend on a tenant SystemSettings SMTP that may hang or be misconfigured.
- * Falls back to Admin → System Settings SMTP when env is unset.
+ * Prefer RESEND_API_KEY (HTTPS) on Render free — SMTP ports are blocked there.
+ * SMTP (CONTACT_SMTP_* / System Settings) is only used when Resend is unset,
+ * so a blocked SMTP path cannot hang the request after a successful HTTPS setup.
  */
 async function sendContactInquiry({ name, email, organization, jobTitle, userCount, extra }) {
   const to = inquiryRecipient();
@@ -161,16 +212,16 @@ async function sendContactInquiry({ name, email, organization, jobTitle, userCou
   console.log(`Contact inquiry → to=${to} replyTo=${email} org=${organization}`);
 
   const attempts = [];
+  const apiKey = resendApiKey();
+  const resendFrom = resendFromAddress();
 
-  const envTransporter = getEnvTransporter();
-  const envFrom = (process.env.CONTACT_SMTP_FROM || process.env.CONTACT_SMTP_USER || '').trim();
-  if (envTransporter && envFrom) {
+  if (apiKey && resendFrom) {
     attempts.push({
-      label: 'CONTACT_SMTP_*',
+      label: 'Resend',
       run: () =>
-        sendWithNodemailer({
-          transporter: envTransporter,
-          from: envFrom,
+        sendWithResend({
+          apiKey,
+          from: resendFrom,
           to,
           replyTo: email,
           subject,
@@ -178,23 +229,50 @@ async function sendContactInquiry({ name, email, organization, jobTitle, userCou
           html,
         }),
     });
+  } else if (apiKey && !resendFrom) {
+    console.warn(
+      'Contact inquiry: RESEND_API_KEY is set but CONTACT_RESEND_FROM (or RESEND_FROM) is missing'
+    );
   }
 
-  const systemMail = await getSystemSettingsMail();
-  if (systemMail) {
-    attempts.push({
-      label: 'SystemSettings',
-      run: () =>
-        sendWithNodemailer({
-          transporter: systemMail.transporter,
-          from: systemMail.from,
-          to,
-          replyTo: email,
-          subject,
-          text,
-          html,
-        }),
-    });
+  // Skip SMTP when Resend is configured — on Render free, SMTP hangs ~15–30s per attempt.
+  const useSmtp = !apiKey || process.env.CONTACT_SMTP_FALLBACK === 'true';
+
+  if (useSmtp) {
+    const envTransporter = getEnvTransporter();
+    const envFrom = (process.env.CONTACT_SMTP_FROM || process.env.CONTACT_SMTP_USER || '').trim();
+    if (envTransporter && envFrom) {
+      attempts.push({
+        label: 'CONTACT_SMTP_*',
+        run: () =>
+          sendWithNodemailer({
+            transporter: envTransporter,
+            from: envFrom,
+            to,
+            replyTo: email,
+            subject,
+            text,
+            html,
+          }),
+      });
+    }
+
+    const systemMail = await getSystemSettingsMail();
+    if (systemMail) {
+      attempts.push({
+        label: 'SystemSettings',
+        run: () =>
+          sendWithNodemailer({
+            transporter: systemMail.transporter,
+            from: systemMail.from,
+            to,
+            replyTo: email,
+            subject,
+            text,
+            html,
+          }),
+      });
+    }
   }
 
   if (attempts.length === 0) {
@@ -202,7 +280,7 @@ async function sendContactInquiry({ name, email, organization, jobTitle, userCou
       ok: false,
       code: 'SMTP_NOT_CONFIGURED',
       message:
-        'Contact email is not configured. Set CONTACT_SMTP_* on the host, or Admin → System Settings email.',
+        'Contact email is not configured. Set RESEND_API_KEY + CONTACT_RESEND_FROM (recommended on Render free), or CONTACT_SMTP_* / Admin → System Settings email.',
     };
   }
 
@@ -214,11 +292,11 @@ async function sendContactInquiry({ name, email, organization, jobTitle, userCou
       return sent;
     } catch (err) {
       lastError = err;
-      console.error(`Contact inquiry SMTP (${attempt.label}) failed:`, err.message);
+      console.error(`Contact inquiry (${attempt.label}) failed:`, err.message);
     }
   }
 
-  const timedOut = /timed out/i.test(String(lastError?.message || ''));
+  const timedOut = isTimeoutError(lastError);
   return {
     ok: false,
     code: timedOut ? 'TIMEOUT' : 'SEND_FAILED',
@@ -230,6 +308,8 @@ async function sendContactInquiry({ name, email, organization, jobTitle, userCou
 
 module.exports = {
   sendContactInquiry,
+  sendWithResend,
   DEFAULT_RECIPIENT,
   SMTP_ATTEMPT_TIMEOUT_MS,
+  RESEND_API_URL,
 };

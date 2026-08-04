@@ -60,7 +60,7 @@ exports.postInquiry = async (req, res) => {
           message:
             result.code === 'TIMEOUT'
               ? "We saved your inquiry, but email delivery timed out. We'll still follow up — or email info@mysl8te.com."
-              : 'We saved your inquiry, but email is not configured on this server. Please email info@mysl8te.com directly.',
+              : 'We saved your inquiry, but email is not configured on this server. Please email info@mysl8te.com directly (or set RESEND_API_KEY on the host).',
         });
       }
       const status = result.code === 'SMTP_NOT_CONFIGURED' ? 503 : 500;
