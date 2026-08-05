@@ -11,7 +11,7 @@ const QuizWaveImmersiveShell: React.FC<QuizWaveImmersiveShellProps> = ({
   className = ''
 }) => (
   <div
-    className={`fixed inset-0 z-[110] overflow-y-auto overscroll-y-contain lg:left-20 ${className}`}
+    className={`fixed inset-0 z-[110] overflow-y-auto overscroll-y-contain ${className}`}
   >
     {children}
   </div>

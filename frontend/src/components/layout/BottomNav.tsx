@@ -55,7 +55,8 @@ const BottomNav: React.FC = () => {
               return {
                 ...option,
                 ...item,
-                // Keep icon from canonical nav option; localStorage stores plain JSON.
+                // Prefer canonical label/icon so renamed tabs update for existing users.
+                label: option.label,
                 icon: option.icon,
               };
             }
@@ -96,7 +97,8 @@ const BottomNav: React.FC = () => {
               return {
                 ...option,
                 ...item,
-                // Keep icon from canonical nav option; localStorage stores plain JSON.
+                // Prefer canonical label/icon so renamed tabs update for existing users.
+                label: option.label,
                 icon: option.icon,
               };
             }

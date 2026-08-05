@@ -15,7 +15,7 @@ const ToDoPage: React.FC = () => {
       preventScrollInterference={true}
       className="min-h-screen bg-gray-50 dark:bg-gray-900"
     >
-      <MobileAppShell title="To Do">
+      <MobileAppShell title="Up next">
         <div className="mx-auto w-full max-w-4xl px-4 py-3 lg:p-6">
           <ToDoPanel />
         </div>

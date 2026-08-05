@@ -53,7 +53,7 @@ export const ALL_NAV_OPTIONS: NavItem[] = [
   },
   { 
     id: 'todo', 
-    label: 'To Do', 
+    label: 'Up next', 
     icon: ClipboardList, 
     to: '/todo',
     activePaths: ['/todo']

@@ -412,7 +412,7 @@ export const ToDoPanel: React.FC = () => {
       return (
         <div className={`${mobilePanelClass} py-10 text-center`}>
           <ClipboardList className="mx-auto mb-2 h-7 w-7 text-gray-300 dark:text-gray-600" strokeWidth={1.5} />
-          <p className="text-[11px] text-gray-500 dark:text-gray-400 sm:text-xs">No tasks to do</p>
+          <p className="text-[11px] text-gray-500 dark:text-gray-400 sm:text-xs">Nothing due right now</p>
         </div>
       );
     }
@@ -488,7 +488,8 @@ export const ToDoPanel: React.FC = () => {
     <div className="space-y-4">
       <div className={panelClass}>
         <div className="border-b border-gray-100 px-4 py-3 dark:border-gray-700/60">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">To Do</h2>
+          <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Up next</h2>
+          <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">Due soon and waiting on you</p>
         </div>
       
         {plannerUxOn && plannerFeedLoading ? (
@@ -496,8 +497,9 @@ export const ToDoPanel: React.FC = () => {
             Loading planner…
           </div>
         ) : allTasks.length === 0 ? (
-          <div className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-            No tasks to do
+          <div className="py-10 text-center">
+            <ClipboardList className="mx-auto mb-2 h-8 w-8 text-gray-300 dark:text-gray-600" strokeWidth={1.5} />
+            <p className="text-sm text-gray-500 dark:text-gray-400">Nothing due right now</p>
           </div>
         ) : (
           <div>

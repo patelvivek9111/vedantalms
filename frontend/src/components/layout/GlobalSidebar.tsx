@@ -7,12 +7,9 @@ import {
   BookOpen, 
   Calendar, 
   Inbox, 
-  Share2, 
-  MoreHorizontal, 
   Users, 
   LogOut,
   Settings,
-  BarChart3,
   Shield,
   Database,
   Search,
@@ -78,9 +75,9 @@ const getNavItems = (userRole: string) => {
   return [...baseItems, { label: 'Groups', icon: Users, to: '/groups' }, { label: 'Catalog', icon: Search, to: '/catalog' }, ...studentItems];
 };
 
-/** Shared nav tile + active rail for a calmer, modern sidebar selection state */
+/** Shared nav tile + active rail for bottom dock selection state */
 const sidebarNavBase =
-  'flex flex-col items-center w-full py-1.5 px-1 rounded-xl relative transition-[color,background-color,box-shadow,transform] duration-200 ease-out group outline-none focus-visible:ring-2 focus-visible:ring-sky-400/40 focus-visible:ring-offset-2 focus-visible:ring-offset-blue-900 dark:focus-visible:ring-offset-gray-900';
+  'flex flex-col items-center justify-center min-w-[4rem] px-3 py-2 rounded-xl relative transition-[color,background-color,box-shadow,transform] duration-200 ease-out group outline-none focus-visible:ring-2 focus-visible:ring-sky-400/40 focus-visible:ring-offset-2 focus-visible:ring-offset-blue-900 dark:focus-visible:ring-offset-gray-900';
 
 const sidebarNavInactive =
   'text-blue-100/85 dark:text-gray-400 hover:bg-white/[0.08] dark:hover:bg-white/[0.06] hover:text-white dark:hover:text-gray-100';
@@ -92,7 +89,7 @@ function SidebarActiveRail({ show }: { show: boolean }) {
   if (!show) return null;
   return (
     <span
-      className="pointer-events-none absolute left-0.5 top-2 bottom-2 w-[3px] rounded-full bg-gradient-to-b from-sky-200 to-sky-400 shadow-[0_0_14px_rgba(56,189,248,0.45)] dark:from-sky-300 dark:to-sky-500 dark:shadow-[0_0_12px_rgba(56,189,248,0.35)]"
+      className="pointer-events-none absolute left-2 right-2 bottom-0.5 h-[3px] rounded-full bg-gradient-to-r from-sky-200 to-sky-400 shadow-[0_0_14px_rgba(56,189,248,0.45)] dark:from-sky-300 dark:to-sky-500 dark:shadow-[0_0_12px_rgba(56,189,248,0.35)]"
       aria-hidden
     />
   );
@@ -116,7 +113,12 @@ export default function GlobalSidebar() {
     const button = coursesButtonRef.current;
     if (!button) return;
     const rect = button.getBoundingClientRect();
-    setCourseDropdownPos({ top: rect.top, left: rect.right + 8 });
+    const panelWidth = 192; // min-w-48
+    const left = Math.min(
+      Math.max(8, rect.left + rect.width / 2 - panelWidth / 2),
+      window.innerWidth - panelWidth - 8
+    );
+    setCourseDropdownPos({ top: rect.top - 8, left });
   }, []);
 
   const prefersFinePointer =
@@ -196,7 +198,7 @@ export default function GlobalSidebar() {
     showCourseDropdown ? (
       <div
         ref={dropdownPanelRef}
-        className="fixed z-[100] w-auto min-w-48 rounded-lg border border-gray-200 bg-white py-2 shadow-lg dark:border-gray-700 dark:bg-gray-800"
+        className="fixed z-[100] w-auto min-w-48 -translate-y-full rounded-lg border border-gray-200 bg-white py-2 shadow-lg dark:border-gray-700 dark:bg-gray-800"
         style={{ top: courseDropdownPos.top, left: courseDropdownPos.left }}
         onMouseEnter={prefersFinePointer ? handleMouseEnter : undefined}
         onMouseLeave={prefersFinePointer ? handleMouseLeave : undefined}
@@ -261,25 +263,34 @@ export default function GlobalSidebar() {
 
   return (
     <>
-      {/* Mobile Hamburger Button - Removed for mobile, only show on desktop */}
-      {/* Mobile Overlay - Removed since hamburger is removed */}
+      {/* Soft fade so page content doesn't read through under/around the dock */}
+      <div
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-[55] hidden h-32 bg-gradient-to-t from-gray-50 from-25% via-gray-50/85 to-transparent print:hidden dark:from-gray-900 dark:via-gray-900/85 lg:block"
+        aria-hidden
+      />
 
-      {/* Sidebar - Hidden on mobile, visible on desktop */}
+      {/* Desktop global nav — centered bottom dock (mobile uses BottomNav) */}
       <nav 
-        className="print:hidden hidden lg:flex fixed top-0 left-0 h-[100dvh] bg-blue-900 dark:bg-gray-900 flex-col items-center py-2 z-50 shadow-lg border-r-2 border-blue-700 dark:border-gray-700 transition-all duration-300 w-20 overflow-visible"
+        className="print:hidden hidden lg:flex fixed bottom-4 left-1/2 z-[60] max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-row items-center gap-2 overflow-hidden rounded-2xl border border-blue-700 bg-blue-900 px-3 py-2 shadow-[0_12px_40px_rgba(15,23,42,0.35)] isolate dark:border-gray-700 dark:bg-gray-900"
         data-testid="global-sidebar"
         aria-label="Global navigation"
       >
-      <div className="mb-3 flex w-full shrink-0 justify-center">
-        <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-blue-700 bg-white dark:border-gray-600 dark:bg-gray-800">
+      {/* Opaque paint layer — blocks scroll content behind rounded dock */}
+      <div
+        className="pointer-events-none absolute inset-0 rounded-2xl bg-blue-900 dark:bg-gray-900"
+        aria-hidden
+      />
+      <div className="relative z-[1] flex shrink-0 items-center justify-center px-1">
+        <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-blue-700 bg-white dark:border-gray-600 dark:bg-gray-800">
           <img
             src={`${import.meta.env.BASE_URL}assets/Vedanta_logo.png`}
             alt="MYSL8TE"
-            className="h-9 w-9 object-contain object-center"
+            className="h-7 w-7 object-contain object-center"
           />
         </div>
       </div>
-      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col gap-1 items-center w-full px-2">
+
+      <div className="relative z-[1] flex max-w-[min(80vw,60rem)] flex-row items-center gap-2 overflow-x-auto overflow-y-hidden px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {getNavItems(user?.role || '').map(({ label, icon: Icon, to }) => {
           // Highlight 'Courses' for any /courses* route (but not /teacher/courses or /admin/courses)
           const isActive =
@@ -298,8 +309,8 @@ export default function GlobalSidebar() {
                 className={`${sidebarNavBase} ${dashActive ? sidebarNavActive : sidebarNavInactive}`}
               >
                 <SidebarActiveRail show={dashActive} />
-                <Icon className={`mb-1 h-5 w-5 transition-opacity duration-200 ${dashActive ? 'opacity-100' : 'opacity-90 group-hover:opacity-100'}`} />
-                <span className={`text-[11px] font-medium leading-tight tracking-tight ${dashActive ? 'font-semibold' : ''}`}>
+                <Icon className={`mb-0.5 h-5 w-5 transition-opacity duration-200 ${dashActive ? 'opacity-100' : 'opacity-90 group-hover:opacity-100'}`} />
+                <span className={`text-[10px] font-medium leading-tight tracking-tight ${dashActive ? 'font-semibold' : ''}`}>
                   {label}
                 </span>
               </Link>
@@ -315,9 +326,9 @@ export default function GlobalSidebar() {
                 className={`${sidebarNavBase} ${isActive ? sidebarNavActive : sidebarNavInactive}`}
               >
                 <SidebarActiveRail show={isActive} />
-                <div className="relative mb-1 flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-white/20 bg-blue-800/80 dark:border-gray-600 dark:bg-gray-700 transition-transform duration-200 group-hover:border-white/30">
+                <div className="relative mb-0.5 flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border border-white/20 bg-blue-800/80 dark:border-gray-600 dark:bg-gray-700 transition-transform duration-200 group-hover:border-white/30">
                   {/* Fallback initials - always present as background */}
-                  <span className="text-white dark:text-gray-200 text-sm font-bold absolute inset-0 flex items-center justify-center">
+                  <span className="text-white dark:text-gray-200 text-xs font-bold absolute inset-0 flex items-center justify-center">
                     {user?.firstName?.charAt(0) || ''}{user?.lastName?.charAt(0) || 'U'}
                   </span>
                   {/* Profile picture - overlays fallback when loaded */}
@@ -335,7 +346,7 @@ export default function GlobalSidebar() {
                     />
                   )}
                 </div>
-                <span className={`text-[11px] font-medium leading-tight tracking-tight ${isActive ? 'font-semibold' : ''}`}>
+                <span className={`text-[10px] font-medium leading-tight tracking-tight ${isActive ? 'font-semibold' : ''}`}>
                   {label}
                 </span>
               </Link>
@@ -354,8 +365,8 @@ export default function GlobalSidebar() {
                   className={`${sidebarNavBase} ${isAdminCoursesActive ? sidebarNavActive : sidebarNavInactive}`}
                 >
                   <SidebarActiveRail show={isAdminCoursesActive} />
-                  <BookOpen className={`mb-1 h-5 w-5 transition-opacity duration-200 ${isAdminCoursesActive ? 'opacity-100' : 'opacity-90 group-hover:opacity-100'}`} />
-                  <span className={`text-[11px] font-medium leading-tight tracking-tight ${isAdminCoursesActive ? 'font-semibold' : ''}`}>
+                  <BookOpen className={`mb-0.5 h-5 w-5 transition-opacity duration-200 ${isAdminCoursesActive ? 'opacity-100' : 'opacity-90 group-hover:opacity-100'}`} />
+                  <span className={`text-[10px] font-medium leading-tight tracking-tight ${isAdminCoursesActive ? 'font-semibold' : ''}`}>
                     {label}
                   </span>
                 </Link>
@@ -366,7 +377,7 @@ export default function GlobalSidebar() {
             return (
               <div 
                 key={label} 
-                className="relative w-full" 
+                className="relative shrink-0" 
                 ref={dropdownRef}
                 onMouseEnter={prefersFinePointer ? handleMouseEnter : undefined}
                 onMouseLeave={prefersFinePointer ? handleMouseLeave : undefined}
@@ -388,8 +399,8 @@ export default function GlobalSidebar() {
                   className={`${sidebarNavBase} ${isActive ? sidebarNavActive : sidebarNavInactive}`}
                 >
                   <SidebarActiveRail show={isActive} />
-                  <BookOpen className={`mb-1 h-5 w-5 transition-opacity duration-200 ${isActive ? 'opacity-100' : 'opacity-90 group-hover:opacity-100'}`} />
-                  <span className={`text-[11px] font-medium leading-tight tracking-tight ${isActive ? 'font-semibold' : ''}`}>
+                  <BookOpen className={`mb-0.5 h-5 w-5 transition-opacity duration-200 ${isActive ? 'opacity-100' : 'opacity-90 group-hover:opacity-100'}`} />
+                  <span className={`text-[10px] font-medium leading-tight tracking-tight ${isActive ? 'font-semibold' : ''}`}>
                     {label}
                   </span>
                 </button>
@@ -409,11 +420,11 @@ export default function GlobalSidebar() {
                 }
               >
                 <SidebarActiveRail show={isActive} />
-                <div className="relative mb-1 inline-flex">
+                <div className="relative mb-0.5 inline-flex">
                   <Icon className={`h-5 w-5 transition-opacity duration-200 ${isActive ? 'opacity-100' : 'opacity-90 group-hover:opacity-100'}`} />
                   <NavCountBadge count={unreadCount} variant="sidebar" />
                 </div>
-                <span className={`text-[11px] font-medium leading-tight tracking-tight ${isActive ? 'font-semibold' : ''}`}>
+                <span className={`text-[10px] font-medium leading-tight tracking-tight ${isActive ? 'font-semibold' : ''}`}>
                   {label}
                 </span>
               </Link>
@@ -427,8 +438,8 @@ export default function GlobalSidebar() {
               className={`${sidebarNavBase} ${isActive ? sidebarNavActive : sidebarNavInactive}`}
             >
               <SidebarActiveRail show={isActive} />
-              <Icon className={`mb-1 h-5 w-5 transition-opacity duration-200 ${isActive ? 'opacity-100' : 'opacity-90 group-hover:opacity-100'}`} />
-              <span className={`text-[11px] font-medium leading-tight tracking-tight ${isActive ? 'font-semibold' : ''}`}>
+              <Icon className={`mb-0.5 h-5 w-5 transition-opacity duration-200 ${isActive ? 'opacity-100' : 'opacity-90 group-hover:opacity-100'}`} />
+              <span className={`text-[10px] font-medium leading-tight tracking-tight ${isActive ? 'font-semibold' : ''}`}>
                 {label}
               </span>
             </Link>
@@ -436,17 +447,17 @@ export default function GlobalSidebar() {
         })}
       </div>
       
-      {/* Logout Button - Always visible at bottom */}
-      <div className="mt-1 w-full px-2 shrink-0">
+      {/* Logout — trailing edge of dock */}
+      <div className="relative z-[1] shrink-0 border-l border-white/10 pl-2 ml-1">
         <button
           type="button"
           onClick={() => void handleLogout()}
           disabled={loggingOut}
-          className="group flex w-full flex-col items-center rounded-xl px-1 py-2 text-blue-100/85 transition-colors duration-200 hover:bg-white/[0.08] hover:text-white disabled:opacity-60 dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-gray-100"
+          className="group flex min-w-[4rem] flex-col items-center justify-center rounded-xl px-3 py-2 text-blue-100/85 transition-colors duration-200 hover:bg-white/[0.08] hover:text-white disabled:opacity-60 dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-gray-100"
         >
-          <LogOut className="mb-1 h-5 w-5 opacity-90 transition-opacity group-hover:opacity-100" />
-          <span className="text-[11px] font-medium leading-tight tracking-tight">
-            {loggingOut ? 'Logging out…' : 'Logout'}
+          <LogOut className="mb-0.5 h-5 w-5 opacity-90 transition-opacity group-hover:opacity-100" />
+          <span className="text-[10px] font-medium leading-tight tracking-tight">
+            {loggingOut ? '…' : 'Logout'}
           </span>
         </button>
       </div>
@@ -454,4 +465,4 @@ export default function GlobalSidebar() {
     {typeof document !== 'undefined' ? createPortal(courseDropdownPanel, document.body) : courseDropdownPanel}
     </>
   );
-} 
+}

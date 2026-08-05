@@ -62,7 +62,7 @@ describe('NavCustomizationModal', () => {
     );
 
     expect(screen.getByText('Dashboard')).toBeInTheDocument();
-    expect(screen.getByText('To Do')).toBeInTheDocument();
+    expect(screen.getByText('Up next')).toBeInTheDocument();
   });
 
   it('should filter my-course option for non-teachers', () => {
