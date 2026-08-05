@@ -230,6 +230,8 @@ function AppContent() {
     location.pathname === '/inbox' && Boolean(new URLSearchParams(location.search).get('c'));
   const hideMobileBottomNav =
     /\/quizwave(\/|$)/.test(location.pathname) || isInboxThread;
+  // Only the dashboard pins the desktop dock, so only it needs standing clearance.
+  const dockPinned = location.pathname === '/dashboard' || location.pathname === '/';
 
   useMessagingSocketConnection(user?._id, token);
   useNotificationSocketConnection(user?._id, token);
@@ -260,7 +262,9 @@ function AppContent() {
         tabIndex={-1}
         className={
           isAuthenticated
-            ? 'flex min-h-dvh flex-1 flex-col bg-gray-50 dark:bg-gray-900 pb-[calc(4rem+env(safe-area-inset-bottom,0px))] lg:pb-24 print:pb-0 transition-all duration-300 outline-none'
+            ? `flex min-h-dvh flex-1 flex-col bg-gray-50 dark:bg-gray-900 pb-[calc(4rem+env(safe-area-inset-bottom,0px))] print:pb-0 transition-all duration-300 outline-none ${
+                dockPinned ? 'lg:pb-24' : 'lg:pb-10'
+              }`
             : 'flex min-h-0 flex-1 flex-col print:pb-0'
         }
       >

@@ -85,6 +85,12 @@ const sidebarNavInactive =
 const sidebarNavActive =
   'text-white dark:text-gray-50 bg-white/[0.12] dark:bg-white/[0.08] ring-1 ring-inset ring-white/15 dark:ring-white/10 shadow-sm';
 
+/** How close the cursor must get to the viewport bottom before a tucked dock slides back up. */
+const DOCK_REVEAL_ZONE_PX = 56;
+
+/** Sliver of the dock left on screen while tucked, so it stays discoverable. */
+const DOCK_PEEK_PX = 8;
+
 function SidebarActiveRail({ show }: { show: boolean }) {
   if (!show) return null;
   return (
@@ -104,6 +110,9 @@ export default function GlobalSidebar() {
   const [showCourseDropdown, setShowCourseDropdown] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [courseDropdownPos, setCourseDropdownPos] = useState({ top: 0, left: 0 });
+  const [pointerNearBottom, setPointerNearBottom] = useState(false);
+  const [pointerOnDock, setPointerOnDock] = useState(false);
+  const [dockFocused, setDockFocused] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const coursesButtonRef = useRef<HTMLButtonElement>(null);
   const dropdownPanelRef = useRef<HTMLDivElement>(null);
@@ -124,6 +133,31 @@ export default function GlobalSidebar() {
   const prefersFinePointer =
     typeof window !== 'undefined' &&
     window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+
+  /** Dashboard keeps the dock pinned; elsewhere it tucks away until the pointer nears it. */
+  const isDashboardHome =
+    location.pathname === '/dashboard' || location.pathname === '/';
+  const dockRevealed =
+    isDashboardHome || pointerNearBottom || pointerOnDock || dockFocused || showCourseDropdown;
+
+  useEffect(() => {
+    if (isDashboardHome) {
+      setPointerNearBottom(false);
+      return undefined;
+    }
+    const handlePointerMove = (event: MouseEvent) => {
+      const nearBottom = event.clientY >= window.innerHeight - DOCK_REVEAL_ZONE_PX;
+      setPointerNearBottom((prev) => (prev === nearBottom ? prev : nearBottom));
+    };
+    window.addEventListener('mousemove', handlePointerMove);
+    return () => window.removeEventListener('mousemove', handlePointerMove);
+  }, [isDashboardHome]);
+
+  // Leaving a page while the dock is peeking would otherwise strand it open.
+  useEffect(() => {
+    setPointerOnDock(false);
+    setDockFocused(false);
+  }, [location.pathname]);
 
   // Close dropdown when clicking/tapping outside
   useEffect(() => {
@@ -265,13 +299,24 @@ export default function GlobalSidebar() {
     <>
       {/* Soft fade so page content doesn't read through under/around the dock */}
       <div
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-[55] hidden h-32 bg-gradient-to-t from-gray-50 from-25% via-gray-50/85 to-transparent print:hidden dark:from-gray-900 dark:via-gray-900/85 lg:block"
+        className={`pointer-events-none fixed inset-x-0 bottom-0 z-[55] hidden h-32 bg-gradient-to-t from-gray-50 from-25% via-gray-50/85 to-transparent transition-opacity duration-300 print:hidden dark:from-gray-900 dark:via-gray-900/85 lg:block ${
+          dockRevealed ? 'opacity-100' : 'opacity-0'
+        }`}
         aria-hidden
       />
 
       {/* Desktop global nav — centered bottom dock (mobile uses BottomNav) */}
       <nav 
-        className="print:hidden hidden lg:flex fixed bottom-4 left-1/2 z-[60] max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-row items-center gap-2 overflow-hidden rounded-2xl border border-blue-700 bg-blue-900 px-3 py-2 shadow-[0_12px_40px_rgba(15,23,42,0.35)] isolate dark:border-gray-700 dark:bg-gray-900"
+        className="print:hidden hidden lg:flex fixed bottom-4 left-1/2 z-[60] max-w-[calc(100vw-2rem)] flex-row items-center gap-2 overflow-hidden rounded-2xl border border-blue-700 bg-blue-900 px-3 py-2 shadow-[0_12px_40px_rgba(15,23,42,0.35)] transition-transform duration-300 ease-out isolate dark:border-gray-700 dark:bg-gray-900"
+        style={{
+          transform: `translate(-50%, ${
+            dockRevealed ? '0px' : `calc(100% + 1rem - ${DOCK_PEEK_PX}px)`
+          })`,
+        }}
+        onMouseEnter={() => setPointerOnDock(true)}
+        onMouseLeave={() => setPointerOnDock(false)}
+        onFocusCapture={() => setDockFocused(true)}
+        onBlurCapture={() => setDockFocused(false)}
         data-testid="global-sidebar"
         aria-label="Global navigation"
       >
