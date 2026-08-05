@@ -14,8 +14,10 @@ import {
   XCircle,
   Eye,
   EyeOff,
-  GraduationCap
+  GraduationCap,
+  Palette
 } from 'lucide-react';
+import BrandingSettingsTab from '../components/admin/BrandingSettingsTab';
 import InstitutionGradingPolicyTab from '../components/admin/InstitutionGradingPolicyTab';
 import AcademicSettingsTab from '../components/admin/AcademicSettingsTab';
 import OpsDashboardPanel from '../components/admin/OpsDashboardPanel';
@@ -210,6 +212,7 @@ export function AdminSystemSettings() {
 
   const tabs = [
     { id: 'general', label: 'General', icon: Settings },
+    { id: 'branding', label: 'Branding', icon: Palette },
     { id: 'security', label: 'Security', icon: Shield },
     { id: 'email', label: 'Email', icon: Bell },
     { id: 'storage', label: 'Storage', icon: Database },
@@ -694,6 +697,7 @@ export function AdminSystemSettings() {
           </div>
         )}
 
+        {activeTab === 'branding' && <BrandingSettingsTab />}
         {activeTab === 'grading' && <InstitutionGradingPolicyTab />}
         {activeTab === 'academic' && <AcademicSettingsTab />}
         {activeTab === 'operations' && (

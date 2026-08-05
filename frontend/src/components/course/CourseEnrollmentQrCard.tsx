@@ -160,7 +160,7 @@ const CourseEnrollmentQrCard: React.FC<Props> = ({ courseId }) => {
             max-width: 28mm;
             margin: 0 auto 7mm;
             border-radius: 1mm;
-            background: linear-gradient(90deg, #2563eb, #6366f1) !important;
+            background: linear-gradient(90deg, rgb(var(--brand-600)), rgb(var(--brand-secondary-500))) !important;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
           }

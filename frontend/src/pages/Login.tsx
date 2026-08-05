@@ -8,6 +8,7 @@ import { InteractiveEyes } from '../components/common/InteractiveEyes';
 import FloatingLabelInput from '../components/common/FloatingLabelInput';
 import FloatingLabelPasswordInput from '../components/common/FloatingLabelPasswordInput';
 import { loginRedirectPath } from '../utils/loginRedirect';
+import { getImageUrl } from '../services/api';
 import { API_URL } from '../config';
 
 const CREDENTIALS_ERROR = 'Incorrect Username or Password.';
@@ -52,11 +53,17 @@ export function Login() {
   const location = useLocation();
   const redirectTo = loginRedirectPath(location.state, user?.role);
   const brandLogo = tenant?.brand?.logoUrl;
-  const primaryLogo = brandLogo || `${import.meta.env.BASE_URL}assets/MySl8te_logo.png`;
+  const primaryLogo = brandLogo
+    ? getImageUrl(brandLogo)
+    : `${import.meta.env.BASE_URL}assets/MySl8te_logo.png`;
   const fallbackLogo = `${import.meta.env.BASE_URL}assets/MySl8te_logo.png`;
   const [logoSrc, setLogoSrc] = useState(primaryLogo);
   const wordmark = tenant?.brand?.wordmark || 'MYSL8TE';
   const accent = tenant?.brand?.primaryColor || '#4F46E5';
+  const loginBackground = tenant?.brand?.loginBackgroundUrl
+    ? getImageUrl(tenant.brand.loginBackgroundUrl)
+    : '';
+  const loginTagline = tenant?.brand?.loginTagline?.trim() || '';
   const ssoProviders = (tenant?.authProviders || []).filter(
     (p) => p.authType && p.authType !== 'password'
   );
@@ -247,6 +254,20 @@ export function Login() {
 
   return (
     <div className="relative min-h-[100svh] overflow-x-hidden bg-slate-50 dark:bg-slate-950">
+      {loginBackground && (
+        <>
+          <div
+            className="pointer-events-none absolute inset-0 bg-cover bg-center"
+            style={{ backgroundImage: `url(${loginBackground})` }}
+            aria-hidden
+          />
+          {/* Scrim keeps the sign-in card readable over arbitrary institution photos. */}
+          <div
+            className="pointer-events-none absolute inset-0 bg-slate-50/80 dark:bg-slate-950/85"
+            aria-hidden
+          />
+        </>
+      )}
       <div
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_90%_55%_at_50%_-15%,rgba(99,102,241,0.18),transparent)] dark:bg-[radial-gradient(ellipse_85%_50%_at_50%_-20%,rgba(129,140,248,0.22),transparent)]"
         aria-hidden
@@ -354,11 +375,12 @@ export function Login() {
                 {wordmark}
               </p>
               <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-                Welcome back.{' '}
+                {loginTagline || 'Welcome back.'}{' '}
                 <span className="text-slate-500 dark:text-slate-500">New here?</span>{' '}
                 <Link
                   to="/signup"
-                  className="font-semibold text-indigo-600 underline-offset-2 transition hover:text-indigo-700 hover:underline dark:text-indigo-400 dark:hover:text-indigo-300"
+                  style={{ color: accent }}
+                  className="font-semibold underline-offset-2 transition hover:underline"
                 >
                   Create an account
                 </Link>
@@ -427,7 +449,8 @@ export function Login() {
                 <p className="text-right text-sm">
                   <Link
                     to="/forgot-password"
-                    className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
+                    style={{ color: accent }}
+                    className="font-medium hover:underline"
                   >
                     Forgot password?
                   </Link>

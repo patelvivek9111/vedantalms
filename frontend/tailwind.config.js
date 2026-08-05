@@ -1,3 +1,17 @@
+/**
+ * Accent families resolve to institution branding at runtime. The app carries ~2,000
+ * hardcoded `blue-*`/`indigo-*`/`violet-*`/`purple-*` classes, so remapping the palettes
+ * themes every existing call site instead of requiring a codebase-wide rewrite.
+ */
+const brandScale = (prefix) =>
+  [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950].reduce((acc, stop) => {
+    acc[stop] = `rgb(var(--${prefix}-${stop}) / <alpha-value>)`;
+    return acc;
+  }, {});
+
+const primaryScale = brandScale('brand');
+const secondaryScale = brandScale('brand-secondary');
+
 /** @type {import('tailwindcss').Config} */
 export default {
   darkMode: 'class',
@@ -42,6 +56,22 @@ export default {
         'qw-celebrate-bg': 'qw-celebrate-bg 2s ease-in-out infinite',
       },
       colors: {
+        // Institution branding (Theme Editor) — resolved at runtime from AccountBrand.
+        brand: {
+          ...primaryScale,
+          DEFAULT: 'var(--brand-primary)',
+          hover: 'var(--brand-primary-hover)',
+          soft: 'var(--brand-primary-soft)',
+          contrast: 'var(--brand-primary-contrast)',
+          secondary: 'var(--brand-secondary)',
+        },
+        // Existing accent classes across the app inherit the brand automatically.
+        // Semantic families (green/red/amber/teal) stay fixed so status stays readable.
+        blue: primaryScale,
+        indigo: primaryScale,
+        sky: primaryScale,
+        violet: secondaryScale,
+        purple: secondaryScale,
         // Enhanced dark mode colors
         dark: {
           bg: {

@@ -47,6 +47,25 @@ router.put('/settings', protect, authorize('admin'), updateSystemSettings);
 router.post('/academic/apply-calendar', protect, authorize('admin'), require('../controllers/academic.controller').applyInstitutionCalendar);
 router.post('/settings/test-email', protect, authorize('admin'), testEmailConfig);
 
+// Canvas Theme Editor equivalent — branding is a school-admin concern, not platform admin.
+const upload = require('../middleware/upload');
+const accountBrand = require('../controllers/accountBrand.controller');
+router.get('/branding', protect, authorize('admin'), accountBrand.getBrand);
+router.put('/branding', protect, authorize('admin'), accountBrand.updateBrand);
+router.post(
+  '/branding/assets/:kind',
+  protect,
+  authorize('admin'),
+  upload.single('asset'),
+  accountBrand.uploadBrandAsset
+);
+router.delete(
+  '/branding/assets/:kind',
+  protect,
+  authorize('admin'),
+  accountBrand.removeBrandAsset
+);
+
 const accountTree = require('../controllers/accountTree.controller');
 router.get('/accounts', protect, authorize('admin', 'department_admin'), accountTree.listAccountTree);
 router.post('/accounts', protect, authorize('admin'), accountTree.createSubAccount);

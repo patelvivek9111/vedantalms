@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCourse } from '../../contexts/CourseContext';
+import { useOptionalTenant } from '../../contexts/TenantContext';
 import { useUnreadMessages } from '../../hooks/useUnreadMessages';
 import { getImageUrl } from '../../services/api';
 import { NavCountBadge } from '../common/NavCountBadge';
@@ -106,6 +107,7 @@ export default function GlobalSidebar() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { courses } = useCourse();
+  const tenant = useOptionalTenant()?.tenant;
   const { unreadCount } = useUnreadMessages();
   const [showCourseDropdown, setShowCourseDropdown] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -228,6 +230,11 @@ export default function GlobalSidebar() {
 
   const availableCourses = courses.filter((course) => course.published);
 
+  const defaultLogoSrc = `${import.meta.env.BASE_URL}assets/Vedanta_logo.png`;
+  const brandLogoSrc = tenant?.brand?.logoUrl
+    ? getImageUrl(tenant.brand.logoUrl)
+    : defaultLogoSrc;
+
   const courseDropdownPanel =
     showCourseDropdown ? (
       <div
@@ -328,9 +335,12 @@ export default function GlobalSidebar() {
       <div className="relative z-[1] flex shrink-0 items-center justify-center px-1">
         <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-blue-700 bg-white dark:border-gray-600 dark:bg-gray-800">
           <img
-            src={`${import.meta.env.BASE_URL}assets/Vedanta_logo.png`}
-            alt="MYSL8TE"
+            src={brandLogoSrc}
+            alt={tenant?.brand?.displayName || tenant?.name || 'MYSL8TE'}
             className="h-7 w-7 object-contain object-center"
+            onError={(e) => {
+              e.currentTarget.src = defaultLogoSrc;
+            }}
           />
         </div>
       </div>

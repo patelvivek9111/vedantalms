@@ -651,7 +651,7 @@ const CalendarPage: React.FC = () => {
   // Custom event styling
   const eventPropGetter = (event: any) => {
     const backgroundColor = event.color || (event.type === 'assignment'
-      ? '#2563eb'
+      ? 'rgb(var(--brand-600))'
       : event.type === 'quiz'
       ? '#22c55e'
       : '#a3a3a3');

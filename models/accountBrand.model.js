@@ -16,6 +16,7 @@ const accountBrandSchema = new mongoose.Schema(
     primaryColor: { type: String, default: '#4F46E5' },
     secondaryColor: { type: String, default: '#7C3AED' },
     loginBackgroundUrl: { type: String, default: '' },
+    loginTagline: { type: String, default: '', trim: true },
   },
   { timestamps: true }
 );

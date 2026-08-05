@@ -20,15 +20,53 @@
 
   /* Registrar Office — subtle polish for nested forms still using raw Tailwind */
   .registrar-office {
-    --ru-focus: 2px solid rgb(14 165 233 / 0.35);
+    --ru-focus: 2px solid rgb(var(--brand-500) / 0.35);
   }
 
   .registrar-office ::selection {
-    background: rgb(14 165 233 / 0.2);
+    background: rgb(var(--brand-500) / 0.2);
   }
 }
 
 @layer base {
+  /*
+   * Institution branding defaults; overridden at runtime by useBrandTheme.
+   * Ramp stops are bare RGB channels so Tailwind can apply opacity modifiers
+   * (e.g. `bg-blue-600/20`). Defaults match stock indigo/violet.
+   */
+  :root {
+    --brand-primary: #4f46e5;
+    --brand-primary-hover: #4338ca;
+    --brand-primary-soft: #eef2ff;
+    --brand-primary-contrast: #ffffff;
+    --brand-secondary: #7c3aed;
+    --brand-secondary-contrast: #ffffff;
+
+    --brand-50: 238 242 255;
+    --brand-100: 224 231 255;
+    --brand-200: 199 210 254;
+    --brand-300: 165 180 252;
+    --brand-400: 129 140 248;
+    --brand-500: 99 102 241;
+    --brand-600: 79 70 229;
+    --brand-700: 67 56 202;
+    --brand-800: 55 48 163;
+    --brand-900: 49 46 129;
+    --brand-950: 30 27 75;
+
+    --brand-secondary-50: 245 243 255;
+    --brand-secondary-100: 237 233 254;
+    --brand-secondary-200: 221 214 254;
+    --brand-secondary-300: 196 181 253;
+    --brand-secondary-400: 167 139 250;
+    --brand-secondary-500: 139 92 246;
+    --brand-secondary-600: 124 58 237;
+    --brand-secondary-700: 109 40 217;
+    --brand-secondary-800: 91 33 182;
+    --brand-secondary-900: 76 29 149;
+    --brand-secondary-950: 46 16 101;
+  }
+
   html {
     font-size: 14px;
   }
@@ -88,7 +126,7 @@
 }
 
 .calendar-modern .rbc-today {
-  background: #eff6ff !important;
+  background: rgb(var(--brand-50)) !important;
 }
 
 .calendar-modern .rbc-date-cell {
@@ -229,7 +267,7 @@
 }
 
 .dark .rbc-toolbar button.rbc-active {
-  background-color: #3b82f6 !important;
+  background-color: rgb(var(--brand-500)) !important;
   color: #ffffff !important;
 }
 
@@ -251,21 +289,21 @@
 }
 
 .dark .rbc-selected {
-  background-color: #1e40af !important;
+  background-color: rgb(var(--brand-800)) !important;
 }
 
 .dark .rbc-slot-selection {
-  background-color: rgba(59, 130, 246, 0.2) !important;
+  background-color: rgb(var(--brand-500) / 0.2) !important;
 }
 
 /* Fix for highlighted day column in week view */
 .dark .rbc-day-slot.rbc-now {
-  background-color: rgba(59, 130, 246, 0.1) !important;
+  background-color: rgb(var(--brand-500) / 0.1) !important;
 }
 
 .dark .rbc-header.rbc-now {
-  background-color: rgba(59, 130, 246, 0.15) !important;
-  color: #60a5fa !important;
+  background-color: rgb(var(--brand-500) / 0.15) !important;
+  color: rgb(var(--brand-400)) !important;
   font-weight: 600 !important;
 }
 
@@ -395,14 +433,14 @@ input[type="number"] {
 
 /* Focus visible indicators for accessibility */
 *:focus-visible {
-  outline: 2px solid #3b82f6;
+  outline: 2px solid rgb(var(--brand-500));
   outline-offset: 2px;
   border-radius: 4px;
 }
 
 /* Ensure focus indicators work in dark mode */
 .dark *:focus-visible {
-  outline-color: #60a5fa;
+  outline-color: rgb(var(--brand-400));
 }
 
 /* Remove default focus outline for mouse users, keep for keyboard */
@@ -552,8 +590,8 @@ input[type="number"] {
   
   /* Improve tap highlight on mobile */
   * {
-    -webkit-tap-highlight-color: rgba(59, 130, 246, 0.2);
-    tap-highlight-color: rgba(59, 130, 246, 0.2);
+    -webkit-tap-highlight-color: rgb(var(--brand-500) / 0.2);
+    tap-highlight-color: rgb(var(--brand-500) / 0.2);
   }
   
   /* Better scrolling on iOS */
