@@ -3,13 +3,17 @@ import { Trash2 } from 'lucide-react';
 import { getImageUrl } from '../../services/api';
 
 interface StudentCardProps {
-  student: {
-    _id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-    profilePicture?: string;
-  };
+  /** Null when the underlying account was deleted but the course still references it. */
+  student:
+    | {
+        _id: string;
+        firstName: string;
+        lastName: string;
+        email: string;
+        profilePicture?: string;
+      }
+    | null
+    | undefined;
   isInstructor?: boolean;
   isAdmin?: boolean;
   handleUnenroll?: ((studentId: string) => void) | null;
@@ -27,6 +31,9 @@ const StudentCard: React.FC<StudentCardProps> = ({
   listItem = false,
 }) => {
   const [imgError, setImgError] = useState(false);
+
+  if (!student) return null;
+
   const initials =
     student.firstName && student.lastName
       ? `${student.firstName[0]}${student.lastName[0]}`.toUpperCase()

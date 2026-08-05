@@ -860,7 +860,7 @@ export function Dashboard() {
                         {course.catalog?.courseCode || course.title}
                       </h2>
                       <p className="line-clamp-1 text-xs text-gray-500 dark:text-gray-400 lg:text-sm">
-                        Instructor: {course.instructor.firstName} {course.instructor.lastName}
+                        Instructor: {course.instructor ? `${course.instructor.firstName} ${course.instructor.lastName}` : 'TBA'}
                       </p>
                     </div>
 
@@ -1051,7 +1051,7 @@ export function Dashboard() {
                         </h2>
                         <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm flex items-center line-clamp-1">
                           <span className="w-2 h-2 bg-gray-400 rounded-full mr-2 flex-shrink-0"></span>
-                          Instructor: {course.instructor.firstName} {course.instructor.lastName}
+                          Instructor: {course.instructor ? `${course.instructor.firstName} ${course.instructor.lastName}` : 'TBA'}
                         </p>
                       </div>
                       

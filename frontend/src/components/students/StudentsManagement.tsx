@@ -70,13 +70,16 @@ const StudentsManagement: React.FC<StudentsManagementProps> = ({
   handleDenyEnrollment,
   handleUnenroll,
 }) => {
-  const pendingRequests =
-    course.enrollmentRequests?.filter((req: any) => req.status === 'pending') ?? [];
-  const waitlistedRequests =
-    course.enrollmentRequests?.filter((req: any) => req.status === 'waitlisted') ?? [];
+  // Deleted accounts leave dangling refs that populate resolves to null, so drop
+  // them rather than letting a missing person take down the whole roster.
+  const requestsWithStudent =
+    course.enrollmentRequests?.filter((req: any) => req?.student) ?? [];
+  const pendingRequests = requestsWithStudent.filter((req: any) => req.status === 'pending');
+  const waitlistedRequests = requestsWithStudent.filter((req: any) => req.status === 'waitlisted');
+  const enrolledStudents = (course.students ?? []).filter(Boolean);
   const canManage = isInstructor || isAdmin;
   const overCapacity =
-    course.catalog?.maxStudents && course.students.length > course.catalog.maxStudents;
+    course.catalog?.maxStudents && enrolledStudents.length > course.catalog.maxStudents;
 
   return (
     <div className="space-y-4">
@@ -193,7 +196,7 @@ const StudentsManagement: React.FC<StudentsManagementProps> = ({
           <SectionDividerHeading id="waitlist-heading">
             Waitlist ({waitlistedRequests.length})
           </SectionDividerHeading>
-          {course.catalog?.maxStudents && course.students.length >= course.catalog.maxStudents && (
+          {course.catalog?.maxStudents && enrolledStudents.length >= course.catalog.maxStudents && (
             <p className="mb-2 rounded-lg border border-blue-200/90 bg-blue-50/80 px-3 py-2 text-[10px] leading-relaxed text-blue-800 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-200 sm:text-[11px]">
               You can approve waitlisted students even when the course is full.
             </p>
@@ -201,7 +204,7 @@ const StudentsManagement: React.FC<StudentsManagementProps> = ({
           <div className={ITEM_LIST}>
             {waitlistedRequests.map((request: any, idx: number) => {
               const waitlistPosition = course.waitlist?.find(
-                (entry: any) => entry.student._id === request.student._id
+                (entry: any) => entry?.student?._id === request.student._id
               )?.position;
 
               return (
@@ -251,31 +254,37 @@ const StudentsManagement: React.FC<StudentsManagementProps> = ({
       <section aria-labelledby="instructor-heading">
         <SectionDividerHeading id="instructor-heading">Instructor</SectionDividerHeading>
         <div className={ITEM_LIST}>
-          <StudentCard
-            key={course.instructor._id || 'instructor'}
-            student={course.instructor}
-            isInstructorCard
-            listItem
-          />
+          {course.instructor ? (
+            <StudentCard
+              key={course.instructor._id || 'instructor'}
+              student={course.instructor}
+              isInstructorCard
+              listItem
+            />
+          ) : (
+            <p className="px-3 py-2.5 text-[11px] text-gray-500 dark:text-gray-400">
+              No instructor assigned.
+            </p>
+          )}
         </div>
       </section>
 
       <section aria-labelledby="enrolled-students-heading">
         <SectionDividerHeading id="enrolled-students-heading">
-          Enrolled students ({course.students.length})
+          Enrolled students ({enrolledStudents.length})
           {overCapacity && (
             <span className="ml-1 font-normal normal-case tracking-normal text-amber-700 dark:text-amber-400">
               · over capacity
             </span>
           )}
         </SectionDividerHeading>
-        {course.students.length === 0 ? (
+        {enrolledStudents.length === 0 ? (
           <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50/80 py-8 text-center dark:border-gray-700 dark:bg-gray-800/50">
             <p className="text-[11px] text-gray-500 dark:text-gray-400">No students enrolled yet.</p>
           </div>
         ) : (
           <div className={ITEM_LIST}>
-            {course.students.map((student: any, idx: number) => (
+            {enrolledStudents.map((student: any, idx: number) => (
               <StudentCard
                 key={`student-card-${student._id}-${idx}`}
                 student={student}

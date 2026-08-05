@@ -114,8 +114,8 @@ const Catalog: React.FC = () => {
                          course.title.toLowerCase().includes(searchLower) ||
                          course.catalog?.courseCode?.toLowerCase().includes(searchLower) ||
                          course.description.toLowerCase().includes(searchLower) ||
-                         course.instructor.firstName.toLowerCase().includes(searchLower) ||
-                         course.instructor.lastName.toLowerCase().includes(searchLower);
+                         course.instructor?.firstName?.toLowerCase().includes(searchLower) ||
+                         course.instructor?.lastName?.toLowerCase().includes(searchLower);
     
     const matchesSubject = !selectedSubject || course.catalog?.subject === selectedSubject;
     
@@ -393,7 +393,9 @@ const CourseListItem: React.FC<CourseListItemProps> = ({ course, onEnroll, onUne
               <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-gray-500 dark:text-gray-400 sm:text-[11px]">
                 <span className="inline-flex items-center gap-0.5">
                   <User className="h-3 w-3 shrink-0" />
-                  {course.instructor.firstName} {course.instructor.lastName}
+                  {course.instructor
+                    ? `${course.instructor.firstName} ${course.instructor.lastName}`
+                    : 'Instructor TBA'}
                 </span>
                 {course.catalog?.creditHours && (
                   <span className="inline-flex items-center gap-0.5">
@@ -455,7 +457,7 @@ const CourseListItem: React.FC<CourseListItemProps> = ({ course, onEnroll, onUne
               <div className="space-y-1.5 text-[10px] sm:text-[11px]">
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-400">Instructor:</span>
-                  <span className="font-medium text-gray-900 dark:text-gray-100">{course.instructor.firstName} {course.instructor.lastName}</span>
+                  <span className="font-medium text-gray-900 dark:text-gray-100">{course.instructor ? `${course.instructor.firstName} ${course.instructor.lastName}` : 'TBA'}</span>
                 </div>
                 {course.catalog?.creditHours && (
                   <div className="flex justify-between">
