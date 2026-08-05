@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
 import ErrorBoundary from '@/components/common/ErrorBoundary';
@@ -54,5 +54,47 @@ describe('ErrorBoundary — §14.1 crash recovery', () => {
       </ErrorBoundary>
     );
     expect(screen.getByRole('link', { name: /go home/i })).toHaveAttribute('href', '/');
+  });
+});
+
+describe('ErrorBoundary — technical detail exposure', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    window.localStorage.removeItem('lms:show-error-details');
+  });
+
+  it('shows the stack inline during development', () => {
+    vi.stubEnv('DEV', true);
+    render(
+      <ErrorBoundary>
+        <Bomb shouldThrow />
+      </ErrorBoundary>
+    );
+    expect(screen.getByText('Technical details')).toBeInTheDocument();
+    expect(screen.getByText(/inventory test boom/)).toBeInTheDocument();
+  });
+
+  it('replaces the stack with a reference code in production', () => {
+    vi.stubEnv('DEV', false);
+    render(
+      <ErrorBoundary>
+        <Bomb shouldThrow />
+      </ErrorBoundary>
+    );
+    expect(screen.queryByText('Technical details')).not.toBeInTheDocument();
+    expect(screen.queryByText(/inventory test boom/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Reference code/)).toBeInTheDocument();
+  });
+
+  it('lets an engineer opt back into details in production via localStorage', () => {
+    vi.stubEnv('DEV', false);
+    window.localStorage.setItem('lms:show-error-details', '1');
+    render(
+      <ErrorBoundary>
+        <Bomb shouldThrow />
+      </ErrorBoundary>
+    );
+    expect(screen.getByText('Technical details')).toBeInTheDocument();
+    expect(screen.getByText(/inventory test boom/)).toBeInTheDocument();
   });
 });

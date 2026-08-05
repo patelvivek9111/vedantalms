@@ -14,6 +14,23 @@ interface State {
   hasError: boolean;
   error?: Error;
   errorInfo?: ErrorInfo;
+  errorId?: string;
+}
+
+/**
+ * Stack traces name internal modules and can echo back server payloads, so they
+ * stay out of the production UI. Engineers debugging a live incident can opt in
+ * by setting this key in localStorage.
+ */
+const DEBUG_KEY = 'lms:show-error-details';
+
+function detailsAllowed(): boolean {
+  if (import.meta.env.DEV) return true;
+  try {
+    return window.localStorage.getItem(DEBUG_KEY) === '1';
+  } catch {
+    return false;
+  }
 }
 
 class ErrorBoundary extends Component<Props, State> {
@@ -27,19 +44,23 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    this.setState({
-      error,
-      errorInfo
-    });
-    
+    let errorId: string | undefined;
+
     // Log the error
     logger.error('Error caught by boundary', error, { errorInfo });
 
     if (import.meta.env.VITE_SENTRY_DSN) {
-      Sentry.captureException(error, {
+      errorId = Sentry.captureException(error, {
         contexts: { react: { componentStack: errorInfo.componentStack } },
       });
     }
+
+    this.setState({
+      error,
+      errorInfo,
+      // Without Sentry there is still a handle to correlate a screenshot with server logs.
+      errorId: errorId || Math.random().toString(36).slice(2, 10).toUpperCase(),
+    });
   }
 
   handleRetry = () => {
@@ -47,7 +68,7 @@ class ErrorBoundary extends Component<Props, State> {
       window.location.reload();
       return;
     }
-    this.setState({ hasError: false, error: undefined, errorInfo: undefined });
+    this.setState({ hasError: false, error: undefined, errorInfo: undefined, errorId: undefined });
   };
 
   render() {
@@ -71,7 +92,7 @@ class ErrorBoundary extends Component<Props, State> {
               We're sorry, but something unexpected happened. Please try refreshing the page or contact support if the problem persists.
             </p>
 
-            {this.state.error && (
+            {this.state.error && detailsAllowed() && (
               <details className="text-left mb-4 sm:mb-6 p-3 sm:p-4 bg-gray-100 dark:bg-gray-800 rounded text-xs sm:text-sm">
                 <summary className="cursor-pointer font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Technical details
@@ -90,6 +111,16 @@ class ErrorBoundary extends Component<Props, State> {
                   )}
                 </div>
               </details>
+            )}
+
+            {this.state.errorId && !detailsAllowed() && (
+              <p className="mb-4 sm:mb-6 rounded bg-gray-100 px-3 py-2 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                Reference code{' '}
+                <span className="font-mono font-semibold text-gray-800 dark:text-gray-200">
+                  {this.state.errorId}
+                </span>
+                . Share this with support and they can pull up the full report.
+              </p>
             )}
 
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center">
