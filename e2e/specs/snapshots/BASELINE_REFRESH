@@ -1,2 +1,0 @@
-Refresh Linux visual baselines after the Theme Editor took over the accent palettes: blue/indigo/sky now resolve to the brand primary and violet/purple to the brand secondary, so every accented surface shifts hue under the default theme.
-This file is removed by the Update Visual Baselines workflow after it commits new PNGs.
