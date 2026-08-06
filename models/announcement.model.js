@@ -40,4 +40,7 @@ announcementSchema.plugin(portabilityMetadataPlugin);
 
 announcementSchema.plugin(courseChildTenantPlugin, { coursePath: 'course' });
 
+announcementSchema.index({ course: 1, createdAt: -1 });
+announcementSchema.index({ course: 1, postTo: 1, groupset: 1, createdAt: -1 });
+
 module.exports = mongoose.model('Announcement', announcementSchema); 

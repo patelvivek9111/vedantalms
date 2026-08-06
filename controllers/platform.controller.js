@@ -1,6 +1,7 @@
 const Account = require('../models/account.model');
 const AccountDomain = require('../models/accountDomain.model');
 const AccountBrand = require('../models/accountBrand.model');
+const { serializeBrand } = require('./accountBrand.controller');
 const AccountFeatureFlag = require('../models/accountFeatureFlag.model');
 const AuthenticationProvider = require('../models/authenticationProvider.model');
 const ContactLead = require('../models/contactLead.model');
@@ -69,7 +70,7 @@ exports.getCurrentTenant = async (req, res) => {
         timezone: account.timezone,
         studentEmailMode: account.studentEmailMode || 'already-provided',
         studentActivationEnabled: account.studentEmailMode === 'auto-generate' && Boolean(account.domain),
-        brand,
+        brand: serializeBrand(brand),
         domains,
         authProviders: providers,
         publicRegistrationDisabled: isPublicRegistrationDisabled(rootId),

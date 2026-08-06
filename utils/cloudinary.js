@@ -174,7 +174,7 @@ const extractPublicId = (url) => {
 
 function getSignedCloudinaryUrl(
   url,
-  { download = true, resourceType = 'auto', fileName } = {}
+  { download = true, resourceType = 'auto', fileName, width } = {}
 ) {
   if (!url || !url.includes('cloudinary.com')) return null;
   const publicId = extractPublicId(url);
@@ -191,10 +191,24 @@ function getSignedCloudinaryUrl(
       .slice(0, 120);
     flags = safeName ? `attachment:${safeName}` : 'attachment';
   }
+  // Display delivery (not downloads) gets format/quality optimization at sign time.
+  const transformation =
+    !download && resolvedType === 'image'
+      ? [
+          {
+            fetch_format: 'auto',
+            quality: 'auto',
+            ...(width
+              ? { width: Math.max(1, Math.round(Number(width))), crop: 'limit' }
+              : {}),
+          },
+        ]
+      : undefined;
   return cloudinary.url(publicId, {
     resource_type: resolvedType,
     secure: true,
     sign_url: true,
+    ...(transformation ? { transformation } : {}),
     ...(flags ? { flags } : {}),
   });
 }

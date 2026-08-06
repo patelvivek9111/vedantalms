@@ -10,6 +10,7 @@ const { paths } = require('../config/paths');
 const { walkUploadsDir, resolveLocalPathFromUrl, normalizeLegacyUrl } = require('../utils/fileBlobUtils');
 const { isCourseFinalized } = require('./fileGovernance.service');
 const { writeReport } = require('../utils/fileReports');
+const { loadFileAssetsInBatches } = require('../utils/fileAssetCursor');
 
 const PROTECTED_CATEGORIES = new Set(['grade-export', 'transcript']);
 
@@ -39,7 +40,10 @@ async function collectReferencedAssetIds() {
 
 async function detectOrphans(options = {}) {
   const referenced = await collectReferencedAssetIds();
-  const assets = await FileAsset.find({ isDeleted: false, cleanupState: { $ne: 'HARD_DELETED' } }).lean();
+  const assets = await loadFileAssetsInBatches(
+    { isDeleted: false, cleanupState: { $ne: 'HARD_DELETED' } },
+    { batchSize: options.batchSize || 500, limit: options.scanLimit }
+  );
 
   const unattachedStaged = [];
   const missingBlobs = [];
@@ -47,11 +51,12 @@ async function detectOrphans(options = {}) {
   const protectedOrphans = [];
   const duplicateChecksums = new Map();
   const diskFiles = walkUploadsDir();
-  const diskByKey = new Map(diskFiles.map((f) => [f.relativePath, f.absolutePath]));
   const registeredKeys = new Set();
+  const registeredPaths = new Set();
 
   for (const asset of assets) {
-    registeredKeys.add(asset.storageKey);
+    if (asset.storageKey) registeredKeys.add(asset.storageKey);
+    if (asset.path) registeredPaths.add(asset.path);
     if (asset.checksumSha256) {
       const list = duplicateChecksums.get(asset.checksumSha256) || [];
       list.push(String(asset._id));
@@ -85,10 +90,8 @@ async function detectOrphans(options = {}) {
   }
 
   for (const disk of diskFiles) {
-    const hasAsset = assets.some(
-      (a) => a.storageKey === disk.relativePath || a.path === `/uploads/${disk.relativePath}`
-    );
-    if (!hasAsset) {
+    const uploadPath = `/uploads/${disk.relativePath}`;
+    if (!registeredKeys.has(disk.relativePath) && !registeredPaths.has(uploadPath)) {
       missingDbRefs.push({ relativePath: disk.relativePath, absolutePath: disk.absolutePath });
     }
   }

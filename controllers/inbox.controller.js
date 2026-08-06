@@ -76,18 +76,27 @@ exports.getConversations = async (req, res) => {
       participantFilter.folder = 'deleted';
     }
 
-    // Find all conversations where user is a participant
-    const participants = await ConversationParticipant.find(participantFilter).lean();
-    const conversationIds = participants.map(p => p.conversationId);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 200, 1), 500);
+
+    // Find conversations where user is a participant, then bound by recent updatedAt
+    const participants = await ConversationParticipant.find(participantFilter)
+      .select('conversationId')
+      .lean();
+    const participantConversationIds = participants.map((p) => p.conversationId);
+    if (participantConversationIds.length === 0) {
+      return res.json([]);
+    }
+
+    const conversations = await Conversation.find({ _id: { $in: participantConversationIds } })
+      .sort({ updatedAt: -1 })
+      .limit(limit)
+      .lean();
+    const conversationIds = conversations.map((c) => c._id);
     if (conversationIds.length === 0) {
       return res.json([]);
     }
 
-    // Get conversations and aggregate participant/message metadata in batches
-    const conversations = await Conversation.find({ _id: { $in: conversationIds } })
-      .sort({ updatedAt: -1 })
-      .lean();
-
+    // Aggregate participant/message metadata only for the bounded page
     const baseQueries = [
       ConversationParticipant.find({ conversationId: { $in: conversationIds } })
         .populate('userId', 'firstName lastName email profilePicture')
@@ -221,70 +230,86 @@ exports.createConversation = async (req, res) => {
     await inboxAntiSpam.assertCanCreateConversations(userId, { batchSize: composeBatchSize });
 
     if (sendIndividually) {
-      // Create a separate conversation for each recipient
-      const results = await Promise.all(participantIds.map(async (recipientId) => {
-        // Create conversation
-        const conversation = await Conversation.create({ subject, course, createdBy: userId });
-        // Add participants (sender and recipient)
-        await Promise.all([
-          ConversationParticipant.create({
-            conversationId: conversation._id,
-            userId: userId,
-            lastReadAt: new Date(),
+      const now = new Date();
+      const conversations = await Conversation.insertMany(
+        participantIds.map(() => ({ subject, course, createdBy: userId }))
+      );
+
+      const participantDocs = [];
+      for (let i = 0; i < participantIds.length; i++) {
+        const conversationId = conversations[i]._id;
+        participantDocs.push(
+          {
+            conversationId,
+            userId,
+            lastReadAt: now,
             folder: 'sent',
-          }),
-          ConversationParticipant.create({
-            conversationId: conversation._id,
-            userId: recipientId,
+          },
+          {
+            conversationId,
+            userId: participantIds[i],
             lastReadAt: null,
             folder: 'inbox',
-          })
-        ]);
-        // Create initial message
-        const message = await Message.create({
+          }
+        );
+      }
+      await ConversationParticipant.insertMany(participantDocs);
+
+      const messages = await Message.insertMany(
+        conversations.map((conversation) => ({
           conversationId: conversation._id,
           senderId: userId,
           ...messageFields,
-        });
-        await inboxUnread.recordMessageSent({
-          conversationId: conversation._id,
-          senderId: userId,
+        }))
+      );
+
+      await inboxUnread.recordMessagesSentBatch({
+        senderId: userId,
+        items: messages.map((message, i) => ({
+          conversationId: conversations[i]._id,
           messageId: message._id,
-        });
-        if (!inboxUnread.isDenormUnreadEnabled()) {
-          await ConversationParticipant.updateMany(
-            { conversationId: conversation._id, userId: { $ne: userId } },
-            { folder: 'inbox' }
-          );
-        }
-        await inboxCache.invalidateAfterMessageChange(conversation._id, [userId, recipientId]);
-        await messageAudit.recordConversationCreated(req, {
-          conversationId: conversation._id,
-          courseId: course,
-          recipientCount: 1,
-          sendIndividually: true,
-        });
-        await messageAudit.recordMessageSent(req, {
-          conversationId: conversation._id,
-          messageId: message._id,
-          attachmentCount: (messageFields.fileAssetIds || []).length,
-        });
-        await messagingRealtime.notifyMessageNew({
-          conversationId: conversation._id,
-          messageId: message._id,
-          senderId: userId,
-          participantUserIds: [userId, recipientId],
-        });
-        return {
-          conversation,
-          message: serializeMessageForClient(message),
-        };
-      }));
+        })),
+      });
+      if (!inboxUnread.isDenormUnreadEnabled()) {
+        await ConversationParticipant.updateMany(
+          {
+            conversationId: { $in: conversations.map((c) => c._id) },
+            userId: { $ne: userId },
+          },
+          { folder: 'inbox' }
+        );
+      }
+
+      await Promise.all(
+        conversations.map(async (conversation, i) => {
+          const recipientId = participantIds[i];
+          const message = messages[i];
+          await inboxCache.invalidateAfterMessageChange(conversation._id, [userId, recipientId]);
+          await messageAudit.recordConversationCreated(req, {
+            conversationId: conversation._id,
+            courseId: course,
+            recipientCount: 1,
+            sendIndividually: true,
+          });
+          await messageAudit.recordMessageSent(req, {
+            conversationId: conversation._id,
+            messageId: message._id,
+            attachmentCount: (messageFields.fileAssetIds || []).length,
+          });
+          await messagingRealtime.notifyMessageNew({
+            conversationId: conversation._id,
+            messageId: message._id,
+            senderId: userId,
+            participantUserIds: [userId, recipientId],
+          });
+        })
+      );
+
       await inboxCache.invalidateConversationLists([userId, ...participantIds]);
       res.status(201).json({
-        results: results.map((r) => ({
-          conversation: r.conversation,
-          message: r.message,
+        results: conversations.map((conversation, i) => ({
+          conversation,
+          message: serializeMessageForClient(messages[i]),
         })),
       });
     } else {

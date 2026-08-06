@@ -3,7 +3,7 @@ const Course = require('../models/course.model');
 const User = require('../models/user.model');
 const mongoose = require('mongoose');
 const { isCourseGradingStaff } = require('../middleware/academicPermissions');
-const { resolveProfilePictureUrl } = require('../utils/profilePictureUrl');
+const { mapUsersWithResolvedProfilePictures } = require('../utils/profilePictureUrl');
 
 function denyAttendanceRosterAccess(res) {
   return res.status(403).json({ message: 'Not authorized to view course attendance roster' });
@@ -80,23 +80,25 @@ exports.getAttendance = async (req, res) => {
       attendanceMap[record.student._id.toString()] = record;
     });
 
+    // Resolve avatars once for the roster (still per-user today, but keeps one code path;
+    // absolute Cloudinary URLs short-circuit without a DB hit).
+    const studentsWithPics = await mapUsersWithResolvedProfilePictures(course.students || []);
+
     // Create attendance data for all enrolled students
-    const attendanceData = await Promise.all(
-      course.students.map(async (student) => {
-        const existingRecord = attendanceMap[student._id.toString()];
-        return {
-          studentId: student._id,
-          studentName: `${student.firstName} ${student.lastName}`,
-          email: student.email,
-          profilePicture: await resolveProfilePictureUrl(student.profilePicture, { userId: student._id }),
-          status: existingRecord ? existingRecord.status : 'unmarked',
-          date: date,
-          timestamp: existingRecord ? existingRecord.timestamp : null,
-          reason: existingRecord ? existingRecord.reason : '',
-          notes: existingRecord ? existingRecord.notes : '',
-        };
-      })
-    );
+    const attendanceData = studentsWithPics.map((student) => {
+      const existingRecord = attendanceMap[student._id.toString()];
+      return {
+        studentId: student._id,
+        studentName: `${student.firstName} ${student.lastName}`,
+        email: student.email,
+        profilePicture: student.profilePicture || '',
+        status: existingRecord ? existingRecord.status : 'unmarked',
+        date: date,
+        timestamp: existingRecord ? existingRecord.timestamp : null,
+        reason: existingRecord ? existingRecord.reason : '',
+        notes: existingRecord ? existingRecord.notes : '',
+      };
+    });
 
     res.json(attendanceData);
   } catch (error) {
@@ -140,60 +142,54 @@ exports.saveAttendance = async (req, res) => {
 
     const results = [];
 
-    // First, let's check what's currently in the database for this date
     const attendanceDate = new Date(date);
     attendanceDate.setHours(0, 0, 0, 0);
-    const nextDate = new Date(attendanceDate);
-    nextDate.setDate(nextDate.getDate() + 1);
-    
-    const existingRecords = await Attendance.find({
-      course: courseId,
-      date: {
-        $gte: attendanceDate,
-        $lt: nextDate
-      }
-    });
-    
+
+    // One round-trip for the whole roster instead of findOneAndUpdate/Delete per student.
+    const ops = [];
     for (const record of attendanceData) {
-      // Parse the date properly
-      const attendanceDate = new Date(date);
-      attendanceDate.setHours(0, 0, 0, 0);
-      
       if (record.status === 'unmarked') {
-        // Remove attendance record if status is unmarked
-        const deleteResult = await Attendance.findOneAndDelete({
-          course: courseId,
-          student: record.studentId,
-          date: attendanceDate
+        ops.push({
+          deleteOne: {
+            filter: {
+              course: courseId,
+              student: record.studentId,
+              date: attendanceDate,
+            },
+          },
         });
         results.push({ studentId: record.studentId, status: 'unmarked' });
       } else {
-        try {
-          // Upsert attendance record
-          const attendanceRecord = await Attendance.findOneAndUpdate(
-            {
+        ops.push({
+          updateOne: {
+            filter: {
               course: courseId,
               student: record.studentId,
-              date: attendanceDate
+              date: attendanceDate,
             },
-            {
-              status: record.status,
-              timestamp: new Date(),
-              markedBy: req.user._id,
-              reason: record.reason || '',
-              notes: record.notes || ''
+            update: {
+              $set: {
+                status: record.status,
+                timestamp: new Date(),
+                markedBy: req.user._id,
+                reason: record.reason || '',
+                notes: record.notes || '',
+              },
+              $setOnInsert: {
+                course: courseId,
+                student: record.studentId,
+                date: attendanceDate,
+              },
             },
-            {
-              upsert: true,
-              new: true
-            }
-          );
-          results.push({ studentId: record.studentId, status: attendanceRecord.status });
-        } catch (upsertError) {
-          console.error('Error upserting attendance record:', upsertError);
-          throw upsertError;
-        }
+            upsert: true,
+          },
+        });
+        results.push({ studentId: record.studentId, status: record.status });
       }
+    }
+
+    if (ops.length > 0) {
+      await Attendance.bulkWrite(ops, { ordered: false });
     }
 
     res.json({ 

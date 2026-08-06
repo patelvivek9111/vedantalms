@@ -62,6 +62,6 @@ export function useBrandTheme(brand: TenantBrand | undefined) {
   }, [palette]);
 
   useEffect(() => {
-    applyFavicon(faviconUrl ? getImageUrl(faviconUrl) : '');
+    applyFavicon(faviconUrl ? getImageUrl(faviconUrl, { width: 64 }) : '');
   }, [faviconUrl]);
 }

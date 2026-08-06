@@ -24,8 +24,12 @@ async function verifyBlobExists(asset) {
 }
 
 async function runFileIntegrityCheck(options = {}) {
+  const { loadFileAssetsInBatches } = require('../utils/fileAssetCursor');
   const limit = options.limit || 5000;
-  const assets = await FileAsset.find({ isDeleted: false }).limit(limit).lean();
+  const assets = await loadFileAssetsInBatches(
+    { isDeleted: false },
+    { batchSize: options.batchSize || 500, limit }
+  );
   const failures = [];
   let verified = 0;
 

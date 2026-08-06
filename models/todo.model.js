@@ -27,4 +27,7 @@ const todoSchema = new mongoose.Schema({
 
 todoSchema.plugin(courseChildTenantPlugin, { coursePath: 'courseId' });
 
+todoSchema.index({ user: 1, completed: 1, dueDate: 1 });
+todoSchema.index({ user: 1, type: 1, createdAt: -1 });
+
 module.exports = mongoose.model('Todo', todoSchema); 

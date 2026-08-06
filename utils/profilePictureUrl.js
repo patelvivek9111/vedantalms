@@ -3,6 +3,7 @@ const fs = require('fs');
 const FileAsset = require('../models/fileAsset.model');
 const User = require('../models/user.model');
 const { getSignedCloudinaryUrl } = require('./cloudinary');
+const { optimizeCloudinaryUrl } = require('./cloudinaryUrl');
 const { paths } = require('../config/paths');
 
 const FILE_ASSET_ID_RE = /\/api\/files\/([a-f0-9]{24})/i;
@@ -33,12 +34,14 @@ function legacyPathVariants(profilePicture) {
 
 function cloudinaryDisplayUrl(asset) {
   if (asset?.provider === 'cloudinary' && asset.metadata?.providerUrl) {
-    return (
+    const signed =
       getSignedCloudinaryUrl(asset.metadata.providerUrl, {
         download: false,
         resourceType: asset.metadata?.resourceType || 'image',
-      }) || asset.metadata.providerUrl
-    );
+        width: 160,
+      }) || asset.metadata.providerUrl;
+    // Unsigned fallback still gets f_auto/q_auto; signed URLs already include transforms.
+    return optimizeCloudinaryUrl(signed, { width: 160 });
   }
   return null;
 }
@@ -97,7 +100,10 @@ async function clearStaleProfilePicture(userId, profilePicture) {
 async function resolveProfilePictureUrl(profilePicture, { userId } = {}) {
   const raw = String(profilePicture || '').trim();
   if (!raw) return '';
-  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  if (raw.startsWith('http://') || raw.startsWith('https://')) {
+    // Avatars are shown small across the shell — cap delivery width for retina tiles.
+    return optimizeCloudinaryUrl(raw, { width: 160 });
+  }
 
   const asset = await findProfileAsset(raw);
   const cloudinary = cloudinaryDisplayUrl(asset);
@@ -138,13 +144,60 @@ async function resolveProfilePictureRedirectUrl(relativeFilename) {
 
 async function mapUsersWithResolvedProfilePictures(users) {
   if (!Array.isArray(users) || users.length === 0) return users;
+
+  // Prefetch FileAssets by id in one query so a 100-student roster isn't 100 finds.
+  const fileIds = [];
+  for (const user of users) {
+    const raw = String(user?.profilePicture || '').trim();
+    if (!raw || raw.startsWith('http')) continue;
+    const match = raw.match(FILE_ASSET_ID_RE);
+    if (match) fileIds.push(match[1]);
+  }
+
+  const assetsById = new Map();
+  if (fileIds.length > 0) {
+    const assets = await FileAsset.find({
+      _id: { $in: [...new Set(fileIds)] },
+      isDeleted: { $ne: true },
+    }).lean();
+    assets.forEach((asset) => assetsById.set(String(asset._id), asset));
+  }
+
   return Promise.all(
     users.map(async (user) => {
       if (!user || typeof user !== 'object') return user;
-      if (!user.profilePicture) return user;
+      const raw = String(user.profilePicture || '').trim();
+      if (!raw) return user;
+
+      if (raw.startsWith('http://') || raw.startsWith('https://')) {
+        return {
+          ...user,
+          profilePicture: optimizeCloudinaryUrl(raw, { width: 160 }),
+        };
+      }
+
+      const match = raw.match(FILE_ASSET_ID_RE);
+      if (match) {
+        const asset = assetsById.get(match[1]);
+        const cloudinary = cloudinaryDisplayUrl(asset);
+        if (cloudinary) return { ...user, profilePicture: cloudinary };
+        if (asset?.storageKey) {
+          const assetLocal = path.join(paths.uploads, asset.storageKey);
+          if (fs.existsSync(assetLocal)) {
+            const rel = path.relative(paths.uploads, assetLocal).replace(/\\/g, '/');
+            const servedPath = `/uploads/${rel}`;
+            const apiBase = getPublicApiBase();
+            return {
+              ...user,
+              profilePicture: apiBase ? `${apiBase}${servedPath}` : servedPath,
+            };
+          }
+        }
+      }
+
       return {
         ...user,
-        profilePicture: await resolveProfilePictureUrl(user.profilePicture, { userId: user._id }),
+        profilePicture: await resolveProfilePictureUrl(raw, { userId: user._id }),
       };
     })
   );

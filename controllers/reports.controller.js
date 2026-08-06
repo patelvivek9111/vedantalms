@@ -4,7 +4,6 @@ const Module = require('../models/module.model');
 const Assignment = require('../models/Assignment');
 const Submission = require('../models/Submission');
 const Thread = require('../models/thread.model');
-const Group = require('../models/Group');
 const { calculateCourseGradeForStudent } = require('../services/gradeCalculation.service');
 const discussionReplyService = require('../services/discussionReply.service');
 const {
@@ -125,24 +124,9 @@ exports.getStudentTranscript = async (req, res) => {
         student: studentId
       });
 
-      // For group assignments, find the student's group and get submissions
-      let groupSubmissions = [];
-      for (const groupAssignment of groupAssignments) {
-        const groupSetId = groupAssignment.groupSet?._id || groupAssignment.groupSet;
-        const group = await Group.findOne({
-          groupSet: groupSetId,
-          members: studentId
-        });
-        if (group) {
-          const submission = await Submission.findOne({
-            assignment: groupAssignment._id,
-            group: group._id
-          }).populate('memberGrades.student', 'firstName lastName');
-          if (submission) {
-            groupSubmissions.push(submission);
-          }
-        }
-      }
+      // Batch group membership + group submissions (2 queries instead of 2×N).
+      const { loadGroupSubmissionsForStudent } = require('../services/gradeCalculationInputs.service');
+      const groupSubmissions = await loadGroupSubmissionsForStudent(groupAssignments, studentId);
 
       // Combine all submissions
       const allSubmissions = [...regularSubmissions, ...groupSubmissions];
@@ -154,11 +138,14 @@ exports.getStudentTranscript = async (req, res) => {
       // Fetch all graded discussions (threads) for the course
       const threads = await Thread.find({ course: course._id, isGraded: true });
       
-      // Map threads to assignment format
+      const repliedThreadIds = await discussionReplyService.batchThreadIdsRepliedByUser(
+        threads.map((t) => t._id),
+        studentId
+      );
       const discussionAssignments = [];
       for (const thread of threads) {
         const studentGradeObj = thread.studentGrades.find(g => g.student.toString() === studentId.toString());
-        const hasSubmitted = await discussionReplyService.hasReplyByUser(thread, studentId);
+        const hasSubmitted = repliedThreadIds.has(String(thread._id));
         discussionAssignments.push({
           _id: thread._id,
           title: thread.title,

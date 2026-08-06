@@ -47,7 +47,8 @@ exports.getAnnouncementsByCourse = async (req, res) => {
       };
       const announcements = await Announcement.find(query)
         .populate('author', 'firstName lastName profilePicture')
-        .sort({ createdAt: -1 });
+        .sort({ createdAt: -1 })
+        .limit(100);
 
       return res.json({ success: true, data: announcements });
     }
@@ -57,7 +58,8 @@ exports.getAnnouncementsByCourse = async (req, res) => {
     }
     const announcements = await Announcement.find(query)
       .populate('author', 'firstName lastName profilePicture')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .limit(100);
     
     res.json({ success: true, data: announcements });
   } catch (err) {

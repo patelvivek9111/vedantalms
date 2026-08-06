@@ -5,7 +5,8 @@ const quizSchema = new mongoose.Schema({
   course: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Course',
-    required: [true, 'Course is required']
+    required: [true, 'Course is required'],
+    index: true,
   },
   title: {
     type: String,

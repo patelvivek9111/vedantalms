@@ -13,9 +13,12 @@ const gradebookHistoryService = require('./gradebookHistory.service');
 const {
   loadCourseGradeAssignments,
   buildStudentGradeInputs,
+  buildStudentGradeInputsForStudents,
 } = require('./gradeCalculationInputs.service');
 const { listActiveStudentIds } = require('./registrar/rosterRead.service');
 const User = require('../models/user.model');
+const courseStudentGradeOverrideService = require('./courseStudentGradeOverride.service');
+const gradingPeriodRollupService = require('./gradingPeriodRollup.service');
 
 function normalizeStudentId(id) {
   if (id && typeof id === 'object' && id._id) return String(id._id);
@@ -112,14 +115,33 @@ async function computeCourseClassAverage(courseId) {
 
   const assignments = await loadGradebookColumns(courseId);
   const policyCache = new Map();
+  const resolved = await gradingPolicyService.getResolvedPolicyForCourse(course, {
+    policyCache,
+  });
+  const coursePeriods = await gradingPeriodRollupService.listCoursePeriods(courseId);
+  const inputsByStudent = await buildStudentGradeInputsForStudents(
+    course,
+    studentIds,
+    assignments,
+    'student',
+    { resolved }
+  );
+  const overridesByStudent = await courseStudentGradeOverrideService.getActiveOverridesForStudents(
+    courseId,
+    studentIds
+  );
 
   const percentResults = await Promise.all(
     studentIds.map(async (sid) => {
       try {
+        const built = inputsByStudent.get(String(sid));
         const result = await computeStudentCourseGrade(course, sid, {
           audience: 'student',
           assignments,
           policyCache,
+          coursePeriods,
+          ...(built || {}),
+          gradeOverride: overridesByStudent.get(String(sid)) || null,
           summaryOnly: true,
         });
         return Number.isFinite(result.currentPercent) ? result.currentPercent : null;
@@ -216,10 +238,32 @@ async function getCourseGradebookPage(
     ...(gradingPeriodId ? { gradingPeriodId } : {}),
   };
 
+  // Shared DB loads for the page — avoid 2×N submission/discussion/override queries.
+  const [instructorInputs, studentInputs, overridesByStudent, coursePeriods] = await Promise.all([
+    buildStudentGradeInputsForStudents(course, pageStudentIds, assignments, 'instructor', {
+      resolved,
+    }),
+    buildStudentGradeInputsForStudents(course, pageStudentIds, assignments, 'student', {
+      resolved,
+    }),
+    courseStudentGradeOverrideService.getActiveOverridesForStudents(courseId, pageStudentIds),
+    gradingPeriodId
+      ? Promise.resolve(null)
+      : gradingPeriodRollupService.listCoursePeriods(courseId),
+  ]);
+
   for (const sid of pageStudentIds) {
+    const sidStr = String(sid);
+    const instructorBuilt = instructorInputs.get(sidStr) || {};
+    const studentBuilt = studentInputs.get(sidStr) || {};
+    const gradeOverride = overridesByStudent.get(sidStr) || null;
+
     const instructorResult = await computeStudentCourseGrade(course, sid, {
       ...gradeOptions,
       audience: 'instructor',
+      coursePeriods,
+      ...instructorBuilt,
+      gradeOverride,
     });
 
     grades[sid] = instructorResult.grades[sid] || {};
@@ -252,6 +296,9 @@ async function getCourseGradebookPage(
     const studentResult = await computeStudentCourseGrade(course, sid, {
       ...gradeOptions,
       audience: 'student',
+      coursePeriods,
+      ...studentBuilt,
+      gradeOverride,
     });
 
     if (Number.isFinite(studentResult.currentPercent)) {

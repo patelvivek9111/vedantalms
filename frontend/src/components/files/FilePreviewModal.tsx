@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense, lazy } from 'react';
 import api from '../../services/api';
 import { Download } from 'lucide-react';
 import BaseModal from '../common/BaseModal';
@@ -16,13 +16,15 @@ import PdfPreview from './previews/PdfPreview';
 import TextPreview from './previews/TextPreview';
 import MediaPreview from './previews/MediaPreview';
 import OfficePreview from './previews/OfficePreview';
-import DocxPreview from './previews/DocxPreview';
 import { isDocxFile } from '../../utils/fileTypes';
 import { useFileDownload } from '../../hooks/useFileDownload';
 import { buildStreamUrl } from '../../services/fileUploadApi';
 import FileAccessBanner from './FileAccessBanner';
 import { useAuthenticatedFileBlob, useLegacyDirectBlobUrl } from '../../hooks/useAuthenticatedFileBlob';
 import { LoadingInline } from '../../design-system';
+
+// docx-preview + jszip are heavy — only load when a .docx is actually opened.
+const DocxPreview = lazy(() => import('./previews/DocxPreview'));
 
 interface FilePreviewModalProps {
   file: NormalizedFile | null;
@@ -292,11 +294,13 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, open, onClose
           <LoadingInline label="Loading PDF…" />
         )
       ) : kind === 'office' && isDocxFile(display) && (fileAssetId || legacyDirectUrl) ? (
-        <DocxPreview
-          fileAssetId={fileAssetId}
-          fileName={display.name}
-          directUrl={legacyDirectUrl || undefined}
-        />
+        <Suspense fallback={<LoadingInline label="Loading Word preview…" />}>
+          <DocxPreview
+            fileAssetId={fileAssetId}
+            fileName={display.name}
+            directUrl={legacyDirectUrl || undefined}
+          />
+        </Suspense>
       ) : kind === 'office' && fileAssetId ? (
         <OfficePreview fileAssetId={fileAssetId} fileName={display.name} />
       ) : kind === 'text' && fileAssetId ? (

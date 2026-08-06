@@ -109,6 +109,45 @@ async function recordMessageSent({ conversationId, senderId, messageId, session 
   );
 }
 
+/**
+ * Batch unread denorm updates for send-individually (one sender, many 1:1 threads).
+ * @param {{ conversationId: *, messageId: * }[]} items
+ */
+async function recordMessagesSentBatch({ senderId, items, session = null }) {
+  if (!isDenormUnreadEnabled() || !items?.length) return;
+  const opts = session ? { session } : undefined;
+  const readAt = new Date();
+  const conversationIds = items.map((i) => i.conversationId);
+  const messageByConversation = new Map(
+    items.map((i) => [String(i.conversationId), i.messageId])
+  );
+
+  await ConversationParticipant.updateMany(
+    { conversationId: { $in: conversationIds }, userId: { $ne: senderId } },
+    {
+      $inc: { unreadCount: 1 },
+      $set: { folder: 'inbox' },
+    },
+    opts
+  );
+
+  await Promise.all(
+    conversationIds.map((conversationId) =>
+      ConversationParticipant.updateOne(
+        { conversationId, userId: senderId },
+        {
+          $set: {
+            lastReadAt: readAt,
+            lastReadMessageId: messageByConversation.get(String(conversationId)),
+            unreadCount: 0,
+          },
+        },
+        opts
+      )
+    )
+  );
+}
+
 async function markConversationRead({ conversationId, userId, session = null }) {
   const opts = session ? { session } : undefined;
   const latestQuery = Message.findOne({ conversationId })
@@ -190,6 +229,7 @@ module.exports = {
   buildUnreadCountAggregation,
   aggregateUnreadByConversation,
   recordMessageSent,
+  recordMessagesSentBatch,
   markConversationRead,
   getInboxUnreadTotal,
   recomputeParticipantUnread,

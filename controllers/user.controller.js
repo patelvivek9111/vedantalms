@@ -66,8 +66,10 @@ exports.searchUsers = async (req, res) => {
     }
 
 
-    // Search for users with matching criteria
-    const users = await User.find(searchQuery).select('firstName lastName email role profilePicture');
+    // Search for users with matching criteria (cap results — typeahead never needs thousands)
+    const users = await User.find(searchQuery)
+      .select('firstName lastName email role profilePicture')
+      .limit(50);
     
 
     res.json({

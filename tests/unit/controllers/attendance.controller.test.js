@@ -1,11 +1,16 @@
 jest.mock('../../../models/attendance.model', () => ({
   find: jest.fn(),
   findOneAndDelete: jest.fn(),
-  findOneAndUpdate: jest.fn()
+  findOneAndUpdate: jest.fn(),
+  bulkWrite: jest.fn(),
 }));
 
 jest.mock('../../../models/course.model', () => ({
   findById: jest.fn()
+}));
+
+jest.mock('../../../utils/profilePictureUrl', () => ({
+  mapUsersWithResolvedProfilePictures: jest.fn(async (users) => users),
 }));
 
 const Attendance = require('../../../models/attendance.model');

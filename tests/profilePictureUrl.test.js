@@ -30,7 +30,9 @@ describe('profilePictureUrl', () => {
 
   it('passes through absolute URLs', async () => {
     const url = 'https://res.cloudinary.com/demo/image/upload/v1/sample.jpg';
-    expect(await resolveProfilePictureUrl(url)).toBe(url);
+    expect(await resolveProfilePictureUrl(url)).toBe(
+      'https://res.cloudinary.com/demo/image/upload/f_auto,q_auto,w_160,c_limit/v1/sample.jpg'
+    );
   });
 
   it('returns empty string for missing legacy files (avoids CORB on 404 JSON)', async () => {

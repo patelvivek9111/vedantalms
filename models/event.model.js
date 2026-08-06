@@ -14,4 +14,7 @@ const eventSchema = new mongoose.Schema({
 
 eventSchema.plugin(courseChildTenantPlugin, { coursePath: 'course' });
 
+eventSchema.index({ calendar: 1, start: 1 });
+eventSchema.index({ createdBy: 1, start: 1 });
+
 module.exports = mongoose.model('Event', eventSchema); 

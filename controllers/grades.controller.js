@@ -4,7 +4,6 @@ const Module = require('../models/module.model');
 const Assignment = require('../models/Assignment');
 const Submission = require('../models/Submission');
 const Thread = require('../models/thread.model');
-const Group = require('../models/Group');
 const GroupSet = require('../models/GroupSet');
 const {
   calculateFinalGradeWithWeightedGroups,
@@ -146,13 +145,15 @@ exports.getStudentCourseGradeLegacy = async (req, res) => {
     // Fetch all assignments for these modules
     const assignments = await Assignment.find({ module: { $in: moduleIds } });
 
-    // Fetch all group assignments for the course (by groupSet.course)
-    const groupAssignmentsRaw = await Assignment.find({
-      isGroupAssignment: true,
-      groupSet: { $ne: null }
-    }).populate({ path: 'groupSet', match: { course: courseId } });
-    // Only keep group assignments for this course
-    const groupAssignments = groupAssignmentsRaw.filter(a => a.groupSet);
+    // Scope group assignments to this course's group sets (avoid global isGroupAssignment scan).
+    const courseGroupSets = await GroupSet.find({ course: courseId }).select('_id').lean();
+    const groupAssignments =
+      courseGroupSets.length > 0
+        ? await Assignment.find({
+            isGroupAssignment: true,
+            groupSet: { $in: courseGroupSets.map((g) => g._id) },
+          }).populate('groupSet')
+        : [];
 
     // Fetch all submissions for this student for regular assignments
     const assignmentIds = assignments.map(a => a._id);
@@ -161,25 +162,9 @@ exports.getStudentCourseGradeLegacy = async (req, res) => {
       student: studentId
     });
     
-    // For group assignments, find the student's group for each groupSet and get submissions
-    let groupSubmissions = [];
-    for (const groupAssignment of groupAssignments) {
-      // Find the student's group in this groupSet
-      const group = await Group.findOne({
-        groupSet: groupAssignment.groupSet._id,
-        members: studentId
-      });
-      if (group) {
-        // Find the submission for this group assignment and group
-        const submission = await Submission.findOne({
-          assignment: groupAssignment._id,
-          group: group._id
-        }).populate('memberGrades.student', 'firstName lastName');
-        if (submission) {
-          groupSubmissions.push(submission);
-        }
-      }
-    }
+    // Batch group membership + group submissions (2 queries instead of 2×N).
+    const { loadGroupSubmissionsForStudent } = require('../services/gradeCalculationInputs.service');
+    const groupSubmissions = await loadGroupSubmissionsForStudent(groupAssignments, studentId);
 
     // Combine all submissions
     const allSubmissions = [...regularSubmissions, ...groupSubmissions];
@@ -190,11 +175,14 @@ exports.getStudentCourseGradeLegacy = async (req, res) => {
 
     // Fetch all graded discussions (threads) for the course
     const threads = await Thread.find({ course: courseId, isGraded: true });
-    // For each thread, find the student's grade
+    const repliedThreadIds = await discussionReplyService.batchThreadIdsRepliedByUser(
+      threads.map((t) => t._id),
+      studentId
+    );
     const discussionAssignments = [];
     for (const thread of threads) {
       const studentGradeObj = discussionGradeVisibility.discussionGradeForTotals(thread, studentId);
-      const hasSubmitted = await discussionReplyService.hasReplyByUser(thread, studentId);
+      const hasSubmitted = repliedThreadIds.has(String(thread._id));
       discussionAssignments.push({
         _id: thread._id,
         title: thread.title,

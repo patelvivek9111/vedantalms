@@ -232,7 +232,7 @@ export default function GlobalSidebar() {
 
   const defaultLogoSrc = `${import.meta.env.BASE_URL}assets/Vedanta_logo.png`;
   const brandLogoSrc = tenant?.brand?.logoUrl
-    ? getImageUrl(tenant.brand.logoUrl)
+    ? getImageUrl(tenant.brand.logoUrl, { width: 96 })
     : defaultLogoSrc;
 
   const courseDropdownPanel =
@@ -389,9 +389,7 @@ export default function GlobalSidebar() {
                   {/* Profile picture - overlays fallback when loaded */}
                   {user?.profilePicture && (
                     <img 
-                      src={user.profilePicture.startsWith('http') 
-                        ? user.profilePicture 
-                        : getImageUrl(user.profilePicture)} 
+                      src={getImageUrl(user.profilePicture, { width: 80 })} 
                       alt={`${user.firstName} ${user.lastName}`}
                       className="w-full h-full object-cover rounded-full relative z-10"
                       onError={(e) => {

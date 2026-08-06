@@ -1,9 +1,9 @@
 const fs = require('fs');
 const path = require('path');
-const FileAsset = require('../../models/fileAsset.model');
 const { hashContent } = require('../../shared/portability/exportUtils.cjs');
 const { paths, isPathInside } = require('../../config/paths');
 const { resolveLocalPathFromUrl } = require('../../utils/fileBlobUtils');
+const { forEachFileAssetBatch } = require('../../utils/fileAssetCursor');
 
 /**
  * Build blob inventory + optional binary copy for institution export (U7.6).
@@ -19,54 +19,61 @@ async function buildBlobManifestForExport(exportRoot, batchId, options = {}) {
     if (!fs.existsSync(checksumsDir)) fs.mkdirSync(checksumsDir, { recursive: true });
   }
 
-  const assets = await FileAsset.find({ isDeleted: false }).lean();
   const entries = [];
   const missing = [];
+  let totalAssets = 0;
 
-  for (const asset of assets) {
-    const entry = {
-      fileAssetId: String(asset._id),
-      storageKey: asset.storageKey,
-      provider: asset.provider,
-      checksumSha256: asset.checksumSha256,
-      size: asset.size,
-      category: asset.category,
-      courseId: asset.courseId ? String(asset.courseId) : null,
-      included: false,
-    };
+  await forEachFileAssetBatch(
+    { isDeleted: false },
+    (batch) => {
+      for (const asset of batch) {
+        totalAssets++;
+        const entry = {
+          fileAssetId: String(asset._id),
+          storageKey: asset.storageKey,
+          provider: asset.provider,
+          checksumSha256: asset.checksumSha256,
+          size: asset.size,
+          category: asset.category,
+          courseId: asset.courseId ? String(asset.courseId) : null,
+          included: false,
+        };
 
-    if (includeBinaries && asset.provider === 'local') {
-      const local =
-        resolveLocalPathFromUrl(asset.path) || path.join(paths.uploads, asset.storageKey);
-      if (fs.existsSync(local) && isPathInside(paths.uploads, path.resolve(local))) {
-        const destName = `${asset._id}${path.extname(asset.originalName || '')}`;
-        const dest = path.join(blobsDir, destName);
-        fs.copyFileSync(local, dest);
-        entry.included = true;
-        entry.bundlePath = `blobs/${destName}`;
-        if (asset.checksumSha256) {
-          fs.writeFileSync(
-            path.join(checksumsDir, `${asset._id}.sha256`),
-            `${asset.checksumSha256}  ${destName}\n`
-          );
+        if (includeBinaries && asset.provider === 'local') {
+          const local =
+            resolveLocalPathFromUrl(asset.path) || path.join(paths.uploads, asset.storageKey);
+          if (fs.existsSync(local) && isPathInside(paths.uploads, path.resolve(local))) {
+            const destName = `${asset._id}${path.extname(asset.originalName || '')}`;
+            const dest = path.join(blobsDir, destName);
+            fs.copyFileSync(local, dest);
+            entry.included = true;
+            entry.bundlePath = `blobs/${destName}`;
+            if (asset.checksumSha256) {
+              fs.writeFileSync(
+                path.join(checksumsDir, `${asset._id}.sha256`),
+                `${asset.checksumSha256}  ${destName}\n`
+              );
+            }
+          } else {
+            missing.push({ fileAssetId: String(asset._id), reason: 'blob_missing' });
+          }
+        } else if (asset.metadata?.providerUrl) {
+          entry.providerUrl = asset.metadata.providerUrl;
+          entry.included = false;
+          entry.note = 'cloud_reference_only';
         }
-      } else {
-        missing.push({ fileAssetId: String(asset._id), reason: 'blob_missing' });
-      }
-    } else if (asset.metadata?.providerUrl) {
-      entry.providerUrl = asset.metadata.providerUrl;
-      entry.included = false;
-      entry.note = 'cloud_reference_only';
-    }
 
-    entries.push(entry);
-  }
+        entries.push(entry);
+      }
+    },
+    { batchSize: options.batchSize || 500, limit: options.limit }
+  );
 
   const manifest = {
     schemaVersion: 1,
     generatedAt: new Date().toISOString(),
     includeBinaries,
-    totalAssets: assets.length,
+    totalAssets,
     includedCount: entries.filter((e) => e.included).length,
     missingCount: missing.length,
     entries,

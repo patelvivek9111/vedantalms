@@ -37,5 +37,13 @@ describe('cloudinary signed URLs', () => {
     const signed = getSignedCloudinaryUrl(sampleUrl, { download: false, resourceType: 'auto' });
     expect(signed).toContain('/image/upload/');
     expect(signed).not.toContain('/auto/upload/');
+    expect(signed).toMatch(/f_auto/);
+    expect(signed).toMatch(/q_auto/);
+  });
+
+  test('getSignedCloudinaryUrl skips image transforms for downloads', () => {
+    const signed = getSignedCloudinaryUrl(sampleUrl, { download: true, resourceType: 'image' });
+    expect(signed).toMatch(/fl_attachment/);
+    expect(signed).not.toMatch(/f_auto/);
   });
 });

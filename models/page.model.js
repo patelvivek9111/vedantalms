@@ -45,4 +45,7 @@ pageSchema.pre('validate', function(next) {
 
 pageSchema.plugin(courseChildTenantPlugin, { modulePath: 'module' });
 
+pageSchema.index({ module: 1 });
+pageSchema.index({ groupSet: 1 });
+
 module.exports = mongoose.model('Page', pageSchema); 

@@ -16,16 +16,21 @@ export default defineConfig({
   },
   build: {
     sourcemap: false,
-    // excelVendor (~940kb) loads only on gradebook export; main entry stays under this limit
+    // excelVendor loads only on gradebook export; docxVendor only when previewing Word files
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
         manualChunks(id) {
           if (!id.includes('node_modules')) return;
-          if (id.includes('exceljs') || id.includes('jszip') || id.includes('archiver')) {
+          // Keep exceljs out of the initial graph — jszip is pulled by docx-preview separately.
+          if (id.includes('exceljs') || id.includes('archiver')) {
             return 'excelVendor';
           }
-          if (id.includes('react-big-calendar') || id.includes('date-fns')) return 'calendarVendor';
+          if (id.includes('jszip') || id.includes('docx-preview')) {
+            return 'docxVendor';
+          }
+          // Calendar UI only — date-fns is shared app-wide and must not pull the calendar into preload.
+          if (id.includes('react-big-calendar')) return 'calendarVendor';
           if (id.includes('@tiptap') || id.includes('tinymce')) return 'editorVendor';
           if (id.includes('@reduxjs') || id.includes('react-redux') || id.includes('/redux/')) {
             return 'reduxVendor';

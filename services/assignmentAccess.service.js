@@ -79,7 +79,16 @@ function getAssignmentAvailability(assignment, now = new Date()) {
   };
 }
 
-async function loadAssignmentContext(assignmentOrId) {
+async function loadAssignmentContext(assignmentOrId, options = {}) {
+  if (options.context?.assignment && options.context?.course) {
+    return {
+      assignment: options.context.assignment,
+      module: options.context.module || null,
+      groupSet: options.context.groupSet || null,
+      course: options.context.course,
+    };
+  }
+
   const assignment =
     assignmentOrId && typeof assignmentOrId === 'object' && assignmentOrId._id
       ? assignmentOrId
@@ -198,7 +207,7 @@ async function studentHasGradedSubmission(userId, assignment) {
 }
 
 async function assertStudentCanViewAssignment(user, assignmentOrId, options = {}) {
-  const context = await loadAssignmentContext(assignmentOrId);
+  const context = await loadAssignmentContext(assignmentOrId, options);
   const { assignment, module, course } = context;
   const preview = options.preview === true;
 

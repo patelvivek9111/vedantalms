@@ -45,6 +45,8 @@ const attendanceSchema = new mongoose.Schema({
 // Compound index to ensure one attendance record per student per date per course
 // Temporarily removing unique constraint to fix the issue
 attendanceSchema.index({ course: 1, student: 1, date: 1 });
+// Daily roster + stats queries filter by course + date range (no student).
+attendanceSchema.index({ course: 1, date: 1 });
 
 const { portabilityMetadataPlugin } = require('./plugins/portabilityMetadata.plugin');
 attendanceSchema.plugin(portabilityMetadataPlugin);

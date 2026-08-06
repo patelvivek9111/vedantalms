@@ -107,7 +107,8 @@ async function computeStudentCourseGrade(course, studentId, options = {}) {
 
   // Canvas: when viewing all periods and periods are weighted, course total = weighted period average.
   if (!options.gradingPeriodId && !options.skipPeriodRollup) {
-    const periods = await gradingPeriodRollupService.listCoursePeriods(courseId);
+    const periods =
+      options.coursePeriods || (await gradingPeriodRollupService.listCoursePeriods(courseId));
     if (gradingPeriodRollupService.shouldUseWeightedRollup(periods)) {
       const rollup = await gradingPeriodRollupService.rollupWeightedPeriodGrades(
         coursePlain,
@@ -138,7 +139,10 @@ async function computeStudentCourseGrade(course, studentId, options = {}) {
     }
   }
 
-  const override = await courseStudentGradeOverrideService.getActiveOverride(courseId, sid);
+  const override =
+    options.gradeOverride !== undefined
+      ? options.gradeOverride
+      : await courseStudentGradeOverrideService.getActiveOverride(courseId, sid);
   if (override) {
     dualTotals = {
       ...dualTotals,

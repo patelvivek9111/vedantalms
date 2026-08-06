@@ -259,11 +259,33 @@ exports.getCourses = async (req, res) => {
       populate.push({ path: 'enrollmentRequests.student', select: 'firstName lastName email' });
     }
 
-    const courses = await query.select(COURSE_LIST_SELECT).populate(populate).lean();
+    // Safety cap: institution catalogs can grow large; optional ?limit=&page= for callers that page.
+    const requestedLimit = parseInt(req.query.limit, 10);
+    const limit = Math.min(
+      Number.isFinite(requestedLimit) && requestedLimit > 0 ? requestedLimit : 500,
+      500
+    );
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const skip = (page - 1) * limit;
+
+    const [courses, total] = await Promise.all([
+      query
+        .select(COURSE_LIST_SELECT)
+        .populate(populate)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Course.countDocuments(query.getFilter()),
+    ]);
 
     res.json({
       success: true,
       count: courses.length,
+      total,
+      page,
+      limit,
+      hasMore: skip + courses.length < total,
       data: courses.map((course) => toCourseListSummary(course, req.user)),
     });
   } catch (err) {

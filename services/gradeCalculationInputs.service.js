@@ -156,40 +156,83 @@ async function loadGroupSubmissionsForStudent(groupAssignments, studentId) {
 }
 
 /**
- * Build allAssignments, grades map, and submissionMap for one student.
- * @param {'instructor'|'student'} audience — student applies grade-release + discussion visibility
- * @param {{ resolved?: object }} [options]
+ * Batch group submissions for many students (2–3 queries total vs 2×N).
+ * Returns Map<studentId, Submission[]>.
  */
-async function buildStudentGradeInputs(course, studentId, assignments, audience = 'instructor', options = {}) {
+async function loadGroupSubmissionsForStudents(groupAssignments, studentIds) {
+  const result = new Map(studentIds.map((id) => [normalizeStudentId(id), []]));
+  if (!groupAssignments.length || !studentIds.length) return result;
+
+  const groupSetIds = [
+    ...new Set(groupAssignments.map((a) => a.groupSet).filter(Boolean).map(String)),
+  ].map((id) => new mongoose.Types.ObjectId(id));
+  const studentOids = studentIds
+    .map((id) => normalizeStudentId(id))
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+
+  const groups = await Group.find({
+    groupSet: { $in: groupSetIds },
+    members: { $in: studentOids },
+  })
+    .select('_id groupSet members')
+    .lean();
+
+  if (!groups.length) return result;
+
+  const groupIds = groups.map((g) => g._id);
+  const groupAssignmentIds = groupAssignments.map((a) => a._id);
+  const groupSubs = await Submission.find({
+    assignment: { $in: groupAssignmentIds },
+    group: { $in: groupIds },
+  }).lean();
+
+  const subByAssignmentGroup = new Map(
+    groupSubs.map((s) => [`${String(s.assignment)}:${String(s.group)}`, s])
+  );
+
+  for (const group of groups) {
+    const memberIds = (group.members || []).map((m) => normalizeStudentId(m));
+    for (const groupAssignment of groupAssignments) {
+      if (String(groupAssignment.groupSet) !== String(group.groupSet)) continue;
+      const submission = subByAssignmentGroup.get(
+        `${String(groupAssignment._id)}:${String(group._id)}`
+      );
+      if (!submission) continue;
+      for (const sid of memberIds) {
+        if (!result.has(sid)) continue;
+        result.get(sid).push(submission);
+      }
+    }
+  }
+
+  return result;
+}
+
+function materializeStudentGradeInputs({
+  assignments,
+  studentId,
+  audience,
+  regularSubmissions,
+  groupSubmissions,
+  repliedThreadIds,
+  firstReplyAtByThread,
+  resolved,
+}) {
   const includeMutedInTotals =
-    options.resolved?.gradeVisibility?.mutedAssignmentsInTotals === 'include';
+    resolved?.gradeVisibility?.mutedAssignmentsInTotals === 'include';
   const effectiveAudience =
     includeMutedInTotals && audience === 'student' ? 'instructor' : audience;
   const sid = normalizeStudentId(studentId);
+
   const regularAssignments = assignments.filter((a) => !a.isDiscussion && !a.isGroupAssignment);
   const groupAssignments = assignments.filter((a) => a.isGroupAssignment);
   const discussions = assignments.filter((a) => a.isDiscussion);
-
-  const assignmentIds = regularAssignments.map((a) => a._id);
-  const regularSubmissions = assignmentIds.length
-    ? await Submission.find({
-        assignment: { $in: assignmentIds },
-        student: studentId,
-      }).lean()
-    : [];
-
-  const groupSubmissions = await loadGroupSubmissionsForStudent(groupAssignments, studentId);
 
   const submissionMap = {};
   for (const sub of [...regularSubmissions, ...groupSubmissions]) {
     submissionMap[String(sub.assignment)] = sub;
   }
-
-  const threadIds = discussions.map((d) => d._id);
-  const [repliedThreadIds, firstReplyAtByThread] = await Promise.all([
-    discussionReplyService.batchThreadIdsRepliedByUser(threadIds, studentId),
-    discussionReplyService.batchFirstReplyCreatedAtByUser(threadIds, studentId),
-  ]);
 
   const discussionItems = discussions.map((thread) => {
     const gradeRow =
@@ -264,6 +307,109 @@ async function buildStudentGradeInputs(course, studentId, assignments, audience 
   return { allAssignments, grades, submissionMap };
 }
 
+/**
+ * Build grade inputs for many students with shared DB loads (gradebook page / class average).
+ * Returns Map<studentId, { allAssignments, grades, submissionMap }>.
+ */
+async function buildStudentGradeInputsForStudents(
+  course,
+  studentIds,
+  assignments,
+  audience = 'instructor',
+  options = {}
+) {
+  const sids = [...new Set((studentIds || []).map(normalizeStudentId).filter(Boolean))];
+  const out = new Map();
+  if (!sids.length) return out;
+
+  const regularAssignments = assignments.filter((a) => !a.isDiscussion && !a.isGroupAssignment);
+  const groupAssignments = assignments.filter((a) => a.isGroupAssignment);
+  const discussions = assignments.filter((a) => a.isDiscussion);
+  const assignmentIds = regularAssignments.map((a) => a._id);
+  const threadIds = discussions.map((d) => d._id);
+
+  const studentOids = sids
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+
+  const [regularSubs, groupSubsByStudent, repliedByStudent, firstReplyByStudent] =
+    await Promise.all([
+      assignmentIds.length && studentOids.length
+        ? Submission.find({
+            assignment: { $in: assignmentIds },
+            student: { $in: studentOids },
+          }).lean()
+        : [],
+      loadGroupSubmissionsForStudents(groupAssignments, sids),
+      discussionReplyService.batchStudentDiscussionParticipation(sids, threadIds),
+      discussionReplyService.batchFirstReplyCreatedAtForStudents(sids, threadIds),
+    ]);
+
+  const regularByStudent = new Map(sids.map((id) => [id, []]));
+  for (const sub of regularSubs) {
+    const sid = normalizeStudentId(sub.student);
+    if (!regularByStudent.has(sid)) regularByStudent.set(sid, []);
+    regularByStudent.get(sid).push(sub);
+  }
+
+  for (const sid of sids) {
+    out.set(
+      sid,
+      materializeStudentGradeInputs({
+        assignments,
+        studentId: sid,
+        audience,
+        regularSubmissions: regularByStudent.get(sid) || [],
+        groupSubmissions: groupSubsByStudent.get(sid) || [],
+        repliedThreadIds: repliedByStudent.get(sid) || new Set(),
+        firstReplyAtByThread: firstReplyByStudent.get(sid) || new Map(),
+        resolved: options.resolved,
+      })
+    );
+  }
+
+  return out;
+}
+
+/**
+ * Build allAssignments, grades map, and submissionMap for one student.
+ * @param {'instructor'|'student'} audience — student applies grade-release + discussion visibility
+ * @param {{ resolved?: object }} [options]
+ */
+async function buildStudentGradeInputs(course, studentId, assignments, audience = 'instructor', options = {}) {
+  const sid = normalizeStudentId(studentId);
+  const regularAssignments = assignments.filter((a) => !a.isDiscussion && !a.isGroupAssignment);
+  const groupAssignments = assignments.filter((a) => a.isGroupAssignment);
+  const discussions = assignments.filter((a) => a.isDiscussion);
+
+  const assignmentIds = regularAssignments.map((a) => a._id);
+  const regularSubmissions = assignmentIds.length
+    ? await Submission.find({
+        assignment: { $in: assignmentIds },
+        student: studentId,
+      }).lean()
+    : [];
+
+  const groupSubmissions = await loadGroupSubmissionsForStudent(groupAssignments, studentId);
+
+  const threadIds = discussions.map((d) => d._id);
+  const [repliedThreadIds, firstReplyAtByThread] = await Promise.all([
+    discussionReplyService.batchThreadIdsRepliedByUser(threadIds, studentId),
+    discussionReplyService.batchFirstReplyCreatedAtByUser(threadIds, studentId),
+  ]);
+
+  return materializeStudentGradeInputs({
+    assignments,
+    studentId: sid,
+    audience,
+    regularSubmissions,
+    groupSubmissions,
+    repliedThreadIds,
+    firstReplyAtByThread,
+    resolved: options.resolved,
+  });
+}
+
 async function computeStudentCurrentGrade(course, studentId, audience = 'student') {
   const { computeStudentCourseGrade } = require('./gradeCalculation.service');
   return computeStudentCourseGrade(course, studentId, { audience });
@@ -272,7 +418,9 @@ async function computeStudentCurrentGrade(course, studentId, audience = 'student
 module.exports = {
   loadCourseGradeAssignments,
   buildStudentGradeInputs,
+  buildStudentGradeInputsForStudents,
   computeStudentCurrentGrade,
   loadGroupSubmissionsForStudent,
+  loadGroupSubmissionsForStudents,
   sortAssignmentsChronologically,
 };

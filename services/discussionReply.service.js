@@ -870,6 +870,64 @@ async function batchFirstReplyCreatedAtByUser(threadIds, userId) {
   return result;
 }
 
+/**
+ * Gradebook-scale first-reply timestamps: Map<studentId, Map<threadId, Date>>.
+ */
+async function batchFirstReplyCreatedAtForStudents(studentIds, threadIds) {
+  const map = new Map();
+  const uniqueStudents = [...new Set(studentIds.map(normalizeId).filter(Boolean))];
+  const uniqueThreads = [...new Set(threadIds.map(normalizeId).filter(Boolean))];
+  for (const sid of uniqueStudents) map.set(sid, new Map());
+  if (!uniqueStudents.length || !uniqueThreads.length) return map;
+
+  const studentOids = uniqueStudents
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+  const threadOids = uniqueThreads
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+  if (!studentOids.length || !threadOids.length) return map;
+
+  const collectionHits = await DiscussionReply.aggregate([
+    {
+      $match: {
+        threadId: { $in: threadOids },
+        authorId: { $in: studentOids },
+        deletedAt: null,
+      },
+    },
+    {
+      $group: {
+        _id: { studentId: '$authorId', threadId: '$threadId' },
+        firstAt: { $min: '$createdAt' },
+      },
+    },
+  ]);
+  for (const row of collectionHits) {
+    const sid = String(row._id.studentId);
+    const tid = String(row._id.threadId);
+    if (row.firstAt) map.get(sid)?.set(tid, new Date(row.firstAt));
+  }
+
+  const threads = await Thread.find({ _id: { $in: threadOids } }).select('replies').lean();
+  for (const thread of threads) {
+    const tid = String(thread._id);
+    for (const reply of thread.replies || []) {
+      if (reply.deletedAt) continue;
+      const sid = normalizeId(reply.author);
+      if (!map.has(sid)) continue;
+      const at = reply.createdAt ? new Date(reply.createdAt) : null;
+      if (!at || Number.isNaN(at.getTime())) continue;
+      const existing = map.get(sid).get(tid);
+      if (!existing || at.getTime() < existing.getTime()) {
+        map.get(sid).set(tid, at);
+      }
+    }
+  }
+
+  return map;
+}
+
 async function batchThreadIdsRepliedByUser(threadIds, userId) {
   const replied = new Set();
   const unique = [...new Set(threadIds.map(normalizeId).filter(Boolean))];
@@ -1010,6 +1068,7 @@ module.exports = {
   hasReplyByUser,
   batchStudentDiscussionParticipation,
   batchFirstReplyCreatedAtByUser,
+  batchFirstReplyCreatedAtForStudents,
   batchThreadIdsRepliedByUser,
   hideReply,
   listChildReplies,

@@ -820,14 +820,16 @@ exports.getStudentSubmissionsForCourse = async (req, res) => {
     const assignments = await Assignment.find({ module: { $in: moduleIds } }).select('_id');
     const assignmentIds = assignments.map(a => a._id);
     
-    // Find all group assignments for the course
-    const groupAssignmentsRaw = await Assignment.find({
-      isGroupAssignment: true,
-      groupSet: { $ne: null }
-    }).populate({ path: 'groupSet', match: { course: req.params.courseId } });
-    // Only keep group assignments for this course
-    const groupAssignments = groupAssignmentsRaw.filter(a => a.groupSet);
-    const groupAssignmentIds = groupAssignments.map(a => a._id);
+    // Scope group assignments to this course (avoid global isGroupAssignment scan).
+    const GroupSet = require('../models/GroupSet');
+    const courseGroupSets = await GroupSet.find({ course: req.params.courseId }).select('_id').lean();
+    const groupAssignments =
+      courseGroupSets.length > 0
+        ? await Assignment.find({
+            isGroupAssignment: true,
+            groupSet: { $in: courseGroupSets.map((g) => g._id) },
+          }).populate('groupSet')
+        : [];
 
     // Find all submissions by this student for regular assignments
     const individualSubmissions = await Submission.find({
@@ -835,25 +837,15 @@ exports.getStudentSubmissionsForCourse = async (req, res) => {
       student: req.user._id
     }).populate('assignment');
 
-    // For group assignments, find the student's group for each groupSet
-    let groupSubmissions = [];
-    for (const groupAssignment of groupAssignments) {
-      // Find the student's group in this groupSet
-      const group = await Group.findOne({
-        groupSet: groupAssignment.groupSet._id,
-        members: req.user._id
-      });
-      if (group) {
-        // Find the submission for this group assignment and group
-        const submission = await Submission.findOne({
-          assignment: groupAssignment._id,
-          group: group._id
-        }).populate('assignment');
-        if (submission) {
-          groupSubmissions.push(submission);
-        }
-      }
-    }
+    // Batch group membership + group submissions (2 queries instead of 2×N).
+    const { loadGroupSubmissionsForStudent } = require('../services/gradeCalculationInputs.service');
+    const groupSubsLean = await loadGroupSubmissionsForStudent(groupAssignments, req.user._id);
+    const groupSubmissions =
+      groupSubsLean.length > 0
+        ? await Submission.find({ _id: { $in: groupSubsLean.map((s) => s._id) } }).populate(
+            'assignment'
+          )
+        : [];
 
     // Combine and return all submissions with student-facing grade release rules applied.
     const allSubmissions = [...individualSubmissions, ...groupSubmissions];

@@ -111,6 +111,7 @@ const fileAssetSchema = new mongoose.Schema(
 );
 
 fileAssetSchema.index({ courseId: 1, createdAt: -1 });
+fileAssetSchema.index({ courseId: 1, isDeleted: 1, _id: -1 });
 fileAssetSchema.index({ uploadedBy: 1, createdAt: -1 });
 fileAssetSchema.index({ category: 1, createdAt: -1 });
 fileAssetSchema.index({ submissionId: 1 });

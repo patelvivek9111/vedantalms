@@ -8,6 +8,22 @@ async function getActiveOverride(courseId, studentId) {
   }).lean();
 }
 
+/** One query for a gradebook page of students. Returns Map<studentId, overrideDoc>. */
+async function getActiveOverridesForStudents(courseId, studentIds) {
+  const map = new Map();
+  const ids = [...new Set((studentIds || []).map((id) => String(id._id || id)).filter(Boolean))];
+  if (!ids.length) return map;
+  const rows = await CourseStudentGradeOverride.find({
+    course: courseId,
+    student: { $in: ids },
+    active: true,
+  }).lean();
+  for (const row of rows) {
+    map.set(String(row.student), row);
+  }
+  return map;
+}
+
 async function setFinalGradeOverride(courseId, studentId, payload, userId) {
   const existing = await CourseStudentGradeOverride.findOne({
     course: courseId,
@@ -45,6 +61,7 @@ async function clearFinalGradeOverride(courseId, studentId) {
 
 module.exports = {
   getActiveOverride,
+  getActiveOverridesForStudents,
   setFinalGradeOverride,
   clearFinalGradeOverride,
 };

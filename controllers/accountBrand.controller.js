@@ -1,5 +1,6 @@
 const AccountBrand = require('../models/accountBrand.model');
 const { rootAccountIdFromRequest } = require('../utils/tenantContext');
+const { optimizeCloudinaryUrl } = require('../utils/cloudinaryUrl');
 
 /** Canvas Theme Editor equivalent: per-institution branding owned by school admins. */
 
@@ -24,12 +25,13 @@ function normalizeColor(value, fallback) {
 }
 
 function serializeBrand(brand) {
+  // Keep stored URLs raw; optimize only on the way out for browser delivery.
   return {
     displayName: brand.displayName || '',
     wordmark: brand.wordmark || '',
-    logoUrl: brand.logoUrl || '',
-    faviconUrl: brand.faviconUrl || '',
-    loginBackgroundUrl: brand.loginBackgroundUrl || '',
+    logoUrl: optimizeCloudinaryUrl(brand.logoUrl || '', { width: 256 }),
+    faviconUrl: optimizeCloudinaryUrl(brand.faviconUrl || '', { width: 64 }),
+    loginBackgroundUrl: optimizeCloudinaryUrl(brand.loginBackgroundUrl || ''),
     loginTagline: brand.loginTagline || '',
     primaryColor: brand.primaryColor || '#4F46E5',
     secondaryColor: brand.secondaryColor || '#7C3AED',

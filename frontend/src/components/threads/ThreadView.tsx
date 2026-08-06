@@ -357,6 +357,11 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
   const [editContent, setEditContent] = useState(reply.content);
   const [editAttachments, setEditAttachments] = useState<NormalizedFile[]>([]);
   const [editRemoveIds, setEditRemoveIds] = useState<string[]>([]);
+  const authorFirstName = reply.author?.firstName || 'Unknown';
+  const authorLastName = reply.author?.lastName || 'User';
+  const authorDisplayName = `${authorFirstName} ${authorLastName}`.trim();
+  const authorInitials = `${authorFirstName.charAt(0)}${authorLastName.charAt(0)}`;
+  const authorProfilePicture = reply.author?.profilePicture;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -441,7 +446,7 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
       }}
       className="mb-4 lg:mb-6"
       role="article"
-      aria-label={`Reply by ${reply.author.firstName} ${reply.author.lastName}, level ${level + 1}`}
+      aria-label={`Reply by ${authorDisplayName}, level ${level + 1}`}
     >
               <div className={`bg-white dark:bg-gray-800 rounded-2xl shadow-sm border overflow-hidden transition-shadow duration-200 hover:shadow-md ${
                 isReplying
@@ -453,12 +458,12 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center space-x-3">
               <div className="relative">
-                {reply.author.profilePicture ? (
+                {authorProfilePicture ? (
                   <img
-                    src={reply.author.profilePicture.startsWith('http')
-                      ? reply.author.profilePicture
-                      : getImageUrl(reply.author.profilePicture)}
-                    alt={`${reply.author.firstName} ${reply.author.lastName}`}
+                    src={authorProfilePicture.startsWith('http')
+                      ? authorProfilePicture
+                      : getImageUrl(authorProfilePicture)}
+                    alt={authorDisplayName}
                     className="w-10 h-10 rounded-full object-cover border-2 border-gray-100 dark:border-gray-700"
                     onError={(e) => {
                       e.currentTarget.style.display = 'none';
@@ -468,16 +473,16 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
                   />
                 ) : null}
                 <div
-                  className={`w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 items-center justify-center text-white text-sm font-bold border-2 border-gray-100 dark:border-gray-700 ${reply.author.profilePicture ? 'hidden' : 'flex'}`}
-                  style={{ display: reply.author.profilePicture ? 'none' : 'flex' }}
+                  className={`w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 items-center justify-center text-white text-sm font-bold border-2 border-gray-100 dark:border-gray-700 ${authorProfilePicture ? 'hidden' : 'flex'}`}
+                  style={{ display: authorProfilePicture ? 'none' : 'flex' }}
                 >
-                  {reply.author.firstName?.charAt(0)}{reply.author.lastName?.charAt(0)}
+                  {authorInitials}
                 </div>
               </div>
               <div>
                 <div className="flex items-center space-x-2">
                   <span className="font-semibold text-gray-900 dark:text-gray-100">
-                    {reply.author.firstName} {reply.author.lastName}
+                    {authorDisplayName}
                   </span>
 
                 </div>
@@ -497,7 +502,7 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
                   onClick={() => setShowMenu(!showMenu)}
                   className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full p-2 transition-colors duration-200 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 dark:hover:bg-gray-700"
                   title="More options"
-                  aria-label={`More options for reply by ${reply.author.firstName} ${reply.author.lastName}`}
+                  aria-label={`More options for reply by ${authorDisplayName}`}
                   aria-expanded={showMenu}
                   aria-haspopup="menu"
                 >
@@ -631,7 +636,7 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
                       onClick={() => onReply(reply._id)}
                       disabled={!canPostDiscussion}
                       className="inline-flex min-h-[44px] items-center gap-2 rounded-lg px-2 text-sm font-medium text-indigo-600 transition-colors hover:text-indigo-700 disabled:opacity-50 dark:text-indigo-400 dark:hover:text-indigo-300"
-                      aria-label={`Reply to ${reply.author.firstName} ${reply.author.lastName}`}
+                      aria-label={`Reply to ${authorDisplayName}`}
                     >
                       <Reply className="h-4 w-4 shrink-0" aria-hidden="true" />
                       <span>Reply</span>
@@ -652,7 +657,7 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
                         type="button"
                         onClick={() => onLike(reply._id)}
                         className="inline-flex min-h-[44px] items-center gap-2 rounded-lg px-2 text-sm font-medium text-slate-600 transition-colors hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400"
-                        aria-label={`Like reply by ${reply.author.firstName} ${reply.author.lastName}; ${likeCount} likes`}
+                        aria-label={`Like reply by ${authorDisplayName}; ${likeCount} likes`}
                         aria-pressed={likedByCurrentUser}
                       >
                         <Heart
@@ -689,7 +694,7 @@ const ReplyComponent: React.FC<ReplyComponentProps> = ({
           <div className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50/90 p-3 dark:border-slate-700 dark:bg-slate-800/50 sm:p-4">
             <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
               <Reply className="h-4 w-4 shrink-0" />
-              <span>Reply to {reply.author.firstName}</span>
+              <span>Reply to {authorFirstName}</span>
             </h4>
             <DiscussionReplyComposer
               content={replyContent}
@@ -947,7 +952,11 @@ const ThreadView: React.FC = () => {
         if (courseRes.data.success) {
           const courseData = courseRes.data.data;
           const studentsData = courseData.students;
-          setStudents(Array.isArray(studentsData) ? studentsData : []);
+          setStudents(
+            Array.isArray(studentsData)
+              ? studentsData.filter((s: { _id?: string } | null) => s && s._id)
+              : []
+          );
           setCourseArchived(courseData.operationalStatus === 'archived');
         }
         
@@ -1543,7 +1552,9 @@ const ThreadView: React.FC = () => {
 
   // Check if the user has already replied to the main post
   const hasUserMainReply = replies.some(
-    (reply) => !normalizeReplyParentId(reply.parentReply) && reply.author._id === user?._id
+    (reply) =>
+      !normalizeReplyParentId(reply.parentReply) &&
+      normalizeMongoIdRef(reply.author?._id) === normalizeMongoIdRef(user?._id)
   );
   const discussionStatus = resolveDiscussionStatus(thread);
   const unreadCount = thread.unreadCount ?? thread.currentUserParticipation?.unreadCount ?? 0;

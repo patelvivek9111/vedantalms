@@ -43,7 +43,11 @@ describe('notificationRead.service', () => {
     mockCountDocuments.mockResolvedValue(3);
     mockFind.mockReturnValue({
       select: () => ({
-        lean: () => Promise.resolve([]),
+        sort: () => ({
+          limit: () => ({
+            lean: () => Promise.resolve([]),
+          }),
+        }),
       }),
     });
     mockDeleteMany.mockResolvedValue({ deletedCount: 0 });

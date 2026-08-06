@@ -7,35 +7,12 @@ import { CourseProvider } from './contexts/CourseContext';
 import { ModuleProvider } from './contexts/ModuleContext';
 import { PrivateRoute } from './components/common/PrivateRoute';
 import { Login } from './pages/Login';
-import { Signup } from './pages/Signup';
-import { AcceptInvite } from './pages/AcceptInvite';
-import { PrivacyPolicy } from './pages/PrivacyPolicy';
-import { TermsOfService } from './pages/TermsOfService';
-import { ForgotPassword } from './pages/ForgotPassword';
-import { ResetPassword } from './pages/ResetPassword';
-import { StudentActivation } from './pages/StudentActivation';
 import { Dashboard } from './pages/Dashboard';
-import CourseList from './components/course/CourseList';
-import CourseForm from './components/course/CourseForm';
-import PageView from './components/pages/PageView';
-import PageViewWrapper from './components/pages/PageViewWrapper';
-import AssignmentList from './components/assignments/AssignmentList';
-import CreateAssignmentWrapper from './components/assignments/CreateAssignmentWrapper';
-import AssignmentViewWrapper from './components/assignments/AssignmentViewWrapper';
-import AssignmentDetailsWrapper from './components/assignments/AssignmentDetailsWrapper';
-import AssignmentGradingWrapper from './components/assignments/AssignmentGradingWrapper';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { AppLoadingSkeleton } from './components/common/SkeletonLoader';
-import ThreadView from './components/threads/ThreadView';
-import ThreadViewWrapper from './components/threads/ThreadViewWrapper';
 import { Provider } from 'react-redux';
 import { store } from './store/store';
-import GroupDiscussion from './components/groups/GroupDiscussion';
-import GroupPeopleWrapper from './components/groups/GroupPeopleWrapper';
-import GroupHome from './components/groups/GroupHome';
-import GroupPageView from './components/groups/GroupPageView';
-import GroupMeetings from './components/groups/GroupMeetings';
 import GlobalSidebar from './components/layout/GlobalSidebar';
 import BottomNav from './components/layout/BottomNav';
 import LandingPage from './pages/LandingPage';
@@ -51,6 +28,54 @@ import { useNotificationSocketConnection } from './hooks/notifications/useNotifi
 import { useNotificationCrossTabSync } from './hooks/notifications/useNotificationCrossTabSync';
 import { loginRedirectPath, homePathForRole, isPlatformAdminAllowedPath } from './utils/loginRedirect';
 import { AdminPhoneGate } from './components/admin/AdminPhoneGate';
+
+// Auth side-pages and legal copy — not first-paint critical.
+const Signup = lazyWithRetry(() => import('./pages/Signup').then((m) => ({ default: m.Signup })));
+const AcceptInvite = lazyWithRetry(() =>
+  import('./pages/AcceptInvite').then((m) => ({ default: m.AcceptInvite }))
+);
+const PrivacyPolicy = lazyWithRetry(() =>
+  import('./pages/PrivacyPolicy').then((m) => ({ default: m.PrivacyPolicy }))
+);
+const TermsOfService = lazyWithRetry(() =>
+  import('./pages/TermsOfService').then((m) => ({ default: m.TermsOfService }))
+);
+const ForgotPassword = lazyWithRetry(() =>
+  import('./pages/ForgotPassword').then((m) => ({ default: m.ForgotPassword }))
+);
+const ResetPassword = lazyWithRetry(() =>
+  import('./pages/ResetPassword').then((m) => ({ default: m.ResetPassword }))
+);
+const StudentActivation = lazyWithRetry(() =>
+  import('./pages/StudentActivation').then((m) => ({ default: m.StudentActivation }))
+);
+
+// Course / assignment / thread / group trees — heavy and rarely the first paint.
+const CourseList = lazyWithRetry(() => import('./components/course/CourseList'));
+const CourseForm = lazyWithRetry(() => import('./components/course/CourseForm'));
+const PageView = lazyWithRetry(() => import('./components/pages/PageView'));
+const PageViewWrapper = lazyWithRetry(() => import('./components/pages/PageViewWrapper'));
+const AssignmentList = lazyWithRetry(() => import('./components/assignments/AssignmentList'));
+const CreateAssignmentWrapper = lazyWithRetry(
+  () => import('./components/assignments/CreateAssignmentWrapper')
+);
+const AssignmentViewWrapper = lazyWithRetry(
+  () => import('./components/assignments/AssignmentViewWrapper')
+);
+const AssignmentDetailsWrapper = lazyWithRetry(
+  () => import('./components/assignments/AssignmentDetailsWrapper')
+);
+const AssignmentGradingWrapper = lazyWithRetry(
+  () => import('./components/assignments/AssignmentGradingWrapper')
+);
+const ThreadView = lazyWithRetry(() => import('./components/threads/ThreadView'));
+const ThreadViewWrapper = lazyWithRetry(() => import('./components/threads/ThreadViewWrapper'));
+const GroupDiscussion = lazyWithRetry(() => import('./components/groups/GroupDiscussion'));
+const GroupPeopleWrapper = lazyWithRetry(() => import('./components/groups/GroupPeopleWrapper'));
+const GroupHome = lazyWithRetry(() => import('./components/groups/GroupHome'));
+const GroupPageView = lazyWithRetry(() => import('./components/groups/GroupPageView'));
+const GroupMeetings = lazyWithRetry(() => import('./components/groups/GroupMeetings'));
+
 const AdminDashboard = lazyWithRetry(() => import('./pages/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 const AdminAccountTree = lazyWithRetry(() => import('./pages/AdminAccountTree').then(m => ({ default: m.AdminAccountTree })));
 const AdminPlatformInstitutions = lazyWithRetry(() =>
@@ -272,18 +297,18 @@ function AppContent() {
           {/* Public Routes */}
           <Route path="/" element={isAuthenticated ? <Navigate to={homePathForRole(user?.role)} replace /> : <LandingPage />} />
           <Route path="/login" element={<LoginRoute />} />
-          <Route path="/signup" element={isAuthenticated ? <Navigate to={homePathForRole(user?.role)} replace /> : <Signup />} />
+          <Route path="/signup" element={isAuthenticated ? <Navigate to={homePathForRole(user?.role)} replace /> : withRouteLoader(<Signup />)} />
           <Route
             path="/accept-invite"
-            element={isAuthenticated ? <Navigate to={homePathForRole(user?.role)} replace /> : <AcceptInvite />}
+            element={isAuthenticated ? <Navigate to={homePathForRole(user?.role)} replace /> : withRouteLoader(<AcceptInvite />)}
           />
-          <Route path="/privacy" element={<PrivacyPolicy />} />
-          <Route path="/terms" element={<TermsOfService />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/privacy" element={withRouteLoader(<PrivacyPolicy />)} />
+          <Route path="/terms" element={withRouteLoader(<TermsOfService />)} />
+          <Route path="/forgot-password" element={withRouteLoader(<ForgotPassword />)} />
+          <Route path="/reset-password" element={withRouteLoader(<ResetPassword />)} />
           <Route
             path="/activate"
-            element={isAuthenticated ? <Navigate to={homePathForRole(user?.role)} replace /> : <StudentActivation />}
+            element={isAuthenticated ? <Navigate to={homePathForRole(user?.role)} replace /> : withRouteLoader(<StudentActivation />)}
           />
           <Route path="/unauthorized" element={<Unauthorized />} />
           
@@ -300,7 +325,7 @@ function AppContent() {
             path="/courses"
             element={
               <PrivateRoute>
-                <CourseList />
+                {withRouteLoader(<CourseList />)}
               </PrivateRoute>
             }
           />
@@ -308,7 +333,7 @@ function AppContent() {
             path="/courses/create"
             element={
               <PrivateRoute>
-                <CourseForm mode="create" />
+                {withRouteLoader(<CourseForm mode="create" />)}
               </PrivateRoute>
             }
           />
@@ -341,7 +366,7 @@ function AppContent() {
             path="/courses/:id/edit"
             element={
               <PrivateRoute>
-                <CourseForm mode="edit" />
+                {withRouteLoader(<CourseForm mode="edit" />)}
               </PrivateRoute>
             }
           />
@@ -350,7 +375,7 @@ function AppContent() {
             element={
               <PrivateRoute>
                 <ModuleProvider>
-                  <PageViewWrapper />
+                  {withRouteLoader(<PageViewWrapper />)}
                 </ModuleProvider>
               </PrivateRoute>
             }
@@ -360,7 +385,7 @@ function AppContent() {
             element={
               <PrivateRoute>
                 <ModuleProvider>
-                  <PageView />
+                  {withRouteLoader(<PageView />)}
                 </ModuleProvider>
               </PrivateRoute>
             }
@@ -370,7 +395,7 @@ function AppContent() {
             path="/modules/:moduleId/assignments"
             element={
               <PrivateRoute>
-                <AssignmentListWrapper />
+                {withRouteLoader(<AssignmentListWrapper />)}
               </PrivateRoute>
             }
           />
@@ -378,7 +403,7 @@ function AppContent() {
             path="/modules/:moduleId/assignments/create"
             element={
               <PrivateRoute>
-                <CreateAssignmentFormWrapper />
+                {withRouteLoader(<CreateAssignmentFormWrapper />)}
               </PrivateRoute>
             }
           />
@@ -386,7 +411,7 @@ function AppContent() {
             path="/assignments/:id/view"
             element={
               <PrivateRoute>
-                <AssignmentViewWrapper />
+                {withRouteLoader(<AssignmentViewWrapper />)}
               </PrivateRoute>
             }
           />
@@ -394,7 +419,7 @@ function AppContent() {
             path="/assignments/:id/grade"
             element={
               <PrivateRoute allowedRoles={['teacher', 'admin']}>
-                <AssignmentGradingWrapper />
+                {withRouteLoader(<AssignmentGradingWrapper />)}
               </PrivateRoute>
             }
           />
@@ -410,7 +435,7 @@ function AppContent() {
             path="/assignments/:id"
             element={
               <PrivateRoute>
-                <AssignmentDetailsWrapper />
+                {withRouteLoader(<AssignmentDetailsWrapper />)}
               </PrivateRoute>
             }
           />
@@ -439,7 +464,7 @@ function AppContent() {
             path="/courses/:courseId/threads/:threadId"
             element={
               <PrivateRoute>
-                <ThreadViewWrapper />
+                {withRouteLoader(<ThreadViewWrapper />)}
               </PrivateRoute>
             }
           />
@@ -454,17 +479,17 @@ function AppContent() {
             </PrivateRoute>
           } />
           <Route path="/groups/:groupId/*" element={withRouteLoader(<GroupDashboard />)}>
-            <Route path="home" element={<GroupHome />} />
-            <Route path="discussion" element={<GroupDiscussion />} />
-            <Route path="meetings" element={<GroupMeetings />} />
-            <Route path="discussion/:threadId" element={<ThreadView />} />
-            <Route path="people" element={<GroupPeopleWrapper />} />
+            <Route path="home" element={withRouteLoader(<GroupHome />)} />
+            <Route path="discussion" element={withRouteLoader(<GroupDiscussion />)} />
+            <Route path="meetings" element={withRouteLoader(<GroupMeetings />)} />
+            <Route path="discussion/:threadId" element={withRouteLoader(<ThreadView />)} />
+            <Route path="people" element={withRouteLoader(<GroupPeopleWrapper />)} />
             <Route path="pages/:pageId" element={
               <ModuleProvider>
-                <GroupPageView />
+                {withRouteLoader(<GroupPageView />)}
               </ModuleProvider>
             } />
-            <Route index element={<GroupHome />} />
+            <Route index element={withRouteLoader(<GroupHome />)} />
           </Route>
           <Route
             path="/calendar"
@@ -512,7 +537,7 @@ function AppContent() {
             element={
               <PrivateRoute>
                 <ModuleProvider>
-                  <ThreadViewWrapper />
+                  {withRouteLoader(<ThreadViewWrapper />)}
                 </ModuleProvider>
               </PrivateRoute>
             }

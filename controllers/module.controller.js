@@ -53,9 +53,10 @@ exports.getModulesByCourse = async (req, res) => {
       ...(isStudent ? { published: true } : {})
     })
       .sort({ createdAt: 1 })
+      // List view only needs titles — full HTML content is loaded per-page on open.
       .populate({
         path: 'pages',
-        select: 'title content attachments createdAt updatedAt published'
+        select: 'title attachments fileAssets createdAt updatedAt published'
       });
     res.json({ 
       success: true, 

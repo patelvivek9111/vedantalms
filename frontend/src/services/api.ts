@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { API_URL, getBackendOrigin } from '../config';
 import { getMemoryAuthToken } from '../utils/authToken';
+import { optimizeCloudinaryUrl } from '../utils/cloudinaryUrl';
 
 const getBaseURL = () => {
   if (!API_URL || API_URL === '') {
@@ -124,9 +125,15 @@ export const updateOverviewConfig = async (courseId: string, config: {
   return response.data;
 };
 
-export const getImageUrl = (filename: string): string => {
+export const getImageUrl = (
+  filename: string,
+  options?: { width?: number }
+): string => {
   if (!filename) return '';
-  if (filename.startsWith('http')) return filename;
+  if (filename.startsWith('http')) {
+    // Absolute Cloudinary URLs get f_auto/q_auto (and optional width) at delivery time.
+    return optimizeCloudinaryUrl(filename, options);
+  }
 
   const backendBase = (API_URL || getBackendOrigin()).replace(/\/$/, '');
 

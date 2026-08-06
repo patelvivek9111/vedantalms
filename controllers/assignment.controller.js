@@ -354,20 +354,52 @@ exports.getAssignmentMetadataBulk = async (req, res) => {
       .slice(0, 50);
 
     const data = {};
+    for (const id of ids) {
+      data[id] = { totalPoints: null };
+    }
+    if (!ids.length) {
+      return res.json({ success: true, data });
+    }
+
+    const assignments = await Assignment.find({ _id: { $in: ids } })
+      .select(
+        'totalPoints title published module groupSet isGroupAssignment availableFrom lockAt lockAfterDue dueDate locked'
+      )
+      .lean();
+
+    const moduleIds = [
+      ...new Set(assignments.map((a) => (a.module ? String(a.module) : null)).filter(Boolean)),
+    ];
+    const groupSetIds = [
+      ...new Set(assignments.map((a) => (a.groupSet ? String(a.groupSet) : null)).filter(Boolean)),
+    ];
+
+    const [modules, groupSets] = await Promise.all([
+      moduleIds.length
+        ? Module.find({ _id: { $in: moduleIds } }).populate('course').lean()
+        : [],
+      groupSetIds.length
+        ? GroupSet.find({ _id: { $in: groupSetIds } }).populate('course').lean()
+        : [],
+    ]);
+    const moduleById = new Map(modules.map((m) => [String(m._id), m]));
+    const groupSetById = new Map(groupSets.map((g) => [String(g._id), g]));
 
     await Promise.all(
-      ids.map(async (id) => {
+      assignments.map(async (assignment) => {
+        const id = String(assignment._id);
         try {
-          const assignment = await Assignment.findById(id).select(
-            'totalPoints title published module groupSet isGroupAssignment availableFrom'
-          );
-
-          if (!assignment) {
-            data[id] = { totalPoints: null };
+          const moduleDoc = assignment.module ? moduleById.get(String(assignment.module)) : null;
+          const groupSet = assignment.groupSet
+            ? groupSetById.get(String(assignment.groupSet))
+            : null;
+          const course = moduleDoc?.course || groupSet?.course || null;
+          if (!course) {
             return;
           }
-
-          await assignmentAccess.assertStudentCanViewAssignment(req.user, assignment);
+          await assignmentAccess.assertStudentCanViewAssignment(req.user, assignment, {
+            context: { assignment, module: moduleDoc, groupSet, course },
+          });
           data[id] = {
             totalPoints: typeof assignment.totalPoints === 'number' ? assignment.totalPoints : null,
             title: assignment.title || null,
